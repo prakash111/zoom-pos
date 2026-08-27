@@ -1,0 +1,38 @@
+ENVATO / CODECANYON STANDARD ITEM LICENSES
+==========================================
+
+This item is distributed under the terms of the Envato Market Regular and Extended Licenses.
+
+1. REGULAR LICENSE
+------------------
+The Regular License grants you, the purchaser, an ongoing, non-exclusive, worldwide license to make use of the digital work (Item) you have purchased.
+
+You are licensed to use the Item to create one single End Product for yourself or for one client (a "single application"), and the End Product can be distributed for Free.
+
+You CAN:
+- Create one End Product for a client or yourself.
+- Modify or manipulate the Item, or combine the Item with other works.
+- Host the application on a single live domain / subdomain installation.
+
+You CANNOT:
+- Sell the End Product, except to one client (if you are a freelancer / agency creating a bespoke site for a single end-user).
+- Re-distribute the Item source code, as-is or modified, on any marketplace or public forum.
+- Allow end users of the End Product to pay for access or subscription services unless you purchase an Extended License.
+
+
+2. EXTENDED LICENSE
+-------------------
+The Extended License grants you all the permissions of the Regular License, plus the ability to create a single End Product where End Users can be charged (e.g. running a Multi-Tenant SaaS platform where store owners pay subscription fees to use the POS and management software).
+
+You CAN:
+- Create one single End Product (e.g., your SaaS Platform).
+- Charge paying subscribers / tenants / end users on your platform.
+- Customize branding, themes, payment gateways, and features.
+
+You CANNOT:
+- Re-sell or redistribute the item on CodeCanyon or any other marketplace as a template, clone, or source script.
+
+
+For complete legal license terms, please refer to:
+https://codecanyon.net/licenses/standard
+https://envato.com/legal/market-terms/

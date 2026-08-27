@@ -1,0 +1,2057 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
+use App\Models\AuditLog;
+use App\Models\Brand;
+use App\Models\Category;
+use App\Models\Company;
+use App\Models\Customer;
+use App\Models\OrderPayment;
+use App\Models\Plan;
+use App\Models\Product;
+use App\Models\Sale;
+use App\Models\Subscription;
+use App\Models\Supplier;
+use App\Models\TaxRule;
+use App\Models\TenantApiKey;
+use App\Models\Unit;
+use App\Models\User;
+use App\Services\Delivery\MessageQueueService;
+use App\Services\Tenancy\TenantProvisioningService;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+
+class PosSyncApiController extends Controller
+{
+    use ResolvesTenantSyncContext;
+
+    protected function desktopPermissions(User $user): array
+    {
+        return [
+            'pos.create' => $user->hasPermission('pos', 'create'),
+            'products.view' => $user->hasPermission('products', 'view'),
+            'products.create' => $user->hasPermission('products', 'create'),
+            'products.edit' => $user->hasPermission('products', 'edit'),
+            'customers.view' => $user->hasPermission('customers', 'view'),
+            'customers.create' => $user->hasPermission('customers', 'create'),
+            'customers.edit' => $user->hasPermission('customers', 'edit'),
+            'reports.view' => $user->hasPermission('reports', 'view'),
+            'settings.view' => $user->hasPermission('settings', 'view'),
+        ];
+    }
+
+    /**
+     * 1. Public Tenant Login
+     * POST /api/v1/pos/auth/login
+     */
+    public function login(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => ['required', 'string'],
+            'password' => ['required', 'string'],
+            'account_id' => ['nullable', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Please provide email and password.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $identifier = trim($request->input('email'));
+        $password = $request->input('password');
+        $accountId = $request->input('account_id');
+
+        $company = null;
+        if ($accountId) {
+            $company = Company::query()
+                ->where('unique_account_id', $accountId)
+                ->orWhere('slug', $accountId)
+                ->orWhere('id', $accountId)
+                ->first();
+
+            if (! $company) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Company account ID not found.',
+                ], 404);
+            }
+        }
+
+        $userQuery = User::query()->withoutGlobalScope('company')
+            ->where(function ($q) use ($identifier) {
+                $q->where('email', $identifier)->orWhere('login', $identifier);
+            });
+
+        if ($company) {
+            $userQuery->where('company_id', $company->id);
+        }
+
+        $user = $userQuery->first();
+
+        if (! $user || ! Hash::check($password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid email/login or password.',
+            ], 401);
+        }
+
+        $company ??= Company::query()->find($user->company_id);
+
+        if (! $company || $company->isSuspended()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'This tenant account has been suspended. Please contact support.',
+            ], 403);
+        }
+
+        // Generate or fetch active Tenant API Key for POS terminal authentication
+        $apiKey = TenantApiKey::firstOrCreate(
+            [
+                'company_id' => $company->id,
+                'user_id' => $user->id,
+                'name' => 'Desktop POS Client (' . ($user->name ?: 'Terminal') . ')',
+                'active' => true,
+            ],
+            [
+                'token' => 'zk_live_' . Str::random(40),
+                'permissions' => ['*'],
+            ]
+        );
+
+        $subscription = Subscription::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', 'active')
+            ->latest('started_at')
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'token' => $apiKey->token,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'login' => $user->login,
+                'email' => $user->email,
+                'role' => $user->role,
+                'company_id' => $user->company_id,
+                'permissions' => $this->desktopPermissions($user),
+            ],
+            'company' => [
+                'id' => $company->id,
+                'name' => $company->name,
+                'trade_name' => $company->trade_name ?? $company->name,
+                'slug' => $company->slug,
+                'currency' => $company->currency ?? 'USD',
+                'currency_symbol' => $company->currency_symbol ?? '$',
+                'tax_number' => $company->document ?? $company->tax_id ?? '',
+                'address' => $company->address ?? '',
+                'phone' => $company->phone ?? '',
+                'plan_name' => $company->plan_name ?? 'trial',
+                'expires_at' => $company->expires_at?->toIso8601String(),
+            ],
+            // Only present when the tenant is actually on a plan — lets a fresh
+            // desktop device provision a local mirror of both rows (companies.plan_name
+            // is a foreign key) without a second round trip. See DesktopAuthBootstrapService.
+            'plan' => $company->plan ? $company->plan->only([
+                'name', 'display_name', 'billing_cycle', 'duration_days', 'price', 'currency', 'features', 'limits', 'active',
+            ]) : null,
+            'subscription' => [
+                'plan_name' => $subscription?->plan_name ?? $company->plan_name ?? 'trial',
+                'status' => $subscription?->status ?? ($company->isExpired() ? 'expired' : 'active'),
+                'expires_at' => $company->expires_at?->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * 2. Public Tenant Registration
+     * POST /api/v1/pos/auth/register
+     */
+    public function register(Request $request, TenantProvisioningService $provisioner): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'store_name' => ['required', 'string', 'max:150'],
+            'name' => ['required', 'string', 'max:150'],
+            'email' => ['required', 'email', 'max:150', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:6'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'currency' => ['nullable', 'string', 'max:10'],
+            'pos_mode' => ['nullable', 'string'],
+            'activation_code' => ['nullable', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error during tenant registration.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            $regData = [
+                'store_name' => $request->input('store_name'),
+                'owner_name' => $request->input('name'),
+                'admin_name' => $request->input('name'),
+                'email' => $request->input('email'),
+                'admin_email' => $request->input('email'),
+                'password' => $request->input('password'),
+                'admin_password' => $request->input('password'),
+                'phone' => $request->input('phone'),
+                'currency' => $request->input('currency', 'USD'),
+                'pos_mode' => $request->input('pos_mode', 'general'),
+                'activation_code' => $request->input('activation_code'),
+            ];
+
+            $result = $provisioner->registerTenant($regData);
+            $company = $result['company'];
+            $user = $result['user'];
+
+            $apiKey = TenantApiKey::create([
+                'company_id' => $company->id,
+                'user_id' => $user->id,
+                'name' => 'Desktop POS Client (' . $user->name . ')',
+                'token' => 'zk_live_' . Str::random(40),
+                'permissions' => ['*'],
+                'active' => true,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Tenant registered and provisioned successfully.',
+                'token' => $apiKey->token,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'company_id' => $user->company_id,
+                    'permissions' => $this->desktopPermissions($user),
+                ],
+                'company' => [
+                    'id' => $company->id,
+                    'name' => $company->name,
+                    'slug' => $company->slug,
+                    'currency' => $company->currency ?? 'USD',
+                    'currency_symbol' => $company->currency_symbol ?? '$',
+                    'plan_name' => $company->plan_name ?? 'trial',
+                    'expires_at' => $company->expires_at?->toIso8601String(),
+                ],
+                'subscription' => [
+                    'plan_name' => $company->plan_name,
+                    'status' => 'active',
+                    'expires_at' => $company->expires_at?->toIso8601String(),
+                ],
+            ], 201);
+        } catch (\Throwable $e) {
+            Log::error('POS Tenant Registration Failed: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json([
+                'success' => false,
+                'error' => 'Registration failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * 3. Session Info
+     * GET /api/v1/pos/auth/session
+     */
+    public function session(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        return response()->json([
+            'success' => true,
+            'user' => $user ? [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'company_id' => $user->company_id,
+                'permissions' => $this->desktopPermissions($user),
+            ] : null,
+            'company' => [
+                'id' => $company->id,
+                'name' => $company->name,
+                'trade_name' => $company->trade_name ?? $company->name,
+                'slug' => $company->slug,
+                'currency' => $company->currency ?? 'USD',
+                'currency_symbol' => $company->currency_symbol ?? '$',
+                'tax_number' => $company->document ?? $company->tax_id ?? '',
+                'address' => $company->address ?? '',
+                'phone' => $company->phone ?? '',
+                'plan_name' => $company->plan_name ?? 'trial',
+                'expires_at' => $company->expires_at?->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /** Mint a short-lived, one-use bridge into the session-based web UI. */
+    public function desktopWebSession(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = Auth::user();
+
+        if (! $user || $user->company_id !== $company->id) {
+            return response()->json([
+                'success' => false,
+                'error' => 'This desktop credential is not bound to a user. Please sign in again.',
+            ], 403);
+        }
+
+        $destination = (string) $request->input('destination', '/tenant');
+        if (! str_starts_with($destination, '/tenant') || str_starts_with($destination, '//')) {
+            $destination = '/tenant';
+        }
+
+        $bridge = Str::random(80);
+        Cache::put('desktop-web-session:'.hash('sha256', $bridge), [
+            'user_id' => $user->id,
+            'company_id' => $company->id,
+            'destination' => $destination,
+        ], now()->addMinutes(2));
+
+        return response()->json([
+            'success' => true,
+            'url' => url('/desktop/session/'.$bridge),
+        ]);
+    }
+
+    /**
+     * 4. Handshake and verify terminal connectivity and settings.
+     * GET /api/v1/pos/status
+     */
+    public function status(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        return response()->json([
+            'success' => true,
+            'status' => 'online',
+            'server_time' => now()->toIso8601String(),
+            'company' => [
+                'id' => $company->id,
+                'name' => $company->name,
+                'trade_name' => $company->trade_name ?? $company->name,
+                'currency' => $company->currency ?? 'USD',
+                'currency_symbol' => $company->currency_symbol ?? '$',
+                'tax_number' => $company->document ?? $company->tax_id ?? '',
+                'address' => $company->address ?? '',
+                'city' => $company->city ?? '',
+                'state' => $company->state ?? '',
+                'phone' => $company->phone ?? '',
+                'receipt_footer_note' => $company->receipt_footer_note ?? 'Thank you for your business!',
+            ],
+            'features' => [
+                'offline_sync' => true,
+                'thermal_printing' => true,
+                'barcode_scanner' => true,
+                'inventory_management' => true,
+                'customer_ledger' => true,
+                'analytics' => true,
+                'subscription_management' => true,
+                'version' => '1.0.0',
+            ],
+        ]);
+    }
+
+    /**
+     * 5. Inbound Catalog Pull (Delta synchronization since a given timestamp).
+     * GET /api/v1/pos/sync-catalog
+     * GET /api/v1/pos/sync-pull
+     */
+    public function syncPull(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $since = $request->query('since');
+
+        $sinceCarbon = null;
+        if (! empty($since)) {
+            try {
+                $sinceCarbon = Carbon::parse($since);
+            } catch (\Throwable) {
+                $sinceCarbon = null;
+            }
+        }
+
+        // 1. Fetch Products Delta
+        $productsQuery = Product::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id);
+
+        if ($sinceCarbon) {
+            $productsQuery->where('updated_at', '>=', $sinceCarbon);
+        }
+
+        $products = $productsQuery->get()->map(function (Product $p) {
+            return [
+                'id' => (string) ($p->external_id ?: $p->id),
+                'server_id' => $p->id,
+                'name' => $p->name,
+                'barcode' => $p->barcode ?: $p->code ?: '',
+                'sku' => $p->sku ?: '',
+                'price' => (float) ($p->sale_price ?? 0),
+                'cost_price' => (float) ($p->cost_price ?? 0),
+                'stock' => (float) ($p->current_stock ?? 0),
+                'min_stock' => (float) ($p->minimum_stock ?? 0),
+                'unit' => $p->unit ?? 'pcs',
+                'category_id' => $p->category_id ? (string) $p->category_id : null,
+                'category_name' => $p->category_name ?? $p->category?->name ?? 'General',
+                'category' => $p->category_name ?? $p->category?->name ?? 'General',
+                'brand_name' => $p->brand_name ?? $p->brand?->name ?? '',
+                'image_url' => $p->getImageUrlOrDefault(),
+                'tax_rate' => (float) ($p->tax_rate ?? 0),
+                'active' => (bool) $p->active,
+                'updated_at' => $p->updated_at?->toIso8601String() ?? now()->toIso8601String(),
+            ];
+        });
+
+        // 2. Fetch Categories Delta
+        $categoriesQuery = Category::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id);
+
+        if ($sinceCarbon) {
+            $categoriesQuery->where('updated_at', '>=', $sinceCarbon);
+        }
+
+        $categories = $categoriesQuery->get()->map(function (Category $c) {
+            return [
+                'id' => (string) ($c->external_id ?: $c->id),
+                'server_id' => $c->id,
+                'name' => $c->name,
+                'color' => $c->color ?? '#3b82f6',
+                'icon' => $c->getIconAttribute(),
+                'active' => (bool) ($c->active ?? true),
+                'updated_at' => $c->updated_at?->toIso8601String() ?? now()->toIso8601String(),
+            ];
+        });
+
+        // 3. Fetch Customers Delta
+        $customersQuery = Customer::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id);
+
+        if ($sinceCarbon) {
+            $customersQuery->where('updated_at', '>=', $sinceCarbon);
+        }
+
+        $customers = $customersQuery->get()->map(function (Customer $cust) {
+            return [
+                'id' => (string) ($cust->external_id ?: $cust->id),
+                'server_id' => $cust->id,
+                'name' => $cust->name,
+                'phone' => $cust->phone ?? '',
+                'email' => $cust->email ?? '',
+                'document' => $cust->document ?? $cust->tax_id ?? '',
+                'balance_due' => $cust->total_due,
+                'loyalty_points' => (int) ($cust->loyalty_points ?? 0),
+                'updated_at' => $cust->updated_at?->toIso8601String() ?? now()->toIso8601String(),
+            ];
+        });
+
+        // 4. Fetch Quotations Delta
+        $quotationsQuery = Sale::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('operation_type', 'quotation');
+
+        if ($sinceCarbon) {
+            $quotationsQuery->where('updated_at', '>=', $sinceCarbon);
+        }
+
+        $quotations = $quotationsQuery->latest('created_at')->limit(100)->get()->map(function (Sale $q) {
+            $items = is_array($q->items) ? $q->items : (json_decode($q->items ?? '', true) ?: []);
+            return [
+                'id' => (string) ($q->external_id ?: $q->id),
+                'server_id' => $q->id,
+                'quote_number' => $q->sale_number,
+                'customer_id' => $q->customer_id ? (string) $q->customer_id : null,
+                'customer_name' => $q->customer_name ?: ($q->customer?->name ?? 'Customer'),
+                'customer_phone' => $q->customer?->phone ?? '',
+                'customer_email' => $q->customer?->email ?? '',
+                'items' => $items,
+                'subtotal' => (float) ($q->subtotal ?? $q->total),
+                'tax' => (float) ($q->tax_amount ?? 0),
+                'discount' => (float) ($q->discount ?? 0),
+                'total' => (float) ($q->total ?? 0),
+                'notes' => $q->notes ?? '',
+                'terms' => $q->terms ?? '',
+                'valid_until' => $q->due_date?->toIso8601String() ?? '',
+                'status' => $q->status ?: 'draft',
+                'updated_at' => $q->updated_at?->toIso8601String() ?? now()->toIso8601String(),
+                'createdAt' => $q->created_at?->toIso8601String() ?? now()->toIso8601String(),
+            ];
+        });
+
+        // 5. Fetch Sales Delta (completed sales, not quotations — pushed by the client
+        // via sync-push/sync-batch but never previously pulled back down, so a sale
+        // made on the web never reached the desktop client's local history).
+        $salesQuery = Sale::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(function ($q) {
+                // operation_type is null for regular sales created via the
+                // existing sync-push/sync-batch path (it's only ever set
+                // explicitly to 'quotation') — a plain != excludes nulls in SQL.
+                $q->whereNull('operation_type')->orWhere('operation_type', '!=', 'quotation');
+            });
+
+        if ($sinceCarbon) {
+            $salesQuery->where('updated_at', '>=', $sinceCarbon);
+        }
+
+        $sales = $salesQuery->latest('created_at')->limit(200)->get()->map(function (Sale $s) {
+            $items = is_array($s->items) ? $s->items : (json_decode($s->items ?? '', true) ?: []);
+            return [
+                'id' => (string) ($s->external_id ?: $s->id),
+                'server_id' => $s->id,
+                'sale_number' => $s->sale_number,
+                'customer_id' => $s->customer_id ? (string) $s->customer_id : null,
+                'customer_name' => $s->customer_name,
+                'items' => $items,
+                'total' => (float) ($s->total ?? 0),
+                'net_amount' => (float) ($s->net_amount ?? $s->total ?? 0),
+                'discount' => (float) ($s->discount ?? 0),
+                'tax' => (float) ($s->tax_amount ?? 0),
+                'payment_method' => $s->payment_method,
+                'payment_status' => $s->payment_status,
+                'paid_amount' => (float) ($s->paid_amount ?? 0),
+                'due_amount' => (float) ($s->due_amount ?? 0),
+                'status' => $s->status,
+                'notes' => $s->notes ?? '',
+                'updated_at' => $s->updated_at?->toIso8601String() ?? now()->toIso8601String(),
+                'createdAt' => $s->created_at?->toIso8601String() ?? now()->toIso8601String(),
+            ];
+        });
+
+        // 5b. Fetch Suppliers Delta
+        $suppliersQuery = Supplier::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id);
+
+        if ($sinceCarbon) {
+            $suppliersQuery->where('updated_at', '>=', $sinceCarbon);
+        }
+
+        $suppliers = $suppliersQuery->get()->map(function (Supplier $sup) {
+            return [
+                'id' => (string) ($sup->external_id ?: $sup->id),
+                'server_id' => $sup->id,
+                'name' => $sup->name,
+                'legal_name' => $sup->legal_name,
+                'phone' => $sup->phone ?? '',
+                'email' => $sup->email ?? '',
+                'active' => (bool) ($sup->active ?? true),
+                'updated_at' => $sup->updated_at?->toIso8601String() ?? now()->toIso8601String(),
+            ];
+        });
+
+        // 5c. Fetch Brands & Units Delta (small, low-churn — always sent in full)
+        $brands = Brand::query()->withoutGlobalScope('company')->where('company_id', $company->id)
+            ->get()->map(fn (Brand $b) => [
+                'id' => (string) ($b->external_id ?: $b->id),
+                'server_id' => $b->id,
+                'name' => $b->name,
+                'active' => (bool) ($b->active ?? true),
+                'updated_at' => $b->updated_at?->toIso8601String() ?? now()->toIso8601String(),
+            ]);
+
+        $units = Unit::query()->withoutGlobalScope('company')->where('company_id', $company->id)
+            ->get()->map(fn (Unit $u) => [
+                'id' => (string) ($u->external_id ?: $u->id),
+                'server_id' => $u->id,
+                'name' => $u->name,
+                'abbreviation' => $u->abbreviation,
+                'updated_at' => $u->updated_at?->toIso8601String() ?? now()->toIso8601String(),
+            ]);
+
+        // 6. Fetch Taxes Delta
+        $taxesQuery = TaxRule::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id);
+
+        if ($sinceCarbon) {
+            $taxesQuery->where('updated_at', '>=', $sinceCarbon);
+        }
+
+        $taxes = $taxesQuery->get()->map(function (TaxRule $t) {
+            return [
+                'id' => (string) $t->id,
+                'name' => $t->tax_name,
+                'rate' => (float) $t->rate,
+                'is_default' => (bool) $t->is_default,
+                'active' => (bool) $t->active,
+                'type' => $t->type ?? 'percentage',
+                'calc_type' => $t->calc_type ?? 'exclusive',
+                'updated_at' => $t->updated_at?->toIso8601String() ?? now()->toIso8601String(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'server_time' => now()->toIso8601String(),
+            'counts' => [
+                'products' => $products->count(),
+                'categories' => $categories->count(),
+                'customers' => $customers->count(),
+                'quotations' => $quotations->count(),
+                'sales' => $sales->count(),
+                'suppliers' => $suppliers->count(),
+                'brands' => $brands->count(),
+                'units' => $units->count(),
+                'taxes' => $taxes->count(),
+            ],
+            'products' => $products,
+            'categories' => $categories,
+            'customers' => $customers,
+            'quotations' => $quotations,
+            'sales' => $sales,
+            'suppliers' => $suppliers,
+            'brands' => $brands,
+            'units' => $units,
+            'taxes' => $taxes,
+        ]);
+    }
+
+    /**
+     * 6. Outbound Sales Push (Batch ingestion of offline-recorded sales).
+     * POST /api/v1/pos/sync-sales
+     * POST /api/v1/pos/sync-push
+     */
+    public function syncPush(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'sales' => ['required', 'array', 'min:1'],
+            'sales.*.id' => ['required', 'string'],
+            'sales.*.total' => ['required', 'numeric', 'min:0'],
+            'sales.*.payment_method' => ['nullable', 'string'],
+            'sales.*.items' => ['required', 'array', 'min:1'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error in sales sync payload.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $salesPayload = $request->input('sales', []);
+        $syncedIds = $this->processSalesBatch($salesPayload, $company, $user);
+
+        return response()->json([
+            'success' => true,
+            'message' => sprintf('Successfully synchronized %d sale(s).', count($syncedIds)),
+            'synced_ids' => $syncedIds,
+            'server_time' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * Last-write-wins guard for a pushed field edit: apply it unless the
+     * payload carries an updated_at that is not newer than the server row's
+     * — a client with no updated_at (or one already applied) always applies,
+     * matching prior behavior for rows synced before this field existed.
+     */
+    protected function clientRowIsNewer(Model $existing, array $payload): bool
+    {
+        if (empty($payload['updated_at'])) {
+            return true;
+        }
+
+        try {
+            return Carbon::parse($payload['updated_at'])->greaterThan($existing->updated_at ?? Carbon::createFromTimestamp(0));
+        } catch (\Throwable) {
+            return true;
+        }
+    }
+
+    /**
+     * Helper to process sales batch transactionally
+     */
+    protected function processSalesBatch(array $salesPayload, Company $company, ?User $user): array
+    {
+        $syncedIds = [];
+
+        DB::transaction(function () use ($salesPayload, $company, $user, &$syncedIds) {
+            foreach ($salesPayload as $saleData) {
+                $clientUuid = (string) ($saleData['id'] ?? $saleData['client_uuid'] ?? Str::uuid()->toString());
+
+                // Idempotency: skip if already ingested
+                $existingSale = Sale::query()
+                    ->withoutGlobalScope('company')
+                    ->where('company_id', $company->id)
+                    ->where('external_id', $clientUuid)
+                    ->first();
+
+                if ($existingSale) {
+                    $syncedIds[] = $clientUuid;
+                    continue;
+                }
+
+                $items = (array) ($saleData['items'] ?? []);
+                $normalizedItems = [];
+                $calcSubtotal = 0;
+
+                foreach ($items as $item) {
+                    $qty = (float) ($item['quantity'] ?? $item['qty'] ?? 1);
+                    $price = (float) ($item['price'] ?? $item['unit_price'] ?? 0);
+                    $productId = $item['id'] ?? $item['product_id'] ?? null;
+                    $name = $item['name'] ?? $item['product_name'] ?? 'Product';
+                    $lineTotal = round($qty * $price, 2);
+                    $calcSubtotal += $lineTotal;
+
+                    $normalizedItems[] = [
+                        'id' => $productId,
+                        'product_id' => $productId,
+                        'name' => $name,
+                        'price' => $price,
+                        'quantity' => $qty,
+                        'subtotal' => $lineTotal,
+                        'total' => $lineTotal,
+                    ];
+
+                    // Decrement Stock in Cloud Database
+                    if ($productId) {
+                        $product = Product::query()
+                            ->withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->where(function ($q) use ($productId) {
+                                $q->where('id', $productId)
+                                  ->orWhere('external_id', (string) $productId);
+                            })
+                            ->first();
+
+                        if ($product) {
+                            $product->decrementStock($qty, "POS Offline Sync Sale #{$clientUuid}");
+                        }
+                    }
+                }
+
+                $total = (float) ($saleData['total'] ?? $calcSubtotal);
+                $discount = (float) ($saleData['discount'] ?? 0);
+                $paymentMethod = $saleData['payment_method'] ?? 'cash';
+                $orderNumber = $saleData['order_number'] ?? $saleData['sale_number'] ?? ('POS-' . strtoupper(substr($clientUuid, 0, 8)));
+                $createdAt = isset($saleData['createdAt']) ? Carbon::parse($saleData['createdAt']) : now();
+
+                // Associate Customer if passed
+                $customerId = null;
+                $customerName = $saleData['customer_name'] ?? null;
+                if (! empty($saleData['customer_id'])) {
+                    $cust = Customer::query()
+                        ->withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where(function ($q) use ($saleData) {
+                            $q->where('id', $saleData['customer_id'])
+                              ->orWhere('external_id', (string) $saleData['customer_id']);
+                        })
+                        ->first();
+
+                    if ($cust) {
+                        $customerId = $cust->id;
+                        $customerName = $cust->name;
+                        // Accrue loyalty points (1 point per 10 units spent)
+                        $earnedPoints = (int) floor($total / 10);
+                        if ($earnedPoints > 0) {
+                            $cust->increment('loyalty_points', $earnedPoints);
+                        }
+                    }
+                }
+
+                // If payment method is credit/khata, record as due_amount
+                $isCredit = strtolower($paymentMethod) === 'credit' || strtolower($paymentMethod) === 'khata';
+                $paidAmount = $isCredit ? 0 : $total;
+                $dueAmount = $isCredit ? $total : 0;
+                $paymentStatus = $isCredit ? 'pending' : 'paid';
+
+                Sale::create([
+                    'company_id' => $company->id,
+                    'external_id' => $clientUuid,
+                    'sale_number' => $orderNumber,
+                    'user_id' => $user?->id,
+                    'customer_id' => $customerId,
+                    'customer_name' => $customerName,
+                    'total' => $total,
+                    'net_amount' => max(0, $total - $discount),
+                    'discount' => $discount,
+                    'payment_method' => $paymentMethod,
+                    'status' => 'completed',
+                    'payment_status' => $paymentStatus,
+                    'paid_amount' => $paidAmount,
+                    'due_amount' => $dueAmount,
+                    'items' => $normalizedItems,
+                    'created_at' => $createdAt,
+                    'updated_at' => now(),
+                ]);
+
+                $syncedIds[] = $clientUuid;
+            }
+        });
+
+        return $syncedIds;
+    }
+
+    /**
+     * 7. Full Combined Batch Sync
+     * POST /api/v1/pos/sync-batch
+     */
+    public function syncBatch(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $syncedSales = [];
+        $syncedAdjustments = [];
+        $syncedPayments = [];
+        $syncedProducts = [];
+        $syncedCustomers = [];
+        $syncedQuotations = [];
+
+        DB::beginTransaction();
+        try {
+            // 1. Process Offline Created Products
+            if ($request->has('created_products') && is_array($request->input('created_products'))) {
+                foreach ($request->input('created_products') as $prodData) {
+                    $extId = (string) ($prodData['id'] ?? Str::uuid()->toString());
+                    $p = Product::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where('external_id', $extId)
+                        ->first();
+                    if (! $p && ! empty($prodData['barcode'])) {
+                        $p = Product::withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->where('barcode', $prodData['barcode'])
+                            ->first();
+                    }
+
+                    // Descriptive/pricing fields only — current_stock is deliberately
+                    // excluded here and can only change via decrementStock()/inventory
+                    // adjustments, never a blind overwrite from a possibly-stale offline
+                    // snapshot (concurrent online sales may have moved stock meanwhile).
+                    $attrs = [
+                        'name' => $prodData['name'] ?? 'New Product',
+                        'barcode' => $prodData['barcode'] ?? null,
+                        'sku' => $prodData['sku'] ?? null,
+                        'sale_price' => (float) ($prodData['price'] ?? $prodData['sale_price'] ?? 0),
+                        'cost_price' => (float) ($prodData['cost_price'] ?? 0),
+                        'minimum_stock' => (float) ($prodData['min_stock'] ?? 0),
+                        'unit' => $prodData['unit'] ?? 'pcs',
+                        'category_name' => $prodData['category_name'] ?? 'General',
+                        'tax_rate' => (float) ($prodData['tax_rate'] ?? 0),
+                    ];
+
+                    if (! $p) {
+                        $p = Product::create($attrs + [
+                            'company_id' => $company->id,
+                            'external_id' => $extId,
+                            'current_stock' => (float) ($prodData['stock'] ?? $prodData['current_stock'] ?? 0),
+                            'active' => true,
+                        ]);
+                    } elseif ($this->clientRowIsNewer($p, $prodData)) {
+                        // A field edit made offline (e.g. name/price change) — apply it
+                        // unless the server has a strictly newer edit for the same row.
+                        $p->update($attrs);
+                    }
+                    $syncedProducts[] = $extId;
+                }
+            }
+
+            // 2. Process Offline Created Customers
+            if ($request->has('created_customers') && is_array($request->input('created_customers'))) {
+                foreach ($request->input('created_customers') as $custData) {
+                    $extId = (string) ($custData['id'] ?? Str::uuid()->toString());
+                    $c = Customer::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where('external_id', $extId)
+                        ->first();
+                    if (! $c && ! empty($custData['phone'])) {
+                        $c = Customer::withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->where('phone', $custData['phone'])
+                            ->first();
+                    }
+
+                    // loyalty_points is deliberately excluded from the update path — it
+                    // only ever changes via increment() from an actual sale, never a
+                    // blind overwrite from a possibly-stale offline snapshot.
+                    $attrs = [
+                        'name' => $custData['name'] ?? 'Customer',
+                        'phone' => $custData['phone'] ?? null,
+                        'email' => $custData['email'] ?? null,
+                        'document' => $custData['document'] ?? null,
+                    ];
+
+                    if (! $c) {
+                        $c = Customer::create($attrs + [
+                            'company_id' => $company->id,
+                            'external_id' => $extId,
+                            'loyalty_points' => (int) ($custData['loyalty_points'] ?? 0),
+                        ]);
+                    } elseif ($this->clientRowIsNewer($c, $custData)) {
+                        $c->update($attrs);
+                    }
+                    $syncedCustomers[] = $extId;
+                }
+            }
+
+            // 3. Process Sales
+            if ($request->has('sales') && is_array($request->input('sales')) && count($request->input('sales')) > 0) {
+                $syncedSales = $this->processSalesBatch($request->input('sales'), $company, $user);
+            }
+
+            // 4. Process Inventory Adjustments
+            if ($request->has('inventory_adjustments') && is_array($request->input('inventory_adjustments'))) {
+                foreach ($request->input('inventory_adjustments') as $adj) {
+                    $adjId = (string) ($adj['id'] ?? Str::uuid()->toString());
+                    $isNewOperation = DB::table('desktop_sync_receipts')->insertOrIgnore([
+                        'company_id' => $company->id,
+                        'operation_type' => 'inventory_adjustment',
+                        'external_id' => $adjId,
+                        'created_at' => now(),
+                    ]) === 1;
+                    if (! $isNewOperation) {
+                        $syncedAdjustments[] = $adjId;
+                        continue;
+                    }
+                    $prodId = $adj['product_id'] ?? null;
+                    $type = $adj['type'] ?? 'add';
+                    $qty = (float) ($adj['quantity'] ?? $adj['qty'] ?? 0);
+
+                    if ($prodId) {
+                        $prod = Product::withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->where(fn($q) => $q->where('id', $prodId)->orWhere('external_id', (string) $prodId))
+                            ->first();
+
+                        if ($prod) {
+                            if ($type === 'add') {
+                                $prod->increment('current_stock', $qty);
+                            } elseif ($type === 'subtract') {
+                                $prod->decrement('current_stock', $qty);
+                            } elseif ($type === 'set') {
+                                $prod->update(['current_stock' => $qty]);
+                            }
+                        }
+                    }
+                    $syncedAdjustments[] = $adjId;
+                }
+            }
+
+            // 5. Process Customer Ledger Payments
+            if ($request->has('customer_payments') && is_array($request->input('customer_payments'))) {
+                foreach ($request->input('customer_payments') as $pay) {
+                    $payId = (string) ($pay['id'] ?? Str::uuid()->toString());
+                    $isNewOperation = DB::table('desktop_sync_receipts')->insertOrIgnore([
+                        'company_id' => $company->id,
+                        'operation_type' => 'customer_payment',
+                        'external_id' => $payId,
+                        'created_at' => now(),
+                    ]) === 1;
+                    if (! $isNewOperation) {
+                        $syncedPayments[] = $payId;
+                        continue;
+                    }
+                    $custId = $pay['customer_id'] ?? null;
+                    $amount = (float) ($pay['amount'] ?? 0);
+                    $method = $pay['payment_method'] ?? 'cash';
+                    $ref = $pay['reference'] ?? null;
+                    $notes = $pay['notes'] ?? 'POS Offline Customer Ledger Payment';
+
+                    if ($custId && $amount > 0) {
+                        $cust = Customer::withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->where(fn($q) => $q->where('id', $custId)->orWhere('external_id', (string) $custId))
+                            ->first();
+
+                        if ($cust) {
+                            $dueSales = Sale::withoutGlobalScope('company')
+                                ->where('company_id', $company->id)
+                                ->where('customer_id', $cust->id)
+                                ->where('due_amount', '>', 0)
+                                ->where('status', '!=', 'cancelled')
+                                ->orderBy('created_at')
+                                ->get();
+
+                            $rem = $amount;
+                            foreach ($dueSales as $sale) {
+                                if ($rem <= 0) break;
+                                $apply = min($rem, (float) $sale->due_amount);
+                                $newPaid = (float) $sale->paid_amount + $apply;
+                                $newDue = max(0, (float) $sale->total - $newPaid);
+                                $sale->update([
+                                    'paid_amount' => $newPaid,
+                                    'due_amount' => $newDue,
+                                    'payment_status' => $newDue <= 0.001 ? 'paid' : 'partially_paid',
+                                ]);
+
+                                OrderPayment::create([
+                                    'company_id' => $company->id,
+                                    'sale_id' => $sale->id,
+                                    'payment_method' => $method,
+                                    'amount' => $apply,
+                                    'tendered' => $apply,
+                                    'change_returned' => 0,
+                                    'reference_number' => $ref,
+                                    'notes' => $notes,
+                                ]);
+                                $rem -= $apply;
+                            }
+                        }
+                    }
+                    $syncedPayments[] = $payId;
+                }
+            }
+
+            // 6. Process Quotations
+            if ($request->has('quotations') && is_array($request->input('quotations'))) {
+                foreach ($request->input('quotations') as $quoteData) {
+                    $extId = (string) ($quoteData['id'] ?? Str::uuid()->toString());
+                    $quote = Sale::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where('external_id', $extId)
+                        ->first();
+
+                    $items = (array) ($quoteData['items'] ?? []);
+                    $total = (float) ($quoteData['total'] ?? 0);
+                    $discount = (float) ($quoteData['discount'] ?? 0);
+                    $tax = (float) ($quoteData['tax'] ?? 0);
+                    $quoteNumber = $quoteData['quote_number'] ?? $quoteData['sale_number'] ?? ('QUO-' . strtoupper(substr($extId, 0, 8)));
+                    $createdAt = isset($quoteData['createdAt']) ? Carbon::parse($quoteData['createdAt']) : now();
+
+                    $customerId = null;
+                    $customerName = $quoteData['customer_name'] ?? null;
+                    if (! empty($quoteData['customer_id'])) {
+                        $cust = Customer::withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->where(function ($q) use ($quoteData) {
+                                $q->where('id', $quoteData['customer_id'])
+                                  ->orWhere('external_id', (string) $quoteData['customer_id']);
+                            })
+                            ->first();
+
+                        if ($cust) {
+                            $customerId = $cust->id;
+                            $customerName = $cust->name;
+                        }
+                    }
+
+                    if ($quote) {
+                        $quote->update([
+                            'customer_id' => $customerId,
+                            'customer_name' => $customerName,
+                            'total' => $total,
+                            'net_amount' => max(0, $total - $discount),
+                            'discount' => $discount,
+                            'tax_amount' => $tax,
+                            'status' => $quoteData['status'] ?? $quote->status ?? 'draft',
+                            'notes' => $quoteData['notes'] ?? $quote->notes,
+                            'terms' => $quoteData['terms'] ?? $quote->terms,
+                            'items' => $items,
+                        ]);
+                    } else {
+                        Sale::create([
+                            'company_id' => $company->id,
+                            'external_id' => $extId,
+                            'sale_number' => $quoteNumber,
+                            'user_id' => $user?->id,
+                            'customer_id' => $customerId,
+                            'customer_name' => $customerName,
+                            'total' => $total,
+                            'net_amount' => max(0, $total - $discount),
+                            'discount' => $discount,
+                            'tax_amount' => $tax,
+                            'status' => $quoteData['status'] ?? 'draft',
+                            'operation_type' => 'quotation',
+                            'notes' => $quoteData['notes'] ?? null,
+                            'terms' => $quoteData['terms'] ?? null,
+                            'items' => $items,
+                            'created_at' => $createdAt,
+                            'updated_at' => now(),
+                        ]);
+                    }
+                    $syncedQuotations[] = $extId;
+                }
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('POS Sync Batch Ingestion Failed: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json([
+                'success' => false,
+                'error' => 'Batch sync failed: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Batch sync processed successfully.',
+            'server_time' => now()->toIso8601String(),
+            'synced' => [
+                'sales' => $syncedSales,
+                'adjustments' => $syncedAdjustments,
+                'payments' => $syncedPayments,
+                'products' => $syncedProducts,
+                'customers' => $syncedCustomers,
+                'quotations' => $syncedQuotations,
+            ],
+        ]);
+    }
+
+    /**
+     * 8. Inventory Management: List Products
+     * GET /api/v1/pos/inventory
+     */
+    public function inventoryIndex(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $products = Product::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['category', 'brand'])
+            ->orderBy('name')
+            ->get()
+            ->map(function (Product $p) {
+                return [
+                    'id' => (string) ($p->external_id ?: $p->id),
+                    'server_id' => $p->id,
+                    'name' => $p->name,
+                    'barcode' => $p->barcode ?: $p->code ?: '',
+                    'sku' => $p->sku ?: '',
+                    'sale_price' => (float) ($p->sale_price ?? 0),
+                    'cost_price' => (float) ($p->cost_price ?? 0),
+                    'current_stock' => (float) ($p->current_stock ?? 0),
+                    'minimum_stock' => (float) ($p->minimum_stock ?? 0),
+                    'is_low_stock' => (float) ($p->current_stock ?? 0) <= (float) ($p->minimum_stock ?? 0),
+                    'unit' => $p->unit ?? 'pcs',
+                    'category_id' => $p->category_id ? (string) $p->category_id : null,
+                    'category_name' => $p->category_name ?? $p->category?->name ?? 'General',
+                    'brand_name' => $p->brand_name ?? $p->brand?->name ?? '',
+                    'image_url' => $p->getImageUrlOrDefault(),
+                    'tax_rate' => (float) ($p->tax_rate ?? 0),
+                    'active' => (bool) $p->active,
+                    'updated_at' => $p->updated_at?->toIso8601String(),
+                ];
+            });
+
+        $categories = Category::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'color']);
+
+        $brands = Brand::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json([
+            'success' => true,
+            'total_products' => $products->count(),
+            'low_stock_count' => $products->where('is_low_stock', true)->count(),
+            'products' => $products,
+            'categories' => $categories,
+            'brands' => $brands,
+        ]);
+    }
+
+    /**
+     * 9. Inventory Management: Create/Update Product
+     * POST /api/v1/pos/inventory/product
+     */
+    public function inventoryStoreProduct(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'max:200'],
+            'sale_price' => ['required', 'numeric', 'min:0'],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
+            'current_stock' => ['nullable', 'numeric'],
+            'minimum_stock' => ['nullable', 'numeric', 'min:0'],
+            'barcode' => ['nullable', 'string', 'max:100'],
+            'sku' => ['nullable', 'string', 'max:100'],
+            'unit' => ['nullable', 'string', 'max:50'],
+            'category_name' => ['nullable', 'string', 'max:100'],
+            'brand_name' => ['nullable', 'string', 'max:100'],
+            'tax_rate' => ['nullable', 'numeric', 'min:0'],
+            'external_id' => ['nullable', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error saving product.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $extId = $request->input('external_id') ?: Str::uuid()->toString();
+
+        $product = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(function ($q) use ($request, $extId) {
+                if ($request->filled('id')) {
+                    $q->where('id', $request->input('id'));
+                } elseif ($extId) {
+                    $q->where('external_id', $extId);
+                }
+            })
+            ->first();
+
+        $data = [
+            'company_id' => $company->id,
+            'external_id' => $extId,
+            'name' => $request->input('name'),
+            'sale_price' => (float) $request->input('sale_price', 0),
+            'cost_price' => (float) $request->input('cost_price', 0),
+            'current_stock' => (float) $request->input('current_stock', 0),
+            'minimum_stock' => (float) $request->input('minimum_stock', 0),
+            'barcode' => $request->input('barcode') ?: null,
+            'sku' => $request->input('sku') ?: null,
+            'unit' => $request->input('unit', 'pcs'),
+            'category_name' => $request->input('category_name', 'General'),
+            'brand_name' => $request->input('brand_name') ?: null,
+            'tax_rate' => (float) $request->input('tax_rate', 0),
+            'active' => true,
+        ];
+
+        if ($product) {
+            $product->update($data);
+        } else {
+            $product = Product::create($data);
+        }
+
+        AuditLog::record('inventory.product_saved', $company->id, $user?->id, [
+            'product_id' => $product->id,
+            'name' => $product->name,
+            'stock' => $product->current_stock,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product saved successfully.',
+            'product' => [
+                'id' => (string) ($product->external_id ?: $product->id),
+                'server_id' => $product->id,
+                'name' => $product->name,
+                'barcode' => $product->barcode,
+                'sku' => $product->sku,
+                'sale_price' => (float) $product->sale_price,
+                'cost_price' => (float) $product->cost_price,
+                'current_stock' => (float) $product->current_stock,
+                'minimum_stock' => (float) $product->minimum_stock,
+                'unit' => $product->unit,
+                'category_name' => $product->category_name,
+                'tax_rate' => (float) $product->tax_rate,
+            ],
+        ]);
+    }
+
+    /**
+     * 10. Inventory Management: Stock Adjustment
+     * POST /api/v1/pos/inventory/adjust
+     */
+    public function inventoryAdjustStock(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'product_id' => ['required'],
+            'type' => ['required', 'in:add,subtract,set'],
+            'quantity' => ['required', 'numeric', 'min:0'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error during stock adjustment.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $prodId = $request->input('product_id');
+        $product = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(function ($q) use ($prodId) {
+                $q->where('id', $prodId)->orWhere('external_id', (string) $prodId);
+            })
+            ->firstOrFail();
+
+        $qty = (float) $request->input('quantity');
+        $type = $request->input('type');
+        $oldStock = (float) $product->current_stock;
+
+        if ($type === 'add') {
+            $product->increment('current_stock', $qty);
+        } elseif ($type === 'subtract') {
+            $product->decrement('current_stock', $qty);
+        } elseif ($type === 'set') {
+            $product->update(['current_stock' => $qty]);
+        }
+
+        $product->refresh();
+        $newStock = (float) $product->current_stock;
+
+        AuditLog::record('inventory.stock_adjusted', $company->id, $user?->id, [
+            'product_id' => $product->id,
+            'name' => $product->name,
+            'type' => $type,
+            'adjusted_qty' => $qty,
+            'old_stock' => $oldStock,
+            'new_stock' => $newStock,
+            'reason' => $request->input('reason', 'Manual adjustment via POS Terminal'),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Stock adjusted successfully.',
+            'product_id' => (string) ($product->external_id ?: $product->id),
+            'old_stock' => $oldStock,
+            'new_stock' => $newStock,
+        ]);
+    }
+
+    /**
+     * 11. Customer Ledger: List Customers & Balances
+     * GET /api/v1/pos/customers
+     */
+    public function customersIndex(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $customers = Customer::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->withCount(['sales as pending_sales_count' => fn($q) => $q->where('due_amount', '>', 0)])
+            ->withSum(['sales as total_due_balance' => fn($q) => $q->where('status', '!=', 'cancelled')], 'due_amount')
+            ->orderBy('name')
+            ->get()
+            ->map(function (Customer $c) {
+                return [
+                    'id' => (string) ($c->external_id ?: $c->id),
+                    'server_id' => $c->id,
+                    'name' => $c->name,
+                    'phone' => $c->phone ?? '',
+                    'email' => $c->email ?? '',
+                    'document' => $c->document ?? $c->tax_id ?? '',
+                    'balance_due' => (float) ($c->total_due_balance ?? 0),
+                    'pending_invoices' => (int) ($c->pending_sales_count ?? 0),
+                    'loyalty_points' => (int) ($c->loyalty_points ?? 0),
+                    'address' => $c->address ?? '',
+                    'city' => $c->city ?? '',
+                    'state' => $c->state ?? '',
+                ];
+            });
+
+        $totalReceivables = (float) Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', '!=', 'cancelled')
+            ->sum('due_amount');
+
+        return response()->json([
+            'success' => true,
+            'total_customers' => $customers->count(),
+            'total_receivables' => $totalReceivables,
+            'customers' => $customers,
+        ]);
+    }
+
+    /**
+     * 12. Customer Ledger: Create/Update Customer
+     * POST /api/v1/pos/customers
+     */
+    public function customersStore(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'max:150'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:150'],
+            'document' => ['nullable', 'string', 'max:50'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'external_id' => ['nullable', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error saving customer.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $extId = $request->input('external_id') ?: Str::uuid()->toString();
+
+        $customer = Customer::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(function ($q) use ($request, $extId) {
+                if ($request->filled('id')) {
+                    $q->where('id', $request->input('id'));
+                } elseif ($extId) {
+                    $q->where('external_id', $extId);
+                }
+            })
+            ->first();
+
+        $data = [
+            'company_id' => $company->id,
+            'external_id' => $extId,
+            'name' => $request->input('name'),
+            'phone' => $request->input('phone'),
+            'email' => $request->input('email'),
+            'document' => $request->input('document'),
+            'address' => $request->input('address'),
+            'city' => $request->input('city'),
+            'state' => $request->input('state'),
+        ];
+
+        if ($customer) {
+            $customer->update($data);
+        } else {
+            $customer = Customer::create($data);
+        }
+
+        AuditLog::record('customer.saved', $company->id, $user?->id, [
+            'customer_id' => $customer->id,
+            'name' => $customer->name,
+            'phone' => $customer->phone,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Customer saved successfully.',
+            'customer' => [
+                'id' => (string) ($customer->external_id ?: $customer->id),
+                'server_id' => $customer->id,
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'email' => $customer->email,
+                'document' => $customer->document,
+                'balance_due' => $customer->total_due,
+                'loyalty_points' => (int) $customer->loyalty_points,
+            ],
+        ]);
+    }
+
+    /**
+     * 13. Customer Ledger: Get Transaction History
+     * GET /api/v1/pos/customers/{id}/ledger
+     */
+    public function customerLedger(Request $request, $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $customer = Customer::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(function ($q) use ($id) {
+                $q->where('id', $id)->orWhere('external_id', (string) $id);
+            })
+            ->firstOrFail();
+
+        $sales = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('customer_id', $customer->id)
+            ->with('payments')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $ledgerEntries = [];
+
+        foreach ($sales as $sale) {
+            $ledgerEntries[] = [
+                'type' => 'invoice',
+                'id' => (string) ($sale->external_id ?: $sale->id),
+                'sale_number' => $sale->sale_number,
+                'date' => $sale->created_at?->toIso8601String(),
+                'total' => (float) $sale->total,
+                'paid_amount' => (float) $sale->paid_amount,
+                'due_amount' => (float) $sale->due_amount,
+                'payment_method' => $sale->payment_method,
+                'status' => $sale->payment_status,
+                'items_count' => count((array) ($sale->items ?: [])),
+            ];
+
+            foreach ($sale->payments as $pay) {
+                $ledgerEntries[] = [
+                    'type' => 'payment',
+                    'id' => (string) $pay->id,
+                    'sale_number' => $sale->sale_number,
+                    'date' => $pay->created_at?->toIso8601String(),
+                    'amount' => (float) $pay->amount,
+                    'payment_method' => $pay->payment_method,
+                    'reference' => $pay->reference_number,
+                    'notes' => $pay->notes,
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'customer' => [
+                'id' => (string) ($customer->external_id ?: $customer->id),
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'email' => $customer->email,
+                'document' => $customer->document,
+                'balance_due' => $customer->total_due,
+                'loyalty_points' => (int) $customer->loyalty_points,
+            ],
+            'ledger' => $ledgerEntries,
+        ]);
+    }
+
+    /**
+     * 14. Customer Ledger: Record Receivable Payment
+     * POST /api/v1/pos/customers/{id}/payment
+     */
+    public function customerRecordPayment(Request $request, $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_method' => ['required', 'string'],
+            'reference' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:500'],
+            'sale_id' => ['nullable'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error recording customer payment.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $customer = Customer::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(function ($q) use ($id) {
+                $q->where('id', $id)->orWhere('external_id', (string) $id);
+            })
+            ->firstOrFail();
+
+        $amount = (float) $request->input('amount');
+        $method = $request->input('payment_method', 'cash');
+        $ref = $request->input('reference');
+        $notes = $request->input('notes', 'Khata / Receivable collection via POS Terminal');
+
+        $appliedTo = [];
+
+        DB::transaction(function () use ($company, $customer, $amount, $method, $ref, $notes, $request, &$appliedTo) {
+            $salesQuery = Sale::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where('customer_id', $customer->id)
+                ->where('due_amount', '>', 0)
+                ->where('status', '!=', 'cancelled');
+
+            if ($request->filled('sale_id')) {
+                $sId = $request->input('sale_id');
+                $salesQuery->where(fn($q) => $q->where('id', $sId)->orWhere('external_id', (string) $sId));
+            }
+
+            $dueSales = $salesQuery->orderBy('created_at')->lockForUpdate()->get();
+            $remaining = $amount;
+
+            foreach ($dueSales as $sale) {
+                if ($remaining <= 0) break;
+
+                $apply = min($remaining, (float) $sale->due_amount);
+                $newPaid = round((float) $sale->paid_amount + $apply, 2);
+                $newDue = max(0, round((float) $sale->total - $newPaid, 2));
+
+                $sale->update([
+                    'paid_amount' => $newPaid,
+                    'due_amount' => $newDue,
+                    'payment_status' => $newDue <= 0.001 ? 'paid' : 'partially_paid',
+                ]);
+
+                OrderPayment::create([
+                    'company_id' => $company->id,
+                    'sale_id' => $sale->id,
+                    'payment_method' => $method,
+                    'amount' => $apply,
+                    'tendered' => $apply,
+                    'change_returned' => 0,
+                    'reference_number' => $ref,
+                    'notes' => $notes,
+                ]);
+
+                $appliedTo[] = [
+                    'sale_id' => (string) ($sale->external_id ?: $sale->id),
+                    'sale_number' => $sale->sale_number,
+                    'amount_applied' => $apply,
+                    'remaining_due' => $newDue,
+                ];
+
+                $remaining -= $apply;
+            }
+        });
+
+        AuditLog::record('financials.customer_payment_received', $company->id, $user?->id, [
+            'customer_id' => $customer->id,
+            'customer_name' => $customer->name,
+            'amount' => $amount,
+            'payment_method' => $method,
+            'applied_invoices' => count($appliedTo),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => sprintf('Payment of %s%.2f successfully recorded.', $company->currency_symbol ?? '$', $amount),
+            'amount' => $amount,
+            'new_balance_due' => $customer->fresh()->total_due,
+            'applied_invoices' => $appliedTo,
+        ]);
+    }
+
+    /**
+     * 15. Analytics: Executive Dashboard KPIs & Sales Trends
+     * GET /api/v1/pos/analytics
+     */
+    public function analytics(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $salesBase = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', '!=', 'cancelled');
+
+        $todaySales = (clone $salesBase)->whereDate('created_at', now()->toDateString());
+        $todayRevenue = (float) (clone $todaySales)->sum('total');
+        $todayOrders = (clone $todaySales)->count();
+
+        $monthSales = (clone $salesBase)->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()]);
+        $monthRevenue = (float) (clone $monthSales)->sum('total');
+        $monthOrders = (clone $monthSales)->count();
+
+        $allTimeRevenue = (float) (clone $salesBase)->sum('total');
+        $allTimeOrders = (clone $salesBase)->count();
+        $avgTicket = $allTimeOrders > 0 ? round($allTimeRevenue / $allTimeOrders, 2) : 0;
+
+        // Payment Method Breakdown
+        $paymentMethods = (clone $salesBase)
+            ->select('payment_method', DB::raw('COUNT(*) as count'), DB::raw('SUM(total) as total'))
+            ->groupBy('payment_method')
+            ->get()
+            ->map(fn($row) => [
+                'method' => ucfirst($row->payment_method ?: 'Cash'),
+                'count' => (int) $row->count,
+                'total' => (float) $row->total,
+            ]);
+
+        // 7-day revenue trend
+        $sevenDaysTrend = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $d = now()->subDays($i)->format('Y-m-d');
+            $dayRev = (float) Sale::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where('status', '!=', 'cancelled')
+                ->whereDate('created_at', $d)
+                ->sum('total');
+
+            $sevenDaysTrend[] = [
+                'date' => $d,
+                'day' => now()->subDays($i)->format('D'),
+                'revenue' => $dayRev,
+            ];
+        }
+
+        // Top 5 Products by Sales
+        $allRecentSales = (clone $salesBase)->latest('created_at')->limit(100)->get();
+        $productStats = [];
+        foreach ($allRecentSales as $s) {
+            $items = (array) ($s->items ?: []);
+            foreach ($items as $item) {
+                $pName = $item['name'] ?? 'Product';
+                $pQty = (float) ($item['quantity'] ?? $item['qty'] ?? 1);
+                $pTot = (float) ($item['total'] ?? ($pQty * ($item['price'] ?? 0)));
+
+                if (! isset($productStats[$pName])) {
+                    $productStats[$pName] = ['name' => $pName, 'units_sold' => 0, 'revenue' => 0];
+                }
+                $productStats[$pName]['units_sold'] += $pQty;
+                $productStats[$pName]['revenue'] += $pTot;
+            }
+        }
+        usort($productStats, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
+        $topProducts = array_slice($productStats, 0, 5);
+
+        // Low stock count & Receivables
+        $lowStockCount = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->whereRaw('current_stock <= minimum_stock')
+            ->count();
+
+        $totalReceivables = (float) (clone $salesBase)->sum('due_amount');
+
+        return response()->json([
+            'success' => true,
+            'currency_symbol' => $company->currency_symbol ?? '$',
+            'kpis' => [
+                'today_revenue' => $todayRevenue,
+                'today_orders' => $todayOrders,
+                'month_revenue' => $monthRevenue,
+                'month_orders' => $monthOrders,
+                'all_time_revenue' => $allTimeRevenue,
+                'all_time_orders' => $allTimeOrders,
+                'average_order_value' => $avgTicket,
+                'total_receivables' => $totalReceivables,
+                'low_stock_count' => $lowStockCount,
+            ],
+            'payment_breakdown' => $paymentMethods,
+            'revenue_trend' => $sevenDaysTrend,
+            'top_products' => $topProducts,
+        ]);
+    }
+
+    /**
+     * 16. Subscription Management: Plan Status & Available Plans
+     * GET /api/v1/pos/subscription
+     */
+    public function subscription(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $subscription = Subscription::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', 'active')
+            ->latest('started_at')
+            ->first();
+
+        $plan = Plan::find($company->plan_name) ?? Plan::first();
+        $availablePlans = Plan::where('active', true)->get()->map(fn(Plan $p) => [
+            'name' => $p->name,
+            'display_name' => $p->display_name ?: ucfirst($p->name),
+            'price' => (float) $p->price,
+            'currency' => $p->currency ?: 'USD',
+            'billing_cycle' => $p->billing_cycle,
+            'duration_days' => $p->duration_days,
+            'features' => $p->features ?: [],
+            'limits' => $p->limits ?: [],
+        ]);
+
+        $productsCount = Product::withoutGlobalScope('company')->where('company_id', $company->id)->count();
+        $usersCount = User::withoutGlobalScope('company')->where('company_id', $company->id)->count();
+
+        $daysRemaining = null;
+        if ($company->expires_at) {
+            $daysRemaining = max(0, (int) now()->diffInDays($company->expires_at, false));
+        }
+
+        return response()->json([
+            'success' => true,
+            'subscription' => [
+                'plan_name' => $company->plan_name ?? 'trial',
+                'display_name' => $plan?->display_name ?? ucfirst($company->plan_name ?? 'Trial'),
+                'status' => $company->isExpired() ? 'expired' : 'active',
+                'started_at' => $subscription?->started_at?->toIso8601String(),
+                'expires_at' => $company->expires_at?->toIso8601String(),
+                'days_remaining' => $daysRemaining,
+                'is_lifetime' => $company->expires_at === null,
+            ],
+            'usage' => [
+                'products_count' => $productsCount,
+                'products_limit' => $company->max_products ?? $plan?->limits['products'] ?? 'Unlimited',
+                'users_count' => $usersCount,
+                'users_limit' => $company->max_users ?? $plan?->limits['users'] ?? 'Unlimited',
+            ],
+            'available_plans' => $availablePlans,
+        ]);
+    }
+
+    /**
+     * 17. Subscription Management: Redeem Activation Code
+     * POST /api/v1/pos/subscription/redeem
+     */
+    public function subscriptionRedeem(Request $request, TenantProvisioningService $provisioner): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'code' => ['required', 'string', 'min:6'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Please enter a valid activation code.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            $res = $provisioner->redeemActivationCode($company, $request->input('code'), $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Activation code redeemed successfully! Plan updated.',
+                'plan_name' => $res['plan_name'],
+                'expires_at' => $res['expires_at']?->toIso8601String(),
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('Activation Code Redemption Failed: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json([
+                'success' => false,
+                'error' => 'Redemption failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * 18. Send WhatsApp / Email Delivery for Invoices & Quotations
+     * POST /api/v1/pos/send-delivery
+     */
+    public function sendDelivery(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'type' => ['required', 'string', 'in:email,whatsapp'],
+            'document_type' => ['required', 'string', 'in:invoice,quotation'],
+            'recipient' => ['required', 'string'],
+            'document_id' => ['nullable', 'string'],
+            'custom_message' => ['nullable', 'string'],
+            'document_data' => ['nullable', 'array'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $type = $request->input('type');
+        $docType = $request->input('document_type');
+        $recipient = trim($request->input('recipient'));
+        $docId = $request->input('document_id');
+        $customMessage = $request->input('custom_message');
+        $docData = $request->input('document_data', []);
+
+        // Find Sale/Quotation in Database or hydrate
+        $sale = null;
+        if (! empty($docId)) {
+            $sale = Sale::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where(function ($q) use ($docId) {
+                    $q->where('external_id', $docId)
+                      ->orWhere('sale_number', $docId)
+                      ->orWhere('id', $docId);
+                })
+                ->first();
+        }
+
+        if (! $sale && ! empty($docData)) {
+            // Reconcile/create sale if it was queued offline before being batch-synced
+            $extId = (string) ($docData['id'] ?? $docId ?? Str::uuid()->toString());
+            $items = (array) ($docData['items'] ?? []);
+            $total = (float) ($docData['total'] ?? 0);
+            $orderNumber = $docData['order_number'] ?? $docData['quote_number'] ?? $docData['sale_number'] ?? ('POS-' . strtoupper(substr($extId, 0, 8)));
+
+            $sale = Sale::create([
+                'company_id' => $company->id,
+                'external_id' => $extId,
+                'sale_number' => $orderNumber,
+                'user_id' => $user?->id,
+                'customer_name' => $docData['customer_name'] ?? null,
+                'total' => $total,
+                'net_amount' => $total,
+                'discount' => (float) ($docData['discount'] ?? 0),
+                'tax_amount' => (float) ($docData['tax'] ?? 0),
+                'payment_method' => $docData['payment_method'] ?? 'cash',
+                'status' => $docType === 'quotation' ? 'draft' : 'completed',
+                'operation_type' => $docType === 'quotation' ? 'quotation' : 'sale',
+                'items' => $items,
+                'notes' => $docData['notes'] ?? null,
+                'created_at' => isset($docData['createdAt']) ? Carbon::parse($docData['createdAt']) : now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        if (! $sale) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Document not found and cannot be delivered.',
+            ], 404);
+        }
+
+        $messageQueue = app(MessageQueueService::class);
+
+        try {
+            if ($type === 'email') {
+                $result = $messageQueue->sendOrQueueEmail($sale, $recipient, $customMessage, true);
+
+                AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
+                    'type' => 'email',
+                    'document_type' => $docType,
+                    'recipient' => $recipient,
+                    'document_number' => $sale->sale_number,
+                    'status' => $result['status'],
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'status' => $result['status'],
+                    'message' => $result['status'] === 'sent'
+                        ? "Email sent successfully to {$recipient}."
+                        : "No connection right now — queued and will send to {$recipient} automatically once back online.",
+                    'document_number' => $sale->sale_number,
+                    'sent_at' => $result['status'] === 'sent' ? now()->toIso8601String() : null,
+                ]);
+            } else {
+                $result = $messageQueue->sendOrQueueWhatsApp($sale, $recipient, $customMessage);
+
+                AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
+                    'type' => 'whatsapp',
+                    'document_type' => $docType,
+                    'recipient' => $recipient,
+                    'document_number' => $sale->sale_number,
+                    'status' => $result['status'],
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'status' => $result['status'],
+                    'message' => match ($result['status']) {
+                        'sent' => "WhatsApp message sent successfully to {$recipient}.",
+                        'queued' => "No connection right now — queued and will send to {$recipient} automatically once back online.",
+                        default => "WhatsApp message prepared for {$recipient}.",
+                    },
+                    'whatsapp_url' => $result['url'] ?? null,
+                    'document_number' => $sale->sale_number,
+                    'sent_at' => $result['status'] === 'sent' ? now()->toIso8601String() : null,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('POS Delivery Exception: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json([
+                'success' => false,
+                'error' => 'Delivery failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * 19. Taxes Management: List Tax Rules
+     * GET /api/v1/pos/taxes
+     */
+    public function taxRulesIndex(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $taxes = TaxRule::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->get()
+            ->map(function (TaxRule $t) {
+                return [
+                    'id' => (string) $t->id,
+                    'name' => $t->tax_name,
+                    'rate' => (float) $t->rate,
+                    'is_default' => (bool) $t->is_default,
+                    'active' => (bool) $t->active,
+                    'type' => $t->type ?? 'percentage',
+                    'calc_type' => $t->calc_type ?? 'exclusive',
+                    'updated_at' => $t->updated_at?->toIso8601String(),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'taxes' => $taxes,
+        ]);
+    }
+
+    /**
+     * 20. Taxes Management: Store / Update Tax Rule
+     * POST /api/v1/pos/taxes
+     */
+    public function taxRulesStore(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $validator = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'max:100'],
+            'rate' => ['required', 'numeric', 'min:0', 'max:100'],
+            'is_default' => ['nullable', 'boolean'],
+            'active' => ['nullable', 'boolean'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        if ($request->boolean('is_default')) {
+            TaxRule::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->update(['is_default' => false]);
+        }
+
+        $taxRule = TaxRule::create([
+            'company_id' => $company->id,
+            'tax_name' => $request->input('name'),
+            'tax_code' => strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $request->input('name')), 0, 8)),
+            'rate' => (float) $request->input('rate'),
+            'is_default' => $request->boolean('is_default', false),
+            'active' => $request->boolean('active', true),
+            'calc_type' => 'exclusive',
+            'type' => 'percentage',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tax rule saved successfully.',
+            'tax' => [
+                'id' => (string) $taxRule->id,
+                'name' => $taxRule->tax_name,
+                'rate' => (float) $taxRule->rate,
+                'is_default' => (bool) $taxRule->is_default,
+                'active' => (bool) $taxRule->active,
+            ],
+        ]);
+    }
+}

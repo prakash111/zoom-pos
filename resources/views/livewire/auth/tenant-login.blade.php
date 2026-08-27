@@ -31,6 +31,46 @@
                 </div>
             @endif
 
+            @if (config('app.demo_mode'))
+                <!-- Demo Mode Visual Notification Badge -->
+                <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between shadow-sm">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-lg">⚡</span>
+                        <div>
+                            <span class="font-extrabold text-amber-200 uppercase tracking-wider text-[10px] block">{{ __('Demo Mode Active') }}</span>
+                            <span class="text-[11px] text-amber-300/90">{{ __('Credentials pre-filled for instant 1-click testing') }}</span>
+                        </div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-200 text-[10px] font-mono font-bold">1-Click</span>
+                </div>
+
+                <!-- Quick Demo Account Selector Pills -->
+                <div class="space-y-1.5">
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">{{ __('Quick Demo Credentials (1-Click Fill)') }}</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button"
+                                wire:click="fillDemo('manager')"
+                                class="p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-left transition flex items-center gap-2 cursor-pointer group active:scale-95">
+                            <span class="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-bold shrink-0">👔</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-xs font-bold text-white group-hover:text-brand-lime truncate">{{ __('Store Manager') }}</div>
+                                <div class="text-[10px] text-slate-400 truncate">admin@zoommarket.test</div>
+                            </div>
+                        </button>
+
+                        <button type="button"
+                                wire:click="fillDemo('cashier')"
+                                class="p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-left transition flex items-center gap-2 cursor-pointer group active:scale-95">
+                            <span class="w-7 h-7 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-bold shrink-0">🛒</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-xs font-bold text-white group-hover:text-brand-lime truncate">{{ __('Cashier Staff') }}</div>
+                                <div class="text-[10px] text-slate-400 truncate">cashier@zoommarket.test</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            @endif
+
             <!-- Form Inputs -->
             <div class="space-y-4">
                 
@@ -91,6 +131,14 @@
                 </div>
 
             </div>
+
+            @php($socialProviders = collect(['google' => 'Google', 'facebook' => 'Facebook'])->filter(fn ($label, $key) => filter_var(\App\Models\PlatformSystem::get("social_{$key}_enabled", false), FILTER_VALIDATE_BOOLEAN) && \App\Models\PlatformSystem::get("social_{$key}_client_id") && \App\Models\PlatformSystem::get("social_{$key}_client_secret")))
+            @if ($socialProviders->isNotEmpty())
+                <div class="grid grid-cols-{{ $socialProviders->count() }} gap-2">
+                    @foreach ($socialProviders as $key => $label)<a href="{{ route('social.redirect', $key) }}" class="py-2.5 rounded-xl bg-white text-slate-800 text-center text-xs font-bold">{{ __('Continue with :provider', ['provider' => $label]) }}</a>@endforeach
+                </div>
+                <div class="text-center text-[10px] text-slate-500 uppercase">{{ __('or use your password') }}</div>
+            @endif
 
             <!-- Primary Action Button (Vibrant Neon Lime Pill) -->
             <div>

@@ -12,23 +12,23 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-                <span>🍳 Kitchen Display System (KDS)</span>
+                <span>🍳 {{ __("Kitchen Display System (KDS)") }}</span>
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
             </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Real-time live kitchen order tracker & ticket bump screen (Auto-refreshing every 5s)</p>
+            <p class="text-xs text-slate-400 mt-0.5">{{ __("Real-time live kitchen order tracker & ticket bump screen (Auto-refreshing every 5s)") }}</p>
         </div>
 
         <!-- Service Mode & Status Filter Pills -->
         <div class="flex flex-wrap items-center gap-2">
             <div class="flex items-center bg-white dark:bg-slate-800 rounded-2xl p-1 border border-slate-200 dark:border-slate-700 text-xs font-bold">
-                <button type="button" wire:click="$set('filterServiceType', 'all')" @class(['px-3 py-1.5 rounded-xl transition', 'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950 font-black' => $filterServiceType === 'all', 'text-slate-500' => $filterServiceType !== 'all'])>All</button>
-                <button type="button" wire:click="$set('filterServiceType', 'dine_in')" @class(['px-3 py-1.5 rounded-xl transition', 'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950 font-black' => $filterServiceType === 'dine_in', 'text-slate-500' => $filterServiceType !== 'dine_in'])>🍽️ Dine-In</button>
-                <button type="button" wire:click="$set('filterServiceType', 'takeaway')" @class(['px-3 py-1.5 rounded-xl transition', 'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950 font-black' => $filterServiceType === 'takeaway', 'text-slate-500' => $filterServiceType !== 'takeaway'])>🛍️ Takeaway</button>
-                <button type="button" wire:click="$set('filterServiceType', 'delivery')" @class(['px-3 py-1.5 rounded-xl transition', 'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950 font-black' => $filterServiceType === 'delivery', 'text-slate-500' => $filterServiceType !== 'delivery'])>🛵 Delivery</button>
+                <button type="button" wire:click="$set('filterServiceType', 'all')" @class(['px-3 py-1.5 rounded-xl transition', 'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950 font-black' => $filterServiceType === 'all', 'text-slate-500' => $filterServiceType !== 'all'])>{{ __("All") }}</button>
+                <button type="button" wire:click="$set('filterServiceType', 'dine_in')" @class(['px-3 py-1.5 rounded-xl transition', 'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950 font-black' => $filterServiceType === 'dine_in', 'text-slate-500' => $filterServiceType !== 'dine_in'])>🍽️ {{ __("Dine-In") }}</button>
+                <button type="button" wire:click="$set('filterServiceType', 'takeaway')" @class(['px-3 py-1.5 rounded-xl transition', 'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950 font-black' => $filterServiceType === 'takeaway', 'text-slate-500' => $filterServiceType !== 'takeaway'])>🛍️ {{ __("Takeaway") }}</button>
+                <button type="button" wire:click="$set('filterServiceType', 'delivery')" @class(['px-3 py-1.5 rounded-xl transition', 'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950 font-black' => $filterServiceType === 'delivery', 'text-slate-500' => $filterServiceType !== 'delivery'])>🛵 {{ __("Delivery") }}</button>
             </div>
 
-            <a href="{{ route('tenant.restaurant.pos') }}" class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-lime-500 hover:bg-lime-600 text-slate-950 shadow-md">
-                🍽️ POS Terminal
+            <a wire:navigate.hover href="{{ route('tenant.restaurant.pos') }}" class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-lime-500 hover:bg-lime-600 text-slate-950 shadow-md">
+                🍽️ {{ __("POS Terminal") }}
             </a>
         </div>
     </div>
@@ -37,7 +37,7 @@
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div class="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5 flex items-center justify-between">
             <div>
-                <div class="text-[10px] font-extrabold uppercase tracking-wider text-amber-500">Pending Orders</div>
+                <div class="text-[10px] font-extrabold uppercase tracking-wider text-amber-500">{{ __("Pending Orders") }}</div>
                 <div class="text-xl font-black text-amber-500">{{ $pendingCount }}</div>
             </div>
             <div class="text-2xl">⏳</div>
@@ -45,7 +45,7 @@
 
         <div class="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-3.5 flex items-center justify-between">
             <div>
-                <div class="text-[10px] font-extrabold uppercase tracking-wider text-blue-500">In Cooking</div>
+                <div class="text-[10px] font-extrabold uppercase tracking-wider text-blue-500">{{ __("In Cooking") }}</div>
                 <div class="text-xl font-black text-blue-500">{{ $preparingCount }}</div>
             </div>
             <div class="text-2xl">🍳</div>
@@ -53,7 +53,7 @@
 
         <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 flex items-center justify-between">
             <div>
-                <div class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-500">Ready to Serve</div>
+                <div class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-500">{{ __("Ready to Serve") }}</div>
                 <div class="text-xl font-black text-emerald-500">{{ $readyCount }}</div>
             </div>
             <div class="text-2xl">🔔</div>
@@ -61,7 +61,7 @@
 
         <div class="bg-purple-500/10 border border-purple-500/30 rounded-2xl p-3.5 flex items-center justify-between">
             <div>
-                <div class="text-[10px] font-extrabold uppercase tracking-wider text-purple-500">Total Active KOTs</div>
+                <div class="text-[10px] font-extrabold uppercase tracking-wider text-purple-500">{{ __("Total Active KOTs") }}</div>
                 <div class="text-xl font-black text-purple-500">{{ $tickets->count() }}</div>
             </div>
             <div class="text-2xl">📋</div>
@@ -99,7 +99,7 @@
                                 </span>
                             </div>
                             <div class="text-xs font-black text-lime-600 dark:text-lime-400 mt-0.5">
-                                {{ $kot->table_name ?: ucfirst(str_replace('_', ' ', $kot->service_type)) }}
+                                {{ $kot->table_name ?: ucfirst(str_replace('_', ' ', __($kot->service_type))) }}
                             </div>
                         </div>
 
@@ -111,7 +111,7 @@
                             'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 animate-bounce' => $mins >= 20,
                         ])>
                             <span>⏱️</span>
-                            <span>{{ $mins }}m ago</span>
+                            <span>{{ $mins }}{{ __("m ago") }}</span>
                         </div>
                     </div>
 
@@ -124,16 +124,16 @@
                                         <span class="w-6 h-6 rounded-lg bg-lime-400 text-slate-950 text-xs font-black flex items-center justify-center">
                                             {{ $item['quantity'] ?? 1 }}x
                                         </span>
-                                        <span>{{ $item['name'] ?? 'Food Item' }}</span>
+                                        <span>{{ $item['name'] ?? __('Food Item') }}</span>
                                     </span>
                                     @if (!empty($item['seat']))
-                                        <span class="text-[10px] font-bold text-slate-400">Seat {{ $item['seat'] }}</span>
+                                        <span class="text-[10px] font-bold text-slate-400">{{ __("Seat") }} {{ $item["seat"] }}</span>
                                     @endif
                                 </div>
 
                                 @if (!empty($item['variant']))
                                     <div class="text-[11px] font-bold text-slate-500 dark:text-slate-400 pl-8">
-                                        &bull; Option: {{ $item['variant'] }}
+                                        &bull; {{ __("Option:") }} {{ $item["variant"] }}
                                     </div>
                                 @endif
 
@@ -154,7 +154,7 @@
 
                     @if ($kot->kitchen_notes)
                         <div class="mt-3 p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-xs font-bold text-amber-800 dark:text-amber-300">
-                            <strong>Note:</strong> {{ $kot->kitchen_notes }}
+                            <strong>{{ __("Note:") }}</strong> {{ $kot->kitchen_notes }}
                         </div>
                     @endif
                 </div>
@@ -166,27 +166,27 @@
                         <button type="button"
                                 wire:click="startPreparing('{{ $kot->id }}')"
                                 class="w-full py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-md shadow-blue-500/20 active:scale-95 transition flex items-center justify-center gap-1.5">
-                            <span>🍳 Start Preparing</span>
+                            <span>🍳 {{ __("Start Preparing") }}</span>
                         </button>
                     @elseif ($kot->status === 'preparing')
                         <button type="button"
                                 wire:click="markReady('{{ $kot->id }}')"
                                 class="w-full py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition flex items-center justify-center gap-1.5">
-                            <span>🔔 Mark as Ready</span>
+                            <span>🔔 {{ __("Mark as Ready") }}</span>
                         </button>
                     @elseif ($kot->status === 'ready')
                         <button type="button"
                                 wire:click="markServed('{{ $kot->id }}')"
                                 class="w-full py-2.5 rounded-2xl bg-slate-900 dark:bg-lime-400 hover:bg-lime-500 text-white dark:text-slate-950 font-black text-xs shadow-md active:scale-95 transition flex items-center justify-center gap-1.5">
-                            <span>✅ Mark as Served</span>
+                            <span>✅ {{ __("Mark as Served") }}</span>
                         </button>
                     @endif
 
                     <div class="flex items-center justify-between text-xs font-bold text-slate-400 pt-1">
                         <a href="{{ route('tenant.restaurant.kot.print', $kot) }}" target="_blank" class="hover:text-blue-500 flex items-center gap-1">
-                            <span>🖨️ Print Ticket</span>
+                            <span>🖨️ {{ __("Print Ticket") }}</span>
                         </a>
-                        <button type="button" wire:click="cancelKot('{{ $kot->id }}')" wire:confirm="Cancel KOT {{ $kot->kot_number }}?" class="hover:text-rose-500">Cancel</button>
+                        <button type="button" wire:click="cancelKot('{{ $kot->id }}')" wire:confirm="{{ __("Cancel KOT") }} {{ $kot->kot_number }}?" class="hover:text-rose-500">{{ __("Cancel") }}</button>
                     </div>
 
                 </div>
@@ -195,8 +195,8 @@
         @empty
             <div class="col-span-full py-16 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-3">
                 <div class="text-4xl">🍽️</div>
-                <h3 class="font-extrabold text-base text-slate-900 dark:text-white">All Kitchen Orders Cleared!</h3>
-                <p class="text-xs text-slate-400">New orders from Dine-In tables, Takeaway, Delivery, or QR Digital Menu will appear here in real-time.</p>
+                <h3 class="font-extrabold text-base text-slate-900 dark:text-white">{{ __("All Kitchen Orders Cleared!") }}</h3>
+                <p class="text-xs text-slate-400">{{ __("New orders from Dine-In tables, Takeaway, Delivery, or QR Digital Menu will appear here in real-time.") }}</p>
             </div>
         @endforelse
     </div>

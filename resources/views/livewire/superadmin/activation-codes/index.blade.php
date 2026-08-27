@@ -32,10 +32,10 @@
     <div class="flex items-center justify-between">
         <div>
             <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white">Activation License Keys</h3>
-            <p class="text-xs text-slate-400">Generate and manage offline license vouchers for instant self-registration and renewals</p>
+            <p class="text-xs text-slate-400">{{ __("Generate and manage offline license vouchers for instant self-registration and renewals") }}</p>
         </div>
         <button wire:click="$toggle('showForm')" type="button" class="px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/25 active:scale-95 transition flex items-center gap-1.5 cursor-pointer">
-            <span>+ Generate Key</span>
+            <span>+ {{ __('Generate Key') }}</span>
         </button>
     </div>
 
@@ -43,7 +43,7 @@
     @if ($showForm)
         <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-5 animate-in fade-in">
             <h4 class="text-sm sm:text-base font-black text-slate-900 dark:text-white">
-                Generate Offline License Voucher
+                {{ __('Generate Offline License Voucher') }}
             </h4>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -75,8 +75,8 @@
             </div>
 
             <div class="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <button wire:click="$set('showForm', false)" type="button" class="px-5 py-2.5 rounded-2xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">Cancel</button>
-                <button wire:click="generate" type="button" class="px-6 py-2.5 rounded-2xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/25 active:scale-95 transition">Generate Code</button>
+                <button wire:click="$set('showForm', false)" type="button" class="px-5 py-2.5 rounded-2xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">{{ __("Cancel") }}</button>
+                <button wire:click="generate" type="button" class="px-6 py-2.5 rounded-2xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/25 active:scale-95 transition">{{ __('Generate Code') }}</button>
             </div>
         </div>
     @endif
@@ -111,25 +111,25 @@
                             </td>
 
                             <td class="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-mono">
-                                {{ $code->expires_at?->format('Y-m-d') ?? 'Never (Lifetime)' }}
+                                {{ $code->expires_at?->format('Y-m-d') ?? __('Never (Lifetime)') }}
                             </td>
 
                             <td class="px-6 py-4">
                                 @if ($code->revoked)
                                     <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
-                                        Revoked
+                                        {{ __("Revoked") }}
                                     </span>
                                 @else
                                     <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center gap-1.5 w-max">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {{ __("Active") }}
                                     </span>
                                 @endif
                             </td>
 
                             <td class="px-6 py-4 text-right">
                                 @unless ($code->revoked)
-                                    <button wire:click="revoke('{{ $code->id }}')" wire:confirm="Revoke this license key?" type="button" class="text-rose-600 hover:underline font-bold text-xs">
-                                        Revoke
+                                    <button wire:click="revoke('{{ $code->id }}')" wire:confirm="{{ __("Revoke this license key?") }}" type="button" class="text-rose-600 hover:underline font-bold text-xs">
+                                        {{ __("Revoke") }}
                                     </button>
                                 @endunless
                             </td>
@@ -137,7 +137,7 @@
                     @empty
                         <tr>
                             <td colspan="6" class="px-6 py-12 text-center text-slate-400">
-                                No activation codes generated yet. Click "+ Generate Key" above.
+                                {{ __('No activation codes generated yet. Click "+ Generate Key" above.') }}
                             </td>
                         </tr>
                     @endforelse

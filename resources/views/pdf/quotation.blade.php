@@ -21,6 +21,9 @@
         $bg = (int) ($g * 0.25 + 255 * 0.75);
         $bb = (int) ($b * 0.25 + 255 * 0.75);
         $borderTint = sprintf('#%02x%02x%02x', $br, $bg, $bb);
+        $headerTaxRows = \App\Services\TaxEngineService::normalizeTaxBreakdown($sale->tax_breakdown);
+        $appliedTaxRuleName = $headerTaxRows[0]['name'] ?? $sale->tax_name;
+        $customerTaxNumber = $sale->customer?->tax_id ?: ($sale->customer?->gstin ?: $sale->customer?->document);
     @endphp
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -260,7 +263,7 @@
                             {{ $company->city }}{{ $company->state ? ', ' . $company->state : '' }} {{ $company->postal_code }}<br>
                         @endif
                         @if ($company->tax_id)
-                            <span>{{ $company->tax_id_label ?: 'Tax ID' }}: {{ $company->tax_id }}</span><br>
+                            <span>{{ \App\Services\TaxEngineService::getTaxIdentifierLabel($company->country, $appliedTaxRuleName) }}: {{ $company->tax_id }}</span><br>
                         @endif
                         @if ($company->phone) Tel: {{ $company->phone }} @endif
                         @if ($company->email) | {{ $company->email }} @endif
@@ -280,6 +283,12 @@
                             <td class="meta-label">Valid Until:</td>
                             <td class="meta-val">{{ $sale->due_date ? $sale->due_date->format('d M Y') : ($sale->created_at ? $sale->created_at->addDays(15)->format('d M Y') : now()->addDays(15)->format('d M Y')) }}</td>
                         </tr>
+                        @if ($sale->payment_terms)
+                            <tr>
+                                <td class="meta-label">Payment Terms:</td>
+                                <td class="meta-val">{{ $sale->payment_terms }}</td>
+                            </tr>
+                        @endif
                         @if ($sale->user)
                             <tr>
                                 <td class="meta-label">Sales Rep:</td>
@@ -306,8 +315,8 @@
             @if ($sale->customer?->address || $sale->customer?->city)
                 <div style="color: #334155; margin-top: 1px;"><strong>Address:</strong> {{ $sale->customer->address ? $sale->customer->address . ', ' : '' }}{{ $sale->customer->city }}{{ $sale->customer->state ? ' ' . $sale->customer->state : '' }} {{ $sale->customer->postal_code ?? '' }}</div>
             @endif
-            @if ($sale->customer?->document)
-                <div style="color: #334155; margin-top: 1px;"><strong>{{ $sale->customer->tax_id_label ?: 'Tax ID / VAT' }}:</strong> {{ $sale->customer->document }}</div>
+            @if ($customerTaxNumber)
+                <div style="color: #334155; margin-top: 1px;"><strong>{{ \App\Services\TaxEngineService::getTaxIdentifierLabel($company->country, $appliedTaxRuleName) }}:</strong> {{ $customerTaxNumber }}</div>
             @endif
         </div>
 
@@ -315,9 +324,9 @@
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 50%;">Item & Scope Description</th>
-                    <th class="text-center" style="width: 12%;">Qty</th>
-                    <th class="text-right" style="width: 18%;">Unit Price</th>
+                    <th style="width: 50%;">{{ __("Item & Scope Description") }}</th>
+                    <th class="text-center" style="width: 12%;">{{ __("Qty") }}</th>
+                    <th class="text-right" style="width: 18%;">{{ __("Unit Price") }}</th>
                     <th class="text-right" style="width: 20%;">Total Amount</th>
                 </tr>
             </thead>
@@ -349,29 +358,78 @@
             </tbody>
         </table>
 
+        <!-- Structured Fiscal Tax Summary Breakdown -->
+        @php
+            $subtotal = $sale->subtotal;
+            $taxSummary = \App\Services\TaxEngineService::normalizeTaxBreakdown($sale->tax_breakdown);
+        @endphp
+        @if (!empty($taxSummary))
+            <table class="items-table" style="margin-top: 14px; page-break-inside: avoid;">
+                <thead>
+                    <tr>
+                        <th style="font-size: 8.5px;">{{ __("Tax Category / Rule") }}</th>
+                        <th class="text-right" style="font-size: 8.5px;">{{ __("Rate (%)") }}</th>
+                        <th class="text-right" style="font-size: 8.5px;">{{ __("Taxable Amount") }}</th>
+                        <th class="text-right" style="font-size: 8.5px;">{{ __("Tax Amount") }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($taxSummary as $tRow)
+                        <tr>
+                            <td><strong>{{ $tRow['name'] }}</strong></td>
+                            <td class="text-right">{{ $tRow['rate'] }}%</td>
+                            <td class="text-right">{{ $company->formatMoney($tRow['taxable']) }}</td>
+                            <td class="text-right"><strong>{{ $company->formatMoney($tRow['amount']) }}</strong></td>
+                        </tr>
+                        @foreach ($tRow['sub_components'] as $component)
+                            <tr style="color: #64748b; font-size: 9px;">
+                                <td style="padding-left: 18px;">&#9492; {{ $component['name'] }}</td>
+                                <td class="text-right">{{ $component['rate'] }}%</td>
+                                <td class="text-right">&mdash;</td>
+                                <td class="text-right">{{ $company->formatMoney($component['amount']) }}</td>
+                            </tr>
+                        @endforeach
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+
         <!-- Summary Totals -->
         <table class="summary-table">
             <tr>
-                <td style="color: #64748b; font-weight: bold;">Subtotal:</td>
+                <td style="color: #64748b; font-weight: bold;">{{ __("Subtotal:") }}</td>
                 <td style="text-align: right; font-weight: bold;">{{ $company->formatMoney($subtotal) }}</td>
             </tr>
             @if ($sale->discount > 0)
                 <tr>
-                    <td style="color: #dc2626; font-weight: bold;">Discount:</td>
+                    <td style="color: #dc2626; font-weight: bold;">{{ __("Discount:") }}</td>
                     <td style="text-align: right; color: #dc2626; font-weight: bold;">-{{ $company->formatMoney($sale->discount) }}</td>
                 </tr>
             @endif
             @php
-                $taxAmount = ($sale->total - $subtotal + $sale->discount) > 0 ? ($sale->total - $subtotal + $sale->discount) : 0;
+                $flattenedTaxes = $sale->flattened_tax_components;
+                $taxAmount = (float)($sale->tax_amount ?? (($sale->total - $subtotal + $sale->discount) > 0 ? ($sale->total - $subtotal + $sale->discount) : 0));
+                if ($taxAmount <= 0 && !empty($flattenedTaxes)) {
+                    $taxAmount = array_sum(array_column($flattenedTaxes, 'amount'));
+                }
             @endphp
-            @if ($taxAmount > 0)
-                <tr>
-                    <td style="color: #64748b; font-weight: bold;">Estimated Tax / VAT:</td>
-                    <td style="text-align: right; font-weight: bold;">+{{ $company->formatMoney($taxAmount) }}</td>
-                </tr>
+            @if ($taxAmount > 0 || !empty($flattenedTaxes))
+                @if (!empty($flattenedTaxes))
+                    @foreach ($flattenedTaxes as $tComp)
+                        <tr>
+                            <td style="color: #475569; font-weight: 500;">{{ $tComp['name'] }} ({{ $tComp['rate'] }}%):</td>
+                            <td style="text-align: right; font-weight: 600;">+{{ $company->formatMoney($tComp['amount']) }}</td>
+                        </tr>
+                    @endforeach
+                @else
+                    <tr>
+                        <td style="color: #475569; font-weight: 500;">{{ $sale->tax_name ?: __('Estimated Tax / VAT') }} ({{ (float)($sale->tax_rate ?? 0) }}%):</td>
+                        <td style="text-align: right; font-weight: 600;">+{{ $company->formatMoney($taxAmount) }}</td>
+                    </tr>
+                @endif
             @endif
             <tr class="total-row">
-                <td>Total Estimate:</td>
+                <td>{{ __("Total Estimate:") }}</td>
                 <td style="text-align: right;">{{ $company->formatMoney($sale->total) }}</td>
             </tr>
         </table>
@@ -380,7 +438,7 @@
         @if (!empty($sale->notes))
             <div class="notes-section">
                 <div class="card-heading">Notes & Proposal Remarks</div>
-                <div class="card-content">{!! $sale->notes !!}</div>
+                <div class="card-content">{!! clean_html($sale->notes) !!}</div>
             </div>
         @endif
 
@@ -391,14 +449,14 @@
                     <div class="card-heading">Payable To & Banking</div>
                     <div class="card-content">
                         <strong>{{ $company->trade_name ?? $company->name }}</strong><br>
-                        {!! $company->bank_details ?? ($company->name . '<br>Phone: ' . ($company->phone ?? '+123-456-7890')) !!}
+                        {!! clean_html($company->bank_details ?? ($company->name . '<br>Phone: ' . ($company->phone ?? '+123-456-7890'))) !!}
                     </div>
                 </td>
                 <td>
                     <div class="card-heading">Terms & Conditions</div>
                     <div class="card-content">
                         @if (!empty($company->quote_terms))
-                            {!! $company->quote_terms !!}
+                            {!! clean_html($company->quote_terms) !!}
                         @else
                             <ul class="terms-list">
                                 <li>All rates quoted are valid for 15 days from date of issuance.</li>
@@ -433,6 +491,14 @@
             @if ($company->phone) &bull; Tel: {{ $company->phone }} @endif
             @if ($company->email) &bull; Email: {{ $company->email }} @endif
             @if ($company->website) &bull; {{ $company->website }} @endif
+            @php
+                $platformBranding = \App\Models\PlatformBranding::current();
+                $platformName = $platformBranding?->platform_name ?? config('app.name');
+                $platformDomain = config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'saas.zoomnearby.com';
+            @endphp
+            <div style="margin-top: 4px; font-size: 9px; color: #94a3b8;">
+                Powered by {{ $platformName }} &bull; Issued via {{ $platformDomain }}
+            </div>
         </div>
     </div>
 </body>

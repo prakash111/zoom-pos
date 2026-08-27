@@ -15,9 +15,14 @@
             <p class="text-xs text-slate-400 mt-0.5">Public content pages (About, Terms, Privacy, etc.) &mdash; one of these can also be set as the landing page in Branding settings.</p>
         </div>
 
-        <a href="{{ route('superadmin.pages.create') }}" class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-md shadow-blue-500/20 transition text-center">
-            + New Page
-        </a>
+        <div class="flex items-center gap-2">
+            <a wire:navigate.hover href="{{ route('superadmin.menus.index') }}" class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition text-center flex items-center gap-1.5">
+                <span>🧭</span> {{ __('Manage Navigation Menus') }}
+            </a>
+            <a wire:navigate.hover href="{{ route('superadmin.pages.create') }}" class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-md shadow-blue-500/20 transition text-center">
+                + New Page
+            </a>
+        </div>
     </div>
 
     <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -59,7 +64,7 @@
                                 @if ($page->is_active)
                                     <a href="{{ route('pages.show', $page->slug) }}" target="_blank" class="text-slate-400 hover:text-slate-700 dark:hover:text-white font-bold mr-3" title="View live">View</a>
                                 @endif
-                                <a href="{{ route('superadmin.pages.edit', $page) }}" class="text-blue-600 hover:underline font-bold mr-3">Edit</a>
+                                <a wire:navigate.hover href="{{ route('superadmin.pages.edit', $page) }}" class="text-blue-600 hover:underline font-bold mr-3">Edit</a>
                                 <button type="button"
                                         wire:click="delete({{ $page->id }})"
                                         wire:confirm="Delete page &quot;{{ $page->title }}&quot;? This cannot be undone."

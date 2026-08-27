@@ -1,4 +1,4 @@
-<div class="h-[calc(100vh-4.5rem)] flex flex-col lg:flex-row gap-4 antialiased overflow-hidden font-sans relative"
+<div class="h-full flex-1 flex flex-col lg:flex-row gap-4 antialiased overflow-hidden font-sans relative min-h-0"
      x-data
      x-on:item-added-to-cart.window="playAddToCartBeep()">
     
@@ -36,7 +36,7 @@
                             'bg-[#a3e635] text-slate-950 shadow-md' => $serviceType === 'dine_in',
                             'text-slate-400 hover:text-white' => $serviceType !== 'dine_in',
                         ])>
-                    <span>🍽️ Dine-In</span>
+                    <span>🍽️ {{ __("Dine-In") }}</span>
                 </button>
 
                 <button type="button"
@@ -46,7 +46,7 @@
                             'bg-[#a3e635] text-slate-950 shadow-md' => $serviceType === 'takeaway',
                             'text-slate-400 hover:text-white' => $serviceType !== 'takeaway',
                         ])>
-                    <span>🛍️ Takeaway</span>
+                    <span>🛍️ {{ __("Takeaway") }}</span>
                 </button>
 
                 <button type="button"
@@ -56,7 +56,7 @@
                             'bg-[#a3e635] text-slate-950 shadow-md' => $serviceType === 'delivery',
                             'text-slate-400 hover:text-white' => $serviceType !== 'delivery',
                         ])>
-                    <span>🛵 Delivery</span>
+                    <span>🛵 {{ __("Delivery") }}</span>
                 </button>
             </div>
 
@@ -65,7 +65,7 @@
                 <div class="relative w-44 sm:w-56">
                     <input type="text"
                            wire:model.live.debounce.250ms="search"
-                           placeholder="Search menu..."
+                           placeholder="{{ __("Search menu...") }}"
                            class="w-full pl-8 pr-3 py-1.5 bg-slate-900/80 border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:ring-1 focus:ring-lime-400">
                     <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-500 text-xs">
                         🔍
@@ -73,8 +73,8 @@
                 </div>
 
                 <div class="text-right hidden sm:block">
-                    <div class="text-xs font-black text-slate-200">{{ auth('web')->user()?->name ?? 'Staff' }}</div>
-                    <div class="text-[10px] font-bold text-slate-400">POS Server &bull; {{ now()->format('h:i A') }}</div>
+                    <div class="text-xs font-black text-slate-200">{{ auth('web')->user()?->name ?? __('Staff') }}</div>
+                    <div class="text-[10px] font-bold text-slate-400">{{ __("POS Server") }} &bull; {{ now()->format('h:i A') }}</div>
                 </div>
             </div>
         </div>
@@ -83,56 +83,62 @@
         @if ($serviceType === 'takeaway')
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-900/80 p-2.5 rounded-2xl border border-slate-800 my-2 text-xs">
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Customer Name</label>
-                    <input type="text" wire:model="customerName" placeholder="Guest name" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
+                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">{{ __("Customer Name") }}</label>
+                    <input type="text" wire:model="customerName" placeholder="{{ __("Guest name") }}" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Phone Number</label>
-                    <input type="text" wire:model="customerPhone" placeholder="Phone" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
+                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">{{ __("Phone Number") }}</label>
+                    <input type="text" wire:model="customerPhone" placeholder="{{ __("Phone") }}" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Pickup Time</label>
-                    <input type="text" wire:model="pickupTime" placeholder="e.g. 15 mins, 06:00 PM" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
+                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">{{ __("Pickup Time") }}</label>
+                    <input type="text" wire:model="pickupTime" placeholder="{{ __("e.g. 15 mins, 06:00 PM") }}" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
                 </div>
             </div>
         @elseif ($serviceType === 'delivery')
             <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 bg-slate-900/80 p-2.5 rounded-2xl border border-slate-800 my-2 text-xs">
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Customer Name</label>
-                    <input type="text" wire:model="customerName" placeholder="Customer name" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
+                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">{{ __("Customer Name") }}</label>
+                    <input type="text" wire:model="customerName" placeholder="{{ __("Customer name") }}" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Customer Phone</label>
-                    <input type="text" wire:model="customerPhone" placeholder="Phone" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
+                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">{{ __("Customer Phone") }}</label>
+                    <input type="text" wire:model="customerPhone" placeholder="{{ __("Phone") }}" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Delivery Address</label>
-                    <input type="text" wire:model="deliveryAddress" placeholder="Street & apt" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
+                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">{{ __("Delivery Address") }}</label>
+                    <input type="text" wire:model="deliveryAddress" placeholder="{{ __("Street & apt") }}" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Driver / Courier</label>
-                    <input type="text" wire:model="driverName" placeholder="Driver name" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
+                    <label class="block text-[10px] font-bold text-slate-400 mb-0.5">{{ __("Driver / Courier") }}</label>
+                    <input type="text" wire:model="driverName" placeholder="{{ __("Driver name") }}" class="w-full py-1 px-2.5 rounded-lg bg-slate-800 border-slate-700 text-xs text-white">
                 </div>
             </div>
         @endif
 
         <!-- Category Filter Pills (matching food-idea-pos.png) -->
-        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-3">
+        <div class="pos-categories-row tab-scroll-container flex items-center gap-2 overflow-x-auto no-scrollbar py-3">
             <button type="button"
                     wire:click="$set('selectedCategoryId', null)"
+                    class="pos-category-btn"
+                    role="tab"
+                    aria-selected="{{ $selectedCategoryId === null ? 'true' : 'false' }}"
                     @class([
-                        'px-4 py-2 rounded-2xl text-xs whitespace-nowrap transition-all',
+                        'px-4 py-2 rounded-2xl text-xs whitespace-nowrap transition-all cursor-pointer',
                         'bg-[#a3e635] text-slate-950 font-black shadow-lg shadow-lime-500/20' => $selectedCategoryId === null,
                         'bg-slate-900/90 text-slate-400 hover:text-white border border-slate-800 font-bold' => $selectedCategoryId !== null,
                     ])>
-                All Menu
+                {{ __("All Menu") }}
             </button>
 
             @foreach ($categories as $cat)
                 <button type="button"
                         wire:click="$set('selectedCategoryId', {{ $cat->id }})"
+                        class="pos-category-btn"
+                        role="tab"
+                        aria-selected="{{ $selectedCategoryId === $cat->id ? 'true' : 'false' }}"
                         @class([
-                            'px-4 py-2 rounded-2xl text-xs whitespace-nowrap transition-all',
+                            'px-4 py-2 rounded-2xl text-xs whitespace-nowrap transition-all cursor-pointer',
                             'bg-[#a3e635] text-slate-950 font-black shadow-lg shadow-lime-500/20' => $selectedCategoryId === $cat->id,
                             'bg-slate-900/90 text-slate-400 hover:text-white border border-slate-800 font-bold' => $selectedCategoryId !== $cat->id,
                         ])>
@@ -141,14 +147,25 @@
             @endforeach
         </div>
 
+        <!-- Skeleton Shimmer Placeholder for Food Menu -->
+        <div wire:loading.grid wire:target="search,selectedCategoryId" class="flex-1 overflow-y-auto pr-1 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5 content-start">
+            @for ($i = 0; $i < 8; $i++)
+                <div class="animate-pulse bg-slate-900/90 rounded-3xl p-3 flex flex-col gap-2.5 border border-slate-800/80">
+                    <div class="w-full aspect-square bg-slate-800 rounded-2xl"></div>
+                    <div class="h-3.5 bg-slate-800 rounded-md w-3/4"></div>
+                    <div class="h-3 bg-slate-800 rounded-md w-1/3"></div>
+                </div>
+            @endfor
+        </div>
+
         <!-- Food Menu Grid (matching food-idea-pos.png) -->
-        <div class="flex-1 overflow-y-auto pr-1 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5 content-start">
+        <div wire:loading.remove wire:target="search,selectedCategoryId" class="flex-1 overflow-y-auto pr-1 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5 content-start">
             @forelse ($products as $p)
                 <div wire:click="addItemDirect({{ $p->id }})"
-                     class="bg-slate-900/90 hover:bg-slate-800/90 rounded-3xl overflow-hidden border border-slate-800/80 hover:border-[#a3e635]/60 hover:shadow-lg hover:shadow-lime-500/10 transition-all cursor-pointer group flex flex-col justify-between shadow-md active:scale-98">
+                     class="bg-slate-900/90 hover:bg-slate-800/90 rounded-3xl overflow-hidden border border-slate-800/80 hover:border-[#a3e635]/60 hover:shadow-lg hover:shadow-lime-500/10 transition-all duration-150 ease-out cursor-pointer group flex flex-col justify-between shadow-md active:scale-[0.97]">
                     
-                    <!-- Food Photo Thumbnail -->
-                    <div class="relative h-28 sm:h-32 w-full bg-slate-800 overflow-hidden shrink-0">
+                    <!-- Food Photo Thumbnail with Fixed Aspect Ratio -->
+                    <div class="relative w-full aspect-square bg-slate-800 overflow-hidden shrink-0">
                         <img src="{{ $p->getImageUrlOrDefault() }}"
                              alt="{{ $p->name }}"
                              loading="lazy"
@@ -158,7 +175,7 @@
 
                         @if (!empty($p->variants) && count($p->variants) > 0)
                             <span class="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black bg-black/80 text-[#a3e635] backdrop-blur-xs border border-lime-500/30">
-                                Options
+                                {{ __("Options") }}
                             </span>
                         @endif
 
@@ -173,14 +190,14 @@
                             {{ $p->name }}
                         </h4>
                         <div class="text-[11px] font-semibold text-slate-400 truncate mt-0.5">
-                            {{ $p->category_name ?? $p->category?->name ?? 'Food Menu' }}
+                            {{ $p->category_name ?? $p->category?->name ?? __('Food Menu') }}
                         </div>
                     </div>
 
                 </div>
             @empty
                 <div class="col-span-full py-16 text-center text-slate-500 text-xs">
-                    No food items found. Use "+ Add Product" in Products menu to create items.
+                    {{ __('No food items found. Use "+ Add Product" in Products menu to create items.') }}
                 </div>
             @endforelse
         </div>
@@ -188,7 +205,7 @@
     </div>
 
     <!-- RIGHT: Seat Breakdown, Cart Order & Kitchen Dispatch (matching food-idea-pos.png) -->
-    <div class="w-full lg:w-[420px] flex flex-col justify-between bg-[#121829] dark:bg-[#090d16] rounded-3xl p-5 border border-slate-800/80 shadow-2xl overflow-hidden">
+    <div class="w-full lg:w-96 xl:w-[420px] shrink-0 flex flex-col justify-between bg-[#121829] dark:bg-[#090d16] rounded-3xl p-5 border border-slate-800/80 shadow-2xl overflow-hidden h-full max-h-full sticky top-0 min-h-0">
         
         <!-- Order Panel Top: Table Info / Mode Header -->
         <div>
@@ -198,17 +215,17 @@
                         <div>
                             <div class="flex items-center gap-2">
                                 <h3 class="text-lg font-black text-white">
-                                    {{ $activeTable?->table_number ?? 'Select Table' }}
+                                    {{ $activeTable?->table_number ?? __('Select Table') }}
                                 </h3>
                                 <button type="button"
                                         wire:click="$set('showTableSelectorModal', true)"
                                         class="text-slate-400 hover:text-lime-400 text-xs p-1"
-                                        title="Switch Table">
+                                        title="{{ __("Switch Table") }}">
                                     ✏️
                                 </button>
                             </div>
                             <div class="text-[11px] font-bold text-slate-400">
-                                {{ $activeTable?->floor?->name ?? 'Floor Area' }}
+                                {{ $activeTable?->floor?->name ?? __('Floor Area') }}
                             </div>
                         </div>
                     </div>
@@ -223,17 +240,17 @@
                         <button type="button"
                                 wire:click="$set('showTransferModal', true)"
                                 class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs"
-                                title="Transfer Table">
+                                title="{{ __("Transfer Table") }}">
                             🔄
                         </button>
                     </div>
                 @else
                     <div>
                         <h3 class="text-base font-black text-white capitalize">
-                            {{ $serviceType }} Order
+                            {{ $serviceType }} {{ __("Order") }}
                         </h3>
                         <div class="text-xs font-bold text-lime-400">
-                            {{ $customerName ?: 'Counter Checkout' }}
+                            {{ $customerName ?: __('Counter Checkout') }}
                         </div>
                     </div>
                 @endif
@@ -272,7 +289,7 @@
         </div>
 
         <!-- Order Items List -->
-        <div class="flex-1 overflow-y-auto py-3 space-y-2 pr-1 my-1">
+        <div class="flex-1 min-h-[140px] overflow-y-auto py-3 space-y-2 pr-1 my-1">
             @forelse ($items as $item)
                 <div class="bg-slate-900/90 rounded-2xl p-3 border border-slate-800 space-y-1.5">
                     <div class="flex justify-between items-start">
@@ -286,7 +303,7 @@
 
                             @if (!empty($item['variant']))
                                 <div class="text-[11px] font-bold text-slate-400">
-                                    Option: {{ $item['variant'] }}
+                                    {{ __("Option:") }} {{ $item["variant"] }}
                                 </div>
                             @endif
 
@@ -298,7 +315,7 @@
 
                             @if (!empty($item['note']))
                                 <div class="text-[10px] font-extrabold text-amber-400">
-                                    Note: {{ $item['note'] }}
+                                    {{ __("Note:") }} {{ $item["note"] }}
                                 </div>
                             @endif
                         </div>
@@ -334,8 +351,8 @@
                                 <input type="number" min="0" step="0.01" value="{{ $item['price'] }}"
                                        wire:change="applyPriceOverride('{{ $item['id'] }}', $event.target.value)"
                                        class="w-14 py-0.5 px-1 text-[10px] font-bold rounded-md border border-slate-700 bg-slate-800 text-white"
-                                       title="Override unit price">
-                                <span class="text-[10px] text-slate-500">each</span>
+                                       title="{{ __("Override unit price") }}">
+                                <span class="text-[10px] text-slate-500">{{ __("each") }}</span>
                             @endif
                             <span class="font-black text-white">
                                 {{ $company->formatMoney(((float)$item['price']) * ((float)$item['quantity'])) }}
@@ -345,26 +362,26 @@
                 </div>
             @empty
                 <div class="py-16 text-center text-slate-500 text-xs">
-                    No items selected for this order.<br>Click any menu card on the left to add food.
+                    {{ __("No items selected for this order.") }}<br>{{ __("Click any menu card on the left to add food.") }}
                 </div>
             @endforelse
         </div>
 
         <!-- Order Summary & Actions (matching food-idea-pos.png) -->
-        <div class="pt-3 border-t border-slate-800 space-y-3">
+        <div class="pt-3 border-t border-slate-800 space-y-3 shrink-0">
             <div class="space-y-1 text-xs">
                 <div class="flex justify-between text-slate-400">
-                    <span>Subtotal</span>
+                    <span>{{ __("Subtotal") }}</span>
                     <span class="font-bold text-white">{{ $company->formatMoney($this->subtotal) }}</span>
                 </div>
                 @if ($discount > 0)
                     <div class="flex justify-between text-rose-400">
-                        <span>Discount</span>
+                        <span>{{ __("Discount") }}</span>
                         <span class="font-bold">-{{ $company->formatMoney($discount) }}</span>
                     </div>
                 @endif
                 <div class="flex justify-between text-base font-black text-white pt-1 border-t border-slate-800">
-                    <span>Total</span>
+                    <span>{{ __("Total") }}</span>
                     <span class="text-[#a3e635]">{{ $company->formatMoney($this->total) }}</span>
                 </div>
             </div>
@@ -373,9 +390,9 @@
             <div class="flex items-center gap-2">
                 <button type="button"
                         wire:click="clearOrder"
-                        wire:confirm="Clear all items in this order?"
+                        wire:confirm="{{ __("Clear all items in this order?") }}"
                         class="w-1/3 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition active:scale-95 text-center">
-                    Cancel
+                    {{ __("Cancel") }}
                 </button>
 
                 <button type="button"
@@ -389,7 +406,7 @@
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Dispatching...</span>
+                        <span>{{ __("Dispatching...") }}</span>
                     </span>
                 </button>
             </div>
@@ -398,7 +415,7 @@
             <button type="button"
                     wire:click="openCheckoutModal"
                     class="w-full py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-md active:scale-95 transition flex items-center justify-center gap-1.5">
-                <span>💳 Pay & Settle Bill &bull; {{ $company->formatMoney($this->total) }}</span>
+                <span>💳 {{ __("Pay & Settle Bill") }} &bull; {{ $company->formatMoney($this->total) }}</span>
             </button>
         </div>
 
@@ -419,7 +436,7 @@
                 <!-- Variants Selection -->
                 @if (!empty($selectedProduct->variants) && count($selectedProduct->variants) > 0)
                     <div class="space-y-2">
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Size / Style</label>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __("Size / Style") }}</label>
                         <div class="grid grid-cols-1 gap-1.5">
                             @foreach ($selectedProduct->variants as $v)
                                 <button type="button"
@@ -440,7 +457,7 @@
                 <!-- Modifiers / Add-ons -->
                 @if (!empty($selectedProduct->modifiers) && count($selectedProduct->modifiers) > 0)
                     <div class="space-y-2">
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Add-ons & Extras</label>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __("Add-ons & Extras") }}</label>
                         <div class="space-y-1.5">
                             @foreach ($selectedProduct->modifiers as $m)
                                 @php
@@ -470,23 +487,23 @@
                 <div class="grid grid-cols-2 gap-3">
                     @if ($serviceType === 'dine_in')
                         <div>
-                            <label class="block text-[11px] font-bold text-slate-400 mb-1">Target Seat</label>
+                            <label class="block text-[11px] font-bold text-slate-400 mb-1">{{ __("Target Seat") }}</label>
                             <select wire:model="activeSeat" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white">
                                 @foreach ($seats as $s)
-                                    <option value="{{ $s }}">Seat {{ $s }}</option>
+                                    <option value="{{ $s }}">{{ __("Seat") }} {{ $s }}</option>
                                 @endforeach
                             </select>
                         </div>
                     @endif
                     <div class="{{ $serviceType !== 'dine_in' ? 'col-span-2' : '' }}">
-                        <label class="block text-[11px] font-bold text-slate-400 mb-1">Kitchen Note</label>
-                        <input type="text" wire:model="itemNote" placeholder="e.g. No onion" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white">
+                        <label class="block text-[11px] font-bold text-slate-400 mb-1">{{ __("Kitchen Note") }}</label>
+                        <input type="text" wire:model="itemNote" placeholder="{{ __("e.g. No onion") }}" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white">
                     </div>
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" wire:click="$set('showModifierModal', false)" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-400">Cancel</button>
-                    <button type="button" wire:click="addCustomizedItemToCart" class="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-[#a3e635] text-slate-950">Add to Order</button>
+                    <button type="button" wire:click="addCustomizedItemToCart" class="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-[#a3e635] text-slate-950">{{ __("Add to Order") }}</button>
                 </div>
             </div>
         </div>
@@ -497,7 +514,7 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
             <div class="bg-slate-900 rounded-3xl max-w-2xl w-full p-6 space-y-4 border border-slate-800 max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center pb-2 border-b border-slate-800">
-                    <h3 class="text-base font-black text-white">Select Dine-In Table</h3>
+                    <h3 class="text-base font-black text-white">{{ __("Select Dine-In Table") }}</h3>
                     <button type="button" wire:click="$set('showTableSelectorModal', false)" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
                 </div>
 
@@ -532,21 +549,21 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
             <div class="bg-slate-900 rounded-3xl max-w-md w-full p-6 space-y-4 border border-slate-800">
                 <div class="flex justify-between items-center pb-2 border-b border-slate-800">
-                    <h3 class="text-base font-black text-white">Transfer Table Order</h3>
+                    <h3 class="text-base font-black text-white">{{ __("Transfer Table Order") }}</h3>
                     <button type="button" wire:click="$set('showTransferModal', false)" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 mb-1">Select Destination Table</label>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">{{ __("Select Destination Table") }}</label>
                     <select wire:model="transferTargetTableId" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white">
-                        <option value="">Select Available Table</option>
+                        <option value="">{{ __("Select Available Table") }}</option>
                         @foreach ($tables->where('status', 'available') as $t)
-                            <option value="{{ $t->id }}">{{ $t->table_number }} ({{ $t->floor?->name }}) - 👤 {{ $t->seating_capacity }} seats</option>
+                            <option value="{{ $t->id }}">{{ $t->table_number }} ({{ $t->floor?->name }}) - 👤 {{ $t->seating_capacity }} {{ __("seats") }}</option>
                         @endforeach
                     </select>
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" wire:click="$set('showTransferModal', false)" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-400">Cancel</button>
-                    <button type="button" wire:click="transferTable" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white">Transfer Order</button>
+                    <button type="button" wire:click="transferTable" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white">{{ __("Transfer Order") }}</button>
                 </div>
             </div>
         </div>
@@ -557,7 +574,7 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
             <div class="bg-slate-900 rounded-3xl max-w-xl w-full p-6 space-y-4 border border-slate-800 max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center pb-2 border-b border-slate-800">
-                    <h3 class="text-base font-black text-white">Settle Bill & Print Receipt</h3>
+                    <h3 class="text-base font-black text-white">{{ __("Settle Bill & Print Receipt") }}</h3>
                     <div class="flex items-center gap-2">
                         <button type="button"
                                 wire:click="toggleSplitPayment"
@@ -566,7 +583,7 @@
                                     'bg-lime-400 text-slate-950 border-lime-400' => $isSplitPayment,
                                     'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700' => ! $isSplitPayment,
                                 ])>
-                            🔀 Split: {{ $isSplitPayment ? 'ON' : 'OFF' }}
+                            🔀 {{ __('Split:') }} {{ $isSplitPayment ? __('ON') : __('OFF') }}
                         </button>
                         <button type="button" wire:click="$set('showCheckoutModal', false)" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
                     </div>
@@ -574,13 +591,13 @@
 
                 <div class="space-y-3">
                     <div class="bg-slate-800/80 rounded-2xl p-4 text-center space-y-1">
-                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Amount Due</div>
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __("Total Amount Due") }}</div>
                         <div class="text-3xl font-black text-lime-400">{{ $company->formatMoney($this->total) }}</div>
                     </div>
 
                     @if (! $isSplitPayment)
                         <div>
-                            <label class="block text-xs font-bold text-slate-400 mb-1.5">Payment Method</label>
+                            <label class="block text-xs font-bold text-slate-400 mb-1.5">{{ __("Payment Method") }}</label>
                             <div class="grid grid-cols-3 gap-2">
                                 @foreach ($paymentMethods as $pm)
                                     @php $val = $pm->code ?: strtolower($pm->name); @endphp
@@ -600,11 +617,11 @@
                         @if ($paymentMethod === 'cash')
                             <div class="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label class="block text-xs font-bold text-slate-400 mb-1">Cash Tendered ($)</label>
+                                    <label class="block text-xs font-bold text-slate-400 mb-1">{{ __("Cash Tendered ($)") }}</label>
                                     <input type="number" min="0" step="0.5" wire:model.live="cashTendered" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white">
                                 </div>
                                 <div class="bg-lime-500/10 border border-lime-500/30 rounded-xl p-2 flex flex-col justify-center">
-                                    <div class="text-[9px] font-extrabold uppercase text-lime-400">Change Due</div>
+                                    <div class="text-[9px] font-extrabold uppercase text-lime-400">{{ __("Change Due") }}</div>
                                     <div class="text-sm font-black text-lime-400">{{ $company->formatMoney($this->changeDue) }}</div>
                                 </div>
                             </div>
@@ -612,8 +629,8 @@
                     @else
                         <div class="space-y-2 p-3 rounded-2xl border border-lime-500/30 bg-lime-500/5">
                             <div class="flex items-center justify-between">
-                                <span class="text-[11px] font-extrabold text-lime-400 uppercase tracking-wider">Split Payment Entries</span>
-                                <button type="button" wire:click="addSplitRow" class="px-2 py-1 rounded-lg bg-lime-400 hover:bg-lime-500 text-slate-950 font-bold text-[10px]">+ Add Split</button>
+                                <span class="text-[11px] font-extrabold text-lime-400 uppercase tracking-wider">{{ __("Split Payment Entries") }}</span>
+                                <button type="button" wire:click="addSplitRow" class="px-2 py-1 rounded-lg bg-lime-400 hover:bg-lime-500 text-slate-950 font-bold text-[10px]">+ {{ __("Add Split") }}</button>
                             </div>
 
                             @foreach ($splitPayments as $idx => $sp)
@@ -623,19 +640,19 @@
                                             <option value="{{ $pm->code }}">{{ $pm->name }}</option>
                                         @endforeach
                                     </select>
-                                    <input type="number" min="0" step="0.5" wire:model.live="splitPayments.{{ $idx }}.amount" class="col-span-4 text-[10px] rounded-lg bg-slate-900 border-slate-700 text-white py-1 px-1.5" placeholder="Amount">
-                                    <input type="text" wire:model.live="splitPayments.{{ $idx }}.reference_number" class="col-span-3 text-[10px] rounded-lg bg-slate-900 border-slate-700 text-white py-1 px-1.5" placeholder="Ref #">
+                                    <input type="number" min="0" step="0.5" wire:model.live="splitPayments.{{ $idx }}.amount" class="col-span-4 text-[10px] rounded-lg bg-slate-900 border-slate-700 text-white py-1 px-1.5" placeholder="{{ __("Amount") }}">
+                                    <input type="text" wire:model.live="splitPayments.{{ $idx }}.reference_number" class="col-span-3 text-[10px] rounded-lg bg-slate-900 border-slate-700 text-white py-1 px-1.5" placeholder="{{ __("Ref #") }}">
                                     <button type="button" wire:click="removeSplitRow({{ $idx }})" class="col-span-1 text-rose-400 hover:text-rose-300 font-black text-xs">✕</button>
                                 </div>
                             @endforeach
 
                             <div class="grid grid-cols-3 gap-1.5 pt-1 text-center">
                                 <div class="bg-slate-800 rounded-lg p-1.5">
-                                    <div class="text-[9px] text-slate-400 font-bold uppercase">Total</div>
+                                    <div class="text-[9px] text-slate-400 font-bold uppercase">{{ __("Total") }}</div>
                                     <div class="text-xs font-black text-white">{{ $company->formatMoney($this->total) }}</div>
                                 </div>
                                 <div class="bg-slate-800 rounded-lg p-1.5">
-                                    <div class="text-[9px] text-slate-400 font-bold uppercase">Allocated</div>
+                                    <div class="text-[9px] text-slate-400 font-bold uppercase">{{ __("Allocated") }}</div>
                                     <div class="text-xs font-black text-lime-400">{{ $company->formatMoney($this->splitTotalPaid) }}</div>
                                 </div>
                                 <div @class([
@@ -644,7 +661,7 @@
                                     'bg-emerald-500/20' => $this->remainingBalance <= 0,
                                 ])>
                                     <div class="text-[9px] font-bold uppercase text-slate-300">
-                                        {{ $this->remainingBalance > 0 ? 'Remaining' : ($this->remainingBalance < 0 ? 'Change Due' : 'Settled') }}
+                                        {{ $this->remainingBalance > 0 ? __('Remaining') : ($this->remainingBalance < 0 ? __('Change Due') : __('Settled')) }}
                                     </div>
                                     <div class="text-xs font-black text-white">{{ $company->formatMoney(abs($this->remainingBalance)) }}</div>
                                 </div>
@@ -652,7 +669,7 @@
 
                             @if ($this->remainingBalance > 0)
                                 <div class="flex items-center justify-between gap-2 pt-1">
-                                    <span class="text-[10px] text-amber-400 font-semibold">⚠️ Balance logged to Accounts Receivable</span>
+                                    <span class="text-[10px] text-amber-400 font-semibold">⚠️ {{ __("Balance logged to Accounts Receivable") }}</span>
                                     <input type="date" wire:model="dueDate" class="text-[10px] rounded-lg bg-slate-900 border-slate-700 text-white py-1 px-1.5">
                                 </div>
                             @endif
@@ -660,20 +677,20 @@
                     @endif
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 mb-1">Discount ($)</label>
+                        <label class="block text-xs font-bold text-slate-400 mb-1">{{ __("Discount ($)") }}</label>
                         <input type="number" step="0.01" wire:model.live="discount" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 mb-1">Order Notes & Remarks (Printed on Receipt)</label>
-                        <textarea wire:model="notes" rows="2" placeholder="Special instructions, cashier remarks..." class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white placeholder-slate-500"></textarea>
+                        <label class="block text-xs font-bold text-slate-400 mb-1">{{ __("Order Notes & Remarks (Printed on Receipt)") }}</label>
+                        <textarea wire:model="notes" rows="2" placeholder="{{ __("Special instructions, cashier remarks...") }}" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white placeholder-slate-500"></textarea>
                     </div>
                 </div>
 
                 <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
                     <button type="button" wire:click="$set('showCheckoutModal', false)" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-400">Cancel</button>
                     <button type="button" wire:click="settleBill" class="px-6 py-2.5 rounded-xl text-xs font-black bg-lime-400 hover:bg-lime-500 text-slate-950 shadow-lg shadow-lime-500/20 active:scale-95 transition">
-                        Complete & Print Receipt
+                        {{ __("Complete & Print Receipt") }}
                     </button>
                 </div>
             </div>
@@ -691,27 +708,27 @@
 
                 <div>
                     <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-lime-400 text-slate-950 mb-2 shadow-xs">
-                        {{ $lastDispatchedKotNumber }} DISPATCHED
+                        {{ $lastDispatchedKotNumber }} {{ __("DISPATCHED") }}
                     </span>
-                    <h3 class="text-xl font-black text-white">Order Sent to Kitchen!</h3>
+                    <h3 class="text-xl font-black text-white">{{ __("Order Sent to Kitchen!") }}</h3>
                     <p class="text-xs text-slate-400 mt-1">
-                        Ticket is now active in the Kitchen Display System (KDS) queue.
+                        {{ __("Ticket is now active in the Kitchen Display System (KDS) queue.") }}
                     </p>
                 </div>
 
                 <!-- Summary Details -->
                 <div class="bg-slate-800/80 rounded-2xl p-4 border border-slate-700/60 text-left space-y-2 text-xs">
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Destination:</span>
+                        <span class="text-slate-400">{{ __("Destination:") }}</span>
                         <span class="font-bold text-white">{{ $lastDispatchedTableName }}</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Food Items:</span>
-                        <span class="font-bold text-[#a3e635]">{{ $lastDispatchedItemCount }} items</span>
+                        <span class="text-slate-400">{{ __("Food Items:") }}</span>
+                        <span class="font-bold text-[#a3e635]">{{ $lastDispatchedItemCount }} {{ __("items") }}</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Ticket Status:</span>
-                        <span class="font-black text-amber-400 uppercase">⏳ Pending / In Cooking</span>
+                        <span class="text-slate-400">{{ __("Ticket Status:") }}</span>
+                        <span class="font-black text-amber-400 uppercase">⏳ {{ __("Pending / In Cooking") }}</span>
                     </div>
                 </div>
 
@@ -721,32 +738,35 @@
                         <a href="{{ $lastDispatchedKotPrintUrl }}"
                            target="_blank"
                            class="w-full py-3.5 rounded-2xl bg-[#a3e635] hover:bg-lime-400 text-slate-950 font-black text-sm transition shadow-lg shadow-lime-500/20 flex items-center justify-center gap-2">
-                            <span>🖨️ Print Kitchen Ticket (KOT)</span>
+                            <span>🖨️ {{ __("Print Kitchen Ticket (KOT)") }}</span>
                         </a>
                     @endif
 
                     <div class="grid grid-cols-2 gap-2">
-                        <a href="{{ route('tenant.restaurant.kds') }}"
+                        <a wire:navigate.hover href="{{ route('tenant.restaurant.kds') }}"
                            class="py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition text-center flex items-center justify-center gap-1.5">
-                            <span>🍳 Open KDS</span>
+                            <span>🍳 {{ __("Open KDS") }}</span>
                         </a>
 
                         <button type="button"
                                 wire:click="closeKotModalAndResetOrder"
                                 class="py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs transition text-center">
-                            + Start Next Order
+                            + Start Next {{ __("Order") }}
                         </button>
                     </div>
 
                     <button type="button"
                             wire:click="closeKotModalKeepOrder"
                             class="text-xs text-slate-400 hover:text-white font-bold py-1">
-                        Keep Order On Screen
+                        {{ __("Keep Order On Screen") }}
                     </button>
                 </div>
 
             </div>
         </div>
     @endif
+
+    <!-- Cash Register Shift Gating Modal -->
+    @include('livewire.tenant.sales.partials.register-gating-modal')
 
 </div>

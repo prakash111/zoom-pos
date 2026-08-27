@@ -1,5 +1,8 @@
 @php
     $publicBranding = $branding ?? \App\Models\PlatformBranding::current();
+    $publicHeaderMenu = \App\Models\MenuItem::getMenu('header');
+    $publicFooterCol1 = \App\Models\MenuItem::getMenu('footer_col_1');
+    $publicFooterCol2 = \App\Models\MenuItem::getMenu('footer_col_2');
     $publicFooterPages = $footerPages ?? \App\Models\Page::where('is_active', true)->where('show_in_footer', true)->orderBy('title')->get();
     $publicLocService = app(\App\Services\Localization\LocalizationService::class);
     $publicActiveLang = $publicLocService->getActiveLanguage();
@@ -49,6 +52,8 @@
 </head>
 <body class="bg-slate-900 text-slate-900 dark:text-slate-100 font-sans antialiased min-h-screen selection:bg-brand-lime selection:text-slate-900">
 
+    @include('layouts.partials.preloader')
+
     <!-- Global Floating / Sticky Navbar -->
     <header x-data="{ mobileOpen: false, scrolled: false }"
             x-init="window.addEventListener('scroll', () => { scrolled = window.scrollY > 20 })"
@@ -73,17 +78,37 @@
 
             <!-- Desktop Navigation Links -->
             <nav class="hidden lg:flex items-center gap-1.5 bg-white/10 dark:bg-slate-800/40 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10">
-                <a href="{{ url('/') }}#showcase" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Platform') }}</a>
-                <a href="{{ url('/') }}#features" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Products') }}</a>
-                <a href="{{ url('/') }}#solutions" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Solutions') }}</a>
-                <a href="{{ url('/') }}#pricing" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Pricing') }}</a>
-                <a href="{{ url('/') }}#about" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Company') }}</a>
-                <a href="{{ url('/') }}#contact" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Contact') }}</a>
+                @if(!empty($publicHeaderMenu))
+                    @foreach($publicHeaderMenu as $item)
+                        @php
+                            $itemUrl = is_array($item) ? $item['url'] : $item->url;
+                            $itemTitle = is_array($item) ? $item['title'] : $item->title;
+                            $itemTarget = is_array($item) ? ($item['target'] ?? '_self') : ($item->target ?? '_self');
+                            if (str_starts_with($itemUrl, '#')) {
+                                $itemUrl = request()->is('/') ? $itemUrl : url('/' . $itemUrl);
+                            } elseif (!str_starts_with($itemUrl, 'http://') && !str_starts_with($itemUrl, 'https://') && !str_starts_with($itemUrl, '/')) {
+                                $itemUrl = url($itemUrl);
+                            }
+                        @endphp
+                        <a href="{{ $itemUrl }}"
+                           target="{{ $itemTarget }}"
+                           class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">
+                            {{ $itemTitle }}
+                        </a>
+                    @endforeach
+                @else
+                    <a href="{{ url('/') }}#showcase" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Platform') }}</a>
+                    <a href="{{ url('/') }}#features" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Products') }}</a>
+                    <a href="{{ url('/') }}#solutions" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Solutions') }}</a>
+                    <a href="{{ url('/') }}#pricing" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Pricing') }}</a>
+                    <a href="{{ url('/') }}#about" class="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Company') }}</a>
+                    <a href="{{ url('/') }}#contact" class="px-3.5 py-2.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ __('Contact') }}</a>
+                @endif
             </nav>
 
             <!-- Right Actions -->
             <div class="flex items-center gap-2 sm:gap-3">
-                
+
                 <!-- Language Switcher Dropdown (Desktop) -->
                 @if ($publicLanguages->isNotEmpty())
                     <div class="relative" x-data="{ openLang: false }">
@@ -156,13 +181,33 @@
 
         <!-- Mobile Nav Drawer -->
         <div x-show="mobileOpen" x-cloak x-transition x-on:click.outside="mobileOpen = false" class="lg:hidden border-t border-white/10 px-4 sm:px-6 py-4 flex flex-col gap-2 bg-slate-950/95 backdrop-blur-2xl">
-            <a href="{{ url('/') }}#showcase" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Platform') }}</a>
-            <a href="{{ url('/') }}#features" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Products') }}</a>
-            <a href="{{ url('/') }}#solutions" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Solutions') }}</a>
-            <a href="{{ url('/') }}#pricing" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Pricing') }}</a>
-            <a href="{{ url('/') }}#about" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Company') }}</a>
-            <a href="{{ url('/') }}#contact" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Contact') }}</a>
-            
+            @if(!empty($publicHeaderMenu))
+                @foreach($publicHeaderMenu as $item)
+                    @php
+                        $itemUrl = is_array($item) ? $item['url'] : $item->url;
+                        $itemTitle = is_array($item) ? $item['title'] : $item->title;
+                        $itemTarget = is_array($item) ? ($item['target'] ?? '_self') : ($item->target ?? '_self');
+                        if (str_starts_with($itemUrl, '#')) {
+                            $itemUrl = request()->is('/') ? $itemUrl : url('/' . $itemUrl);
+                        } elseif (!str_starts_with($itemUrl, 'http://') && !str_starts_with($itemUrl, 'https://') && !str_starts_with($itemUrl, '/')) {
+                            $itemUrl = url($itemUrl);
+                        }
+                    @endphp
+                    <a href="{{ $itemUrl }}"
+                       target="{{ $itemTarget }}"
+                       class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">
+                        {{ $itemTitle }}
+                    </a>
+                @endforeach
+            @else
+                <a href="{{ url('/') }}#showcase" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Platform') }}</a>
+                <a href="{{ url('/') }}#features" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Products') }}</a>
+                <a href="{{ url('/') }}#solutions" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Solutions') }}</a>
+                <a href="{{ url('/') }}#pricing" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Pricing') }}</a>
+                <a href="{{ url('/') }}#about" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Company') }}</a>
+                <a href="{{ url('/') }}#contact" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Contact') }}</a>
+            @endif
+
             <!-- Mobile Language Switcher -->
             @if ($publicLanguages->isNotEmpty())
                 <div class="pt-2 border-t border-white/10">
@@ -232,12 +277,32 @@
                 </div>
 
                 <div>
-                    <h4 class="text-xs font-black uppercase tracking-wider text-slate-200 mb-3">{{ __('Core Platform') }}</h4>
+                    <h4 class="text-xs font-black uppercase tracking-wider text-slate-200 mb-3">{{ __('Quick Links') }}</h4>
                     <ul class="space-y-2.5 text-xs">
-                        <li><a href="{{ url('/') }}#features" class="text-slate-400 hover:text-brand-lime transition">{{ __('Smart Inventory & Stock') }}</a></li>
-                        <li><a href="{{ url('/') }}#features" class="text-slate-400 hover:text-brand-lime transition">{{ __('Retail POS & Checkout') }}</a></li>
-                        <li><a href="{{ url('/') }}#features" class="text-slate-400 hover:text-brand-lime transition">{{ __('Restaurant & Dining KOT') }}</a></li>
-                        <li><a href="{{ url('/') }}#features" class="text-slate-400 hover:text-brand-lime transition">{{ __('Financials & Invoicing') }}</a></li>
+                        @if(!empty($publicFooterCol1))
+                            @foreach($publicFooterCol1 as $item)
+                                @php
+                                    $itemUrl = is_array($item) ? $item['url'] : $item->url;
+                                    $itemTitle = is_array($item) ? $item['title'] : $item->title;
+                                    $itemTarget = is_array($item) ? ($item['target'] ?? '_self') : ($item->target ?? '_self');
+                                    if (str_starts_with($itemUrl, '#')) {
+                                        $itemUrl = request()->is('/') ? $itemUrl : url('/' . $itemUrl);
+                                    } elseif (!str_starts_with($itemUrl, 'http://') && !str_starts_with($itemUrl, 'https://') && !str_starts_with($itemUrl, '/')) {
+                                        $itemUrl = url($itemUrl);
+                                    }
+                                @endphp
+                                <li>
+                                    <a href="{{ $itemUrl }}" target="{{ $itemTarget }}" class="text-slate-400 hover:text-brand-lime transition">
+                                        {{ $itemTitle }}
+                                    </a>
+                                </li>
+                            @endforeach
+                        @else
+                            <li><a href="{{ url('/') }}#features" class="text-slate-400 hover:text-brand-lime transition">{{ __('Smart Inventory & Stock') }}</a></li>
+                            <li><a href="{{ url('/') }}#features" class="text-slate-400 hover:text-brand-lime transition">{{ __('Retail POS & Checkout') }}</a></li>
+                            <li><a href="{{ url('/') }}#features" class="text-slate-400 hover:text-brand-lime transition">{{ __('Restaurant & Dining KOT') }}</a></li>
+                            <li><a href="{{ url('/') }}#features" class="text-slate-400 hover:text-brand-lime transition">{{ __('Financials & Invoicing') }}</a></li>
+                        @endif
                     </ul>
                 </div>
 
@@ -262,13 +327,33 @@
                 </div>
 
                 <div>
-                    <h4 class="text-xs font-black uppercase tracking-wider text-slate-200 mb-3">{{ __('Legal') }}</h4>
+                    <h4 class="text-xs font-black uppercase tracking-wider text-slate-200 mb-3">{{ __('Legal & Company') }}</h4>
                     <ul class="space-y-2.5 text-xs">
-                        @forelse ($publicFooterPages as $fp)
-                            <li><a href="{{ route('pages.show', $fp->slug) }}" class="text-slate-400 hover:text-brand-lime transition">{{ $fp->title }}</a></li>
-                        @empty
-                            <li class="text-slate-500">{{ __('Terms & Privacy Policy') }}</li>
-                        @endforelse
+                        @if(!empty($publicFooterCol2))
+                            @foreach($publicFooterCol2 as $item)
+                                @php
+                                    $itemUrl = is_array($item) ? $item['url'] : $item->url;
+                                    $itemTitle = is_array($item) ? $item['title'] : $item->title;
+                                    $itemTarget = is_array($item) ? ($item['target'] ?? '_self') : ($item->target ?? '_self');
+                                    if (str_starts_with($itemUrl, '#')) {
+                                        $itemUrl = request()->is('/') ? $itemUrl : url('/' . $itemUrl);
+                                    } elseif (!str_starts_with($itemUrl, 'http://') && !str_starts_with($itemUrl, 'https://') && !str_starts_with($itemUrl, '/')) {
+                                        $itemUrl = url($itemUrl);
+                                    }
+                                @endphp
+                                <li>
+                                    <a href="{{ $itemUrl }}" target="{{ $itemTarget }}" class="text-slate-400 hover:text-brand-lime transition">
+                                        {{ $itemTitle }}
+                                    </a>
+                                </li>
+                            @endforeach
+                        @else
+                            @forelse ($publicFooterPages as $fp)
+                                <li><a href="{{ route('pages.show', $fp->slug) }}" class="text-slate-400 hover:text-brand-lime transition">{{ $fp->title }}</a></li>
+                            @empty
+                                <li class="text-slate-500">{{ __('Terms & Privacy Policy') }}</li>
+                            @endforelse
+                        @endif
                     </ul>
                 </div>
             </div>

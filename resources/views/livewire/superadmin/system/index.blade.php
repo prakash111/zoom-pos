@@ -11,7 +11,7 @@
         
         <div class="border-b border-slate-100 dark:border-slate-800 pb-4">
             <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🛠️ System Health & Global Maintenance Mode</span>
+                <span>🛠️ {{ __("System Health & Global Maintenance Mode") }}</span>
             </h3>
             <p class="text-xs text-slate-400 mt-1">
                 Control platform accessibility, maintenance lockouts, client build compatibility, and app releases.
@@ -30,18 +30,18 @@
 
         <div class="space-y-4">
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Maintenance Lockout Message</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Maintenance Lockout Message") }}</label>
                 <textarea wire:model="maintenanceMessage" rows="3" placeholder="Our systems are undergoing scheduled maintenance and upgrades. We'll be back shortly." class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500"></textarea>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Minimum Client Build Version</label>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Minimum Client Build Version") }}</label>
                     <input type="text" wire:model="minClientBuildVersion" placeholder="1.0.0" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500 font-mono">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Platform Application Version</label>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Platform Application Version") }}</label>
                     <input type="text" wire:model="appVersion" placeholder="2.5.0" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500 font-mono">
                 </div>
             </div>

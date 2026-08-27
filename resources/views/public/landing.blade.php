@@ -23,7 +23,7 @@
     @if (!empty($page->content))
         <div class="max-w-4xl mx-auto px-4 sm:px-6 py-12">
             <div class="page-content rounded-3xl bg-slate-900/80 border border-white/10 p-8 sm:p-12 text-white">
-                {!! $page->content !!}
+                {!! clean_html($page->content) !!}
             </div>
         </div>
     @endif

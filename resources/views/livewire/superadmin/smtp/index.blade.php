@@ -20,7 +20,7 @@
         
         <div class="border-b border-slate-100 dark:border-slate-800 pb-4">
             <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <span>✉️ Global Platform SMTP Email Configuration</span>
+                <span>✉️ {{ __("Global Platform SMTP Email Configuration") }}</span>
             </h3>
             <p class="text-xs text-slate-400 mt-1">
                 Configure primary mail server settings used for platform notifications, registration verification, tenant onboarding, and default invoice deliveries.
@@ -31,17 +31,17 @@
             
             <!-- SMTP Host -->
             <div class="sm:col-span-2">
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">SMTP Host Server *</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">{{ __("SMTP Host Server *") }}</label>
                 <input type="text"
                        wire:model="smtpHost"
-                       placeholder="smtp.mailgun.org, smtp.sendgrid.net, smtp.gmail.com…"
+                       placeholder="{{ __("smtp.mailgun.org, smtp.sendgrid.net, smtp.gmail.com…") }}"
                        class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-indigo-500 focus:border-indigo-500 font-medium">
                 @error('smtpHost') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
 
             <!-- SMTP Port -->
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Port *</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">{{ __("Port *") }}</label>
                 <input type="number"
                        wire:model="smtpPort"
                        placeholder="587"
@@ -51,22 +51,22 @@
 
             <!-- Encryption -->
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Encryption Protocol *</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">{{ __("Encryption Protocol *") }}</label>
                 <select wire:model="smtpEncryption"
                         class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-indigo-500 focus:border-indigo-500 font-medium">
-                    <option value="tls">TLS (Port 587 - Recommended)</option>
-                    <option value="ssl">SSL (Port 465)</option>
-                    <option value="">None (Port 25)</option>
+                    <option value="tls">{{ __("TLS (Port 587 - Recommended)") }}</option>
+                    <option value="ssl">{{ __("SSL (Port 465)") }}</option>
+                    <option value="">{{ __("None (Port 25)") }}</option>
                 </select>
                 @error('smtpEncryption') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
 
             <!-- Username -->
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">SMTP Username / API Key</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">{{ __("SMTP Username / API Key") }}</label>
                 <input type="text"
                        wire:model="smtpUsername"
-                       placeholder="apikey, username@domain.com…"
+                       placeholder="{{ __("apikey, username@domain.com…") }}"
                        class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-indigo-500 focus:border-indigo-500 font-medium">
                 @error('smtpUsername') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
@@ -76,7 +76,7 @@
                 <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
                     <span>SMTP Password</span>
                     @if ($hasStoredPassword)
-                        <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">● Saved securely</span>
+                        <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">● {{ __("Saved securely") }}</span>
                     @endif
                 </label>
                 <input type="password"
@@ -93,20 +93,20 @@
                 </label>
                 <input type="email"
                        wire:model="smtpFromAddress"
-                       placeholder="no-reply@saas.zoomnearby.com, billing@yourdomain.com"
+                       placeholder="{{ __("no-reply@saas.zoomnearby.com, billing@yourdomain.com") }}"
                        class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-indigo-500 focus:border-indigo-500 font-medium">
-                <p class="text-[11px] text-slate-400 mt-1">This email address will appear in the "From:" header of all outgoing system emails.</p>
+                <p class="text-[11px] text-slate-400 mt-1">{{ __('This email address will appear in the "From:" header of all outgoing system emails.') }}</p>
                 @error('smtpFromAddress') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
 
             <!-- FROM NAME -->
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Email From Name (Sender Name) *</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">{{ __("Email From Name (Sender Name) *") }}</label>
                 <input type="text"
                        wire:model="smtpFromName"
-                       placeholder="Smart Inventory Platform, SaaS Billing…"
+                       placeholder="{{ __("Smart Inventory Platform, SaaS Billing…") }}"
                        class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-indigo-500 focus:border-indigo-500 font-medium">
-                <p class="text-[11px] text-slate-400 mt-1">Brand or company name displayed to recipients.</p>
+                <p class="text-[11px] text-slate-400 mt-1">{{ __("Brand or company name displayed to recipients.") }}</p>
                 @error('smtpFromName') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
 
@@ -117,8 +117,8 @@
                     type="button"
                     wire:loading.attr="disabled"
                     class="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-indigo-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer">
-                <span wire:loading.remove>Save SMTP Configuration</span>
-                <span wire:loading>Saving...</span>
+                <span wire:loading.remove>{{ __("Save SMTP Configuration") }}</span>
+                <span wire:loading>{{ __("Saving...") }}</span>
             </button>
         </div>
 
@@ -130,21 +130,21 @@
             <h4 class="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>🧪 Send Test Verification Email</span>
             </h4>
-            <p class="text-xs text-slate-400">Send an immediate test dispatch to verify that your SMTP host credentials and sender address are working properly.</p>
+            <p class="text-xs text-slate-400">{{ __("Send an immediate test dispatch to verify that your SMTP host credentials and sender address are working properly.") }}</p>
         </div>
 
         <div class="flex flex-col sm:flex-row gap-3">
             <input type="email"
                    wire:model="testEmailTo"
-                   placeholder="admin@yourcompany.com"
+                   placeholder="{{ __("admin@yourcompany.com") }}"
                    class="flex-1 rounded-2xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-indigo-500 focus:border-indigo-500 py-3 px-4 font-medium">
             
             <button wire:click="sendTest"
                     type="button"
                     wire:loading.attr="disabled"
                     class="px-6 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-extrabold text-xs sm:text-sm transition active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer shadow-2xs">
-                <span wire:loading.remove>Send Test Email</span>
-                <span wire:loading>Sending Test...</span>
+                <span wire:loading.remove>{{ __("Send Test Email") }}</span>
+                <span wire:loading>{{ __("Sending Test...") }}</span>
             </button>
         </div>
     </div>

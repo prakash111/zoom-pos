@@ -39,6 +39,8 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between p-3 sm:p-6 lg:p-10 font-sans antialiased relative overflow-x-hidden selection:bg-brand-lime selection:text-slate-900">
     
+    @include('layouts.partials.preloader')
+
     <!-- Ambient Aurora Canvas Background matching landing page -->
     <div class="fixed inset-0 bg-gradient-to-br from-[#0c5966] via-[#10707e] to-[#6da734] dark:from-[#06242a] dark:via-[#09353c] dark:to-[#2b4414] -z-20"></div>
 
@@ -48,16 +50,20 @@
 
     <!-- Top Floating Navigation Bar -->
     <div class="w-full max-w-6xl mx-auto flex items-center justify-between py-3 px-2 sm:px-4 z-20 mb-4 sm:mb-6">
-        <!-- Direct "Back to Home" Link -->
-        <a href="{{ route('home') }}" class="group inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/15 text-xs sm:text-sm font-bold text-white transition active:scale-95 shadow-md">
-            <svg class="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-            <span>{{ __('Back to Home') }}</span>
-        </a>
+        {{-- Top Return Navigation Link --}}
+        @if(setting('landing_page_enabled', true))
+            <a href="{{ url('/') }}" class="group inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/15 text-xs sm:text-sm font-bold text-white transition active:scale-95 shadow-md">
+                <svg class="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                <span>{{ __('Back to Home') }}</span>
+            </a>
+        @else
+            <div class="w-10"><!-- Spacer when landing page is disabled --></div>
+        @endif
 
         <!-- Center Brand Logo linking back to Home -->
-        <a href="{{ route('home') }}" class="inline-flex items-center gap-2.5 group">
+        <a @if(setting('landing_page_enabled', true)) href="{{ url('/') }}" @endif class="inline-flex items-center gap-2.5 group">
             @if ($guestLogoUrl)
                 <img src="{{ $guestLogoUrl }}" alt="{{ $guestBrandName }}" class="h-8 w-auto object-contain">
             @else
@@ -126,9 +132,11 @@
                 <span x-show="!dark">🌙</span>
                 <span x-show="dark">☀️</span>
             </button>
-            <a href="{{ route('home') }}#features" class="hidden md:inline-flex px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/15 text-xs font-bold text-slate-200 transition">
-                {{ __('Platform Features') }}
-            </a>
+            @if(setting('landing_page_enabled', true))
+                <a href="{{ url('/') }}#features" class="hidden md:inline-flex px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/15 text-xs font-bold text-slate-200 transition">
+                    {{ __('Platform Features') }}
+                </a>
+            @endif
         </div>
     </div>
 
@@ -152,14 +160,15 @@
             <span>&copy; {{ now()->year }} {{ $guestBrandName }}.</span>
             <span>{{ __('All rights reserved.') }}</span>
         </div>
-        <div class="flex items-center gap-4 text-white/80 font-medium">
-            <a href="{{ route('home') }}#pricing" class="hover:text-brand-lime transition">{{ __('Pricing Plans') }}</a>
-            <span>&middot;</span>
-            <a href="{{ route('home') }}#contact" class="hover:text-brand-lime transition">{{ __('Support & Contact') }}</a>
-        </div>
+        @if(setting('landing_page_enabled', true))
+            <div class="flex items-center gap-4 text-white/80 font-medium">
+                <a href="{{ url('/') }}#pricing" class="hover:text-brand-lime transition">{{ __('Pricing Plans') }}</a>
+                <span>&middot;</span>
+                <a href="{{ url('/') }}#contact" class="hover:text-brand-lime transition">{{ __('Support & Contact') }}</a>
+            </div>
+        @endif
     </div>
 
     @livewireScripts
 </body>
 </html>
-

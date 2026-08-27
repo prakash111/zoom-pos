@@ -253,14 +253,14 @@
          class="fixed bottom-0 inset-x-0 z-40 p-4 bg-slate-950/90 backdrop-blur-md border-t border-slate-800">
         <div class="max-w-3xl mx-auto flex items-center justify-between gap-3">
             <div>
-                <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Order Subtotal</div>
+                <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ __("Order Subtotal") }}</div>
                 <div class="text-lg font-black text-white" x-text="'$' + getCartTotal().toFixed(2)"></div>
             </div>
 
             <button type="button"
                     x-on:click="cartOpen = true"
                     class="px-6 py-3 rounded-2xl bg-lime-400 hover:bg-lime-500 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-lime-500/25 active:scale-95 transition-all flex items-center gap-2">
-                <span>Review & Place Order</span>
+                <span>{{ __("Review & Place Order") }}</span>
                 <span class="w-5 h-5 rounded-full bg-slate-950 text-lime-400 text-xs flex items-center justify-center font-black" x-text="getCartCount()"></span>
             </button>
         </div>
@@ -284,7 +284,7 @@
             <!-- Variants (Size / Style) -->
             <template x-if="activeItem && activeItem.variants && activeItem.variants.length > 0">
                 <div class="space-y-2">
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Choose Option</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __("Choose Option") }}</label>
                     <div class="grid grid-cols-1 gap-2">
                         <template x-for="(v, vIdx) in activeItem.variants" :key="vIdx">
                             <button type="button"
@@ -302,7 +302,7 @@
             <!-- Modifiers & Add-ons -->
             <template x-if="activeItem && activeItem.modifiers && activeItem.modifiers.length > 0">
                 <div class="space-y-2">
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Add-ons & Extras</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __("Add-ons & Extras") }}</label>
                     <div class="space-y-1.5">
                         <template x-for="(m, mIdx) in activeItem.modifiers" :key="mIdx">
                             <label class="p-3 rounded-2xl border border-slate-800 bg-slate-800/40 text-xs font-bold flex items-center justify-between cursor-pointer hover:border-slate-700">
@@ -322,7 +322,7 @@
 
             <!-- Special Note -->
             <div>
-                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Kitchen Note (Optional)</label>
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{{ __("Kitchen Note (Optional)") }}</label>
                 <input type="text"
                        x-model="itemNote"
                        placeholder="e.g. No onion, dressing on the side"
@@ -349,7 +349,7 @@
             <!-- Drawer Header -->
             <div class="flex items-center justify-between pb-4 border-b border-slate-800">
                 <div>
-                    <h2 class="text-base font-black text-white">Table Order Review</h2>
+                    <h2 class="text-base font-black text-white">{{ __("Table Order Review") }}</h2>
                     <p class="text-xs text-lime-400 font-bold">🪑 {{ $table->table_number }}</p>
                 </div>
                 <button type="button" x-on:click="cartOpen = false" class="text-slate-400 hover:text-white text-2xl font-bold">&times;</button>
@@ -377,7 +377,7 @@
 
                         <!-- Steppers & Remove -->
                         <div class="flex justify-between items-center pt-1 border-t border-slate-700/50">
-                            <button type="button" x-on:click="removeFromCart(idx)" class="text-[11px] text-rose-400 hover:text-rose-300 font-bold">Remove</button>
+                            <button type="button" x-on:click="removeFromCart(idx)" class="text-[11px] text-rose-400 hover:text-rose-300 font-bold">{{ __("Remove") }}</button>
                             <div class="flex items-center gap-2">
                                 <button type="button" x-on:click="if (item.quantity > 1) item.quantity--; else removeFromCart(idx);" class="w-6 h-6 rounded-lg bg-slate-700 text-white font-bold flex items-center justify-center text-xs">-</button>
                                 <span class="font-black text-xs text-white" x-text="item.quantity"></span>
@@ -410,19 +410,19 @@
                 </template>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Your Name (Optional)</label>
+                    <label class="block text-[11px] font-bold text-slate-400 mb-1">{{ __("Your Name (Optional)") }}</label>
                     <input type="text" name="guest_name" x-model="guestName" placeholder="e.g. Alex" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white focus:ring-lime-500">
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Special Order Instructions</label>
+                    <label class="block text-[11px] font-bold text-slate-400 mb-1">{{ __("Special Order Instructions") }}</label>
                     <input type="text" name="special_instructions" x-model="specialInstructions" placeholder="e.g. Bring appetizer first" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white focus:ring-lime-500">
                 </div>
 
                 <button type="submit"
                         :disabled="cart.length === 0"
                         class="w-full py-4 rounded-2xl bg-lime-400 hover:bg-lime-500 disabled:opacity-50 text-slate-950 font-black text-sm shadow-xl shadow-lime-500/25 active:scale-95 transition flex items-center justify-center gap-2">
-                    <span>Send Order to Kitchen &bull;</span>
+                    <span>{{ __("Send Order to Kitchen") }} &bull;</span>
                     <span x-text="'$' + getCartTotal().toFixed(2)"></span>
                 </button>
             </form>

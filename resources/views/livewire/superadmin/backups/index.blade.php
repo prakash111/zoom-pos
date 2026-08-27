@@ -11,24 +11,24 @@
     <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-4">
         <div>
             <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <span>💾 Automated Database Backup & Retention Policy</span>
+                <span>💾 {{ __("Automated Database Backup & Retention Policy") }}</span>
             </h3>
-            <p class="text-xs text-slate-400">Configure schedule frequency and retention lifecycle for database snapshots</p>
+            <p class="text-xs text-slate-400">{{ __("Configure schedule frequency and retention lifecycle for database snapshots") }}</p>
         </div>
 
         <div class="flex flex-wrap gap-4 items-end pt-2">
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Backup Frequency</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Backup Frequency") }}</label>
                 <select wire:model="frequency" class="rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
                     <option value="manual">Manual Execution Only</option>
-                    <option value="daily">Daily Automated Snapshot</option>
-                    <option value="weekly">Weekly Automated Snapshot</option>
-                    <option value="monthly">Monthly Snapshot</option>
+                    <option value="daily">{{ __("Daily Automated Snapshot") }}</option>
+                    <option value="weekly">{{ __("Weekly Automated Snapshot") }}</option>
+                    <option value="monthly">{{ __("Monthly Snapshot") }}</option>
                 </select>
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Retention Window (Days)</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Retention Window (Days)") }}</label>
                 <input type="number" wire:model="retentionDays" class="w-36 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
             </div>
 
@@ -43,7 +43,7 @@
         <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div>
                 <h4 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">Database Snapshots</h4>
-                <p class="text-xs text-slate-400">Available database dumps stored on disk</p>
+                <p class="text-xs text-slate-400">{{ __("Available database dumps stored on disk") }}</p>
             </div>
 
             <button wire:click="createSnapshot" wire:loading.attr="disabled" type="button" class="px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/25 active:scale-95 transition flex items-center gap-1.5 cursor-pointer">
@@ -76,7 +76,7 @@
                             </td>
                             <td class="px-6 py-4 text-right space-x-3">
                                 <button wire:click="download('{{ $snap['name'] }}')" type="button" class="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">Download</button>
-                                <button wire:click="deleteSnapshot('{{ $snap['name'] }}')" wire:confirm="Delete this snapshot?" type="button" class="text-rose-600 hover:underline font-bold">Delete</button>
+                                <button wire:click="deleteSnapshot('{{ $snap['name'] }}')" wire:confirm="{{ __("Delete this snapshot?") }}" type="button" class="text-rose-600 hover:underline font-bold">{{ __("Delete") }}</button>
                             </td>
                         </tr>
                     @empty

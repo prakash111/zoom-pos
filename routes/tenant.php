@@ -1,0 +1,193 @@
+<?php
+
+use App\Http\Controllers\Sync\CatalogViewController;
+use App\Http\Controllers\Tenant\BackupDownloadController;
+use App\Http\Controllers\Tenant\CashRegisterSlipController;
+use App\Http\Controllers\Tenant\ImpersonationController;
+use App\Http\Controllers\Tenant\InvoiceController;
+use App\Http\Controllers\Tenant\PwaManifestController;
+use App\Http\Controllers\Tenant\QuotationController;
+use App\Http\Controllers\Tenant\Restaurant\KotController;
+use App\Http\Controllers\Tenant\Restaurant\TableOrderController;
+use App\Http\Controllers\Tenant\SubscriptionInvoiceController;
+use App\Http\Middleware\CheckMaintenanceMode;
+use App\Http\Middleware\ResolveTenantContext;
+use App\Livewire\Auth\AcceptInvite;
+use App\Livewire\Auth\TenantLogin;
+use App\Livewire\Auth\TenantRegister;
+use App\Livewire\Auth\VerifyOtp;
+use App\Livewire\Tenant\Billing;
+use App\Livewire\Tenant\Brands;
+use App\Livewire\Tenant\Catalog;
+use App\Livewire\Tenant\Categories;
+use App\Livewire\Tenant\Consignments\Create;
+use App\Livewire\Tenant\Consignments\Index;
+use App\Livewire\Tenant\Consignments\Show;
+use App\Livewire\Tenant\Customers;
+use App\Livewire\Tenant\Dashboard;
+use App\Livewire\Tenant\Devices;
+use App\Livewire\Tenant\Financials;
+use App\Livewire\Tenant\Languages;
+use App\Livewire\Tenant\Products;
+use App\Livewire\Tenant\Quotes;
+use App\Livewire\Tenant\Reports;
+use App\Livewire\Tenant\Restaurant;
+use App\Livewire\Tenant\Sales;
+use App\Livewire\Tenant\Settings;
+use App\Livewire\Tenant\Suppliers;
+use App\Livewire\Tenant\Units;
+use App\Livewire\Tenant\Users;
+use App\Models\CashRegister;
+use App\Models\CashRegisterTransaction;
+use App\Models\DiningTable;
+use App\Models\KitchenTicket;
+use App\Models\Sale;
+use App\Models\SubscriptionInvoice;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
+
+Route::model('quote', Sale::class);
+Route::model('kot', KitchenTicket::class);
+Route::model('table', DiningTable::class);
+Route::model('subscription_invoice', SubscriptionInvoice::class);
+Route::model('register', CashRegister::class);
+Route::model('tx', CashRegisterTransaction::class);
+
+Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class)->group(function () {
+    Route::get('/login', TenantLogin::class)
+        ->middleware('guest:web')
+        ->name('login');
+
+    Route::get('/register', TenantRegister::class)
+        ->middleware('guest:web')
+        ->name('register');
+
+    Route::get('/verify-otp', VerifyOtp::class)
+        ->middleware('auth:web')
+        ->name('verify_otp');
+
+    Route::post('/logout', function () {
+        Auth::guard('web')->logout();
+
+        return redirect()->route('tenant.login');
+    })->middleware('auth:web')->name('logout');
+
+    Route::middleware(['auth:web', ResolveTenantContext::class, 'tenant.verified'])->group(function () {
+        Route::get('/app.webmanifest', PwaManifestController::class)->name('pwa.manifest');
+
+        // Billing, Invoicing & Activation (Always reachable by tenant admin even if expired)
+        Route::get('/billing', Billing\Index::class)->name('billing.index');
+        Route::get('/activate', Billing\Index::class)->name('activate');
+        Route::get('/billing/invoices/{invoice}/pdf', [SubscriptionInvoiceController::class, 'pdf'])->name('billing.invoices.pdf');
+
+        // Store Settings & Languages (Reachable by tenant admin to manage store configs)
+        Route::get('/settings', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.index');
+        Route::redirect('/settings-redirect', '/tenant/settings')->name('settings');
+        Route::get('/settings/backup/download', [BackupDownloadController::class, 'download'])->middleware('tenant.permission:settings,view')->name('settings.backup.download');
+        Route::get('/languages', Languages\Index::class)->middleware('tenant.permission:settings,view')->name('languages.index');
+
+        // Core Dashboard & POS Operations (Protected by Subscription Status Middleware)
+        Route::middleware('tenant.subscription')->group(function () {
+            Route::get('/', Dashboard::class)->name('dashboard');
+
+            Route::get('/products', Products\Index::class)->middleware('tenant.permission:products,view')->name('products.index');
+            Route::get('/categories', Categories\Index::class)->middleware('tenant.permission:categories,view')->name('categories.index');
+            Route::get('/brands', Brands\Index::class)->middleware('tenant.permission:categories,view')->name('brands.index');
+            Route::get('/units', Units\Index::class)->middleware('tenant.permission:units,view')->name('units.index');
+            Route::get('/suppliers', Suppliers\Index::class)->middleware('tenant.permission:suppliers,view')->name('suppliers.index');
+
+            Route::get('/customers', Customers\Index::class)->middleware('tenant.permission:customers,view')->name('customers.index');
+
+            Route::get('/sales', Sales\Index::class)->middleware('tenant.permission:sales,view')->name('sales.index');
+            Route::get('/sales/create', Sales\Create::class)->middleware(['tenant.permission:pos,create', 'tenant.pos_mode:general'])->name('sales.create');
+            Route::get('/sales/{sale}', Sales\Show::class)->middleware('tenant.permission:sales,view')->name('sales.show');
+            Route::get('/sales/{sale}/pdf', [InvoiceController::class, 'pdf'])->middleware('tenant.permission:sales,view')->name('sales.pdf');
+            Route::post('/sales/{sale}/send', [InvoiceController::class, 'send'])->middleware('tenant.permission:sales,export')->name('sales.send');
+
+            // Invoice named route aliases for compatibility
+            Route::get('/invoices', Sales\Index::class)->middleware('tenant.permission:sales,view')->name('invoices.index');
+            Route::get('/invoices/{sale}', Sales\Show::class)->middleware('tenant.permission:sales,view')->name('invoices.show');
+            Route::get('/invoices/{sale}/pdf', [InvoiceController::class, 'pdf'])->middleware('tenant.permission:sales,view')->name('invoices.pdf');
+            Route::post('/invoices/{sale}/send', [InvoiceController::class, 'send'])->middleware('tenant.permission:sales,export')->name('invoices.send');
+
+            Route::get('/quotes', Quotes\Index::class)->middleware(['tenant.permission:quotes,view', 'tenant.pos_mode:general'])->name('quotes.index');
+            Route::get('/quotes/create', Quotes\Create::class)->middleware(['tenant.permission:quotes,create', 'tenant.pos_mode:general'])->name('quotes.create');
+            Route::get('/quotes/{quote}', Quotes\Show::class)->middleware(['tenant.permission:quotes,view', 'tenant.pos_mode:general'])->name('quotes.show');
+            Route::get('/quotes/{quote}/edit', Quotes\Edit::class)->middleware(['tenant.permission:quotes,create', 'tenant.pos_mode:general'])->name('quotes.edit');
+            Route::get('/quotes/{quote}/pdf', [QuotationController::class, 'pdf'])->middleware(['tenant.permission:quotes,view', 'tenant.pos_mode:general'])->name('quotes.pdf');
+            Route::post('/quotes/{quote}/send', [QuotationController::class, 'send'])->middleware(['tenant.permission:quotes,export', 'tenant.pos_mode:general'])->name('quotes.send');
+
+            // Quotation named route aliases for compatibility
+            Route::get('/quotations', Quotes\Index::class)->middleware(['tenant.permission:quotes,view', 'tenant.pos_mode:general'])->name('quotations.index');
+            Route::get('/quotations/create', Quotes\Create::class)->middleware(['tenant.permission:quotes,create', 'tenant.pos_mode:general'])->name('quotations.create');
+            Route::get('/quotations/{quote}', Quotes\Show::class)->middleware(['tenant.permission:quotes,view', 'tenant.pos_mode:general'])->name('quotations.show');
+            Route::get('/quotations/{quote}/edit', Quotes\Edit::class)->middleware(['tenant.permission:quotes,create', 'tenant.pos_mode:general'])->name('quotations.edit');
+            Route::get('/quotations/{quote}/pdf', [QuotationController::class, 'pdf'])->middleware(['tenant.permission:quotes,view', 'tenant.pos_mode:general'])->name('quotations.pdf');
+            Route::post('/quotations/{quote}/send', [QuotationController::class, 'send'])->middleware(['tenant.permission:quotes,export', 'tenant.pos_mode:general'])->name('quotations.send');
+
+            // Consignments
+            Route::get('/consignments', Index::class)->middleware(['tenant.permission:consignments,view', 'tenant.pos_mode:general'])->name('consignments.index');
+            Route::get('/consignments/create', Create::class)->middleware(['tenant.permission:consignments,create', 'tenant.pos_mode:general'])->name('consignments.create');
+            Route::get('/consignments/{consignment}', Show::class)->middleware(['tenant.permission:consignments,view', 'tenant.pos_mode:general'])->name('consignments.show');
+
+            // Service Orders & Warranty Repair Tracking
+            Route::get('/service-orders', App\Livewire\Tenant\ServiceOrders\Index::class)->middleware(['tenant.permission:service_orders,view', 'tenant.pos_mode:general'])->name('service-orders.index');
+
+            // Sales Targets & Goals
+            Route::get('/sales-targets', App\Livewire\Tenant\SalesTargets\Index::class)->middleware('tenant.permission:targets,view')->name('sales-targets.index');
+            Route::get('/targets', App\Livewire\Tenant\SalesTargets\Index::class)->middleware('tenant.permission:targets,view')->name('targets.index');
+
+            // Financial Management: Cash Register, Accounts Receivable & Payable
+            Route::get('/finance/cash-register', Financials\CashRegister::class)->middleware('tenant.permission:cash_register,view')->name('financials.cash_register');
+            Route::get('/finance/cash-register/{register}/z-report', [CashRegisterSlipController::class, 'viewZReport'])->middleware('tenant.permission:cash_register,view')->name('cash_register.z_report.view');
+            Route::get('/finance/cash-register/{register}/z-report/pdf', [CashRegisterSlipController::class, 'pdfZReport'])->middleware('tenant.permission:cash_register,view')->name('cash_register.z_report.pdf');
+            Route::get('/finance/cash-register/movement/{tx}', [CashRegisterSlipController::class, 'viewMovement'])->middleware('tenant.permission:cash_register,view')->name('cash_register.movement.view');
+            Route::get('/finance/cash-register/movement/{tx}/pdf', [CashRegisterSlipController::class, 'pdfMovement'])->middleware('tenant.permission:cash_register,view')->name('cash_register.movement.pdf');
+            Route::get('/finance/receivables', Financials\Receivables::class)->middleware('tenant.permission:finance,view')->name('financials.receivables');
+            Route::get('/finance/payables', Financials\Payables::class)->middleware('tenant.permission:finance,view')->name('financials.payables');
+
+            // Reports & Financial Analytics
+            Route::get('/reports', Reports\Index::class)->middleware('tenant.permission:reports,view')->name('reports.index');
+            Route::get('/reports/sales', Reports\Index::class)->middleware('tenant.permission:reports,view')->name('reports.sales');
+            Route::get('/reports/profit-loss', Reports\Index::class)->middleware('tenant.permission:reports,view')->name('reports.profit-loss');
+
+            // Food & Restaurant POS Mode Subsystem (Strictly Isolated)
+            Route::get('/restaurant/pos', Restaurant\Pos::class)->middleware(['tenant.permission:pos,create', 'tenant.pos_mode:restaurant'])->name('restaurant.pos');
+            Route::get('/restaurant/tables', Restaurant\Tables::class)->middleware(['tenant.permission:pos,view', 'tenant.pos_mode:restaurant'])->name('restaurant.tables');
+            Route::get('/restaurant/kds', Restaurant\Kds::class)->middleware(['tenant.permission:pos,view', 'tenant.pos_mode:restaurant'])->name('restaurant.kds');
+            Route::get('/restaurant/kot/{kot}/print', [KotController::class, 'print'])->middleware(['tenant.permission:pos,view', 'tenant.pos_mode:restaurant'])->name('restaurant.kot.print');
+            Route::get('/restaurant/tables/{table}/qr', [TableOrderController::class, 'qrCard'])->middleware(['tenant.permission:pos,view', 'tenant.pos_mode:restaurant'])->name('restaurant.table.qr');
+
+            Route::get('/catalog', Catalog\Index::class)->middleware('tenant.permission:catalog,view')->name('catalog.index');
+
+            Route::get('/users', Users\Index::class)->middleware('tenant.permission:users,view')->name('users.index');
+            Route::get('/users/permissions', Users\Permissions::class)->middleware('tenant.permission:users,view')->name('users.permissions');
+            Route::get('/users/{user}/permissions', Users\Permissions::class)->middleware('tenant.permission:users,view')->name('users.user-permissions');
+
+            Route::get('/devices', Devices\Index::class)->middleware('tenant.permission:settings,view')->name('devices.index');
+
+            Route::post('/impersonate/{user}', [ImpersonationController::class, 'start'])->name('impersonate.start');
+            Route::post('/impersonate', [ImpersonationController::class, 'stop'])->name('impersonate.stop');
+        });
+    });
+});
+
+// Invite acceptance is deliberately outside the auth:web/company-scoped
+// group above — the invitee has no session and no known company yet.
+Route::get('/accept-invite', AcceptInvite::class)
+    ->middleware('guest:web')
+    ->name('accept-invite');
+
+// Public QR Code Table Digital Ordering
+Route::get('/order/table/{token}', [TableOrderController::class, 'show'])->name('restaurant.table.order');
+Route::post('/order/table/{token}', [TableOrderController::class, 'placeOrder'])->name('restaurant.table.order.place');
+Route::get('/t/{token}', [TableOrderController::class, 'show'])->name('restaurant.table.short');
+
+// Public online-catalog share links.
+Route::get('/c/{id}', [CatalogViewController::class, 'show'])
+    ->where('id', '[a-f0-9]{32}')
+    ->name('catalog.show');
+
+// Public shareable document links (for customers clicking from WhatsApp or Email).
+Route::get('/i/{sale_number}', [InvoiceController::class, 'publicShow'])->name('sales.public');
+Route::get('/q/{quote_number}', [QuotationController::class, 'publicShow'])->name('quotes.public');

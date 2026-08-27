@@ -19,14 +19,14 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-                <span>🌐 Store Languages & Custom Translation Editor</span>
+                <span>🌐 {{ __("Store Languages & Custom Translation Editor") }}</span>
             </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Customize phrases, POS terms, receipt titles, and tax invoice wording specifically for your store</p>
+            <p class="text-xs text-slate-400 mt-0.5">{{ __("Customize phrases, POS terms, receipt titles, and tax invoice wording specifically for your store") }}</p>
         </div>
 
         <div class="flex items-center gap-2">
-            <a href="{{ route('tenant.settings.index') }}" class="px-4 py-2 rounded-2xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs border border-slate-200 dark:border-slate-700 transition">
-                ⚙️ Store Settings
+            <a wire:navigate.hover href="{{ route('tenant.settings.index') }}" class="px-4 py-2 rounded-2xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs border border-slate-200 dark:border-slate-700 transition">
+                ⚙️ {{ __("Store Settings") }}
             </a>
         </div>
     </div>
@@ -38,8 +38,8 @@
                 🌍
             </div>
             <div>
-                <h3 class="text-base font-extrabold text-slate-900 dark:text-white">Store Primary Language</h3>
-                <p class="text-xs text-slate-400">Default language for customer receipts, table QR orders, and staff POS terminals</p>
+                <h3 class="text-base font-extrabold text-slate-900 dark:text-white">{{ __("Store Primary Language") }}</h3>
+                <p class="text-xs text-slate-400">{{ __("Default language for customer receipts, table QR orders, and staff POS terminals") }}</p>
             </div>
         </div>
 
@@ -57,7 +57,7 @@
             <button type="button"
                     wire:click="saveStoreDefaultLanguage"
                     class="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-md shadow-blue-500/20 active:scale-95 transition cursor-pointer">
-                Apply Primary Language
+                {{ __("Apply Primary Language") }}
             </button>
         </div>
     </div>
@@ -68,9 +68,9 @@
         <!-- Language Selector Bar -->
         <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Customize Phrases for Language:</span>
+                <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">{{ __("Customize Phrases for Language:") }}</span>
                 <span class="text-xs font-bold text-slate-600 dark:text-slate-300">
-                    Language: <span class="font-mono text-blue-600 dark:text-blue-400">{{ $currentLanguage?->name }} ({{ $selectedLocale }})</span>
+                    {{ __("Language:") }} <span class="font-mono text-blue-600 dark:text-blue-400">{{ $currentLanguage?->name }} ({{ $selectedLocale }})</span>
                 </span>
             </div>
 
@@ -98,7 +98,7 @@
                 </div>
                 <input type="text"
                        wire:model.live.debounce.250ms="searchQuery"
-                       placeholder="Search terms or phrases…"
+                       placeholder="{{ __("Search terms or phrases…") }}"
                        class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none text-xs sm:text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500">
             </div>
 
@@ -106,15 +106,15 @@
                 <button type="button"
                         wire:click="openAddModal"
                         class="px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-2xs">
-                    <span>➕ Add Custom Phrase</span>
+                    <span>➕ {{ __("Add Custom Phrase") }}</span>
                 </button>
 
                 <button type="button"
                         wire:click="saveAllOverrides"
                         wire:loading.attr="disabled"
                         class="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-lg shadow-blue-500/25 active:scale-95 transition cursor-pointer flex items-center gap-2">
-                    <span wire:loading.remove>💾 Save Store Overrides</span>
-                    <span wire:loading>Saving...</span>
+                    <span wire:loading.remove>💾 {{ __("Save Store Overrides") }}</span>
+                    <span wire:loading>{{ __("Saving...") }}</span>
                 </button>
             </div>
         </div>
@@ -125,10 +125,10 @@
                 <table class="w-full text-left text-xs">
                     <thead>
                         <tr class="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-extrabold uppercase tracking-wider text-[10px] bg-slate-50/50 dark:bg-slate-800/40">
-                            <th class="py-3.5 pl-5 w-1/3">Term / Phrase</th>
-                            <th class="py-3.5 px-4 w-1/4">System Default</th>
-                            <th class="py-3.5 px-4 w-1/3">Your Custom Store Translation</th>
-                            <th class="py-3.5 pr-5 text-right">Reset</th>
+                            <th class="py-3.5 pl-5 w-1/3">{{ __("Term / Phrase") }}</th>
+                            <th class="py-3.5 px-4 w-1/4">{{ __("System Default") }}</th>
+                            <th class="py-3.5 px-4 w-1/3">{{ __("Your Custom Store Translation") }}</th>
+                            <th class="py-3.5 pr-5 text-right">{{ __("Reset") }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -146,7 +146,7 @@
                                     </div>
                                     @if ($hasOverride)
                                         <span class="inline-block mt-0.5 px-2 py-0.2 rounded-md text-[9px] font-black bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
-                                            Customized
+                                            {{ __("Customized") }}
                                         </span>
                                     @endif
                                 </td>
@@ -172,8 +172,8 @@
                                         <button type="button"
                                                 wire:click="clearOverride('{{ addslashes($key) }}')"
                                                 class="text-xs font-bold text-slate-400 hover:text-rose-600 transition cursor-pointer"
-                                                title="Reset to system default">
-                                            ↺ Reset
+                                                title="{{ __("Reset to system default") }}">
+                                            ↺ {{ __("Reset") }}
                                         </button>
                                     @else
                                         <span class="text-[11px] text-slate-300 dark:text-slate-600">&bull;</span>
@@ -195,7 +195,7 @@
             <div class="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between text-xs text-slate-400">
                 <span>Showing {{ count($filteredKeys) }} phrases in [{{ $selectedLocale }}]</span>
                 <button type="button" wire:click="saveAllOverrides" class="font-bold text-blue-600 hover:underline cursor-pointer">
-                    💾 Save All Custom Translations
+                    💾 {{ __("Save All Custom Translations") }}
                 </button>
             </div>
         </div>
@@ -208,26 +208,26 @@
             <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in zoom-in-95">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                     <h3 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white flex items-center gap-2">
-                        <span>➕ Add Custom Phrase</span>
+                        <span>➕ {{ __("Add Custom Phrase") }}</span>
                     </h3>
                     <button type="button" wire:click="$set('showAddModal', false)" class="text-slate-400 hover:text-white text-xl font-bold p-1 cursor-pointer">&times;</button>
                 </div>
 
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Phrase Key *</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Phrase Key *") }}</label>
                         <input type="text"
                                wire:model="customKey"
-                               placeholder="e.g. Return Policy, Special Promo"
+                               placeholder="{{ __("e.g. Return Policy, Special Promo") }}"
                                class="w-full rounded-2xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-blue-500">
                         @error('customKey') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Your Store Custom Translation *</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Your Store Custom Translation *") }}</label>
                         <input type="text"
                                wire:model="customValue"
-                               placeholder="e.g. Política de Devoluciones"
+                               placeholder="{{ __("e.g. Política de Devoluciones") }}"
                                class="w-full rounded-2xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-blue-500">
                         @error('customValue') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
@@ -238,7 +238,7 @@
                     <button type="button"
                             wire:click="addCustomPhrase"
                             class="px-5 py-2.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 active:scale-95 transition cursor-pointer">
-                        Save Phrase
+                        {{ __("Save Phrase") }}
                     </button>
                 </div>
             </div>

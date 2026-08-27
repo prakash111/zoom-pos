@@ -26,11 +26,11 @@
         </button>
     </div>
 
-    <!-- Create / Edit Plan Modal Form -->
+    <!-- Create / {{ __("Edit Plan") }} Modal Form -->
     @if ($showForm)
         <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-5 animate-in fade-in">
             <h4 class="text-sm sm:text-base font-black text-slate-900 dark:text-white">
-                {{ $editingName ? 'Edit Plan: ' . $displayName : 'Create New Subscription Plan' }}
+                {{ $editingName ? __('Edit Plan') . ': ' . $displayName : __('Create New Subscription Plan') }}
             </h4>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -50,10 +50,10 @@
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Billing Cycle</label>
                     <select wire:model="billingCycle" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
                         <option value="trial">Free Trial</option>
-                        <option value="monthly">Monthly</option>
+                        <option value="monthly">{{ __("Monthly") }}</option>
                         <option value="quarterly">Quarterly</option>
                         <option value="biannual">Biannual (6 Months)</option>
-                        <option value="yearly">Yearly</option>
+                        <option value="yearly">{{ __("Yearly") }}</option>
                         <option value="lifetime">Lifetime</option>
                     </select>
                 </div>
@@ -101,7 +101,7 @@
 
             <div class="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button wire:click="$set('showForm', false)" type="button" class="px-5 py-2.5 rounded-2xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">Cancel</button>
-                <button wire:click="save" type="button" class="px-6 py-2.5 rounded-2xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/25 active:scale-95 transition">Save Plan</button>
+                <button wire:click="save" type="button" class="px-6 py-2.5 rounded-2xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/25 active:scale-95 transition">{{ __("Save Plan") }}</button>
             </div>
         </div>
     @endif
@@ -148,7 +148,7 @@
 
                 <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                     <button wire:click="edit('{{ $plan->name }}')" type="button" class="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-bold hover:bg-indigo-100 transition">
-                        Edit Plan
+                        {{ __("Edit Plan") }}
                     </button>
                     <button wire:click="delete('{{ $plan->name }}')" wire:confirm="Delete this plan?" type="button" class="text-rose-600 hover:underline font-bold">
                         Delete

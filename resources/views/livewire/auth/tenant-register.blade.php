@@ -328,6 +328,13 @@
                     </button>
                 </div>
 
+                @php($socialProviders = collect(['google' => 'Google', 'facebook' => 'Facebook'])->filter(fn ($label, $key) => filter_var(\App\Models\PlatformSystem::get("social_{$key}_enabled", false), FILTER_VALIDATE_BOOLEAN) && \App\Models\PlatformSystem::get("social_{$key}_client_id") && \App\Models\PlatformSystem::get("social_{$key}_client_secret")))
+                @if ($socialProviders->isNotEmpty())
+                    <div class="grid grid-cols-{{ $socialProviders->count() }} gap-2">
+                        @foreach ($socialProviders as $key => $label)<a href="{{ route('social.redirect', ['provider' => $key, 'intent' => 'register']) }}" class="py-2.5 rounded-xl bg-white text-slate-800 text-center text-xs font-bold">{{ __('Continue with :provider', ['provider' => $label]) }}</a>@endforeach
+                    </div>
+                @endif
+
                 <!-- Primary Action Button: Launch Store -->
                 <div class="pt-2">
                     <button type="submit"

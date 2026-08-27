@@ -45,11 +45,11 @@
         @if (auth()->check())
             <div class="bg-slate-900/80 rounded-2xl p-3.5 border border-slate-800/80 text-xs flex items-center justify-between text-left">
                 <div class="space-y-0.5">
-                    <div class="text-[10px] font-bold uppercase text-slate-500">Active Account</div>
+                    <div class="text-[10px] font-bold uppercase text-slate-500">{{ __("Active Account") }}</div>
                     <div class="font-extrabold text-slate-200 truncate max-w-[180px]">{{ auth()->user()->name }}</div>
                 </div>
                 <div class="text-right">
-                    <div class="text-[10px] font-bold uppercase text-slate-500">Assigned Role</div>
+                    <div class="text-[10px] font-bold uppercase text-slate-500">{{ __("Assigned Role") }}</div>
                     <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/15 text-blue-400 border border-blue-500/30 capitalize">
                         {{ auth()->user()->role ?? 'Staff' }}
                     </span>
@@ -59,7 +59,7 @@
 
         <!-- Help Advice Note -->
         <div class="text-[11px] text-slate-400 bg-slate-900/40 rounded-xl p-3 border border-slate-800/50">
-            💡 If you need access to this section, please request permission from your store <strong class="text-slate-200 font-bold">Administrator</strong>.
+            💡 {{ __("If you need access to this section, please request permission from your store") }} <strong class="text-slate-200 font-bold">{{ __("Administrator") }}</strong>.
         </div>
 
         <!-- Action Buttons -->

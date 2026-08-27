@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation — Zoom POS Multi-Tenant SaaS & POS System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #eff6ff;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --bg-light: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --code-bg: #0f172a;
+            --code-text: #f8fafc;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            line-height: 1.6;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Navigation */
+        #sidebar {
+            width: 290px;
+            background-color: #ffffff;
+            border-right: 1px solid var(--border);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            overflow-y: auto;
+            padding: 2rem 1.5rem;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+            text-decoration: none;
+            color: var(--text-dark);
+        }
+
+        .brand-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 900;
+            font-size: 1.25rem;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+        }
+
+        .brand-text {
+            font-weight: 800;
+            font-size: 1.1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .brand-version {
+            font-size: 0.7rem;
+            background-color: var(--primary-light);
+            color: var(--primary);
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-weight: 700;
+            margin-left: 4px;
+        }
+
+        .nav-group-title {
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+            padding-left: 0.5rem;
+        }
+
+        .nav-links {
+            list-style: none;
+        }
+
+        .nav-links a {
+            display: block;
+            padding: 0.5rem 0.75rem;
+            color: #334155;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.15s ease;
+            margin-bottom: 2px;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            background-color: var(--primary-light);
+            color: var(--primary);
+        }
+
+        /* Main Content */
+        #content {
+            margin-left: 290px;
+            flex: 1;
+            max-width: 1050px;
+            padding: 3rem 4rem;
+        }
+
+        header {
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 2.25rem;
+            font-weight: 900;
+            letter-spacing: -0.03em;
+            margin-bottom: 0.75rem;
+            color: var(--text-dark);
+        }
+
+        .lead {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        section {
+            margin-bottom: 3.5rem;
+            scroll-margin-top: 2rem;
+        }
+
+        h2 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 1.25rem;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-top: 1.75rem;
+            margin-bottom: 0.75rem;
+            color: #1e293b;
+        }
+
+        p, li {
+            font-size: 0.95rem;
+            color: #334155;
+            line-height: 1.7;
+            margin-bottom: 1rem;
+        }
+
+        ul, ol {
+            padding-left: 1.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        li {
+            margin-bottom: 0.4rem;
+        }
+
+        /* Cards & Alerts */
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 1.25rem;
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+        }
+
+        .alert-info {
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+        }
+
+        .alert-warning {
+            background-color: #fffbeb;
+            border: 1px solid #fde68a;
+            color: #92400e;
+        }
+
+        .alert-success {
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        /* Code Blocks */
+        pre {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 1.25rem;
+            border-radius: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin-bottom: 1.25rem;
+            line-height: 1.6;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            background-color: #e2e8f0;
+            color: #0f172a;
+            padding: 2px 6px;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+
+        pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+            font-size: inherit;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        th, td {
+            padding: 0.875rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #f8fafc;
+            font-weight: 700;
+            color: #475569;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            border-radius: 9999px;
+            background-color: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .badge-success {
+            background-color: #dcfce7;
+            color: #15803d;
+        }
+
+        /* Steps */
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background-color: var(--primary);
+            color: white;
+            font-weight: 800;
+            font-size: 0.85rem;
+            margin-right: 0.5rem;
+        }
+
+        @media (max-width: 900px) {
+            #sidebar {
+                display: none;
+            }
+            #content {
+                margin-left: 0;
+                padding: 2rem 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <nav id="sidebar">
+        <a href="#overview" class="brand">
+            <div class="brand-logo">Z</div>
+            <div>
+                <div class="brand-text">Zoom POS SaaS <span class="brand-version">v2.0</span></div>
+            </div>
+        </a>
+
+        <div class="nav-group-title">Getting Started</div>
+        <ul class="nav-links">
+            <li><a href="#overview" class="active">Overview & Features</a></li>
+            <li><a href="#requirements">Server Requirements</a></li>
+            <li><a href="#installer">1-Click Web Installer</a></li>
+        </ul>
+
+        <div class="nav-group-title">Hosting & Deployment</div>
+        <ul class="nav-links">
+            <li><a href="#cpanel-install">cPanel / Plesk Hosting</a></li>
+            <li><a href="#vps-install">VPS / Nginx / Apache</a></li>
+            <li><a href="#cron-jobs">Cron Job & Scheduler</a></li>
+        </ul>
+
+        <div class="nav-group-title">Configuration</div>
+        <ul class="nav-links">
+            <li><a href="#payment-gateways">Payment Gateways</a></li>
+            <li><a href="#thermal-printing">Thermal Receipt Printing</a></li>
+            <li><a href="#restaurant-pos">Restaurant POS & KDS</a></li>
+            <li><a href="#multi-tenancy">Multi-Tenancy & Domains</a></li>
+            <li><a href="#localization">Languages & Translations</a></li>
+        </ul>
+
+        <div class="nav-group-title">Support</div>
+        <ul class="nav-links">
+            <li><a href="#troubleshooting">Troubleshooting & FAQ</a></li>
+            <li><a href="#changelog">Changelog & Support</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="content">
+        <header>
+            <h1>Zoom POS Multi-Tenant SaaS & POS System</h1>
+            <p class="lead">Complete User Guide, Technical Documentation & Deployment Manual for CodeCanyon</p>
+        </header>
+
+        <!-- 1. Overview -->
+        <section id="overview">
+            <h2>🚀 Overview & Architecture</h2>
+            <p><strong>Zoom POS SaaS</strong> is an enterprise-grade Multi-Tenant Point of Sale and SaaS billing platform built on Laravel, Livewire 3, Alpine.js, Tailwind CSS, and MySQL.</p>
+
+            <div class="card">
+                <h3>Core Capabilities & Feature Highlights</h3>
+                <ul>
+                    <li><strong>Dual POS Workflows:</strong> Seamlessly toggle between <em>Retail / Grocery Barcode POS</em> and <em>Restaurant Dine-In POS</em> with dining floors, table layouts, and Kitchen Order Tickets (KOT/KDS).</li>
+                    <li><strong>Continuous Thermal Receipt Printing:</strong> Exact millimeter-calibrated DomPDF and browser print engine supporting standard <strong>58mm and 80mm</strong> continuous thermal rolls without right-edge text clipping or multi-page voids.</li>
+                    <li><strong>Quotation & Document Management:</strong> Issue professional client proposals, convert quotations directly into sales/invoices, deduct stock automatically, and export branded PDF slips.</li>
+                    <li><strong>Accounts Receivable & Cash Registers:</strong> Manage credit sales, installment tracking, register open/close shifts, and financial audit ledgers.</li>
+                    <li><strong>Multi-Tenancy & Custom Domains:</strong> Flexible tenant routing supporting subdomains (<code>{tenant}.domain.com</code>), path prefixes (<code>/tenant/*</code>), and dedicated custom domains.</li>
+                    <li><strong>100% Offline Asset Delivery:</strong> Zero third-party CDN dependencies; all charts, rich-text editors, icons, and QR code engines are bundled locally.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 2. Server Requirements -->
+        <section id="requirements">
+            <h2>💻 Server Requirements</h2>
+            <p>Ensure your server or hosting account satisfies the following requirements:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Requirement</th>
+                        <th>Recommended / Mandatory</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>PHP Version</strong></td>
+                        <td>PHP 8.2, 8.3, or 8.4</td>
+                        <td><span class="badge badge-success">Mandatory</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>PHP Memory Limit</strong></td>
+                        <td>256MB or higher (512MB for high-volume POS)</td>
+                        <td><span class="badge badge-success">Mandatory</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Database</strong></td>
+                        <td>MySQL 8.0+ / MariaDB 10.5+</td>
+                        <td><span class="badge badge-success">Mandatory</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Required PHP Extensions</strong></td>
+                        <td>BCMath, Ctype, cURL, DOM, Fileinfo, JSON, Mbstring, OpenSSL, PCRE, PDO, PDO_MySQL, Tokenizer, XML</td>
+                        <td><span class="badge badge-success">Mandatory</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Graphics Extension</strong></td>
+                        <td>GD or Imagick (for QR Codes & Barcodes)</td>
+                        <td><span class="badge badge-success">Mandatory</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- 3. Web Installer -->
+        <section id="installer">
+            <h2>⚡ 1-Click Interactive Web Installer</h2>
+            <p>Zoom POS comes with a standalone graphical web installer at <code>/install</code>.</p>
+
+            <div class="card">
+                <h3>Installation Steps:</h3>
+                <ol>
+                    <li>Upload the script files to your web server root.</li>
+                    <li>Navigate to <code>https://yourdomain.com/install</code> in your web browser.</li>
+                    <li><strong>Step 1:</strong> System checks verify PHP extensions, memory limit, and folder write permissions.</li>
+                    <li><strong>Step 2:</strong> Enter your database credentials (Host, Port, Database Name, User, Password) and click <em>Test Connection</em>.</li>
+                    <li><strong>Step 3:</strong> Click <em>Run Database Migrations & Seed Defaults</em>.</li>
+                    <li><strong>Step 4:</strong> Create your primary Super Admin account and enter your CodeCanyon Purchase Code.</li>
+                    <li><strong>Step 5:</strong> Click <em>Complete & Lock Installation</em> to generate the application encryption key and lock the installer.</li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- 4. cPanel Installation -->
+        <section id="cpanel-install">
+            <h2>🌐 cPanel / Plesk Hosting Setup</h2>
+            <div class="card">
+                <ol>
+                    <li><strong>Set Document Root:</strong> In cPanel &gt; Domains, point your domain's Document Root to the <code>/public</code> directory of the project (e.g. <code>public_html/public</code> or <code>subdomain/public</code>).</li>
+                    <li><strong>Create MySQL Database:</strong> In cPanel &gt; MySQL Databases, create a database, user, and assign full permissions.</li>
+                    <li><strong>Upload & Extract:</strong> Upload the source archive into your hosting folder and extract.</li>
+                    <li><strong>Configure Permissions:</strong> Ensure <code>storage/</code> and <code>bootstrap/cache/</code> have write permissions (<code>chmod -R 775 storage bootstrap/cache</code>).</li>
+                    <li><strong>Run Installer:</strong> Visit <code>https://yourdomain.com/install</code> to finalize.</li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- 5. VPS / Nginx / Apache -->
+        <section id="vps-install">
+            <h2>🖥️ VPS / Nginx & Apache Configuration</h2>
+            <div class="card">
+                <h3>Sample Nginx Server Block:</h3>
+                <pre><code>server {
+    listen 80;
+    server_name yourdomain.com *.yourdomain.com;
+    root /var/www/zoom-pos/public;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
+
+    index index.php;
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}</code></pre>
+            </div>
+        </section>
+
+        <!-- 6. Cron Job Setup -->
+        <section id="cron-jobs">
+            <h2>⏰ Cron Job & Task Scheduler</h2>
+            <p>Laravel's task scheduler manages subscription renewals, overdue invoice reminders, inventory alerts, and database cleanups. Add the following cron job to your server:</p>
+            <pre><code>* * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1</code></pre>
+            <div class="alert alert-info">
+                <span>💡</span>
+                <div>In cPanel, go to <strong>Cron Jobs</strong> &gt; Select <em>Once Per Minute (* * * * *)</em> &gt; Enter the command above replacing <code>/path-to-your-project</code> with your absolute server path.</div>
+            </div>
+        </section>
+
+        <!-- 7. Payment Gateways -->
+        <section id="payment-gateways">
+            <h2>💳 Payment Gateways Setup</h2>
+            <p>Super Admins can enable payment gateways in the Super Admin Console (<strong>Settings &gt; Payment Gateways</strong>) or via <code>.env</code>:</p>
+            <div class="card">
+                <ul>
+                    <li><strong>Stripe:</strong> Enter Publishable Key, Secret Key, and Webhook Secret.</li>
+                    <li><strong>PayPal:</strong> Enter Client ID, Secret Key, and set Mode to <em>live</em> or <em>sandbox</em>.</li>
+                    <li><strong>Razorpay:</strong> Enter Key ID and Key Secret.</li>
+                    <li><strong>Mercado Pago:</strong> Enter Public Key and Access Token.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 8. Thermal Printing -->
+        <section id="thermal-printing">
+            <h2>🖨️ Thermal Receipt Printing Setup (58mm & 80mm)</h2>
+            <p>Zoom POS features precision CSS print media rules and dynamic PDF millimeter canvas sizing tailored for standard POS thermal receipt printers (Epson, Star Micronics, Xprinter, MUNBYN, Rongta, etc.):</p>
+            <div class="card">
+                <ul>
+                    <li><strong>Continuous Roll Output:</strong> The layout automatically calculates item counts and sub-lines to fit receipts onto a single continuous roll without blank bottom voids.</li>
+                    <li><strong>Browser Direct Print:</strong> Click <em>Print Receipt</em> in POS to invoke native browser printing configured with <code>@media print</code> zero-margin safety padding.</li>
+                    <li><strong>Paper Size Setting:</strong> Store managers can toggle between <strong>58mm</strong> (standard compact) and <strong>80mm</strong> (wide format) in <strong>Store Settings &gt; POS Configuration</strong>.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 9. Troubleshooting -->
+        <section id="troubleshooting">
+            <h2>🛠️ Troubleshooting & Frequently Asked Questions</h2>
+            <div class="card">
+                <h3>1. Storage permission error / 500 Internal Server Error:</h3>
+                <p>Run the following commands in your server terminal:</p>
+                <pre><code>chmod -R 775 storage bootstrap/cache
+php artisan storage:link</code></pre>
+
+                <h3>2. How to reset Super Admin password:</h3>
+                <p>Use Laravel Tinker:</p>
+                <pre><code>php artisan tinker
+App\Models\PlatformAdmin::first()->update(['password' => Hash::make('NewPassword123')]);</code></pre>
+
+                <h3>3. Clearing optimization caches after updates:</h3>
+                <pre><code>php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache</code></pre>
+            </div>
+        </section>
+
+        <!-- 10. Changelog -->
+        <section id="changelog">
+            <h2>📜 Support & Licensing</h2>
+            <p>For technical support, custom feature development, or questions regarding CodeCanyon licensing:</p>
+            <div class="card">
+                <ul>
+                    <li><strong>Support Inquiries:</strong> Open a ticket through your Envato / CodeCanyon item support tab.</li>
+                    <li><strong>Item License:</strong> Refer to <code>Licensing/Standard_Licenses.txt</code> for license terms.</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+</body>
+</html>

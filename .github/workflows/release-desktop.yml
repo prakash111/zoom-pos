@@ -1,0 +1,58 @@
+name: Release Desktop POS (NativePHP)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo, pdo_sqlite, sqlite3, curl, dom, fileinfo, gd, zip
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Composer Dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction
+
+      - name: Install Node Dependencies
+        run: npm ci
+
+      - name: Build Web Assets
+        run: npm run build
+
+      - name: Prepare Environment
+        run: |
+          if (!(Test-Path .env)) { Copy-Item .env.example .env }
+          php artisan key:generate --force
+
+      - name: Build NativePHP Windows Installer
+        run: php artisan native:build win x64
+        env:
+          NATIVEPHP_APP_VERSION: ${{ github.ref_name }}
+
+      - name: Upload Installer to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: 'Zoom POS ${{ github.ref_name }}'
+          draft: false
+          prerelease: false
+          files: |
+            dist-desktop/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

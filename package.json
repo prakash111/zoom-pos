@@ -1,0 +1,37 @@
+{
+    "$schema": "https://www.schemastore.org/package.json",
+    "name": "zoom-pos",
+    "version": "1.1.0",
+    "description": "Zoom POS secure Windows web application",
+    "homepage": "https://saas.zoomnearby.com",
+    "author": {
+        "name": "ZoomNearby",
+        "email": "support@zoomnearby.com"
+    },
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "node node_modules/vite/bin/vite.js build",
+        "dev": "node node_modules/vite/bin/vite.js"
+    },
+    "devDependencies": {
+        "@tailwindcss/forms": "^0.5.11",
+        "@tailwindcss/oxide-linux-x64-gnu": "^4.3.3",
+        "@tailwindcss/vite": "^4.3.3",
+        "autoprefixer": "^10.5.4",
+        "concurrently": "^10.0.3",
+        "laravel-vite-plugin": "^1.3.0",
+        "postcss": "^8.5.26",
+        "tailwindcss": "^4.3.3",
+        "vite": "^5.4.21"
+    },
+    "optionalDependencies": {
+        "@laravel/multiplex": "^0.4.1"
+    },
+    "dependencies": {
+        "alpinejs": "^3.16.3",
+        "html5-qrcode": "^2.3.8",
+        "nprogress": "^0.2.0",
+        "vue": "^3.5.41"
+    }
+}

@@ -7,7 +7,7 @@
 
         <!-- Restaurant Hero Banner -->
         <div class="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-emerald-500/20">
-            
+
             <!-- Decorative Glow Orbs -->
             <div class="absolute -right-10 -top-10 w-64 h-64 bg-lime-400/15 rounded-full blur-3xl pointer-events-none"></div>
             <div class="absolute right-40 -bottom-20 w-48 h-48 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none"></div>
@@ -43,9 +43,110 @@
             </div>
         </div>
 
+        <!-- Executive KPI Metrics Section -->
+        <div class="space-y-4" x-data="{ period: 'daily' }">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white">{{ __('Executive Summary') }}</h3>
+                    <p class="text-xs text-slate-400">{{ __('Real-time financial performance overview') }}</p>
+                </div>
+                <!-- Daily / Monthly Period Switcher -->
+                <div class="flex items-center gap-1 bg-slate-200/80 dark:bg-slate-800 p-1 rounded-2xl">
+                    <button type="button"
+                            @click="period = 'daily'"
+                            :class="period === 'daily' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'"
+                            class="px-3 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer">
+                        {{ __('Today (Daily)') }}
+                    </button>
+                    <button type="button"
+                            @click="period = 'monthly'"
+                            :class="period === 'monthly' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'"
+                            class="px-3 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer">
+                        {{ __('This Month') }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4-Card Revenue & Profit Metrics Grid (High-Impact KPI Stat Cards) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+                <!-- 1. Total Revenue -->
+                <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <div class="absolute -top-6 -right-6 w-24 h-24 bg-gradient-to-br from-indigo-500/10 to-blue-500/0 rounded-full blur-xl pointer-events-none"></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400" x-text="period === 'daily' ? @js(__('Today\'s Revenue')) : @js(__('Monthly Revenue'))">{{ __("Today's Revenue") }}</span>
+                        <span class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center text-sm shadow-xs">💰</span>
+                    </div>
+                    <div class="text-2xl font-black tracking-tight text-slate-900 dark:text-white mt-2"
+                         x-text="period === 'daily' ? '{{ $currencySymbol }}{{ number_format($dailyRevenue, 2) }}' : '{{ $currencySymbol }}{{ number_format($monthlyRevenue, 2) }}'">
+                        {{ $currencySymbol }}{{ number_format($dailyRevenue, 2) }}
+                    </div>
+                    <div class="flex items-center justify-between gap-1 text-[11px] font-semibold mt-1">
+                        <span class="flex items-center gap-1 {{ $revenueGrowth >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}">
+                            <span>{{ $revenueGrowth >= 0 ? '↑ +' : '↓ ' }}{{ $revenueGrowth }}%</span>
+                            <span class="text-slate-400 font-normal">vs prev</span>
+                        </span>
+                        <a wire:navigate.hover href="{{ route('tenant.reports.sales') }}" class="text-blue-500 hover:underline font-bold text-[11px]">{{ __("View Sales") }} &rarr;</a>
+                    </div>
+                </div>
+
+                <!-- 2. Net Estimated Profit -->
+                <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <div class="absolute -top-6 -right-6 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-teal-500/0 rounded-full blur-xl pointer-events-none"></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400" x-text="period === 'daily' ? @js(__('Today\'s Net Profit')) : @js(__('Monthly Net Profit'))">{{ __("Today's Net Profit") }}</span>
+                        <span class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center text-sm shadow-xs">📈</span>
+                    </div>
+                    <div class="text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 mt-2"
+                         x-text="period === 'daily' ? '{{ $currencySymbol }}{{ number_format($dailyProfit, 2) }}' : '{{ $currencySymbol }}{{ number_format($monthlyProfit, 2) }}'">
+                        {{ $currencySymbol }}{{ number_format($dailyProfit, 2) }}
+                    </div>
+                    <div class="flex items-center justify-between gap-1 text-[11px] mt-1">
+                        <span class="text-slate-500">{{ __("Margin:") }} <strong class="text-slate-700 dark:text-slate-200 font-bold" x-text="period === 'daily' ? '{{ $dailyProfitMargin }}%' : '{{ $monthlyProfitMargin }}%'">{{ $dailyProfitMargin }}%</strong></span>
+                        <a wire:navigate.hover href="{{ route('tenant.reports.profit-loss') }}" class="text-emerald-500 hover:underline font-bold text-[11px]">{{ __("P&L Breakdown") }} &rarr;</a>
+                    </div>
+                </div>
+
+                <!-- 3. Completed Orders / Sales Count -->
+                <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <div class="absolute -top-6 -right-6 w-24 h-24 bg-gradient-to-br from-violet-500/10 to-purple-500/0 rounded-full blur-xl pointer-events-none"></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400" x-text="period === 'daily' ? @js(__('Today\'s Invoices')) : @js(__('Monthly Invoices'))">{{ __("Today's Invoices") }}</span>
+                        <span class="w-8 h-8 rounded-xl bg-violet-50 dark:bg-violet-950/50 text-violet-600 flex items-center justify-center text-sm shadow-xs">🧾</span>
+                    </div>
+                    <div class="text-2xl font-black tracking-tight text-slate-900 dark:text-white mt-2"
+                         x-text="period === 'daily' ? '{{ $dailyOrdersCount }}' : '{{ $monthlyOrdersCount }}'">
+                        {{ $dailyOrdersCount }}
+                    </div>
+                    <div class="flex items-center justify-between gap-1 text-[11px] mt-1">
+                        <span class="text-slate-400">{{ __("Avg items:") }} <strong class="text-slate-700 dark:text-slate-300">{{ $avgItemsPerOrder }}</strong></span>
+                        <a wire:navigate.hover href="{{ route('tenant.sales.index') }}" class="text-violet-500 hover:underline font-bold text-[11px]">{{ __("All Orders") }} &rarr;</a>
+                    </div>
+                </div>
+
+                <!-- 4. Average Ticket / AOV -->
+                <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <div class="absolute -top-6 -right-6 w-24 h-24 bg-gradient-to-br from-amber-500/10 to-orange-500/0 rounded-full blur-xl pointer-events-none"></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ __("Avg Ticket (AOV)") }}</span>
+                        <span class="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center text-sm shadow-xs">🎯</span>
+                    </div>
+                    <div class="text-2xl font-black tracking-tight text-slate-900 dark:text-white mt-2"
+                         x-text="period === 'daily' ? '{{ $currencySymbol }}{{ number_format($dailyAov, 2) }}' : '{{ $currencySymbol }}{{ number_format($monthlyAov, 2) }}'">
+                        {{ $currencySymbol }}{{ number_format($dailyAov, 2) }}
+                    </div>
+                    <div class="flex items-center justify-between gap-1 text-[11px] mt-1">
+                        <span class="text-slate-500">{{ __("Per Client Spend") }}</span>
+                        <a wire:navigate.hover href="{{ route('tenant.customers.index') }}" class="text-amber-500 hover:underline font-bold text-[11px]">{{ __("Customer Dir") }} &rarr;</a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
         <!-- 4 Restaurant Metric Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            
+
             <!-- Metric 1: Today's Revenue -->
             <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex items-center gap-4">
                 <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xl shadow-sm">
@@ -93,7 +194,7 @@
 
         <!-- Floor Plan Overview & Recent KOTs -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
+
             <!-- Left 2 Cols: Floor Plan Live Table Map -->
             <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -192,7 +293,7 @@
 
         <!-- Hero Banner Card -->
         <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            
+
             <!-- Decorative Glow Orbs -->
             <div class="absolute -right-10 -top-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
             <div class="absolute right-40 -bottom-20 w-48 h-48 bg-indigo-400/20 rounded-full blur-xl pointer-events-none"></div>
@@ -233,50 +334,165 @@
             </div>
         </div>
 
-        <!-- 4 Key Metric Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            
-            <!-- Metric 1: Today's Revenue -->
-            <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                <div class="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xl shadow-sm">
-                    $
-                </div>
+        <!-- Executive KPI Metrics Section -->
+        <div class="space-y-4" x-data="{ period: 'daily' }">
+            <div class="flex items-center justify-between">
                 <div>
-                    <div class="text-xs font-semibold text-slate-400 dark:text-slate-500">{{ __("Today's Sales") }}</div>
-                    <div class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">${{ number_format($todaySalesTotal, 2) }}</div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white">{{ __('Executive Summary') }}</h3>
+                    <p class="text-xs text-slate-400">{{ __('Real-time financial performance overview') }}</p>
+                </div>
+                <!-- Daily / Monthly Period Switcher -->
+                <div class="flex items-center gap-1 bg-slate-200/80 dark:bg-slate-800 p-1 rounded-2xl">
+                    <button type="button"
+                            @click="period = 'daily'"
+                            :class="period === 'daily' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'"
+                            class="px-3 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer">
+                        {{ __('Today (Daily)') }}
+                    </button>
+                    <button type="button"
+                            @click="period = 'monthly'"
+                            :class="period === 'monthly' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'"
+                            class="px-3 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer">
+                        {{ __('This Month') }}
+                    </button>
                 </div>
             </div>
 
-            <!-- Metric 2: Today's Orders -->
-            <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold shadow-sm">
-                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <!-- 4-Card Revenue, Profit, Customers, and Invoices Grid (High-Impact KPI Stat Cards) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+                <!-- 1. Total Revenue -->
+                <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <div class="absolute -top-6 -right-6 w-24 h-24 bg-gradient-to-br from-indigo-500/10 to-blue-500/0 rounded-full blur-xl pointer-events-none"></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400" x-text="period === 'daily' ? @js(__('Today\'s Revenue')) : @js(__('Monthly Revenue'))">{{ __("Today's Revenue") }}</span>
+                        <span class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold shadow-xs">💰</span>
+                    </div>
+                    <div class="text-2xl font-black tracking-tight text-slate-900 dark:text-white mt-2"
+                         x-text="period === 'daily' ? '{{ $currencySymbol }}{{ number_format($dailyRevenue, 2) }}' : '{{ $currencySymbol }}{{ number_format($monthlyRevenue, 2) }}'">
+                        {{ $currencySymbol }}{{ number_format($dailyRevenue, 2) }}
+                    </div>
+                    <div class="flex items-center justify-between gap-1 text-[11px] font-semibold mt-1">
+                        <span class="flex items-center gap-1 {{ $revenueGrowth >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}"
+                              x-text="period === 'daily' ? '{{ $revenueGrowth >= 0 ? '↑ +' : '↓ ' }}{{ $revenueGrowth }}% vs yesterday' : '{{ $monthlyRevenueGrowth >= 0 ? '↑ +' : '↓ ' }}{{ $monthlyRevenueGrowth }}% vs last month'">
+                            {{ $revenueGrowth >= 0 ? '↑ +' : '↓ ' }}{{ $revenueGrowth }}% vs yesterday
+                        </span>
+                        <a wire:navigate.hover href="{{ route('tenant.reports.sales') }}" class="text-blue-500 hover:underline font-bold text-[11px]">{{ __("View Sales") }} &rarr;</a>
+                    </div>
                 </div>
-                <div>
-                    <div class="text-xs font-semibold text-slate-400 dark:text-slate-500">{{ __("Today's Orders") }}</div>
-                    <div class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">{{ $todayOrdersCount }}</div>
+
+                <!-- 2. Net Estimated Profit & Margin -->
+                <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <div class="absolute -top-6 -right-6 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-teal-500/0 rounded-full blur-xl pointer-events-none"></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400" x-text="period === 'daily' ? @js(__('Today\'s Net Profit')) : @js(__('Monthly Net Profit'))">{{ __("Today's Net Profit") }}</span>
+                        <span class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm font-bold shadow-xs">📈</span>
+                    </div>
+                    <div class="text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 mt-2"
+                         x-text="period === 'daily' ? '{{ $currencySymbol }}{{ number_format($dailyProfit, 2) }}' : '{{ $currencySymbol }}{{ number_format($monthlyProfit, 2) }}'">
+                        {{ $currencySymbol }}{{ number_format($dailyProfit, 2) }}
+                    </div>
+                    <div class="flex items-center justify-between gap-1 text-[11px] mt-1">
+                        <span class="text-slate-500">{{ __("Margin:") }} <strong class="text-slate-700 dark:text-slate-200 font-bold" x-text="period === 'daily' ? '{{ $dailyProfitMargin }}%' : '{{ $monthlyProfitMargin }}%'">{{ $dailyProfitMargin }}%</strong></span>
+                        <a wire:navigate.hover href="{{ route('tenant.reports.profit-loss') }}" class="text-emerald-500 hover:underline font-bold text-[11px]">{{ __("P&L Breakdown") }} &rarr;</a>
+                    </div>
                 </div>
+
+                <!-- 3. Today's Invoices & Completed Orders -->
+                <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <div class="absolute -top-6 -right-6 w-24 h-24 bg-gradient-to-br from-violet-500/10 to-purple-500/0 rounded-full blur-xl pointer-events-none"></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400" x-text="period === 'daily' ? @js(__('Today\'s Invoices')) : @js(__('Monthly Invoices'))">{{ __("Today's Invoices") }}</span>
+                        <span class="w-8 h-8 rounded-xl bg-violet-50 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400 flex items-center justify-center text-sm font-bold shadow-xs">🧾</span>
+                    </div>
+                    <div class="text-2xl font-black tracking-tight text-slate-900 dark:text-white mt-2"
+                         x-text="period === 'daily' ? '{{ $dailyOrdersCount }}' : '{{ $monthlyOrdersCount }}'">
+                        {{ $dailyOrdersCount }}
+                    </div>
+                    <div class="flex items-center justify-between gap-1 text-[11px] mt-1">
+                        <span class="text-slate-400">{{ __("Served:") }} <strong class="text-slate-700 dark:text-slate-200 font-bold" x-text="period === 'daily' ? '{{ $dailyCustomersCount }} clients' : '{{ $monthlyCustomersCount }} clients'">{{ $dailyCustomersCount }} clients</strong></span>
+                        <a wire:navigate.hover href="{{ route('tenant.sales.index') }}" class="text-violet-500 hover:underline font-bold text-[11px]">{{ __("All Orders") }} &rarr;</a>
+                    </div>
+                </div>
+
+                <!-- 4. Average Ticket / AOV -->
+                <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <div class="absolute -top-6 -right-6 w-24 h-24 bg-gradient-to-br from-amber-500/10 to-orange-500/0 rounded-full blur-xl pointer-events-none"></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ __("Avg Ticket (AOV)") }}</span>
+                        <span class="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center text-sm font-bold shadow-xs">🎯</span>
+                    </div>
+                    <div class="text-2xl font-black tracking-tight text-slate-900 dark:text-white mt-2"
+                         x-text="period === 'daily' ? '{{ $currencySymbol }}{{ number_format($dailyAov, 2) }}' : '{{ $currencySymbol }}{{ number_format($monthlyAov, 2) }}'">
+                        {{ $currencySymbol }}{{ number_format($dailyAov, 2) }}
+                    </div>
+                    <div class="flex items-center justify-between gap-1 text-[11px] mt-1">
+                        <span class="text-slate-500">{{ __("Avg Items:") }} <strong class="text-slate-700 dark:text-slate-300 font-bold">{{ $avgItemsPerOrder }}</strong></span>
+                        <a wire:navigate.hover href="{{ route('tenant.customers.index') }}" class="text-amber-500 hover:underline font-bold text-[11px]">{{ __("Customer Dir") }} &rarr;</a>
+                    </div>
+                </div>
+
             </div>
 
-            <!-- Metric 3: Active Products -->
-            <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                <div class="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold shadow-sm">
-                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                </div>
-                <div>
-                    <div class="text-xs font-semibold text-slate-400 dark:text-slate-500">{{ __('Active Products') }}</div>
-                    <div class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">{{ $totalProductsCount }}</div>
-                </div>
-            </div>
+            <!-- Monthly Sales Target vs. Achieved Progress Bar -->
+            @php
+                $targetAmount = (float) ($salesTargetProgress['target_amount'] ?? 0);
+                $achievedAmount = (float) ($salesTargetProgress['achieved_amount'] ?? $monthlyRevenue);
+                $targetPercentage = (float) ($salesTargetProgress['percentage'] ?? ($targetAmount > 0 ? round(($achievedAmount / $targetAmount) * 100, 1) : 0));
+                $cappedPercentage = min(100, max(0, $targetPercentage));
+            @endphp
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-lg font-black shadow-sm">
+                            🎯
+                        </div>
+                        <div>
+                            <h3 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
+                                {{ __("Monthly Sales Target") }} ({{ now()->format('F Y') }})
+                            </h3>
+                            <p class="text-xs text-slate-400">
+                                {{ __("Track store sales performance against current monthly objective") }}
+                            </p>
+                        </div>
+                    </div>
 
-            <!-- Metric 4: Total Customers -->
-            <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                <div class="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold shadow-sm">
-                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    <div class="flex items-center gap-2">
+                        @if ($targetAmount > 0)
+                            <span @class([
+                                'px-3 py-1 rounded-full text-xs font-black',
+                                'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300' => $targetPercentage >= 100,
+                                'bg-blue-100 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300' => $targetPercentage < 100 && $targetPercentage >= 50,
+                                'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300' => $targetPercentage < 50,
+                            ])>
+                                {{ $targetPercentage }}% {{ $targetPercentage >= 100 ? __('Goal Achieved 🎉') : __('Achieved') }}
+                            </span>
+                        @else
+                            <a wire:navigate.hover href="{{ route('tenant.targets.index') }}" class="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition">
+                                + {{ __("Set Monthly Goal") }}
+                            </a>
+                        @endif
+                    </div>
                 </div>
-                <div>
-                    <div class="text-xs font-semibold text-slate-400 dark:text-slate-500">{{ __('Total Customers') }}</div>
-                    <div class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">{{ $totalCustomersCount }}</div>
+
+                <!-- Numbers and Progress Bar -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between text-xs font-bold">
+                        <div class="text-slate-600 dark:text-slate-300 font-mono">
+                            <span class="text-slate-400">{{ __("Sold:") }}</span>
+                            <span class="text-emerald-600 dark:text-emerald-400 font-black text-sm">{{ $company ? $company->formatMoney($achievedAmount) : ($currencySymbol . number_format($achievedAmount, 2)) }}</span>
+                        </div>
+                        <div class="text-slate-600 dark:text-slate-300 font-mono">
+                            <span class="text-slate-400">{{ __("Goal:") }}</span>
+                            <span class="text-slate-900 dark:text-white font-black text-sm">{{ $targetAmount > 0 ? ($company ? $company->formatMoney($targetAmount) : ($currencySymbol . number_format($targetAmount, 2))) : __('Not Configured') }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Visual Progress Bar -->
+                    <div class="w-full h-3.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200/60 dark:border-slate-700/60">
+                        <div class="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r {{ $targetPercentage >= 100 ? 'from-emerald-500 to-teal-400' : 'from-blue-600 to-indigo-500' }}"
+                             style="width: {{ $targetAmount > 0 ? $cappedPercentage : 0 }}%;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -313,7 +529,7 @@
 
         <!-- 2 Columns: Low Stock Alerts + Recent Sales -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
+
             <!-- Left: Low Stock Alerts -->
             <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -395,7 +611,7 @@
     @if ($showPosLayoutModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
             <div class="bg-white dark:bg-slate-900 rounded-[2rem] p-6 sm:p-8 max-w-3xl w-full shadow-2xl border border-slate-200 dark:border-slate-800 space-y-6 animate-in fade-in zoom-in-95">
-                
+
                 <!-- Modal Header -->
                 <div class="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
                     <div>
@@ -415,7 +631,7 @@
 
                 <!-- 3 Layout Selection Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    
+
                     <!-- Layout 1: Standard Retail Scan -->
                     <div wire:click="selectLayout('standard')"
                          @class([

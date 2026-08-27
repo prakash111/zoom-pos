@@ -18,6 +18,10 @@
         $b = hexdec(substr($hex, 4, 2));
         $lightBg = sprintf('rgba(%d, %d, %d, 0.08)', $r, $g, $b);
         $borderTint = sprintf('rgba(%d, %d, %d, 0.22)', $r, $g, $b);
+        $documentTaxRows = \App\Services\TaxEngineService::normalizeTaxBreakdown($sale->tax_breakdown);
+        $documentTaxRuleName = $documentTaxRows[0]['name'] ?? $sale->tax_name;
+        $documentTaxLabel = \App\Services\TaxEngineService::getTaxIdentifierLabel($company->country, $documentTaxRuleName);
+        $customerTaxNumber = $sale->customer?->tax_id ?: ($sale->customer?->gstin ?: $sale->customer?->document);
     @endphp
     <style>
         * {
@@ -402,6 +406,9 @@
                     @if ($company->city || $company->state)
                         {{ $company->city }}{{ $company->state ? ', ' . $company->state : '' }} {{ $company->postal_code }}
                     @endif
+                    @if ($company->tax_id)
+                        <br>{{ $documentTaxLabel }}: {{ $company->tax_id }}
+                    @endif
                 </div>
             </div>
 
@@ -411,7 +418,7 @@
                     <span class="meta-val">{{ $sale->customer?->id ? sprintf('%04d-01', $sale->customer->id) : '3110-01' }}</span>
                 </div>
                 <div class="meta-row">
-                    <span class="meta-label">Date:</span>
+                    <span class="meta-label">{{ __("Date:") }}</span>
                     <span class="meta-val">{{ $sale->created_at ? $sale->created_at->format('d/m/Y') : now()->format('d/m/Y') }}</span>
                 </div>
                 <div class="meta-row">
@@ -430,10 +437,16 @@
                         <span class="meta-val">{{ $sale->customer->email }}</span>
                     </div>
                 @endif
-                @if ($sale->customer?->document)
+                @if ($customerTaxNumber)
                     <div class="meta-row">
-                        <span class="meta-label">{{ $sale->customer->tax_id_label ?: 'Tax ID' }}:</span>
-                        <span class="meta-val">{{ $sale->customer->document }}</span>
+                        <span class="meta-label">{{ $documentTaxLabel }}:</span>
+                        <span class="meta-val">{{ $customerTaxNumber }}</span>
+                    </div>
+                @endif
+                @if (!empty($sale->payment_terms))
+                    <div class="meta-row">
+                        <span class="meta-label">Payment Terms:</span>
+                        <span class="meta-val" style="font-weight: bold; color: var(--doc-accent);">{{ $sale->payment_terms }}</span>
                     </div>
                 @endif
                 <div class="meta-row" style="margin-top: 4px;">
@@ -529,7 +542,7 @@
         @if (!empty($sale->notes))
             <div class="info-card" style="margin-top: 24px;">
                 <div class="card-heading">Order Notes & Remarks</div>
-                <div class="card-text" style="margin-bottom: 0;">{!! $sale->notes !!}</div>
+                <div class="card-text" style="margin-bottom: 0;">{!! clean_html($sale->notes) !!}</div>
             </div>
         @endif
 
@@ -546,7 +559,7 @@
 
                 <div class="card-heading">Bank Details</div>
                 <div class="card-text" style="margin-bottom: 0;">
-                    {!! $company->bank_details ?? ($company->name . '<br>Phone: ' . ($company->phone ?? '+123-456-7890')) !!}
+                    {!! clean_html($company->bank_details ?? ($company->name . '<br>Phone: ' . ($company->phone ?? '+123-456-7890'))) !!}
                 </div>
             </div>
 
@@ -555,9 +568,9 @@
                 <div class="card-heading">Terms and conditions:</div>
                 <div class="card-text" style="margin-bottom: 0;">
                     @if ($isQuotation && !empty($company->quote_terms))
-                        {!! $company->quote_terms !!}
+                        {!! clean_html($company->quote_terms) !!}
                     @elseif (!$isQuotation && !empty($company->invoice_terms))
-                        {!! $company->invoice_terms !!}
+                        {!! clean_html($company->invoice_terms) !!}
                     @else
                         <ul class="terms-list">
                             <li>All rates quoted are valid for 15 days.</li>

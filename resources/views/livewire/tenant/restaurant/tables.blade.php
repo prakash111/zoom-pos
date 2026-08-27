@@ -12,28 +12,28 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-                <span>🪑 Floor Plan & Tables</span>
-                <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-lime-500/15 text-lime-600 dark:text-lime-400 border border-lime-500/30">Restaurant Mode</span>
+                <span>🪑 {{ __("Floor Plan & Tables") }}</span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-lime-500/15 text-lime-600 dark:text-lime-400 border border-lime-500/30">{{ __("Restaurant Mode") }}</span>
             </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Manage seating floor areas, table occupancy statuses, and QR code digital menus</p>
+            <p class="text-xs text-slate-400 mt-0.5">{{ __("Manage seating floor areas, table occupancy statuses, and QR code digital menus") }}</p>
         </div>
 
         <div class="flex items-center gap-2">
-            <a href="{{ route('tenant.restaurant.pos') }}"
+            <a wire:navigate.hover href="{{ route('tenant.restaurant.pos') }}"
                class="px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold bg-lime-500 hover:bg-lime-600 text-slate-950 shadow-md shadow-lime-500/20 active:scale-95 transition flex items-center gap-1.5">
-                <span>🍽️ Open Restaurant POS</span>
+                <span>🍽️ {{ __("Open Restaurant POS") }}</span>
             </a>
 
             <button type="button"
                     wire:click="openAddFloor"
                     class="px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-700 transition">
-                + Add Floor
+                + {{ __("Add Floor") }}
             </button>
 
             <button type="button"
                     wire:click="openAddTable"
                     class="px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25 active:scale-95 transition">
-                + Add Table
+                + {{ __("Add Table") }}
             </button>
         </div>
     </div>
@@ -47,7 +47,7 @@
                     'bg-slate-900 text-white dark:bg-white dark:text-slate-900' => $selectedFloorId === 'all',
                     'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700' => $selectedFloorId !== 'all',
                 ])>
-            All Floor Areas
+            {{ __("All Floor Areas") }}
         </button>
 
         @foreach ($floors as $floor)
@@ -69,12 +69,12 @@
     <!-- Live Status Legend Bar -->
     <div class="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs font-bold">
         <div class="flex items-center gap-4">
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Available ({{ $tables->where('status', 'available')->count() }})</span>
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Occupied ({{ $tables->where('status', 'occupied')->count() }})</span>
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Reserved ({{ $tables->where('status', 'reserved')->count() }})</span>
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Billed ({{ $tables->where('status', 'billed')->count() }})</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> {{ __("Available") }} ({{ $tables->where("status", "available")->count() }})</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> {{ __("Occupied") }} ({{ $tables->where("status", "occupied")->count() }})</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> {{ __("Reserved") }} ({{ $tables->where("status", "reserved")->count() }})</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> {{ __("Billed") }} ({{ $tables->where("status", "billed")->count() }})</span>
         </div>
-        <div class="text-slate-400 text-[11px]">Total Tables: {{ $tables->count() }}</div>
+        <div class="text-slate-400 text-[11px]">{{ __("Total Tables:") }} {{ $tables->count() }}</div>
     </div>
 
     <!-- Tables Visual Grid -->
@@ -92,16 +92,16 @@
                     <!-- Card Top -->
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                            {{ $tbl->floor?->name ?? 'Floor' }}
+                            {{ $tbl->floor?->name ?? __('Floor') }}
                         </span>
                         
                         <!-- Status Badge Dropdown -->
                         <select wire:change="setTableStatus('{{ $tbl->id }}', $event.target.value)"
                                 class="text-[10px] font-black uppercase rounded-lg border-0 py-0.5 px-2 cursor-pointer bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-0">
-                            <option value="available" @selected($tbl->status === 'available')>🟢 Available</option>
-                            <option value="occupied" @selected($tbl->status === 'occupied')>🔵 Occupied</option>
-                            <option value="reserved" @selected($tbl->status === 'reserved')>🟡 Reserved</option>
-                            <option value="billed" @selected($tbl->status === 'billed')>🟣 Billed</option>
+                            <option value="available" @selected($tbl->status === "available")>🟢 {{ __("Available") }}</option>
+                            <option value="occupied" @selected($tbl->status === "occupied")>🔵 {{ __("Occupied") }}</option>
+                            <option value="reserved" @selected($tbl->status === "reserved")>🟡 {{ __("Reserved") }}</option>
+                            <option value="billed" @selected($tbl->status === "billed")>🟣 {{ __("Billed") }}</option>
                         </select>
                     </div>
 
@@ -111,9 +111,9 @@
                             {{ $tbl->table_number }}
                         </h3>
                         <div class="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                            <span>👤 Capacity: {{ $tbl->seating_capacity }}</span>
+                            <span>👤 {{ __("Capacity:") }} {{ $tbl->seating_capacity }}</span>
                             @if ($tbl->status === 'occupied' && $tbl->guest_count > 0)
-                                <span class="text-blue-600 dark:text-blue-400 font-extrabold">&bull; {{ $tbl->guest_count }} Guests</span>
+                                <span class="text-blue-600 dark:text-blue-400 font-extrabold">&bull; {{ $tbl->guest_count }} {{ __("Guests") }}</span>
                             @endif
                         </div>
                     </div>
@@ -122,9 +122,9 @@
                 <!-- Card Actions -->
                 <div class="pt-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2">
                     
-                    <a href="{{ route('tenant.restaurant.pos', ['table_id' => $tbl->id]) }}"
+                    <a wire:navigate.hover href="{{ route('tenant.restaurant.pos', ['table_id' => $tbl->id]) }}"
                        class="w-full py-2 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-lime-500 dark:hover:bg-lime-400 hover:text-slate-950 dark:hover:text-slate-950 text-white text-xs font-extrabold transition flex items-center justify-center gap-1.5">
-                        <span>🍽️ Open Table POS</span>
+                        <span>🍽️ {{ __("Open Table POS") }}</span>
                     </a>
 
                     <div class="flex items-center justify-between text-[11px] font-bold text-slate-500 pt-1">
@@ -132,12 +132,12 @@
                         <a href="{{ route('tenant.restaurant.table.qr', $tbl) }}"
                            target="_blank"
                            class="hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1">
-                            <span>📱 QR Stand</span>
+                            <span>📱 {{ __("QR Stand") }}</span>
                         </a>
 
                         <div class="space-x-1.5">
-                            <button type="button" wire:click="openEditTable('{{ $tbl->id }}')" class="hover:text-blue-500">Edit</button>
-                            <button type="button" wire:click="deleteTable('{{ $tbl->id }}')" wire:confirm="Remove table {{ $tbl->table_number }}?" class="hover:text-rose-500">Delete</button>
+                            <button type="button" wire:click="openEditTable('{{ $tbl->id }}')" class="hover:text-blue-500">{{ __("Edit") }}</button>
+                            <button type="button" wire:click="deleteTable('{{ $tbl->id }}')" wire:confirm="{{ __("Remove table") }} {{ $tbl->table_number }}?" class="hover:text-rose-500">{{ __("Delete") }}</button>
                         </div>
                     </div>
 
@@ -146,7 +146,7 @@
             </div>
         @empty
             <div class="col-span-full py-12 text-center text-slate-400 text-xs">
-                No tables registered for this floor. Click "+ Add Table" to start.
+                {{ __('No tables registered for this floor. Click "+ Add Table" to start.') }}
             </div>
         @endforelse
     </div>
@@ -156,17 +156,17 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
             <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4">
                 <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <h3 class="font-extrabold text-slate-900 dark:text-white">{{ $editingFloorId ? 'Edit Floor Area' : 'Add Floor Area' }}</h3>
+                    <h3 class="font-extrabold text-slate-900 dark:text-white">{{ $editingFloorId ? __('Edit Floor Area') : __('Add Floor Area') }}</h3>
                     <button type="button" wire:click="$set('showFloorModal', false)" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Area Name *</label>
-                    <input type="text" wire:model="floorName" placeholder="e.g. Rooftop Patio, Bar, Hall" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Area Name *") }}</label>
+                    <input type="text" wire:model="floorName" placeholder="{{ __("e.g. Rooftop Patio, Bar, Hall") }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
                     @error('floorName') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" wire:click="$set('showFloorModal', false)" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-500">Cancel</button>
-                    <button type="button" wire:click="saveFloor" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white">Save Floor</button>
+                    <button type="button" wire:click="$set('showFloorModal', false)" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-500">{{ __("Cancel") }}</button>
+                    <button type="button" wire:click="saveFloor" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white">{{ __("Save Floor") }}</button>
                 </div>
             </div>
         </div>
@@ -177,43 +177,43 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
             <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4">
                 <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <h3 class="font-extrabold text-slate-900 dark:text-white">{{ $editingTableId ? 'Edit Table' : 'Add Table' }}</h3>
+                    <h3 class="font-extrabold text-slate-900 dark:text-white">{{ $editingTableId ? __('Edit Table') : __('Add Table') }}</h3>
                     <button type="button" wire:click="$set('showTableModal', false)" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
                 </div>
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Table Name / Number *</label>
-                        <input type="text" wire:model="tableNumber" placeholder="e.g. Table 04, VIP-1, Bar-02" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Table Name / Number *") }}</label>
+                        <input type="text" wire:model="tableNumber" placeholder="{{ __("e.g. Table 04, VIP-1, Bar-02") }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
                         @error('tableNumber') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Floor Area</label>
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Floor Area") }}</label>
                             <select wire:model="tableFloorId" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
-                                <option value="">No Floor Assigned</option>
+                                <option value="">{{ __("No Floor Assigned") }}</option>
                                 @foreach ($floors as $f)
                                     <option value="{{ $f->id }}">{{ $f->name }}</option>
                                 @endforeach
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Capacity (Seats)</label>
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Capacity (Seats)") }}</label>
                             <input type="number" wire:model="tableCapacity" min="1" max="50" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Initial Status</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Initial Status") }}</label>
                         <select wire:model="tableStatus" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
-                            <option value="available">Available</option>
-                            <option value="occupied">Occupied</option>
-                            <option value="reserved">Reserved</option>
-                            <option value="billed">Billed</option>
+                            <option value="available">{{ __("Available") }}</option>
+                            <option value="occupied">{{ __("Occupied") }}</option>
+                            <option value="reserved">{{ __("Reserved") }}</option>
+                            <option value="billed">{{ __("Billed") }}</option>
                         </select>
                     </div>
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" wire:click="$set('showTableModal', false)" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-500">Cancel</button>
-                    <button type="button" wire:click="saveTable" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white">Save Table</button>
+                    <button type="button" wire:click="$set('showTableModal', false)" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-500">{{ __("Cancel") }}</button>
+                    <button type="button" wire:click="saveTable" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white">{{ __("Save Table") }}</button>
                 </div>
             </div>
         </div>

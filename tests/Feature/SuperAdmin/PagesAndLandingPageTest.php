@@ -1,0 +1,142 @@
+<?php
+
+namespace Tests\Feature\SuperAdmin;
+
+use App\Livewire\Public\ContactForm;
+use App\Livewire\SuperAdmin\Branding\Index as BrandingIndex;
+use App\Livewire\SuperAdmin\Pages\Create as PagesCreate;
+use App\Livewire\SuperAdmin\Pages\Edit as PagesEdit;
+use App\Livewire\SuperAdmin\Pages\Index as PagesIndex;
+use App\Mail\ContactInquiryMailable;
+use App\Models\ContactInquiry;
+use App\Models\Page;
+use App\Models\PlatformBranding;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
+use Livewire\Livewire;
+use Tests\Concerns\ActsAsPlatformAdmin;
+use Tests\TestCase;
+
+class PagesAndLandingPageTest extends TestCase
+{
+    use ActsAsPlatformAdmin, RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        file_put_contents(storage_path('installed'), '{}');
+    }
+
+    protected function tearDown(): void
+    {
+        @unlink(storage_path('installed'));
+        parent::tearDown();
+    }
+
+    public function test_superadmin_can_create_edit_and_delete_a_page(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        Livewire::test(PagesCreate::class)
+            ->set('title', 'About Us')
+            ->set('content', '<p>Hello world</p>')
+            ->call('save');
+
+        $page = Page::where('title', 'About Us')->firstOrFail();
+        $this->assertSame('about-us', $page->slug);
+        $this->assertSame('<p>Hello world</p>', $page->content);
+        $this->assertTrue($page->is_active);
+
+        // Duplicate title auto-disambiguates the slug.
+        Livewire::test(PagesCreate::class)
+            ->set('title', 'About Us')
+            ->set('content', '<p>Second one</p>')
+            ->call('save');
+
+        $second = Page::where('content', '<p>Second one</p>')->firstOrFail();
+        $this->assertSame('about-us-2', $second->slug);
+
+        Livewire::test(PagesEdit::class, ['page' => $page])
+            ->assertSet('title', 'About Us')
+            ->set('title', 'About Our Company')
+            ->set('slug', 'about-our-company')
+            ->call('save');
+
+        $page->refresh();
+        $this->assertSame('About Our Company', $page->title);
+        $this->assertSame('about-our-company', $page->slug);
+
+        Livewire::test(PagesIndex::class)->call('delete', $page->id);
+        $this->assertNull(Page::find($page->id));
+    }
+
+    public function test_public_page_route_respects_is_active(): void
+    {
+        $active = Page::create(['title' => 'Terms', 'slug' => 'terms', 'content' => '<p>Terms text</p>', 'is_active' => true]);
+        $inactive = Page::create(['title' => 'Draft', 'slug' => 'draft-page', 'content' => '<p>Draft</p>', 'is_active' => false]);
+
+        $this->get(route('pages.show', $active->slug))->assertOk()->assertSee('Terms text');
+        $this->get(route('pages.show', $inactive->slug))->assertNotFound();
+    }
+
+    public function test_root_route_falls_back_to_login_redirect_when_landing_page_disabled(): void
+    {
+        $this->get('/')->assertRedirect('/tenant/login');
+    }
+
+    public function test_enabling_landing_page_in_branding_renders_it_at_root(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        $page = Page::create(['title' => 'Home', 'slug' => 'home', 'content' => '<p>Welcome to our platform</p>', 'is_active' => true]);
+
+        Livewire::test(BrandingIndex::class)
+            ->set('landingPageEnabled', true)
+            ->set('landingPageId', $page->id)
+            ->call('save');
+
+        $branding = PlatformBranding::current();
+        $this->assertTrue($branding->landing_page_enabled);
+        $this->assertSame($page->id, $branding->landing_page_id);
+
+        // A guest (not the superadmin session above) hitting `/` sees the landing page.
+        auth('platform_web')->logout();
+        $this->get('/')->assertOk()->assertSee('Welcome to our platform');
+    }
+
+    public function test_contact_form_stores_inquiry_and_sends_notification_email(): void
+    {
+        Mail::fake();
+
+        PlatformBranding::current()->update(['support_email' => 'owner@example.com']);
+
+        Livewire::test(ContactForm::class)
+            ->set('name', 'Jane Prospect')
+            ->set('email', 'jane@prospect.test')
+            ->set('phone', '555-0100')
+            ->set('subject', 'Pricing question')
+            ->set('message', 'How does the restaurant mode pricing work?')
+            ->call('submit')
+            ->assertSet('submitted', true)
+            ->assertSet('name', '');
+
+        $inquiry = ContactInquiry::where('email', 'jane@prospect.test')->firstOrFail();
+        $this->assertSame('Jane Prospect', $inquiry->name);
+        $this->assertSame('How does the restaurant mode pricing work?', $inquiry->message);
+
+        Mail::assertQueued(ContactInquiryMailable::class, function ($mail) use ($inquiry) {
+            return $mail->inquiry->id === $inquiry->id
+                && $mail->hasTo('owner@example.com');
+        });
+    }
+
+    public function test_contact_form_requires_name_email_and_message(): void
+    {
+        Livewire::test(ContactForm::class)
+            ->set('email', 'not-an-email')
+            ->call('submit')
+            ->assertHasErrors(['name', 'email', 'message']);
+
+        $this->assertSame(0, ContactInquiry::count());
+    }
+}

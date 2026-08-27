@@ -1,20 +1,20 @@
 <div class="space-y-6">
     
     <div>
-        <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white">Global Audit Trail & Security Logs</h3>
-        <p class="text-xs text-slate-400">Immutable event record of administrative actions, config mutations, and security events</p>
+        <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white">{{ __("Global Audit Trail & Security Logs") }}</h3>
+        <p class="text-xs text-slate-400">{{ __("Immutable event record of administrative actions, config mutations, and security events") }}</p>
     </div>
 
     <!-- Filter Toolbar -->
     <div class="flex flex-col sm:flex-row gap-3">
         <input type="text"
                wire:model.live.debounce.300ms="action"
-               placeholder="Filter by event action (e.g. smtp.updated)…"
+               placeholder="{{ __("Filter by event action (e.g. smtp.updated)…") }}"
                class="w-full sm:w-72 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-indigo-500 shadow-xs">
         
         <input type="text"
                wire:model.live.debounce.300ms="companyId"
-               placeholder="Filter by Tenant / Company ID…"
+               placeholder="{{ __("Filter by Tenant / Company ID…") }}"
                class="w-full sm:w-72 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-indigo-500 shadow-xs">
     </div>
 

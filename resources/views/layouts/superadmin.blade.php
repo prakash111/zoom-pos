@@ -18,23 +18,56 @@
     @if ($branding?->favicon_url)
         <link rel="icon" href="{{ $branding->favicon_url }}">
     @endif
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600;1,700;1,800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="stylesheet" href="{{ asset('assets/libs/nprogress.css') }}">
+    <script src="{{ asset('assets/libs/nprogress.js') }}"></script>
+    @if (request()->routeIs('superadmin.pages.create', 'superadmin.pages.edit'))
+        <script src="{{ asset('assets/libs/tinymce/tinymce.min.js') }}"></script>
+        <script src="{{ asset('assets/libs/tinymce/tinymce-theme-handler.js') }}"></script>
+    @endif
+    @if (request()->routeIs('superadmin.menus.*'))
+        <script src="{{ asset('assets/libs/sortable.min.js') }}"></script>
+    @endif
+    <script src="{{ asset('assets/libs/turbo.min.js') }}" data-turbo-track="reload"></script>
+    <meta name="turbo-cache-control" content="no-preview">
     @livewireStyles
+    <script>window.platformAppearanceDefaults = @json(appearance_defaults());</script>
+
+    <!-- Inline Loading Bar Styling -->
+    <style>
+        #nprogress .bar {
+            background: #2563eb !important;
+            height: 3px !important;
+            z-index: 99999 !important;
+        }
+        #nprogress .peg {
+            box-shadow: 0 0 10px #2563eb, 0 0 5px #2563eb !important;
+        }
+    </style>
     <script>
         (function() {
             try {
+                var defaults = window.platformAppearanceDefaults || {};
                 var raw = localStorage.getItem('sa_dock_nav_state');
                 var saved = raw ? JSON.parse(raw) : null;
-                var pos = (saved && saved.position) ? saved.position : 'left';
-                var mode = (saved && saved.mode) ? saved.mode : 'docked';
-                var layout = (saved && saved.layout) ? saved.layout : 'slim';
+                if (saved && String(saved.defaultVersion || '') !== String(defaults.version || '')) saved = null;
+                var pos = (saved && saved.position) ? saved.position : (defaults.position || 'left');
+                var mode = (saved && saved.mode) ? saved.mode : (defaults.mode || 'docked');
+                var layout = (saved && saved.layout) ? saved.layout : (defaults.layout || 'slim');
                 var theme = (saved && saved.theme) ? saved.theme : 'violet';
                 var sticky = (saved && typeof saved.sticky !== 'undefined') ? saved.sticky : (localStorage.getItem('nav_sticky') === 'true');
+                var navTextColor = (saved && saved.navTextColor) ? saved.navTextColor : (defaults.navTextColor || '#ffffff');
+                var navTextActive = (saved && saved.navTextActiveColor) ? saved.navTextActiveColor : (defaults.navTextActiveColor || '#60a5fa');
                 document.documentElement.setAttribute('data-dock-pos', pos);
                 document.documentElement.setAttribute('data-dock-mode', mode);
                 document.documentElement.setAttribute('data-nav-layout', layout);
                 document.documentElement.setAttribute('data-nav-theme', theme);
                 document.documentElement.setAttribute('data-nav-sticky', sticky ? 'true' : 'false');
+                document.documentElement.style.setProperty('--nav-item-color', navTextColor);
+                document.documentElement.style.setProperty('--nav-item-active-color', navTextActive);
             } catch(e) {}
         })();
     </script>
@@ -42,9 +75,40 @@
         :root {
             --sa-sidebar-color: {{ $saSidebarColor }};
             --sa-primary-color: {{ $saPrimaryColor }};
+            --nav-item-color: #ffffff;
+            --nav-item-active-color: #60a5fa;
+        }
+        .dockable-nav-item:not([aria-selected="true"]) span,
+        .top-nav-item:not(.active) span {
+            color: var(--nav-item-color);
+        }
+        .dockable-nav-item[aria-selected="true"] span,
+        .dockable-nav-item.active span,
+        .top-nav-item.active span {
+            color: var(--nav-item-active-color) !important;
+            font-weight: 700;
         }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Dockable & Category Menu CSS Specifications (Android-Style Scroll-Snap) */
+        .dockable-nav-container,
+        .pos-categories-row,
+        .tab-scroll-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; /* Firefox */
+        }
+        .dockable-nav-container::-webkit-scrollbar,
+        .pos-categories-row::-webkit-scrollbar,
+        .tab-scroll-container::-webkit-scrollbar {
+            display: none; /* Chrome, Safari */
+        }
         
         /* Vertical rotated text matching tenant POS rail design */
         .vertical-rail-label {
@@ -76,6 +140,8 @@
     </style>
 </head>
 <body class="bg-[#1a1f37] dark:bg-[#0c101d] text-slate-900 dark:text-slate-100 min-h-screen p-2 sm:p-4 md:p-6 antialiased selection:bg-indigo-500 selection:text-white">
+
+    @include('layouts.partials.preloader')
 
     <!-- Main Outer Container with Draggable & Dockable Layout Binding -->
     <div x-data="dockableNav('sa_dock_nav_state', 'left')"
@@ -113,7 +179,7 @@
             $isTenants = request()->routeIs('superadmin.tenants.*');
             $isPlans = request()->routeIs('superadmin.plans.*') || request()->routeIs('superadmin.payment-gateways.*');
             $isCodes = request()->routeIs('superadmin.activation-codes.*');
-            $isSettings = request()->routeIs('superadmin.smtp.*') || request()->routeIs('superadmin.branding.*') || request()->routeIs('superadmin.tax.*') || request()->routeIs('superadmin.backups.*') || request()->routeIs('superadmin.system.*') || request()->routeIs('superadmin.audit.*') || request()->routeIs('superadmin.pages.*') || request()->routeIs('superadmin.languages.*');
+            $isSettings = request()->routeIs('superadmin.settings.*') || request()->routeIs('superadmin.smtp.*') || request()->routeIs('superadmin.branding.*') || request()->routeIs('superadmin.tax.*') || request()->routeIs('superadmin.backups.*') || request()->routeIs('superadmin.system.*') || request()->routeIs('superadmin.audit.*') || request()->routeIs('superadmin.pages.*') || request()->routeIs('superadmin.languages.*') || request()->routeIs('superadmin.menus.*');
         @endphp
         
         <!-- ==========================================
@@ -167,7 +233,7 @@
                         <div class="font-black text-xs text-white leading-tight truncate">
                             {{ $branding?->platform_name ?? 'SuperAdmin' }}
                         </div>
-                        <div class="text-[9px] text-white/60 font-bold uppercase tracking-wider">Control Center</div>
+                        <div class="text-[9px] text-white/60 font-bold uppercase tracking-wider">{{ __("Control Center") }}</div>
                     </div>
                 </div>
 
@@ -232,6 +298,7 @@
 
             <!-- Navigation Links Container (Slim Mode) -->
             <div x-show="layout === 'slim'"
+                 class="dockable-nav-container tab-scroll-container"
                  :class="{
                      'w-full flex flex-col items-center gap-4 sm:gap-5 my-auto': position === 'left' || position === 'right',
                      'flex-1 flex flex-row items-center justify-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar mx-2 py-1': position === 'top' || position === 'bottom',
@@ -239,7 +306,9 @@
                  }">
                 
                 <!-- 1. Home -->
-                <a wire:navigate href="{{ route('superadmin.dashboard') }}"
+                <a wire:navigate.hover href="{{ route('superadmin.dashboard') }}"
+                   class="dockable-nav-item"
+                   aria-selected="{{ $isHome ? 'true' : 'false' }}"
                    :class="{
                        'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
@@ -258,7 +327,9 @@
                 </a>
 
                 <!-- 2. Tenants -->
-                <a wire:navigate href="{{ route('superadmin.tenants.index') }}"
+                <a wire:navigate.hover href="{{ route('superadmin.tenants.index') }}"
+                   class="dockable-nav-item"
+                   aria-selected="{{ $isTenants ? 'true' : 'false' }}"
                    :class="{
                        'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
@@ -277,7 +348,9 @@
                 </a>
 
                 <!-- 3. Plans -->
-                <a wire:navigate href="{{ route('superadmin.plans.index') }}"
+                <a wire:navigate.hover href="{{ route('superadmin.plans.index') }}"
+                   class="dockable-nav-item"
+                   aria-selected="{{ $isPlans ? 'true' : 'false' }}"
                    :class="{
                        'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
@@ -296,7 +369,9 @@
                 </a>
 
                 <!-- 4. Activation Codes -->
-                <a wire:navigate href="{{ route('superadmin.activation-codes.index') }}"
+                <a wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}"
+                   class="dockable-nav-item"
+                   aria-selected="{{ $isCodes ? 'true' : 'false' }}"
                    :class="{
                        'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
@@ -315,7 +390,9 @@
                 </a>
 
                 <!-- 5. Settings -->
-                <a wire:navigate href="{{ route('superadmin.smtp.index') }}"
+                <a wire:navigate.hover href="{{ route('superadmin.settings.index') }}"
+                   class="dockable-nav-item"
+                   aria-selected="{{ $isSettings ? 'true' : 'false' }}"
                    :class="{
                        'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
@@ -348,7 +425,7 @@
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
                         {{ __('Overview') }}
                     </div>
-                    <a wire:navigate href="{{ route('superadmin.dashboard') }}"
+                    <a wire:navigate.hover href="{{ route('superadmin.dashboard') }}"
                        :class="{
                            'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
                            'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
@@ -372,7 +449,7 @@
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
                         {{ __('Tenants & Stores') }}
                     </div>
-                    <a wire:navigate href="{{ route('superadmin.tenants.index') }}"
+                    <a wire:navigate.hover href="{{ route('superadmin.tenants.index') }}"
                        :class="{
                            'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
                            'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
@@ -396,7 +473,7 @@
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
                         {{ __('Billing & Licensing') }}
                     </div>
-                    <a wire:navigate href="{{ route('superadmin.plans.index') }}"
+                    <a wire:navigate.hover href="{{ route('superadmin.plans.index') }}"
                        :class="{
                            'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
                            'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
@@ -414,7 +491,7 @@
                         </div>
                     </a>
 
-                    <a wire:navigate href="{{ route('superadmin.activation-codes.index') }}"
+                    <a wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}"
                        :class="{
                            'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
                            'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
@@ -438,7 +515,7 @@
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
                         {{ __('System & Config') }}
                     </div>
-                    <a wire:navigate href="{{ route('superadmin.smtp.index') }}"
+                    <a wire:navigate.hover href="{{ route('superadmin.settings.index') }}"
                        :class="{
                            'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
                            'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
@@ -490,7 +567,7 @@
         <nav x-show="layout === 'macos-dock'"
              x-cloak
              :class="position === 'top' ? 'top-4 sm:top-6' : 'bottom-4 sm:bottom-6'"
-             class="fixed left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full backdrop-blur-2xl border flex items-center gap-2 sm:gap-3.5 shadow-2xl select-none transition-all duration-300"
+             class="dockable-nav-container tab-scroll-container fixed left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full backdrop-blur-2xl border flex items-center gap-2 sm:gap-3.5 shadow-2xl select-none transition-all duration-300 max-w-[95vw] overflow-x-auto"
              :class="{
                  'bg-indigo-950/85 border-indigo-500/40 text-white shadow-indigo-500/30': theme === 'violet',
                  'bg-slate-900/70 border-white/25 text-white backdrop-blur-3xl shadow-2xl': theme === 'glass',
@@ -499,13 +576,14 @@
              }">
             
             <!-- Grab Handle -->
-            <button type="button" @click="toggleQuickMenu()" class="p-1.5 rounded-full hover:bg-white/20 transition text-white/60 hover:text-white" title="{{ __('Dock Options') }}">
+            <button type="button" @click="toggleQuickMenu()" class="p-1.5 rounded-full hover:bg-white/20 transition text-white/60 hover:text-white shrink-0" title="{{ __('Dock Options') }}">
                 ⋮⋮
             </button>
 
             <!-- 1. Home -->
-            <a wire:navigate href="{{ route('superadmin.dashboard') }}"
-               class="group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom"
+            <a wire:navigate.hover href="{{ route('superadmin.dashboard') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               aria-selected="{{ $isHome ? 'true' : 'false' }}"
                title="{{ __('Dashboard') }}">
                 <div @class([
                     'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
@@ -514,12 +592,15 @@
                 ])>
                     📊
                 </div>
-                <span x-show="$isHome" class="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1"></span>
+                @if ($isHome)
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1"></span>
+                @endif
             </a>
 
             <!-- 2. Tenants -->
-            <a wire:navigate href="{{ route('superadmin.tenants.index') }}"
-               class="group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom"
+            <a wire:navigate.hover href="{{ route('superadmin.tenants.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               aria-selected="{{ $isTenants ? 'true' : 'false' }}"
                title="{{ __('Tenants & Stores') }}">
                 <div @class([
                     'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
@@ -531,8 +612,9 @@
             </a>
 
             <!-- 3. Plans -->
-            <a wire:navigate href="{{ route('superadmin.plans.index') }}"
-               class="group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom"
+            <a wire:navigate.hover href="{{ route('superadmin.plans.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               aria-selected="{{ $isPlans ? 'true' : 'false' }}"
                title="{{ __('Subscription Plans') }}">
                 <div @class([
                     'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
@@ -544,8 +626,9 @@
             </a>
 
             <!-- 4. Codes -->
-            <a wire:navigate href="{{ route('superadmin.activation-codes.index') }}"
-               class="group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom"
+            <a wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               aria-selected="{{ $isCodes ? 'true' : 'false' }}"
                title="{{ __('Licensing') }}">
                 <div @class([
                     'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
@@ -557,8 +640,9 @@
             </a>
 
             <!-- 5. Settings -->
-            <a wire:navigate href="{{ route('superadmin.smtp.index') }}"
-               class="group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom"
+            <a wire:navigate.hover href="{{ route('superadmin.settings.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               aria-selected="{{ $isSettings ? 'true' : 'false' }}"
                title="{{ __('System Settings') }}">
                 <div @class([
                     'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
@@ -570,15 +654,15 @@
             </a>
 
             <!-- Divider -->
-            <div class="w-px h-6 bg-white/20 my-auto"></div>
+            <div class="w-px h-6 bg-white/20 my-auto shrink-0"></div>
 
             <!-- Customizer Button -->
-            <button type="button" @click="toggleCustomizerModal()" class="w-9 h-9 rounded-2xl bg-white/15 hover:bg-white/30 text-white flex items-center justify-center text-base hover:scale-125 transition-transform duration-200 origin-bottom shadow-sm cursor-pointer" title="{{ __('Menu Appearance') }}">
+            <button type="button" @click="toggleCustomizerModal()" class="w-9 h-9 rounded-2xl bg-white/15 hover:bg-white/30 text-white flex items-center justify-center text-base hover:scale-125 transition-transform duration-200 origin-bottom shadow-sm cursor-pointer shrink-0" title="{{ __('Menu Appearance') }}">
                 🎨
             </button>
 
             <!-- Full Drawer Menu -->
-            <button type="button" x-on:click="sidebarOpen = true" class="w-9 h-9 rounded-2xl bg-white/15 hover:bg-white/30 text-white flex items-center justify-center text-base hover:scale-125 transition-transform duration-200 origin-bottom shadow-sm cursor-pointer" title="{{ __('Full Menu') }}">
+            <button type="button" x-on:click="sidebarOpen = true" class="w-9 h-9 rounded-2xl bg-white/15 hover:bg-white/30 text-white flex items-center justify-center text-base hover:scale-125 transition-transform duration-200 origin-bottom shadow-sm cursor-pointer shrink-0" title="{{ __('Full Menu') }}">
                 📋
             </button>
         </nav>
@@ -609,22 +693,22 @@
                  x-transition:leave-end="opacity-0 translate-y-4 scale-90"
                  class="flex flex-col items-end gap-2.5 p-3 rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/20 shadow-2xl text-xs font-bold text-white">
                 
-                <a wire:navigate href="{{ route('superadmin.dashboard') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                <a wire:navigate.hover href="{{ route('superadmin.dashboard') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
                     <span>{{ __('Overview') }}</span>
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">📊</span>
                 </a>
 
-                <a wire:navigate href="{{ route('superadmin.tenants.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                <a wire:navigate.hover href="{{ route('superadmin.tenants.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
                     <span>{{ __('Stores') }}</span>
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">🏬</span>
                 </a>
 
-                <a wire:navigate href="{{ route('superadmin.plans.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                <a wire:navigate.hover href="{{ route('superadmin.plans.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
                     <span>{{ __('Plans') }}</span>
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">💳</span>
                 </a>
 
-                <a wire:navigate href="{{ route('superadmin.smtp.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                <a wire:navigate.hover href="{{ route('superadmin.settings.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
                     <span>{{ __('Settings') }}</span>
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">⚙️</span>
                 </a>
@@ -682,7 +766,7 @@
                     <div>
                         <div class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 px-3">{{ __('Tenants & Stores') }}</div>
                         <div class="space-y-1">
-                            <a wire:navigate href="{{ route('superadmin.dashboard') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.dashboard') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     📊
                                 </span>
@@ -692,7 +776,7 @@
                                 </div>
                             </a>
 
-                            <a wire:navigate href="{{ route('superadmin.tenants.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.tenants.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     🏢
                                 </span>
@@ -702,7 +786,7 @@
                                 </div>
                             </a>
 
-                            <a wire:navigate href="{{ route('superadmin.tenants.create') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.tenants.create') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     ➕
                                 </span>
@@ -718,7 +802,7 @@
                     <div>
                         <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Subscriptions & Billing') }}</div>
                         <div class="space-y-1">
-                            <a wire:navigate href="{{ route('superadmin.plans.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.plans.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     💳
                                 </span>
@@ -728,7 +812,7 @@
                                 </div>
                             </a>
 
-                            <a wire:navigate href="{{ route('superadmin.activation-codes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     🔑
                                 </span>
@@ -738,23 +822,23 @@
                                 </div>
                             </a>
 
-                            <a wire:navigate href="{{ route('superadmin.payment-gateways.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.payment-gateways.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     💰
                                 </span>
                                 <div>
                                     <div class="font-bold">{{ __('Payment Gateways') }}</div>
-                                    <div class="text-[10px] text-slate-400 font-normal">Stripe, PayPal, Mollie, Razorpay</div>
+                                    <div class="text-[10px] text-slate-400 font-normal">{{ __("Stripe, PayPal, Mollie, Razorpay") }}</div>
                                 </div>
                             </a>
 
-                            <a wire:navigate href="{{ route('superadmin.tax.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.tax.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     🏛️
                                 </span>
                                 <div>
                                     <div class="font-bold">{{ __('Tax Reference System') }}</div>
-                                    <div class="text-[10px] text-slate-400 font-normal">HSN / SAC codes & VAT presets</div>
+                                    <div class="text-[10px] text-slate-400 font-normal">{{ __("HSN / SAC codes & VAT presets") }}</div>
                                 </div>
                             </a>
                         </div>
@@ -764,7 +848,7 @@
                     <div>
                         <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Platform & Maintenance') }}</div>
                         <div class="space-y-1">
-                            <a wire:navigate href="{{ route('superadmin.branding.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.branding.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     🎨
                                 </span>
@@ -774,7 +858,7 @@
                                 </div>
                             </a>
 
-                            <a wire:navigate href="{{ route('superadmin.pages.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.pages.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     📄
                                 </span>
@@ -784,7 +868,17 @@
                                 </div>
                             </a>
 
-                            <a wire:navigate href="{{ route('superadmin.smtp.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.menus.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                                <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
+                                    🧭
+                                </span>
+                                <div>
+                                    <div class="font-bold">{{ __('Navigation Menus') }}</div>
+                                    <div class="text-[10px] text-slate-400 font-normal">{{ __('Header & footer drag-and-drop builder') }}</div>
+                                </div>
+                            </a>
+
+                            <a wire:navigate.hover href="{{ route('superadmin.smtp.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     ✉️
                                 </span>
@@ -794,7 +888,7 @@
                                 </div>
                             </a>
 
-                            <a wire:navigate href="{{ route('superadmin.languages.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.languages.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     🌐
                                 </span>
@@ -804,7 +898,7 @@
                                 </div>
                             </a>
 
-                            <a wire:navigate href="{{ route('superadmin.backups.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.backups.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     💾
                                 </span>
@@ -814,7 +908,7 @@
                                 </div>
                             </a>
 
-                            <a wire:navigate href="{{ route('superadmin.system.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.system.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     🛠️
                                 </span>
@@ -824,7 +918,7 @@
                                 </div>
                             </a>
 
-                            <a wire:navigate href="{{ route('superadmin.audit.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.audit.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     📋
                                 </span>
@@ -897,15 +991,6 @@
                 <!-- Right Header Actions (Fullscreen, Theme Toggle, Profile Menu) -->
                 <div class="flex items-center gap-2.5 sm:gap-3">
 
-                    <!-- Appearance & Menu Layout Customizer Trigger -->
-                    <button type="button"
-                            @click="toggleCustomizerModal()"
-                            class="px-2.5 sm:px-3 py-2 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs border border-indigo-200/50 dark:border-indigo-800/50"
-                            title="{{ __('Navigation & Appearance Settings') }}">
-                        <span class="text-sm">🎨</span>
-                        <span class="hidden lg:inline text-[11px] font-bold uppercase">{{ __('Layout') }}</span>
-                    </button>
-
                     <!-- Fullscreen Toggle Button -->
                     <button type="button"
                             x-on:click="$store.fullscreen.toggle()"
@@ -914,13 +999,13 @@
                         <template x-if="!$store.fullscreen.active">
                             <span class="flex items-center gap-1">
                                 <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
-                                <span class="hidden md:inline">Fullscreen</span>
+                                <span class="hidden md:inline">{{ __("Fullscreen") }}</span>
                             </span>
                         </template>
                         <template x-if="$store.fullscreen.active">
                             <span class="flex items-center gap-1 text-amber-500">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                <span class="hidden md:inline">Exit</span>
+                                <span class="hidden md:inline">{{ __("Exit") }}</span>
                             </span>
                         </template>
                     </button>
@@ -956,7 +1041,7 @@
                             </div>
                             <div class="max-h-60 overflow-y-auto no-scrollbar space-y-0.5">
                                 @foreach ($saAllLangs as $lang)
-                                    <a wire:navigate href="{{ route('locale.switch', $lang->code) }}"
+                                    <a wire:navigate.hover href="{{ route('locale.switch', $lang->code) }}"
                                        @class([
                                             'flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition',
                                             'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold' => ($saActiveLang?->code ?? 'en') === $lang->code,
@@ -973,7 +1058,7 @@
                                 @endforeach
                             </div>
                             <div class="pt-1 border-t border-slate-100 dark:border-slate-800">
-                                <a wire:navigate href="{{ route('superadmin.languages.index') }}" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50">
+                                <a wire:navigate.hover href="{{ route('superadmin.languages.index') }}" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50">
                                     <span>🌐 Manage All Languages</span>
                                 </a>
                             </div>
@@ -989,7 +1074,7 @@
                         <span x-show="dark" class="text-sm">☀️</span>
                     </button>
 
-                    <!-- Superadmin User Profile Dropdown -->
+                    <!-- Superadmin User Profile Dropdown (Streamlined) -->
                     <div class="relative" x-data="{ open: false }" x-on:click.outside="open = false">
                         <button type="button"
                                 x-on:click="open = !open"
@@ -1016,39 +1101,19 @@
                              class="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 p-2 z-30 space-y-1 text-xs">
                             
                             <div class="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-                                <div class="font-extrabold text-slate-900 dark:text-white">{{ auth('platform_web')->user()?->name ?? 'Administrator' }}</div>
+                                <div class="font-extrabold text-slate-900 dark:text-white">{{ auth('platform_web')->user()?->name ?? __('Administrator') }}</div>
                                 <div class="text-[11px] text-slate-400 truncate">{{ auth('platform_web')->user()?->email }}</div>
                             </div>
 
-                            <button type="button" @click="toggleCustomizerModal(); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition text-left cursor-pointer font-semibold">
-                                <span>🎨</span>
-                                <span>{{ __('Appearance & Layout') }}</span>
-                            </button>
-
-                            <a wire:navigate href="{{ route('superadmin.branding.index') }}" class="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition">
-                                <span>🖌️</span>
-                                <span>{{ __('White-label Settings') }}</span>
-                            </a>
-
-                            <a wire:navigate href="{{ route('superadmin.pages.index') }}" class="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition">
-                                <span>📄</span>
-                                <span>{{ __('Custom Pages') }}</span>
-                            </a>
-
-                            <a wire:navigate href="{{ route('superadmin.smtp.index') }}" class="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition">
-                                <span>✉️</span>
-                                <span>{{ __('SMTP Settings') }}</span>
-                            </a>
-
-                            <button type="button" @click="resetAll(); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition text-left cursor-pointer">
-                                <span>🔄</span>
-                                <span>{{ __('Reset Menu Position') }}</span>
-                            </button>
-
-                            <a wire:navigate href="{{ route('tenant.login') }}" class="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition">
+                            <a wire:navigate.hover href="{{ route('tenant.login') }}" class="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition font-medium">
                                 <span>🏪</span>
                                 <span>{{ __('Tenant Store Portal') }}</span>
                             </a>
+
+                            <button type="button" @click="resetAll(); open = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition text-left cursor-pointer font-medium">
+                                <span>🔄</span>
+                                <span>{{ __('Reset Menu Position') }}</span>
+                            </button>
 
                             <div class="border-t border-slate-100 dark:border-slate-800 pt-1">
                                 <form method="POST" action="{{ route('superadmin.logout') }}">
@@ -1065,10 +1130,11 @@
                 </div>
             </header>
 
-            <!-- Main Livewire Page Container -->
-            <main class="flex-1 p-3 sm:p-6 md:p-8 w-full max-w-none">
+            <!-- Main Dynamic View Container with Smooth Transition -->
+            <main class="flex-1 p-3 sm:p-6 md:p-8 w-full max-w-none spa-page-enter" id="main-app-content">
                 <div class="w-full max-w-none">
-                    {{ $slot }}
+                    {{ $slot ?? '' }}
+                    @yield('content')
                 </div>
             </main>
 
@@ -1079,6 +1145,49 @@
 
     </div>
 
+    <!-- Global Dynamic Flash Toast Notifications with Slide-Down Physics & Auto-Dismiss Progress Bar -->
+    <div x-data="{
+             toasts: [],
+             add(type, message) {
+                 const id = Date.now() + Math.random();
+                 this.toasts.push({ id, type: type || 'info', message });
+                 setTimeout(() => this.remove(id), 4500);
+             },
+             remove(id) {
+                 this.toasts = this.toasts.filter(t => t.id !== id);
+             }
+         }"
+         x-on:notify.window="add($event.detail[0]?.type || $event.detail.type, $event.detail[0]?.message || $event.detail.message)"
+         x-on:toast.window="add($event.detail[0]?.type || $event.detail.type || 'info', $event.detail[0]?.message || $event.detail.message)"
+         class="fixed top-5 right-5 z-[99999] flex flex-col gap-3 max-w-sm w-full pointer-events-none px-3 sm:px-0">
+        <template x-for="t in toasts" :key="t.id">
+            <div x-transition:enter="transition ease-out duration-300 transform"
+                 x-transition:enter-start="-translate-y-4 opacity-0 scale-95"
+                 x-transition:enter-end="translate-y-0 opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-200 transform"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-90 -translate-y-2"
+                 class="pointer-events-auto relative overflow-hidden flex flex-col p-4 rounded-2xl shadow-2xl backdrop-blur-md text-xs font-bold transition-all duration-300 border"
+                 :class="{
+                     'bg-rose-600/95 dark:bg-rose-700/95 text-white border-rose-400/40 shadow-rose-500/25': t.type === 'error',
+                     'bg-emerald-600/95 dark:bg-emerald-700/95 text-white border-emerald-400/40 shadow-emerald-500/25': t.type === 'success',
+                     'bg-amber-500/95 dark:bg-amber-600/95 text-white border-amber-300/40 shadow-amber-500/25': t.type === 'warning',
+                     'bg-indigo-600/95 dark:bg-indigo-700/95 text-white border-indigo-400/40 shadow-indigo-500/25': t.type === 'info'
+                 }">
+                <div class="flex items-start gap-3">
+                    <span class="text-base shrink-0" x-text="t.type === 'error' ? '⚠️' : (t.type === 'success' ? '✓' : (t.type === 'warning' ? '⚡' : 'ℹ️'))"></span>
+                    <div class="flex-1 text-xs font-bold leading-relaxed pr-1" x-text="t.message"></div>
+                    <button type="button" @click="remove(t.id)" class="text-white/80 hover:text-white font-black text-sm shrink-0 leading-none cursor-pointer">&times;</button>
+                </div>
+                <!-- Auto-Dismiss Progress Bar -->
+                <div class="h-1 bg-black/20 dark:bg-white/20 rounded-full overflow-hidden mt-2.5 w-full">
+                    <div class="h-full bg-white/90 rounded-full toast-progress-bar"></div>
+                </div>
+            </div>
+        </template>
+    </div>
+
     @livewireScripts
+    @stack('scripts')
 </body>
 </html>

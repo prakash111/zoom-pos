@@ -1,0 +1,389 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../../app/Livewire/**/*.php';
+@source '../views/**/*.blade.php';
+
+/* Class-based dark mode (toggled via localStorage + <html class="dark">). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+[x-cloak] { display: none !important; }
+[wire\:cloak] { display: none !important; }
+
+/* Shared interaction contract for every application surface. */
+:where(button, a, input, select, textarea, [role='button']):focus-visible {
+    outline: 2px solid color-mix(in srgb, #2563eb 82%, white);
+    outline-offset: 2px;
+}
+
+:where(button, [role='button'], input[type='submit'], input[type='button']):not(:disabled) {
+    touch-action: manipulation;
+}
+
+:where(button, input, select, textarea):disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+html {
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    overflow-x: clip;
+}
+
+img, svg, video, canvas {
+    max-width: 100%;
+}
+
+/* Preserve motion polish while respecting accessibility and low-power devices. */
+@media (prefers-reduced-motion: reduce) {
+    html:focus-within { scroll-behavior: auto !important; }
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Avoid costly full-screen blur and transform animations on small/low-power devices. */
+@media (max-width: 640px), (hover: none) and (pointer: coarse) {
+    .modal-backdrop {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+    }
+
+    .modal-transition {
+        transform: none !important;
+        transition-property: opacity !important;
+        transition-duration: 120ms !important;
+    }
+}
+
+@theme {
+    --font-sans: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+    /* Marketing site brand palette — bold ink + lime accent, pastel icon tints. */
+    --color-brand-ink: #14161f;
+    --color-brand-lime: #d7f24e;
+    --color-brand-lime-dark: #bfda36;
+    --color-brand-emerald: #10b981;
+    --color-brand-teal: #14b8a6;
+    --color-brand-lavender: #e2dcfb;
+    --color-brand-lavender-ink: #6d5bd0;
+    --color-brand-butter: #fdf0c4;
+    --color-brand-butter-ink: #b6890a;
+    --color-brand-mint: #d9f2e6;
+    --color-brand-mint-ink: #10916b;
+}
+
+@keyframes float-slow {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-8px) rotate(-1deg); }
+}
+
+@keyframes pulse-glow {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+.animate-float-slow {
+    animation: float-slow 6s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+    animation: pulse-glow 8s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   Instant Single-Page Navigation (SPA) & Loading Bar Styles
+   ========================================================================== */
+
+/* NProgress Progress Bar Styling */
+#nprogress {
+    pointer-events: none;
+}
+
+#nprogress .bar {
+    background: linear-gradient(90deg, #10b981, #d7f24e, #3b82f6, #8b5cf6);
+    position: fixed;
+    z-index: 999999;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.8), 0 0 4px rgba(215, 242, 78, 0.9);
+}
+
+#nprogress .peg {
+    display: block;
+    position: absolute;
+    right: 0px;
+    width: 100px;
+    height: 100%;
+    box-shadow: 0 0 10px #10b981, 0 0 5px #d7f24e;
+    opacity: 1.0;
+    transform: rotate(3deg) translate(0px, -4px);
+}
+
+#nprogress .spinner {
+    display: block;
+    position: fixed;
+    z-index: 999999;
+    top: 12px;
+    right: 12px;
+}
+
+#nprogress .spinner-icon {
+    width: 18px;
+    height: 18px;
+    box-sizing: border-box;
+    border: solid 2.5px transparent;
+    border-top-color: #10b981;
+    border-left-color: #d7f24e;
+    border-radius: 50%;
+    animation: nprogress-spinner 400ms linear infinite;
+}
+
+@keyframes nprogress-spinner {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Livewire 3 SPA Navigation Bar */
+.livewire-progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3b82f6, #6366f1);
+    z-index: 99999;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+/* Native Livewire Navigate Loading Bar Indicator */
+[wire\:loading\.delay], .livewire-nav-progress {
+    background: linear-gradient(90deg, #10b981, #d7f24e, #3b82f6) !important;
+    height: 3px !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 99999;
+}
+
+/* Global Alpine Cloak & Smooth Transition Styling */
+[x-cloak] {
+    display: none !important;
+}
+
+/* Smooth Page Fade-In Transition */
+.spa-page-enter {
+    animation: pageFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pageFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(3px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Page fade transitions (legacy alias) */
+.spa-page-transition {
+    animation: pageFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ==========================================================================
+   Dockable & Category Menu CSS Specifications (Android-Style Scroll-Snap)
+   ========================================================================== */
+.dockable-nav-container,
+.pos-categories-row,
+.pos-categories-container,
+.tab-scroll-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+}
+
+.dockable-nav-container::-webkit-scrollbar,
+.pos-categories-row::-webkit-scrollbar,
+.pos-categories-container::-webkit-scrollbar,
+.tab-scroll-container::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+    display: none; /* Chrome, Safari */
+}
+
+.no-scrollbar,
+.scrollbar-none {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+}
+
+/* ==========================================================================
+   UI/UX & Design Upgrade: Radiant Gradients, Glassmorphism & Animations
+   ========================================================================== */
+
+/* Radiant Micro-Gradient Button */
+.btn-vibrant-blue,
+.btn-gradient-primary {
+    background-image: linear-gradient(to right, #2563eb, #4f46e5, #1d4ed8);
+    color: #ffffff;
+    box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.25);
+    transition: all 0.15s ease-out;
+}
+.btn-vibrant-blue:hover,
+.btn-gradient-primary:hover {
+    background-image: linear-gradient(to right, #3b82f6, #6366f1, #2563eb);
+    box-shadow: 0 6px 20px 0 rgba(79, 70, 229, 0.35);
+}
+.btn-vibrant-blue:active,
+.btn-gradient-primary:active,
+.active-scale:active {
+    transform: scale(0.97);
+}
+
+/* Hardware-Accelerated Interactive Element Transitions */
+.interactive-tap {
+    transition: transform 150ms cubic-bezier(0, 0, 0.2, 1), box-shadow 150ms ease-out, background-color 150ms ease-out;
+}
+.interactive-tap:active {
+    transform: scale(0.97);
+}
+
+/* Glassmorphism Surface Elevation */
+.glass-panel {
+    background-color: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(226, 232, 240, 0.6);
+}
+.dark .glass-panel {
+    background-color: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-modal-backdrop {
+    background-color: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* Toast auto-dismiss progress bar */
+@keyframes toast-progress-shrink {
+    from {
+        width: 100%;
+    }
+    to {
+        width: 0%;
+    }
+}
+.toast-progress-bar {
+    animation: toast-progress-shrink 4.5s linear forwards;
+}
+
+/* Shimmer placeholder animation */
+@keyframes shimmer-sweep {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+.animate-shimmer {
+    position: relative;
+    overflow: hidden;
+}
+.animate-shimmer::after {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0,
+        rgba(255, 255, 255, 0.08) 20%,
+        rgba(255, 255, 255, 0.2) 60%,
+        rgba(255, 255, 255, 0)
+    );
+    animation: shimmer-sweep 1.5s infinite;
+    content: '';
+}
+
+/* ==========================================================================
+   Dedicated Print Engine Stylesheet
+   ========================================================================== */
+@media print {
+    /* 1. Hide all website navigation, sidebars, headers, modals overlays, and buttons */
+    .no-print,
+    header,
+    nav,
+    footer,
+    button,
+    .btn,
+    #app-global-loader,
+    #preloader-container,
+    .dockable-nav-container,
+    .app-main-frame > aside,
+    .app-main-frame > nav {
+        display: none !important;
+    }
+
+    /* 2. Reset document canvas to white with pure black text */
+    html, body, main, .app-main-frame, .main-content-pane {
+        background: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-height: auto !important;
+        box-shadow: none !important;
+        border: none !important;
+        overflow: visible !important;
+    }
+
+    /* 3. Center and format the print slip canvas */
+    .printable-sheet {
+        display: block !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 1.5rem !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    /* 4. Thermal Receipt Auto-Fit (80mm width mode) */
+    .printable-thermal-80mm {
+        width: 76mm !important;
+        margin: 0 auto !important;
+        padding: 2mm !important;
+        font-size: 11px !important;
+        line-height: 1.25 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+}

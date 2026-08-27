@@ -50,9 +50,9 @@
             <div class="flex items-center gap-3">
                 <button type="button"
                         x-on:click="cartOpen = true"
-                        class="relative px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-blue-500/25 active:scale-95 transition-all">
+                        class="relative px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 text-white font-extrabold text-xs sm:text-sm flex items-center gap-2 shadow-md shadow-indigo-500/20 active:scale-[0.97] transition duration-150 ease-out cursor-pointer">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                    <span>Cart</span>
+                    <span>{{ __("Cart") }}</span>
                     <span x-show="totalItemCount > 0"
                           x-text="totalItemCount"
                           class="px-2 py-0.5 rounded-full bg-white text-blue-600 font-black text-xs shadow-xs">
@@ -101,10 +101,14 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
             @forelse ($products as $product)
                 <div x-show="matchesSearch({{ json_encode($product->name) }}, {{ json_encode($product->code ?? '') }})"
-                     class="bg-white rounded-3xl p-5 shadow-[0_4px_25px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col items-center text-center justify-between hover:shadow-lg transition-all group duration-200">
+                     class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm hover:shadow-xl border border-slate-200/60 flex flex-col items-center text-center justify-between transition-all group duration-200">
                     
-                    <div class="my-3 transform group-hover:scale-105 transition-transform duration-200">
-                        <x-pos-product-icon :name="$product->name" size="lg" />
+                    <div class="w-full aspect-square rounded-2xl bg-slate-50 overflow-hidden mb-3 flex items-center justify-center relative">
+                        @if ($product->image_url)
+                            <img src="{{ $product->image_url }}" alt="{{ $product->name }}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                        @else
+                            <x-pos-product-icon :name="$product->name" size="lg" />
+                        @endif
                     </div>
 
                     <div class="w-full space-y-1">
@@ -124,23 +128,23 @@
                         <template x-if="!getItem({{ $product->id }})">
                             <button type="button"
                                     x-on:click="addToCart({{ $product->id }}, {{ json_encode($product->name) }}, {{ (float)$product->sale_price }})"
-                                    class="w-full py-2.5 px-3 rounded-2xl bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white font-extrabold text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-xs">
+                                    class="w-full py-2.5 px-3 rounded-2xl bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white font-extrabold text-xs transition-all duration-150 ease-out active:scale-[0.97] flex items-center justify-center gap-1.5 shadow-xs cursor-pointer">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                                <span>Add to Cart</span>
+                                <span>{{ __("Add to Cart") }}</span>
                             </button>
                         </template>
 
                         <template x-if="getItem({{ $product->id }})">
-                            <div class="flex items-center justify-between bg-blue-600 text-white rounded-2xl p-1 shadow-md">
+                            <div class="flex items-center justify-between bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl p-1 shadow-md">
                                 <button type="button"
                                         x-on:click="decreaseQty({{ $product->id }})"
-                                        class="w-7 h-7 rounded-xl bg-white/20 hover:bg-white/30 text-white flex items-center justify-center font-black text-sm active:scale-90 transition">
+                                        class="w-7 h-7 rounded-xl bg-white/20 hover:bg-white/30 text-white flex items-center justify-center font-black text-sm active:scale-[0.9] transition duration-150 cursor-pointer">
                                     -
                                 </button>
                                 <span class="font-black text-xs px-2" x-text="getItem({{ $product->id }}).quantity"></span>
                                 <button type="button"
                                         x-on:click="increaseQty({{ $product->id }})"
-                                        class="w-7 h-7 rounded-xl bg-white/20 hover:bg-white/30 text-white flex items-center justify-center font-black text-sm active:scale-90 transition">
+                                        class="w-7 h-7 rounded-xl bg-white/20 hover:bg-white/30 text-white flex items-center justify-center font-black text-sm active:scale-[0.9] transition duration-150 cursor-pointer">
                                     +
                                 </button>
                             </div>
@@ -186,7 +190,7 @@
                         <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
                         </div>
-                        <h3 class="font-extrabold text-base text-slate-900">Your Order Cart</h3>
+                        <h3 class="font-extrabold text-base text-slate-900">{{ __("Your Order Cart") }}</h3>
                     </div>
                     <button type="button" x-on:click="cartOpen = false" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center font-bold text-base transition">
                         &times;
@@ -224,8 +228,8 @@
                     <template x-if="cart.length === 0">
                         <div class="py-16 text-center text-slate-400 space-y-2">
                             <div class="text-3xl">🛒</div>
-                            <div class="text-xs font-semibold">Your cart is currently empty.</div>
-                            <div class="text-[11px] text-slate-400">Click on any product to add it.</div>
+                            <div class="text-xs font-semibold">{{ __("Your cart is currently empty.") }}</div>
+                            <div class="text-[11px] text-slate-400">{{ __("Click on any product to add it.") }}</div>
                         </div>
                     </template>
                 </div>
@@ -237,15 +241,15 @@
                     <template x-if="cart.length > 0">
                         <div class="space-y-2.5">
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-700 mb-1">Your Name *</label>
+                                <label class="block text-[11px] font-bold text-slate-700 mb-1">{{ __("Your Name *") }}</label>
                                 <input type="text" x-model="customerName" placeholder="e.g. Sarah Connor" class="w-full rounded-xl border-slate-200 text-xs focus:ring-blue-500">
                             </div>
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-700 mb-1">Your Phone / WhatsApp Number</label>
+                                <label class="block text-[11px] font-bold text-slate-700 mb-1">{{ __("Your Phone / WhatsApp Number") }}</label>
                                 <input type="text" x-model="customerPhone" placeholder="e.g. +1 555-0199" class="w-full rounded-xl border-slate-200 text-xs focus:ring-blue-500">
                             </div>
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-700 mb-1">Delivery Address / Order Notes</label>
+                                <label class="block text-[11px] font-bold text-slate-700 mb-1">{{ __("Delivery Address / Order Notes") }}</label>
                                 <input type="text" x-model="customerNotes" placeholder="Delivery address or special requests..." class="w-full rounded-xl border-slate-200 text-xs focus:ring-blue-500">
                             </div>
                         </div>
@@ -253,7 +257,7 @@
 
                     <!-- Total Breakdown -->
                     <div class="flex items-baseline justify-between pt-2 border-t border-slate-100">
-                        <span class="text-sm font-extrabold text-slate-700">Total Order Amount:</span>
+                        <span class="text-sm font-extrabold text-slate-700">{{ __("Total Order Amount:") }}</span>
                         <span class="text-2xl font-black text-slate-900">$<span x-text="totalAmount.toFixed(2)"></span></span>
                     </div>
 
@@ -263,7 +267,7 @@
                             :disabled="cart.length === 0"
                             class="w-full py-3.5 rounded-2xl bg-[#25D366] hover:bg-[#1EBE5D] disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm tracking-wide shadow-lg shadow-emerald-500/25 active:scale-95 transition-all flex items-center justify-center gap-2">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.275.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.158.57 4.184 1.564 5.941l-1.657 6.059 6.223-1.632c1.705.932 3.654 1.465 5.73 1.465 6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
-                        <span>Order via WhatsApp</span>
+                        <span>{{ __("Order via WhatsApp") }}</span>
                     </button>
                 </div>
 
@@ -283,10 +287,10 @@
 
             <div class="flex items-center gap-4">
                 @if ($company?->phone)
-                    <a href="tel:{{ $company->phone }}" class="hover:text-blue-600 font-bold">Call: {{ $company->phone }}</a>
+                    <a href="tel:{{ $company->phone }}" class="hover:text-blue-600 font-bold">{{ __("Call:") }} {{ $company->phone }}</a>
                 @endif
                 @if ($company?->email)
-                    <a href="mailto:{{ $company->email }}" class="hover:text-blue-600 font-bold">Email Us</a>
+                    <a href="mailto:{{ $company->email }}" class="hover:text-blue-600 font-bold">{{ __("Email Us") }}</a>
                 @endif
             </div>
         </div>

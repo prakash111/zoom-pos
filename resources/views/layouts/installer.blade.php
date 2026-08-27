@@ -8,6 +8,7 @@
     @livewireStyles
 </head>
 <body class="bg-slate-100 text-slate-900 min-h-screen">
+    @include('layouts.partials.preloader')
     <div class="max-w-3xl mx-auto py-12 px-4">
         <div class="mb-8 text-center">
             <h1 class="text-2xl font-semibold">{{ config('app.name') }} Installer</h1>

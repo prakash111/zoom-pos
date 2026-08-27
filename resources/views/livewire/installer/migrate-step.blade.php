@@ -1,5 +1,5 @@
 <div>
-    <h2 class="text-lg font-semibold mb-4">Step 3 — Migrate & Seed</h2>
+    <h2 class="text-lg font-semibold mb-4">{{ __("Step 3 — Migrate & Seed") }}</h2>
 
     <p class="text-sm text-slate-600 mb-4">
         This creates every database table the application needs and seeds default plans and platform settings.
@@ -10,7 +10,7 @@
     @endif
 
     @if ($failed)
-        <p class="text-sm text-rose-600 mb-4">Migration failed. Check the output above and try again.</p>
+        <p class="text-sm text-rose-600 mb-4">{{ __("Migration failed. Check the output above and try again.") }}</p>
     @endif
 
     <div class="flex justify-between mt-6">

@@ -1,0 +1,1502 @@
+{
+  "+1 555-0199": {
+    "de": "+1 555-0199",
+    "nl": "+1 555-0199",
+    "ru": "+1 555-0199",
+    "tr": "+1 555-0199"
+  },
+  "0% Exempt": {
+    "de": "0% Befreit",
+    "nl": "0% Vrijgesteld",
+    "ru": "0% Освобождено от налога",
+    "tr": "%0 Muaf"
+  },
+  "1 day": {
+    "de": "1 Tag",
+    "nl": "1 dag",
+    "ru": "1 день",
+    "tr": "1 gün"
+  },
+  "10% Happy Hour": {
+    "de": "10% Happy Hour",
+    "nl": "10% Happy hour",
+    "ru": "10% «Счастливые часы»",
+    "tr": "%10 Happy Hour"
+  },
+  "14-day zero-risk trial evaluation": {
+    "de": "14 Tage unverbindliche Testphase ohne Risiko",
+    "nl": "14 dagen risicovrije proefevaluatie",
+    "ru": "14-дневная пробная оценка без риска",
+    "tr": "14 günlük risksiz deneme değerlendirmesi"
+  },
+  "15% Member VIP": {
+    "de": "15% VIP-Mitglied",
+    "nl": "15% VIP-lid",
+    "ru": "15% VIP-клиент",
+    "tr": "%15 VIP Üye"
+  },
+  "20% Promo Clearance": {
+    "de": "20% Räumungsrabatt",
+    "nl": "20% Uitverkoopkorting",
+    "ru": "20% Распродажа",
+    "tr": "%20 Promosyon / Tasfiye İndirimi"
+  },
+  "256-Bit SSL Encrypted Payment": {
+    "de": "256-Bit-SSL-verschlüsselte Zahlung",
+    "nl": "256-bits SSL-gecodeerde betaling",
+    "ru": "Оплата с 256-битным SSL-шифрованием",
+    "tr": "256-Bit SSL Şifreli Ödeme"
+  },
+  "30 days": {
+    "de": "30 Tage",
+    "nl": "30 dagen",
+    "ru": "30 дней",
+    "tr": "30 gün"
+  },
+  "40% advance milestone required upon quotation acceptance.": {
+    "de": "40% Anzahlung bei Angebotsannahme erforderlich.",
+    "nl": "40% voorschot vereist bij acceptatie van de offerte.",
+    "ru": "40% предоплата при принятии коммерческого предложения.",
+    "tr": "Teklifin kabulünde %40 avans ödemesi gereklidir."
+  },
+  "5% Staff Discount": {
+    "de": "5% Mitarbeiterrabatt",
+    "nl": "5% Personeelskorting",
+    "ru": "5% Скидка для персонала",
+    "tr": "%5 Personel İndirimi"
+  },
+  "7 days": {
+    "de": "7 Tage",
+    "nl": "7 dagen",
+    "ru": "7 дней",
+    "tr": "7 gün"
+  },
+  "80mm / 58mm": {
+    "de": "80mm / 58mm",
+    "nl": "80mm / 58mm",
+    "ru": "80мм / 58мм",
+    "tr": "80mm / 58mm"
+  },
+  "Abbreviation": {
+    "de": "Abkürzung",
+    "nl": "Afkorting",
+    "ru": "Аббревиатура",
+    "tr": "Kısaltma"
+  },
+  "Accepted": {
+    "de": "Akzeptiert",
+    "nl": "Geaccepteerd",
+    "ru": "Принято",
+    "tr": "Kabul Edildi"
+  },
+  "Accepted / Approved": {
+    "de": "Akzeptiert / Genehmigt",
+    "nl": "Geaccepteerd / Goedgekeurd",
+    "ru": "Принято / Утверждено",
+    "tr": "Kabul Edildi / Onaylandı"
+  },
+  "Access Control": {
+    "de": "Zugriffskontrolle",
+    "nl": "Toegangscontrole",
+    "ru": "Контроль доступа",
+    "tr": "Erişim Kontrolü"
+  },
+  "Accounts Payable & Expense Management": {
+    "de": "Kreditorenbuchhaltung & Ausgabenverwaltung",
+    "nl": "Crediteurenadministratie & Onkostenbeheer",
+    "ru": "Кредиторская задолженность и управление расходами",
+    "tr": "Borç Hesapları ve Gider Yönetimi"
+  },
+  "Accounts Receivable (Customer Credit & Invoices)": {
+    "de": "Debitorenbuchhaltung (Kundenkredit & Rechnungen)",
+    "nl": "Debiteurenadministratie (Klantkrediet & Facturen)",
+    "ru": "Дебиторская задолженность (Кредиты клиентов и счета)",
+    "tr": "Alacak Hesapları (Müşteri Kredisi ve Faturalar)"
+  },
+  "Action": {
+    "de": "Aktion",
+    "nl": "Actie",
+    "ru": "Действие",
+    "tr": "İşlem"
+  },
+  "Actions": {
+    "de": "Aktionen",
+    "nl": "Acties",
+    "ru": "Действия",
+    "tr": "İşlemler"
+  },
+  "Activate": {
+    "de": "Aktivieren",
+    "nl": "Activeren",
+    "ru": "Активировать",
+    "tr": "Etkinleştir"
+  },
+  "Activate Free Trial": {
+    "de": "Kostenlose Testversion aktivieren",
+    "nl": "Gratis proefperiode activeren",
+    "ru": "Активировать бесплатный пробный период",
+    "tr": "Ücretsiz Denemeyi Başlat"
+  },
+  "Activation / License Key *": {
+    "de": "Aktivierungs- / Lizenzschlüssel *",
+    "nl": "Activerings- / Licentiesleutel *",
+    "ru": "Ключ активации / Лицензионный ключ *",
+    "tr": "Etkinleştirme / Lisans Anahtarı *"
+  },
+  "Active (Visible in POS)": {
+    "de": "Aktiv (Im POS sichtbar)",
+    "nl": "Actief (Zichtbaar in POS)",
+    "ru": "Активно (Видимо в POS)",
+    "tr": "Aktif (POS'ta Görünür)"
+  },
+  "Active Account": {
+    "de": "Aktives Konto",
+    "nl": "Actief account",
+    "ru": "Активный аккаунт",
+    "tr": "Aktif Hesap"
+  },
+  "Active Devices & POS Terminals": {
+    "de": "Aktive Geräte & POS-Terminals",
+    "nl": "Actieve apparaten & POS-terminals",
+    "ru": "Активные устройства и POS-терминалы",
+    "tr": "Aktif Cihazlar ve POS Terminalleri"
+  },
+  "Active Store": {
+    "de": "Aktiver Shop",
+    "nl": "Actieve winkel",
+    "ru": "Активный магазин",
+    "tr": "Aktif Mağaza"
+  },
+  "Active Store Plan": {
+    "de": "Aktiver Shop-Tarif",
+    "nl": "Actief winkelabonnement",
+    "ru": "Активный тариф магазина",
+    "tr": "Aktif Mağaza Planı"
+  },
+  "Active Supplier": {
+    "de": "Aktiver Lieferant",
+    "nl": "Actieve leverancier",
+    "ru": "Активный поставщик",
+    "tr": "Aktif Tedarikçi"
+  },
+  "Active subscription plans": {
+    "de": "Aktive Abonnement-Pläne",
+    "nl": "Actieve abonnementen",
+    "ru": "Активные планы подписки",
+    "tr": "Aktif abonelik planları"
+  },
+  "Add Currency": {
+    "de": "Währung hinzufügen",
+    "nl": "Valuta toevoegen",
+    "ru": "Добавить валюту",
+    "tr": "Para Birimi Ekle"
+  },
+  "Add Custom Phrase": {
+    "de": "Benutzerdefinierte Phrase hinzufügen",
+    "nl": "Aangepaste zin toevoegen",
+    "ru": "Добавить пользовательскую фразу",
+    "tr": "Özel İfade Ekle"
+  },
+  "Add Customer": {
+    "de": "Kunde hinzufügen",
+    "nl": "Klant toevoegen",
+    "ru": "Добавить клиента",
+    "tr": "Müşteri Ekle"
+  },
+  "Add Floor": {
+    "de": "Ebene / Bereich hinzufügen",
+    "nl": "Verdieping toevoegen",
+    "ru": "Добавить зал / зону",
+    "tr": "Kat / Alan Ekle"
+  },
+  "Add Floor Area": {
+    "de": "Bereich hinzufügen",
+    "nl": "Vloeroppervlak toevoegen",
+    "ru": "Добавить зону зала",
+    "tr": "Kat Alanı Ekle"
+  },
+  "Add Method": {
+    "de": "Methode hinzufügen",
+    "nl": "Methode toevoegen",
+    "ru": "Добавить метод",
+    "tr": "Yöntem Ekle"
+  },
+  "Add Method Split": {
+    "de": "Zahlungsteilung hinzufügen",
+    "nl": "Gesplitste methode toevoegen",
+    "ru": "Добавить разделение оплаты",
+    "tr": "Bölünmüş Yöntem Ekle"
+  },
+  "Add New Category": {
+    "de": "Neue Kategorie hinzufügen",
+    "nl": "Nieuwe categorie toevoegen",
+    "ru": "Добавить новую категорию",
+    "tr": "Yeni Kategori Ekle"
+  },
+  "Add New Client": {
+    "de": "Neuen Kunden hinzufügen",
+    "nl": "Nieuwe klant toevoegen",
+    "ru": "Добавить нового клиента",
+    "tr": "Yeni Müşteri Ekle"
+  },
+  "Add New Customer": {
+    "de": "Neuen Kunden hinzufügen",
+    "nl": "Nieuwe klant toevoegen",
+    "ru": "Добавить нового клиента",
+    "tr": "Yeni Müşteri Ekle"
+  },
+  "Add New Payment Method": {
+    "de": "Neue Zahlungsmethode hinzufügen",
+    "nl": "Nieuwe betaalmethode toevoegen",
+    "ru": "Добавить новый способ оплаты",
+    "tr": "Yeni Ödeme Yöntemi Ekle"
+  },
+  "Add New Supplier": {
+    "de": "Neuen Lieferanten hinzufügen",
+    "nl": "Nieuwe leverancier toevoegen",
+    "ru": "Добавить нового поставщика",
+    "tr": "Yeni Tedarikçi Ekle"
+  },
+  "Add New Unit": {
+    "de": "Neue Einheit hinzufügen",
+    "nl": "Nieuwe eenheid toevoegen",
+    "ru": "Добавить новую единицу",
+    "tr": "Yeni Birim Ekle"
+  },
+  "Add Row": {
+    "de": "Zeile hinzufügen",
+    "nl": "Rij toevoegen",
+    "ru": "Добавить строку",
+    "tr": "Satır Ekle"
+  },
+  "Add Split": {
+    "de": "Teilung hinzufügen",
+    "nl": "Splitsing toevoegen",
+    "ru": "Добавить разделение",
+    "tr": "Bölüm Ekle"
+  },
+  "Add Table": {
+    "de": "Tisch hinzufügen",
+    "nl": "Tafel toevoegen",
+    "ru": "Добавить стол",
+    "tr": "Masa Ekle"
+  },
+  "Add Vendor Bill / Expense": {
+    "de": "Lieferantenrechnung / Ausgabe hinzufügen",
+    "nl": "Leveranciersfactuur / Uitgave toevoegen",
+    "ru": "Добавить счет поставщика / расход",
+    "tr": "Tedarikçi Faturası / Masraf Ekle"
+  },
+  "Add special instructions, client PO reference, warranty notes or cashier remarks...": {
+    "de": "Sonderanweisungen, Kunden-Bestellnummer, Garantiehinweise oder Kassierer-Anmerkungen hinzufügen...",
+    "nl": "Voeg speciale instructies, inkoopordernummer van klant, garantie-opmerkingen of kassiernotities toe...",
+    "ru": "Добавьте особые инструкции, номер заказа клиента, примечания по гарантии или комментарии кассира...",
+    "tr": "Özel talimatlar, müşteri sipariş referansı, garanti notları veya kasiyer açıklamaları ekleyin..."
+  },
+  "Add to Cart": {
+    "de": "In den Warenkorb",
+    "nl": "Toevoegen aan winkelwagen",
+    "ru": "В корзину",
+    "tr": "Sepete Ekle"
+  },
+  "Add to Order": {
+    "de": "Zur Bestellung hinzufügen",
+    "nl": "Toevoegen aan bestelling",
+    "ru": "Добавить к заказу",
+    "tr": "Siparişe Ekle"
+  },
+  "Add to Sale +": {
+    "de": "Zum Verkauf hinzufügen +",
+    "nl": "Toevoegen aan verkoop +",
+    "ru": "Добавить к продаже +",
+    "tr": "Satışa Ekle +"
+  },
+  "Add, edit, enable or remove custom payment methods for POS checkout": {
+    "de": "Benutzerdefinierte Zahlungsmethoden für die POS-Kasse hinzufügen, bearbeiten, aktivieren oder entfernen",
+    "nl": "Aangepaste betaalmethoden voor POS-kassa toevoegen, bewerken, inschakelen of verwijderen",
+    "ru": "Добавляйте, редактируйте, включайте или удаляйте способы оплаты для кассы POS",
+    "tr": "POS kasası için özel ödeme yöntemleri ekleyin, düzenleyin, etkinleştirin veya kaldırın"
+  },
+  "Add-ons & Extras": {
+    "de": "Zusatzoptionen & Extras",
+    "nl": "Add-ons & Extra's",
+    "ru": "Дополнения и экстра",
+    "tr": "Eklentiler ve Ekstralar"
+  },
+  "Additional Custom Authored Content (Optional)": {
+    "de": "Zusätzlicher benutzerdefinierter Inhalt (Optional)",
+    "nl": "Aanvullende aangepaste inhoud (Optioneel)",
+    "ru": "Дополнительный авторский контент (Необязательно)",
+    "tr": "Ek Özel İçerik (İsteğe Bağlı)"
+  },
+  "Address": {
+    "de": "Adresse",
+    "nl": "Adres",
+    "ru": "Адрес",
+    "tr": "Adres"
+  },
+  "Address:": {
+    "de": "Adresse:",
+    "nl": "Adres:",
+    "ru": "Адрес:",
+    "tr": "Adres:"
+  },
+  "Adjust": {
+    "de": "Anpassen",
+    "nl": "Aanpassen",
+    "ru": "Скорректировать",
+    "tr": "Ayarla"
+  },
+  "Adjust Points": {
+    "de": "Punkte anpassen",
+    "nl": "Punten aanpassen",
+    "ru": "Скорректировать баллы",
+    "tr": "Puanları Ayarla"
+  },
+  "Adjustment (+/- Qty)": {
+    "de": "Korrektur (+/- Menge)",
+    "nl": "Aanpassing (+/- Aantal)",
+    "ru": "Корректировка (+/- Кол-во)",
+    "tr": "Düzeltme (+/- Miktar)"
+  },
+  "Admin Full Name *": {
+    "de": "Vollständiger Name des Administrators *",
+    "nl": "Volledige naam beheerder *",
+    "ru": "Полное имя администратора *",
+    "tr": "Yönetici Tam Adı *"
+  },
+  "Admin Login / Username *": {
+    "de": "Admin-Login / Benutzername *",
+    "nl": "Admin login / Gebruikersnaam *",
+    "ru": "Логин / Имя пользователя администратора *",
+    "tr": "Yönetici Girişi / Kullanıcı Adı *"
+  },
+  "Admin Login Email *": {
+    "de": "Admin-Login-E-Mail *",
+    "nl": "Admin login e-mail *",
+    "ru": "Email для входа администратора *",
+    "tr": "Yönetici Giriş E-postası *"
+  },
+  "Administration & Settings": {
+    "de": "Verwaltung & Einstellungen",
+    "nl": "Beheer & Instellingen",
+    "ru": "Администрирование и настройки",
+    "tr": "Yönetim ve Ayarlar"
+  },
+  "Administrator": {
+    "de": "Administrator",
+    "nl": "Beheerder",
+    "ru": "Администратор",
+    "tr": "Yönetici"
+  },
+  "All": {
+    "de": "Alle",
+    "nl": "Alle",
+    "ru": "Все",
+    "tr": "Tümü"
+  },
+  "All Categories": {
+    "de": "Alle Kategorien",
+    "nl": "Alle categorieën",
+    "ru": "Все категории",
+    "tr": "Tüm Kategoriler"
+  },
+  "All Customers": {
+    "de": "Alle Kunden",
+    "nl": "Alle klanten",
+    "ru": "Все клиенты",
+    "tr": "Tüm Müşteriler"
+  },
+  "All Floor Areas": {
+    "de": "Alle Bereiche",
+    "nl": "Alle ruimtes",
+    "ru": "Все зоны зала",
+    "tr": "Tüm Kat Alanları"
+  },
+  "All Items": {
+    "de": "Alle Artikel",
+    "nl": "Alle artikelen",
+    "ru": "Все товары",
+    "tr": "Tüm Ürünler"
+  },
+  "All Kitchen Orders Cleared!": {
+    "de": "Alle Küchenbestellungen erledigt!",
+    "nl": "Alle keukenbestellingen afgehandeld!",
+    "ru": "Все кухонные заказы выполнены!",
+    "tr": "Tüm Mutfak Siparişleri Tamamlandı!"
+  },
+  "All Menu": {
+    "de": "Gesamtes Menü",
+    "nl": "Volledig menu",
+    "ru": "Всё меню",
+    "tr": "Tüm Menü"
+  },
+  "All Quotes": {
+    "de": "Alle Angebote",
+    "nl": "Alle offertes",
+    "ru": "Все коммерческие предложения",
+    "tr": "Tüm Teklifler"
+  },
+  "All Statuses": {
+    "de": "Alle Status",
+    "nl": "Alle statussen",
+    "ru": "Все статусы",
+    "tr": "Tüm Durumlar"
+  },
+  "All Suppliers": {
+    "de": "Alle Lieferanten",
+    "nl": "Alle leveranciers",
+    "ru": "Все поставщики",
+    "tr": "Tüm Tedarikçiler"
+  },
+  "All inventory items are healthy and above minimum threshold.": {
+    "de": "Alle Lagerbestände sind im optimalen Bereich und über dem Mindestbestand.",
+    "nl": "Alle voorraadartikelen zijn op peil en boven de minimumdrempel.",
+    "ru": "Все остатки товаров в норме и превышают минимальный порог.",
+    "tr": "Tüm stok kalemleri iyi durumda ve minimum eşiğin üzerinde."
+  },
+  "All rates quoted are valid for 15 days from issue date.": {
+    "de": "Alle angegebenen Preise sind 15 Tage ab Ausstellungsdatum gültig.",
+    "nl": "Alle geoffreerde prijzen zijn 15 dagen geldig vanaf de uitgiftedatum.",
+    "ru": "Все указанные цены действительны в течение 15 дней с даты выставления.",
+    "tr": "Belirtilen tüm fiyatlar düzenlenme tarihinden itibaren 15 gün geçerlidir."
+  },
+  "All unpaid bills": {
+    "de": "Alle unbezahlten Rechnungen",
+    "nl": "Alle onbetaalde facturen",
+    "ru": "Все неоплаченные счета",
+    "tr": "Tüm ödenmemiş faturalar"
+  },
+  "All-inclusive for growing businesses": {
+    "de": "Rundum-Sorglos-Paket für wachsende Unternehmen",
+    "nl": "Alles-in-één voor groeiende bedrijven",
+    "ru": "Всё включено для растущего бизнеса",
+    "tr": "Büyüyen işletmeler için her şey dahil"
+  },
+  "Allocated": {
+    "de": "Zugewiesen",
+    "nl": "Toegewezen",
+    "ru": "Выделено",
+    "tr": "Tahsis Edildi"
+  },
+  "Amber Gold": {
+    "de": "Bernsteingold",
+    "nl": "Amber goud",
+    "ru": "Янтарно-золотой",
+    "tr": "Kehribar Sarısı"
+  },
+  "Amount": {
+    "de": "Betrag",
+    "nl": "Bedrag",
+    "ru": "Сумма",
+    "tr": "Tutar"
+  },
+  "Amount ($)": {
+    "de": "Betrag ($)",
+    "nl": "Bedrag ($)",
+    "ru": "Сумма ($)",
+    "tr": "Tutar ($)"
+  },
+  "App URL": {
+    "de": "App-URL",
+    "nl": "App-URL",
+    "ru": "URL приложения",
+    "tr": "Uygulama URL'si"
+  },
+  "Application & Navigation Theme Color": {
+    "de": "Designfarbe für Anwendung & Navigation",
+    "nl": "Themakleur voor applicatie & navigatie",
+    "ru": "Цветовая тема приложения и навигации",
+    "tr": "Uygulama ve Gezinme Tema Rengi"
+  },
+  "Application primary theme color, default POS layout design, logo, and document colors": {
+    "de": "Primäre Designfarbe der Anwendung, Standard-POS-Layout, Logo und Dokumentfarben",
+    "nl": "Primaire themakleur van de applicatie, standaard POS-indeling, logo en documentkleuren",
+    "ru": "Основной цвет темы приложения, стандартный макет POS, логотип и цвета документов",
+    "tr": "Uygulama birincil tema rengi, varsayılan POS düzeni, logo ve belge renkleri"
+  },
+  "Apply": {
+    "de": "Anwenden",
+    "nl": "Toepassen",
+    "ru": "Применить",
+    "tr": "Uygula"
+  },
+  "Apply Primary Language": {
+    "de": "Primärsprache anwenden",
+    "nl": "Primaire taal toepassen",
+    "ru": "Применить основной язык",
+    "tr": "Birincil Dili Uygula"
+  },
+  "Apply Role Profile Preset:": {
+    "de": "Rollenprofil-Vorlage anwenden:",
+    "nl": "Rolprofiel-voorinstelling toepassen:",
+    "ru": "Применить шаблон профиля роли:",
+    "tr": "Rol Profili Önayarını Uygula:"
+  },
+  "Are you sure you want to delete payment method": {
+    "de": "Möchten Sie diese Zahlungsmethode wirklich löschen",
+    "nl": "Weet u zeker dat u de betaalmethode wilt verwijderen",
+    "ru": "Вы уверены, что хотите удалить способ оплаты",
+    "tr": "Ödeme yöntemini silmek istediğinizden emin misiniz"
+  },
+  "Are you sure you want to delete the selected quotations?": {
+    "de": "Möchten Sie die ausgewählten Angebote wirklich löschen?",
+    "nl": "Weet u zeker dat u de geselecteerde offertes wilt verwijderen?",
+    "ru": "Вы уверены, что хотите удалить выбранные коммерческие предложения?",
+    "tr": "Seçilen teklifleri silmek istediğinizden emin misiniz?"
+  },
+  "Are you sure you want to delete this bill?": {
+    "de": "Möchten Sie diese Rechnung wirklich löschen?",
+    "nl": "Weet u zeker dat u deze factuur wilt verwijderen?",
+    "ru": "Вы уверены, что хотите удалить этот счет?",
+    "tr": "Bu faturayı silmek istediğinizden emin misiniz?"
+  },
+  "Are you sure you want to delete this quote?": {
+    "de": "Möchten Sie dieses Angebot wirklich löschen?",
+    "nl": "Weet u zeker dat u deze offerte wilt verwijderen?",
+    "ru": "Вы уверены, что хотите удалить это коммерческое предложение?",
+    "tr": "Bu teklifi silmek istediğinizden emin misiniz?"
+  },
+  "Are you sure you want to delete this translation key?": {
+    "de": "Möchten Sie diesen Übersetzungsschlüssel wirklich löschen?",
+    "nl": "Weet u zeker dat u deze vertaalsleutel wilt verwijderen?",
+    "ru": "Вы уверены, что хотите удалить этот ключ перевода?",
+    "tr": "Bu çeviri anahtarını silmek istediğinizden emin misiniz?"
+  },
+  "Area Name *": {
+    "de": "Bereichsname *",
+    "nl": "Gebiedsnaam *",
+    "ru": "Название зоны *",
+    "tr": "Alan Adı *"
+  },
+  "Assigned Role": {
+    "de": "Zugewiesene Rolle",
+    "nl": "Toegewezen rol",
+    "ru": "Назначенная роль",
+    "tr": "Atanan Rol"
+  },
+  "Attach Official PDF Document": {
+    "de": "Offizielles PDF-Dokument anhängen",
+    "nl": "Officieel PDF-document bijvoegen",
+    "ru": "Прикрепить официальный PDF-документ",
+    "tr": "Resmi PDF Belgesini Ekle"
+  },
+  "Authorized POS Devices": {
+    "de": "Autorisierte POS-Geräte",
+    "nl": "Geautoriseerde POS-apparaten",
+    "ru": "Авторизованные POS-устройства",
+    "tr": "Yetkili POS Cihazları"
+  },
+  "Automated Database Backup & Retention Policy": {
+    "de": "Automatische Datenbanksicherung & Aufbewahrungsrichtlinie",
+    "nl": "Automatische databaseback-up & bewaarbeleid",
+    "ru": "Автоматическое резервное копирование БД и политика хранения",
+    "tr": "Otomatik Veritabanı Yedekleme ve Saklama Politikası"
+  },
+  "Available": {
+    "de": "Verfügbar",
+    "nl": "Beschikbaar",
+    "ru": "Доступно",
+    "tr": "Kullanılabilir"
+  },
+  "Available Subscription Plans": {
+    "de": "Verfügbare Abonnement-Pläne",
+    "nl": "Beschikbare abonnementen",
+    "ru": "Доступные планы подписки",
+    "tr": "Mevcut Abonelik Planları"
+  },
+  "Available database dumps stored on disk": {
+    "de": "Auf der Festplatte gespeicherte Datenbank-Dumps",
+    "nl": "Beschikbare databasedumps opgeslagen op schijf",
+    "ru": "Доступные дампы баз данных на диске",
+    "tr": "Diskte saklanan mevcut veritabanı dökümleri"
+  },
+  "BACK / CLEAR": {
+    "de": "ZURÜCK / LÖSCHEN",
+    "nl": "TERUG / WISSEN",
+    "ru": "НАЗАД / ОЧИСТИТЬ",
+    "tr": "GERİ / TEMİZLE"
+  },
+  "Back to Quotation Detail": {
+    "de": "Zurück zu den Angebotsdetails",
+    "nl": "Terug naar offertedetails",
+    "ru": "Назад к деталям предложения",
+    "tr": "Teklif Detayına Geri Dön"
+  },
+  "Back to Quotes": {
+    "de": "Zurück zu den Angeboten",
+    "nl": "Terug naar offertes",
+    "ru": "Назад к предложениям",
+    "tr": "Tekliflere Geri Dön"
+  },
+  "Back to Sales": {
+    "de": "Zurück zu den Verkäufen",
+    "nl": "Terug naar verkopen",
+    "ru": "Назад к продажам",
+    "tr": "Satışlara Geri Dön"
+  },
+  "Back to Users & Team": {
+    "de": "Zurück zu Benutzern & Team",
+    "nl": "Terug naar gebruikers & team",
+    "ru": "Назад к пользователям и команде",
+    "tr": "Kullanıcılara ve Ekibe Geri Dön"
+  },
+  "Backup Frequency": {
+    "de": "Sicherungshäufigkeit",
+    "nl": "Back-upfrequentie",
+    "ru": "Частота резервного копирования",
+    "tr": "Yedekleme Sıklığı"
+  },
+  "Badge Color": {
+    "de": "Badge-Farbe",
+    "nl": "Badgekleur",
+    "ru": "Цвет бейджа",
+    "tr": "Rozet Rengi"
+  },
+  "Balance Due": {
+    "de": "Fälliger Restbetrag",
+    "nl": "Verschuldigd saldo",
+    "ru": "Остаток к оплате",
+    "tr": "Kalan Bakiye"
+  },
+  "Balance Due:": {
+    "de": "Fälliger Restbetrag:",
+    "nl": "Verschuldigd saldo:",
+    "ru": "Остаток к оплате:",
+    "tr": "Kalan Bakiye:"
+  },
+  "Balance logged to Accounts Receivable": {
+    "de": "Restbetrag in Debitorenbuchhaltung erfasst",
+    "nl": "Saldo geregistreerd in debiteurenadministratie",
+    "ru": "Остаток записан в дебиторскую задолженность",
+    "tr": "Bakiye Alacak Hesaplarına kaydedildi"
+  },
+  "Balanced": {
+    "de": "Ausgeglichen",
+    "nl": "In evenwicht",
+    "ru": "Сбалансировано",
+    "tr": "Dengeli"
+  },
+  "Bank & Payment Details (Rich-Text)": {
+    "de": "Bank- & Zahlungsdetails (Formatierter Text)",
+    "nl": "Bank- en betaalgegevens (Rich-text)",
+    "ru": "Банковские и платежные реквизиты (Rich-Text)",
+    "tr": "Banka ve Ödeme Bilgileri (Zengin Metin)"
+  },
+  "Bank & Payment Instructions": {
+    "de": "Bank- & Zahlungsanweisungen",
+    "nl": "Bank- en betalingsinstructies",
+    "ru": "Банковские и платежные инструкции",
+    "tr": "Banka ve Ödeme Talimatları"
+  },
+  "Bank Reference / Wire TXN / Check #": {
+    "de": "Bankreferenz / Überweisungs-Transaktions-Nr. / Scheck-Nr.",
+    "nl": "Bankreferentie / Overschrijvings-TXN / Chequenr.",
+    "ru": "Банковский референс / Номер транзакции / Чек №",
+    "tr": "Banka Referansı / Havale İşlem No / Çek No"
+  },
+  "Bar / Lounge": {
+    "de": "Bar / Lounge",
+    "nl": "Bar / Lounge",
+    "ru": "Бар / Лаундж",
+    "tr": "Bar / Dinlenme Salonu"
+  },
+  "Barcode": {
+    "de": "Barcode",
+    "nl": "Barcode",
+    "ru": "Штрихкод",
+    "tr": "Barkod"
+  },
+  "Barcode / SKU": {
+    "de": "Barcode / SKU",
+    "nl": "Barcode / SKU",
+    "ru": "Штрихкод / Артикул (SKU)",
+    "tr": "Barkod / SKU"
+  },
+  "Base Amount ($)": {
+    "de": "Grundbetrag ($)",
+    "nl": "Basisbedrag ($)",
+    "ru": "Базовая сумма ($)",
+    "tr": "Temel Tutar ($)"
+  },
+  "Base Currency Code": {
+    "de": "Basiswährungscode",
+    "nl": "Basisvalutacode",
+    "ru": "Код базовой валюты",
+    "tr": "Temel Para Birimi Kodu"
+  },
+  "Base currency code, symbol, decimal precision, and placement used across POS, cart, checkout, and invoices": {
+    "de": "Basiswährungscode, Symbol, Dezimalstellen und Platzierung für POS, Warenkorb, Kasse und Rechnungen",
+    "nl": "Basisvalutacode, symbool, decimale precisie en plaatsing gebruikt in POS, winkelwagen, kassa en facturen",
+    "ru": "Код базовой валюты, символ, точность десятичных знаков и позиция для POS, корзины, кассы и счетов",
+    "tr": "POS, sepet, ödeme ve faturalarda kullanılan temel para birimi kodu, sembolü, ondalık basamağı ve konumu"
+  },
+  "Best Value": {
+    "de": "Bestes Preis-Leistungs-Verhältnis",
+    "nl": "Beste waarde",
+    "ru": "Лучшее предложение",
+    "tr": "En İyi Değer"
+  },
+  "Best for: General Retail, Supermarkets, Convenience stores": {
+    "de": "Ideal für: Einzelhandel, Supermärkte, Convenience Stores",
+    "nl": "Beste voor: Algemene detailhandel, supermarkten, gemakswinkels",
+    "ru": "Лучше всего для: розницы, супермаркетов, продуктовых магазинов",
+    "tr": "En uygunu: Genel Perakende, Süpermarketler, Marketler"
+  },
+  "Best for: Modern tablet/iPad stands, boutique shops, cafes": {
+    "de": "Ideal für: Moderne Tablet-/iPad-Ständer, Boutiquen, Cafés",
+    "nl": "Beste voor: Moderne tablet-/iPad-standaards, boetieks, cafés",
+    "ru": "Лучше всего для: современных планшетов/iPad, бутиков, кафе",
+    "tr": "En uygunu: Modern tablet/iPad standları, butik mağazalar, kafeler"
+  },
+  "Best for: Touch registers, high-traffic counters, department stores": {
+    "de": "Ideal für: Touch-Kassen, hochfrequentierte Theken, Warenhäuser",
+    "nl": "Beste voor: Touch-kassa's, drukke balies, warenhuizen",
+    "ru": "Лучше всего для: сенсорных касс, точек с высокой проходимостью, универмагов",
+    "tr": "En uygunu: Dokunmatik kasalar, yoğun tezgahlar, büyük mağazalar"
+  },
+  "Bill": {
+    "de": "Rechnung",
+    "nl": "Factuur",
+    "ru": "Счет",
+    "tr": "Fatura"
+  },
+  "Bill #": {
+    "de": "Rechnung Nr.",
+    "nl": "Factuurnr.",
+    "ru": "Счет №",
+    "tr": "Fatura No"
+  },
+  "Bill / Invoice Reference #": {
+    "de": "Rechnungsreferenz-Nr.",
+    "nl": "Factuurreferentienummer",
+    "ru": "Номер счета / фактуры",
+    "tr": "Fatura Referans No"
+  },
+  "Bill Amount": {
+    "de": "Rechnungsbetrag",
+    "nl": "Factuurbedrag",
+    "ru": "Сумма счета",
+    "tr": "Fatura Tutarı"
+  },
+  "Bill Date": {
+    "de": "Rechnungsdatum",
+    "nl": "Factuurdatum",
+    "ru": "Дата счета",
+    "tr": "Fatura Tarihi"
+  },
+  "Bill Title / Description": {
+    "de": "Rechnungstitel / Beschreibung",
+    "nl": "Factuurtitel / Omschrijving",
+    "ru": "Название / Описание счета",
+    "tr": "Fatura Başlığı / Açıklaması"
+  },
+  "Billed": {
+    "de": "Abgerechnet",
+    "nl": "Gefactureerd",
+    "ru": "Выставлен счет",
+    "tr": "Faturalandırıldı"
+  },
+  "Bottom CTA Banner": {
+    "de": "Unterer CTA-Banner",
+    "nl": "Onderste CTA-banner",
+    "ru": "Нижний CTA-баннер",
+    "tr": "Alt Eylem Çağrısı (CTA) Başlığı"
+  },
+  "Bottom Dock Bar": {
+    "de": "Untere Dock-Leiste",
+    "nl": "Onderste dockbalk",
+    "ru": "Нижняя панель (Dock)",
+    "tr": "Alt Sabit Panel"
+  },
+  "Brand": {
+    "de": "Marke",
+    "nl": "Merk",
+    "ru": "Бренд",
+    "tr": "Marka"
+  },
+  "Brand Logo URL / Image Path": {
+    "de": "Marken-Logo-URL / Bildpfad",
+    "nl": "Merklogo-URL / Afbeeldingspad",
+    "ru": "URL логотипа бренда / Путь к изображению",
+    "tr": "Marka Logo URL'si / Görsel Yolu"
+  },
+  "Brand Name *": {
+    "de": "Markenname *",
+    "nl": "Merknaam *",
+    "ru": "Название бренда *",
+    "tr": "Marka Adı *"
+  },
+  "Brand names & supplier labels": {
+    "de": "Markennamen & Lieferantenbezeichnungen",
+    "nl": "Merknamen & leverancierslabels",
+    "ru": "Названия брендов и метки поставщиков",
+    "tr": "Marka adları ve tedarikçi etiketleri"
+  },
+  "Brand or company name displayed to recipients.": {
+    "de": "Empfängern angezeigter Marken- oder Firmenname.",
+    "nl": "Merk- of bedrijfsnaam getoond aan ontvangers.",
+    "ru": "Название бренда или компании, отображаемое получателям.",
+    "tr": "Alıcılara gösterilen marka veya şirket adı."
+  },
+  "Brands & Manufacturers": {
+    "de": "Marken & Hersteller",
+    "nl": "Merken & Fabrikanten",
+    "ru": "Бренды и производители",
+    "tr": "Markalar ve Üreticiler"
+  },
+  "Brands & Modifiers": {
+    "de": "Marken & Modifikatoren",
+    "nl": "Merken & Opties",
+    "ru": "Бренды и модификаторы",
+    "tr": "Markalar ve Seçenekler"
+  },
+  "Browser Favicon URL (.ico / .png)": {
+    "de": "Browser-Favicon-URL (.ico / .png)",
+    "nl": "Browser favicon-URL (.ico / .png)",
+    "ru": "URL фавикона браузера (.ico / .png)",
+    "tr": "Tarayıcı Simge (Favicon) URL'si (.ico / .png)"
+  },
+  "Business Contact Email": {
+    "de": "Geschäftliche Kontakt-E-Mail",
+    "nl": "Zakelijk contact-e-mailadres",
+    "ru": "Контактный email организации",
+    "tr": "İş İletişim E-postası"
+  },
+  "Business details displayed on POS terminal, receipts, and invoices": {
+    "de": "Unternehmensdaten auf POS-Terminal, Belegen und Rechnungen",
+    "nl": "Bedrijfsgegevens weergegeven op POS-terminal, bonnen en facturen",
+    "ru": "Данные компании, отображаемые на POS-терминале, чеках и счетах",
+    "tr": "POS terminalinde, makbuzlarda ve faturalarda gösterilen işletme bilgileri"
+  },
+  "CVV / CVC *": {
+    "de": "CVV / CVC *",
+    "nl": "CVV / CVC *",
+    "ru": "CVV / CVC *",
+    "tr": "CVV / CVC *"
+  },
+  "Call:": {
+    "de": "Anrufen:",
+    "nl": "Bellen:",
+    "ru": "Тел.:",
+    "tr": "Ara:"
+  },
+  "Cancel KOT": {
+    "de": "KOT stornieren",
+    "nl": "KOT annuleren",
+    "ru": "Отменить кухонный заказ",
+    "tr": "KOT İptal Et"
+  },
+  "Cancel Sale & Restock": {
+    "de": "Verkauf stornieren & Bestand zurückbuchen",
+    "nl": "Verkoop annuleren & voorraad herstellen",
+    "ru": "Отменить продажу и вернуть на склад",
+    "tr": "Satışı İptal Et ve Stoğa İade Et"
+  },
+  "Cancel [Esc]": {
+    "de": "Abbrechen [Esc]",
+    "nl": "Annuleren [Esc]",
+    "ru": "Отмена [Esc]",
+    "tr": "İptal [Esc]"
+  },
+  "Cancel this sale and restore stock?": {
+    "de": "Diesen Verkauf stornieren und Lagerbestand wiederherstellen?",
+    "nl": "Deze verkoop annuleren en voorraad herstellen?",
+    "ru": "Отменить эту продажу и восстановить остатки на складе?",
+    "tr": "Bu satış iptal edilip stok geri yüklensin mi?"
+  },
+  "Capacity (Seats)": {
+    "de": "Kapazität (Sitzplätze)",
+    "nl": "Capaciteit (Zitplaatsen)",
+    "ru": "Вместимость (мест)",
+    "tr": "Kapasite (Koltuk)"
+  },
+  "Capacity:": {
+    "de": "Kapazität:",
+    "nl": "Capaciteit:",
+    "ru": "Вместимость:",
+    "tr": "Kapasite:"
+  },
+  "Card Number *": {
+    "de": "Kartennummer *",
+    "nl": "Kaartnummer *",
+    "ru": "Номер карты *",
+    "tr": "Kart Numarası *"
+  },
+  "Cardholder Name *": {
+    "de": "Name des Karteninhabers *",
+    "nl": "Naam kaarthouder *",
+    "ru": "Имя держателя карты *",
+    "tr": "Kart Sahibinin Adı *"
+  },
+  "Cart": {
+    "de": "Warenkorb",
+    "nl": "Winkelwagen",
+    "ru": "Корзина",
+    "tr": "Sepet"
+  },
+  "Cart is empty. Tap products to add items.": {
+    "de": "Warenkorb ist leer. Tippen Sie auf Produkte, um Artikel hinzuzufügen.",
+    "nl": "Winkelwagen is leeg. Tik op producten om artikelen toe te voegen.",
+    "ru": "Корзина пуста. Нажмите на товар, чтобы добавить.",
+    "tr": "Sepet boş. Ürün eklemek için dokunun."
+  },
+  "Cash In": {
+    "de": "Bareinzahlung",
+    "nl": "Geld in kas",
+    "ru": "Внесение наличных",
+    "tr": "Kasa Girişi"
+  },
+  "Cash In / Out": {
+    "de": "Bar Ein- / Auszahlung",
+    "nl": "Kas in / uit",
+    "ru": "Внесение / Изъятие наличных",
+    "tr": "Kasa Giriş / Çıkış"
+  },
+  "Cash Movement Log": {
+    "de": "Bargeldbewegungsprotokoll",
+    "nl": "Kasstroomlogboek",
+    "ru": "Журнал движения наличных",
+    "tr": "Kasa Hareket Günlüğü"
+  },
+  "Cash Out": {
+    "de": "Barauszahlung",
+    "nl": "Geld uit kas",
+    "ru": "Изъятие наличных",
+    "tr": "Kasa Çıkışı"
+  },
+  "Cash Register (Daily Register Management)": {
+    "de": "Kasse (Tägliche Kassenverwaltung)",
+    "nl": "Kassa (Dagelijks kassabeheer)",
+    "ru": "Касса (Ежедневное управление кассой)",
+    "tr": "Yazar Kasa (Günlük Kasa Yönetimi)"
+  },
+  "Cash Sales": {
+    "de": "Barverkäufe",
+    "nl": "Contante verkopen",
+    "ru": "Продажи за наличные",
+    "tr": "Nakit Satışlar"
+  },
+  "Cash Tendered ($)": {
+    "de": "Gegebenes Bargeld ($)",
+    "nl": "Ontvangen contant ($)",
+    "ru": "Внесенные наличные ($)",
+    "tr": "Alınan Nakit ($)"
+  },
+  "Cash Tendered by Customer ($)": {
+    "de": "Vom Kunden gegebenes Bargeld ($)",
+    "nl": "Contant ontvangen van klant ($)",
+    "ru": "Наличные, полученные от клиента ($)",
+    "tr": "Müşteriden Alınan Nakit ($)"
+  },
+  "Casier POS": {
+    "de": "Kassierer-POS",
+    "nl": "Kassa-POS",
+    "ru": "POS кассира",
+    "tr": "Kasiyer POS"
+  },
+  "Catalog Item...": {
+    "de": "Katalogartikel...",
+    "nl": "Catalogusartikel...",
+    "ru": "Товар из каталога...",
+    "tr": "Katalog Öğesi..."
+  },
+  "Catalog Title *": {
+    "de": "Katalogtitel *",
+    "nl": "Catalogustitel *",
+    "ru": "Название каталога *",
+    "tr": "Katalog Başlığı *"
+  },
+  "Category": {
+    "de": "Kategorie",
+    "nl": "Categorie",
+    "ru": "Категория",
+    "tr": "Kategori"
+  },
+  "Category & Title": {
+    "de": "Kategorie & Titel",
+    "nl": "Categorie & Titel",
+    "ru": "Категория и название",
+    "tr": "Kategori ve Başlık"
+  },
+  "Category Name *": {
+    "de": "Kategoriename *",
+    "nl": "Categorienaam *",
+    "ru": "Название категории *",
+    "tr": "Kategori Adı *"
+  },
+  "Change": {
+    "de": "Wechselgeld",
+    "nl": "Wisselgeld",
+    "ru": "Сдача",
+    "tr": "Para Üstü"
+  },
+  "Change Due": {
+    "de": "Fälliges Wechselgeld",
+    "nl": "Verschuldigd wisselgeld",
+    "ru": "Сдача клиенту",
+    "tr": "Verilecek Para Üstü"
+  },
+  "Change Due to Customer": {
+    "de": "Wechselgeld für den Kunden",
+    "nl": "Wisselgeld voor de klant",
+    "ru": "Сдача, причитающаяся клиенту",
+    "tr": "Müşteriye Verilecek Para Üstü"
+  },
+  "Changes apply immediately upon saving.": {
+    "de": "Änderungen werden sofort nach dem Speichern wirksam.",
+    "nl": "Wijzigingen worden direct na het opslaan toegepast.",
+    "ru": "Изменения вступают в силу сразу после сохранения.",
+    "tr": "Değişiklikler kaydedildikten hemen sonra uygulanır."
+  },
+  "Charge": {
+    "de": "Kassieren",
+    "nl": "Afrekenen",
+    "ru": "Оплатить",
+    "tr": "Tahsil Et"
+  },
+  "Choose Option": {
+    "de": "Option wählen",
+    "nl": "Kies optie",
+    "ru": "Выберите вариант",
+    "tr": "Seçenek Seçin"
+  },
+  "Choose a primary header & table theme color for Quotations and PDF Receipts": {
+    "de": "Wählen Sie eine primäre Kopf- & Tabellenfarbe für Angebote und PDF-Belege",
+    "nl": "Kies een primaire koptekst- en tabelkleur voor offertes en PDF-bonnen",
+    "ru": "Выберите основной цвет заголовков и таблиц для предложений и PDF-чеков",
+    "tr": "Teklifler ve PDF Makbuzları için birincil başlık ve tablo rengi seçin"
+  },
+  "Choose between General Retail POS vs Food & Restaurant Mode with strict UI & route isolation": {
+    "de": "Wählen Sie zwischen Einzelhandels-POS und Gastronomie-Modus mit getrennter Benutzeroberfläche",
+    "nl": "Kies tussen Algemene Detailhandel POS of Horeca-modus met strikte interface-isolatie",
+    "ru": "Выберите между розничной кассой POS и режимом ресторана с разделением интерфейса",
+    "tr": "Genel Perakende POS veya tam arayüz yalıtımlı Restoran Modu arasında seçim yapın"
+  },
+  "Choose dispatch channel, configure message body, and toggle PDF attachment": {
+    "de": "Versandkanal wählen, Nachrichtentext konfigurieren und PDF-Anhang einstellen",
+    "nl": "Kies verzendkanaal, configureer berichttekst en voeg PDF-bijlage toe",
+    "ru": "Выберите канал отправки, настройте текст сообщения и вложение PDF",
+    "tr": "Gönderim kanalını seçin, mesaj gövdesini yapılandırın ve PDF ekini ayarlayın"
+  },
+  "Choose the default interface style for your Point of Sale counter": {
+    "de": "Wählen Sie das Standard-Interface für Ihre POS-Kasse",
+    "nl": "Kies de standaard interfacestijl voor uw kassa",
+    "ru": "Выберите интерфейс по умолчанию для кассового узла POS",
+    "tr": "Satış Noktası kasanız için varsayılan arayüz stilini seçin"
+  },
+  "Choose your preferred register design before entering the Point of Sale terminal": {
+    "de": "Wählen Sie Ihr bevorzugtes Kassen-Design vor dem Öffnen des POS-Terminals",
+    "nl": "Kies uw gewenste kassaontwerp voordat u de POS-terminal opent",
+    "ru": "Выберите желаемый дизайн кассы перед входом в POS-терминал",
+    "tr": "Satış Noktası terminaline girmeden önce tercih ettiğiniz kasa tasarımını seçin"
+  },
+  "City": {
+    "de": "Stadt",
+    "nl": "Stad",
+    "ru": "Город",
+    "tr": "Şehir"
+  },
+  "City / Location": {
+    "de": "Stadt / Standort",
+    "nl": "Stad / Locatie",
+    "ru": "Город / Местоположение",
+    "tr": "Şehir / Konum"
+  },
+  "Clean photo tiles, top category tabs, discounts bar & quick-charge pill.": {
+    "de": "Übersichtliche Fotokacheln, obere Kategoriereiter, Rabattleiste & Schnellkassieren.",
+    "nl": "Overzichtelijke fototegels, categorietabbladen bovenaan, kortingsbalk & snel afrekenen.",
+    "ru": "Плитки с фото, верхние вкладки категорий, панель скидок и быстрая оплата.",
+    "tr": "Görsel karoları, üst kategori sekmeleri, indirim çubuğu ve hızlı tahsilat düğmesi."
+  },
+  "Clean photo-first tiles, Favorites / Library / Keypad tabs, discount presets & quick blue \"Charge\" pill.": {
+    "de": "Klare Fotokacheln, Reiter für Favoriten/Bibliothek/Ziffernblock, Rabattvorlagen & blaue \"Kassieren\"-Schaltfläche.",
+    "nl": "Duidelijke fototegels, tabbladen Favorieten/Bibliotheek/Toetsenbord, kortingsvoorinstellingen & blauwe \"Afrekenen\"-knop.",
+    "ru": "Плитки с фото, вкладки Избранное / Каталог / Клавиатура, пресеты скидок и кнопка «Оплатить».",
+    "tr": "Fotoğraflı karolar, Favoriler / Kütüphane / Tuş Takımı sekmeleri, hazır indirimler ve mavi \"Tahsil Et\" butonu."
+  },
+  "Clear All": {
+    "de": "Alles löschen",
+    "nl": "Alles wissen",
+    "ru": "Очистить всё",
+    "tr": "Tümünü Temizle"
+  },
+  "Clear Cart": {
+    "de": "Warenkorb leeren",
+    "nl": "Winkelwagen legen",
+    "ru": "Очистить корзину",
+    "tr": "Sepeti Temizle"
+  },
+  "Clear Filter": {
+    "de": "Filter zurücksetzen",
+    "nl": "Filter wissen",
+    "ru": "Сбросить фильтр",
+    "tr": "Filtreyi Temizle"
+  },
+  "Clear all items in this order?": {
+    "de": "Alle Artikel in dieser Bestellung löschen?",
+    "nl": "Alle artikelen in deze bestelling wissen?",
+    "ru": "Удалить все позиции из этого заказа?",
+    "tr": "Bu siparişteki tüm ürünler temizlensin mi?"
+  },
+  "Click any menu card on the left to add food.": {
+    "de": "Klicken Sie links auf eine Menükarte, um Speisen hinzuzufügen.",
+    "nl": "Klik links op een menukaart om gerechten toe te voegen.",
+    "ru": "Нажмите на любое блюдо слева, чтобы добавить его.",
+    "tr": "Yemek eklemek için soldaki herhangi bir menü kartına tıklayın."
+  },
+  "Click any table to immediately open POS and take order": {
+    "de": "Klicken Sie auf einen Tisch, um die Kasse zu öffnen und zu bestellen",
+    "nl": "Klik op een tafel om direct POS te openen en een bestelling op te nemen",
+    "ru": "Нажмите на любой столик, чтобы открыть POS и принять заказ",
+    "tr": "POS'u hemen açmak ve sipariş almak için herhangi bir masaya tıklayın"
+  },
+  "Click on any product to add it.": {
+    "de": "Klicken Sie auf ein Produkt, um es hinzuzufügen.",
+    "nl": "Klik op een product om het toe te voegen.",
+    "ru": "Нажмите на товар, чтобы добавить его.",
+    "tr": "Eklemek için herhangi bir ürüne tıklayın."
+  },
+  "Click to Insert Smart Placeholders:": {
+    "de": "Klicken, um intelligente Platzhalter einzufügen:",
+    "nl": "Klik om slimme tijdelijke aanduidingen in te voegen:",
+    "ru": "Нажмите, чтобы вставить умные плейсхолдеры:",
+    "tr": "Akıllı Yer Tutucuları Eklemek İçin Tıklayın:"
+  },
+  "Clicking proceed will securely launch the Razorpay checkout dialog supporting Cards, UPI, Netbanking, Google Pay, Apple Pay & Wallets.": {
+    "de": "Beim Fortfahren öffnet sich das sichere Razorpay-Zahlungsfenster für Karten, UPI, Netbanking, Google Pay, Apple Pay & Wallets.",
+    "nl": "Als u doorgaat, wordt het veilige Razorpay-betaalvenster geopend met ondersteuning voor kaarten, UPI, internetbankieren, Google Pay, Apple Pay en wallets.",
+    "ru": "При продолжении откроется безопасное окно оплаты Razorpay с поддержкой карт, UPI, онлайн-банкинга, Google Pay, Apple Pay и кошельков.",
+    "tr": "Devam ettiğinizde Kartlar, UPI, İnternet Bankacılığı, Google Pay, Apple Pay ve Cüzdanları destekleyen güvenli Razorpay ödeme penceresi açılır."
+  },
+  "Client": {
+    "de": "Kunde",
+    "nl": "Klant",
+    "ru": "Клиент",
+    "tr": "Müşteri"
+  },
+  "Client Name *": {
+    "de": "Kundenname *",
+    "nl": "Klantnaam *",
+    "ru": "Имя клиента *",
+    "tr": "Müşteri Adı *"
+  },
+  "Client:": {
+    "de": "Kunde:",
+    "nl": "Klant:",
+    "ru": "Клиент:",
+    "tr": "Müşteri:"
+  },
+  "Close": {
+    "de": "Schließen",
+    "nl": "Sluiten",
+    "ru": "Закрыть",
+    "tr": "Kapat"
+  },
+  "Close Register": {
+    "de": "Kasse schließen",
+    "nl": "Kassa sluiten",
+    "ru": "Закрыть смену / кассу",
+    "tr": "Kasayı Kapat"
+  },
+  "Close Register & Generate Z-Report": {
+    "de": "Kasse schließen & Z-Bericht erstellen",
+    "nl": "Kassa sluiten & Z-rapport genereren",
+    "ru": "Закрыть смену и сформировать Z-отчет",
+    "tr": "Kasayı Kapat ve Z Raporu Oluştur"
+  },
+  "Closed": {
+    "de": "Geschlossen",
+    "nl": "Gesloten",
+    "ru": "Закрыто",
+    "tr": "Kapalı"
+  },
+  "Closed By": {
+    "de": "Geschlossen von",
+    "nl": "Gesloten door",
+    "ru": "Закрыто (кем)",
+    "tr": "Kapatan"
+  },
+  "Closing Notes": {
+    "de": "Abschlussnotizen",
+    "nl": "Afsluitnotities",
+    "ru": "Примечания при закрытии",
+    "tr": "Kapanış Notları"
+  },
+  "Closing Notes (Optional)": {
+    "de": "Abschlussnotizen (Optional)",
+    "nl": "Afsluitnotities (Optioneel)",
+    "ru": "Примечания при закрытии (Необязательно)",
+    "tr": "Kapanış Notları (İsteğe Bağlı)"
+  },
+  "Cobalt Blue": {
+    "de": "Kobaltblau",
+    "nl": "Kobaltblauw",
+    "ru": "Кобальтово-синий",
+    "tr": "Kobalt Mavisi"
+  },
+  "Code": {
+    "de": "Code",
+    "nl": "Code",
+    "ru": "Код",
+    "tr": "Kod"
+  },
+  "Code / Key (Optional)": {
+    "de": "Code / Schlüssel (Optional)",
+    "nl": "Code / Sleutel (Optioneel)",
+    "ru": "Код / Ключ (Необязательно)",
+    "tr": "Kod / Anahtar (İsteğe Bağlı)"
+  },
+  "Code / SKU": {
+    "de": "Code / SKU",
+    "nl": "Code / SKU",
+    "ru": "Код / Артикул (SKU)",
+    "tr": "Kod / SKU"
+  },
+  "Code:": {
+    "de": "Code:",
+    "nl": "Code:",
+    "ru": "Код:",
+    "tr": "Kod:"
+  },
+  "Collect Pay": {
+    "de": "Zahlung einziehen",
+    "nl": "Betaling ontvangen",
+    "ru": "Принять оплату",
+    "tr": "Ödeme Al"
+  },
+  "Collected This Month": {
+    "de": "Diesen Monat eingenommen",
+    "nl": "Deze maand ontvangen",
+    "ru": "Собрано в этом месяце",
+    "tr": "Bu Ay Tahsil Edilen"
+  },
+  "Collection Amount ($)": {
+    "de": "Einnahmebetrag ($)",
+    "nl": "Incassobedrag ($)",
+    "ru": "Сумма сбора ($)",
+    "tr": "Tahsilat Tutarı ($)"
+  },
+  "Company / Store Name *": {
+    "de": "Firmen- / Shopname *",
+    "nl": "Bedrijfs- / Winkelnaam *",
+    "ru": "Название компании / магазина *",
+    "tr": "Şirket / Mağaza Adı *"
+  },
+  "Company mission card": {
+    "de": "Unternehmensleitbild-Karte",
+    "nl": "Bedrijfsmissiekaart",
+    "ru": "Карточка миссии компании",
+    "tr": "Şirket misyonu kartı"
+  },
+  "Complete & Print Receipt": {
+    "de": "Abschließen & Beleg drucken",
+    "nl": "Voltooien & bon afdrukken",
+    "ru": "Завершить и распечатать чек",
+    "tr": "Tamamla ve Fişi Yazdır"
+  },
+  "Complete Checkout": {
+    "de": "Kauf abschließen",
+    "nl": "Afrekenen voltooien",
+    "ru": "Завершить оформление",
+    "tr": "Ödemeyi Tamamla"
+  },
+  "Configure fine-grained read, write, edit, delete, and export permissions per module.": {
+    "de": "Detaillierte Lese-, Schreib-, Bearbeitungs-, Lösch- und Exportberechtigungen pro Modul konfigurieren.",
+    "nl": "Configureer gedetailleerde lees-, schrijf-, bewerk-, verwijder- en exportmachtigingen per module.",
+    "ru": "Настройте детальные права на чтение, запись, редактирование, удаление и экспорт для каждого модуля.",
+    "tr": "Her modül için ayrıntılı okuma, yazma, düzenleme, silme ve dışa aktarma izinlerini yapılandırın."
+  },
+  "Configure global checkout processors for tenant subscription billing and renewals": {
+    "de": "Globale Zahlungsanbieter für Mandantenabonnements und Verlängerungen konfigurieren",
+    "nl": "Configureer wereldwijde betalingsverwerkers voor tenant-abonnementen en verlengingen",
+    "ru": "Настройте глобальные платежные шлюзы для подписок клиентов и продлений",
+    "tr": "Kiracı abonelik faturalandırması ve yenilemeleri için küresel ödeme işlemcilerini yapılandırın"
+  },
+  "Configure outbound email delivery for sending invoices, quotations, and staff invitations": {
+    "de": "Ausgehenden E-Mail-Versand für Rechnungen, Angebote und Team-Einladungen konfigurieren",
+    "nl": "Configureer uitgaande e-mailbezorging voor het verzenden van facturen, offertes en personeelsuitnodigingen",
+    "ru": "Настройте отправку исходящей почты для счетов, предложений и приглашений сотрудников",
+    "tr": "Faturalar, teklifler ve personel davetleri göndermek için giden e-posta teslimatını yapılandırın"
+  },
+  "Configure schedule frequency and retention lifecycle for database snapshots": {
+    "de": "Zeitplan, Häufigkeit und Aufbewahrungsdauer für Datenbanksicherungen konfigurieren",
+    "nl": "Configureer de frequentie en bewaartermijn voor databasesnapshots",
+    "ru": "Настройте расписание, частоту и срок хранения резервных копий базы данных",
+    "tr": "Veritabanı anlık görüntüleri için zamanlama sıklığını ve saklama döngüsünü yapılandırın"
+  },
+  "Confirm & Complete Sale": {
+    "de": "Verkauf bestätigen & abschließen",
+    "nl": "Verkoop bevestigen & voltooien",
+    "ru": "Подтвердить и завершить продажу",
+    "tr": "Satışı Onayla ve Tamamla"
+  },
+  "Confirm Collection Receipt": {
+    "de": "Einnahmebeleg bestätigen",
+    "nl": "Ontvangstbewijs bevestigen",
+    "ru": "Подтвердить квитанцию о получении",
+    "tr": "Tahsilat Makbuzunu Onayla"
+  },
+  "Confirm Password": {
+    "de": "Passwort bestätigen",
+    "nl": "Wachtwoord bevestigen",
+    "ru": "Подтвердите пароль",
+    "tr": "Şifreyi Doğrula"
+  },
+  "Confirm Settlement Payment": {
+    "de": "Ausgleichszahlung bestätigen",
+    "nl": "Vereffeningsbetaling bevestigen",
+    "ru": "Подтвердить платеж взаиморасчета",
+    "tr": "Hesap Kapatma Ödemesini Onayla"
+  },
+  "Connecting Gateway...": {
+    "de": "Verbindung zum Gateway wird hergestellt...",
+    "nl": "Verbinding maken met gateway...",
+    "ru": "Подключение к платежному шлюзу...",
+    "tr": "Ödeme Ağ Geçidine Bağlanılıyor..."
+  },
+  "Contact": {
+    "de": "Kontakt",
+    "nl": "Contact",
+    "ru": "Контакты",
+    "tr": "İletişim"
+  },
+  "Contact Phone": {
+    "de": "Kontakttelefon",
+    "nl": "Contacttelefoon",
+    "ru": "Контактный телефон",
+    "tr": "İletişim Telefonu"
+  },
+  "Control Center": {
+    "de": "Kontrollzentrum",
+    "nl": "Controlecentrum",
+    "ru": "Центр управления",
+    "tr": "Kontrol Merkezi"
+  },
+  "Convert": {
+    "de": "Umwandeln",
+    "nl": "Converteren",
+    "ru": "Преобразовать",
+    "tr": "Dönüştür"
+  },
+  "Convert quote #": {
+    "de": "Angebot umwandeln #",
+    "nl": "Offerte converteren #",
+    "ru": "Преобразовать предложение №",
+    "tr": "Teklifi dönüştür #"
+  },
+  "Convert this quotation to an active Sale invoice and deduct inventory stock?": {
+    "de": "Dieses Angebot in eine aktive Verkaufsrechnung umwandeln und Lagerbestand abbuchen?",
+    "nl": "Deze offerte omzetten naar een actieve verkoopfactuur en voorraad afschrijven?",
+    "ru": "Преобразовать это предложение в активный счет продажи и списать товар со склада?",
+    "tr": "Bu teklif aktif bir Satış faturasına dönüştürülüp stoktan düşülsün mü?"
+  },
+  "Convert to Sale": {
+    "de": "In Verkauf umwandeln",
+    "nl": "Omzetten naar verkoop",
+    "ru": "Преобразовать в продажу",
+    "tr": "Satışa Dönüştür"
+  },
+  "Converted": {
+    "de": "Umgewandelt",
+    "nl": "Geconverteerd",
+    "ru": "Преобразовано",
+    "tr": "Dönüştürüldü"
+  },
+  "Cost Price ($) *": {
+    "de": "Einkaufspreis ($) *",
+    "nl": "Inkoopprijs ($) *",
+    "ru": "Себестоимость ($) *",
+    "tr": "Maliyet Fiyatı ($) *"
+  },
+  "Counted": {
+    "de": "Gezählt",
+    "nl": "Geteld",
+    "ru": "Подсчитано",
+    "tr": "Sayılan"
+  },
+  "Counted Cash": {
+    "de": "Gezähltes Bargeld",
+    "nl": "Geteld contant geld",
+    "ru": "Подсчитанная наличность",
+    "tr": "Sayılan Nakit"
+  },
+  "Counted Cash in Drawer ($)": {
+    "de": "Gezähltes Bargeld in der Kassenlade ($)",
+    "nl": "Geteld contant geld in kassalade ($)",
+    "ru": "Подсчитанные наличные в кассе ($)",
+    "tr": "Çekmecede Sayılan Nakit ($)"
+  },
+  "Counter Checkout": {
+    "de": "Theken-Kasse",
+    "nl": "Balie-kassa",
+    "ru": "Оплата на кассе",
+    "tr": "Kasa Ödemesi"
+  },
+  "Country (2-letter ISO)": {
+    "de": "Land (2-stelliger ISO-Code)",
+    "nl": "Land (2-letterige ISO)",
+    "ru": "Страна (2-буквенный ISO)",
+    "tr": "Ülke (2 harfli ISO)"
+  },
+  "Country (ISO 2-letter) *": {
+    "de": "Land (ISO 2-stellig) *",
+    "nl": "Land (ISO 2 letters) *",
+    "ru": "Страна (ISO 2-буквенный код) *",
+    "tr": "Ülke (ISO 2 harfli) *"
+  },
+  "Create & Generate Invite": {
+    "de": "Erstellen & Einladung generieren",
+    "nl": "Aanmaken & uitnodiging genereren",
+    "ru": "Создать и сгенерировать приглашение",
+    "tr": "Oluştur ve Davet Üret"
+  },
+  "Create New Subscription Plan": {
+    "de": "Neuen Abonnement-Plan erstellen",
+    "nl": "Nieuw abonnement aanmaken",
+    "ru": "Создать новый план подписки",
+    "tr": "Yeni Abonelik Planı Oluştur"
+  },
+  "Create Quotation": {
+    "de": "Angebot erstellen",
+    "nl": "Offerte aanmaken",
+    "ru": "Создать коммерческое предложение",
+    "tr": "Teklif Oluştur"
+  },
+  "Create Vendor Bill / Expense": {
+    "de": "Lieferantenrechnung / Ausgabe erfassen",
+    "nl": "Leveranciersfactuur / Uitgave aanmaken",
+    "ru": "Создать счет поставщика / расход",
+    "tr": "Tedarikçi Faturası / Masraf Oluştur"
+  },
+  "Create a public shareable digital menu or product showcase link": {
+    "de": "Erstellen Sie einen öffentlich teilbaren Link für digitale Speisekarten oder Produktkataloge",
+    "nl": "Maak een openbare deelbare link voor een digitaal menu of productoverzicht",
+    "ru": "Создайте общедоступную ссылку на цифровое меню или витрину товаров",
+    "tr": "Paylaşılabilir bir dijital menü veya ürün vitrini bağlantısı oluşturun"
+  },
+  "Create and initialize an isolated tenant store environment with initial admin account": {
+    "de": "Erstellen und initialisieren Sie eine isolierte Mandanten-Shop-Umgebung mit erstem Admin-Konto",
+    "nl": "Maak en initialiseer een geïsoleerde tenant-winkelomgeving met een eerste beheerdersaccount",
+    "ru": "Создайте и инициализируйте изолированную среду магазина с учетной записью первого администратора",
+    "tr": "İlk yönetici hesabıyla yalıtılmış bir kiracı mağaza ortamı oluşturun ve başlatın"
+  },
+  "Create formal quotations and convert them to sales in 1-click": {
+    "de": "Formelle Angebote erstellen und mit 1 Klick in Verkäufe umwandeln",
+    "nl": "Maak formele offertes en zet ze met 1 klik om in verkopen",
+    "ru": "Создавайте официальные коммерческие предложения и превращайте их в продажи в 1 клик",
+    "tr": "Resmi teklifler oluşturun ve bunları tek tıkla satışa dönüştürün"
+  },
+  "Created": {
+    "de": "Erstellt",
+    "nl": "Aangemaakt",
+    "ru": "Создано",
+    "tr": "Oluşturuldu"
+  },
+  "Credit / Receivable Sale:": {
+    "de": "Kredit- / Forderungsverkauf:",
+    "nl": "Krediet- / Debiteurenverkoop:",
+    "ru": "Продажа в кредит / под дебиторскую задолженность:",
+    "tr": "Kredili / Alacaklı Satış:"
+  }
+}

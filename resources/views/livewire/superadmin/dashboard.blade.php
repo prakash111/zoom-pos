@@ -1,88 +1,94 @@
 <div class="space-y-6">
     
-    <!-- Top Stats Cards Grid matching tenant dashboard -->
+    <!-- Top Stats Cards Grid (High-Impact KPI Stat Cards) -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         
         <!-- 1. Total Tenants -->
-        <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+        <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div class="absolute -top-6 -right-6 w-20 h-20 bg-gradient-to-br from-indigo-500/10 to-blue-500/0 rounded-full blur-xl pointer-events-none"></div>
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Total Stores</span>
-                <div class="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm font-bold">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Stores</span>
+                <div class="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm font-bold shadow-xs">
                     🏢
                 </div>
             </div>
-            <div class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-3">{{ $totalTenants }}</div>
+            <div class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white mt-3">{{ $totalTenants }}</div>
         </div>
 
         <!-- 2. Active Tenants -->
-        <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+        <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div class="absolute -top-6 -right-6 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-teal-500/0 rounded-full blur-xl pointer-events-none"></div>
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">Active</span>
-                <div class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm font-bold">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Active</span>
+                <div class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm font-bold shadow-xs">
                     ✓
                 </div>
             </div>
-            <div class="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-3">{{ $activeTenants }}</div>
+            <div class="text-2xl sm:text-3xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 mt-3">{{ $activeTenants }}</div>
         </div>
 
         <!-- 3. Suspended -->
-        <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+        <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div class="absolute -top-6 -right-6 w-20 h-20 bg-gradient-to-br from-rose-500/10 to-red-500/0 rounded-full blur-xl pointer-events-none"></div>
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-rose-500">Suspended</span>
-                <div class="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-sm font-bold">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-rose-500">Suspended</span>
+                <div class="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-sm font-bold shadow-xs">
                     ⛔
                 </div>
             </div>
-            <div class="text-2xl sm:text-3xl font-black text-rose-600 dark:text-rose-400 mt-3">{{ $suspendedTenants }}</div>
+            <div class="text-2xl sm:text-3xl font-black tracking-tight text-rose-600 dark:text-rose-400 mt-3">{{ $suspendedTenants }}</div>
         </div>
 
         <!-- 4. Expiring Soon -->
-        <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+        <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div class="absolute -top-6 -right-6 w-20 h-20 bg-gradient-to-br from-amber-500/10 to-orange-500/0 rounded-full blur-xl pointer-events-none"></div>
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-amber-500">Expiring (30d)</span>
-                <div class="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-sm font-bold">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-amber-500">Expiring (30d)</span>
+                <div class="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-sm font-bold shadow-xs">
                     ⏳
                 </div>
             </div>
-            <div class="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400 mt-3">{{ $expiringSoon }}</div>
+            <div class="text-2xl sm:text-3xl font-black tracking-tight text-amber-600 dark:text-amber-400 mt-3">{{ $expiringSoon }}</div>
         </div>
 
         <!-- 5. Total Users -->
-        <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+        <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div class="absolute -top-6 -right-6 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-indigo-500/0 rounded-full blur-xl pointer-events-none"></div>
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Total Users</span>
-                <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Users</span>
+                <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold shadow-xs">
                     👥
                 </div>
             </div>
-            <div class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-3">{{ $totalUsers }}</div>
+            <div class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white mt-3">{{ $totalUsers }}</div>
         </div>
 
         <!-- 6. License Keys -->
-        <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+        <div class="relative overflow-hidden bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div class="absolute -top-6 -right-6 w-20 h-20 bg-gradient-to-br from-purple-500/10 to-violet-500/0 rounded-full blur-xl pointer-events-none"></div>
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-purple-600 dark:text-purple-400">License Keys</span>
-                <div class="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center text-sm font-bold">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">License Keys</span>
+                <div class="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center text-sm font-bold shadow-xs">
                     🔑
                 </div>
             </div>
-            <div class="text-2xl sm:text-3xl font-black text-purple-600 dark:text-purple-400 mt-3">{{ $activationCodesAvailable }}</div>
+            <div class="text-2xl sm:text-3xl font-black tracking-tight text-purple-600 dark:text-purple-400 mt-3">{{ $activationCodesAvailable }}</div>
         </div>
 
     </div>
 
     <!-- Quick Action Launch Bar -->
     <div class="flex flex-wrap items-center gap-3">
-        <a href="{{ route('superadmin.tenants.create') }}" class="px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-indigo-500/25 active:scale-95 transition flex items-center gap-2">
+        <a wire:navigate.hover href="{{ route('superadmin.tenants.create') }}" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 via-blue-600 to-indigo-700 hover:from-indigo-500 hover:via-blue-500 hover:to-indigo-600 text-white font-extrabold text-xs shadow-md shadow-indigo-500/20 active:scale-[0.97] transition duration-150 ease-out flex items-center gap-2">
             <span>➕ Provision New Store</span>
         </a>
-        <a href="{{ route('superadmin.activation-codes.index') }}" class="px-5 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold text-xs shadow-xs active:scale-95 transition flex items-center gap-2">
+        <a wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}" class="px-5 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold text-xs shadow-xs active:scale-[0.97] transition duration-150 ease-out flex items-center gap-2">
             <span>🔑 Generate License Keys</span>
         </a>
-        <a href="{{ route('superadmin.plans.index') }}" class="px-5 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold text-xs shadow-xs active:scale-95 transition flex items-center gap-2">
+        <a wire:navigate.hover href="{{ route('superadmin.plans.index') }}" class="px-5 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold text-xs shadow-xs active:scale-[0.97] transition duration-150 ease-out flex items-center gap-2">
             <span>💳 Manage Pricing Plans</span>
         </a>
-        <a href="{{ route('superadmin.smtp.index') }}" class="px-5 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold text-xs shadow-xs active:scale-95 transition flex items-center gap-2">
+        <a wire:navigate.hover href="{{ route('superadmin.smtp.index') }}" class="px-5 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold text-xs shadow-xs active:scale-[0.97] transition duration-150 ease-out flex items-center gap-2">
             <span>✉️ SMTP & Email Server</span>
         </a>
     </div>
@@ -94,8 +100,8 @@
                 <h3 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">Recently Provisioned Stores</h3>
                 <p class="text-xs text-slate-400">Latest tenant accounts and live subscription status</p>
             </div>
-            <a href="{{ route('superadmin.tenants.index') }}" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
-                View All Stores &rarr;
+            <a wire:navigate.hover href="{{ route('superadmin.tenants.index') }}" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
+                {{ __("View All Stores") }} &rarr;
             </a>
         </div>
 
@@ -146,8 +152,8 @@
                             </td>
 
                             <td class="px-6 py-4 text-right">
-                                <a href="{{ route('superadmin.tenants.show', $tenant) }}" class="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 font-extrabold text-xs transition">
-                                    Manage &rarr;
+                                <a wire:navigate.hover href="{{ route('superadmin.tenants.show', $tenant) }}" class="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 font-extrabold text-xs transition">
+                                    {{ __("Manage") }} &rarr;
                                 </a>
                             </td>
                         </tr>

@@ -30,6 +30,34 @@
                 </div>
             @endif
 
+            @if (config('app.demo_mode'))
+                <!-- Demo Mode Visual Notification Badge -->
+                <div class="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs flex items-center justify-between shadow-sm">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-lg">⚡</span>
+                        <div>
+                            <span class="font-extrabold text-indigo-200 uppercase tracking-wider text-[10px] block">{{ __('Demo Mode Active') }}</span>
+                            <span class="text-[11px] text-indigo-300/90">{{ __('Super Admin credentials pre-filled for instant testing') }}</span>
+                        </div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full bg-indigo-400/20 text-indigo-200 text-[10px] font-mono font-bold">1-Click</span>
+                </div>
+
+                <!-- Quick Demo Account Pill -->
+                <div class="space-y-1.5">
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">{{ __('Quick Demo Credentials (1-Click Fill)') }}</label>
+                    <button type="button"
+                            wire:click="fillDemo('superadmin')"
+                            class="w-full p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-left transition flex items-center gap-2.5 cursor-pointer group active:scale-95">
+                        <span class="w-7 h-7 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-sm font-bold shrink-0">🛡️</span>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-xs font-bold text-white group-hover:text-indigo-300 truncate">{{ __('Super Administrator') }}</div>
+                            <div class="text-[10px] text-slate-400 truncate">superadmin@gmail.com &bull; password123</div>
+                        </div>
+                    </button>
+                </div>
+            @endif
+
             <!-- Form Inputs -->
             <div class="space-y-4">
                 

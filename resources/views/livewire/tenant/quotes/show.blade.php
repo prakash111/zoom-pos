@@ -11,9 +11,15 @@
     $lightBg = sprintf('rgba(%d, %d, %d, 0.08)', $r, $g, $b);
     $mediumBg = sprintf('rgba(%d, %d, %d, 0.16)', $r, $g, $b);
     $borderTint = sprintf('rgba(%d, %d, %d, 0.22)', $r, $g, $b);
+    $quoteTaxRows = \App\Services\TaxEngineService::normalizeTaxBreakdown($quote->tax_breakdown);
+    $appliedTaxRuleName = $quoteTaxRows[0]['name'] ?? $quote->tax_name;
+    $taxIdentifierLabel = \App\Services\TaxEngineService::getTaxIdentifierLabel($company?->country, $appliedTaxRuleName);
+    $customerTaxNumber = $quote->customer?->tax_id ?: ($quote->customer?->gstin ?: $quote->customer?->document);
 @endphp
 
-<div class="max-w-4xl mx-auto space-y-6">
+<div class="max-w-4xl mx-auto space-y-6"
+     x-data
+     x-on:open-print-preview.window="window.open($event.detail.url, '_blank')">
     @if (session('status'))
         <div class="px-5 py-3.5 rounded-2xl bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 text-xs sm:text-sm font-bold flex items-center gap-2.5 shadow-sm border border-emerald-100 dark:border-emerald-900/50">
             <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -46,10 +52,10 @@
                     ])>{{ $quote->status }}</span>
                 </div>
                 <div class="text-xs text-slate-400 mt-0.5">
-                    Client: <strong class="text-slate-700 dark:text-slate-300 font-bold">{{ $quote->customer_name }}</strong> &bull;
-                    Created {{ $quote->created_at ? $quote->created_at->format('M d, Y') : now()->format('M d, Y') }}
+                    {{ __("Client:") }} <strong class="text-slate-700 dark:text-slate-300 font-bold">{{ $quote->customer_name }}</strong> &bull;
+                    {{ __("Created") }} {{ $quote->created_at ? $quote->created_at->format('M d, Y') : now()->format('M d, Y') }}
                     @if ($quote->user)
-                        &bull; Rep: <span class="text-slate-600 dark:text-slate-400 font-semibold">{{ $quote->user->name }}</span>
+                        &bull; {{ __("Rep:") }} <span class="text-slate-600 dark:text-slate-400 font-semibold">{{ $quote->user->name }}</span>
                     @endif
                 </div>
             </div>
@@ -59,26 +65,49 @@
         <div class="flex flex-wrap items-center gap-2">
             <!-- Edit Button -->
             @if ($quote->status !== 'converted')
-                <a href="{{ route('tenant.quotes.edit', $quote) }}"
+                <a wire:navigate.hover href="{{ route('tenant.quotes.edit', $quote) }}"
                    class="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm flex items-center gap-1.5 transition active:scale-95">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                    <span>Edit</span>
+                    <span>{{ __("Edit") }}</span>
                 </a>
             @endif
 
+            @if ($this->desktopPrintReady)
+                <button type="button"
+                        wire:click="printNow"
+                        wire:loading.attr="disabled"
+                        class="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm flex items-center gap-1.5 transition active:scale-95">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z" /></svg>
+                    <span>{{ __("Print") }}</span>
+                </button>
+            @endif
+
             <!-- Preview PDF in Browser -->
-            <a href="{{ route('tenant.quotes.pdf', $quote) }}"
+            <a href="{{ route('tenant.quotes.pdf', ['quote' => $quote->id, 'download' => 0]) }}"
                target="_blank"
+               rel="noopener noreferrer"
+               data-turbo="false"
                class="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm flex items-center gap-1.5 transition active:scale-95">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                <span>Preview</span>
+                <span>{{ __("Preview") }}</span>
             </a>
 
             <!-- Download Official PDF -->
-            <a href="{{ route('tenant.quotes.pdf', $quote) }}?download=1"
+            <a href="{{ route('tenant.quotes.pdf', ['quote' => $quote->id, 'download' => 1]) }}"
+               download="Quotation_{{ $quote->sale_number }}.pdf"
+               data-turbo="false"
                class="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm flex items-center gap-1.5 transition active:scale-95">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                <span>Download PDF</span>
+                <span>{{ __("Download PDF") }}</span>
+            </a>
+
+            <!-- 80mm Thermal Receipt Print -->
+            <a href="{{ route('tenant.quotes.pdf', ['quote' => $quote->id, 'format' => '80mm']) }}"
+               target="_blank"
+               rel="noopener noreferrer"
+               data-turbo="false"
+               class="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm flex items-center gap-1.5 transition active:scale-95">
+                <span>🖨️ {{ __("80mm Thermal") }}</span>
             </a>
 
             <!-- WhatsApp Modal Button -->
@@ -86,7 +115,7 @@
                     wire:click="openSendModal('whatsapp')"
                     class="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.275.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.158.57 4.184 1.564 5.941l-1.657 6.059 6.223-1.632c1.705.932 3.654 1.465 5.73 1.465 6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
-                <span>WhatsApp</span>
+                <span>{{ __("WhatsApp") }}</span>
             </button>
 
             <!-- Send Email Modal Button -->
@@ -94,17 +123,23 @@
                     wire:click="openSendModal('email')"
                     class="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                <span>Send Email</span>
+                <span>{{ __("Send Email") }}</span>
             </button>
 
             <!-- High-Contrast Convert to Sale Action Button -->
-            @if ($quote->status !== 'converted')
+            @if ($quote->status !== 'converted' && auth('web')->user()?->hasPermission('quotes', 'convert_to_sale'))
+                <button type="button"
+                        wire:click="openInPos"
+                        class="px-3.5 py-2.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
+                    <span>🛒 {{ __("Open in POS") }}</span>
+                </button>
+
                 <button type="button"
                         wire:click="convertToSale"
-                        wire:confirm="Convert this quotation to an active Sale invoice and deduct inventory stock?"
+                        wire:confirm="{{ __("Convert this quotation to an active Sale invoice and deduct inventory stock?") }}"
                         class="px-4 py-2.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30 flex items-center gap-1.5 transition active:scale-95 cursor-pointer border border-emerald-500/40">
                     <svg class="w-4 h-4 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span class="text-white font-black tracking-wide">Convert to Sale</span>
+                    <span class="text-white font-black tracking-wide">{{ __("Direct Convert to Sale") }}</span>
                 </button>
             @endif
         </div>
@@ -118,8 +153,8 @@
                 <div class="flex items-center gap-2">
                     <span class="p-2 rounded-xl text-lg font-black" style="background-color: {{ $lightBg }}; color: {{ $primaryColor }};">📋</span>
                     <div>
-                        <h3 class="font-black text-sm text-slate-900 dark:text-white">Send Quotation Proposal #{{ $quote->sale_number }}</h3>
-                        <p class="text-xs text-slate-400">Choose dispatch channel, configure message body, and toggle PDF attachment</p>
+                        <h3 class="font-black text-sm text-slate-900 dark:text-white">{{ __("Send Quotation Proposal #") }}{{ $quote->sale_number }}</h3>
+                        <p class="text-xs text-slate-400">{{ __("Choose dispatch channel, configure message body, and toggle PDF attachment") }}</p>
                     </div>
                 </div>
                 <button type="button" wire:click="$set('showSendModal', false)" class="text-slate-400 hover:text-slate-600 text-lg font-bold cursor-pointer">&times;</button>
@@ -135,7 +170,7 @@
                             'text-slate-600 dark:text-slate-400 hover:text-slate-900' => $activeChannel !== 'email',
                         ])>
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                    <span>Email Dispatch (SMTP)</span>
+                    <span>{{ __("Email Dispatch (SMTP)") }}</span>
                 </button>
 
                 <button type="button"
@@ -146,7 +181,7 @@
                             'text-slate-600 dark:text-slate-400 hover:text-slate-900' => $activeChannel !== 'whatsapp',
                         ])>
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.275.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.158.57 4.184 1.564 5.941l-1.657 6.059 6.223-1.632c1.705.932 3.654 1.465 5.73 1.465 6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
-                    <span>WhatsApp Web / Mobile</span>
+                    <span>{{ __("WhatsApp Web / Mobile") }}</span>
                 </button>
             </div>
 
@@ -154,13 +189,13 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 @if ($activeChannel === 'email')
                     <div class="space-y-1.5 col-span-2">
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Recipient Email Address <span class="text-rose-500">*</span></label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Recipient Email Address") }} <span class="text-rose-500">*</span></label>
                         <input type="email" wire:model="recipientEmail" placeholder="client@example.com" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
                         @error('recipientEmail') <p class="text-rose-600 text-xs">{{ $message }}</p> @enderror
                     </div>
                 @else
                     <div class="space-y-1.5 col-span-2">
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Recipient WhatsApp Phone Number (with Country Code)</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Recipient WhatsApp Phone Number (with Country Code)") }}</label>
                         <input type="text" wire:model.live="recipientPhone" placeholder="+1234567890" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-emerald-500">
                     </div>
                 @endif
@@ -171,14 +206,14 @@
                 <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-4">
                     <div class="space-y-0.5">
                         <div class="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
-                            <span>Attach Official PDF Document</span>
+                            <span>{{ __("Attach Official PDF Document") }}</span>
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-mono"
                                   style="background-color: {{ $lightBg }}; color: {{ $primaryColor }};">
                                 Quotation-{{ $quote->sale_number }}.pdf
                             </span>
                         </div>
                         <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                            {{ $attachPdf ? 'Generates and attaches clean stylized proposal PDF.' : 'Disabled — sends clean structured text email only.' }}
+                            {{ $attachPdf ? __('Generates and attaches clean stylized proposal PDF.') : __('Disabled — sends clean structured text email only.') }}
                         </p>
                     </div>
 
@@ -203,9 +238,9 @@
             <!-- Customizable Text Message Body -->
             <div class="space-y-2">
                 <div class="flex items-center justify-between">
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Customizable Text Message Body</label>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Customizable Text Message Body") }}</label>
                     <button type="button" wire:click="resetMessage" class="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
-                        ↺ Reset Template
+                        ↺ {{ __("Reset Template") }}
                     </button>
                 </div>
 
@@ -213,7 +248,7 @@
 
                 <!-- Smart Placeholders Helper Chips -->
                 <div class="space-y-1">
-                    <div class="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Click to Insert Smart Placeholders:</div>
+                    <div class="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">{{ __("Click to Insert Smart Placeholders:") }}</div>
                     <div class="flex flex-wrap gap-1.5">
                         @foreach (['{customer_name}', '{document_number}', '{total_amount}', '{expiry_date}', '{download_link}', '{company_name}'] as $tag)
                             <button type="button"
@@ -240,7 +275,15 @@
                             wire:loading.attr="disabled"
                             class="px-6 py-2.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer">
                         <svg wire:loading class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-                        <span>Send Quotation Email</span>
+                        <span>{{ __("Send Quotation Email") }}</span>
+                    </button>
+                @elseif ($this->whatsAppApiConfigured)
+                    <button type="button"
+                            wire:click="sendWhatsApp"
+                            wire:loading.attr="disabled"
+                            class="px-6 py-2.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+                        <svg wire:loading class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                        <span>{{ __("Send via WhatsApp") }}</span>
                     </button>
                 @else
                     <a href="{{ $this->whatsAppUrl }}"
@@ -248,7 +291,7 @@
                        wire:click="trackWhatsAppSent"
                        class="px-6 py-2.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.275.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.158.57 4.184 1.564 5.941l-1.657 6.059 6.223-1.632c1.705.932 3.654 1.465 5.73 1.465 6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
-                        <span>Open WhatsApp & Send</span>
+                        <span>{{ __("Open WhatsApp & Send") }}</span>
                     </a>
                 @endif
             </div>
@@ -277,27 +320,39 @@
                         {{ $company->city }}{{ $company->state ? ', ' . $company->state : '' }} {{ $company->postal_code }}<br>
                     @endif
                     @if ($company?->tax_id)
-                        <span class="font-semibold">{{ $company->tax_id_label ?: 'Tax ID' }}: {{ $company->tax_id }}</span>
+                        <span class="font-semibold">{{ $taxIdentifierLabel }}: {{ $company->tax_id }}</span>
                     @endif
                 </div>
             </div>
 
             <div class="text-right text-xs space-y-1.5 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 min-w-[220px]">
                 <div class="flex justify-between gap-4">
-                    <span class="font-bold text-slate-400 uppercase">Quote No:</span>
+                    <span class="font-bold text-slate-400 uppercase">{{ __("Quote No:") }}</span>
                     <strong class="font-mono font-black" style="color: {{ $primaryColor }};">{{ $quote->sale_number }}</strong>
                 </div>
                 <div class="flex justify-between gap-4">
-                    <span class="font-bold text-slate-400 uppercase">Date:</span>
+                    <span class="font-bold text-slate-400 uppercase">{{ __("Date:") }}</span>
                     <strong class="text-slate-800 dark:text-white">{{ $quote->created_at ? $quote->created_at->format('d/m/Y') : now()->format('d/m/Y') }}</strong>
                 </div>
                 <div class="flex justify-between gap-4">
-                    <span class="font-bold text-slate-400 uppercase">Valid Until:</span>
+                    <span class="font-bold text-slate-400 uppercase">{{ __("Valid Until:") }}</span>
                     <strong class="text-slate-800 dark:text-white">{{ $quote->due_date ? $quote->due_date->format('d/m/Y') : ($quote->created_at ? $quote->created_at->addDays(15)->format('d/m/Y') : now()->addDays(15)->format('d/m/Y')) }}</strong>
                 </div>
+                @if ($quote->agreed_payment_method || $quote->payment_method)
+                    <div class="flex justify-between gap-4">
+                        <span class="font-bold text-slate-400 uppercase">{{ __("Payment:") }}</span>
+                        <strong class="text-blue-600 dark:text-blue-400 uppercase font-black">{{ $quote->agreed_payment_method ?: $quote->payment_method }}</strong>
+                    </div>
+                @endif
+                @if ($quote->payment_terms)
+                    <div class="flex justify-between gap-4">
+                        <span class="font-bold text-slate-400 uppercase">{{ __("Terms:") }}</span>
+                        <strong class="text-slate-800 dark:text-white">{{ $quote->payment_terms }}</strong>
+                    </div>
+                @endif
                 @if ($quote->user)
                     <div class="flex justify-between gap-4 pt-1 border-t border-slate-200 dark:border-slate-700">
-                        <span class="font-bold text-slate-400 uppercase">Prepared By:</span>
+                        <span class="font-bold text-slate-400 uppercase">{{ __("Prepared By:") }}</span>
                         <strong class="text-slate-800 dark:text-white">{{ $quote->user->name }}</strong>
                     </div>
                 @endif
@@ -309,29 +364,29 @@
              style="background-color: {{ $lightBg }}; border: 1px solid {{ $borderTint }};">
             <div class="space-y-1">
                 <div class="text-[10px] font-extrabold uppercase tracking-wider" style="color: {{ $primaryColor }};">
-                    PROPOSAL PREPARED FOR:
+                    {{ __("PROPOSAL PREPARED FOR:") }}
                 </div>
                 <div class="text-base font-black text-slate-900 dark:text-white">
                     {{ $quote->customer_name }}
                 </div>
                 @if ($quote->customer?->phone)
                     <div class="text-xs text-slate-600 dark:text-slate-300">
-                        <span class="font-bold">Phone:</span> {{ $quote->customer->phone }}
+                        <span class="font-bold">{{ __("Phone:") }}</span> {{ $quote->customer->phone }}
                     </div>
                 @endif
                 @if ($quote->customer?->email)
                     <div class="text-xs text-slate-600 dark:text-slate-300">
-                        <span class="font-bold">Email:</span> {{ $quote->customer->email }}
+                        <span class="font-bold">{{ __("Email:") }}</span> {{ $quote->customer->email }}
                     </div>
                 @endif
                 @if ($quote->customer?->address || $quote->customer?->city)
                     <div class="text-xs text-slate-600 dark:text-slate-300">
-                        <span class="font-bold">Address:</span> {{ $quote->customer->address ? $quote->customer->address . ', ' : '' }}{{ $quote->customer->city }}{{ $quote->customer->state ? ' ' . $quote->customer->state : '' }}
+                        <span class="font-bold">{{ __("Address:") }}</span> {{ $quote->customer->address ? $quote->customer->address . ', ' : '' }}{{ $quote->customer->city }}{{ $quote->customer->state ? ' ' . $quote->customer->state : '' }}
                     </div>
                 @endif
-                @if ($quote->customer?->document)
+                @if ($customerTaxNumber)
                     <div class="text-xs text-slate-600 dark:text-slate-300">
-                        <span class="font-bold">{{ $quote->customer->tax_id_label ?: 'Tax ID / VAT' }}:</span> {{ $quote->customer->document }}
+                        <span class="font-bold">{{ $taxIdentifierLabel }}:</span> {{ $customerTaxNumber }}
                     </div>
                 @endif
             </div>
@@ -341,10 +396,10 @@
         <div>
             <div class="rounded-xl px-6 py-3.5 flex justify-between font-extrabold text-xs uppercase tracking-wider shadow-xs"
                  style="background-color: {{ $primaryColor }}; color: #ffffff;">
-                <div class="flex-1">Item & Scope Description</div>
-                <div class="w-16 text-center">Qty</div>
-                <div class="w-24 text-right">Price</div>
-                <div class="w-24 text-right">Total</div>
+                <div class="flex-1">{{ __("Item & Scope Description") }}</div>
+                <div class="w-16 text-center">{{ __("Qty") }}</div>
+                <div class="w-24 text-right">{{ __("Price") }}</div>
+                <div class="w-24 text-right">{{ __("Total") }}</div>
             </div>
 
             <div class="rounded-2xl p-6 mt-2 space-y-3"
@@ -374,25 +429,40 @@
 
                 <div class="flex flex-col items-end gap-1.5 text-xs sm:text-sm">
                     <div class="flex justify-between w-64 text-slate-600 dark:text-slate-300 font-bold">
-                        <span>SUB TOTAL</span>
+                        <span>{{ __("SUB TOTAL") }}</span>
                         <span>${{ number_format($subtotal, 2) }}</span>
                     </div>
                     @if ($quote->discount > 0)
                         <div class="flex justify-between w-64 text-rose-600 font-bold">
-                            <span>DISCOUNT</span>
+                            <span>{{ __("DISCOUNT") }}</span>
                             <span>-${{ number_format($quote->discount, 2) }}</span>
                         </div>
                     @endif
                     @php
-                        $taxCalculated = max(0, $quote->total - $subtotal + $quote->discount);
+                        $flattenedTaxes = $quote->flattened_tax_components;
+                        $taxCalculated = (float)($quote->tax_amount ?? max(0, $quote->total - $subtotal + $quote->discount));
+                        if ($taxCalculated <= 0 && !empty($flattenedTaxes)) {
+                            $taxCalculated = array_sum(array_column($flattenedTaxes, 'amount'));
+                        }
                     @endphp
-                    <div class="flex justify-between w-64 text-slate-600 dark:text-slate-300 font-bold">
-                        <span>TAX ESTIMATE</span>
-                        <span>${{ number_format($taxCalculated, 2) }}</span>
-                    </div>
+                    @if ($taxCalculated > 0 || !empty($flattenedTaxes))
+                        @if (!empty($flattenedTaxes))
+                            @foreach ($flattenedTaxes as $tComp)
+                                <div class="flex justify-between w-64 text-slate-600 dark:text-slate-300 font-bold text-xs">
+                                    <span>{{ $tComp['name'] }} ({{ $tComp['rate'] }}%)</span>
+                                    <span>+${{ number_format($tComp['amount'], 2) }}</span>
+                                </div>
+                            @endforeach
+                        @else
+                            <div class="flex justify-between w-64 text-slate-600 dark:text-slate-300 font-bold text-xs">
+                                <span>{{ $quote->tax_name ?: __('TAX ESTIMATE') }} ({{ (float)($quote->tax_rate ?? 0) }}%)</span>
+                                <span>+${{ number_format($taxCalculated, 2) }}</span>
+                            </div>
+                        @endif
+                    @endif
                     <div class="flex justify-between w-64 text-base font-black pt-2 border-t"
                          style="border-color: {{ $borderTint }};">
-                        <span>GRAND TOTAL</span>
+                        <span>{{ __("GRAND TOTAL") }}</span>
                         <span class="text-xl" style="color: {{ $primaryColor }};">${{ number_format($quote->total, 2) }}</span>
                     </div>
                 </div>
@@ -403,8 +473,8 @@
         @if (!empty($quote->notes))
             <div class="rounded-2xl p-6 text-xs space-y-1"
                  style="background-color: {{ $lightBg }}; border: 1px solid {{ $borderTint }};">
-                <div class="font-black text-sm mb-1" style="color: {{ $primaryColor }};">Quote Terms & Notes</div>
-                <div class="text-slate-600 dark:text-slate-300 leading-relaxed prose prose-sm dark:prose-invert max-w-none">{!! $quote->notes !!}</div>
+                <div class="font-black text-sm mb-1" style="color: {{ $primaryColor }};">{{ __("Quote Terms & Notes") }}</div>
+                <div class="text-slate-600 dark:text-slate-300 leading-relaxed prose prose-sm dark:prose-invert max-w-none">{!! clean_html($quote->notes) !!}</div>
             </div>
         @endif
 
@@ -413,31 +483,31 @@
             <div class="rounded-2xl p-6 text-xs space-y-3"
                  style="background-color: {{ $lightBg }}; border: 1px solid {{ $borderTint }};">
                 <div>
-                    <div class="font-black text-sm mb-1" style="color: {{ $primaryColor }};">Payable To</div>
+                    <div class="font-black text-sm mb-1" style="color: {{ $primaryColor }};">{{ __("Payable To") }}</div>
                     <div class="text-slate-600 dark:text-slate-300">
                         <strong>{{ $company?->trade_name ?? $company?->name }}</strong><br>
                         {{ $company?->address ?? '123 Anywhere St., Any City' }}
                     </div>
                 </div>
                 <div>
-                    <div class="font-black text-sm mb-1" style="color: {{ $primaryColor }};">Bank & Payment Instructions</div>
+                    <div class="font-black text-sm mb-1" style="color: {{ $primaryColor }};">{{ __("Bank & Payment Instructions") }}</div>
                     <div class="text-slate-600 dark:text-slate-300 leading-relaxed">
-                        {!! $company?->bank_details ?? ($company?->name . '<br>Phone: ' . ($company?->phone ?? '+123-456-7890')) !!}
+                        {!! clean_html($company?->bank_details ?? ($company?->name . '<br>Phone: ' . ($company?->phone ?? '+123-456-7890'))) !!}
                     </div>
                 </div>
             </div>
 
             <div class="rounded-2xl p-6 text-xs space-y-2"
                  style="background-color: {{ $lightBg }}; border: 1px solid {{ $borderTint }};">
-                <div class="font-black text-sm mb-1" style="color: {{ $primaryColor }};">Terms and Conditions:</div>
+                <div class="font-black text-sm mb-1" style="color: {{ $primaryColor }};">{{ __("Terms and Conditions:") }}</div>
                 <div class="text-slate-600 dark:text-slate-300 leading-relaxed prose prose-sm dark:prose-invert max-w-none">
                     @if (!empty($company?->quote_terms))
-                        {!! $company->quote_terms !!}
+                        {!! clean_html($company->quote_terms) !!}
                     @else
                         <ul class="list-disc pl-4 space-y-1.5">
-                            <li>All rates quoted are valid for 15 days from issue date.</li>
-                            <li>40% advance milestone required upon quotation acceptance.</li>
-                            <li>The remaining balance is payable upon delivery/project completion.</li>
+                            <li>{{ __("All rates quoted are valid for 15 days from issue date.") }}</li>
+                            <li>{{ __("40% advance milestone required upon quotation acceptance.") }}</li>
+                            <li>{{ __("The remaining balance is payable upon delivery/project completion.") }}</li>
                         </ul>
                     @endif
                 </div>

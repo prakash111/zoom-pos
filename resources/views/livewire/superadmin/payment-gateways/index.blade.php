@@ -8,11 +8,11 @@
     @endif
 
     <div class="border-b border-slate-200 dark:border-slate-800 pb-2">
-        <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white">Platform Payment Gateways</h3>
-        <p class="text-xs text-slate-400">Configure global checkout processors for tenant subscription billing and renewals</p>
+        <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white">{{ __("Platform Payment Gateways") }}</h3>
+        <p class="text-xs text-slate-400">{{ __("Configure global checkout processors for tenant subscription billing and renewals") }}</p>
     </div>
 
-    @foreach (['stripe' => ['Stripe Payments', '💳', 'Instant Card & Wallet Processing'], 'paypal' => ['PayPal Commerce', '🅿️', 'Global Express Checkout'], 'razorpay' => ['Razorpay Gateway', '⚡', 'UPI, Cards & NetBanking']] as $key => [$label, $icon, $desc])
+    @foreach (['stripe' => ['Stripe Payments', '💳', 'Instant Card & Wallet Processing'], 'paypal' => ['PayPal Commerce', '🅿️', 'Global Express Checkout'], 'razorpay' => ['Razorpay Gateway', '⚡', 'UPI, Cards & NetBanking'], 'mercadopago' => ['Mercado Pago', '🟦', 'Latin America cards, PIX and wallets']] as $key => [$label, $icon, $desc])
         <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-5">
             <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div class="flex items-center gap-3">
@@ -33,15 +33,15 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Operating Mode</label>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Operating Mode") }}</label>
                     <select wire:model="gateways.{{ $key }}.mode" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
-                        <option value="test">Sandbox / Test Mode</option>
-                        <option value="live">Production / Live Mode</option>
+                        <option value="test">{{ __("Sandbox / Test Mode") }}</option>
+                        <option value="live">{{ __("Production / Live Mode") }}</option>
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Public / Publishable API Key</label>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Public / Publishable API Key") }}</label>
                     <input type="text" wire:model="gateways.{{ $key }}.public_key" placeholder="pk_test_..." class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500 font-mono">
                 </div>
 
@@ -49,7 +49,7 @@
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
                         <span>Secret Key / Access Token</span>
                         @if ($this->hasStoredSecret($key))
-                            <span class="text-[10px] text-emerald-600 font-normal">● Saved securely</span>
+                            <span class="text-[10px] text-emerald-600 font-normal">● {{ __("Saved securely") }}</span>
                         @endif
                     </label>
                     <input type="password" wire:model="gateways.{{ $key }}.secret_key"
@@ -62,7 +62,7 @@
 
     <div class="flex justify-end pt-2">
         <button wire:click="save" type="button" class="px-6 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/25 active:scale-95 transition cursor-pointer">
-            Save Gateway Settings
+            {{ __('Save Gateway Settings') }}
         </button>
     </div>
 

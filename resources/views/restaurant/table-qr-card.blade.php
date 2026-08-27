@@ -114,7 +114,7 @@
 <body>
 
     <div class="no-print-bar">
-        <strong>Stand: {{ $table->table_number }}</strong>
+        <strong>{{ __("Stand:") }} {{ $table->table_number }}</strong>
         <button onclick="window.print()" class="btn">🖨️ Print Card</button>
     </div>
 
@@ -128,7 +128,7 @@
             {{ $table->table_number }}
         </div>
 
-        <div class="scan-cta">Scan to View Menu & Order</div>
+        <div class="scan-cta">{{ __("Scan to View Menu & Order") }}</div>
 
         <div class="qr-box">
             @php

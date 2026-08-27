@@ -19,9 +19,9 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-                <span>🌐 Multi-Language & Translation File Editor</span>
+                <span>🌐 {{ __("Multi-Language & Translation File Editor") }}</span>
             </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Manage supported platform languages, customize JSON translation files, and synchronize multilingual dictionaries</p>
+            <p class="text-xs text-slate-400 mt-0.5">{{ __("Manage supported platform languages, customize JSON translation files, and synchronize multilingual dictionaries") }}</p>
         </div>
 
         <!-- Action / Tab Switcher -->
@@ -55,7 +55,7 @@
             <!-- Language Selector Bar -->
             <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Select Language File to Edit:</span>
+                    <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">{{ __("Select Language File to Edit:") }}</span>
                     <span class="text-xs font-bold text-slate-600 dark:text-slate-300">
                         Editing: <span class="font-mono text-blue-600 dark:text-blue-400">lang/{{ $selectedLocale }}.json</span> ({{ $totalKeyCount }} keys)
                     </span>
@@ -88,7 +88,7 @@
                     </div>
                     <input type="text"
                            wire:model.live.debounce.250ms="searchQuery"
-                           placeholder="Search keys or translated phrases…"
+                           placeholder="{{ __("Search keys or translated phrases…") }}"
                            class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none text-xs sm:text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500">
                 </div>
 
@@ -104,7 +104,7 @@
                             wire:click="syncMissingFromEnglish"
                             wire:loading.attr="disabled"
                             class="px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                            title="Import all missing keys from English template">
+                            title="{{ __("Import all missing keys from English template") }}">
                         <span>🔄 Sync Keys</span>
                     </button>
 
@@ -155,9 +155,9 @@
                                     <td class="py-3 pr-5 text-right align-middle">
                                         <button type="button"
                                                 wire:click="deleteKey('{{ addslashes($key) }}')"
-                                                wire:confirm="Are you sure you want to delete this translation key?"
+                                                wire:confirm="{{ __("Are you sure you want to delete this translation key?") }}"
                                                 class="px-2.5 py-1 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-bold transition cursor-pointer"
-                                                title="Delete translation key">
+                                                title="{{ __("Delete translation key") }}">
                                             🗑️ Delete
                                         </button>
                                     </td>
@@ -191,8 +191,8 @@
             
             <div class="flex items-center justify-between">
                 <div>
-                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white">Supported Platform Languages</h3>
-                    <p class="text-xs text-slate-400">Enable, disable or add new multilingual languages to the system</p>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white">{{ __("Supported Platform Languages") }}</h3>
+                    <p class="text-xs text-slate-400">{{ __("Enable, disable or add new multilingual languages to the system") }}</p>
                 </div>
 
                 <button type="button"
@@ -226,11 +226,11 @@
 
                         <div class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 text-xs space-y-1">
                             <div class="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                                <span>Code:</span>
+                                <span>{{ __("Code:") }}</span>
                                 <span class="font-mono font-bold text-slate-800 dark:text-slate-200">{{ $lang->code }}</span>
                             </div>
                             <div class="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                                <span>Layout Direction:</span>
+                                <span>{{ __("Layout Direction:") }}</span>
                                 <span class="font-bold text-slate-800 dark:text-slate-200 uppercase">{{ $lang->direction }}</span>
                             </div>
                         </div>
@@ -269,19 +269,19 @@
 
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Key Name (Exact String) *</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Key Name (Exact String) *") }}</label>
                         <input type="text"
                                wire:model="newKey"
-                               placeholder="e.g. Return Policy, Print Tax Invoice"
+                               placeholder="{{ __("e.g. Return Policy, Print Tax Invoice") }}"
                                class="w-full rounded-2xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-mono focus:ring-2 focus:ring-blue-500">
                         @error('newKey') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Default English Translation</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Default English Translation") }}</label>
                         <input type="text"
                                wire:model="newValue"
-                               placeholder="e.g. Return Policy"
+                               placeholder="{{ __("e.g. Return Policy") }}"
                                class="w-full rounded-2xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
@@ -312,16 +312,16 @@
                 <div class="space-y-3">
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Language Code (ISO) *</label>
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Language Code (ISO) *") }}</label>
                             <input type="text"
                                    wire:model="newCode"
-                                   placeholder="e.g. nl, ja, it"
+                                   placeholder="{{ __("e.g. nl, ja, it") }}"
                                    class="w-full rounded-2xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-mono uppercase focus:ring-2 focus:ring-blue-500">
                             @error('newCode') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Flag Emoji</label>
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Flag Emoji") }}</label>
                             <input type="text"
                                    wire:model="newFlag"
                                    placeholder="🇳🇱"
@@ -330,27 +330,27 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">English Name *</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("English Name *") }}</label>
                         <input type="text"
                                wire:model="newName"
-                               placeholder="e.g. Dutch"
+                               placeholder="{{ __("e.g. Dutch") }}"
                                class="w-full rounded-2xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-blue-500">
                         @error('newName') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Native Name</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Native Name") }}</label>
                         <input type="text"
                                wire:model="newNativeName"
-                               placeholder="e.g. Nederlands"
+                               placeholder="{{ __("e.g. Nederlands") }}"
                                class="w-full rounded-2xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-blue-500">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Text Direction</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Text Direction") }}</label>
                         <select wire:model="newDirection" class="w-full rounded-2xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-blue-500">
-                            <option value="ltr">Left-to-Right (LTR)</option>
-                            <option value="rtl">Right-to-Left (RTL - Arabic, Hebrew)</option>
+                            <option value="ltr">{{ __("Left-to-Right (LTR)") }}</option>
+                            <option value="rtl">{{ __("Right-to-Left (RTL - Arabic, Hebrew)") }}</option>
                         </select>
                     </div>
                 </div>

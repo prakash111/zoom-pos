@@ -19,7 +19,7 @@
             </div>
         </div>
 
-        <a href="{{ route('superadmin.tenants.index') }}" class="text-xs font-bold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1">
+        <a wire:navigate.hover href="{{ route('superadmin.tenants.index') }}" class="text-xs font-bold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1">
             &larr; Back to Stores
         </a>
     </div>
@@ -30,11 +30,11 @@
         <!-- Action Quick-bar -->
         <div class="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
             <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-slate-500">Live Status:</span>
+                <span class="text-xs font-bold text-slate-500">{{ __("Live Status:") }}</span>
                 @if ($status === 'active')
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">Active Store</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">{{ __("Active Store") }}</span>
                 @else
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">Suspended</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">{{ __("Suspended") }}</span>
                 @endif
             </div>
 
@@ -67,14 +67,14 @@
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Contact Phone</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Contact Phone") }}</label>
                 <input type="text" wire:model="phone" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
             </div>
 
             <div>
                 <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Subscription Plan</label>
                 <select wire:model="planName" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
-                    <option value="">No Plan (Unlimited / Manual)</option>
+                    <option value="">{{ __("No Plan (Unlimited / Manual)") }}</option>
                     @foreach ($plans as $plan)
                         <option value="{{ $plan->name }}">{{ $plan->display_name }}</option>
                     @endforeach
@@ -91,17 +91,17 @@
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Subscription Expiration Date</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Subscription Expiration Date") }}</label>
                 <input type="date" wire:model="expiresAt" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Max Users Limit</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Max Users Limit") }}</label>
                 <input type="number" wire:model="maxUsers" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Max POS Devices Limit</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Max POS Devices Limit") }}</label>
                 <input type="number" wire:model="maxDevices" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
             </div>
         </div>

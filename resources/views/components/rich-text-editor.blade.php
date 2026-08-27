@@ -18,6 +18,7 @@
              }
              tinymce.init({
                  selector: '#{{ $id }}',
+                 license_key: 'gpl',
                  height: {{ $height }},
                  menubar: false,
                  statusbar: false,
