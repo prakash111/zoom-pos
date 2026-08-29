@@ -7,11 +7,10 @@
     document.documentElement.classList.toggle('dark', dark)
 ">
 <head>
-    @php
-        $tenantCompany = auth()->user()?->company ?? new \App\Models\Company;
-        $themeClasses = $tenantCompany->getThemeColorClasses();
-        $uiAccentColorHex = $tenantCompany->primary_color ?: ($themeClasses['hex'] ?? '#2563eb');
-    @endphp
+    {{-- $tenantCompany, $themeClasses, $uiAccentColorHex and every $can*/$is*
+         permission and active-route flag used in this layout are computed
+         once per request by TenantNavigationComposer (registered in
+         AppServiceProvider::boot()), not recomputed inline here. --}}
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="{{ $uiAccentColorHex ?? '#2563eb' }}">
@@ -23,28 +22,21 @@
     @endif
     <link rel="manifest" href="{{ route('tenant.pwa.manifest') }}" crossorigin="use-credentials">
     <link rel="apple-touch-icon" href="{{ asset('pwa/icon-192.png') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600;1,700;1,800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @if (request()->routeIs('tenant.reports.*'))
-        <script src="{{ asset('assets/libs/apexcharts.min.js') }}"></script>
-    @endif
+    {{-- ApexCharts now loads lazily via Vite (resources/js/charts-loader.js),
+         only when the reports dashboard's own DOM marker is present, instead
+         of a route-gated raw <script> tag. --}}
     @livewireStyles
     <script>window.platformAppearanceDefaults = @json(appearance_defaults());</script>
 
-    <!-- Inline Loading Bar & Cloak Styling -->
-    <style>
-        [x-cloak] { display: none !important; }
-        #nprogress .bar {
-            background: #2563eb !important;
-            height: 3px !important;
-            z-index: 99999 !important;
-        }
-        #nprogress .peg {
-            box-shadow: 0 0 10px #2563eb, 0 0 5px #2563eb !important;
-        }
-    </style>
+    {{-- Cloak/nprogress/font-family/dockable-nav/theme-utility CSS used to be
+         duplicated here as an inline <style> block, re-sent and re-parsed on
+         every single page load instead of being cached like the rest of the
+         stylesheet. None of it embeds a per-request value, so it now lives in
+         resources/css/app.css and is compiled + cached once by Vite. Only the
+         next <style> block below is still inline, because it genuinely does
+         need a per-request PHP value ($uiAccentColorHex, the tenant's own
+         branded accent color) baked into the CSS custom property values. --}}
     <script>
         (function() {
             try {
@@ -82,80 +74,7 @@
             --nav-item-color: #ffffff;
             --nav-item-active-color: #60a5fa;
         }
-
-        .dockable-nav-item:not([aria-selected="true"]) span,
-        .top-nav-item:not(.active) span {
-            color: var(--nav-item-color);
-        }
-        .dockable-nav-item[aria-selected="true"] span,
-        .dockable-nav-item.active span,
-        .top-nav-item.active span {
-            color: var(--nav-item-active-color) !important;
-            font-weight: 700;
-        }
-
-        .bg-theme-primary { background-color: var(--color-primary) !important; }
-        .bg-theme-primary-hover:hover { background-color: var(--color-primary-hover) !important; }
-        .bg-theme-primary-light { background-color: var(--color-primary-light) !important; }
-        .text-theme-primary { color: var(--color-primary) !important; }
-        .border-theme-primary { border-color: var(--color-primary) !important; }
-        .from-theme-primary { --tw-gradient-from: var(--color-primary) var(--tw-gradient-from-position); --tw-gradient-to: var(--color-primary-hover) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-        .btn-theme-primary { background-color: var(--color-primary) !important; color: #ffffff !important; }
-        .btn-theme-primary:hover { background-color: var(--color-primary-hover) !important; }
-
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        /* Dockable & Category Menu CSS Specifications (Android-Style Scroll-Snap) */
-        .dockable-nav-container,
-        .pos-categories-row,
-        .tab-scroll-container {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            overflow-x: auto;
-            overflow-y: hidden;
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none; /* Firefox */
-        }
-        .dockable-nav-container::-webkit-scrollbar,
-        .pos-categories-row::-webkit-scrollbar,
-        .tab-scroll-container::-webkit-scrollbar {
-            display: none; /* Chrome, Safari */
-        }
-        
-        /* Vertical rotated text matching pos.png */
-        .vertical-rail-label {
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
-            text-orientation: mixed;
-            letter-spacing: 0.05em;
-        }
-
-        /* Anti-flicker initial dock layout rules */
-        html[data-dock-pos="left"]:not([data-nav-layout="macos-dock"]):not([data-nav-layout="speed-dial"]) .app-main-frame { flex-direction: row; }
-        html[data-dock-pos="right"]:not([data-nav-layout="macos-dock"]):not([data-nav-layout="speed-dial"]) .app-main-frame { flex-direction: row-reverse; }
-        html[data-dock-pos="top"]:not([data-nav-layout="macos-dock"]):not([data-nav-layout="speed-dial"]) .app-main-frame { flex-direction: column; }
-        html[data-dock-pos="bottom"]:not([data-nav-layout="macos-dock"]):not([data-nav-layout="speed-dial"]) .app-main-frame { flex-direction: column-reverse; }
-        html[data-dock-pos="floating"] .app-main-frame,
-        html[data-nav-layout="macos-dock"] .app-main-frame,
-        html[data-nav-layout="speed-dial"] .app-main-frame { flex-direction: column; position: relative; }
-
-        /* Dynamic full-width and margin reset rules when docked Top, Bottom or Floating */
-        html[data-dock-pos="top"] .main-content-pane,
-        html[data-dock-pos="bottom"] .main-content-pane,
-        html[data-dock-pos="floating"] .main-content-pane,
-        html[data-dock-mode="floating"] .main-content-pane {
-            margin-left: 0 !important;
-            margin-right: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-        }
     </style>
-@php
-    $isPosScreen = request()->routeIs('tenant.sales.create') || request()->routeIs('tenant.restaurant.pos');
-@endphp
 <body class="bg-[#1a1f37] dark:bg-[#0c101d] text-slate-900 dark:text-slate-100 antialiased selection:bg-blue-500 selection:text-white {{ $isPosScreen ? 'h-screen overflow-hidden p-0 sm:p-2' : 'min-h-screen p-2 sm:p-4 md:p-6' }}">
 
     @include('layouts.partials.preloader')
@@ -174,58 +93,8 @@
         </div>
     @endif
 
-    @php
-        $tenantCompany = auth()->user()?->company ?? new \App\Models\Company;
-        $themeClasses = $tenantCompany->getThemeColorClasses();
-        $isRestaurant = auth()->user()?->company?->isRestaurantMode();
-        $user = auth()->user();
-        $permChecker = app(\App\Services\Auth\PermissionChecker::class);
-        $canQuotes = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'quotes', 'view');
-        $canSales = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'sales', 'view');
-        $canConsignments = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'consignments', 'view');
-        $canServiceOrders = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'service_orders', 'view');
-        $canPos = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'pos', 'create');
-        $canProducts = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'products', 'view');
-        $canCategories = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'categories', 'view');
-        $canUnits = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'units', 'view');
-        $canSuppliers = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'suppliers', 'view');
-        $canCustomers = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'customers', 'view');
-        $canCatalog = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'catalog', 'view');
-        $canCashRegister = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'cash_register', 'view');
-        $canFinance = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'finance', 'view');
-        $canReports = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'reports', 'view');
-        $canTargets = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'targets', 'view');
-        $canSettings = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'settings', 'view');
-        $canUsers = ! $user || $user->isPrivilegedRole() || $permChecker->allows($user, 'users', 'view');
-
-        $isHome = request()->routeIs('tenant.dashboard');
-        $isQuotes = request()->routeIs('tenant.quotes.*') || request()->routeIs('tenant.quotations.*');
-        $isConsignments = request()->routeIs('tenant.consignments.*');
-        $isServiceOrders = request()->routeIs('tenant.service-orders.*');
-        $isSalesTargets = request()->routeIs('tenant.sales-targets.*');
-        $isTransaction = request()->routeIs('tenant.sales.index') || request()->routeIs('tenant.sales.show');
-        $isCasier = request()->routeIs('tenant.sales.create');
-        $isRestaurantPos = request()->routeIs('tenant.restaurant.pos');
-        $isTables = request()->routeIs('tenant.restaurant.tables');
-        $isKds = request()->routeIs('tenant.restaurant.kds');
-        $isProducts = request()->routeIs('tenant.products.*');
-        $isCategories = request()->routeIs('tenant.categories.*');
-        $isBrands = request()->routeIs('tenant.brands.*');
-        $isUnits = request()->routeIs('tenant.units.*');
-        $isSuppliers = request()->routeIs('tenant.suppliers.*');
-        $isCustomers = request()->routeIs('tenant.customers.*');
-        $isCatalog = request()->routeIs('tenant.catalog.*');
-        $isCashRegister = request()->routeIs('tenant.financials.cash_register');
-        $isReceivables = request()->routeIs('tenant.financials.receivables');
-        $isPayables = request()->routeIs('tenant.financials.payables');
-        $isFinancials = $isCashRegister || $isReceivables || $isPayables;
-        $isReports = request()->routeIs('tenant.reports.*') || $isSalesTargets;
-        $isSettings = request()->routeIs('tenant.settings.*');
-        $isLanguages = request()->routeIs('tenant.languages.*');
-        $isUsers = request()->routeIs('tenant.users.*');
-        $isDevices = request()->routeIs('tenant.devices.*');
-        $isBilling = request()->routeIs('tenant.billing.*') || request()->routeIs('tenant.activate');
-    @endphp
+    {{-- Same note as <head>: all of these are supplied by
+         TenantNavigationComposer now, computed once per request. --}}
 
     <!-- Main Outer Container with Draggable & Dockable Layout Binding -->
     <div x-data="dockableNav('tenant_dock_nav_state', 'left', '{{ $isRestaurant ? 'restaurant' : 'general' }}')"
@@ -392,380 +261,107 @@
                          'flex flex-row sm:flex-col items-center gap-2': position === 'floating'
                      }">
                 
-                <!-- 1. Home -->
-                <a x-show="isItemVisible('home')" wire:navigate.hover href="{{ route('tenant.dashboard') }}"
-                   class="dockable-nav-item"
-                   aria-selected="{{ $isHome ? 'true' : 'false' }}"
-                   :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                       'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                   }"
-                   @class([
-                       'transition-all group duration-200 cursor-pointer',
-                       'bg-white text-blue-600 shadow-xl font-extrabold' => $isHome,
-                       'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isHome,
-                   ])
-                   title="{{ __('Home') }}">
-                    <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-                    </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[11px] sm:text-xs' : 'text-xs whitespace-nowrap font-bold'">{{ __('Home') }}</span>
-                </a>
+                <x-nav.rail-item :route="route('tenant.dashboard')" :active="$isHome" item-key="home" variant="white" label-size="text-[11px] sm:text-xs" label="{{ __('Home') }}">
+                    <x-ui.icon name="home" class="w-5 h-5 group-hover:scale-110 transition-transform" />
+                </x-nav.rail-item>
 
                 @if ($isRestaurant)
                     @if ($canPos)
-                        <!-- 2. Restaurant POS -->
-                        <a x-show="isItemVisible('restaurant_pos')" wire:navigate.hover href="{{ route('tenant.restaurant.pos') }}"
-                           class="dockable-nav-item"
-                           aria-selected="{{ $isRestaurantPos ? 'true' : 'false' }}"
-                           :class="{
-                               'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                               'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                               'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                           }"
-                           @class([
-                               'transition-all group duration-200 cursor-pointer',
-                               'bg-[#a3e635] text-slate-950 shadow-xl font-extrabold' => $isRestaurantPos,
-                               'text-lime-200 hover:text-white hover:bg-white/20 font-medium' => !$isRestaurantPos,
-                           ])
-                           title="{{ __('Food & Restaurant POS') }}">
+                        <x-nav.rail-item :route="route('tenant.restaurant.pos')" :active="$isRestaurantPos" item-key="restaurant_pos" variant="lime" title="{{ __('Food & Restaurant POS') }}" label="{{ __('Food POS') }}">
                             <span class="text-xl group-hover:scale-110 transition-transform shrink-0">🍽️</span>
-                            <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Food POS') }}</span>
-                        </a>
+                        </x-nav.rail-item>
 
-                        <!-- 3. Tables -->
-                        <a x-show="isItemVisible('tables')" wire:navigate.hover href="{{ route('tenant.restaurant.tables') }}"
-                           class="dockable-nav-item"
-                           aria-selected="{{ $isTables ? 'true' : 'false' }}"
-                           :class="{
-                               'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                               'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                               'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                           }"
-                           @class([
-                               'transition-all group duration-200 cursor-pointer',
-                               'bg-white text-blue-600 shadow-xl font-extrabold' => $isTables,
-                               'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isTables,
-                           ])
-                           title="{{ __('Tables & Floor Plan') }}">
+                        <x-nav.rail-item :route="route('tenant.restaurant.tables')" :active="$isTables" item-key="tables" title="{{ __('Tables & Floor Plan') }}" label="{{ __('Tables') }}">
                             <span class="text-xl group-hover:scale-110 transition-transform shrink-0">🪑</span>
-                            <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Tables') }}</span>
-                        </a>
+                        </x-nav.rail-item>
 
-                        <!-- 4. KDS -->
-                        <a x-show="isItemVisible('kds')" wire:navigate.hover href="{{ route('tenant.restaurant.kds') }}"
-                           class="dockable-nav-item"
-                           aria-selected="{{ $isKds ? 'true' : 'false' }}"
-                           :class="{
-                               'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                               'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                               'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                           }"
-                           @class([
-                               'transition-all group duration-200 cursor-pointer',
-                               'bg-white text-blue-600 shadow-xl font-extrabold' => $isKds,
-                               'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isKds,
-                           ])
-                           title="{{ __('Kitchen Display System') }}">
+                        <x-nav.rail-item :route="route('tenant.restaurant.kds')" :active="$isKds" item-key="kds" title="{{ __('Kitchen Display System') }}" label="{{ __('Kitchen') }}">
                             <span class="text-xl group-hover:scale-110 transition-transform shrink-0">🍳</span>
-                            <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Kitchen') }}</span>
-                        </a>
+                        </x-nav.rail-item>
                     @endif
 
                     @if ($canSales)
-                        <!-- Dining History -->
-                        <a x-show="isItemVisible('sales')" wire:navigate.hover href="{{ route('tenant.sales.index') }}"
-                           class="dockable-nav-item"
-                           aria-selected="{{ $isTransaction ? 'true' : 'false' }}"
-                           :class="{
-                               'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                               'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                               'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                           }"
-                           @class([
-                               'transition-all group duration-200 cursor-pointer',
-                               'bg-white text-blue-600 shadow-xl font-extrabold' => $isTransaction,
-                               'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isTransaction,
-                           ])
-                           title="{{ __('Dining & Sales History') }}">
-                            <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                            </svg>
-                            <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Dining History') }}</span>
-                        </a>
+                        <x-nav.rail-item :route="route('tenant.sales.index')" :active="$isTransaction" item-key="sales" title="{{ __('Dining & Sales History') }}" label="{{ __('Dining History') }}">
+                            <x-ui.icon name="receipt" class="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        </x-nav.rail-item>
                     @endif
                 @else
                     @if ($canPos)
-                        <!-- 2. Retail Casier (POS) -->
-                        <a x-show="isItemVisible('pos')" wire:navigate.hover href="{{ route('tenant.sales.create') }}"
-                           class="dockable-nav-item"
-                           aria-selected="{{ $isCasier ? 'true' : 'false' }}"
-                           :class="{
-                               'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                               'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                               'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                           }"
-                           @class([
-                               'transition-all group duration-200 cursor-pointer',
-                               'bg-white text-blue-600 shadow-xl font-extrabold' => $isCasier,
-                               'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isCasier,
-                           ])
-                           title="{{ __('Retail POS') }}">
-                            <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                            </svg>
-                            <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Retail POS') }}</span>
-                        </a>
+                        <x-nav.rail-item :route="route('tenant.sales.create')" :active="$isCasier" item-key="pos" label="{{ __('Retail POS') }}">
+                            <x-ui.icon name="cart" class="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        </x-nav.rail-item>
                     @endif
 
                     @if ($canSales)
-                        <!-- 3. Transaction (Sales & Invoices) -->
-                        <a x-show="isItemVisible('sales')" wire:navigate.hover href="{{ route('tenant.sales.index') }}"
-                           class="dockable-nav-item"
-                           aria-selected="{{ $isTransaction ? 'true' : 'false' }}"
-                           :class="{
-                               'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                               'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                               'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                           }"
-                           @class([
-                               'transition-all group duration-200 cursor-pointer',
-                               'bg-white text-blue-600 shadow-xl font-extrabold' => $isTransaction,
-                               'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isTransaction,
-                           ])
-                           title="{{ __('Invoices & Sales') }}">
-                            <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                            </svg>
-                            <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Invoices') }}</span>
-                        </a>
+                        <x-nav.rail-item :route="route('tenant.sales.index')" :active="$isTransaction" item-key="sales" title="{{ __('Invoices & Sales') }}" label="{{ __('Invoices') }}">
+                            <x-ui.icon name="receipt" class="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        </x-nav.rail-item>
                     @endif
 
                     @if ($canQuotes)
-                        <!-- 4. Quotations & Proposals -->
-                        <a x-show="isItemVisible('quotes')" wire:navigate.hover href="{{ route('tenant.quotes.index') }}"
-                           class="dockable-nav-item"
-                           aria-selected="{{ $isQuotes ? 'true' : 'false' }}"
-                           :class="{
-                               'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                               'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                               'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                           }"
-                           @class([
-                               'transition-all group duration-200 cursor-pointer',
-                               'bg-white text-blue-600 shadow-xl font-extrabold' => $isQuotes,
-                               'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isQuotes,
-                           ])
-                           title="{{ __('Quotations & Proposals') }}">
-                            <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Quotations') }}</span>
-                        </a>
+                        <x-nav.rail-item :route="route('tenant.quotes.index')" :active="$isQuotes" item-key="quotes" title="{{ __('Quotations & Proposals') }}" label="{{ __('Quotations') }}">
+                            <x-ui.icon name="document" class="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        </x-nav.rail-item>
                     @endif
 
                     @if ($canConsignments)
-                        <!-- Consignments -->
-                        <a wire:navigate.hover href="{{ route('tenant.consignments.index') }}"
-                           class="dockable-nav-item"
-                           aria-selected="{{ $isConsignments ? 'true' : 'false' }}"
-                           :class="{
-                               'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                               'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                               'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                           }"
-                           @class([
-                               'transition-all group duration-200 cursor-pointer',
-                               'bg-white text-blue-600 shadow-xl font-extrabold' => $isConsignments,
-                               'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isConsignments,
-                           ])
-                           title="{{ __('Consignments') }}">
-                            <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                            </svg>
-                            <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Consign') }}</span>
-                        </a>
+                        <x-nav.rail-item :route="route('tenant.consignments.index')" :active="$isConsignments" title="{{ __('Consignments') }}" label="{{ __('Consign') }}">
+                            <x-ui.icon name="box" class="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        </x-nav.rail-item>
                     @endif
 
                     @if ($canServiceOrders)
-                        <!-- Service Orders & Warranty Repairs -->
-                        <a wire:navigate.hover href="{{ route('tenant.service-orders.index') }}"
-                           class="dockable-nav-item"
-                           aria-selected="{{ $isServiceOrders ? 'true' : 'false' }}"
-                           :class="{
-                               'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                               'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                               'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                           }"
-                           @class([
-                               'transition-all group duration-200 cursor-pointer',
-                               'bg-white text-blue-600 shadow-xl font-extrabold' => $isServiceOrders,
-                               'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isServiceOrders,
-                           ])
-                           title="{{ __('Service Orders & Warranty Repairs') }}">
+                        <x-nav.rail-item :route="route('tenant.service-orders.index')" :active="$isServiceOrders" title="{{ __('Service Orders & Warranty Repairs') }}" label="{{ __('Repairs / OS') }}">
                             <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
-                            <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Repairs / OS') }}</span>
-                        </a>
+                        </x-nav.rail-item>
                     @endif
 
                     @if ($canProducts)
-                        <!-- Products -->
-                        <a x-show="isItemVisible('products')" wire:navigate.hover href="{{ route('tenant.products.index') }}"
-                           class="dockable-nav-item"
-                           aria-selected="{{ $isProducts ? 'true' : 'false' }}"
-                           :class="{
-                               'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                               'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                               'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                           }"
-                           @class([
-                               'transition-all group duration-200 cursor-pointer',
-                               'bg-white text-blue-600 shadow-xl font-extrabold' => $isProducts,
-                               'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isProducts,
-                           ])
-                           title="{{ __('Products & Stock') }}">
-                            <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                            </svg>
-                            <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Products') }}</span>
-                        </a>
+                        <x-nav.rail-item :route="route('tenant.products.index')" :active="$isProducts" item-key="products" title="{{ __('Products & Stock') }}" label="{{ __('Products') }}">
+                            <x-ui.icon name="box" class="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        </x-nav.rail-item>
                     @endif
 
                     @if ($canCustomers)
-                        <!-- Customers -->
-                        <a x-show="isItemVisible('customers')" wire:navigate.hover href="{{ route('tenant.customers.index') }}"
-                           class="dockable-nav-item"
-                           aria-selected="{{ $isCustomers ? 'true' : 'false' }}"
-                           :class="{
-                               'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                               'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                               'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                           }"
-                           @class([
-                               'transition-all group duration-200 cursor-pointer',
-                               'bg-white text-blue-600 shadow-xl font-extrabold' => $isCustomers,
-                               'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isCustomers,
-                           ])
-                           title="{{ __('Customers & CRM') }}">
-                            <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Customers') }}</span>
-                        </a>
+                        <x-nav.rail-item :route="route('tenant.customers.index')" :active="$isCustomers" item-key="customers" title="{{ __('Customers & CRM') }}" label="{{ __('Customers') }}">
+                            <x-ui.icon name="users" class="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        </x-nav.rail-item>
                     @endif
                 @endif
 
                 @if ($canCashRegister)
-                    <!-- Cash Register -->
-                    <a x-show="isItemVisible('register')" wire:navigate.hover href="{{ route('tenant.financials.cash_register') }}"
-                       class="dockable-nav-item"
-                       aria-selected="{{ $isCashRegister ? 'true' : 'false' }}"
-                       :class="{
-                           'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                           'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                           'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                       }"
-                       @class([
-                           'transition-all group duration-200 cursor-pointer',
-                           'bg-white text-blue-600 shadow-xl font-extrabold' => $isCashRegister,
-                           'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isCashRegister,
-                       ])
-                       title="{{ __('Cash Register') }}">
+                    <x-nav.rail-item :route="route('tenant.financials.cash_register')" :active="$isCashRegister" item-key="register" title="{{ __('Cash Register') }}" label="{{ __('Register') }}">
                         <span class="text-xl group-hover:scale-110 transition-transform shrink-0">🗄️</span>
-                        <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Register') }}</span>
-                    </a>
+                    </x-nav.rail-item>
                 @endif
 
                 @if ($canReports)
-                    <!-- Reports -->
-                    <a x-show="isItemVisible('reports')" wire:navigate.hover href="{{ route('tenant.reports.index') }}"
-                       class="dockable-nav-item"
-                       aria-selected="{{ $isReports ? 'true' : 'false' }}"
-                       :class="{
-                           'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                           'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                           'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                       }"
-                       @class([
-                           'transition-all group duration-200 cursor-pointer',
-                           'bg-white text-blue-600 shadow-xl font-extrabold' => $isReports,
-                           'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isReports,
-                       ])
-                       title="{{ __('Reports & Analytics') }}">
+                    <x-nav.rail-item :route="route('tenant.reports.index')" :active="$isReports" item-key="reports" title="{{ __('Reports & Analytics') }}" label="{{ __('Reports') }}">
                         <span class="text-xl group-hover:scale-110 transition-transform shrink-0">📊</span>
-                        <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Reports') }}</span>
-                    </a>
+                    </x-nav.rail-item>
                 @endif
 
                 @if ($canTargets)
-                    <!-- Sales Targets & Goals -->
-                    <a wire:navigate.hover href="{{ route('tenant.sales-targets.index') }}"
-                       class="dockable-nav-item"
-                       aria-selected="{{ $isSalesTargets ? 'true' : 'false' }}"
-                       :class="{
-                           'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                           'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                           'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                       }"
-                       @class([
-                           'transition-all group duration-200 cursor-pointer',
-                           'bg-white text-blue-600 shadow-xl font-extrabold' => $isSalesTargets,
-                           'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isSalesTargets,
-                       ])
-                       title="{{ __('Sales Targets & Goals') }}">
+                    <x-nav.rail-item :route="route('tenant.sales-targets.index')" :active="$isSalesTargets" title="{{ __('Sales Targets & Goals') }}" label="{{ __('Targets') }}">
                         <span class="text-xl group-hover:scale-110 transition-transform shrink-0">🎯</span>
-                        <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Targets') }}</span>
-                    </a>
+                    </x-nav.rail-item>
                 @endif
 
                 @if ($canSettings)
-                    <!-- Settings -->
-                    <a x-show="isItemVisible('settings')" wire:navigate.hover href="{{ route('tenant.settings.index') }}"
-                       class="dockable-nav-item"
-                       aria-selected="{{ $isSettings ? 'true' : 'false' }}"
-                       :class="{
-                           'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                           'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                           'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                       }"
-                       @class([
-                           'transition-all group duration-200 cursor-pointer',
-                           'bg-white text-blue-600 shadow-xl font-extrabold' => $isSettings,
-                           'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isSettings,
-                       ])
-                       title="{{ __('Settings') }}">
+                    <x-nav.rail-item :route="route('tenant.settings.index')" :active="$isSettings" item-key="settings" label="{{ __('Settings') }}">
                         <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Settings') }}</span>
-                    </a>
+                    </x-nav.rail-item>
                 @endif
 
-                <!-- Billing -->
-                <a x-show="isItemVisible('billing')" wire:navigate.hover href="{{ route('tenant.billing.index') }}"
-                   class="dockable-nav-item"
-                   aria-selected="{{ $isBilling ? 'true' : 'false' }}"
-                   :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                       'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                   }"
-                   @class([
-                       'transition-all group duration-200 cursor-pointer',
-                       'bg-white text-blue-600 shadow-xl font-extrabold' => $isBilling,
-                       'text-blue-100 hover:text-white hover:bg-white/20 font-medium' => !$isBilling,
-                   ])
-                   title="{{ __('Subscription & Billing') }}">
-                    <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                    </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Billing & Plans') }}</span>
-                </a>
+                <x-nav.rail-item :route="route('tenant.billing.index')" :active="$isBilling" item-key="billing" title="{{ __('Subscription & Billing') }}" label="{{ __('Billing & Plans') }}">
+                    <x-ui.icon name="credit-card" class="w-5 h-5 group-hover:scale-110 transition-transform" />
+                </x-nav.rail-item>
                 </div>
             </div>
 
@@ -782,23 +378,9 @@
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
                         {{ __('Store Overview') }}
                     </div>
-                    <a x-show="isItemVisible('home')" wire:navigate.hover href="{{ route('tenant.dashboard') }}"
-                       :class="{
-                           'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                           'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                           'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                       }"
-                       @class([
-                           'bg-white text-blue-700 shadow-md' => $isHome,
-                           'text-white/80 hover:text-white hover:bg-white/15' => !$isHome,
-                       ])
-                       title="{{ __('Dashboard') }}">
+                    <x-nav.expanded-item :route="route('tenant.dashboard')" :active="$isHome" item-key="home" title="{{ __('Dashboard') }}" subtitle="{{ __('Sales summary & metrics') }}">
                         <span class="text-base shrink-0">📊</span>
-                        <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                            <div class="text-xs truncate">{{ __('Dashboard') }}</div>
-                            <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Sales summary & metrics') }}</div>
-                        </div>
-                    </a>
+                    </x-nav.expanded-item>
                 </div>
 
                 <!-- Category 2: POS & Operations -->
@@ -808,153 +390,41 @@
                     </div>
                     @if ($isRestaurant)
                         @if ($canPos)
-                            <a wire:navigate.hover x-show="isItemVisible('restaurant_pos')" href="{{ route('tenant.restaurant.pos') }}"
-                               :class="{
-                                   'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                                   'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                                   'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                               }"
-                               @class([
-                                   'bg-[#a3e635] text-slate-950 shadow-md' => $isRestaurantPos,
-                                   'text-white/80 hover:text-white hover:bg-white/15' => !$isRestaurantPos,
-                               ])
-                               title="{{ __('Restaurant POS') }}">
+                            <x-nav.expanded-item :route="route('tenant.restaurant.pos')" :active="$isRestaurantPos" item-key="restaurant_pos" variant="lime" title="{{ __('Restaurant POS') }}" subtitle="{{ __('Dine-In, Takeaway, KOT') }}">
                                 <span class="text-base shrink-0">🍽️</span>
-                                <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                    <div class="text-xs truncate">{{ __('Restaurant POS') }}</div>
-                                    <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Dine-In, Takeaway, KOT') }}</div>
-                                </div>
-                            </a>
-                            <a wire:navigate.hover x-show="isItemVisible('tables')" href="{{ route('tenant.restaurant.tables') }}"
-                               :class="{
-                                   'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                                   'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                                   'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                               }"
-                               @class([
-                                   'bg-white text-blue-700 shadow-md' => $isTables,
-                                   'text-white/80 hover:text-white hover:bg-white/15' => !$isTables,
-                               ])
-                               title="{{ __('Tables & Floor') }}">
+                            </x-nav.expanded-item>
+                            <x-nav.expanded-item :route="route('tenant.restaurant.tables')" :active="$isTables" item-key="tables" title="{{ __('Tables & Floor') }}" subtitle="{{ __('Floor plan & live seats') }}">
                                 <span class="text-base shrink-0">🪑</span>
-                                <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                    <div class="text-xs truncate">{{ __('Tables & Floor') }}</div>
-                                    <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Floor plan & live seats') }}</div>
-                                </div>
-                            </a>
-                            <a wire:navigate.hover x-show="isItemVisible('kds')" href="{{ route('tenant.restaurant.kds') }}"
-                               :class="{
-                                   'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                                   'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                                   'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                               }"
-                               @class([
-                                   'bg-white text-blue-700 shadow-md' => $isKds,
-                                   'text-white/80 hover:text-white hover:bg-white/15' => !$isKds,
-                               ])
-                               title="{{ __('Kitchen Display (KDS)') }}">
+                            </x-nav.expanded-item>
+                            <x-nav.expanded-item :route="route('tenant.restaurant.kds')" :active="$isKds" item-key="kds" title="{{ __('Kitchen Display (KDS)') }}" subtitle="{{ __('Order preparation queue') }}">
                                 <span class="text-base shrink-0">🍳</span>
-                                <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                    <div class="text-xs truncate">{{ __('Kitchen Display (KDS)') }}</div>
-                                    <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Order preparation queue') }}</div>
-                                </div>
-                            </a>
+                            </x-nav.expanded-item>
                         @endif
                         @if ($canSales)
-                            <a wire:navigate.hover x-show="isItemVisible('sales')" href="{{ route('tenant.sales.index') }}"
-                               :class="{
-                                   'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                                   'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                                   'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                               }"
-                               @class([
-                                   'bg-white text-blue-700 shadow-md' => $isTransaction,
-                                   'text-white/80 hover:text-white hover:bg-white/15' => !$isTransaction,
-                               ])
-                               title="{{ __('Dining History') }}">
+                            <x-nav.expanded-item :route="route('tenant.sales.index')" :active="$isTransaction" item-key="sales" title="{{ __('Dining History') }}" subtitle="{{ __('Orders & thermal receipts') }}">
                                 <span class="text-base shrink-0">🧾</span>
-                                <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                    <div class="text-xs truncate">{{ __('Dining History') }}</div>
-                                    <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Orders & thermal receipts') }}</div>
-                                </div>
-                            </a>
+                            </x-nav.expanded-item>
                         @endif
                     @else
                         @if ($canPos)
-                            <a wire:navigate.hover x-show="isItemVisible('pos')" href="{{ route('tenant.sales.create') }}"
-                               :class="{
-                                   'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                                   'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                                   'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                               }"
-                               @class([
-                                   'bg-white text-blue-700 shadow-md' => $isCasier,
-                                   'text-white/80 hover:text-white hover:bg-white/15' => !$isCasier,
-                               ])
-                               title="{{ __('Cashier POS') }}">
+                            <x-nav.expanded-item :route="route('tenant.sales.create')" :active="$isCasier" item-key="pos" title="{{ __('Cashier POS') }}" subtitle="{{ __('Barcode & Touch Sales') }}">
                                 <span class="text-base shrink-0">🛒</span>
-                                <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                    <div class="text-xs truncate">{{ __('Cashier POS') }}</div>
-                                    <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Barcode & Touch Sales') }}</div>
-                                </div>
-                            </a>
+                            </x-nav.expanded-item>
                         @endif
                         @if ($canSales)
-                            <a wire:navigate.hover x-show="isItemVisible('sales')" href="{{ route('tenant.sales.index') }}"
-                               :class="{
-                                   'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                                   'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                                   'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                               }"
-                               @class([
-                                   'bg-white text-blue-700 shadow-md' => $isTransaction,
-                                   'text-white/80 hover:text-white hover:bg-white/15' => !$isTransaction,
-                               ])
-                               title="{{ __('Sales & Invoices') }}">
+                            <x-nav.expanded-item :route="route('tenant.sales.index')" :active="$isTransaction" item-key="sales" title="{{ __('Sales & Invoices') }}" subtitle="{{ __('Invoices, returns & receipts') }}">
                                 <span class="text-base shrink-0">🧾</span>
-                                <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                    <div class="text-xs truncate">{{ __('Sales & Invoices') }}</div>
-                                    <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Invoices, returns & receipts') }}</div>
-                                </div>
-                            </a>
+                            </x-nav.expanded-item>
                         @endif
                         @if ($canQuotes)
-                            <a wire:navigate.hover x-show="isItemVisible('quotes')" href="{{ route('tenant.quotes.index') }}"
-                               :class="{
-                                   'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                                   'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                                   'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                               }"
-                               @class([
-                                   'bg-white text-blue-700 shadow-md' => $isQuotes,
-                                   'text-white/80 hover:text-white hover:bg-white/15' => !$isQuotes,
-                               ])
-                               title="{{ __('Quotations') }}">
+                            <x-nav.expanded-item :route="route('tenant.quotes.index')" :active="$isQuotes" item-key="quotes" title="{{ __('Quotations') }}" subtitle="{{ __('Quotes, proposals & estimates') }}">
                                 <span class="text-base shrink-0">📑</span>
-                                <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                    <div class="text-xs truncate">{{ __('Quotations') }}</div>
-                                    <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Quotes, proposals & estimates') }}</div>
-                                </div>
-                            </a>
+                            </x-nav.expanded-item>
                         @endif
                         @if ($canCustomers)
-                            <a wire:navigate.hover x-show="isItemVisible('customers')" href="{{ route('tenant.customers.index') }}"
-                               :class="{
-                                   'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                                   'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                                   'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                               }"
-                               @class([
-                                   'bg-white text-blue-700 shadow-md' => $isCustomers,
-                                   'text-white/80 hover:text-white hover:bg-white/15' => !$isCustomers,
-                               ])
-                               title="{{ __('Customers & CRM') }}">
+                            <x-nav.expanded-item :route="route('tenant.customers.index')" :active="$isCustomers" item-key="customers" title="{{ __('Customers & CRM') }}" subtitle="{{ __('Profiles, history & loyalty') }}">
                                 <span class="text-base shrink-0">👥</span>
-                                <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                    <div class="text-xs truncate">{{ __('Customers & CRM') }}</div>
-                                    <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Profiles, history & loyalty') }}</div>
-                                </div>
-                            </a>
+                            </x-nav.expanded-item>
                         @endif
                     @endif
                 </div>
@@ -965,76 +435,20 @@
                         <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
                             {{ __('Financial Management') }}
                         </div>
-                        <a wire:navigate.hover x-show="isItemVisible('register')" href="{{ route('tenant.financials.cash_register') }}"
-                           :class="{
-                               'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                               'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                               'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                           }"
-                           @class([
-                               'bg-white text-blue-700 shadow-md' => $isCashRegister,
-                               'text-white/80 hover:text-white hover:bg-white/15' => !$isCashRegister,
-                           ])
-                           title="{{ __('Cash Register') }}">
+                        <x-nav.expanded-item :route="route('tenant.financials.cash_register')" :active="$isCashRegister" item-key="register" title="{{ __('Cash Register') }}" subtitle="{{ __('Shifts, float & cash balancing') }}">
                             <span class="text-base shrink-0">🗄️</span>
-                            <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                <div class="text-xs truncate">{{ __('Cash Register') }}</div>
-                                <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Shifts, float & cash balancing') }}</div>
-                            </div>
-                        </a>
-                        <a wire:navigate.hover x-show="isItemVisible('receivables')" href="{{ route('tenant.financials.receivables') }}"
-                           :class="{
-                               'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                               'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                               'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                           }"
-                           @class([
-                               'bg-white text-blue-700 shadow-md' => $isReceivables,
-                               'text-white/80 hover:text-white hover:bg-white/15' => !$isReceivables,
-                           ])
-                           title="{{ __('Accounts Receivable') }}">
+                        </x-nav.expanded-item>
+                        <x-nav.expanded-item :route="route('tenant.financials.receivables')" :active="$isReceivables" item-key="receivables" title="{{ __('Accounts Receivable') }}" subtitle="{{ __('Customer credit & unpaid bills') }}">
                             <span class="text-base shrink-0">📈</span>
-                            <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                <div class="text-xs truncate">{{ __('Accounts Receivable') }}</div>
-                                <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Customer credit & unpaid bills') }}</div>
-                            </div>
-                        </a>
-                        <a wire:navigate.hover x-show="isItemVisible('receivables')" href="{{ route('tenant.financials.payables') }}"
-                           :class="{
-                               'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                               'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                               'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                           }"
-                           @class([
-                               'bg-white text-blue-700 shadow-md' => $isPayables,
-                               'text-white/80 hover:text-white hover:bg-white/15' => !$isPayables,
-                           ])
-                           title="{{ __('Accounts Payable') }}">
+                        </x-nav.expanded-item>
+                        <x-nav.expanded-item :route="route('tenant.financials.payables')" :active="$isPayables" item-key="receivables" title="{{ __('Accounts Payable') }}" subtitle="{{ __('Supplier bills & expenses') }}">
                             <span class="text-base shrink-0">📉</span>
-                            <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                <div class="text-xs truncate">{{ __('Accounts Payable') }}</div>
-                                <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Supplier bills & expenses') }}</div>
-                            </div>
-                        </a>
+                        </x-nav.expanded-item>
 
                         @if ($canReports)
-                            <a wire:navigate.hover x-show="isItemVisible('reports')" href="{{ route('tenant.reports.index') }}"
-                               :class="{
-                                   'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                                   'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                                   'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                               }"
-                               @class([
-                                   'bg-white text-blue-700 shadow-md' => $isReports,
-                                   'text-white/80 hover:text-white hover:bg-white/15' => !$isReports,
-                               ])
-                               title="{{ __('Reports & Analytics') }}">
+                            <x-nav.expanded-item :route="route('tenant.reports.index')" :active="$isReports" item-key="reports" title="{{ __('Reports & Analytics') }}" subtitle="{{ __('Sales, commissions & aging') }}">
                                 <span class="text-base shrink-0">📊</span>
-                                <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                    <div class="text-xs truncate">{{ __('Reports & Analytics') }}</div>
-                                    <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Sales, commissions & aging') }}</div>
-                                </div>
-                            </a>
+                            </x-nav.expanded-item>
                         @endif
                     </div>
                 @endif
@@ -1045,61 +459,19 @@
                         {{ __('Products & Inventory') }}
                     </div>
                     @if ($canProducts)
-                        <a wire:navigate.hover x-show="isItemVisible('products')" href="{{ route('tenant.products.index') }}"
-                           :class="{
-                               'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                               'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                               'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                           }"
-                           @class([
-                               'bg-white text-blue-700 shadow-md' => $isProducts,
-                               'text-white/80 hover:text-white hover:bg-white/15' => !$isProducts,
-                           ])
-                           title="{{ __('Products & Stock') }}">
+                        <x-nav.expanded-item :route="route('tenant.products.index')" :active="$isProducts" item-key="products" title="{{ __('Products & Stock') }}" subtitle="{{ __('Catalog, prices & alerts') }}">
                             <span class="text-base shrink-0">📦</span>
-                            <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                <div class="text-xs truncate">{{ __('Products & Stock') }}</div>
-                                <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Catalog, prices & alerts') }}</div>
-                            </div>
-                        </a>
+                        </x-nav.expanded-item>
                     @endif
                     @if ($canCategories)
-                        <a wire:navigate.hover x-show="isItemVisible('categories')" href="{{ route('tenant.categories.index') }}"
-                           :class="{
-                               'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                               'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                               'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                           }"
-                           @class([
-                               'bg-white text-blue-700 shadow-md' => $isCategories,
-                               'text-white/80 hover:text-white hover:bg-white/15' => !$isCategories,
-                           ])
-                           title="{{ __('Categories') }}">
+                        <x-nav.expanded-item :route="route('tenant.categories.index')" :active="$isCategories" item-key="categories" title="{{ __('Categories') }}" subtitle="{{ __('Departments & tax rates') }}">
                             <span class="text-base shrink-0">🏷️</span>
-                            <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                <div class="text-xs truncate">{{ __('Categories') }}</div>
-                                <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Departments & tax rates') }}</div>
-                            </div>
-                        </a>
+                        </x-nav.expanded-item>
                     @endif
                     @if ($canCatalog)
-                        <a wire:navigate.hover x-show="isItemVisible('products')" href="{{ route('tenant.catalog.index') }}"
-                           :class="{
-                               'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                               'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                               'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                           }"
-                           @class([
-                               'bg-white text-blue-700 shadow-md' => $isCatalog,
-                               'text-white/80 hover:text-white hover:bg-white/15' => !$isCatalog,
-                           ])
-                           title="{{ __('Online Catalog') }}">
+                        <x-nav.expanded-item :route="route('tenant.catalog.index')" :active="$isCatalog" item-key="products" title="{{ __('Online Catalog') }}" subtitle="{{ __('Digital catalog & WhatsApp share') }}">
                             <span class="text-base shrink-0">🌐</span>
-                            <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                <div class="text-xs truncate">{{ __('Online Catalog') }}</div>
-                                <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Digital catalog & WhatsApp share') }}</div>
-                            </div>
-                        </a>
+                        </x-nav.expanded-item>
                     @endif
                 </div>
 
@@ -1109,59 +481,17 @@
                         {{ __('Administration & Settings') }}
                     </div>
                     @if ($canSettings)
-                        <a wire:navigate.hover x-show="isItemVisible('settings')" href="{{ route('tenant.settings.index') }}"
-                           :class="{
-                               'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                               'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                               'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                           }"
-                           @class([
-                               'bg-white text-blue-700 shadow-md' => $isSettings,
-                               'text-white/80 hover:text-white hover:bg-white/15' => !$isSettings,
-                           ])
-                           title="{{ __('Store Settings') }}">
+                        <x-nav.expanded-item :route="route('tenant.settings.index')" :active="$isSettings" item-key="settings" title="{{ __('Store Settings') }}" subtitle="{{ __('Profile, printer, tax & domain') }}">
                             <span class="text-base shrink-0">⚙️</span>
-                            <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                <div class="text-xs truncate">{{ __('Store Settings') }}</div>
-                                <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Profile, printer, tax & domain') }}</div>
-                            </div>
-                        </a>
+                        </x-nav.expanded-item>
                     @endif
-                    <a wire:navigate.hover x-show="isItemVisible('billing')" href="{{ route('tenant.billing.index') }}"
-                       :class="{
-                           'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                           'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                           'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                       }"
-                       @class([
-                           'bg-white text-blue-700 shadow-md' => $isBilling,
-                           'text-white/80 hover:text-white hover:bg-white/15' => !$isBilling,
-                       ])
-                       title="{{ __('Subscription & Billing') }}">
+                    <x-nav.expanded-item :route="route('tenant.billing.index')" :active="$isBilling" item-key="billing" title="{{ __('Subscription & Billing') }}" subtitle="{{ __('Plan details & invoices') }}">
                         <span class="text-base shrink-0">💳</span>
-                        <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                            <div class="text-xs truncate">{{ __('Subscription & Billing') }}</div>
-                            <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Plan details & invoices') }}</div>
-                        </div>
-                    </a>
+                    </x-nav.expanded-item>
                     @if ($canUsers)
-                        <a wire:navigate.hover href="{{ route('tenant.users.index') }}"
-                           :class="{
-                               'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
-                               'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-                               'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
-                           }"
-                           @class([
-                               'bg-white text-blue-700 shadow-md' => $isUsers,
-                               'text-white/80 hover:text-white hover:bg-white/15' => !$isUsers,
-                           ])
-                           title="{{ __('Users & Permissions') }}">
+                        <x-nav.expanded-item :route="route('tenant.users.index')" :active="$isUsers" title="{{ __('Users & Permissions') }}" subtitle="{{ __('Staff accounts & access matrix') }}">
                             <span class="text-base shrink-0">🛡️</span>
-                            <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
-                                <div class="text-xs truncate">{{ __('Users & Permissions') }}</div>
-                                <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Staff accounts & access matrix') }}</div>
-                            </div>
-                        </a>
+                        </x-nav.expanded-item>
                     @endif
                 </div>
 
@@ -1213,146 +543,47 @@
             </button>
 
             <!-- 1. Home -->
-            <a wire:navigate.hover href="{{ route('tenant.dashboard') }}"
-               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
-               aria-selected="{{ $isHome ? 'true' : 'false' }}"
-               title="{{ __('Dashboard') }}">
-                <div @class([
-                    'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                    'bg-white text-blue-600 font-bold ring-2 ring-blue-400' => $isHome,
-                    'bg-white/15 text-white hover:bg-white/30' => !$isHome,
-                ])>
-                    📊
-                </div>
-            </a>
+            <x-nav.pill-item :route="route('tenant.dashboard')" :active="$isHome" title="{{ __('Dashboard') }}">📊</x-nav.pill-item>
 
             <!-- 2. POS Option -->
             @if ($isRestaurant)
                 @if ($canPos)
-                    <a wire:navigate.hover x-show="isItemVisible('restaurant_pos')" href="{{ route('tenant.restaurant.pos') }}"
-                       class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
-                       aria-selected="{{ $isRestaurantPos ? 'true' : 'false' }}"
-                       title="{{ __('Restaurant POS') }}">
-                        <div @class([
-                            'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                            'bg-[#a3e635] text-slate-950 font-bold ring-2 ring-lime-400' => $isRestaurantPos,
-                            'bg-white/15 text-white hover:bg-white/30' => !$isRestaurantPos,
-                        ])>
-                            🍽️
-                        </div>
-                    </a>
+                    <x-nav.pill-item :route="route('tenant.restaurant.pos')" :active="$isRestaurantPos" item-key="restaurant_pos" variant="lime" title="{{ __('Restaurant POS') }}">🍽️</x-nav.pill-item>
                 @endif
             @else
                 @if ($canPos)
-                    <a wire:navigate.hover x-show="isItemVisible('pos')" href="{{ route('tenant.sales.create') }}"
-                       class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
-                       aria-selected="{{ $isCasier ? 'true' : 'false' }}"
-                       title="{{ __('Retail POS') }}">
-                        <div @class([
-                            'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                            'bg-white text-blue-600 font-bold ring-2 ring-blue-400' => $isCasier,
-                            'bg-white/15 text-white hover:bg-white/30' => !$isCasier,
-                        ])>
-                            🛒
-                        </div>
-                    </a>
+                    <x-nav.pill-item :route="route('tenant.sales.create')" :active="$isCasier" item-key="pos" title="{{ __('Retail POS') }}">🛒</x-nav.pill-item>
                 @endif
             @endif
 
             <!-- 3. Sales & Invoices -->
             @if ($canSales)
-                <a wire:navigate.hover x-show="isItemVisible('sales')" href="{{ route('tenant.sales.index') }}"
-                   class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
-                   aria-selected="{{ $isTransaction ? 'true' : 'false' }}"
-                   title="{{ __('Invoices & Sales') }}">
-                    <div @class([
-                        'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                        'bg-white text-blue-600 font-bold ring-2 ring-blue-400' => $isTransaction,
-                        'bg-white/15 text-white hover:bg-white/30' => !$isTransaction,
-                    ])>
-                        🧾
-                    </div>
-                </a>
+                <x-nav.pill-item :route="route('tenant.sales.index')" :active="$isTransaction" item-key="sales" title="{{ __('Invoices & Sales') }}">🧾</x-nav.pill-item>
             @endif
 
             <!-- 4. Quotations (General Mode) -->
             @if (!$isRestaurant && $canQuotes)
-                <a wire:navigate.hover x-show="isItemVisible('quotes')" href="{{ route('tenant.quotes.index') }}"
-                   class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
-                   aria-selected="{{ $isQuotes ? 'true' : 'false' }}"
-                   title="{{ __('Quotations & Proposals') }}">
-                    <div @class([
-                        'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                        'bg-white text-blue-600 font-bold ring-2 ring-blue-400' => $isQuotes,
-                        'bg-white/15 text-white hover:bg-white/30' => !$isQuotes,
-                    ])>
-                        📑
-                    </div>
-                </a>
+                <x-nav.pill-item :route="route('tenant.quotes.index')" :active="$isQuotes" item-key="quotes" title="{{ __('Quotations & Proposals') }}">📑</x-nav.pill-item>
             @endif
 
             <!-- 5. Products -->
             @if ($canProducts)
-                <a wire:navigate.hover x-show="isItemVisible('products')" href="{{ route('tenant.products.index') }}"
-                   class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
-                   aria-selected="{{ $isProducts ? 'true' : 'false' }}"
-                   title="{{ __('Products & Catalog') }}">
-                    <div @class([
-                        'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                        'bg-white text-blue-600 font-bold ring-2 ring-blue-400' => $isProducts,
-                        'bg-white/15 text-white hover:bg-white/30' => !$isProducts,
-                    ])>
-                        📦
-                    </div>
-                </a>
+                <x-nav.pill-item :route="route('tenant.products.index')" :active="$isProducts" item-key="products" title="{{ __('Products & Catalog') }}">📦</x-nav.pill-item>
             @endif
 
             <!-- 6. Cash Register -->
             @if ($canFinance)
-                <a wire:navigate.hover x-show="isItemVisible('register')" href="{{ route('tenant.financials.cash_register') }}"
-                   class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
-                   aria-selected="{{ $isCashRegister ? 'true' : 'false' }}"
-                   title="{{ __('Cash Register') }}">
-                    <div @class([
-                        'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                        'bg-white text-blue-600 font-bold ring-2 ring-blue-400' => $isCashRegister,
-                        'bg-white/15 text-white hover:bg-white/30' => !$isCashRegister,
-                    ])>
-                        🗄️
-                    </div>
-                </a>
+                <x-nav.pill-item :route="route('tenant.financials.cash_register')" :active="$isCashRegister" item-key="register" title="{{ __('Cash Register') }}">🗄️</x-nav.pill-item>
             @endif
 
             <!-- 7. Reports -->
             @if ($canReports)
-                <a wire:navigate.hover x-show="isItemVisible('reports')" href="{{ route('tenant.reports.index') }}"
-                   class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
-                   aria-selected="{{ $isReports ? 'true' : 'false' }}"
-                   title="{{ __('Reports & Analytics') }}">
-                    <div @class([
-                        'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                        'bg-white text-blue-600 font-bold ring-2 ring-blue-400' => $isReports,
-                        'bg-white/15 text-white hover:bg-white/30' => !$isReports,
-                    ])>
-                        📊
-                    </div>
-                </a>
+                <x-nav.pill-item :route="route('tenant.reports.index')" :active="$isReports" item-key="reports" title="{{ __('Reports & Analytics') }}">📊</x-nav.pill-item>
             @endif
 
             <!-- 8. Settings -->
             @if ($canSettings)
-                <a wire:navigate.hover x-show="isItemVisible('settings')" href="{{ route('tenant.settings.index') }}"
-                   class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
-                   aria-selected="{{ $isSettings ? 'true' : 'false' }}"
-                   title="{{ __('Store Settings') }}">
-                    <div @class([
-                        'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                        'bg-white text-blue-600 font-bold ring-2 ring-blue-400' => $isSettings,
-                        'bg-white/15 text-white hover:bg-white/30' => !$isSettings,
-                    ])>
-                        ⚙️
-                    </div>
-                </a>
+                <x-nav.pill-item :route="route('tenant.settings.index')" :active="$isSettings" item-key="settings" title="{{ __('Store Settings') }}">⚙️</x-nav.pill-item>
             @endif
 
             <!-- Divider -->
@@ -1396,60 +627,36 @@
                  x-transition:leave-end="opacity-0 translate-y-4 scale-90"
                  class="flex flex-col items-end gap-2.5 p-3 rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/20 shadow-2xl text-xs font-bold text-white">
                 
-                <a wire:navigate.hover href="{{ route('tenant.dashboard') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
-                    <span>{{ __('Overview') }}</span>
-                    <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">📊</span>
-                </a>
+                <x-nav.speed-dial-item :route="route('tenant.dashboard')" label="{{ __('Overview') }}">📊</x-nav.speed-dial-item>
 
                 @if ($isRestaurant)
                     @if ($canPos)
-                        <a wire:navigate.hover x-show="isItemVisible('restaurant_pos')" href="{{ route('tenant.restaurant.pos') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
-                            <span>{{ __('Restaurant POS') }}</span>
-                            <span class="w-8 h-8 rounded-full bg-lime-500 text-slate-950 flex items-center justify-center">🍽️</span>
-                        </a>
+                        <x-nav.speed-dial-item :route="route('tenant.restaurant.pos')" item-key="restaurant_pos" variant="lime" label="{{ __('Restaurant POS') }}">🍽️</x-nav.speed-dial-item>
                     @endif
                 @else
                     @if ($canPos)
-                        <a wire:navigate.hover x-show="isItemVisible('pos')" href="{{ route('tenant.sales.create') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
-                            <span>{{ __('Cashier POS') }}</span>
-                            <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">🛒</span>
-                        </a>
+                        <x-nav.speed-dial-item :route="route('tenant.sales.create')" item-key="pos" label="{{ __('Cashier POS') }}">🛒</x-nav.speed-dial-item>
                     @endif
                 @endif
 
                 @if ($canSales)
-                    <a wire:navigate.hover x-show="isItemVisible('sales')" href="{{ route('tenant.sales.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
-                        <span>{{ __('Invoices & Sales') }}</span>
-                        <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">🧾</span>
-                    </a>
+                    <x-nav.speed-dial-item :route="route('tenant.sales.index')" item-key="sales" label="{{ __('Invoices & Sales') }}">🧾</x-nav.speed-dial-item>
                 @endif
 
                 @if (!$isRestaurant && $canQuotes)
-                    <a wire:navigate.hover x-show="isItemVisible('quotes')" href="{{ route('tenant.quotes.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
-                        <span>{{ __('Quotations') }}</span>
-                        <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">📑</span>
-                    </a>
+                    <x-nav.speed-dial-item :route="route('tenant.quotes.index')" item-key="quotes" label="{{ __('Quotations') }}">📑</x-nav.speed-dial-item>
                 @endif
 
                 @if ($canFinance)
-                    <a wire:navigate.hover x-show="isItemVisible('register')" href="{{ route('tenant.financials.cash_register') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
-                        <span>{{ __('Cash Register') }}</span>
-                        <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">🗄️</span>
-                    </a>
+                    <x-nav.speed-dial-item :route="route('tenant.financials.cash_register')" item-key="register" label="{{ __('Cash Register') }}">🗄️</x-nav.speed-dial-item>
                 @endif
 
                 @if ($canReports)
-                    <a wire:navigate.hover x-show="isItemVisible('reports')" href="{{ route('tenant.reports.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
-                        <span>{{ __('Reports') }}</span>
-                        <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">📊</span>
-                    </a>
+                    <x-nav.speed-dial-item :route="route('tenant.reports.index')" item-key="reports" label="{{ __('Reports') }}">📊</x-nav.speed-dial-item>
                 @endif
 
                 @if ($canSettings)
-                    <a wire:navigate.hover x-show="isItemVisible('settings')" href="{{ route('tenant.settings.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
-                        <span>{{ __('Settings') }}</span>
-                        <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">⚙️</span>
-                    </a>
+                    <x-nav.speed-dial-item :route="route('tenant.settings.index')" item-key="settings" label="{{ __('Settings') }}">⚙️</x-nav.speed-dial-item>
                 @endif
 
                 <div class="w-full border-t border-white/10 my-1"></div>
@@ -1507,35 +714,9 @@
                             <div>
                                 <div class="text-[10px] font-extrabold uppercase tracking-wider text-lime-600 dark:text-lime-400 mb-2 px-3">{{ __('Restaurant Operations') }}</div>
                                 <div class="space-y-1">
-                                    <a wire:navigate.hover href="{{ route('tenant.restaurant.pos') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-lime-50 dark:hover:bg-lime-950/50 hover:text-lime-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-lime-50 dark:bg-lime-950/60 text-lime-600 dark:text-lime-400 flex items-center justify-center text-xs group-hover:bg-[#a3e635] group-hover:text-slate-950 transition">
-                                            🍽️
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Restaurant POS Terminal') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Dine-In, Takeaway & Delivery') }}</div>
-                                        </div>
-                                    </a>
-
-                                    <a wire:navigate.hover href="{{ route('tenant.restaurant.tables') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-lime-50 dark:hover:bg-lime-950/50 hover:text-lime-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-[#a3e635] group-hover:text-slate-950 transition">
-                                            🪑
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Floor Plan & Tables') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Live Table Status & QR Menus') }}</div>
-                                        </div>
-                                    </a>
-
-                                    <a wire:navigate.hover href="{{ route('tenant.restaurant.kds') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-lime-50 dark:hover:bg-lime-950/50 hover:text-lime-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-[#a3e635] group-hover:text-slate-950 transition">
-                                            🍳
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Kitchen Display (KDS)') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Live KOT preparation queue') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.restaurant.pos')" hover="lime" highlighted title="{{ __('Restaurant POS Terminal') }}" subtitle="{{ __('Dine-In, Takeaway & Delivery') }}">🍽️</x-nav.drawer-item>
+                                    <x-nav.drawer-item :route="route('tenant.restaurant.tables')" hover="lime" title="{{ __('Floor Plan & Tables') }}" subtitle="{{ __('Live Table Status & QR Menus') }}">🪑</x-nav.drawer-item>
+                                    <x-nav.drawer-item :route="route('tenant.restaurant.kds')" hover="lime" title="{{ __('Kitchen Display (KDS)') }}" subtitle="{{ __('Live KOT preparation queue') }}">🍳</x-nav.drawer-item>
                                 </div>
                             </div>
                         @endif
@@ -1544,27 +725,13 @@
                             <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Orders & Cash') }}</div>
                             <div class="space-y-1">
                                 @if ($canSales)
-                                    <a wire:navigate.hover href="{{ route('tenant.sales.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Dining & Sales History') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Thermal receipts & order history') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.sales.index')" title="{{ __('Dining & Sales History') }}" subtitle="{{ __('Thermal receipts & order history') }}">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                                    </x-nav.drawer-item>
                                 @endif
 
                                 @if ($canFinance)
-                                    <a wire:navigate.hover href="{{ route('tenant.financials.cash_register') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-lime-50 dark:hover:bg-lime-950/50 hover:text-lime-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-[#a3e635] group-hover:text-slate-950 transition">
-                                            🗄️
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Cash Register') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Opening, closing, cash withdrawals') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.financials.cash_register')" hover="lime" title="{{ __('Cash Register') }}" subtitle="{{ __('Opening, closing, cash withdrawals') }}">🗄️</x-nav.drawer-item>
                                 @endif
                             </div>
                         </div>
@@ -1573,36 +740,11 @@
                             <div>
                                 <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Financial Management') }}</div>
                                 <div class="space-y-1">
-                                    <a wire:navigate.hover href="{{ route('tenant.financials.receivables') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            📈
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Accounts Receivable') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Customer credit & unpaid bills') }}</div>
-                                        </div>
-                                    </a>
-
-                                    <a wire:navigate.hover href="{{ route('tenant.financials.payables') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            📉
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Accounts Payable') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Supplier bills & food purchases') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.financials.receivables')" title="{{ __('Accounts Receivable') }}" subtitle="{{ __('Customer credit & unpaid bills') }}">📈</x-nav.drawer-item>
+                                    <x-nav.drawer-item :route="route('tenant.financials.payables')" title="{{ __('Accounts Payable') }}" subtitle="{{ __('Supplier bills & food purchases') }}">📉</x-nav.drawer-item>
 
                                     @if ($canReports)
-                                        <a wire:navigate.hover href="{{ route('tenant.reports.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                            <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                                📊
-                                            </span>
-                                            <div>
-                                                <div class="font-bold">{{ __('Reports & Analytics') }}</div>
-                                                <div class="text-[10px] text-slate-400 font-normal">{{ __('Sales, commissions & aging') }}</div>
-                                            </div>
-                                        </a>
+                                        <x-nav.drawer-item :route="route('tenant.reports.index')" title="{{ __('Reports & Analytics') }}" subtitle="{{ __('Sales, commissions & aging') }}">📊</x-nav.drawer-item>
                                     @endif
                                 </div>
                             </div>
@@ -1612,85 +754,29 @@
                             <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Kitchen Menu & Catalog') }}</div>
                             <div class="space-y-1">
                                 @if ($canProducts)
-                                    <a wire:navigate.hover href="{{ route('tenant.products.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            📦
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Menu Dishes & Stock') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Dishes, ingredients & pricing') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.products.index')" title="{{ __('Menu Dishes & Stock') }}" subtitle="{{ __('Dishes, ingredients & pricing') }}">📦</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCategories)
-                                    <a wire:navigate.hover href="{{ route('tenant.categories.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            🏷️
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Categories') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Menu sections & tax rates') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.categories.index')" title="{{ __('Categories') }}" subtitle="{{ __('Menu sections & tax rates') }}">🏷️</x-nav.drawer-item>
                                 @endif
 
-                                <a wire:navigate.hover href="{{ route('tenant.brands.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                    <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                        ✨
-                                    </span>
-                                    <div>
-                                        <div class="font-bold">{{ __('Brands & Modifiers') }}</div>
-                                        <div class="text-[10px] text-slate-400 font-normal">{{ __('Product brands & food options') }}</div>
-                                    </div>
-                                </a>
+                                <x-nav.drawer-item :route="route('tenant.brands.index')" title="{{ __('Brands & Modifiers') }}" subtitle="{{ __('Product brands & food options') }}">✨</x-nav.drawer-item>
 
                                 @if ($canUnits)
-                                    <a wire:navigate.hover href="{{ route('tenant.units.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            ⚖️
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Units of Measure') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Portions, kg, litres & grams') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.units.index')" title="{{ __('Units of Measure') }}" subtitle="{{ __('Portions, kg, litres & grams') }}">⚖️</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canSuppliers)
-                                    <a wire:navigate.hover href="{{ route('tenant.suppliers.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            🚚
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Food Suppliers') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Vendor contacts & purchasing') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.suppliers.index')" title="{{ __('Food Suppliers') }}" subtitle="{{ __('Vendor contacts & purchasing') }}">🚚</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCatalog)
-                                    <a wire:navigate.hover href="{{ route('tenant.catalog.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            🌐
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Online QR Menu') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Digital QR menu & WhatsApp store') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.catalog.index')" title="{{ __('Online QR Menu') }}" subtitle="{{ __('Digital QR menu & WhatsApp store') }}">🌐</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCustomers)
-                                    <a wire:navigate.hover href="{{ route('tenant.customers.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            👥
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Guest Directory') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Customer history & contact list') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.customers.index')" title="{{ __('Guest Directory') }}" subtitle="{{ __('Customer history & contact list') }}">👥</x-nav.drawer-item>
                                 @endif
                             </div>
                         </div>
@@ -1701,51 +787,19 @@
                             <div class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 px-3">{{ __('Cashier & Sales') }}</div>
                             <div class="space-y-1">
                                 @if ($canPos)
-                                    <a wire:navigate.hover href="{{ route('tenant.sales.create') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            🛒
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Cashier POS Terminal') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Fast barcode scan & cash checkout') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.sales.create')" highlighted title="{{ __('Cashier POS Terminal') }}" subtitle="{{ __('Fast barcode scan & cash checkout') }}">🛒</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canSales)
-                                    <a wire:navigate.hover href="{{ route('tenant.sales.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            🧾
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Sales & Invoices') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('History, print receipts & refunds') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.sales.index')" title="{{ __('Sales & Invoices') }}" subtitle="{{ __('History, print receipts & refunds') }}">🧾</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canQuotes)
-                                    <a wire:navigate.hover href="{{ route('tenant.quotes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            📑
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Quotations & Proposals') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Quotes, estimates & 1-click sales conversion') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.quotes.index')" title="{{ __('Quotations & Proposals') }}" subtitle="{{ __('Quotes, estimates & 1-click sales conversion') }}">📑</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCustomers)
-                                    <a wire:navigate.hover href="{{ route('tenant.customers.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            👥
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Customers & CRM') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Customer directory & loyalty points') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.customers.index')" title="{{ __('Customers & CRM') }}" subtitle="{{ __('Customer directory & loyalty points') }}">👥</x-nav.drawer-item>
                                 @endif
                             </div>
                         </div>
@@ -1754,46 +808,12 @@
                             <div>
                                 <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Financial Management') }}</div>
                                 <div class="space-y-1">
-                                    <a wire:navigate.hover href="{{ route('tenant.financials.cash_register') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            🗄️
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Cash Register') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Opening, closing, cash withdrawals') }}</div>
-                                        </div>
-                                    </a>
-
-                                    <a wire:navigate.hover href="{{ route('tenant.financials.receivables') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            📈
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Accounts Receivable') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Customer credit & pending payments') }}</div>
-                                        </div>
-                                    </a>
-
-                                    <a wire:navigate.hover href="{{ route('tenant.financials.payables') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            📉
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Accounts Payable') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Supplier bills & purchase dues') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.financials.cash_register')" title="{{ __('Cash Register') }}" subtitle="{{ __('Opening, closing, cash withdrawals') }}">🗄️</x-nav.drawer-item>
+                                    <x-nav.drawer-item :route="route('tenant.financials.receivables')" title="{{ __('Accounts Receivable') }}" subtitle="{{ __('Customer credit & pending payments') }}">📈</x-nav.drawer-item>
+                                    <x-nav.drawer-item :route="route('tenant.financials.payables')" title="{{ __('Accounts Payable') }}" subtitle="{{ __('Supplier bills & purchase dues') }}">📉</x-nav.drawer-item>
 
                                     @if ($canReports)
-                                        <a wire:navigate.hover href="{{ route('tenant.reports.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                            <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                                📊
-                                            </span>
-                                            <div>
-                                                <div class="font-bold">{{ __('Reports & Analytics') }}</div>
-                                                <div class="text-[10px] text-slate-400 font-normal">{{ __('Sales, commissions & aging') }}</div>
-                                            </div>
-                                        </a>
+                                        <x-nav.drawer-item :route="route('tenant.reports.index')" title="{{ __('Reports & Analytics') }}" subtitle="{{ __('Sales, commissions & aging') }}">📊</x-nav.drawer-item>
                                     @endif
                                 </div>
                             </div>
@@ -1803,73 +823,25 @@
                             <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Products & Inventory') }}</div>
                             <div class="space-y-1">
                                 @if ($canProducts)
-                                    <a wire:navigate.hover href="{{ route('tenant.products.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            📦
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('All Products') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('SKUs, pricing & inventory levels') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.products.index')" title="{{ __('All Products') }}" subtitle="{{ __('SKUs, pricing & inventory levels') }}">📦</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCategories)
-                                    <a wire:navigate.hover href="{{ route('tenant.categories.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            🏷️
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Categories') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Tax rates & category hierarchy') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.categories.index')" title="{{ __('Categories') }}" subtitle="{{ __('Tax rates & category hierarchy') }}">🏷️</x-nav.drawer-item>
                                 @endif
 
-                                <a wire:navigate.hover href="{{ route('tenant.brands.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                    <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                        ✨
-                                    </span>
-                                    <div>
-                                        <div class="font-bold">{{ __('Brands & Manufacturers') }}</div>
-                                        <div class="text-[10px] text-slate-400 font-normal">{{ __('Brand names & supplier labels') }}</div>
-                                    </div>
-                                </a>
+                                <x-nav.drawer-item :route="route('tenant.brands.index')" title="{{ __('Brands & Manufacturers') }}" subtitle="{{ __('Brand names & supplier labels') }}">✨</x-nav.drawer-item>
 
                                 @if ($canUnits)
-                                    <a wire:navigate.hover href="{{ route('tenant.units.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            ⚖️
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Units of Measure') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Pieces, kg, box, packs & liters') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.units.index')" title="{{ __('Units of Measure') }}" subtitle="{{ __('Pieces, kg, box, packs & liters') }}">⚖️</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canSuppliers)
-                                    <a wire:navigate.hover href="{{ route('tenant.suppliers.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            🚚
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Suppliers & Vendors') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Vendor directory & purchasing') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.suppliers.index')" title="{{ __('Suppliers & Vendors') }}" subtitle="{{ __('Vendor directory & purchasing') }}">🚚</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCatalog)
-                                    <a wire:navigate.hover href="{{ route('tenant.catalog.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition group">
-                                        <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-blue-600 group-hover:text-white transition">
-                                            🌐
-                                        </span>
-                                        <div>
-                                            <div class="font-bold">{{ __('Online Digital Catalog') }}</div>
-                                            <div class="text-[10px] text-slate-400 font-normal">{{ __('Shareable web catalog & WhatsApp store') }}</div>
-                                        </div>
-                                    </a>
+                                    <x-nav.drawer-item :route="route('tenant.catalog.index')" title="{{ __('Online Digital Catalog') }}" subtitle="{{ __('Shareable web catalog & WhatsApp store') }}">🌐</x-nav.drawer-item>
                                 @endif
                             </div>
                         </div>
@@ -1879,46 +851,19 @@
                     <div>
                         <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Administration & Settings') }}</div>
                         <div class="space-y-1">
-                            <a wire:navigate.hover href="{{ route('tenant.billing.index') }}" class="flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition">
-                                <div class="flex items-center gap-2.5">
-                                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                                    <span class="font-bold">{{ __('Subscription & Billing') }}</span>
-                                </div>
-                                <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">{{ __('Invoices') }}</span>
-                            </a>
+                            <x-nav.drawer-link :route="route('tenant.billing.index')" dot="blue" bold title="{{ __('Subscription & Billing') }}" badge="{{ __('Invoices') }}" badge-color="blue" />
 
                             @if ($canSettings)
-                                <a wire:navigate.hover href="{{ route('tenant.settings.index') }}" class="flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition">
-                                    <div class="flex items-center gap-2.5">
-                                        <span class="w-2 h-2 rounded-full bg-slate-400"></span>
-                                        <span>{{ __('Store Settings') }}</span>
-                                    </div>
-                                </a>
+                                <x-nav.drawer-link :route="route('tenant.settings.index')" title="{{ __('Store Settings') }}" />
                             @endif
 
-                            <a wire:navigate.hover href="{{ route('tenant.languages.index') }}" class="flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition">
-                                <div class="flex items-center gap-2.5">
-                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                    <span>{{ __('Languages & Translations') }}</span>
-                                </div>
-                                <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">{{ __('Multi-Lang') }}</span>
-                            </a>
+                            <x-nav.drawer-link :route="route('tenant.languages.index')" dot="emerald" title="{{ __('Languages & Translations') }}" badge="{{ __('Multi-Lang') }}" badge-color="emerald" />
 
                             @if ($canUsers)
-                                <a wire:navigate.hover href="{{ route('tenant.users.index') }}" class="flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition">
-                                    <div class="flex items-center gap-2.5">
-                                        <span class="w-2 h-2 rounded-full bg-slate-400"></span>
-                                        <span>{{ __('Users & Permissions') }}</span>
-                                    </div>
-                                </a>
+                                <x-nav.drawer-link :route="route('tenant.users.index')" title="{{ __('Users & Permissions') }}" />
                             @endif
 
-                            <a wire:navigate.hover href="{{ route('tenant.devices.index') }}" class="flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition">
-                                <div class="flex items-center gap-2.5">
-                                    <span class="w-2 h-2 rounded-full bg-slate-400"></span>
-                                    <span>{{ __('Terminals & Devices') }}</span>
-                                </div>
-                            </a>
+                            <x-nav.drawer-link :route="route('tenant.devices.index')" title="{{ __('Terminals & Devices') }}" />
                         </div>
                     </div>
 
@@ -2092,9 +1037,6 @@
             </header>
 
             <!-- Main Dynamic View Container with Smooth Transition -->
-            @php
-                $isPosScreen = request()->routeIs('tenant.sales.create') || request()->routeIs('tenant.restaurant.pos');
-            @endphp
             <main class="flex-1 w-full max-w-none spa-page-enter transition-all duration-200 {{ $isPosScreen ? 'p-1.5 sm:p-2.5 overflow-hidden flex flex-col min-h-0 h-full' : 'p-3 sm:p-5 md:p-6 overflow-y-auto' }}" id="main-app-content">
                 <div class="w-full max-w-none {{ $isPosScreen ? 'flex-1 min-h-0 flex flex-col overflow-hidden h-full' : '' }}">
                     {{ $slot ?? '' }}

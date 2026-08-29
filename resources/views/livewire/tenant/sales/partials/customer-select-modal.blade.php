@@ -13,11 +13,9 @@
                    class="w-full pl-9 pr-3 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white">
         </div>
 
-        <button type="button"
-                wire:click="openQuickCustomerModal; $set('showCustomerSelectModal', false)"
-                class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 text-white font-extrabold text-xs shadow-md shadow-indigo-500/20 active:scale-[0.97] transition duration-150 ease-out flex items-center gap-1.5 shrink-0 cursor-pointer">
+        <x-ui.button wire:click="openQuickCustomerModal; $set('showCustomerSelectModal', false)" class="shrink-0">
             <span>+ {{ __('New') }}</span>
-        </button>
+        </x-ui.button>
     </div>
 
     <!-- Customer List -->

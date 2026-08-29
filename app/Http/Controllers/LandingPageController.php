@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Page;
 use App\Models\PlatformBranding;
 use App\Models\SaaSPlan;
+use App\Support\Desktop;
 
 class LandingPageController extends Controller
 {
@@ -13,6 +14,12 @@ class LandingPageController extends Controller
      */
     public function index()
     {
+        if (Desktop::isRunning()) {
+            return auth('web')->check()
+                ? redirect('/tenant')
+                : redirect('/tenant/login');
+        }
+
         if (auth('platform_web')->check()) {
             return redirect('/superadmin');
         }

@@ -15,41 +15,29 @@
                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('No printers detected on this machine. Leave blank to keep using the print dialog.') }}</p>
             @else
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('58mm Thermal Receipts') }}</label>
-                        <select wire:model="printer58mm" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
-                            <option value="">{{ __('Use print dialog') }}</option>
-                            @foreach ($printers as $p)
-                                <option value="{{ $p['name'] }}">{{ $p['label'] }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('80mm Thermal Receipts') }}</label>
-                        <select wire:model="printer80mm" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
-                            <option value="">{{ __('Use print dialog') }}</option>
-                            @foreach ($printers as $p)
-                                <option value="{{ $p['name'] }}">{{ $p['label'] }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('A4 Invoices & Quotations') }}</label>
-                        <select wire:model="printerA4" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
-                            <option value="">{{ __('Use print dialog') }}</option>
-                            @foreach ($printers as $p)
-                                <option value="{{ $p['name'] }}">{{ $p['label'] }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    <x-ui.select wire:model="printer58mm" :label="__('58mm Thermal Receipts')">
+                        <option value="">{{ __('Use print dialog') }}</option>
+                        @foreach ($printers as $p)
+                            <option value="{{ $p['name'] }}">{{ $p['label'] }}</option>
+                        @endforeach
+                    </x-ui.select>
+                    <x-ui.select wire:model="printer80mm" :label="__('80mm Thermal Receipts')">
+                        <option value="">{{ __('Use print dialog') }}</option>
+                        @foreach ($printers as $p)
+                            <option value="{{ $p['name'] }}">{{ $p['label'] }}</option>
+                        @endforeach
+                    </x-ui.select>
+                    <x-ui.select wire:model="printerA4" :label="__('A4 Invoices & Quotations')">
+                        <option value="">{{ __('Use print dialog') }}</option>
+                        @foreach ($printers as $p)
+                            <option value="{{ $p['name'] }}">{{ $p['label'] }}</option>
+                        @endforeach
+                    </x-ui.select>
                 </div>
 
-                <button type="button"
-                        wire:click="save"
-                        wire:loading.attr="disabled"
-                        class="px-5 py-2.5 rounded-xl text-xs font-black bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white transition cursor-pointer">
+                <x-ui.button wire:click="save" wire:loading.attr="disabled" variant="secondary" class="!bg-slate-800 hover:!bg-slate-900 dark:!bg-slate-700 dark:hover:!bg-slate-600 !text-white">
                     {{ __('Save Printer Preferences') }}
-                </button>
+                </x-ui.button>
             @endif
         </div>
     @endif

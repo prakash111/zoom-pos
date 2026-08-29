@@ -152,71 +152,61 @@
     </div>
 
     <!-- Floor Modal -->
-    @if ($showFloorModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
-            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4">
-                <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <h3 class="font-extrabold text-slate-900 dark:text-white">{{ $editingFloorId ? __('Edit Floor Area') : __('Add Floor Area') }}</h3>
-                    <button type="button" wire:click="$set('showFloorModal', false)" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Area Name *") }}</label>
-                    <input type="text" wire:model="floorName" placeholder="{{ __("e.g. Rooftop Patio, Bar, Hall") }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
-                    @error('floorName') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
-                </div>
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" wire:click="$set('showFloorModal', false)" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-500">{{ __("Cancel") }}</button>
-                    <button type="button" wire:click="saveFloor" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white">{{ __("Save Floor") }}</button>
-                </div>
-            </div>
+    <x-modal wire:model="showFloorModal" maxWidth="sm" :title="$editingFloorId ? __('Edit Floor Area') : __('Add Floor Area')">
+        <div>
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Area Name *") }}</label>
+            <input type="text" wire:model="floorName" placeholder="{{ __("e.g. Rooftop Patio, Bar, Hall") }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
+            @error('floorName') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
         </div>
-    @endif
+
+        <x-slot:footer>
+            <button type="button" @click="open = false" class="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer">
+                {{ __("Cancel") }}
+            </button>
+            <x-ui.button wire:click="saveFloor">{{ __("Save Floor") }}</x-ui.button>
+        </x-slot:footer>
+    </x-modal>
 
     <!-- Table Modal -->
-    @if ($showTableModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
-            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4">
-                <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <h3 class="font-extrabold text-slate-900 dark:text-white">{{ $editingTableId ? __('Edit Table') : __('Add Table') }}</h3>
-                    <button type="button" wire:click="$set('showTableModal', false)" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+    <x-modal wire:model="showTableModal" maxWidth="md" :title="$editingTableId ? __('Edit Table') : __('Add Table')">
+        <div class="space-y-3">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Table Name / Number *") }}</label>
+                <input type="text" wire:model="tableNumber" placeholder="{{ __("e.g. Table 04, VIP-1, Bar-02") }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
+                @error('tableNumber') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Floor Area") }}</label>
+                    <select wire:model="tableFloorId" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
+                        <option value="">{{ __("No Floor Assigned") }}</option>
+                        @foreach ($floors as $f)
+                            <option value="{{ $f->id }}">{{ $f->name }}</option>
+                        @endforeach
+                    </select>
                 </div>
-                <div class="space-y-3">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Table Name / Number *") }}</label>
-                        <input type="text" wire:model="tableNumber" placeholder="{{ __("e.g. Table 04, VIP-1, Bar-02") }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
-                        @error('tableNumber') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Floor Area") }}</label>
-                            <select wire:model="tableFloorId" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
-                                <option value="">{{ __("No Floor Assigned") }}</option>
-                                @foreach ($floors as $f)
-                                    <option value="{{ $f->id }}">{{ $f->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Capacity (Seats)") }}</label>
-                            <input type="number" wire:model="tableCapacity" min="1" max="50" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Initial Status") }}</label>
-                        <select wire:model="tableStatus" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
-                            <option value="available">{{ __("Available") }}</option>
-                            <option value="occupied">{{ __("Occupied") }}</option>
-                            <option value="reserved">{{ __("Reserved") }}</option>
-                            <option value="billed">{{ __("Billed") }}</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" wire:click="$set('showTableModal', false)" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-500">{{ __("Cancel") }}</button>
-                    <button type="button" wire:click="saveTable" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white">{{ __("Save Table") }}</button>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Capacity (Seats)") }}</label>
+                    <input type="number" wire:model="tableCapacity" min="1" max="50" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
                 </div>
             </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Initial Status") }}</label>
+                <select wire:model="tableStatus" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
+                    <option value="available">{{ __("Available") }}</option>
+                    <option value="occupied">{{ __("Occupied") }}</option>
+                    <option value="reserved">{{ __("Reserved") }}</option>
+                    <option value="billed">{{ __("Billed") }}</option>
+                </select>
+            </div>
         </div>
-    @endif
+
+        <x-slot:footer>
+            <button type="button" @click="open = false" class="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer">
+                {{ __("Cancel") }}
+            </button>
+            <x-ui.button wire:click="saveTable">{{ __("Save Table") }}</x-ui.button>
+        </x-slot:footer>
+    </x-modal>
 
 </div>

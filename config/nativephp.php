@@ -8,7 +8,7 @@ return [
      * It is used to determine if the app needs to be updated.
      * Increment this value every time you release a new version of your app.
      */
-    'version' => env('APP_VERSION', env('NATIVEPHP_APP_VERSION', '1.0.0')),
+    'version' => env('APP_VERSION', env('NATIVEPHP_APP_VERSION', '1.0.3')),
 
     /**
      * The ID of your application. This should be a unique identifier
@@ -70,6 +70,13 @@ return [
      * You may use wildcards to match multiple keys.
      */
     'cleanup_env_keys' => [
+        'APP_DEBUG',
+        'DB_CONNECTION',
+        'DB_HOST',
+        'DB_PORT',
+        'DB_DATABASE',
+        'DB_USERNAME',
+        'DB_PASSWORD',
         'AWS_*',
         'AZURE_*',
         'GITHUB_*',
@@ -172,10 +179,30 @@ return [
 
     /**
      * Define your own scripts to run before and after the build process.
+     *
+     * Deliberately never `config:cache` (which `php artisan optimize` would
+     * include) here: it freezes whatever `.env` happens to be on THIS build
+     * machine — including this server's own production DB_CONNECTION=mysql,
+     * DB_HOST, DB_DATABASE — into bootstrap/cache/config.php, and that file
+     * ships inside the installer for every install. Worse, it also bakes
+     * `nativephp-internal.running` to false (env('NATIVEPHP_RUNNING') isn't
+     * true while merely running a build script), which is read via config()
+     * everywhere including NativePHP's own per-device database rewrite
+     * (NativeServiceProvider::bootingPackage()) — so a cached config
+     * silently skips that rewrite entirely and every local DB write instead
+     * tries to reach this build server's MySQL at 127.0.0.1:3306 from the
+     * end user's machine. `optimize:clear` guarantees no stale cache from a
+     * previous build survives into this one.
      */
     'prebuild' => [
         'npm run build',
-        'php artisan optimize',
+        'php artisan optimize:clear',
+        // Safe to cache, unlike config:cache above: route/view caches don't
+        // freeze any per-device or per-build-machine values into the
+        // installer, they just precompute route matching and compile Blade
+        // views once at build time instead of on every cold start.
+        'php artisan route:cache',
+        'php artisan view:cache',
     ],
 
     'postbuild' => [

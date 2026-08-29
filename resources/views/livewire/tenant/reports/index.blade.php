@@ -1,4 +1,5 @@
 <div class="space-y-6 text-xs font-sans pb-12 w-full"
+     data-apexcharts-dashboard
      x-data="reportsDashboard({
          activeTab: @entangle('activeTab'),
          currencySymbol: '{{ $company->currency_symbol ?? '$' }}',
@@ -433,7 +434,7 @@
         <div class="space-y-6 w-full" x-transition:enter="transition ease-out duration-300 transform opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
             
             <!-- DRE Header Summary Banner -->
-            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl border border-indigo-900/50 shadow-xl space-y-4">
+            <div class="bg-slate-900 text-white p-6 sm:p-8 rounded-3xl border border-indigo-900/50 shadow-lg space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div class="flex items-center gap-3">
                         <span class="text-3xl">📑</span>
@@ -443,7 +444,7 @@
                         </div>
                     </div>
 
-                    <div class="text-right bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
+                    <div class="text-right bg-white/10 px-4 py-2 rounded-2xl border border-white/10">
                         <div class="text-[10px] uppercase font-mono font-bold text-indigo-300">{{ __("Operating Profit (EBITDA)") }}</div>
                         <div class="text-xl sm:text-2xl font-black font-mono {{ $dreStatement['ebitda'] >= 0 ? 'text-emerald-400' : 'text-rose-400' }}">
                             {{ $company->formatMoney($dreStatement['ebitda']) }}
@@ -1165,6 +1166,16 @@ document.addEventListener('alpine:init', () => {
             this.$nextTick(() => {
                 this.renderActiveTabCharts();
             });
+
+            // ApexCharts now loads lazily (bundled via Vite, dynamically
+            // imported only when this dashboard is on the page — see
+            // resources/js/charts-loader.js) instead of via a blocking
+            // <script> tag, so it may not be ready yet on first paint.
+            // renderActiveTabCharts() no-ops if window.ApexCharts isn't
+            // defined; this retries once the async import actually resolves.
+            window.addEventListener('apexcharts-ready', () => {
+                this.$nextTick(() => this.renderActiveTabCharts());
+            }, { once: true });
 
             this.$watch('activeTab', () => {
                 this.$nextTick(() => {

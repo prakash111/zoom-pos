@@ -303,7 +303,9 @@ class ReportingCommissionsAndReceivablesTest extends TestCase
         // Route accessibility
         $response = $this->actingAs($admin, 'web')->get(route('tenant.reports.index'));
         $response->assertOk();
-        $response->assertSee('assets/libs/apexcharts.min.js');
+        // ApexCharts is now lazy-loaded via Vite (resources/js/charts-loader.js)
+        // when this DOM marker is present, instead of a route-gated raw <script> tag.
+        $response->assertSee('data-apexcharts-dashboard', false);
 
         // Test Livewire component across all 5 tabs and KPI metrics
         $component = Livewire::test(ReportsIndex::class);

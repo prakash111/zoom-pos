@@ -110,10 +110,14 @@ class SelfRegistrationAndSubscriptionTest extends TestCase
         $this->assertSame('free_trial', $invoice->payment_method);
         $this->assertSame('paid', $invoice->status);
 
-        // Auto-imported Demo Data for General Retail
-        $this->assertGreaterThan(0, Category::withoutGlobalScopes()->where('company_id', $company->id)->count());
-        $this->assertGreaterThan(0, Product::withoutGlobalScopes()->where('company_id', $company->id)->count());
-        $this->assertGreaterThan(0, Customer::withoutGlobalScopes()->where('company_id', $company->id)->count());
+        // A newly registered tenant starts with a genuinely empty store — no
+        // auto-seeded demo categories/products/customers. Every account used
+        // to get the exact same canned "Terong/Melon/Apple..." catalog and
+        // fake customers, which made every fresh signup look identical and
+        // was mistaken for a cross-tenant data leak.
+        $this->assertSame(0, Category::withoutGlobalScopes()->where('company_id', $company->id)->count());
+        $this->assertSame(0, Product::withoutGlobalScopes()->where('company_id', $company->id)->count());
+        $this->assertSame(0, Customer::withoutGlobalScopes()->where('company_id', $company->id)->count());
     }
 
     public function test_tenant_can_self_register_with_restaurant_mode_and_pro_plan(): void
@@ -135,14 +139,15 @@ class SelfRegistrationAndSubscriptionTest extends TestCase
         $this->assertSame('restaurant', $company->pos_mode);
         $this->assertSame('professional', $company->plan_name);
 
-        // Floor and tables provisioned automatically for restaurant
-        $floor = DiningFloor::where('company_id', $company->id)->firstOrFail();
-        $this->assertSame('Main Dining Area', $floor->name);
-        $this->assertGreaterThanOrEqual(4, DiningTable::where('company_id', $company->id)->count());
-
-        // Restaurant Menu Demo Items provisioned
-        $this->assertGreaterThan(0, Category::where('company_id', $company->id)->count());
-        $this->assertGreaterThan(0, Product::where('company_id', $company->id)->count());
+        // A new restaurant tenant also starts empty — no auto-seeded demo
+        // floors/tables (previously created with fictional "occupied" /
+        // "reserved" / "billed" statuses) or demo menu items. The owner sets
+        // up their own floor plan and menu via the Restaurant > Tables and
+        // Products screens.
+        $this->assertSame(0, DiningFloor::where('company_id', $company->id)->count());
+        $this->assertSame(0, DiningTable::where('company_id', $company->id)->count());
+        $this->assertSame(0, Category::where('company_id', $company->id)->count());
+        $this->assertSame(0, Product::where('company_id', $company->id)->count());
 
         // Tax Invoice check with 18% GST
         $invoice = SubscriptionInvoice::where('company_id', $company->id)->firstOrFail();

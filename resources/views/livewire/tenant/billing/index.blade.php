@@ -95,7 +95,7 @@
         </div>
 
         <!-- Activation Code Redemption Card (1 col) -->
-        <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-3xl p-6 shadow-xl shadow-blue-500/20 flex flex-col justify-between space-y-4">
+        <div class="bg-theme-primary text-white rounded-3xl p-6 shadow-lg flex flex-col justify-between space-y-4">
             <div>
                 <div class="w-10 h-10 rounded-2xl bg-white/20 text-white text-xl flex items-center justify-center font-black mb-2">
                     🔑

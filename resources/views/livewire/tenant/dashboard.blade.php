@@ -6,14 +6,10 @@
         <!-- ========================================== -->
 
         <!-- Restaurant Hero Banner -->
-        <div class="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-emerald-500/20">
-
-            <!-- Decorative Glow Orbs -->
-            <div class="absolute -right-10 -top-10 w-64 h-64 bg-lime-400/15 rounded-full blur-3xl pointer-events-none"></div>
-            <div class="absolute right-40 -bottom-20 w-48 h-48 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="bg-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-emerald-500/20">
 
             <div class="relative z-10 max-w-xl">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-xs font-bold text-lime-200 mb-3 backdrop-blur-xs">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-xs font-bold text-lime-200 mb-3">
                     <span class="w-2 h-2 rounded-full bg-lime-400 animate-pulse"></span>
                     <span>Food & Restaurant Mode Active &bull; {{ auth()->user()?->company?->name }}</span>
                 </div>
@@ -27,17 +23,17 @@
 
             <div class="relative z-10 flex flex-wrap items-center gap-3">
                 <a href="{{ route('tenant.restaurant.pos') }}"
-                   class="px-6 py-3.5 rounded-2xl bg-lime-400 hover:bg-lime-500 text-slate-950 font-black text-sm shadow-xl shadow-lime-500/20 active:scale-95 transition-all flex items-center gap-2">
+                   class="px-6 py-3.5 rounded-2xl bg-lime-400 hover:bg-lime-500 text-slate-950 font-black text-sm shadow-md active:scale-95 transition-all flex items-center gap-2">
                     <span>🍽️ Open Restaurant POS</span>
                 </a>
 
                 <a href="{{ route('tenant.restaurant.kds') }}"
-                   class="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-extrabold text-sm backdrop-blur-xs transition-all flex items-center gap-1.5">
+                   class="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-extrabold text-sm transition-all flex items-center gap-1.5">
                     <span>🍳 Kitchen KDS</span>
                 </a>
 
                 <a href="{{ route('tenant.restaurant.tables') }}"
-                   class="px-4 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm backdrop-blur-xs transition-all">
+                   class="px-4 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition-all">
                     🪑 Tables
                 </a>
             </div>
@@ -292,14 +288,10 @@
         <!-- ========================================== -->
 
         <!-- Hero Banner Card -->
-        <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-
-            <!-- Decorative Glow Orbs -->
-            <div class="absolute -right-10 -top-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-            <div class="absolute right-40 -bottom-20 w-48 h-48 bg-indigo-400/20 rounded-full blur-xl pointer-events-none"></div>
+        <div class="bg-theme-primary rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
 
             <div class="relative z-10 max-w-xl">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-xs font-semibold text-blue-100 mb-3 backdrop-blur-xs">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-xs font-semibold text-blue-100 mb-3">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                     <span>{{ __('Store Ready') }} &bull; {{ auth()->user()?->company?->name ?? __('POS Terminal') }}</span>
                 </div>
@@ -313,7 +305,7 @@
 
             <div class="relative z-10 flex flex-wrap items-center gap-3">
                 <a href="{{ route('tenant.sales.create') }}"
-                   class="px-6 py-3.5 rounded-2xl bg-white hover:bg-blue-50 text-blue-600 font-black text-sm shadow-xl shadow-black/10 active:scale-95 transition-all flex items-center gap-2.5">
+                   class="px-6 py-3.5 rounded-2xl bg-white hover:bg-blue-50 text-blue-600 font-black text-sm shadow-md active:scale-95 transition-all flex items-center gap-2.5">
                     <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
@@ -322,13 +314,13 @@
 
                 <button type="button"
                         wire:click="openPosLayoutModal"
-                        class="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-extrabold text-sm backdrop-blur-xs transition-all flex items-center gap-2 cursor-pointer">
+                        class="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-extrabold text-sm transition-all flex items-center gap-2 cursor-pointer">
                     <span class="text-base">🎨</span>
                     <span>{{ __('Switch POS Layout Design') }}</span>
                 </button>
 
                 <a href="{{ route('tenant.products.index') }}"
-                   class="px-4 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm backdrop-blur-xs transition-all">
+                   class="px-4 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition-all">
                     + {{ __('Product') }}
                 </a>
             </div>

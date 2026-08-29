@@ -1107,7 +1107,7 @@
         </div>
 
         <!-- Automated & Local Database Backup Download Card -->
-        <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-3xl p-6 sm:p-7 border border-blue-900/50 shadow-xl space-y-5">
+        <div class="bg-slate-900 text-white rounded-3xl p-6 sm:p-7 border border-blue-900/50 shadow-lg space-y-5">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div class="flex items-center gap-3">
                     <div class="w-12 h-12 rounded-2xl bg-blue-500/20 text-blue-300 flex items-center justify-center font-bold text-2xl">

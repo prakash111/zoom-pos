@@ -5,6 +5,8 @@ namespace App\Jobs;
 use App\Models\Company;
 use App\Services\Sync\DesktopSyncClient;
 use App\Services\Sync\DesktopSyncEngine;
+use App\Support\Desktop;
+use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -24,11 +26,25 @@ class RunDesktopSyncCycle implements ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
+    use Queueable;
     use SerializesModels;
 
     public function handle(DesktopSyncEngine $engine): void
     {
-        $company = Company::query()->first();
+        // This job runs in a separate queue-worker process with no HTTP
+        // request of its own, so it can't ask "who's logged in right now" —
+        // it has to be told. Desktop::activeCompanyId() is the record of
+        // whichever account most recently completed a real login on this
+        // device. Falling back to Company::first() (whichever row happens to
+        // have the lowest id) would silently sync a stale or entirely wrong
+        // tenant's data on any device that has ever seen more than one
+        // account — exactly the bug that made the real logged-in tenant's
+        // own data look like it never syncs, and let a foreign company's
+        // rows pile up in the same local database.
+        $companyId = Desktop::activeCompanyId();
+        $company = $companyId
+            ? Company::withoutGlobalScopes()->find($companyId)
+            : Company::query()->first();
 
         if (! $company) {
             self::dispatch()->delay(now()->addSeconds(30));

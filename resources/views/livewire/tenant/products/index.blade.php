@@ -21,12 +21,10 @@
 
         <div class="flex gap-2">
         <livewire:tenant.products.product-bulk-import-component />
-        <button wire:click="newProduct"
-                type="button"
-                class="px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 text-white shadow-md shadow-indigo-500/20 active:scale-[0.97] transition duration-150 ease-out flex items-center justify-center gap-2 cursor-pointer">
+        <x-ui.button wire:click="newProduct">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
             <span>+ {{ __('New Product') }}</span>
-        </button>
+        </x-ui.button>
         </div>
     </div>
 
@@ -67,7 +65,7 @@
                         @error('imageFile') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <button type="button" wire:click="generateAiPhoto" wire:loading.attr="disabled" class="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold shadow-md">✨ {{ __('Generate with AI') }}</button>
+                    <button type="button" wire:click="generateAiPhoto" wire:loading.attr="disabled" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-sm transition">✨ {{ __('Generate with AI') }}</button>
 
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">{{ __('Or Direct Image URL') }}</label>
@@ -159,9 +157,9 @@
                 <button wire:click="$set('showForm', false)" type="button" class="px-5 py-2.5 rounded-2xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-[0.97] transition duration-150 ease-out cursor-pointer">
                     {{ __('Cancel') }}
                 </button>
-                <button wire:click="save" type="button" class="px-5 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 text-white shadow-md shadow-indigo-500/20 active:scale-[0.97] transition duration-150 ease-out cursor-pointer">
+                <x-ui.button wire:click="save">
                     {{ __('Save Product') }}
-                </button>
+                </x-ui.button>
             </div>
         </div>
     @endif

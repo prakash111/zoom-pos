@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
+use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Brand;
 use App\Models\Category;
@@ -26,10 +26,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -124,11 +124,11 @@ class PosSyncApiController extends Controller
             [
                 'company_id' => $company->id,
                 'user_id' => $user->id,
-                'name' => 'Desktop POS Client (' . ($user->name ?: 'Terminal') . ')',
+                'name' => 'Desktop POS Client ('.($user->name ?: 'Terminal').')',
                 'active' => true,
             ],
             [
-                'token' => 'zk_live_' . Str::random(40),
+                'token' => 'zk_live_'.Str::random(40),
                 'permissions' => ['*'],
             ]
         );
@@ -188,11 +188,14 @@ class PosSyncApiController extends Controller
         $validator = Validator::make($request->all(), [
             'store_name' => ['required', 'string', 'max:150'],
             'name' => ['required', 'string', 'max:150'],
+            'slug' => ['nullable', 'string', 'max:60', 'regex:/^[a-z0-9-]+$/', 'unique:companies,slug'],
+            'custom_domain' => ['nullable', 'string', 'max:100', 'unique:companies,custom_domain'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
             'phone' => ['nullable', 'string', 'max:50'],
             'currency' => ['nullable', 'string', 'max:10'],
             'pos_mode' => ['nullable', 'string'],
+            'plan_name' => ['nullable', 'string', 'in:trial,starter,professional'],
             'activation_code' => ['nullable', 'string'],
         ]);
 
@@ -207,6 +210,8 @@ class PosSyncApiController extends Controller
         try {
             $regData = [
                 'store_name' => $request->input('store_name'),
+                'slug' => $request->input('slug'),
+                'custom_domain' => $request->input('custom_domain'),
                 'owner_name' => $request->input('name'),
                 'admin_name' => $request->input('name'),
                 'email' => $request->input('email'),
@@ -216,6 +221,7 @@ class PosSyncApiController extends Controller
                 'phone' => $request->input('phone'),
                 'currency' => $request->input('currency', 'USD'),
                 'pos_mode' => $request->input('pos_mode', 'general'),
+                'plan_name' => $request->input('plan_name', 'trial'),
                 'activation_code' => $request->input('activation_code'),
             ];
 
@@ -226,8 +232,8 @@ class PosSyncApiController extends Controller
             $apiKey = TenantApiKey::create([
                 'company_id' => $company->id,
                 'user_id' => $user->id,
-                'name' => 'Desktop POS Client (' . $user->name . ')',
-                'token' => 'zk_live_' . Str::random(40),
+                'name' => 'Desktop POS Client ('.$user->name.')',
+                'token' => 'zk_live_'.Str::random(40),
                 'permissions' => ['*'],
                 'active' => true,
             ]);
@@ -239,6 +245,7 @@ class PosSyncApiController extends Controller
                 'user' => [
                     'id' => $user->id,
                     'name' => $user->name,
+                    'login' => $user->login,
                     'email' => $user->email,
                     'role' => $user->role,
                     'company_id' => $user->company_id,
@@ -253,6 +260,9 @@ class PosSyncApiController extends Controller
                     'plan_name' => $company->plan_name ?? 'trial',
                     'expires_at' => $company->expires_at?->toIso8601String(),
                 ],
+                'plan' => $company->plan ? $company->plan->only([
+                    'name', 'display_name', 'billing_cycle', 'duration_days', 'price', 'currency', 'features', 'limits', 'active',
+                ]) : null,
                 'subscription' => [
                     'plan_name' => $company->plan_name,
                     'status' => 'active',
@@ -260,10 +270,11 @@ class PosSyncApiController extends Controller
                 ],
             ], 201);
         } catch (\Throwable $e) {
-            Log::error('POS Tenant Registration Failed: ' . $e->getMessage(), ['exception' => $e]);
+            Log::error('POS Tenant Registration Failed: '.$e->getMessage(), ['exception' => $e]);
+
             return response()->json([
                 'success' => false,
-                'error' => 'Registration failed: ' . $e->getMessage(),
+                'error' => 'Registration failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -479,6 +490,7 @@ class PosSyncApiController extends Controller
 
         $quotations = $quotationsQuery->latest('created_at')->limit(100)->get()->map(function (Sale $q) {
             $items = is_array($q->items) ? $q->items : (json_decode($q->items ?? '', true) ?: []);
+
             return [
                 'id' => (string) ($q->external_id ?: $q->id),
                 'server_id' => $q->id,
@@ -520,6 +532,7 @@ class PosSyncApiController extends Controller
 
         $sales = $salesQuery->latest('created_at')->limit(200)->get()->map(function (Sale $s) {
             $items = is_array($s->items) ? $s->items : (json_decode($s->items ?? '', true) ?: []);
+
             return [
                 'id' => (string) ($s->external_id ?: $s->id),
                 'server_id' => $s->id,
@@ -605,6 +618,42 @@ class PosSyncApiController extends Controller
             ];
         });
 
+        // Company/business settings — always sent in full (a single row,
+        // no "since" delta to compute) so a change made in Settings on the
+        // web reaches every device on the very next sync cycle. Deliberately
+        // a plain business-info subset: billing/plan fields (plan_name,
+        // expires_at, max_users/max_devices), the tax gateway credentials,
+        // and identity fields (slug/custom_domain/unique_account_id) are
+        // intentionally excluded — those are platform-controlled or would
+        // risk a stale device overwriting billing state, not something a
+        // desktop sync cycle should ever push back either.
+        $companySettings = [
+            'name' => $company->name,
+            'trade_name' => $company->trade_name,
+            'legal_name' => $company->legal_name,
+            'tax_id' => $company->tax_id,
+            'email' => $company->email,
+            'phone' => $company->phone,
+            'website' => $company->website,
+            'address' => $company->address,
+            'city' => $company->city,
+            'state' => $company->state,
+            'postal_code' => $company->postal_code,
+            'country' => $company->country,
+            'currency' => $company->currency,
+            'currency_symbol' => $company->currency_symbol,
+            'currency_decimals' => $company->currency_decimals,
+            'currency_symbol_position' => $company->currency_symbol_position,
+            'pos_mode' => $company->pos_mode,
+            'pos_layout' => $company->pos_layout,
+            'receipt_format' => $company->receipt_format,
+            'invoice_prefix' => $company->invoice_prefix,
+            'quotation_prefix' => $company->quotation_prefix,
+            'invoice_terms' => $company->invoice_terms,
+            'quote_terms' => $company->quote_terms,
+            'bank_details' => $company->bank_details,
+        ];
+
         return response()->json([
             'success' => true,
             'server_time' => now()->toIso8601String(),
@@ -628,6 +677,7 @@ class PosSyncApiController extends Controller
             'brands' => $brands,
             'units' => $units,
             'taxes' => $taxes,
+            'company' => $companySettings,
         ]);
     }
 
@@ -707,6 +757,7 @@ class PosSyncApiController extends Controller
 
                 if ($existingSale) {
                     $syncedIds[] = $clientUuid;
+
                     continue;
                 }
 
@@ -739,7 +790,7 @@ class PosSyncApiController extends Controller
                             ->where('company_id', $company->id)
                             ->where(function ($q) use ($productId) {
                                 $q->where('id', $productId)
-                                  ->orWhere('external_id', (string) $productId);
+                                    ->orWhere('external_id', (string) $productId);
                             })
                             ->first();
 
@@ -752,7 +803,7 @@ class PosSyncApiController extends Controller
                 $total = (float) ($saleData['total'] ?? $calcSubtotal);
                 $discount = (float) ($saleData['discount'] ?? 0);
                 $paymentMethod = $saleData['payment_method'] ?? 'cash';
-                $orderNumber = $saleData['order_number'] ?? $saleData['sale_number'] ?? ('POS-' . strtoupper(substr($clientUuid, 0, 8)));
+                $orderNumber = $saleData['order_number'] ?? $saleData['sale_number'] ?? ('POS-'.strtoupper(substr($clientUuid, 0, 8)));
                 $createdAt = isset($saleData['createdAt']) ? Carbon::parse($saleData['createdAt']) : now();
 
                 // Associate Customer if passed
@@ -764,7 +815,7 @@ class PosSyncApiController extends Controller
                         ->where('company_id', $company->id)
                         ->where(function ($q) use ($saleData) {
                             $q->where('id', $saleData['customer_id'])
-                              ->orWhere('external_id', (string) $saleData['customer_id']);
+                                ->orWhere('external_id', (string) $saleData['customer_id']);
                         })
                         ->first();
 
@@ -827,6 +878,10 @@ class PosSyncApiController extends Controller
         $syncedProducts = [];
         $syncedCustomers = [];
         $syncedQuotations = [];
+        $syncedCategories = [];
+        $syncedBrands = [];
+        $syncedSuppliers = [];
+        $syncedUnits = [];
 
         DB::beginTransaction();
         try {
@@ -915,6 +970,135 @@ class PosSyncApiController extends Controller
                 }
             }
 
+            // 2b. Process Offline Created/Edited Categories, Brands, Suppliers,
+            // Units — created on the desktop app the same way products/customers
+            // are (via the same web UI running locally), but until now nothing
+            // ever pushed them back up: DesktopSyncClient only pulled these four
+            // tables, so a category or brand added on desktop stayed stuck on
+            // that one device forever. Kept intentionally simple (create-or-
+            // update by external_id, name fallback to avoid an obvious dupe)
+            // since these are small reference tables, not transactional data.
+            if ($request->has('created_categories') && is_array($request->input('created_categories'))) {
+                foreach ($request->input('created_categories') as $catData) {
+                    $extId = (string) ($catData['id'] ?? Str::uuid()->toString());
+                    $cat = Category::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where('external_id', $extId)
+                        ->first();
+                    if (! $cat && ! empty($catData['name'])) {
+                        $cat = Category::withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->where('name', $catData['name'])
+                            ->first();
+                    }
+
+                    $attrs = [
+                        'name' => $catData['name'] ?? 'Category',
+                        'color' => $catData['color'] ?? null,
+                        'description' => $catData['description'] ?? null,
+                        'active' => array_key_exists('active', $catData) ? (bool) $catData['active'] : true,
+                    ];
+
+                    if (! $cat) {
+                        $cat = Category::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
+                    } elseif ($this->clientRowIsNewer($cat, $catData)) {
+                        $cat->update($attrs);
+                    }
+                    $syncedCategories[] = $extId;
+                }
+            }
+
+            if ($request->has('created_brands') && is_array($request->input('created_brands'))) {
+                foreach ($request->input('created_brands') as $brandData) {
+                    $extId = (string) ($brandData['id'] ?? Str::uuid()->toString());
+                    $brand = Brand::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where('external_id', $extId)
+                        ->first();
+                    if (! $brand && ! empty($brandData['name'])) {
+                        $brand = Brand::withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->where('name', $brandData['name'])
+                            ->first();
+                    }
+
+                    $attrs = [
+                        'name' => $brandData['name'] ?? 'Brand',
+                        'active' => array_key_exists('active', $brandData) ? (bool) $brandData['active'] : true,
+                    ];
+
+                    if (! $brand) {
+                        $brand = Brand::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
+                    } elseif ($this->clientRowIsNewer($brand, $brandData)) {
+                        $brand->update($attrs);
+                    }
+                    $syncedBrands[] = $extId;
+                }
+            }
+
+            if ($request->has('created_suppliers') && is_array($request->input('created_suppliers'))) {
+                foreach ($request->input('created_suppliers') as $supData) {
+                    $extId = (string) ($supData['id'] ?? Str::uuid()->toString());
+                    $sup = Supplier::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where('external_id', $extId)
+                        ->first();
+                    if (! $sup && ! empty($supData['name'])) {
+                        $sup = Supplier::withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->where('name', $supData['name'])
+                            ->first();
+                    }
+
+                    $attrs = [
+                        'name' => $supData['name'] ?? 'Supplier',
+                        'legal_name' => $supData['legal_name'] ?? null,
+                        'trade_name' => $supData['trade_name'] ?? null,
+                        'tax_id' => $supData['tax_id'] ?? null,
+                        'email' => $supData['email'] ?? null,
+                        'phone' => $supData['phone'] ?? null,
+                        'city' => $supData['city'] ?? null,
+                        'state' => $supData['state'] ?? null,
+                        'active' => array_key_exists('active', $supData) ? (bool) $supData['active'] : true,
+                    ];
+
+                    if (! $sup) {
+                        $sup = Supplier::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
+                    } elseif ($this->clientRowIsNewer($sup, $supData)) {
+                        $sup->update($attrs);
+                    }
+                    $syncedSuppliers[] = $extId;
+                }
+            }
+
+            if ($request->has('created_units') && is_array($request->input('created_units'))) {
+                foreach ($request->input('created_units') as $unitData) {
+                    $extId = (string) ($unitData['id'] ?? Str::uuid()->toString());
+                    $unit = Unit::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where('external_id', $extId)
+                        ->first();
+                    if (! $unit && ! empty($unitData['name'])) {
+                        $unit = Unit::withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->where('name', $unitData['name'])
+                            ->first();
+                    }
+
+                    $attrs = [
+                        'name' => $unitData['name'] ?? 'Unit',
+                        'abbreviation' => $unitData['abbreviation'] ?? null,
+                    ];
+
+                    if (! $unit) {
+                        $unit = Unit::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
+                    } elseif ($this->clientRowIsNewer($unit, $unitData)) {
+                        $unit->update($attrs);
+                    }
+                    $syncedUnits[] = $extId;
+                }
+            }
+
             // 3. Process Sales
             if ($request->has('sales') && is_array($request->input('sales')) && count($request->input('sales')) > 0) {
                 $syncedSales = $this->processSalesBatch($request->input('sales'), $company, $user);
@@ -932,6 +1116,7 @@ class PosSyncApiController extends Controller
                     ]) === 1;
                     if (! $isNewOperation) {
                         $syncedAdjustments[] = $adjId;
+
                         continue;
                     }
                     $prodId = $adj['product_id'] ?? null;
@@ -941,7 +1126,7 @@ class PosSyncApiController extends Controller
                     if ($prodId) {
                         $prod = Product::withoutGlobalScope('company')
                             ->where('company_id', $company->id)
-                            ->where(fn($q) => $q->where('id', $prodId)->orWhere('external_id', (string) $prodId))
+                            ->where(fn ($q) => $q->where('id', $prodId)->orWhere('external_id', (string) $prodId))
                             ->first();
 
                         if ($prod) {
@@ -970,6 +1155,7 @@ class PosSyncApiController extends Controller
                     ]) === 1;
                     if (! $isNewOperation) {
                         $syncedPayments[] = $payId;
+
                         continue;
                     }
                     $custId = $pay['customer_id'] ?? null;
@@ -981,7 +1167,7 @@ class PosSyncApiController extends Controller
                     if ($custId && $amount > 0) {
                         $cust = Customer::withoutGlobalScope('company')
                             ->where('company_id', $company->id)
-                            ->where(fn($q) => $q->where('id', $custId)->orWhere('external_id', (string) $custId))
+                            ->where(fn ($q) => $q->where('id', $custId)->orWhere('external_id', (string) $custId))
                             ->first();
 
                         if ($cust) {
@@ -995,7 +1181,9 @@ class PosSyncApiController extends Controller
 
                             $rem = $amount;
                             foreach ($dueSales as $sale) {
-                                if ($rem <= 0) break;
+                                if ($rem <= 0) {
+                                    break;
+                                }
                                 $apply = min($rem, (float) $sale->due_amount);
                                 $newPaid = (float) $sale->paid_amount + $apply;
                                 $newDue = max(0, (float) $sale->total - $newPaid);
@@ -1036,7 +1224,7 @@ class PosSyncApiController extends Controller
                     $total = (float) ($quoteData['total'] ?? 0);
                     $discount = (float) ($quoteData['discount'] ?? 0);
                     $tax = (float) ($quoteData['tax'] ?? 0);
-                    $quoteNumber = $quoteData['quote_number'] ?? $quoteData['sale_number'] ?? ('QUO-' . strtoupper(substr($extId, 0, 8)));
+                    $quoteNumber = $quoteData['quote_number'] ?? $quoteData['sale_number'] ?? ('QUO-'.strtoupper(substr($extId, 0, 8)));
                     $createdAt = isset($quoteData['createdAt']) ? Carbon::parse($quoteData['createdAt']) : now();
 
                     $customerId = null;
@@ -1046,7 +1234,7 @@ class PosSyncApiController extends Controller
                             ->where('company_id', $company->id)
                             ->where(function ($q) use ($quoteData) {
                                 $q->where('id', $quoteData['customer_id'])
-                                  ->orWhere('external_id', (string) $quoteData['customer_id']);
+                                    ->orWhere('external_id', (string) $quoteData['customer_id']);
                             })
                             ->first();
 
@@ -1097,10 +1285,11 @@ class PosSyncApiController extends Controller
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
-            Log::error('POS Sync Batch Ingestion Failed: ' . $e->getMessage(), ['exception' => $e]);
+            Log::error('POS Sync Batch Ingestion Failed: '.$e->getMessage(), ['exception' => $e]);
+
             return response()->json([
                 'success' => false,
-                'error' => 'Batch sync failed: ' . $e->getMessage(),
+                'error' => 'Batch sync failed: '.$e->getMessage(),
             ], 500);
         }
 
@@ -1115,6 +1304,10 @@ class PosSyncApiController extends Controller
                 'products' => $syncedProducts,
                 'customers' => $syncedCustomers,
                 'quotations' => $syncedQuotations,
+                'categories' => $syncedCategories,
+                'brands' => $syncedBrands,
+                'suppliers' => $syncedSuppliers,
+                'units' => $syncedUnits,
             ],
         ]);
     }
@@ -1349,8 +1542,8 @@ class PosSyncApiController extends Controller
         $customers = Customer::query()
             ->withoutGlobalScope('company')
             ->where('company_id', $company->id)
-            ->withCount(['sales as pending_sales_count' => fn($q) => $q->where('due_amount', '>', 0)])
-            ->withSum(['sales as total_due_balance' => fn($q) => $q->where('status', '!=', 'cancelled')], 'due_amount')
+            ->withCount(['sales as pending_sales_count' => fn ($q) => $q->where('due_amount', '>', 0)])
+            ->withSum(['sales as total_due_balance' => fn ($q) => $q->where('status', '!=', 'cancelled')], 'due_amount')
             ->orderBy('name')
             ->get()
             ->map(function (Customer $c) {
@@ -1579,14 +1772,16 @@ class PosSyncApiController extends Controller
 
             if ($request->filled('sale_id')) {
                 $sId = $request->input('sale_id');
-                $salesQuery->where(fn($q) => $q->where('id', $sId)->orWhere('external_id', (string) $sId));
+                $salesQuery->where(fn ($q) => $q->where('id', $sId)->orWhere('external_id', (string) $sId));
             }
 
             $dueSales = $salesQuery->orderBy('created_at')->lockForUpdate()->get();
             $remaining = $amount;
 
             foreach ($dueSales as $sale) {
-                if ($remaining <= 0) break;
+                if ($remaining <= 0) {
+                    break;
+                }
 
                 $apply = min($remaining, (float) $sale->due_amount);
                 $newPaid = round((float) $sale->paid_amount + $apply, 2);
@@ -1666,7 +1861,7 @@ class PosSyncApiController extends Controller
             ->select('payment_method', DB::raw('COUNT(*) as count'), DB::raw('SUM(total) as total'))
             ->groupBy('payment_method')
             ->get()
-            ->map(fn($row) => [
+            ->map(fn ($row) => [
                 'method' => ucfirst($row->payment_method ?: 'Cash'),
                 'count' => (int) $row->count,
                 'total' => (float) $row->total,
@@ -1706,7 +1901,7 @@ class PosSyncApiController extends Controller
                 $productStats[$pName]['revenue'] += $pTot;
             }
         }
-        usort($productStats, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
+        usort($productStats, fn ($a, $b) => $b['revenue'] <=> $a['revenue']);
         $topProducts = array_slice($productStats, 0, 5);
 
         // Low stock count & Receivables
@@ -1752,7 +1947,7 @@ class PosSyncApiController extends Controller
             ->first();
 
         $plan = Plan::find($company->plan_name) ?? Plan::first();
-        $availablePlans = Plan::where('active', true)->get()->map(fn(Plan $p) => [
+        $availablePlans = Plan::where('active', true)->get()->map(fn (Plan $p) => [
             'name' => $p->name,
             'display_name' => $p->display_name ?: ucfirst($p->name),
             'price' => (float) $p->price,
@@ -1828,10 +2023,11 @@ class PosSyncApiController extends Controller
                 'error' => $e->getMessage(),
             ], 422);
         } catch (\Throwable $e) {
-            Log::error('Activation Code Redemption Failed: ' . $e->getMessage(), ['exception' => $e]);
+            Log::error('Activation Code Redemption Failed: '.$e->getMessage(), ['exception' => $e]);
+
             return response()->json([
                 'success' => false,
-                'error' => 'Redemption failed: ' . $e->getMessage(),
+                'error' => 'Redemption failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -1876,8 +2072,8 @@ class PosSyncApiController extends Controller
                 ->where('company_id', $company->id)
                 ->where(function ($q) use ($docId) {
                     $q->where('external_id', $docId)
-                      ->orWhere('sale_number', $docId)
-                      ->orWhere('id', $docId);
+                        ->orWhere('sale_number', $docId)
+                        ->orWhere('id', $docId);
                 })
                 ->first();
         }
@@ -1887,7 +2083,7 @@ class PosSyncApiController extends Controller
             $extId = (string) ($docData['id'] ?? $docId ?? Str::uuid()->toString());
             $items = (array) ($docData['items'] ?? []);
             $total = (float) ($docData['total'] ?? 0);
-            $orderNumber = $docData['order_number'] ?? $docData['quote_number'] ?? $docData['sale_number'] ?? ('POS-' . strtoupper(substr($extId, 0, 8)));
+            $orderNumber = $docData['order_number'] ?? $docData['quote_number'] ?? $docData['sale_number'] ?? ('POS-'.strtoupper(substr($extId, 0, 8)));
 
             $sale = Sale::create([
                 'company_id' => $company->id,
@@ -1964,10 +2160,11 @@ class PosSyncApiController extends Controller
                 ]);
             }
         } catch (\Throwable $e) {
-            Log::error('POS Delivery Exception: ' . $e->getMessage(), ['exception' => $e]);
+            Log::error('POS Delivery Exception: '.$e->getMessage(), ['exception' => $e]);
+
             return response()->json([
                 'success' => false,
-                'error' => 'Delivery failed: ' . $e->getMessage(),
+                'error' => 'Delivery failed: '.$e->getMessage(),
             ], 500);
         }
     }

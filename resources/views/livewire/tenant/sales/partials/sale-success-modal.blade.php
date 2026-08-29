@@ -123,11 +123,9 @@
 
         <x-slot:footer>
             <div class="w-full space-y-2">
-                <button type="button"
-                        wire:click="startNextSale"
-                        class="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 text-white font-black text-xs shadow-xl shadow-indigo-500/20 active:scale-[0.97] transition duration-150 ease-out flex items-center justify-center gap-2 cursor-pointer">
+                <x-ui.button wire:click="startNextSale" full class="!font-black">
                     <span>➕ Start Next Order / New Sale &rarr;</span>
-                </button>
+                </x-ui.button>
 
                 <a wire:navigate.hover href="{{ route('tenant.sales.show', $cSale) }}"
                    class="block text-center text-[11px] font-semibold text-slate-400 hover:text-blue-500 hover:underline pt-1">

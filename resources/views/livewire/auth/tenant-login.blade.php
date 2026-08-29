@@ -31,7 +31,7 @@
                 </div>
             @endif
 
-            @if (config('app.demo_mode'))
+            @if (config('app.demo_mode') && ! \App\Support\Desktop::isRunning())
                 <!-- Demo Mode Visual Notification Badge -->
                 <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between shadow-sm">
                     <div class="flex items-center gap-2.5">

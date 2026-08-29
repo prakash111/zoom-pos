@@ -43,11 +43,11 @@
     </div>
 
     <!-- Store Milestone Hero Progress Card -->
-    <div class="bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-blue-600/10 relative overflow-hidden">
+    <div class="bg-theme-primary rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
         <div class="relative z-10 space-y-6">
             <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
                 <div>
-                    <span class="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-mono font-bold tracking-wider uppercase text-blue-200 border border-white/10">
+                    <span class="px-3 py-1 rounded-full bg-white/10 text-[11px] font-mono font-bold tracking-wider uppercase text-blue-200 border border-white/10">
                         {{ \Carbon\Carbon::create($year, $month, 1)->translatedFormat('F Y') }} Milestone
                     </span>
                     <h2 class="text-2xl sm:text-3xl font-black mt-2 tracking-tight">
@@ -68,7 +68,7 @@
 
             <!-- Progress Bar -->
             <div class="space-y-1.5">
-                <div class="w-full h-4 bg-black/30 rounded-full overflow-hidden p-0.5 backdrop-blur-md border border-white/10">
+                <div class="w-full h-4 bg-black/30 rounded-full overflow-hidden p-0.5 border border-white/10">
                     <div class="h-full rounded-full transition-all duration-500 {{ $overallProgress['percentage'] >= 100 ? 'bg-gradient-to-r from-emerald-400 to-teal-300' : 'bg-gradient-to-r from-blue-400 to-emerald-400' }}"
                          style="width: {{ min(100, $overallProgress['percentage']) }}%;"></div>
                 </div>
@@ -76,22 +76,22 @@
 
             <!-- Metric Run-Rate Pills -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-white/10 text-xs">
-                <div class="bg-white/5 backdrop-blur-xs p-3 rounded-2xl border border-white/10">
+                <div class="bg-white/5 p-3 rounded-2xl border border-white/10">
                     <div class="text-[10px] uppercase font-bold opacity-70">{{ __("Transactions") }}</div>
                     <div class="text-base font-black font-mono mt-0.5">{{ $overallProgress['sales_count'] }}</div>
                 </div>
 
-                <div class="bg-white/5 backdrop-blur-xs p-3 rounded-2xl border border-white/10">
+                <div class="bg-white/5 p-3 rounded-2xl border border-white/10">
                     <div class="text-[10px] uppercase font-bold opacity-70">{{ __("Monthly Target") }}</div>
                     <div class="text-base font-black font-mono mt-0.5">{{ $company->formatMoney($overallProgress['target']) }}</div>
                 </div>
 
-                <div class="bg-white/5 backdrop-blur-xs p-3 rounded-2xl border border-white/10">
+                <div class="bg-white/5 p-3 rounded-2xl border border-white/10">
                     <div class="text-[10px] uppercase font-bold opacity-70">{{ __("Days Remaining") }}</div>
                     <div class="text-base font-black font-mono mt-0.5">{{ $remainingDays }} {{ __("days") }}</div>
                 </div>
 
-                <div class="bg-white/5 backdrop-blur-xs p-3 rounded-2xl border border-white/10">
+                <div class="bg-white/5 p-3 rounded-2xl border border-white/10">
                     <div class="text-[10px] uppercase font-bold opacity-70">{{ __("Required Daily Run-Rate") }}</div>
                     <div class="text-base font-black font-mono mt-0.5 text-amber-300">
                         {{ $company->formatMoney($dailyRunRateNeeded) }} / {{ __("day") }}

@@ -184,6 +184,7 @@ import { dockableNav } from './dockable-nav';
 import { scrollTabToCenter, syncActiveTabs, initMobileNavController } from './mobile-nav-controller';
 import './pos-scanner';
 import './hardware-barcode-listener';
+import './charts-loader';
 
 let checkoutIslandsPromise = null;
 

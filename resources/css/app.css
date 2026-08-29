@@ -40,6 +40,104 @@ img, svg, video, canvas {
     max-width: 100%;
 }
 
+/* This app must render correctly offline — it can't depend on a network
+   request to Google Fonts. Use the OS-native font stack instead of
+   self-hosting webfonts: zero bytes shipped, zero network round trips. */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, ui-sans-serif, system-ui, Helvetica, Arial, sans-serif;
+}
+
+#nprogress .bar {
+    background: #2563eb !important;
+    height: 3px !important;
+    z-index: 99999 !important;
+}
+#nprogress .peg {
+    box-shadow: 0 0 10px #2563eb, 0 0 5px #2563eb !important;
+}
+
+/* Tenant desktop shell: dockable nav + branded-accent theme utilities.
+   These used to live as an inline <style> block re-sent on every request in
+   layouts/tenant.blade.php — moved here so they're compiled and cached once
+   instead of re-parsed on every page load. Only the --color-primary custom
+   property VALUES stay inline in the layout (they embed a per-request PHP
+   value, the tenant's own branded accent color); the rules that consume
+   those variables are static and belong here. */
+.dockable-nav-item:not([aria-selected='true']) span,
+.top-nav-item:not(.active) span {
+    color: var(--nav-item-color);
+}
+.dockable-nav-item[aria-selected='true'] span,
+.dockable-nav-item.active span,
+.top-nav-item.active span {
+    color: var(--nav-item-active-color) !important;
+    font-weight: 700;
+}
+
+.bg-theme-primary { background-color: var(--color-primary) !important; }
+.bg-theme-primary-hover:hover { background-color: var(--color-primary-hover) !important; }
+.bg-theme-primary-light { background-color: var(--color-primary-light) !important; }
+.text-theme-primary { color: var(--color-primary) !important; }
+.border-theme-primary { border-color: var(--color-primary) !important; }
+.from-theme-primary {
+    --tw-gradient-from: var(--color-primary) var(--tw-gradient-from-position);
+    --tw-gradient-to: var(--color-primary-hover) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.btn-theme-primary { background-color: var(--color-primary) !important; color: #ffffff !important; }
+.btn-theme-primary:hover { background-color: var(--color-primary-hover) !important; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Dockable & category menu scroll containers (Android-style scroll-snap). */
+.dockable-nav-container,
+.pos-categories-row,
+.tab-scroll-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.dockable-nav-container::-webkit-scrollbar,
+.pos-categories-row::-webkit-scrollbar,
+.tab-scroll-container::-webkit-scrollbar {
+    display: none;
+}
+
+.vertical-rail-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    text-orientation: mixed;
+    letter-spacing: 0.05em;
+}
+
+/* Anti-flicker initial dock layout rules: applied from a data attribute set
+   synchronously (before first paint) by the inline FOUC-prevention script
+   in layouts/tenant.blade.php, ahead of Alpine's own reactive :class
+   bindings taking over once it boots. */
+html[data-dock-pos='left']:not([data-nav-layout='macos-dock']):not([data-nav-layout='speed-dial']) .app-main-frame { flex-direction: row; }
+html[data-dock-pos='right']:not([data-nav-layout='macos-dock']):not([data-nav-layout='speed-dial']) .app-main-frame { flex-direction: row-reverse; }
+html[data-dock-pos='top']:not([data-nav-layout='macos-dock']):not([data-nav-layout='speed-dial']) .app-main-frame { flex-direction: column; }
+html[data-dock-pos='bottom']:not([data-nav-layout='macos-dock']):not([data-nav-layout='speed-dial']) .app-main-frame { flex-direction: column-reverse; }
+html[data-dock-pos='floating'] .app-main-frame,
+html[data-nav-layout='macos-dock'] .app-main-frame,
+html[data-nav-layout='speed-dial'] .app-main-frame { flex-direction: column; position: relative; }
+
+html[data-dock-pos='top'] .main-content-pane,
+html[data-dock-pos='bottom'] .main-content-pane,
+html[data-dock-pos='floating'] .main-content-pane,
+html[data-dock-mode='floating'] .main-content-pane {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
 /* Preserve motion polish while respecting accessibility and low-power devices. */
 @media (prefers-reduced-motion: reduce) {
     html:focus-within { scroll-behavior: auto !important; }

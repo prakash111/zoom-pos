@@ -87,8 +87,8 @@
         <button type="button" @click="open = false" class="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer">
             {{ __('Cancel') }}
         </button>
-        <button type="button" wire:click="saveTaxRule" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition active:scale-[0.98] cursor-pointer">
+        <x-ui.button wire:click="saveTaxRule">
             {{ __('Save Tax Rule') }}
-        </button>
+        </x-ui.button>
     </x-slot:footer>
 </x-modal>

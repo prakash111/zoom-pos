@@ -43,10 +43,22 @@ class DesktopSyncClient
      * Legacy tables PosSyncApiController owns, mapped for the generic push
      * loop below — the wire shape for creates matches sync-batch's existing
      * created_products/created_customers keys.
+     *
+     * Categories/brands/suppliers/units were previously only ever pulled
+     * (see legacyPullableModels below) — a category or brand created or
+     * edited on the desktop app had nowhere to go and was silently stuck
+     * on that one device forever, never reaching the server or any other
+     * device. Listing them here is enough: this class's generic push loop
+     * (pushLegacyDirty) already builds the wire payload and marks rows
+     * synced purely from fillable()+external_id, with no per-model code.
      */
     protected array $legacyPushableModels = [
         'created_products' => Product::class,
         'created_customers' => Customer::class,
+        'created_categories' => Category::class,
+        'created_brands' => Brand::class,
+        'created_suppliers' => Supplier::class,
+        'created_units' => Unit::class,
     ];
 
     /**
@@ -62,6 +74,23 @@ class DesktopSyncClient
         'brands' => Brand::class,
         'units' => Unit::class,
         'sales' => Sale::class,
+        'quotations' => Sale::class,
+    ];
+
+    /**
+     * PosSyncApiController::syncPull() emits a hand-shaped wire format that
+     * doesn't always match the local Eloquent column names (e.g. it calls a
+     * product's sale price "price", not "sale_price") — a legacy of this
+     * being the same payload shape the standalone POS terminal client reads.
+     * Without translating these, upsertLocal()'s `only($fillable)` silently
+     * drops every field whose wire name isn't also a column name, which is
+     * exactly why pulled products used to land locally with a real name but
+     * a zeroed price and stock. table_key => [wire_field => model_column].
+     */
+    protected array $legacyPullFieldAliases = [
+        'products' => ['price' => 'sale_price', 'stock' => 'current_stock', 'min_stock' => 'minimum_stock'],
+        'sales' => ['tax' => 'tax_amount'],
+        'quotations' => ['tax' => 'tax_amount', 'quote_number' => 'sale_number', 'valid_until' => 'due_date'],
     ];
 
     public function __construct(protected Company $company, protected DesktopSyncEngine $engine)
@@ -242,9 +271,30 @@ class DesktopSyncClient
         $count = 0;
         foreach ($this->legacyPullableModels as $wireKey => $modelClass) {
             foreach ($response[$wireKey] ?? [] as $row) {
-                $this->upsertLocal($modelClass, $row);
+                if ($wireKey === 'quotations') {
+                    // The wire payload has no operation_type field of its own
+                    // (it's implied by which top-level key the row arrived
+                    // under) — without setting it explicitly here, a pulled
+                    // quotation would land indistinguishable from a regular
+                    // sale in every local query that filters on it.
+                    $row['operation_type'] = 'quotation';
+                }
+
+                $this->upsertLocal($modelClass, $row, $this->legacyPullFieldAliases[$wireKey] ?? []);
                 $count++;
             }
+        }
+
+        // Business/receipt settings changed in Settings on the web (or any
+        // other device) previously never reached this device again after the
+        // one-time bootstrap that created this local Company row — every
+        // subsequent edit was silently stuck server-side. Read-only refresh
+        // only: this deliberately never pushes a local edit back up, since
+        // Company also carries plan/billing fields this sync surface must
+        // never touch (see the field allowlist in PosSyncApiController::
+        // syncPull()).
+        if (! empty($response['company']) && is_array($response['company'])) {
+            $this->company->fill($response['company'])->save();
         }
 
         $this->setConfig('last_pull_at', $response['server_time'] ?? now()->toIso8601String());
@@ -270,11 +320,17 @@ class DesktopSyncClient
         return $count;
     }
 
-    protected function upsertLocal(string $modelClass, array $row): void
+    protected function upsertLocal(string $modelClass, array $row, array $fieldAliases = []): void
     {
         $externalId = (string) ($row['id'] ?? $row['server_id'] ?? null);
         if ($externalId === '') {
             return;
+        }
+
+        foreach ($fieldAliases as $wireField => $column) {
+            if (array_key_exists($wireField, $row) && ! array_key_exists($column, $row)) {
+                $row[$column] = $row[$wireField];
+            }
         }
 
         $existing = $modelClass::query()->withoutGlobalScope('company')
@@ -317,7 +373,12 @@ class DesktopSyncClient
     {
         return Http::baseUrl($this->getConfig('remote_base_url', config('nativephp.website', 'https://saas.zoomnearby.com')))
             ->withToken($this->deviceToken())
-            ->acceptJson();
+            ->acceptJson()
+            // Without a bound timeout, a slow/unresponsive server would hang
+            // this indefinitely — and runCycle() is also called synchronously
+            // right after login (see TenantLogin), so a hang here would hang
+            // the login screen itself, not just a background job.
+            ->timeout(20);
     }
 
     protected function setStatus(string $status): void

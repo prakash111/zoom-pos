@@ -15,35 +15,52 @@ class ResolveTenantContext
      * BelongsToCompany-scoped model query is automatically tenant-isolated.
      * Runs after the guard has resolved the user (tenant_api already binds it
      * during token verification; this also covers the 'web' session guard).
+     *
+     * Always resolves fresh on every request rather than short-circuiting on
+     * "something is already bound" — this container binding can otherwise
+     * survive across requests within the same long-lived PHP process
+     * (NativePHP's desktop app keeps one process alive for the whole app
+     * session, and any Octane/Swoole/RoadRunner web deployment reuses worker
+     * processes the same way). With the old "only bind if not already bound"
+     * guard, logging out and a *different* tenant's user logging back in on
+     * the same running process would keep every subsequent request scoped to
+     * the FIRST account's company forever — the exact cross-tenant leak this
+     * middleware exists to prevent. A request with no resolvable tenant
+     * (guest/superadmin pages) must equally not inherit a stale binding left
+     * by an earlier, unrelated request, so it's explicitly cleared instead.
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (! app()->bound('tenant.company_id')) {
-            $user = Auth::guard('web')->user() ?? Auth::guard('tenant_api')->user();
-            if ($user) {
-                app()->instance('tenant.company_id', $user->company_id);
-            } else {
-                // Check if host matches custom domain or subdomain
-                $host = strtolower($request->getHost());
-                $baseHost = parse_url(config('app.url'), PHP_URL_HOST);
+        $user = Auth::guard('web')->user() ?? Auth::guard('tenant_api')->user();
+        $companyId = $user?->company_id ?? $this->resolveCompanyIdFromHost($request);
 
-                if ($baseHost && str_ends_with($host, '.'.$baseHost)) {
-                    $slug = substr($host, 0, -(strlen($baseHost) + 1));
-                    if ($slug && ! in_array($slug, Company::RESERVED_SLUGS, true)) {
-                        $company = Company::withoutGlobalScopes()->where('slug', $slug)->first();
-                        if ($company) {
-                            app()->instance('tenant.company_id', $company->id);
-                        }
-                    }
-                } elseif ($baseHost && $host !== $baseHost && $host !== 'localhost' && $host !== '127.0.0.1') {
-                    $company = Company::withoutGlobalScopes()->where('custom_domain', $host)->first();
-                    if ($company) {
-                        app()->instance('tenant.company_id', $company->id);
-                    }
-                }
-            }
+        if ($companyId) {
+            app()->instance('tenant.company_id', $companyId);
+        } elseif (app()->bound('tenant.company_id')) {
+            app()->forgetInstance('tenant.company_id');
         }
 
         return $next($request);
+    }
+
+    protected function resolveCompanyIdFromHost(Request $request): ?string
+    {
+        $host = strtolower($request->getHost());
+        $baseHost = parse_url(config('app.url'), PHP_URL_HOST);
+
+        if ($baseHost && str_ends_with($host, '.'.$baseHost)) {
+            $slug = substr($host, 0, -(strlen($baseHost) + 1));
+            if ($slug && ! in_array($slug, Company::RESERVED_SLUGS, true)) {
+                return Company::withoutGlobalScopes()->where('slug', $slug)->value('id');
+            }
+
+            return null;
+        }
+
+        if ($baseHost && $host !== $baseHost && $host !== 'localhost' && $host !== '127.0.0.1') {
+            return Company::withoutGlobalScopes()->where('custom_domain', $host)->value('id');
+        }
+
+        return null;
     }
 }

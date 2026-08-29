@@ -2,15 +2,18 @@
 
 namespace App\Services\Auth;
 
+use App\Exceptions\DesktopLocalProvisioningException;
 use App\Models\Company;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\Sync\DesktopSyncClient;
 use App\Services\Sync\DesktopSyncEngine;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * First-login bootstrap for a fresh desktop install. Its local SQLite
@@ -27,9 +30,7 @@ use Illuminate\Support\Facades\Log;
  */
 class DesktopAuthBootstrapService
 {
-    public function __construct(protected DesktopSyncEngine $syncEngine)
-    {
-    }
+    public function __construct(protected DesktopSyncEngine $syncEngine) {}
 
     public function attemptOnlineBootstrap(string $identifier, string $password): ?User
     {
@@ -55,8 +56,10 @@ class DesktopAuthBootstrapService
 
         $data = $response->json();
 
+        $this->ensureLocalSchemaReady();
+
         try {
-            return DB::transaction(function () use ($data, $password, $baseUrl) {
+            $user = DB::transaction(function () use ($data, $password, $baseUrl) {
                 $company = $this->provisionCompany($data['company'], $data['plan'] ?? null);
                 $user = $this->provisionUser($data['user'], $company, $password);
 
@@ -67,8 +70,134 @@ class DesktopAuthBootstrapService
         } catch (\Throwable $e) {
             Log::error('Desktop first-login bootstrap failed to provision local records.', ['exception' => $e]);
 
-            return null;
+            // The server just confirmed these credentials are correct — the
+            // caller must not report this as "invalid credentials". It's a
+            // distinct, locally-fixable problem.
+            throw new DesktopLocalProvisioningException(
+                'Your credentials were verified with the server, but this device could not finish setting up local data.',
+                previous: $e,
+            );
         }
+
+        $this->syncNewlyBootstrappedDevice($user);
+
+        return $user;
+    }
+
+    /**
+     * A brand-new device linked to an EXISTING cloud account has an empty
+     * local catalog at this point — provisioning above only ever creates the
+     * Company/Plan/User rows, never products/categories/customers/etc. Without
+     * this, the user would land on the dashboard and see nothing until the
+     * self-rescheduling RunDesktopSyncCycle background job happens to catch up
+     * (up to ~30s, and only if the queue worker is already running) — which
+     * reads as "my existing products aren't syncing" even though nothing is
+     * actually broken, just slow and invisible. Run one cycle synchronously,
+     * right here, so the catalog is already local by the time the login
+     * request returns. Deliberately best-effort: a slow/flaky network here
+     * must not turn a successful credential check into a failed login — the
+     * background job will pick up the slack on its own next pass regardless.
+     */
+    protected function syncNewlyBootstrappedDevice(User $user): void
+    {
+        $company = Company::withoutGlobalScopes()->find($user->company_id);
+
+        if (! $company) {
+            return;
+        }
+
+        try {
+            (new DesktopSyncClient($company, $this->syncEngine))->runCycle();
+        } catch (\Throwable $e) {
+            Log::warning('Initial post-bootstrap catalog sync failed — the background sync cycle will retry.', [
+                'exception' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Register a new store on the canonical server, then create the local
+     * offline mirror. Desktop registration must never provision only into
+     * the per-device SQLite database.
+     */
+    public function registerOnline(array $payload): User
+    {
+        $baseUrl = rtrim(config('nativephp.website') ?: 'https://saas.zoomnearby.com', '/');
+
+        try {
+            $response = Http::baseUrl($baseUrl)
+                ->timeout(30)
+                ->acceptJson()
+                ->post('/api/v1/pos/auth/register', [
+                    'store_name' => $payload['store_name'],
+                    'name' => $payload['owner_name'],
+                    'slug' => $payload['slug'] ?? null,
+                    'custom_domain' => $payload['custom_domain'] ?? null,
+                    'email' => $payload['email'],
+                    'password' => $payload['password'],
+                    'phone' => $payload['phone'] ?? null,
+                    'currency' => $payload['currency'] ?? 'USD',
+                    'pos_mode' => $payload['pos_mode'] ?? 'general',
+                    'plan_name' => $payload['plan_name'] ?? 'trial',
+                    'activation_code' => $payload['activation_code'] ?? null,
+                ]);
+        } catch (\Throwable $e) {
+            Log::info('Desktop registration could not reach the server.', ['exception' => $e->getMessage()]);
+
+            throw new \RuntimeException('Could not reach the registration server. Check your internet connection and try again.');
+        }
+
+        if (! $response->successful() || ! $response->json('success')) {
+            $message = $response->json('error') ?: 'Registration failed. Please try again.';
+            $details = collect($response->json('details', []))->flatten()->first();
+
+            throw new \RuntimeException($details ?: $message);
+        }
+
+        $data = $response->json();
+
+        $this->ensureLocalSchemaReady();
+
+        try {
+            $user = DB::transaction(function () use ($data, $payload, $baseUrl) {
+                $company = $this->provisionCompany($data['company'], $data['plan'] ?? null);
+                $user = $this->provisionUser($data['user'], $company, $payload['password']);
+
+                (new DesktopSyncClient($company, $this->syncEngine))->configure($baseUrl, $data['token']);
+
+                return $user;
+            });
+        } catch (\Throwable $e) {
+            Log::error('Desktop registration succeeded remotely but local bootstrap failed.', ['exception' => $e]);
+
+            throw new \RuntimeException('Your store was created online, but this device could not finish setup. Please return to Sign In and use the same credentials.');
+        }
+
+        $this->syncNewlyBootstrappedDevice($user);
+
+        return $user;
+    }
+
+    /**
+     * NativeAppServiceProvider::ensureApplicationInitialized() runs
+     * `migrate` once on cold start, but that step is best-effort (wrapped in
+     * a broad catch so a bad first boot never blocks the app from opening at
+     * all) — so it's possible to reach this service with an empty or
+     * partially-migrated local database. Provisioning the local mirror is
+     * the one place that absolutely depends on that schema existing, so
+     * double-check it here and self-heal rather than fail with a confusing
+     * "could not finish setup" error that a normal migrate would have
+     * avoided entirely.
+     */
+    protected function ensureLocalSchemaReady(): void
+    {
+        if (Schema::hasTable('companies') && Schema::hasTable('users') && Schema::hasTable('configurations')) {
+            return;
+        }
+
+        Log::warning('Desktop local schema was missing required tables at bootstrap time — re-running migrations.');
+
+        Artisan::call('migrate', ['--force' => true]);
     }
 
     protected function provisionCompany(array $c, ?array $plan): Company

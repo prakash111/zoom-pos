@@ -37,7 +37,7 @@
                 </div>
             @endforeach
         </div>
-        <div class="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800"><button type="button" wire:click="saveAiConfiguration" class="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs shadow-md shadow-purple-500/20 transition active:scale-95">{{ __('Save AI Configuration') }}</button></div>
+        <div class="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800"><button type="button" wire:click="saveAiConfiguration" class="px-6 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-sm transition active:scale-95">{{ __('Save AI Configuration') }}</button></div>
     </div>
     
     <!-- Top Header Bar -->

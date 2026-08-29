@@ -315,15 +315,12 @@
                     <span>{{ __("Print Draft") }}</span>
                 </button>
 
-                <button type="button"
-                        wire:click="save"
-                        wire:loading.attr="disabled"
-                        class="py-3 px-5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-blue-500/25 active:scale-[0.98] transition flex items-center justify-center gap-2 cursor-pointer">
+                <x-ui.button wire:click="save" wire:loading.attr="disabled" class="!rounded-2xl !font-black">
                     <span wire:loading.remove class="flex items-center gap-1.5">
                         <span>✓ {{ __("Confirm Sale & Complete") }}</span>
                     </span>
                     <span wire:loading>{{ __("Processing Transaction...") }}</span>
-                </button>
+                </x-ui.button>
             </div>
         </div>
 

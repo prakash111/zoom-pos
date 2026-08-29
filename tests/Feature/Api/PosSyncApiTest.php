@@ -170,6 +170,86 @@ class PosSyncApiTest extends TestCase
         $this->assertSame(1, Product::where('company_id', $this->company->id)->where('external_id', $extId)->count());
     }
 
+    /**
+     * Regression test: categories/brands/suppliers/units were only ever
+     * pulled to the desktop, never pushed back — one created or edited on
+     * the desktop app had no path to reach the server (or any other device)
+     * at all. DesktopSyncClient now lists them in legacyPushableModels,
+     * which routes them through this same sync-batch endpoint under
+     * created_categories/created_brands/created_suppliers/created_units.
+     */
+    public function test_sync_batch_pushes_offline_categories_brands_suppliers_and_units(): void
+    {
+        $catExtId = (string) Str::uuid();
+        $brandExtId = (string) Str::uuid();
+        $supplierExtId = (string) Str::uuid();
+        $unitExtId = (string) Str::uuid();
+
+        $response = $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'created_categories' => [[
+                'id' => $catExtId, 'name' => 'Snacks', 'color' => '#f59e0b', 'active' => true,
+            ]],
+            'created_brands' => [[
+                'id' => $brandExtId, 'name' => 'Acme', 'active' => true,
+            ]],
+            'created_suppliers' => [[
+                'id' => $supplierExtId, 'name' => 'Global Supply Co', 'phone' => '+1555000999', 'active' => true,
+            ]],
+            'created_units' => [[
+                'id' => $unitExtId, 'name' => 'Box', 'abbreviation' => 'bx',
+            ]],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('synced.categories.0', $catExtId)
+            ->assertJsonPath('synced.brands.0', $brandExtId)
+            ->assertJsonPath('synced.suppliers.0', $supplierExtId)
+            ->assertJsonPath('synced.units.0', $unitExtId);
+
+        $this->assertDatabaseHas('categories', ['company_id' => $this->company->id, 'external_id' => $catExtId, 'name' => 'Snacks']);
+        $this->assertDatabaseHas('brands', ['company_id' => $this->company->id, 'external_id' => $brandExtId, 'name' => 'Acme']);
+        $this->assertDatabaseHas('suppliers', ['company_id' => $this->company->id, 'external_id' => $supplierExtId, 'name' => 'Global Supply Co']);
+        $this->assertDatabaseHas('units', ['company_id' => $this->company->id, 'external_id' => $unitExtId, 'name' => 'Box']);
+
+        // Re-push the same batch (simulates a retried/duplicated sync cycle) — must upsert, not duplicate.
+        $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'created_categories' => [['id' => $catExtId, 'name' => 'Snacks Renamed', 'active' => true]],
+        ])->assertOk();
+
+        $this->assertSame(1, Category::where('company_id', $this->company->id)->where('external_id', $catExtId)->count());
+        $this->assertDatabaseHas('categories', ['external_id' => $catExtId, 'name' => 'Snacks Renamed']);
+    }
+
+    public function test_sync_batch_category_push_never_leaks_across_tenants(): void
+    {
+        $otherCompany = Company::create([
+            'name' => 'Other Tenant', 'slug' => 'other-tenant', 'email' => 'owner@other.test',
+            'country' => 'US', 'currency' => 'USD', 'currency_symbol' => '$', 'document' => 'US-000',
+            'plan_name' => 'trial', 'expires_at' => now()->addDays(14),
+        ]);
+        $otherKey = TenantApiKey::create([
+            'company_id' => $otherCompany->id, 'name' => 'Other Register',
+            'token' => 'zk_live_' . bin2hex(random_bytes(16)), 'permissions' => ['*'], 'active' => true,
+        ]);
+
+        $extId = (string) Str::uuid();
+        $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'created_categories' => [['id' => $extId, 'name' => 'Tenant A Category', 'active' => true]],
+        ])->assertOk();
+
+        $this->withToken($otherKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'created_categories' => [['id' => $extId, 'name' => 'Tenant B Category', 'active' => true]],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('categories', [
+            'company_id' => $this->company->id, 'external_id' => $extId, 'name' => 'Tenant A Category',
+        ]);
+        $this->assertDatabaseHas('categories', [
+            'company_id' => $otherCompany->id, 'external_id' => $extId, 'name' => 'Tenant B Category',
+        ]);
+        $this->assertSame(2, Category::withoutGlobalScope('company')->where('external_id', $extId)->count());
+    }
+
     public function test_inventory_adjustment_retry_is_idempotent(): void
     {
         $product = Product::create([

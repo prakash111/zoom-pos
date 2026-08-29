@@ -29,7 +29,18 @@ class AuthenticateTenantApi
         }
 
         // 1. Check TenantApiKey (zk_live_...)
-        $apiKey = TenantApiKey::where('token', $token)->where('active', true)->first();
+        //
+        // Must bypass the 'company' global scope: this query's entire purpose
+        // is to DISCOVER which tenant the token belongs to, so it cannot be
+        // pre-filtered by whatever tenant.company_id happens to already be
+        // bound in the container. In any long-lived PHP process (NativePHP's
+        // desktop app keeps one process alive across many requests, unlike a
+        // fresh PHP-FPM worker per request), a previous request on this same
+        // process can leave a stale company_id bound — silently causing a
+        // perfectly valid token for a *different* company to resolve to zero
+        // rows here and fail with a false "Unauthorized", which reads exactly
+        // like "sync randomly stops working" from the user's side.
+        $apiKey = TenantApiKey::withoutGlobalScope('company')->where('token', $token)->where('active', true)->first();
         if ($apiKey) {
             if ($requiredPermission && ! $apiKey->hasPermission($requiredPermission)) {
                 return response()->json([

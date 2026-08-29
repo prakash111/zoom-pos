@@ -4,7 +4,10 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Services\Auth\PermissionChecker;
+use App\Support\Desktop;
+use App\View\Composers\TenantNavigationComposer;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -14,7 +17,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        if (blank(config('app.key'))) {
+            config(['app.key' => Desktop::resolveOrCreatePersistentAppKey()]);
+        }
     }
 
     /**
@@ -22,6 +27,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $storageDirs = [
+            storage_path('framework/views'),
+            storage_path('framework/sessions'),
+            storage_path('framework/cache/data'),
+            storage_path('logs'),
+            storage_path('app'),
+        ];
+        foreach ($storageDirs as $dir) {
+            if (! is_dir($dir)) {
+                @mkdir($dir, 0775, true);
+            }
+        }
+
+        View::composer('layouts.tenant', TenantNavigationComposer::class);
+
         // Privileged tenant roles bypass every permission check, or evaluate via PermissionChecker
         Gate::before(function ($user, $ability) {
             if ($user instanceof User) {

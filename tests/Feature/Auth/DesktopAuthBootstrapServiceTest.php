@@ -2,13 +2,16 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Exceptions\DesktopLocalProvisioningException;
 use App\Models\Company;
 use App\Models\Configuration;
 use App\Models\Plan;
+use App\Models\Product;
 use App\Models\User;
 use App\Services\Auth\DesktopAuthBootstrapService;
 use App\Services\Auth\TenantAuthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -81,6 +84,58 @@ class DesktopAuthBootstrapServiceTest extends TestCase
         $this->assertNotNull($config, 'Bootstrap must configure DesktopSyncClient with the device token.');
     }
 
+    /**
+     * Regression test for the reported bug: logging into an EXISTING cloud
+     * account from a brand-new device showed no products, because bootstrap
+     * only ever provisioned Company/Plan/User rows and left the catalog to
+     * arrive later via the self-rescheduling background sync job (which may
+     * not even be running yet at this point in the boot sequence). Bootstrap
+     * must now pull the existing catalog synchronously before returning.
+     */
+    public function test_bootstrap_pulls_the_existing_cloud_catalog_immediately(): void
+    {
+        Http::fake([
+            '*/api/v1/pos/auth/login' => Http::response($this->fakeRemoteLoginResponse()),
+            '*/api/health' => Http::response(['ok' => true]),
+            '*/api/v1/pos/sync-catalog*' => Http::response([
+                'success' => true,
+                'server_time' => now()->toIso8601String(),
+                'products' => [
+                    [
+                        'id' => 'prod-existing-1',
+                        'server_id' => 501,
+                        'name' => 'Existing Cloud Product',
+                        'barcode' => '111222333',
+                        'sku' => 'SKU-1',
+                        'price' => 19.99,
+                        'cost_price' => 10,
+                        'stock' => 42,
+                        'min_stock' => 5,
+                        'unit' => 'pcs',
+                        'category_name' => 'General',
+                        'active' => true,
+                        'updated_at' => now()->toIso8601String(),
+                    ],
+                ],
+                'categories' => [], 'customers' => [], 'suppliers' => [], 'brands' => [], 'units' => [], 'sales' => [],
+            ]),
+            '*/api/v1/pos/desktop-sync/pull*' => Http::response([
+                'success' => true, 'server_time' => now()->toIso8601String(), 'data' => [],
+            ]),
+        ]);
+
+        app(DesktopAuthBootstrapService::class)->attemptOnlineBootstrap('cashier@remote-store.com', 'secret123');
+
+        $product = Product::withoutGlobalScopes()
+            ->where('company_id', 'emp_remote001')
+            ->where('external_id', 'prod-existing-1')
+            ->first();
+
+        $this->assertNotNull($product, 'The existing cloud product must be pulled to the local database during bootstrap.');
+        $this->assertSame('Existing Cloud Product', $product->name);
+        $this->assertSame(42.0, (float) $product->current_stock);
+    }
+
     public function test_local_login_succeeds_after_bootstrap_using_the_same_password(): void
     {
         Http::fake(['*/api/v1/pos/auth/login' => Http::response($this->fakeRemoteLoginResponse())]);
@@ -94,7 +149,7 @@ class DesktopAuthBootstrapServiceTest extends TestCase
 
     public function test_returns_null_when_the_server_is_unreachable(): void
     {
-        Http::fake(['*/api/v1/pos/auth/login' => fn () => throw new \Illuminate\Http\Client\ConnectionException('offline')]);
+        Http::fake(['*/api/v1/pos/auth/login' => fn () => throw new ConnectionException('offline')]);
 
         $user = app(DesktopAuthBootstrapService::class)->attemptOnlineBootstrap('cashier@remote-store.com', 'secret123');
 
@@ -120,5 +175,63 @@ class DesktopAuthBootstrapServiceTest extends TestCase
 
         $this->assertSame(1, Company::withoutGlobalScopes()->where('id', 'emp_remote001')->count());
         $this->assertSame(1, User::withoutGlobalScopes()->where('id', 'usr_remote001')->count());
+    }
+
+    public function test_desktop_registration_creates_remote_account_and_local_offline_mirror(): void
+    {
+        Http::fake(['*/api/v1/pos/auth/register' => Http::response($this->fakeRemoteLoginResponse(), 201)]);
+
+        $user = app(DesktopAuthBootstrapService::class)->registerOnline([
+            'store_name' => 'Remote Store',
+            'owner_name' => 'Remote Cashier',
+            'email' => 'cashier@remote-store.com',
+            'password' => 'secret123',
+            'pos_mode' => 'general',
+        ]);
+
+        $this->assertSame('usr_remote001', $user->id);
+        $this->assertNotNull(Company::withoutGlobalScopes()->find('emp_remote001'));
+        $this->assertSame(
+            'usr_remote001',
+            app(TenantAuthService::class)->login('cashier@remote-store.com', 'secret123')['user']->id
+        );
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://saas.zoomnearby.com/api/v1/pos/auth/register'
+            && $request['name'] === 'Remote Cashier');
+    }
+
+    public function test_bootstrap_throws_a_distinct_exception_when_local_provisioning_fails_after_valid_credentials(): void
+    {
+        // The server confirms the credentials are correct, but local
+        // provisioning still fails (schema present, but this response is
+        // missing the company id entirely) — the caller must be able to
+        // tell this apart from "wrong password", since retyping the same
+        // correct password will never fix it.
+        $response = $this->fakeRemoteLoginResponse();
+        unset($response['company']['id']);
+        Http::fake(['*/api/v1/pos/auth/login' => Http::response($response)]);
+
+        $this->expectException(DesktopLocalProvisioningException::class);
+
+        app(DesktopAuthBootstrapService::class)->attemptOnlineBootstrap('cashier@remote-store.com', 'secret123');
+    }
+
+    public function test_desktop_registration_surfaces_server_validation_error(): void
+    {
+        Http::fake(['*/api/v1/pos/auth/register' => Http::response([
+            'success' => false,
+            'error' => 'Validation error during tenant registration.',
+            'details' => ['email' => ['The email has already been taken.']],
+        ], 422)]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('The email has already been taken.');
+
+        app(DesktopAuthBootstrapService::class)->registerOnline([
+            'store_name' => 'Remote Store',
+            'owner_name' => 'Remote Cashier',
+            'email' => 'cashier@remote-store.com',
+            'password' => 'secret123',
+        ]);
     }
 }

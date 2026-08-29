@@ -9,7 +9,7 @@
      x-transition:leave-end="opacity-0 translate-y-4">
     <button type="button" 
             @click="mobileCartOpen = true"
-            class="w-full max-w-md mx-auto py-3 px-3 sm:px-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl shadow-2xl flex items-center justify-between gap-2 font-bold active:scale-95 transition-transform border border-white/20">
+            class="w-full max-w-md mx-auto py-3 px-3 sm:px-5 bg-theme-primary hover:opacity-90 text-white rounded-2xl shadow-xl flex items-center justify-between gap-2 font-bold active:scale-95 transition">
         <div class="flex items-center gap-2.5">
             <span class="bg-black/25 backdrop-blur-xs px-2.5 py-1 rounded-xl text-xs font-black tracking-wide border border-white/10">
                 {{ $this->cartItemCount }} {{ __("Items") }}
@@ -161,15 +161,15 @@
 
             <!-- Complete Checkout Action Button -->
             <div class="pt-1">
-                <button type="button"
-                        @click="mobileCartOpen = false; openCheckout(); $wire.openCheckoutModal()"
-                        @disabled($this->cartItemCount <= 0)
-                        wire:loading.attr="disabled"
-                        wire:target="openCheckoutModal"
-                        class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-sm shadow-xl shadow-blue-500/25 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer">
+                <x-ui.button
+                    @click="mobileCartOpen = false; openCheckout(); $wire.openCheckoutModal()"
+                    :disabled="$this->cartItemCount <= 0"
+                    wire:loading.attr="disabled"
+                    wire:target="openCheckoutModal"
+                    full size="lg" class="!font-black">
                     <span wire:loading.remove wire:target="openCheckoutModal">{{ __("Charge") }} {{ $company->formatMoney($this->total) }} / {{ __("Checkout") }}</span>
                     <span wire:loading.delay wire:target="openCheckoutModal">{{ __("Preparing...") }}</span>
-                </button>
+                </x-ui.button>
             </div>
         </div>
 

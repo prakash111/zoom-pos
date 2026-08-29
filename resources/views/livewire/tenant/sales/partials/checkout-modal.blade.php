@@ -662,16 +662,13 @@
                 </button>
             </div>
 
-            <button type="button"
-                    wire:click="save"
-                    wire:loading.attr="disabled"
-                    class="flex-1 py-3 px-5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 text-white font-black text-sm shadow-md shadow-indigo-500/20 active:scale-[0.97] transition duration-150 ease-out flex items-center justify-center gap-2 cursor-pointer">
+            <x-ui.button wire:click="save" wire:loading.attr="disabled" full class="!flex-1 !py-3 !rounded-2xl !font-black !text-sm">
                 <span wire:loading.remove class="flex items-center gap-2">
                     <span>{{ __("Confirm & Complete Sale") }} ({{ $company->formatMoney($this->total) }})</span>
-                    <kbd class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-blue-800/80 text-white font-black border border-blue-400/40">F10</kbd>
+                    <kbd class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-white/20 text-white font-black border border-white/30">F10</kbd>
                 </span>
                 <span wire:loading>{{ __("Processing Transaction...") }}</span>
-            </button>
+            </x-ui.button>
         </div>
 
     </div>

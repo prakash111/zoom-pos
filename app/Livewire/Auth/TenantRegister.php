@@ -6,8 +6,10 @@ use App\Models\Company;
 use App\Models\PendingRegistration;
 use App\Models\Plan;
 use App\Models\PlatformBranding;
+use App\Services\Auth\DesktopAuthBootstrapService;
 use App\Services\Auth\OtpVerificationService;
 use App\Services\Tenancy\TenantProvisioningService;
+use App\Support\Desktop;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -97,7 +99,7 @@ class TenantRegister extends Component
         $this->otpStatusMessage = '';
     }
 
-    public function register(TenantProvisioningService $provisioner, OtpVerificationService $otpService)
+    public function register(TenantProvisioningService $provisioner, OtpVerificationService $otpService, DesktopAuthBootstrapService $desktopBootstrap)
     {
         $this->errorMessage = '';
         $this->otpStatusMessage = '';
@@ -143,6 +145,31 @@ class TenantRegister extends Component
             'plan_name' => $this->planName,
             'activation_code' => $this->hasActivationCode ? $this->activationCode : null,
         ];
+
+        // The Windows app is an offline-capable client, not the source of
+        // truth for accounts. Create the tenant on the server and then cache
+        // the returned account locally for future offline logins.
+        if (Desktop::isRunning()) {
+            try {
+                $user = $desktopBootstrap->registerOnline($payload);
+                $result = ['user' => $user, 'company' => $user->company];
+            } catch (\Throwable $e) {
+                $this->errorMessage = $e->getMessage();
+
+                return;
+            }
+
+            Auth::guard('web')->login($result['user']);
+            app()->instance('tenant.company_id', $result['company']->id);
+            // See TenantLogin::login() — this is how the background
+            // RunDesktopSyncCycle job (a separate process with no session of
+            // its own) knows which account is actually signed in on this
+            // device.
+            Desktop::rememberActiveCompany($result['company']->id);
+            session()->flash('status', "🎉 Welcome to {$result['company']->name}! Your store is ready and available offline on this device.");
+
+            return $this->redirect(route('tenant.dashboard'), navigate: false);
+        }
 
         $branding = PlatformBranding::current();
 
