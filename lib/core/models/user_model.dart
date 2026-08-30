@@ -10,20 +10,20 @@ class UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      id: json['id'] as int,
+      id: json['id']?.toString() ?? '',
       name: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',
       role: json['role'] as String? ?? '',
-      companyId: json['company_id'] as int,
+      companyId: json['company_id']?.toString() ?? '',
       permissions: _parsePermissions(json['permissions']),
     );
   }
 
-  final int id;
+  final String id;
   final String name;
   final String email;
   final String role;
-  final int companyId;
+  final String companyId;
   final Map<String, bool> permissions;
 
   /// The API sends permissions as `{"pos.create": true, ...}` (see

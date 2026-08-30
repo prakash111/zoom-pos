@@ -54,7 +54,7 @@ class ApiClient {
       if (body is Map<String, dynamic>) {
         if (body['success'] == false) {
           throw ApiException(
-            (body['error'] ?? body['message'] ?? 'Request failed').toString(),
+            _extractErrorMessage(body),
             statusCode: response.statusCode,
             details: body['details'] as Map<String, dynamic>?,
           );
@@ -67,6 +67,19 @@ class ApiClient {
     }
   }
 
+  static String _extractErrorMessage(Map<String, dynamic> body) {
+    final details = body['details'];
+    if (details is Map && details.isNotEmpty) {
+      final first = details.values.first;
+      if (first is List && first.isNotEmpty) {
+        return first.first.toString();
+      } else if (first is String && first.isNotEmpty) {
+        return first;
+      }
+    }
+    return (body['error'] ?? body['message'] ?? 'Request failed').toString();
+  }
+
   ApiException _mapDioError(DioException e) {
     final status = e.response?.statusCode;
     final body = e.response?.data;
@@ -77,7 +90,7 @@ class ApiClient {
 
     if (body is Map<String, dynamic>) {
       return ApiException(
-        (body['error'] ?? body['message'] ?? 'Request failed').toString(),
+        _extractErrorMessage(body),
         statusCode: status,
         details: body['details'] as Map<String, dynamic>?,
       );

@@ -10,7 +10,7 @@ class CompanyModel {
 
   factory CompanyModel.fromJson(Map<String, dynamic> json) {
     return CompanyModel(
-      id: json['id'] as int,
+      id: json['id']?.toString() ?? '',
       name: json['name'] as String? ?? '',
       tradeName: json['trade_name'] as String? ?? json['name'] as String? ?? '',
       currency: json['currency'] as String? ?? 'USD',
@@ -19,7 +19,7 @@ class CompanyModel {
     );
   }
 
-  final int id;
+  final String id;
   final String name;
   final String tradeName;
   final String currency;
