@@ -37,9 +37,9 @@ class ThermalPrinterService {
 
   Future<bool> connect(String macAddress) => PrintBluetoothThermal.connect(macPrinterAddress: macAddress);
 
-  Future<void> disconnect() async {
-    await PrintBluetoothThermal.disconnect();
-  }
+  Future<bool> get isConnected => PrintBluetoothThermal.connectionStatus;
+
+  Future<bool> disconnect() => PrintBluetoothThermal.disconnect;
 
   /// Formats and sends a simple 80mm receipt. Used for both sales and
   /// quotations — the same data already shown on the PDF/preview.
