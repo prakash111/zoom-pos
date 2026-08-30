@@ -32,15 +32,46 @@ class _TaxesScreenState extends State<TaxesScreen> {
     setState(() => _future = _repository.fetchTaxes());
   }
 
-  Future<void> _openTaxForm() async {
+  Future<void> _openTaxForm({TaxRuleModel? tax}) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => TaxFormSheet(repository: _repository),
+      builder: (_) => TaxFormSheet(repository: _repository, tax: tax),
     );
 
     if (saved == true) _reload();
+  }
+
+  Future<void> _setDefault(TaxRuleModel tax) async {
+    try {
+      await _repository.setDefaultTax(tax.id);
+      _reload();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  Future<void> _delete(TaxRuleModel tax) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete ${tax.name}?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await _repository.deleteTax(tax.id);
+      _reload();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   @override
@@ -74,7 +105,15 @@ class _TaxesScreenState extends State<TaxesScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
               itemCount: taxes.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, index) => _TaxTile(tax: taxes[index]),
+              itemBuilder: (context, index) {
+                final tax = taxes[index];
+                return _TaxTile(
+                  tax: tax,
+                  onTap: () => _openTaxForm(tax: tax),
+                  onSetDefault: () => _setDefault(tax),
+                  onDelete: () => _delete(tax),
+                );
+              },
             ),
           );
         },
@@ -84,14 +123,18 @@ class _TaxesScreenState extends State<TaxesScreen> {
 }
 
 class _TaxTile extends StatelessWidget {
-  const _TaxTile({required this.tax});
+  const _TaxTile({required this.tax, required this.onTap, required this.onSetDefault, required this.onDelete});
 
   final TaxRuleModel tax;
+  final VoidCallback onTap;
+  final VoidCallback onSetDefault;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: ListTile(
+        onTap: onTap,
         leading: CircleAvatar(
           backgroundColor: tax.active ? Theme.of(context).colorScheme.primaryContainer : Colors.grey.shade200,
           child: Text('${tax.rate.toStringAsFixed(0)}%', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
@@ -101,6 +144,13 @@ class _TaxTile extends StatelessWidget {
           if (tax.isDefault) 'Default',
           tax.active ? 'Active' : 'Inactive',
         ].join(' · ')),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) => value == 'default' ? onSetDefault() : onDelete(),
+          itemBuilder: (context) => [
+            if (!tax.isDefault) const PopupMenuItem(value: 'default', child: Text('Set as default')),
+            const PopupMenuItem(value: 'delete', child: Text('Delete')),
+          ],
+        ),
       ),
     );
   }

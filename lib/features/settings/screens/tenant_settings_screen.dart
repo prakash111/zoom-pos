@@ -1,0 +1,633 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/api/api_client.dart';
+import '../../../core/api/api_exception.dart';
+import '../../../core/models/settings_models.dart';
+import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/loading_indicator.dart';
+import '../settings_repository.dart';
+import 'payment_methods_screen.dart';
+
+const _tabs = ['Profile', 'Receipts', 'Financial', 'Notifications'];
+
+/// Tenant Settings: Profile / Receipts / Financial / Notifications, mirroring
+/// those tabs on the web Settings page (Mode and API/AI-config tabs are out
+/// of scope for mobile). Each tab saves its own section independently.
+class TenantSettingsScreen extends StatefulWidget {
+  const TenantSettingsScreen({super.key});
+
+  @override
+  State<TenantSettingsScreen> createState() => _TenantSettingsScreenState();
+}
+
+class _TenantSettingsScreenState extends State<TenantSettingsScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+  late final SettingsRepository _repository;
+  late Future<TenantSettingsBundle> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _tabs.length, vsync: this);
+    _repository = SettingsRepository(context.read<ApiClient>());
+    _future = _repository.fetchAll();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _reload() => setState(() => _future = _repository.fetchAll());
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Settings'),
+        bottom: TabBar(controller: _tabController, isScrollable: true, tabs: [for (final t in _tabs) Tab(text: t)]),
+      ),
+      body: FutureBuilder<TenantSettingsBundle>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) return const LoadingIndicator();
+          if (snapshot.hasError) {
+            final message = snapshot.error is ApiException ? (snapshot.error as ApiException).message : 'Could not load settings.';
+            return ErrorView(message: message, onRetry: _reload);
+          }
+
+          final bundle = snapshot.data!;
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _ProfileTab(repository: _repository, initial: bundle.profile),
+              _ReceiptsTab(repository: _repository, initial: bundle.receipts),
+              _FinancialTab(repository: _repository, initial: bundle.financial),
+              _NotificationsTab(repository: _repository, initial: bundle.notifications),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProfileTab extends StatefulWidget {
+  const _ProfileTab({required this.repository, required this.initial});
+
+  final SettingsRepository repository;
+  final ProfileSettings initial;
+
+  @override
+  State<_ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<_ProfileTab> {
+  late final TextEditingController _name;
+  late final TextEditingController _tradeName;
+  late final TextEditingController _taxId;
+  late final TextEditingController _email;
+  late final TextEditingController _phone;
+  late final TextEditingController _website;
+  late final TextEditingController _address;
+  late final TextEditingController _city;
+  late final TextEditingController _state;
+  late final TextEditingController _postalCode;
+  late final TextEditingController _country;
+  late final TextEditingController _commissionRate;
+  late String _commissionType;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.initial;
+    _name = TextEditingController(text: p.name);
+    _tradeName = TextEditingController(text: p.tradeName);
+    _taxId = TextEditingController(text: p.taxId);
+    _email = TextEditingController(text: p.email);
+    _phone = TextEditingController(text: p.phone);
+    _website = TextEditingController(text: p.website);
+    _address = TextEditingController(text: p.address);
+    _city = TextEditingController(text: p.city);
+    _state = TextEditingController(text: p.state);
+    _postalCode = TextEditingController(text: p.postalCode);
+    _country = TextEditingController(text: p.country);
+    _commissionRate = TextEditingController(text: p.defaultCommissionRate.toStringAsFixed(2));
+    _commissionType = p.defaultCommissionType;
+  }
+
+  @override
+  void dispose() {
+    for (final c in [_name, _tradeName, _taxId, _email, _phone, _website, _address, _city, _state, _postalCode, _country, _commissionRate]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_name.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Store name is required.')));
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await widget.repository.updateProfile(
+        name: _name.text.trim(),
+        tradeName: _tradeName.text.trim(),
+        taxId: _taxId.text.trim(),
+        email: _email.text.trim(),
+        phone: _phone.text.trim(),
+        website: _website.text.trim(),
+        address: _address.text.trim(),
+        city: _city.text.trim(),
+        state: _state.text.trim(),
+        postalCode: _postalCode.text.trim(),
+        country: _country.text.trim(),
+        defaultCommissionRate: double.tryParse(_commissionRate.text) ?? 0,
+        defaultCommissionType: _commissionType,
+      );
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile saved.')));
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        TextField(controller: _name, decoration: const InputDecoration(labelText: 'Store name')),
+        const SizedBox(height: 12),
+        TextField(controller: _tradeName, decoration: const InputDecoration(labelText: 'Trade name')),
+        const SizedBox(height: 12),
+        TextField(controller: _taxId, decoration: const InputDecoration(labelText: 'Tax ID')),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: TextField(controller: _email, decoration: const InputDecoration(labelText: 'Email'))),
+          const SizedBox(width: 12),
+          Expanded(child: TextField(controller: _phone, decoration: const InputDecoration(labelText: 'Phone'))),
+        ]),
+        const SizedBox(height: 12),
+        TextField(controller: _website, decoration: const InputDecoration(labelText: 'Website')),
+        const SizedBox(height: 12),
+        TextField(controller: _address, decoration: const InputDecoration(labelText: 'Address')),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: TextField(controller: _city, decoration: const InputDecoration(labelText: 'City'))),
+          const SizedBox(width: 12),
+          Expanded(child: TextField(controller: _state, decoration: const InputDecoration(labelText: 'State'))),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: TextField(controller: _postalCode, decoration: const InputDecoration(labelText: 'Postal code'))),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: _country,
+              maxLength: 2,
+              decoration: const InputDecoration(labelText: 'Country (ISO2)', counterText: ''),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+            child: TextField(
+              controller: _commissionRate,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Default commission rate'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: DropdownButtonFormField<String>(
+              value: _commissionType,
+              decoration: const InputDecoration(labelText: 'Type'),
+              items: const [
+                DropdownMenuItem(value: 'percentage', child: Text('Percentage')),
+                DropdownMenuItem(value: 'fixed', child: Text('Fixed')),
+              ],
+              onChanged: (value) => setState(() => _commissionType = value ?? _commissionType),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Save profile'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReceiptsTab extends StatefulWidget {
+  const _ReceiptsTab({required this.repository, required this.initial});
+
+  final SettingsRepository repository;
+  final ReceiptSettings initial;
+
+  @override
+  State<_ReceiptsTab> createState() => _ReceiptsTabState();
+}
+
+class _ReceiptsTabState extends State<_ReceiptsTab> {
+  late final TextEditingController _invoicePrefix;
+  late final TextEditingController _quotationPrefix;
+  late final TextEditingController _invoiceTerms;
+  late final TextEditingController _quoteTerms;
+  late final TextEditingController _bankDetails;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final r = widget.initial;
+    _invoicePrefix = TextEditingController(text: r.invoicePrefix);
+    _quotationPrefix = TextEditingController(text: r.quotationPrefix);
+    _invoiceTerms = TextEditingController(text: r.invoiceTerms);
+    _quoteTerms = TextEditingController(text: r.quoteTerms);
+    _bankDetails = TextEditingController(text: r.bankDetails);
+  }
+
+  @override
+  void dispose() {
+    for (final c in [_invoicePrefix, _quotationPrefix, _invoiceTerms, _quoteTerms, _bankDetails]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await widget.repository.updateReceipts(
+        invoicePrefix: _invoicePrefix.text.trim(),
+        quotationPrefix: _quotationPrefix.text.trim(),
+        invoiceTerms: _invoiceTerms.text.trim(),
+        quoteTerms: _quoteTerms.text.trim(),
+        bankDetails: _bankDetails.text.trim(),
+      );
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Receipt settings saved.')));
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        Row(children: [
+          Expanded(child: TextField(controller: _invoicePrefix, decoration: const InputDecoration(labelText: 'Invoice prefix'))),
+          const SizedBox(width: 12),
+          Expanded(child: TextField(controller: _quotationPrefix, decoration: const InputDecoration(labelText: 'Quotation prefix'))),
+        ]),
+        const SizedBox(height: 12),
+        TextField(controller: _invoiceTerms, decoration: const InputDecoration(labelText: 'Invoice terms'), maxLines: 3),
+        const SizedBox(height: 12),
+        TextField(controller: _quoteTerms, decoration: const InputDecoration(labelText: 'Quote terms'), maxLines: 3),
+        const SizedBox(height: 12),
+        TextField(controller: _bankDetails, decoration: const InputDecoration(labelText: 'Bank & payment details'), maxLines: 4),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Save receipt settings'),
+        ),
+      ],
+    );
+  }
+}
+
+class _FinancialTab extends StatefulWidget {
+  const _FinancialTab({required this.repository, required this.initial});
+
+  final SettingsRepository repository;
+  final FinancialSettings initial;
+
+  @override
+  State<_FinancialTab> createState() => _FinancialTabState();
+}
+
+class _FinancialTabState extends State<_FinancialTab> {
+  late final TextEditingController _currency;
+  late final TextEditingController _symbol;
+  late final TextEditingController _decimals;
+  late String _symbolPosition;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final f = widget.initial;
+    _currency = TextEditingController(text: f.currency);
+    _symbol = TextEditingController(text: f.currencySymbol);
+    _decimals = TextEditingController(text: f.currencyDecimals.toString());
+    _symbolPosition = f.currencySymbolPosition;
+  }
+
+  @override
+  void dispose() {
+    _currency.dispose();
+    _symbol.dispose();
+    _decimals.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_currency.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Currency code is required.')));
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await widget.repository.updateFinancial(
+        currency: _currency.text.trim(),
+        currencySymbol: _symbol.text.trim(),
+        currencyDecimals: int.tryParse(_decimals.text) ?? 2,
+        currencySymbolPosition: _symbolPosition,
+      );
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Financial settings saved.')));
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        Row(children: [
+          Expanded(
+            child: TextField(
+              controller: _currency,
+              maxLength: 3,
+              decoration: const InputDecoration(labelText: 'Currency code (e.g. USD)', counterText: ''),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: TextField(controller: _symbol, decoration: const InputDecoration(labelText: 'Symbol'))),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+            child: TextField(
+              controller: _decimals,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Decimal places'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: DropdownButtonFormField<String>(
+              value: _symbolPosition,
+              decoration: const InputDecoration(labelText: 'Symbol position'),
+              items: const [
+                DropdownMenuItem(value: 'prefix', child: Text('Prefix (\$10)')),
+                DropdownMenuItem(value: 'suffix', child: Text('Suffix (10\$)')),
+              ],
+              onChanged: (value) => setState(() => _symbolPosition = value ?? _symbolPosition),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Save financial settings'),
+        ),
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Payment methods'),
+          subtitle: const Text('Manage which payment methods appear at checkout'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => PaymentMethodsScreen(repository: widget.repository)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NotificationsTab extends StatefulWidget {
+  const _NotificationsTab({required this.repository, required this.initial});
+
+  final SettingsRepository repository;
+  final NotificationSettings initial;
+
+  @override
+  State<_NotificationsTab> createState() => _NotificationsTabState();
+}
+
+class _NotificationsTabState extends State<_NotificationsTab> {
+  late final TextEditingController _smtpHost;
+  late final TextEditingController _smtpPort;
+  late final TextEditingController _smtpUsername;
+  late final TextEditingController _smtpPassword;
+  late final TextEditingController _smtpFromAddress;
+  late final TextEditingController _smtpFromName;
+  late final TextEditingController _testEmailTo;
+  late final TextEditingController _whatsappPhonePrefix;
+  late final TextEditingController _whatsappCustomNote;
+  late final TextEditingController _whatsappPhoneNumberId;
+  late final TextEditingController _whatsappApiToken;
+  late String _smtpEncryption;
+  late bool _hasSmtpPassword;
+  late bool _hasWhatsappToken;
+  bool _saving = false;
+  bool _testingEmail = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final n = widget.initial;
+    _smtpHost = TextEditingController(text: n.smtp.host);
+    _smtpPort = TextEditingController(text: n.smtp.port.toString());
+    _smtpUsername = TextEditingController(text: n.smtp.username);
+    _smtpPassword = TextEditingController();
+    _smtpFromAddress = TextEditingController(text: n.smtp.fromAddress);
+    _smtpFromName = TextEditingController(text: n.smtp.fromName);
+    _testEmailTo = TextEditingController();
+    _whatsappPhonePrefix = TextEditingController(text: n.whatsapp.phonePrefix);
+    _whatsappCustomNote = TextEditingController(text: n.whatsapp.customNote);
+    _whatsappPhoneNumberId = TextEditingController(text: n.whatsapp.phoneNumberId);
+    _whatsappApiToken = TextEditingController();
+    _smtpEncryption = n.smtp.encryption;
+    _hasSmtpPassword = n.smtp.hasPassword;
+    _hasWhatsappToken = n.whatsapp.hasApiToken;
+  }
+
+  @override
+  void dispose() {
+    for (final c in [
+      _smtpHost, _smtpPort, _smtpUsername, _smtpPassword, _smtpFromAddress, _smtpFromName,
+      _testEmailTo, _whatsappPhonePrefix, _whatsappCustomNote, _whatsappPhoneNumberId, _whatsappApiToken,
+    ]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final result = await widget.repository.updateNotifications(
+        smtpHost: _smtpHost.text.trim(),
+        smtpPort: int.tryParse(_smtpPort.text) ?? 587,
+        smtpUsername: _smtpUsername.text.trim(),
+        smtpPassword: _smtpPassword.text,
+        smtpEncryption: _smtpEncryption,
+        smtpFromAddress: _smtpFromAddress.text.trim(),
+        smtpFromName: _smtpFromName.text.trim(),
+        whatsappPhonePrefix: _whatsappPhonePrefix.text.trim(),
+        whatsappCustomNote: _whatsappCustomNote.text.trim(),
+        whatsappPhoneNumberId: _whatsappPhoneNumberId.text.trim(),
+        whatsappApiToken: _whatsappApiToken.text.trim(),
+      );
+      if (mounted) {
+        setState(() {
+          _hasSmtpPassword = result.smtp.hasPassword;
+          _hasWhatsappToken = result.whatsapp.hasApiToken;
+          _smtpPassword.clear();
+          _whatsappApiToken.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notification settings saved.')));
+      }
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _sendTestEmail() async {
+    if (_testEmailTo.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a recipient email.')));
+      return;
+    }
+
+    setState(() => _testingEmail = true);
+    try {
+      await widget.repository.sendTestEmail(_testEmailTo.text.trim());
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Test email sent.')));
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _testingEmail = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        Text('Email (SMTP)', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        TextField(controller: _smtpHost, decoration: const InputDecoration(labelText: 'SMTP host')),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+            child: TextField(
+              controller: _smtpPort,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Port'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: DropdownButtonFormField<String>(
+              value: _smtpEncryption,
+              decoration: const InputDecoration(labelText: 'Encryption'),
+              items: const [
+                DropdownMenuItem(value: 'tls', child: Text('TLS')),
+                DropdownMenuItem(value: 'ssl', child: Text('SSL')),
+                DropdownMenuItem(value: 'none', child: Text('None')),
+              ],
+              onChanged: (value) => setState(() => _smtpEncryption = value ?? _smtpEncryption),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        TextField(controller: _smtpUsername, decoration: const InputDecoration(labelText: 'Username')),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _smtpPassword,
+          obscureText: true,
+          decoration: InputDecoration(
+            labelText: 'Password',
+            hintText: _hasSmtpPassword ? 'Stored — leave blank to keep' : 'Not set',
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: TextField(controller: _smtpFromAddress, decoration: const InputDecoration(labelText: 'From address'))),
+          const SizedBox(width: 12),
+          Expanded(child: TextField(controller: _smtpFromName, decoration: const InputDecoration(labelText: 'From name'))),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: TextField(controller: _testEmailTo, decoration: const InputDecoration(labelText: 'Send test email to'))),
+          const SizedBox(width: 12),
+          OutlinedButton(
+            onPressed: _testingEmail ? null : _sendTestEmail,
+            child: _testingEmail
+                ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Test'),
+          ),
+        ]),
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 8),
+        Text('WhatsApp', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: TextField(controller: _whatsappPhonePrefix, decoration: const InputDecoration(labelText: 'Default country code'))),
+          const SizedBox(width: 12),
+          Expanded(child: TextField(controller: _whatsappPhoneNumberId, decoration: const InputDecoration(labelText: 'Business Phone Number ID'))),
+        ]),
+        const SizedBox(height: 12),
+        TextField(controller: _whatsappCustomNote, decoration: const InputDecoration(labelText: 'Message footer note')),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _whatsappApiToken,
+          obscureText: true,
+          decoration: InputDecoration(
+            labelText: 'Access token',
+            hintText: _hasWhatsappToken ? 'Stored — leave blank to keep' : 'Not set',
+          ),
+        ),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Save notification settings'),
+        ),
+      ],
+    );
+  }
+}

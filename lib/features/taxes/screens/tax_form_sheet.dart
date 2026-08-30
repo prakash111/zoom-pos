@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/models/tax_rule_model.dart';
 import '../taxes_repository.dart';
 
-/// Bottom sheet for POST /taxes. Creation only — see [TaxesRepository].
-/// Pops with `true` when a new rule is saved.
+/// Bottom sheet for POST/PUT /taxes, used for both creating a new tax rule
+/// ([tax] is null) and editing an existing one. Pops with `true` when saved.
 class TaxFormSheet extends StatefulWidget {
-  const TaxFormSheet({super.key, required this.repository});
+  const TaxFormSheet({super.key, required this.repository, this.tax});
 
   final TaxesRepository repository;
+  final TaxRuleModel? tax;
 
   @override
   State<TaxFormSheet> createState() => _TaxFormSheetState();
@@ -16,12 +18,24 @@ class TaxFormSheet extends StatefulWidget {
 
 class _TaxFormSheetState extends State<TaxFormSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _rateController = TextEditingController();
-  bool _isDefault = false;
-  bool _active = true;
+  late final TextEditingController _nameController;
+  late final TextEditingController _rateController;
+  late bool _isDefault;
+  late bool _active;
   bool _isSaving = false;
   String? _error;
+
+  bool get _isEditing => widget.tax != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final tax = widget.tax;
+    _nameController = TextEditingController(text: tax?.name ?? '');
+    _rateController = TextEditingController(text: tax != null ? tax.rate.toStringAsFixed(2) : '');
+    _isDefault = tax?.isDefault ?? false;
+    _active = tax?.active ?? true;
+  }
 
   @override
   void dispose() {
@@ -39,12 +53,22 @@ class _TaxFormSheetState extends State<TaxFormSheet> {
     });
 
     try {
-      await widget.repository.createTax(
-        name: _nameController.text.trim(),
-        rate: double.parse(_rateController.text),
-        isDefault: _isDefault,
-        active: _active,
-      );
+      if (_isEditing) {
+        await widget.repository.updateTax(
+          id: widget.tax!.id,
+          name: _nameController.text.trim(),
+          rate: double.parse(_rateController.text),
+          isDefault: _isDefault,
+          active: _active,
+        );
+      } else {
+        await widget.repository.createTax(
+          name: _nameController.text.trim(),
+          rate: double.parse(_rateController.text),
+          isDefault: _isDefault,
+          active: _active,
+        );
+      }
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -66,7 +90,7 @@ class _TaxFormSheetState extends State<TaxFormSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('New tax rule', style: Theme.of(context).textTheme.titleLarge),
+              Text(_isEditing ? 'Edit tax rule' : 'New tax rule', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _nameController,
@@ -110,7 +134,7 @@ class _TaxFormSheetState extends State<TaxFormSheet> {
                         width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Text('Create tax rule'),
+                    : Text(_isEditing ? 'Save changes' : 'Create tax rule'),
               ),
             ],
           ),

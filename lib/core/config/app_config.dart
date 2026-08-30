@@ -39,6 +39,8 @@ class ApiEndpoints {
   static const String sendDelivery = '/send-delivery';
 
   static const String taxes = '/taxes';
+  static String tax(String id) => '/taxes/$id';
+  static String taxSetDefault(String id) => '/taxes/$id/set-default';
 
   static const String subscription = '/subscription';
   static const String subscriptionRedeem = '/subscription/redeem';
@@ -65,4 +67,26 @@ class ApiEndpoints {
   static const String reportsCommissions = '/reports/commissions';
   static const String reportsAging = '/reports/aging';
   static const String reportsExport = '/reports/export';
+
+  static const String categories = '/categories';
+  static String category(String id) => '/categories/$id';
+
+  static const String brands = '/brands';
+  static String brand(String id) => '/brands/$id';
+
+  static const String units = '/units';
+  static String unit(String id) => '/units/$id';
+
+  static const String suppliers = '/suppliers';
+  static String supplier(String id) => '/suppliers/$id';
+
+  static const String settings = '/settings';
+  static const String settingsProfile = '/settings/profile';
+  static const String settingsReceipts = '/settings/receipts';
+  static const String settingsFinancial = '/settings/financial';
+  static const String settingsNotifications = '/settings/notifications';
+  static const String settingsTestEmail = '/settings/notifications/test-email';
+  static const String settingsPaymentMethods = '/settings/payment-methods';
+  static String settingsPaymentMethod(String id) => '/settings/payment-methods/$id';
+  static String settingsPaymentMethodToggle(String id) => '/settings/payment-methods/$id/toggle';
 }

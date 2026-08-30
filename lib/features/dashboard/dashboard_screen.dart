@@ -6,6 +6,7 @@ import '../../core/widgets/coming_soon_screen.dart';
 import '../analytics/screens/analytics_screen.dart';
 import '../auth/auth_provider.dart';
 import '../cash_register/screens/cash_register_screen.dart';
+import '../catalog_admin/screens/catalog_admin_screen.dart';
 import '../customers/screens/customers_screen.dart';
 import '../inventory/screens/inventory_screen.dart';
 import '../payables/screens/payables_screen.dart';
@@ -13,6 +14,7 @@ import '../pos/screens/pos_screen.dart';
 import '../quotations/screens/quotations_screen.dart';
 import '../reports/screens/reports_screen.dart';
 import '../sales/screens/sales_screen.dart';
+import '../settings/screens/tenant_settings_screen.dart';
 import '../settings/server_settings_screen.dart';
 import '../subscription/screens/subscription_screen.dart';
 import '../taxes/screens/taxes_screen.dart';
@@ -33,6 +35,7 @@ final List<_FeatureTile> _features = [
   _FeatureTile('Sales', Icons.receipt_long_outlined, (_) => const SalesScreen()),
   _FeatureTile('Quotations', Icons.description_outlined, (_) => const QuotationsScreen()),
   _FeatureTile('Inventory', Icons.inventory_2_outlined, (_) => const InventoryScreen()),
+  _FeatureTile('Catalog Admin', Icons.category_outlined, (_) => const CatalogAdminScreen()),
   _FeatureTile('Customers', Icons.people_outline, (_) => const CustomersScreen()),
   _FeatureTile('Cash Register', Icons.savings_outlined, (_) => const CashRegisterScreen()),
   _FeatureTile('Payables', Icons.request_quote_outlined, (_) => const PayablesScreen()),
@@ -40,6 +43,7 @@ final List<_FeatureTile> _features = [
   _FeatureTile('Taxes', Icons.percent_outlined, (_) => const TaxesScreen()),
   _FeatureTile('Analytics', Icons.bar_chart_outlined, (_) => const AnalyticsScreen()),
   _FeatureTile('Subscription', Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),
+  _FeatureTile('Settings', Icons.settings_outlined, (_) => const TenantSettingsScreen()),
 ];
 
 /// The post-login home base. Each feature module still under construction

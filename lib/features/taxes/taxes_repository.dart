@@ -3,8 +3,7 @@ import '../../core/config/app_config.dart';
 import '../../core/models/tax_rule_model.dart';
 
 /// Talks to the tax-rule endpoints on PosSyncApiController:
-/// GET/POST /taxes. Creation only — the server has no update-by-id path for
-/// tax rules (see taxRulesStore), so editing an existing rate isn't offered.
+/// GET/POST /taxes, PUT/DELETE /taxes/{id}, POST /taxes/{id}/set-default.
 class TaxesRepository {
   TaxesRepository(this._client);
 
@@ -29,5 +28,28 @@ class TaxesRepository {
       'is_default': isDefault,
       'active': active,
     });
+  }
+
+  Future<void> updateTax({
+    required String id,
+    required String name,
+    required double rate,
+    bool isDefault = false,
+    bool active = true,
+  }) {
+    return _client.put(ApiEndpoints.tax(id), data: {
+      'name': name,
+      'rate': rate,
+      'is_default': isDefault,
+      'active': active,
+    });
+  }
+
+  Future<void> deleteTax(String id) {
+    return _client.delete(ApiEndpoints.tax(id));
+  }
+
+  Future<void> setDefaultTax(String id) {
+    return _client.post(ApiEndpoints.taxSetDefault(id));
   }
 }
