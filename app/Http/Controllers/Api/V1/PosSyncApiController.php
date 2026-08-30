@@ -2251,4 +2251,109 @@ class PosSyncApiController extends Controller
             ],
         ]);
     }
+
+    /**
+     * 21. Taxes Management: Update Tax Rule
+     * PUT /api/v1/pos/taxes/{id}
+     */
+    public function taxRulesUpdate(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $taxRule = TaxRule::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $taxRule) {
+            return response()->json(['success' => false, 'error' => 'Tax rule not found.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'max:100'],
+            'rate' => ['required', 'numeric', 'min:0', 'max:100'],
+            'is_default' => ['nullable', 'boolean'],
+            'active' => ['nullable', 'boolean'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        if ($request->boolean('is_default')) {
+            TaxRule::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->update(['is_default' => false]);
+        }
+
+        $taxRule->update([
+            'tax_name' => $request->input('name'),
+            'rate' => (float) $request->input('rate'),
+            'is_default' => $request->boolean('is_default', $taxRule->is_default),
+            'active' => $request->boolean('active', $taxRule->active),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tax rule updated successfully.',
+            'tax' => [
+                'id' => (string) $taxRule->id,
+                'name' => $taxRule->tax_name,
+                'rate' => (float) $taxRule->rate,
+                'is_default' => (bool) $taxRule->is_default,
+                'active' => (bool) $taxRule->active,
+            ],
+        ]);
+    }
+
+    /**
+     * 22. Taxes Management: Set Default Tax Rule
+     * POST /api/v1/pos/taxes/{id}/set-default
+     */
+    public function taxRulesSetDefault(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $taxRule = TaxRule::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $taxRule) {
+            return response()->json(['success' => false, 'error' => 'Tax rule not found.'], 404);
+        }
+
+        TaxRule::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->update(['is_default' => false]);
+        $taxRule->update(['is_default' => true]);
+
+        return response()->json(['success' => true, 'message' => $taxRule->tax_name.' is now the default tax rule.']);
+    }
+
+    /**
+     * 23. Taxes Management: Delete Tax Rule
+     * DELETE /api/v1/pos/taxes/{id}
+     */
+    public function taxRulesDestroy(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $taxRule = TaxRule::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $taxRule) {
+            return response()->json(['success' => false, 'error' => 'Tax rule not found.'], 404);
+        }
+
+        $taxRule->delete();
+
+        return response()->json(['success' => true, 'message' => 'Tax rule deleted.']);
+    }
 }

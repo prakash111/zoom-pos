@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\Api\V1\CashRegisterApiController;
+use App\Http\Controllers\Api\V1\CatalogAdminApiController;
 use App\Http\Controllers\Api\V1\PayablesApiController;
 use App\Http\Controllers\Api\V1\PosDesktopSyncController;
 use App\Http\Controllers\Api\V1\PosSyncApiController;
 use App\Http\Controllers\Api\V1\QuotationApiController;
 use App\Http\Controllers\Api\V1\ReportsApiController;
+use App\Http\Controllers\Api\V1\SettingsApiController;
 use App\Http\Controllers\Api\V1\TaxApiController;
 use App\Http\Middleware\AuthenticateTenantApi;
 use Illuminate\Support\Facades\Route;
@@ -74,6 +76,9 @@ Route::prefix('v1/pos')->group(function () {
         // Taxes & Tax Rules Management
         Route::get('/taxes', [PosSyncApiController::class, 'taxRulesIndex']);
         Route::post('/taxes', [PosSyncApiController::class, 'taxRulesStore'])->middleware('tenant.api.permission:settings,view');
+        Route::put('/taxes/{id}', [PosSyncApiController::class, 'taxRulesUpdate'])->middleware('tenant.api.permission:settings,edit');
+        Route::delete('/taxes/{id}', [PosSyncApiController::class, 'taxRulesDestroy'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/taxes/{id}/set-default', [PosSyncApiController::class, 'taxRulesSetDefault'])->middleware('tenant.api.permission:settings,edit');
 
         // Subscription & Billing
         Route::get('/subscription', [PosSyncApiController::class, 'subscription']);
@@ -110,5 +115,40 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/reports/commissions', [ReportsApiController::class, 'commissions'])->middleware('tenant.api.permission:reports,view');
         Route::get('/reports/aging', [ReportsApiController::class, 'aging'])->middleware('tenant.api.permission:reports,view');
         Route::get('/reports/export', [ReportsApiController::class, 'export'])->middleware('tenant.api.permission:reports,view');
+
+        // Catalog Admin: Categories, Brands, Units, Suppliers
+        Route::get('/categories', [CatalogAdminApiController::class, 'categoriesIndex'])->middleware('tenant.api.permission:categories,view');
+        Route::post('/categories', [CatalogAdminApiController::class, 'categoriesStore'])->middleware('tenant.api.permission:categories,create');
+        Route::put('/categories/{id}', [CatalogAdminApiController::class, 'categoriesUpdate'])->middleware('tenant.api.permission:categories,edit');
+        Route::delete('/categories/{id}', [CatalogAdminApiController::class, 'categoriesDestroy'])->middleware('tenant.api.permission:categories,edit');
+
+        Route::get('/brands', [CatalogAdminApiController::class, 'brandsIndex'])->middleware('tenant.api.permission:categories,view');
+        Route::post('/brands', [CatalogAdminApiController::class, 'brandsStore'])->middleware('tenant.api.permission:categories,create');
+        Route::put('/brands/{id}', [CatalogAdminApiController::class, 'brandsUpdate'])->middleware('tenant.api.permission:categories,edit');
+        Route::delete('/brands/{id}', [CatalogAdminApiController::class, 'brandsDestroy'])->middleware('tenant.api.permission:categories,edit');
+
+        Route::get('/units', [CatalogAdminApiController::class, 'unitsIndex'])->middleware('tenant.api.permission:units,view');
+        Route::post('/units', [CatalogAdminApiController::class, 'unitsStore'])->middleware('tenant.api.permission:units,create');
+        Route::put('/units/{id}', [CatalogAdminApiController::class, 'unitsUpdate'])->middleware('tenant.api.permission:units,edit');
+        Route::delete('/units/{id}', [CatalogAdminApiController::class, 'unitsDestroy'])->middleware('tenant.api.permission:units,edit');
+
+        Route::get('/suppliers', [CatalogAdminApiController::class, 'suppliersIndex'])->middleware('tenant.api.permission:suppliers,view');
+        Route::post('/suppliers', [CatalogAdminApiController::class, 'suppliersStore'])->middleware('tenant.api.permission:suppliers,create');
+        Route::put('/suppliers/{id}', [CatalogAdminApiController::class, 'suppliersUpdate'])->middleware('tenant.api.permission:suppliers,edit');
+        Route::delete('/suppliers/{id}', [CatalogAdminApiController::class, 'suppliersDestroy'])->middleware('tenant.api.permission:suppliers,edit');
+
+        // Settings: Profile / Receipts / Financial / Notifications / Payment Methods
+        Route::get('/settings', [SettingsApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
+        Route::put('/settings/profile', [SettingsApiController::class, 'updateProfile'])->middleware('tenant.api.permission:settings,edit');
+        Route::put('/settings/receipts', [SettingsApiController::class, 'updateReceipts'])->middleware('tenant.api.permission:settings,edit');
+        Route::put('/settings/financial', [SettingsApiController::class, 'updateFinancial'])->middleware('tenant.api.permission:settings,edit');
+        Route::put('/settings/notifications', [SettingsApiController::class, 'updateNotifications'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/settings/notifications/test-email', [SettingsApiController::class, 'testEmail'])->middleware('tenant.api.permission:settings,edit');
+
+        Route::get('/settings/payment-methods', [SettingsApiController::class, 'paymentMethodsIndex'])->middleware('tenant.api.permission:settings,view');
+        Route::post('/settings/payment-methods', [SettingsApiController::class, 'paymentMethodsStore'])->middleware('tenant.api.permission:settings,edit');
+        Route::put('/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsUpdate'])->middleware('tenant.api.permission:settings,edit');
+        Route::delete('/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsDestroy'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/settings/payment-methods/{id}/toggle', [SettingsApiController::class, 'paymentMethodsToggle'])->middleware('tenant.api.permission:settings,edit');
     });
 });
