@@ -6,10 +6,13 @@ import '../../core/widgets/coming_soon_screen.dart';
 import '../analytics/screens/analytics_screen.dart';
 import '../auth/auth_provider.dart';
 import '../cash_register/screens/cash_register_screen.dart';
+import '../catalog/screens/catalog_screen.dart';
 import '../catalog_admin/screens/catalog_admin_screen.dart';
 import '../consignments/screens/consignments_screen.dart';
 import '../customers/screens/customers_screen.dart';
+import '../devices/screens/devices_screen.dart';
 import '../inventory/screens/inventory_screen.dart';
+import '../languages/screens/languages_screen.dart';
 import '../payables/screens/payables_screen.dart';
 import '../pos/screens/pos_screen.dart';
 import '../quotations/screens/quotations_screen.dart';
@@ -19,6 +22,7 @@ import '../sales_targets/screens/sales_targets_screen.dart';
 import '../service_orders/screens/service_orders_screen.dart';
 import '../settings/screens/tenant_settings_screen.dart';
 import '../settings/server_settings_screen.dart';
+import '../staff/screens/staff_screen.dart';
 import '../subscription/screens/subscription_screen.dart';
 import '../taxes/screens/taxes_screen.dart';
 
@@ -49,6 +53,10 @@ final List<_FeatureTile> _features = [
   _FeatureTile('Taxes', Icons.percent_outlined, (_) => const TaxesScreen()),
   _FeatureTile('Analytics', Icons.bar_chart_outlined, (_) => const AnalyticsScreen()),
   _FeatureTile('Subscription', Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),
+  _FeatureTile('Staff & Access', Icons.badge_outlined, (_) => const StaffScreen()),
+  _FeatureTile('Online Catalog', Icons.qr_code_outlined, (_) => const CatalogScreen()),
+  _FeatureTile('Languages', Icons.translate_outlined, (_) => const LanguagesScreen()),
+  _FeatureTile('Devices', Icons.devices_other_outlined, (_) => const DevicesScreen()),
   _FeatureTile('Settings', Icons.settings_outlined, (_) => const TenantSettingsScreen()),
 ];
 

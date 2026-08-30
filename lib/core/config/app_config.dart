@@ -101,4 +101,22 @@ class ApiEndpoints {
   static String serviceOrderStatus(String id) => '/service-orders/$id/status';
 
   static const String salesTargets = '/sales-targets';
+
+  static const String users = '/users';
+  static const String usersInvite = '/users/invite';
+  static String userResendInvite(String id) => '/users/$id/resend-invite';
+  static String userRole(String id) => '/users/$id/role';
+  static String userToggleStatus(String id) => '/users/$id/toggle-status';
+  static String userCommission(String id) => '/users/$id/commission';
+  static String user(String id) => '/users/$id';
+  static String userPermissions(String id) => '/users/$id/permissions';
+
+  static const String catalog = '/catalog';
+  static String catalogLink(String id) => '/catalog/$id';
+
+  static const String devices = '/devices';
+  static String deviceRevoke(String token) => '/devices/$token/revoke';
+
+  static const String languages = '/languages';
+  static const String languagesDefault = '/languages/default';
 }
