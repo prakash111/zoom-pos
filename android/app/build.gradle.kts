@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -28,14 +31,14 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystoreProperties = java.util.Properties()
+            val keystoreProperties = Properties()
             val keystorePropertiesFile = rootProject.file("key.properties")
             if (keystorePropertiesFile.exists()) {
-                keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
-                storeFile = keystoreProperties["storeFile"]?.let { file(it) }
-                storePassword = keystoreProperties["storePassword"] as String?
-                keyAlias = keystoreProperties["keyAlias"] as String?
-                keyPassword = keystoreProperties["keyPassword"] as String?
+                keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+                storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
             }
         }
     }
