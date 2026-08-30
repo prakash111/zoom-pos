@@ -7,6 +7,7 @@ import '../analytics/screens/analytics_screen.dart';
 import '../auth/auth_provider.dart';
 import '../cash_register/screens/cash_register_screen.dart';
 import '../catalog_admin/screens/catalog_admin_screen.dart';
+import '../consignments/screens/consignments_screen.dart';
 import '../customers/screens/customers_screen.dart';
 import '../inventory/screens/inventory_screen.dart';
 import '../payables/screens/payables_screen.dart';
@@ -14,6 +15,8 @@ import '../pos/screens/pos_screen.dart';
 import '../quotations/screens/quotations_screen.dart';
 import '../reports/screens/reports_screen.dart';
 import '../sales/screens/sales_screen.dart';
+import '../sales_targets/screens/sales_targets_screen.dart';
+import '../service_orders/screens/service_orders_screen.dart';
 import '../settings/screens/tenant_settings_screen.dart';
 import '../settings/server_settings_screen.dart';
 import '../subscription/screens/subscription_screen.dart';
@@ -39,6 +42,9 @@ final List<_FeatureTile> _features = [
   _FeatureTile('Customers', Icons.people_outline, (_) => const CustomersScreen()),
   _FeatureTile('Cash Register', Icons.savings_outlined, (_) => const CashRegisterScreen()),
   _FeatureTile('Payables', Icons.request_quote_outlined, (_) => const PayablesScreen()),
+  _FeatureTile('Consignments', Icons.local_shipping_outlined, (_) => const ConsignmentsScreen()),
+  _FeatureTile('Service Orders', Icons.handyman_outlined, (_) => const ServiceOrdersScreen()),
+  _FeatureTile('Sales Targets', Icons.flag_outlined, (_) => const SalesTargetsScreen()),
   _FeatureTile('Reports', Icons.insights_outlined, (_) => const ReportsScreen()),
   _FeatureTile('Taxes', Icons.percent_outlined, (_) => const TaxesScreen()),
   _FeatureTile('Analytics', Icons.bar_chart_outlined, (_) => const AnalyticsScreen()),

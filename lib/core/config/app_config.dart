@@ -89,4 +89,16 @@ class ApiEndpoints {
   static const String settingsPaymentMethods = '/settings/payment-methods';
   static String settingsPaymentMethod(String id) => '/settings/payment-methods/$id';
   static String settingsPaymentMethodToggle(String id) => '/settings/payment-methods/$id/toggle';
+
+  static const String consignments = '/consignments';
+  static String consignment(String id) => '/consignments/$id';
+  static String consignmentDispatch(String id) => '/consignments/$id/dispatch';
+  static String consignmentReconcile(String id) => '/consignments/$id/reconcile';
+  static String consignmentFinalize(String id) => '/consignments/$id/finalize';
+
+  static const String serviceOrders = '/service-orders';
+  static String serviceOrder(String id) => '/service-orders/$id';
+  static String serviceOrderStatus(String id) => '/service-orders/$id/status';
+
+  static const String salesTargets = '/sales-targets';
 }
