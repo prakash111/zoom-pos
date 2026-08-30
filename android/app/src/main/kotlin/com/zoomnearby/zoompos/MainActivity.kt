@@ -1,0 +1,5 @@
+package com.zoomnearby.zoompos
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()

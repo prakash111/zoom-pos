@@ -1,0 +1,84 @@
+workflows:
+  android-debug:
+    name: Zoom POS Mobile - Debug Build
+    max_build_duration: 30
+    instance_type: linux_x2
+    working_directory: mobile
+
+    environment:
+      flutter: stable
+      java: 17
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: "*"
+          include: true
+
+    scripts:
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+
+      - name: Build debug APK
+        script: |
+          flutter build apk --debug
+
+    artifacts:
+      - mobile/build/app/outputs/flutter-apk/*.apk
+
+  android-release:
+    name: Zoom POS Mobile - Release Build (signed)
+    max_build_duration: 30
+    instance_type: linux_x2
+    working_directory: mobile
+
+    environment:
+      flutter: stable
+      java: 17
+      vars:
+        # Keystore committed at mobile/zoom-pos.jks (PKCS12, single entry).
+        KEYSTORE_FILE: "zoom-pos.jks"
+        KEYSTORE_PASSWORD: "123456789"
+        KEY_ALIAS: "zoom-pos"
+        KEY_PASSWORD: "123456789"
+
+    triggering:
+      events:
+        - push
+      tag_patterns:
+        - pattern: "mobile-v*"
+          include: true
+
+    scripts:
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+
+      - name: Set up release keystore
+        script: |
+          KEYSTORE_PATH="$CM_BUILD_DIR/mobile/$KEYSTORE_FILE"
+          if [ ! -f "$KEYSTORE_PATH" ]; then
+            echo "Keystore not found: $KEYSTORE_PATH"
+            exit 1
+          fi
+          cat > "$CM_BUILD_DIR/mobile/android/key.properties" <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$KEYSTORE_PATH
+          EOF
+
+      - name: Build signed release APK
+        script: |
+          flutter build apk --release
+
+      - name: Build signed release App Bundle
+        script: |
+          flutter build appbundle --release
+
+    artifacts:
+      - mobile/build/app/outputs/flutter-apk/*.apk
+      - mobile/build/app/outputs/bundle/**/*.aab
+      - mobile/build/app/outputs/**/mapping.txt
