@@ -11,11 +11,11 @@ class CompanyModel {
   factory CompanyModel.fromJson(Map<String, dynamic> json) {
     return CompanyModel(
       id: json['id']?.toString() ?? '',
-      name: json['name'] as String? ?? '',
-      tradeName: json['trade_name'] as String? ?? json['name'] as String? ?? '',
-      currency: json['currency'] as String? ?? 'USD',
-      currencySymbol: json['currency_symbol'] as String? ?? '\$',
-      planName: json['plan_name'] as String? ?? 'trial',
+      name: json['name']?.toString() ?? '',
+      tradeName: (json['trade_name'] ?? json['name'])?.toString() ?? '',
+      currency: json['currency']?.toString() ?? 'USD',
+      currencySymbol: json['currency_symbol']?.toString() ?? '\$',
+      planName: json['plan_name']?.toString() ?? 'trial',
     );
   }
 

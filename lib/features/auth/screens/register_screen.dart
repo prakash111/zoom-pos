@@ -41,13 +41,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       phone: _phoneController.text.trim(),
     );
 
+    if (success && mounted) {
+      Navigator.of(context).pop();
+      return;
+    }
+
     if (!success && mounted && auth.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(auth.errorMessage!)),
       );
     }
-    // On success AuthProvider flips to authenticated and AuthGate swaps the
-    // screen out from under this route automatically.
   }
 
   @override

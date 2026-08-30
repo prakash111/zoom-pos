@@ -20,6 +20,7 @@ class ApiClient {
           connectTimeout: AppConfig.connectTimeout,
           receiveTimeout: AppConfig.receiveTimeout,
           contentType: 'application/json',
+          headers: const {'Accept': 'application/json'},
         ));
 
   final Dio _dio;
@@ -51,15 +52,16 @@ class ApiClient {
     try {
       final response = await request();
       final body = response.data;
-      if (body is Map<String, dynamic>) {
-        if (body['success'] == false) {
+      if (body is Map) {
+        final json = Map<String, dynamic>.from(body);
+        if (json['success'] == false) {
           throw ApiException(
-            _extractErrorMessage(body),
+            _extractErrorMessage(json),
             statusCode: response.statusCode,
-            details: body['details'] as Map<String, dynamic>?,
+            details: _asStringMap(json['details']),
           );
         }
-        return body;
+        return json;
       }
       return {'success': true, 'data': body};
     } on DioException catch (e) {
@@ -88,11 +90,12 @@ class ApiClient {
       onUnauthenticated?.call();
     }
 
-    if (body is Map<String, dynamic>) {
+    if (body is Map) {
+      final json = Map<String, dynamic>.from(body);
       return ApiException(
-        _extractErrorMessage(body),
+        _extractErrorMessage(json),
         statusCode: status,
-        details: body['details'] as Map<String, dynamic>?,
+        details: _asStringMap(json['details']),
       );
     }
 
@@ -106,5 +109,9 @@ class ApiClient {
       default:
         return ApiException(e.message ?? 'Something went wrong.', statusCode: status);
     }
+  }
+
+  static Map<String, dynamic>? _asStringMap(Object? value) {
+    return value is Map ? Map<String, dynamic>.from(value) : null;
   }
 }

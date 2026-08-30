@@ -11,9 +11,9 @@ class UserModel {
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id']?.toString() ?? '',
-      name: json['name'] as String? ?? '',
-      email: json['email'] as String? ?? '',
-      role: json['role'] as String? ?? '',
+      name: json['name']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      role: json['role']?.toString() ?? '',
       companyId: json['company_id']?.toString() ?? '',
       permissions: _parsePermissions(json['permissions']),
     );

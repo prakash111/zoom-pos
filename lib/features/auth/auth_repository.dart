@@ -1,4 +1,5 @@
 import '../../core/api/api_client.dart';
+import '../../core/api/api_exception.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/company_model.dart';
 import '../../core/models/user_model.dart';
@@ -29,11 +30,7 @@ class AuthRepository {
       if (accountId != null && accountId.isNotEmpty) 'account_id': accountId,
     });
 
-    return LoginResult(
-      token: (response['token'] ?? '').toString(),
-      user: UserModel.fromJson(response['user'] as Map<String, dynamic>? ?? {}),
-      company: CompanyModel.fromJson(response['company'] as Map<String, dynamic>? ?? {}),
-    );
+    return _loginResult(response);
   }
 
   Future<LoginResult> register({
@@ -53,20 +50,47 @@ class AuthRepository {
       if (currency != null && currency.isNotEmpty) 'currency': currency,
     });
 
-    return LoginResult(
-      token: (response['token'] ?? '').toString(),
-      user: UserModel.fromJson(response['user'] as Map<String, dynamic>? ?? {}),
-      company: CompanyModel.fromJson(response['company'] as Map<String, dynamic>? ?? {}),
-    );
+    return _loginResult(response);
   }
 
   Future<({UserModel? user, CompanyModel company})> session() async {
-    final response = await _client.get(ApiEndpoints.session);
+    final response = _payload(await _client.get(ApiEndpoints.session));
     return (
-      user: response['user'] is Map<String, dynamic>
-          ? UserModel.fromJson(response['user'] as Map<String, dynamic>)
+      user: response['user'] is Map
+          ? UserModel.fromJson(Map<String, dynamic>.from(response['user'] as Map))
           : null,
-      company: CompanyModel.fromJson(response['company'] as Map<String, dynamic>? ?? {}),
+      company: CompanyModel.fromJson(_requiredMap(response, 'company')),
     );
+  }
+
+  LoginResult _loginResult(Map<String, dynamic> response) {
+    final payload = _payload(response);
+    final token = payload['token']?.toString() ?? '';
+    if (token.isEmpty) {
+      throw ApiException('The server did not return an authentication token.');
+    }
+
+    return LoginResult(
+      token: token,
+      user: UserModel.fromJson(_requiredMap(payload, 'user')),
+      company: CompanyModel.fromJson(_requiredMap(payload, 'company')),
+    );
+  }
+
+  // Accept both the current flat response and the commonly used
+  // {success: true, data: {...}} envelope, so server middleware/version
+  // differences cannot turn a valid login into a Dart cast error.
+  static Map<String, dynamic> _payload(Map<String, dynamic> response) {
+    final data = response['data'];
+    return data is Map ? Map<String, dynamic>.from(data) : response;
+  }
+
+  static Map<String, dynamic> _requiredMap(
+    Map<String, dynamic> payload,
+    String key,
+  ) {
+    final value = payload[key];
+    if (value is Map) return Map<String, dynamic>.from(value);
+    throw ApiException('The server returned an invalid authentication response.');
   }
 }
