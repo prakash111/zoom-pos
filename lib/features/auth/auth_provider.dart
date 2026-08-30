@@ -37,23 +37,33 @@ class AuthProvider extends ChangeNotifier {
   bool get isBusy => _status == AuthStatus.authenticating;
 
   Future<void> restoreSession() async {
-    final token = await _secureStorage.readToken();
-    if (token == null) {
-      _status = AuthStatus.unauthenticated;
-      notifyListeners();
-      return;
-    }
-
     try {
-      final result = await _authRepository.session();
+      final token = await _secureStorage.readToken().timeout(
+            const Duration(seconds: 4),
+            onTimeout: () => null,
+          );
+
+      if (token == null || token.isEmpty) {
+        _status = AuthStatus.unauthenticated;
+        return;
+      }
+
+      final result = await _authRepository.session().timeout(
+            const Duration(seconds: 6),
+            onTimeout: () => throw ApiException('Session restore timed out'),
+          );
       _user = result.user;
       _company = result.company;
       _status = AuthStatus.authenticated;
     } on ApiException {
       await _secureStorage.clearToken();
       _status = AuthStatus.unauthenticated;
+    } catch (e) {
+      debugPrint('AuthProvider.restoreSession error: $e');
+      _status = AuthStatus.unauthenticated;
+    } finally {
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<bool> login({
@@ -101,6 +111,12 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } on ApiException catch (e) {
       _errorMessage = e.message;
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('AuthProvider._attempt unexpected error: $e');
+      _errorMessage = 'An unexpected error occurred. Please try again.';
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;

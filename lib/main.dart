@@ -10,19 +10,26 @@ import 'features/auth/auth_repository.dart';
 import 'features/auth/screens/auth_gate.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
   final secureStorage = SecureStorageService();
   final preferences = AppPreferences();
   final apiClient = ApiClient(secureStorage: secureStorage, preferences: preferences);
   final authRepository = AuthRepository(apiClient);
 
+  final authProvider = AuthProvider(
+    authRepository: authRepository,
+    secureStorage: secureStorage,
+    apiClient: apiClient,
+  );
+
+  // Restore session in background
+  authProvider.restoreSession();
+
   runApp(ZoomPosApp(
     preferences: preferences,
     apiClient: apiClient,
-    authProvider: AuthProvider(
-      authRepository: authRepository,
-      secureStorage: secureStorage,
-      apiClient: apiClient,
-    )..restoreSession(),
+    authProvider: authProvider,
   ));
 }
 
