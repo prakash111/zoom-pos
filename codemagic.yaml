@@ -19,6 +19,7 @@ workflows:
       - name: Get Flutter packages
         script: |
           flutter pub get
+          dart run flutter_launcher_icons
 
       - name: Build debug APK
         script: |
@@ -53,6 +54,7 @@ workflows:
       - name: Get Flutter packages
         script: |
           flutter pub get
+          dart run flutter_launcher_icons
 
       - name: Set up release keystore
         script: |
