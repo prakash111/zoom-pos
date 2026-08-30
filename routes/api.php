@@ -2,8 +2,12 @@
 
 use App\Http\Controllers\Api\V1\CashRegisterApiController;
 use App\Http\Controllers\Api\V1\CatalogAdminApiController;
+use App\Http\Controllers\Api\V1\CatalogApiController;
 use App\Http\Controllers\Api\V1\ConsignmentApiController;
+use App\Http\Controllers\Api\V1\DeviceApiController;
+use App\Http\Controllers\Api\V1\LanguageApiController;
 use App\Http\Controllers\Api\V1\PayablesApiController;
+use App\Http\Controllers\Api\V1\PermissionApiController;
 use App\Http\Controllers\Api\V1\PosDesktopSyncController;
 use App\Http\Controllers\Api\V1\PosSyncApiController;
 use App\Http\Controllers\Api\V1\QuotationApiController;
@@ -12,6 +16,7 @@ use App\Http\Controllers\Api\V1\SalesTargetApiController;
 use App\Http\Controllers\Api\V1\ServiceOrderApiController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
 use App\Http\Controllers\Api\V1\TaxApiController;
+use App\Http\Controllers\Api\V1\UserApiController;
 use App\Http\Middleware\AuthenticateTenantApi;
 use Illuminate\Support\Facades\Route;
 
@@ -174,5 +179,29 @@ Route::prefix('v1/pos')->group(function () {
         // Sales Targets & Goals
         Route::get('/sales-targets', [SalesTargetApiController::class, 'index'])->middleware('tenant.api.permission:targets,view');
         Route::post('/sales-targets', [SalesTargetApiController::class, 'store'])->middleware('tenant.api.permission:targets,edit');
+
+        // Users & Permissions (impersonation intentionally not exposed)
+        Route::get('/users', [UserApiController::class, 'index'])->middleware('tenant.api.permission:users,view');
+        Route::post('/users/invite', [UserApiController::class, 'invite'])->middleware('tenant.api.permission:users,create');
+        Route::post('/users/{id}/resend-invite', [UserApiController::class, 'resendInvite'])->middleware('tenant.api.permission:users,edit');
+        Route::put('/users/{id}/role', [UserApiController::class, 'updateRole'])->middleware('tenant.api.permission:users,edit');
+        Route::post('/users/{id}/toggle-status', [UserApiController::class, 'toggleStatus'])->middleware('tenant.api.permission:users,edit');
+        Route::put('/users/{id}/commission', [UserApiController::class, 'updateCommission'])->middleware('tenant.api.permission:users,edit');
+        Route::delete('/users/{id}', [UserApiController::class, 'destroy'])->middleware('tenant.api.permission:users,edit');
+        Route::get('/users/{id}/permissions', [PermissionApiController::class, 'show'])->middleware('tenant.api.permission:users,view');
+        Route::put('/users/{id}/permissions', [PermissionApiController::class, 'update'])->middleware('tenant.api.permission:users,edit');
+
+        // Online Catalog
+        Route::get('/catalog', [CatalogApiController::class, 'index'])->middleware('tenant.api.permission:catalog,view');
+        Route::post('/catalog', [CatalogApiController::class, 'store'])->middleware('tenant.api.permission:catalog,create');
+        Route::delete('/catalog/{id}', [CatalogApiController::class, 'destroy'])->middleware('tenant.api.permission:catalog,edit');
+
+        // Devices (active web-login sessions — not TenantApiKey terminals)
+        Route::get('/devices', [DeviceApiController::class, 'index']);
+        Route::post('/devices/{token}/revoke', [DeviceApiController::class, 'revoke']);
+
+        // Languages (store default language only — see LanguageApiController)
+        Route::get('/languages', [LanguageApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
+        Route::put('/languages/default', [LanguageApiController::class, 'setDefault'])->middleware('tenant.api.permission:settings,edit');
     });
 });
