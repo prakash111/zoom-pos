@@ -2,11 +2,14 @@
 
 use App\Http\Controllers\Api\V1\CashRegisterApiController;
 use App\Http\Controllers\Api\V1\CatalogAdminApiController;
+use App\Http\Controllers\Api\V1\ConsignmentApiController;
 use App\Http\Controllers\Api\V1\PayablesApiController;
 use App\Http\Controllers\Api\V1\PosDesktopSyncController;
 use App\Http\Controllers\Api\V1\PosSyncApiController;
 use App\Http\Controllers\Api\V1\QuotationApiController;
 use App\Http\Controllers\Api\V1\ReportsApiController;
+use App\Http\Controllers\Api\V1\SalesTargetApiController;
+use App\Http\Controllers\Api\V1\ServiceOrderApiController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
 use App\Http\Controllers\Api\V1\TaxApiController;
 use App\Http\Middleware\AuthenticateTenantApi;
@@ -150,5 +153,26 @@ Route::prefix('v1/pos')->group(function () {
         Route::put('/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsUpdate'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsDestroy'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/payment-methods/{id}/toggle', [SettingsApiController::class, 'paymentMethodsToggle'])->middleware('tenant.api.permission:settings,edit');
+
+        // Consignments (draft -> dispatched -> reconciled -> finalized)
+        Route::get('/consignments', [ConsignmentApiController::class, 'index'])->middleware('tenant.api.permission:consignments,view');
+        Route::post('/consignments', [ConsignmentApiController::class, 'store'])->middleware('tenant.api.permission:consignments,create');
+        Route::get('/consignments/{id}', [ConsignmentApiController::class, 'show'])->middleware('tenant.api.permission:consignments,view');
+        Route::delete('/consignments/{id}', [ConsignmentApiController::class, 'destroy'])->middleware('tenant.api.permission:consignments,edit');
+        Route::post('/consignments/{id}/dispatch', [ConsignmentApiController::class, 'dispatch'])->middleware('tenant.api.permission:consignments,edit');
+        Route::post('/consignments/{id}/reconcile', [ConsignmentApiController::class, 'reconcile'])->middleware('tenant.api.permission:consignments,edit');
+        Route::post('/consignments/{id}/finalize', [ConsignmentApiController::class, 'finalize'])->middleware('tenant.api.permission:consignments,edit');
+
+        // Service Orders (Repairs / Warranty)
+        Route::get('/service-orders', [ServiceOrderApiController::class, 'index'])->middleware('tenant.api.permission:service_orders,view');
+        Route::post('/service-orders', [ServiceOrderApiController::class, 'store'])->middleware('tenant.api.permission:service_orders,create');
+        Route::get('/service-orders/{id}', [ServiceOrderApiController::class, 'show'])->middleware('tenant.api.permission:service_orders,view');
+        Route::put('/service-orders/{id}', [ServiceOrderApiController::class, 'update'])->middleware('tenant.api.permission:service_orders,edit');
+        Route::post('/service-orders/{id}/status', [ServiceOrderApiController::class, 'updateStatus'])->middleware('tenant.api.permission:service_orders,edit');
+        Route::delete('/service-orders/{id}', [ServiceOrderApiController::class, 'destroy'])->middleware('tenant.api.permission:service_orders,edit');
+
+        // Sales Targets & Goals
+        Route::get('/sales-targets', [SalesTargetApiController::class, 'index'])->middleware('tenant.api.permission:targets,view');
+        Route::post('/sales-targets', [SalesTargetApiController::class, 'store'])->middleware('tenant.api.permission:targets,edit');
     });
 });
