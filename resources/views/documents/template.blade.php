@@ -511,11 +511,47 @@
                     </div>
                 @endif
 
-                @if ($sale->tax > 0)
-                    <div class="summary-row">
-                        <span>Tax / VAT:</span>
-                        <span>+{{ $company->formatMoney($sale->tax) }}</span>
-                    </div>
+                @php
+                    $isIndia = in_array(strtoupper(trim((string)$company->country)), ['IN', 'IND', 'INDIA'], true) || str_contains(strtoupper(trim((string)$company->country)), 'INDIA') || ($company->currency ?? '') === 'INR' || ($company->currency_symbol ?? '') === '₹';
+                    $taxLabel = $isIndia ? 'GST' : ($sale->tax_name ?: 'Tax / VAT');
+                    $taxBreakdown = \App\Services\TaxEngineService::normalizeTaxBreakdown($sale->tax_breakdown);
+                @endphp
+
+                @if ($sale->tax > 0 || !empty($taxBreakdown))
+                    @if (!empty($taxBreakdown))
+                        @foreach ($taxBreakdown as $taxRow)
+                            <div class="summary-row">
+                                <span>{{ $taxRow['name'] }} ({{ $taxRow['rate'] }}%):</span>
+                                <span>+{{ $company->formatMoney($taxRow['amount']) }}</span>
+                            </div>
+                            @foreach ($taxRow['sub_components'] as $comp)
+                                <div class="summary-row" style="font-size: 11px; color: #64748b; padding-left: 14px;">
+                                    <span>&#9492; {{ $comp['name'] }} ({{ $comp['rate'] }}%):</span>
+                                    <span>+{{ $company->formatMoney($comp['amount']) }}</span>
+                                </div>
+                            @endforeach
+                        @endforeach
+                    @else
+                        @if ($isIndia && (float)($sale->tax_rate ?? 0) > 0)
+                            @php
+                                $halfRate = (float)$sale->tax_rate / 2;
+                                $halfTax = (float)$sale->tax / 2;
+                            @endphp
+                            <div class="summary-row">
+                                <span>CGST ({{ number_format($halfRate, 1) }}%):</span>
+                                <span>+{{ $company->formatMoney($halfTax) }}</span>
+                            </div>
+                            <div class="summary-row">
+                                <span>SGST ({{ number_format($halfRate, 1) }}%):</span>
+                                <span>+{{ $company->formatMoney($halfTax) }}</span>
+                            </div>
+                        @else
+                            <div class="summary-row">
+                                <span>{{ $taxLabel }}{{ (float)($sale->tax_rate ?? 0) > 0 ? ' (' . (float)$sale->tax_rate . '%)' : '' }}:</span>
+                                <span>+{{ $company->formatMoney($sale->tax) }}</span>
+                            </div>
+                        @endif
+                    @endif
                 @endif
 
                 <div class="summary-row total-row">

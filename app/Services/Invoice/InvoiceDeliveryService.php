@@ -639,32 +639,39 @@ class InvoiceDeliveryService
         $companyName = $company?->trade_name ?? $company?->name ?? 'Store';
         $customerName = $sale->customer_name ?: 'Valued Customer';
         $currency = $company?->currency ?? 'USD';
+        $sym = $company?->currency_symbol ?: ($currency === 'INR' ? '₹' : '$');
+        $isIndia = in_array(strtoupper(trim((string)($company?->country ?? ''))), ['IN', 'IND', 'INDIA'], true) || $currency === 'INR' || $sym === '₹';
+        $taxLabel = $isIndia ? 'GSTIN' : 'Tax ID';
 
         $itemsText = '';
         foreach ($sale->items ?? [] as $item) {
             $qty = $item['quantity'] ?? 1;
             $price = number_format((float) ($item['price'] ?? 0), 2);
             $name = $item['name'] ?? 'Item';
-            $itemsText .= "• {$name} (x{$qty}) - \${$price}\n";
+            $itemsText .= "• {$name} (x{$qty}) - {$sym}{$price}\n";
         }
 
-        $subtotal = number_format((float) $sale->total + (float) $sale->discount, 2);
-        $discountText = $sale->discount > 0 ? "\n*Discount:* -\$".number_format((float) $sale->discount, 2) : '';
+        $subtotal = number_format((float) ($sale->total - ($sale->tax_amount ?? 0) + $sale->discount), 2);
+        $discountText = $sale->discount > 0 ? "\n*Discount:* -{$sym}".number_format((float) $sale->discount, 2) : '';
+        $taxText = (float)($sale->tax_amount ?? 0) > 0 ? "\n*".($isIndia ? 'GST' : 'Tax').":* +{$sym}".number_format((float) $sale->tax_amount, 2) : '';
         $total = number_format((float) $sale->total, 2);
         $date = $sale->created_at ? $sale->created_at->format('d M Y, h:i A') : now()->format('d M Y, h:i A');
         $publicLink = route('sales.public', $sale->sale_number);
+        $taxIdLine = !empty($company?->tax_id) ? "*{$taxLabel}:* {$company->tax_id}\n" : '';
 
-        return "🧾 *TAX INVOICE RECEIPT*\n"
+        return "🧾 *" . ($isIndia ? 'TAX INVOICE / GST RECEIPT' : 'TAX INVOICE RECEIPT') . "*\n"
             ."*Store:* {$companyName}\n"
+            . $taxIdLine
             ."*Invoice:* #{$sale->sale_number}\n"
             ."*Date:* {$date}\n"
             ."*Customer:* {$customerName}\n\n"
             ."*Items:*\n"
             ."{$itemsText}\n"
             ."----------------------------\n"
-            ."*Subtotal:* \${$subtotal}"
-            ."{$discountText}\n"
-            ."*Total Paid:* \${$total} {$currency}\n"
+            ."*Subtotal:* {$sym}{$subtotal}"
+            ."{$discountText}"
+            ."{$taxText}\n"
+            ."*Total Paid:* {$sym}{$total} {$currency}\n"
             .'*Payment:* '.ucfirst($sale->payment_method ?? 'Cash')."\n"
             .'*Status:* '.ucfirst($sale->status ?? 'Completed')."\n"
             ."----------------------------\n"

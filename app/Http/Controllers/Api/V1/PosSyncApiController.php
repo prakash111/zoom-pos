@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\OrderPayment;
+use App\Models\PaymentMethod;
 use App\Models\Plan;
 use App\Models\Product;
 use App\Models\Sale;
@@ -161,8 +162,14 @@ class PosSyncApiController extends Controller
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
                 'tax_number' => $company->document ?? $company->tax_id ?? '',
+                'tax_id' => $company->tax_id ?? $company->document ?? '',
+                'country' => $company->country ?? 'IN',
                 'address' => $company->address ?? '',
+                'city' => $company->city ?? '',
+                'state' => $company->state ?? '',
+                'postal_code' => $company->postal_code ?? '',
                 'phone' => $company->phone ?? '',
+                'email' => $company->email ?? '',
                 'plan_name' => $company->plan_name ?? 'trial',
                 'expires_at' => $company->expires_at?->toIso8601String(),
             ],
@@ -307,8 +314,14 @@ class PosSyncApiController extends Controller
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
                 'tax_number' => $company->document ?? $company->tax_id ?? '',
+                'tax_id' => $company->tax_id ?? $company->document ?? '',
+                'country' => $company->country ?? 'IN',
                 'address' => $company->address ?? '',
+                'city' => $company->city ?? '',
+                'state' => $company->state ?? '',
+                'postal_code' => $company->postal_code ?? '',
                 'phone' => $company->phone ?? '',
+                'email' => $company->email ?? '',
                 'plan_name' => $company->plan_name ?? 'trial',
                 'expires_at' => $company->expires_at?->toIso8601String(),
             ],
@@ -1376,6 +1389,31 @@ class PosSyncApiController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $paymentMethods = PaymentMethod::where('company_id', $company->id)
+            ->where('is_active', true)
+            ->orderBy('order_index')
+            ->get()
+            ->map(fn (PaymentMethod $pm) => [
+                'id' => (string) $pm->id,
+                'name' => $pm->name,
+                'code' => $pm->code ?: \Illuminate\Support\Str::slug($pm->name, '_'),
+                'description' => $pm->description ?? '',
+                'is_active' => (bool) $pm->is_active,
+                'order_index' => (int) $pm->order_index,
+            ])
+            ->values()
+            ->all();
+
+        if (empty($paymentMethods)) {
+            $paymentMethods = [
+                ['id' => 'cash', 'name' => 'Cash', 'code' => 'cash', 'description' => '', 'is_active' => true, 'order_index' => 0],
+                ['id' => 'card', 'name' => 'Card', 'code' => 'card', 'description' => '', 'is_active' => true, 'order_index' => 1],
+                ['id' => 'upi', 'name' => 'UPI', 'code' => 'upi', 'description' => '', 'is_active' => true, 'order_index' => 2],
+                ['id' => 'credit', 'name' => 'Credit', 'code' => 'credit', 'description' => '', 'is_active' => true, 'order_index' => 3],
+                ['id' => 'other', 'name' => 'Other', 'code' => 'other', 'description' => '', 'is_active' => true, 'order_index' => 4],
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'total_products' => $products->count(),
@@ -1383,6 +1421,7 @@ class PosSyncApiController extends Controller
             'products' => $products,
             'categories' => $categories,
             'brands' => $brands,
+            'payment_methods' => $paymentMethods,
         ]);
     }
 
@@ -1962,16 +2001,20 @@ class PosSyncApiController extends Controller
             ->first();
 
         $plan = Plan::find($company->plan_name) ?? Plan::first();
-        $availablePlans = Plan::where('active', true)->get()->map(fn (Plan $p) => [
-            'name' => $p->name,
-            'display_name' => $p->display_name ?: ucfirst($p->name),
-            'price' => (float) $p->price,
-            'currency' => $p->currency ?: 'USD',
-            'billing_cycle' => $p->billing_cycle,
-            'duration_days' => $p->duration_days,
-            'features' => $p->features ?: [],
-            'limits' => $p->limits ?: [],
-        ]);
+        $availablePlans = Plan::where('active', true)->get()->map(function (Plan $p) {
+            $features = is_array($p->features) ? $p->features : (is_string($p->features) ? (json_decode($p->features, true) ?: []) : []);
+            $limits = is_array($p->limits) ? $p->limits : (is_string($p->limits) ? (json_decode($p->limits, true) ?: []) : []);
+            return [
+                'name' => $p->name,
+                'display_name' => $p->display_name ?: ucfirst($p->name),
+                'price' => (float) ($p->price ?? 0),
+                'currency' => $p->currency ?: 'USD',
+                'billing_cycle' => $p->billing_cycle,
+                'duration_days' => (int) ($p->duration_days ?? 30),
+                'features' => array_values($features),
+                'limits' => $limits,
+            ];
+        })->values()->all();
 
         $productsCount = Product::withoutGlobalScope('company')->where('company_id', $company->id)->count();
         $usersCount = User::withoutGlobalScope('company')->where('company_id', $company->id)->count();
