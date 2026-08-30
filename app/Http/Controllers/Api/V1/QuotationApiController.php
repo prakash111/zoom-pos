@@ -293,6 +293,28 @@ class QuotationApiController extends Controller
         ]);
     }
 
+    /**
+     * PDF of a quotation, same document InvoiceDeliveryService produces for
+     * the web app and for email/WhatsApp delivery.
+     * GET /api/v1/pos/quotations/{id}/pdf?format=a4|80mm|58mm
+     */
+    public function pdf(Request $request, string $id)
+    {
+        $company = $this->resolveCompany($request);
+        $quote = $this->findQuote($company, $id);
+
+        if (! $quote) {
+            return response()->json(['success' => false, 'error' => 'Quotation not found.'], 404);
+        }
+
+        $pdf = app(\App\Services\Invoice\InvoiceDeliveryService::class)->generateQuotationPdf($quote, $request->query('format'));
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$quote->sale_number.'.pdf"',
+        ]);
+    }
+
     private function findQuote(Company $company, string $id): ?Sale
     {
         return Sale::query()

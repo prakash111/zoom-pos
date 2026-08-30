@@ -1,4 +1,32 @@
 <!-- Real-Time Thermal Receipt & Invoice Preview Modal (0ms Alpine Client-Side Mount) -->
+<style>
+    /* Keep the pre-confirmation review visually consistent with the final
+       invoice print preview, regardless of the application's dark mode. */
+    .draft-invoice-preview { background: #fff !important; color: #0f172a !important; }
+    .draft-invoice-preview .preview-canvas { background: #eef2f7 !important; }
+    .draft-invoice-preview .preview-paper { background: #fff !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
+    .draft-invoice-preview .text-white { color: #0f172a !important; }
+    .draft-invoice-preview .text-slate-100,
+    .draft-invoice-preview .text-slate-200 { color: #1e293b !important; }
+    .draft-invoice-preview .text-slate-300 { color: #334155 !important; }
+    .draft-invoice-preview .text-slate-400 { color: #64748b !important; }
+    .draft-invoice-preview .text-slate-500 { color: #94a3b8 !important; }
+    .draft-invoice-preview .text-blue-400 { color: #2563eb !important; }
+    .draft-invoice-preview .text-emerald-400 { color: #059669 !important; }
+    .draft-invoice-preview .text-rose-400 { color: #e11d48 !important; }
+    .draft-invoice-preview .text-amber-400 { color: #b45309 !important; }
+    .draft-invoice-preview .border-slate-700,
+    .draft-invoice-preview .border-slate-800 { border-color: #cbd5e1 !important; }
+    .draft-invoice-preview .border-slate-700\/80,
+    .draft-invoice-preview .border-slate-700\/60,
+    .draft-invoice-preview .border-white\/10 { border-color: #cbd5e1 !important; }
+    .draft-invoice-preview .divide-slate-800 > :not(:last-child) { border-color: #e2e8f0 !important; }
+    .draft-invoice-preview .bg-slate-800\/90,
+    .draft-invoice-preview .bg-slate-800 { background: #f1f5f9 !important; }
+    .draft-invoice-preview .bg-slate-700 { background: #e2e8f0 !important; }
+    .draft-invoice-preview .bg-amber-500\/10,
+    .draft-invoice-preview .bg-amber-500\/15 { background: #fffbeb !important; }
+</style>
 <template x-teleport="body">
 <div x-show="showInvoicePreview"
      x-transition:enter="transition ease-out duration-200"
@@ -24,10 +52,10 @@
              x-transition:leave-start="opacity-100 scale-100 translate-y-0"
              x-transition:leave-end="opacity-0 scale-95 translate-y-2"
              @click.outside="closePreview()"
-             class="relative z-10 w-full max-w-xl my-8 bg-[#0f172a] text-slate-100 border border-slate-700/80 dark:border-white/10 rounded-3xl shadow-2xl p-4 sm:p-6 space-y-4 overflow-hidden text-left flex flex-col max-h-[calc(100vh-4rem)]">
+             class="draft-invoice-preview relative z-10 w-full max-w-3xl my-4 bg-white text-slate-900 border border-slate-200 rounded-3xl shadow-2xl overflow-hidden text-left flex flex-col max-h-[calc(100dvh-2rem)]">
         
         <!-- Preview Modal Header Bar -->
-        <div class="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
+        <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-200 shrink-0 bg-white">
             <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center text-base font-black shadow-xs">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.5 12C3.8 7.9 7.5 5 12 5s8.2 2.9 9.5 7c-1.3 4.1-5 7-9.5 7s-8.2-2.9-9.5-7z"/></svg>
@@ -45,15 +73,15 @@
 
             <button type="button"
                     @click="closePreview()"
-                    class="w-8 h-8 rounded-full bg-slate-800/90 text-slate-400 hover:text-white hover:bg-slate-700 flex items-center justify-center font-bold text-base transition active:scale-95 cursor-pointer"
+                    class="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center font-bold text-base transition active:scale-95 cursor-pointer"
                     title="{{ __('Close (Esc)') }}">
                 &times;
             </button>
         </div>
 
         <!-- Scrollable Receipt Thermal Slip Body -->
-        <div class="flex-1 min-h-0 overflow-y-auto pr-1">
-            <div class="bg-slate-950 border border-dashed border-slate-700/80 rounded-2xl p-4 sm:p-5 font-mono text-xs space-y-3.5 shadow-inner text-slate-200" id="printable-draft-receipt">
+        <div class="preview-canvas flex-1 min-h-0 overflow-y-auto bg-slate-100 p-3 sm:p-5">
+            <div class="preview-paper max-w-xl mx-auto bg-white border border-slate-300 rounded-xl p-4 sm:p-6 font-mono text-xs space-y-3.5 shadow-sm text-slate-800" id="printable-draft-receipt">
                 
                 <!-- Watermark / Draft Banner -->
                 <div class="text-center py-1.5 px-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-black uppercase tracking-widest">
@@ -300,27 +328,21 @@
         </div>
 
         <!-- Preview Modal Footer Actions -->
-        <div class="pt-3 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
+        <div class="px-4 sm:px-6 py-4 border-t border-slate-200 bg-white flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 shrink-0">
             <button type="button"
                     @click="closePreview()"
-                    class="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer flex items-center gap-1.5 border border-slate-700/60 active:scale-95">
+                    class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 border border-slate-300 active:scale-95">
                 <span>← {{ __("Back to Payment") }}</span>
             </button>
 
-            <div class="flex items-center gap-2 flex-1 justify-end">
-                <button type="button"
-                        x-on:click="window.print()"
-                        class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-slate-700">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-12-4h12v8H6z"/></svg>
-                    <span>{{ __("Print Draft") }}</span>
-                </button>
-
-                <x-ui.button wire:click="save" wire:loading.attr="disabled" class="!rounded-2xl !font-black">
+            <div class="flex items-center w-full sm:flex-1 justify-end">
+                <button type="button" wire:click="save" wire:loading.attr="disabled"
+                        class="w-full sm:w-auto px-5 py-3 rounded-xl bg-[#006aff] hover:bg-[#0055d6] text-white font-black text-xs sm:text-sm shadow-lg shadow-blue-500/25 inline-flex items-center justify-center transition active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none cursor-pointer">
                     <span wire:loading.remove class="flex items-center gap-1.5">
                         <span>✓ {{ __("Confirm Sale & Complete") }}</span>
                     </span>
                     <span wire:loading>{{ __("Processing Transaction...") }}</span>
-                </x-ui.button>
+                </button>
             </div>
         </div>
 

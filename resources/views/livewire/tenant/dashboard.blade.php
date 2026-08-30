@@ -575,9 +575,11 @@
                             @forelse ($recentSales as $sale)
                                 <tr>
                                     <td class="py-3 font-bold text-blue-600 dark:text-blue-400">
-                                        <a href="{{ route('tenant.sales.pdf', $sale) }}" target="_blank" class="hover:underline">
+                                        <button type="button" x-data
+                                                x-on:click="$dispatch('open-print-preview', { url: @js(route('tenant.sales.pdf', ['sale' => $sale, 'embed' => 1])), title: @js(__('Invoice Preview')) })"
+                                                class="hover:underline">
                                             #{{ $sale->sale_number }}
-                                        </a>
+                                        </button>
                                     </td>
                                     <td class="py-3 text-slate-800 dark:text-slate-200">{{ $sale->customer_name ?: 'Walk-in Customer' }}</td>
                                     <td class="py-3 capitalize text-slate-500">{{ $sale->payment_method ?? 'Cash' }}</td>

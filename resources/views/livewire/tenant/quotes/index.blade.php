@@ -136,14 +136,13 @@
                                        class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition">
                                         {{ __("View") }}
                                     </a>
-                                    <a href="{{ route('tenant.quotes.pdf', $quote) }}"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       data-turbo="false"
+                                    <button type="button"
+                                       x-data
+                                       x-on:click="$dispatch('open-print-preview', { url: @js(route('tenant.quotes.pdf', ['quote' => $quote, 'embed' => 1])), title: @js(__('Quotation Preview')) })"
                                        class="px-2 py-1 text-slate-400 hover:text-slate-600 transition font-bold text-xs"
-                                       title="{{ __("Download / Stream PDF") }}">
+                                       title="{{ __('Preview PDF') }}">
                                         {{ __("PDF") }}
-                                    </a>
+                                    </button>
                                     <button type="button"
                                             wire:click="deleteQuote({{ $quote->id }})"
                                             wire:confirm="{{ __("Are you sure you want to delete this quote?") }}"

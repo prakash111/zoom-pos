@@ -10,7 +10,7 @@
     $isRtl = $publicLocService->isRtl();
 @endphp
 <!DOCTYPE html>
-<html lang="{{ $publicActiveLang?->code ?? 'en' }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="scroll-smooth" x-data="{ dark: localStorage.getItem('theme') === 'dark' }" x-init="$watch('dark', v => { localStorage.setItem('theme', v ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', v) }); document.documentElement.classList.toggle('dark', dark)">
+<html lang="{{ $publicActiveLang?->code ?? 'en' }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="scroll-smooth" x-data="{ dark: document.documentElement.classList.contains('dark') }" x-init="$watch('dark', v => { localStorage.setItem('theme', v ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', v) })">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -22,12 +22,9 @@
         <link rel="icon" href="{{ $publicBranding->favicon_url }}">
     @endif
 
-    <!-- Google Fonts: Plus Jakarta Sans & Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600;1,700;1,800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    {{-- Set the saved theme before CSS is requested, preventing a light/dark flash. --}}
+    <script>try{document.documentElement.classList.toggle('dark',localStorage.getItem('theme')==='dark')}catch(e){}</script>
+    @vite(['resources/css/app.css', 'resources/js/public-navigation.js'])
     @livewireStyles
     <style>
         :root {
@@ -50,20 +47,17 @@
         [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-900 dark:text-slate-100 font-sans antialiased min-h-screen selection:bg-brand-lime selection:text-slate-900">
-
-    @include('layouts.partials.preloader')
+<body class="public-site bg-slate-900 text-slate-900 dark:text-slate-100 font-sans antialiased min-h-screen selection:bg-brand-lime selection:text-slate-900">
 
     <!-- Global Floating / Sticky Navbar -->
-    <header x-data="{ mobileOpen: false, scrolled: false }"
-            x-init="window.addEventListener('scroll', () => { scrolled = window.scrollY > 20 })"
-            class="sticky top-0 z-50 transition-all duration-300"
-            :class="scrolled ? 'bg-slate-900/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-white/10 shadow-lg' : 'bg-transparent'">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center justify-between">
+    <header x-data="{ mobileOpen: false }"
+            x-effect="document.body.classList.toggle('overflow-hidden', mobileOpen)"
+            class="sticky top-0 z-50 bg-slate-900/95 dark:bg-slate-950/95 border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-[72px] flex items-center justify-between gap-3">
             <!-- Brand Logo -->
-            <a href="{{ url('/') }}" class="inline-flex items-center gap-3 shrink-0 group">
+            <a href="{{ url('/') }}" class="inline-flex items-center gap-2.5 min-w-0 group">
                 @if ($publicBranding->logo_url)
-                    <img src="{{ $publicBranding->logo_url }}" alt="{{ $publicBranding->platform_name }}" class="h-8 w-auto object-contain">
+                    <img src="{{ $publicBranding->logo_url }}" alt="{{ $publicBranding->platform_name }}" class="h-8 w-auto object-contain" decoding="async" fetchpriority="high">
                 @else
                     <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-lime via-emerald-400 to-teal-500 p-0.5 shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform flex items-center justify-center">
                         <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center text-brand-lime font-black text-lg">
@@ -73,7 +67,7 @@
                         </div>
                     </div>
                 @endif
-                <span class="text-lg font-black tracking-tight text-white">{{ $publicBranding->platform_name }}</span>
+                <span class="text-sm sm:text-lg font-black tracking-tight text-white truncate max-w-[12rem] sm:max-w-none">{{ $publicBranding->platform_name }}</span>
             </a>
 
             <!-- Desktop Navigation Links -->
@@ -107,11 +101,11 @@
             </nav>
 
             <!-- Right Actions -->
-            <div class="flex items-center gap-2 sm:gap-3">
+            <div class="flex items-center gap-2 sm:gap-3 shrink-0">
 
                 <!-- Language Switcher Dropdown (Desktop) -->
                 @if ($publicLanguages->isNotEmpty())
-                    <div class="relative" x-data="{ openLang: false }">
+                    <div class="relative hidden md:block" x-data="{ openLang: false }">
                         <button type="button"
                                 x-on:click="openLang = !openLang"
                                 x-on:click.outside="openLang = false"
@@ -158,7 +152,7 @@
 
                 <!-- Dark / Light Theme Toggle -->
                 <button type="button" x-on:click="dark = !dark"
-                        class="p-2 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold transition border border-white/10"
+                        class="hidden md:inline-flex p-2 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold transition border border-white/10"
                         title="{{ __('Toggle Theme') }}">
                     <span x-show="!dark">🌙</span>
                     <span x-show="dark">☀️</span>
@@ -167,12 +161,12 @@
                 <a href="{{ route('tenant.login') }}" class="hidden sm:inline-block px-4 py-2 rounded-full text-xs font-bold text-slate-200 hover:text-white hover:bg-white/10 transition">
                     {{ __('Sign in') }}
                 </a>
-                <a href="{{ route('tenant.register') }}" class="px-4 sm:px-5 py-2 sm:py-2.5 rounded-full bg-brand-lime hover:bg-brand-lime-dark text-slate-950 text-xs sm:text-sm font-black shadow-lg shadow-brand-lime/20 transition active:scale-95">
+                <a href="{{ route('tenant.register') }}" class="hidden sm:inline-flex px-5 py-2.5 rounded-full bg-brand-lime hover:bg-brand-lime-dark text-slate-950 text-sm font-black shadow-lg shadow-brand-lime/20 transition active:scale-95">
                     {{ __('Start Free Trial') }}
                 </a>
 
                 <!-- Mobile Menu Toggle -->
-                <button type="button" x-on:click="mobileOpen = !mobileOpen" class="lg:hidden p-2 rounded-full bg-white/10 text-white border border-white/10" title="{{ __('Menu') }}">
+                <button type="button" x-on:click="mobileOpen = !mobileOpen" :aria-expanded="mobileOpen.toString()" class="lg:hidden w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/10 text-white border border-white/10" title="{{ __('Menu') }}">
                     <svg x-show="!mobileOpen" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
                     <svg x-show="mobileOpen" x-cloak class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
@@ -180,7 +174,26 @@
         </div>
 
         <!-- Mobile Nav Drawer -->
-        <div x-show="mobileOpen" x-cloak x-transition x-on:click.outside="mobileOpen = false" class="lg:hidden border-t border-white/10 px-4 sm:px-6 py-4 flex flex-col gap-2 bg-slate-950/95 backdrop-blur-2xl">
+        <div x-show="mobileOpen"
+             x-cloak
+             x-transition:enter="transition transform ease-out duration-200"
+             x-transition:enter-start="translate-x-full"
+             x-transition:enter-end="translate-x-0"
+             x-transition:leave="transition transform ease-in duration-150"
+             x-transition:leave-start="translate-x-0"
+             x-transition:leave-end="translate-x-full"
+             x-on:keydown.escape.window="mobileOpen = false"
+             class="lg:hidden fixed top-16 sm:top-[72px] right-0 bottom-0 w-full sm:w-96 border-t sm:border-l border-white/10 px-4 py-4 flex flex-col gap-1 bg-slate-950 shadow-2xl overflow-y-auto overscroll-contain">
+            <div class="flex items-center justify-between px-1 pb-3 mb-2 border-b border-white/10">
+                <div>
+                    <div class="text-xs font-black uppercase tracking-wider text-white">{{ __('Navigation') }}</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">{{ $publicBranding->platform_name }}</div>
+                </div>
+                <button type="button" x-on:click="dark = !dark" class="h-9 px-3 rounded-xl bg-white/10 text-slate-200 text-xs font-bold border border-white/10">
+                    <span x-show="!dark">🌙 {{ __('Dark') }}</span>
+                    <span x-show="dark">☀️ {{ __('Light') }}</span>
+                </button>
+            </div>
             @if(!empty($publicHeaderMenu))
                 @foreach($publicHeaderMenu as $item)
                     @php
@@ -195,24 +208,25 @@
                     @endphp
                     <a href="{{ $itemUrl }}"
                        target="{{ $itemTarget }}"
-                       class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">
+                       x-on:click="mobileOpen = false"
+                       class="px-4 py-3 rounded-xl text-sm font-bold text-slate-200 bg-white/[0.04] hover:bg-white/10 transition">
                         {{ $itemTitle }}
                     </a>
                 @endforeach
             @else
-                <a href="{{ url('/') }}#showcase" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Platform') }}</a>
-                <a href="{{ url('/') }}#features" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Products') }}</a>
-                <a href="{{ url('/') }}#solutions" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Solutions') }}</a>
-                <a href="{{ url('/') }}#pricing" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Pricing') }}</a>
-                <a href="{{ url('/') }}#about" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Company') }}</a>
-                <a href="{{ url('/') }}#contact" class="px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-200 hover:bg-white/10 transition">{{ __('Contact') }}</a>
+                <a x-on:click="mobileOpen = false" href="{{ url('/') }}#showcase" class="px-4 py-3 rounded-xl text-sm font-bold text-slate-200 bg-white/[0.04] hover:bg-white/10 transition">{{ __('Platform') }}</a>
+                <a x-on:click="mobileOpen = false" href="{{ url('/') }}#features" class="px-4 py-3 rounded-xl text-sm font-bold text-slate-200 bg-white/[0.04] hover:bg-white/10 transition">{{ __('Products') }}</a>
+                <a x-on:click="mobileOpen = false" href="{{ url('/') }}#solutions" class="px-4 py-3 rounded-xl text-sm font-bold text-slate-200 bg-white/[0.04] hover:bg-white/10 transition">{{ __('Solutions') }}</a>
+                <a x-on:click="mobileOpen = false" href="{{ url('/') }}#pricing" class="px-4 py-3 rounded-xl text-sm font-bold text-slate-200 bg-white/[0.04] hover:bg-white/10 transition">{{ __('Pricing') }}</a>
+                <a x-on:click="mobileOpen = false" href="{{ url('/') }}#about" class="px-4 py-3 rounded-xl text-sm font-bold text-slate-200 bg-white/[0.04] hover:bg-white/10 transition">{{ __('Company') }}</a>
+                <a x-on:click="mobileOpen = false" href="{{ url('/') }}#contact" class="px-4 py-3 rounded-xl text-sm font-bold text-slate-200 bg-white/[0.04] hover:bg-white/10 transition">{{ __('Contact') }}</a>
             @endif
 
             <!-- Mobile Language Switcher -->
             @if ($publicLanguages->isNotEmpty())
-                <div class="pt-2 border-t border-white/10">
+                <div class="mt-2 pt-4 border-t border-white/10">
                     <div class="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 px-1">{{ __('Choose Language') }}</div>
-                    <div class="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto no-scrollbar">
+                    <div class="grid grid-cols-2 gap-1.5">
                         @foreach ($publicLanguages as $lang)
                             <a href="{{ route('locale.switch', $lang->code) }}"
                                @class([
@@ -228,7 +242,7 @@
                 </div>
             @endif
 
-            <div class="pt-2 border-t border-white/10 flex gap-2">
+            <div class="sticky bottom-0 mt-auto pt-4 pb-[max(0px,env(safe-area-inset-bottom))] border-t border-white/10 flex gap-2 bg-slate-950">
                 <a href="{{ route('tenant.login') }}" class="flex-1 text-center px-4 py-2.5 rounded-xl text-sm font-bold text-slate-200 bg-white/10 hover:bg-white/20 transition">{{ __('Sign in') }}</a>
                 <a href="{{ route('tenant.register') }}" class="flex-1 text-center px-4 py-2.5 rounded-xl text-sm font-black text-slate-950 bg-brand-lime hover:bg-brand-lime-dark transition">{{ __('Start Free Trial') }}</a>
             </div>
@@ -247,7 +261,7 @@
                 <div class="col-span-2 lg:col-span-1 pr-4">
                     <a href="{{ url('/') }}" class="inline-flex items-center gap-3">
                         @if ($publicBranding->logo_url)
-                            <img src="{{ $publicBranding->logo_url }}" alt="{{ $publicBranding->platform_name }}" class="h-8 w-auto object-contain">
+                            <img src="{{ $publicBranding->logo_url }}" alt="{{ $publicBranding->platform_name }}" class="h-8 w-auto object-contain" loading="lazy" decoding="async">
                         @else
                             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-lime to-emerald-400 p-0.5 flex items-center justify-center">
                                 <div class="w-full h-full bg-slate-950 rounded-[6px] flex items-center justify-center text-brand-lime font-black text-sm">

@@ -1,0 +1,35 @@
+name: Zoom POS Desktop
+on:
+  workflow_dispatch:
+  push:
+    tags: ['desktop-v*']
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: desktop/package-lock.json }
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux dependencies
+        if: matrix.platform == 'ubuntu-24.04'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+        working-directory: .
+      - run: npm ci
+      - name: Build Windows installers
+        if: runner.os == 'Windows'
+        run: npm run tauri build -- --bundles nsis,msi
+      - name: Build Linux packages
+        if: runner.os == 'Linux'
+        run: npm run tauri build -- --bundles deb,appimage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zoom-pos-${{ matrix.platform }}
+          path: desktop/src-tauri/target/release/bundle/**/*

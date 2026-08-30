@@ -735,6 +735,38 @@ class PosSyncApiTest extends TestCase
             ->assertJsonStructure(['whatsapp_url', 'document_number']);
     }
 
+    public function test_sale_and_quotation_pdf_endpoints(): void
+    {
+        $sale = Sale::create([
+            'company_id' => $this->company->id,
+            'sale_number' => 'POS-PDF-001',
+            'customer_name' => 'John Doe',
+            'total' => 120.00,
+            'items' => [['name' => 'Widget', 'price' => 60, 'quantity' => 2, 'total' => 120]],
+        ]);
+
+        $quote = Sale::create([
+            'company_id' => $this->company->id,
+            'sale_number' => 'QUO-PDF-001',
+            'customer_name' => 'Jane Doe',
+            'operation_type' => 'quotation',
+            'total' => 300.00,
+            'items' => [['name' => 'Custom Service', 'price' => 300, 'quantity' => 1, 'total' => 300]],
+        ]);
+
+        $salePdfRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+            ->get("/api/v1/pos/sales/{$sale->id}/pdf");
+
+        $salePdfRes->assertStatus(200);
+        $this->assertEquals('application/pdf', $salePdfRes->headers->get('Content-Type'));
+
+        $quotePdfRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+            ->get("/api/v1/pos/quotations/{$quote->id}/pdf");
+
+        $quotePdfRes->assertStatus(200);
+        $this->assertEquals('application/pdf', $quotePdfRes->headers->get('Content-Type'));
+    }
+
     public function test_unauthenticated_request_is_rejected(): void
     {
         $response = $this->withHeaders([

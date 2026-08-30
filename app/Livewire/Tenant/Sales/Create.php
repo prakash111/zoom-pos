@@ -1417,7 +1417,7 @@ class Create extends Component
             $this->emailStatus = 'Receipt sent to the printer.';
             $this->emailError = '';
         } else {
-            $this->dispatch('open-print-preview', url: route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 0]));
+            $this->dispatch('open-print-preview', url: route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 0, 'embed' => 1]), title: __('Invoice Preview'));
         }
     }
 

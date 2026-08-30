@@ -101,7 +101,14 @@ class PagesAndLandingPageTest extends TestCase
 
         // A guest (not the superadmin session above) hitting `/` sees the landing page.
         auth('platform_web')->logout();
-        $this->get('/')->assertOk()->assertSee('Welcome to our platform');
+        $response = $this->get('/');
+        $response->assertOk()
+            ->assertSee('Welcome to our platform')
+            ->assertSee('public-site', false)
+            ->assertDontSee('app-global-loader', false)
+            ->assertDontSee('fonts.googleapis.com', false)
+            ->assertDontSee('resources/js/app.js', false)
+            ->assertSee('public-navigation', false);
     }
 
     public function test_contact_form_stores_inquiry_and_sends_notification_email(): void

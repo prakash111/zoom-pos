@@ -20,6 +20,7 @@ use App\Models\TenantApiKey;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\Delivery\MessageQueueService;
+use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Tenancy\TenantProvisioningService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -802,6 +803,9 @@ class PosSyncApiController extends Controller
 
                 $total = (float) ($saleData['total'] ?? $calcSubtotal);
                 $discount = (float) ($saleData['discount'] ?? 0);
+                $taxAmount = (float) ($saleData['tax_amount'] ?? 0);
+                $taxName = $saleData['tax_name'] ?? null;
+                $taxRate = (float) ($saleData['tax_rate'] ?? 0);
                 $paymentMethod = $saleData['payment_method'] ?? 'cash';
                 $orderNumber = $saleData['order_number'] ?? $saleData['sale_number'] ?? ('POS-'.strtoupper(substr($clientUuid, 0, 8)));
                 $createdAt = isset($saleData['createdAt']) ? Carbon::parse($saleData['createdAt']) : now();
@@ -846,6 +850,9 @@ class PosSyncApiController extends Controller
                     'total' => $total,
                     'net_amount' => max(0, $total - $discount),
                     'discount' => $discount,
+                    'tax_amount' => $taxAmount,
+                    'tax_name' => $taxName,
+                    'tax_rate' => $taxRate,
                     'payment_method' => $paymentMethod,
                     'status' => 'completed',
                     'payment_status' => $paymentStatus,
@@ -1320,13 +1327,21 @@ class PosSyncApiController extends Controller
     {
         $company = $this->resolveCompany($request);
 
+        $defaultTaxRule = TaxRule::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->where('is_default', true)
+            ->first();
+        $defaultTaxRate = $defaultTaxRule ? (float) $defaultTaxRule->rate : 0.0;
+
         $products = Product::query()
             ->withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->with(['category', 'brand'])
             ->orderBy('name')
             ->get()
-            ->map(function (Product $p) {
+            ->map(function (Product $p) use ($defaultTaxRate) {
                 return [
                     'id' => (string) ($p->external_id ?: $p->id),
                     'server_id' => $p->id,
@@ -1343,7 +1358,7 @@ class PosSyncApiController extends Controller
                     'category_name' => $p->category_name ?? $p->category?->name ?? 'General',
                     'brand_name' => $p->brand_name ?? $p->brand?->name ?? '',
                     'image_url' => $p->getImageUrlOrDefault(),
-                    'tax_rate' => (float) ($p->tax_rate ?? 0),
+                    'tax_rate' => $p->tax_rate !== null && (float) $p->tax_rate > 0 ? (float) $p->tax_rate : $defaultTaxRate,
                     'active' => (bool) $p->active,
                     'updated_at' => $p->updated_at?->toIso8601String(),
                 ];
@@ -1981,7 +1996,7 @@ class PosSyncApiController extends Controller
                 'products_count' => $productsCount,
                 'products_limit' => $company->max_products ?? $plan?->limits['products'] ?? 'Unlimited',
                 'users_count' => $usersCount,
-                'users_limit' => $company->max_users ?? $plan?->limits['users'] ?? 'Unlimited',
+                'users_limit' => $company->max_users ?? $plan?->limits['usuarios'] ?? 'Unlimited',
             ],
             'available_plans' => $availablePlans,
         ]);
@@ -2167,6 +2182,36 @@ class PosSyncApiController extends Controller
                 'error' => 'Delivery failed: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * 18b. Sale/Invoice PDF (same document InvoiceDeliveryService already
+     * produces for the web app and for email/WhatsApp delivery).
+     * GET /api/v1/pos/sales/{id}/pdf?format=a4|80mm|58mm
+     */
+    public function salePdf(Request $request, string $id)
+    {
+        $company = $this->resolveCompany($request);
+
+        $sale = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(function ($q) use ($id) {
+                $q->where('id', $id)
+                    ->orWhere('external_id', $id)
+                    ->orWhere('sale_number', $id);
+            })
+            ->first();
+
+        if (! $sale) {
+            return response()->json(['success' => false, 'error' => 'Sale not found.'], 404);
+        }
+
+        $pdf = app(InvoiceDeliveryService::class)->generateInvoicePdf($sale, $request->query('format'));
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$sale->sale_number.'.pdf"',
+        ]);
     }
 
     /**

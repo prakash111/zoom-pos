@@ -57,14 +57,57 @@
             }, 400);
         }
 
-        // The interface is usable at DOM ready; do not wait for fonts/images.
-        if (document.readyState !== 'loading') {
-            dismissLoader();
-        } else {
-            document.addEventListener('DOMContentLoaded', dismissLoader, { once: true });
+        // This partial renders on EVERY full document response — the very
+        // first visit this tab has ever made, and any later full (non-SPA)
+        // reload mid-session: a logout redirect, the service-worker
+        // controllerchange reload, a plain <a> without wire:navigate, etc.
+        // wire:navigate itself never re-requests this HTML at all, so it
+        // never reaches this script — this is purely the real-navigation
+        // path. sessionStorage is what tells those two cases apart, since
+        // both produce byte-identical server-rendered markup.
+        var SHELL_SEEN_KEY = 'zoom_pos_app_shell_seen';
+        var isReturnVisit = false;
+        try {
+            isReturnVisit = sessionStorage.getItem(SHELL_SEEN_KEY) === '1';
+            sessionStorage.setItem(SHELL_SEEN_KEY, '1');
+        } catch (e) {
+            // Private browsing / storage disabled: fall back to always
+            // treating this as a first visit, i.e. today's behavior.
         }
 
-        // Safety timeout: Never trap user if a third-party asset hangs
-        setTimeout(dismissLoader, 800);
+        if (!isReturnVisit) {
+            // First load this session: nothing else has painted yet, so
+            // showing this immediately is what avoids a blank flash — the
+            // interface is usable at DOM ready; do not wait for fonts/images.
+            if (document.readyState !== 'loading') {
+                dismissLoader();
+            } else {
+                document.addEventListener('DOMContentLoaded', dismissLoader, { once: true });
+            }
+            setTimeout(dismissLoader, 800); // Safety timeout: never trap the user if a third-party asset hangs.
+            return;
+        }
+
+        // A full reload mid-session: the previous page was already showing
+        // something, so don't flash this loader for a reload that resolves
+        // quickly — only reveal it if the new document is visibly taking a
+        // moment, then let it play out its own fade rather than cutting it
+        // off the instant the DOM is ready.
+        loader.classList.add('loader-hidden');
+        var revealTimer = setTimeout(function () {
+            loader.classList.remove('loader-hidden');
+        }, 220);
+
+        function finishReturnVisitLoad() {
+            clearTimeout(revealTimer);
+            dismissLoader();
+        }
+
+        if (document.readyState !== 'loading') {
+            finishReturnVisitLoad();
+        } else {
+            document.addEventListener('DOMContentLoaded', finishReturnVisitLoad, { once: true });
+        }
+        setTimeout(finishReturnVisitLoad, 1200);
     })();
 </script>

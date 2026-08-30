@@ -90,7 +90,7 @@ class Show extends Component
         if ($printed) {
             session()->flash('status', "Quotation #{$this->quote->sale_number} sent to the printer.");
         } else {
-            $this->dispatch('open-print-preview', url: route('tenant.quotes.pdf', ['quote' => $this->quote->id, 'download' => 0]));
+            $this->dispatch('open-print-preview', url: route('tenant.quotes.pdf', ['quote' => $this->quote->id, 'download' => 0, 'embed' => 1]), title: __('Quotation Preview'));
         }
     }
 

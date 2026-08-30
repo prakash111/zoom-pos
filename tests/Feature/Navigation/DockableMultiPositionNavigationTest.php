@@ -191,6 +191,12 @@ class DockableMultiPositionNavigationTest extends TestCase
         $response->assertSee(route('tenant.languages.index'), false);
         $response->assertSee(route('tenant.users.index'), false);
         $response->assertSee(route('tenant.devices.index'), false);
+        $response->assertSee('Subscription &amp; Billing', false);
+        $response->assertSee('Languages &amp; Translations', false);
+        $response->assertSee('Users &amp; Permissions', false);
+        $response->assertSee('Terminals &amp; Devices', false);
+        $response->assertDontSee('&amp;amp;', false);
+        $response->assertSee('class="hidden sm:flex px-2.5 py-1.5', false);
 
         // Restaurant-specific elements should NOT be visible in General mode
         $response->assertDontSee(route('tenant.restaurant.pos'), false);

@@ -252,9 +252,11 @@
                                         </button>
                                     @endif
 
-                                    <a href="{{ route('tenant.sales.pdf', $inv) }}" target="_blank" class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 font-bold text-[10px] transition" title="{{ __("Print receipt/invoice") }}">
+                                    <button type="button" x-data
+                                            x-on:click="$dispatch('open-print-preview', { url: @js(route('tenant.sales.pdf', ['sale' => $inv, 'embed' => 1])), title: @js(__('Invoice Preview')) })"
+                                            class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 font-bold text-[10px] transition" title="{{ __("Print receipt/invoice") }}">
                                         🖨️
-                                    </a>
+                                    </button>
 
                                     <a wire:navigate.hover href="{{ route('tenant.sales.show', $inv) }}" class="px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-bold text-[10px] hover:underline">
                                         {{ __("View") }} &rarr;

@@ -17,9 +17,7 @@
     $customerTaxNumber = $quote->customer?->tax_id ?: ($quote->customer?->gstin ?: $quote->customer?->document);
 @endphp
 
-<div class="max-w-4xl mx-auto space-y-6"
-     x-data
-     x-on:open-print-preview.window="window.open($event.detail.url, '_blank')">
+<div class="max-w-4xl mx-auto space-y-6" x-data>
     @if (session('status'))
         <div class="px-5 py-3.5 rounded-2xl bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 text-xs sm:text-sm font-bold flex items-center gap-2.5 shadow-sm border border-emerald-100 dark:border-emerald-900/50">
             <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -83,14 +81,12 @@
             @endif
 
             <!-- Preview PDF in Browser -->
-            <a href="{{ route('tenant.quotes.pdf', ['quote' => $quote->id, 'download' => 0]) }}"
-               target="_blank"
-               rel="noopener noreferrer"
-               data-turbo="false"
+            <button type="button"
+               x-on:click="$dispatch('open-print-preview', { url: @js(route('tenant.quotes.pdf', ['quote' => $quote->id, 'download' => 0, 'embed' => 1])), title: @js(__('Quotation Preview')) })"
                class="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm flex items-center gap-1.5 transition active:scale-95">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 <span>{{ __("Preview") }}</span>
-            </a>
+            </button>
 
             <!-- Download Official PDF -->
             <a href="{{ route('tenant.quotes.pdf', ['quote' => $quote->id, 'download' => 1]) }}"
@@ -102,13 +98,11 @@
             </a>
 
             <!-- 80mm Thermal Receipt Print -->
-            <a href="{{ route('tenant.quotes.pdf', ['quote' => $quote->id, 'format' => '80mm']) }}"
-               target="_blank"
-               rel="noopener noreferrer"
-               data-turbo="false"
+            <button type="button"
+               x-on:click="$dispatch('open-print-preview', { url: @js(route('tenant.quotes.pdf', ['quote' => $quote->id, 'format' => '80mm', 'embed' => 1])), title: @js(__('80mm Thermal Preview')) })"
                class="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm flex items-center gap-1.5 transition active:scale-95">
                 <span>🖨️ {{ __("80mm Thermal") }}</span>
-            </a>
+            </button>
 
             <!-- WhatsApp Modal Button -->
             <button type="button"

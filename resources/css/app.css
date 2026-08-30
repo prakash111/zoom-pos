@@ -47,6 +47,34 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, ui-sans-serif, system-ui, Helvetica, Arial, sans-serif;
 }
 
+/* Public pages prioritize paint and scroll performance. Sections below the
+   initial viewport are skipped until needed, with reserved space to avoid
+   layout jumps. */
+.public-site main > :nth-child(n + 3) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 760px;
+}
+
+@media (max-width: 767px), (prefers-reduced-motion: reduce) {
+    .public-site *,
+    .public-site *::before,
+    .public-site *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .public-site .landing-ambient {
+        display: none;
+    }
+
+    .public-site [class*='backdrop-blur'] {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+    }
+}
+
 #nprogress .bar {
     background: #2563eb !important;
     height: 3px !important;
@@ -136,6 +164,21 @@ html[data-dock-mode='floating'] .main-content-pane {
     margin-right: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
+}
+
+/* The configurable desktop dock is hidden below lg. Keep its saved position
+   from reserving an empty row above the mobile header. */
+@media (max-width: 1023px) {
+    .app-main-frame {
+        flex-direction: column !important;
+    }
+
+    .main-content-pane {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
 }
 
 /* Preserve motion polish while respecting accessibility and low-power devices. */
@@ -281,26 +324,17 @@ html[data-dock-mode='floating'] .main-content-pane {
     display: none !important;
 }
 
-/* Smooth Page Fade-In Transition */
-.spa-page-enter {
-    animation: pageFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes pageFadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(3px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Page fade transitions (legacy alias) */
-.spa-page-transition {
-    animation: pageFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
+/* No animation on the wire:navigate content swap by design: #main-app-content
+   is intentionally not @persist'ed (its content must change per route), so
+   it's a fresh DOM node on every navigation — any animation applied to it
+   (opacity fade, slide, a native View Transition crossfade) was, in
+   practice, always visible as a distracting effect rather than a fix. The
+   actual flicker this app used to have was a structural problem (the
+   sidebar/nav being torn down and rebuilt on every visit) fixed via
+   @persist in layouts/tenant.blade.php and layouts/superadmin.blade.php —
+   not something a transition effect on the content area was ever the right
+   tool for. Navigation here is just instant: old content out, new content
+   in, nothing animates. */
 
 /* ==========================================================================
    Dockable & Category Menu CSS Specifications (Android-Style Scroll-Snap)

@@ -314,7 +314,9 @@ class ProductsAndSalesTest extends TestCase
             ->assertSee('Sale Completed!')
             ->assertSee('Michael Scott')
             ->assertSee('$70.00')
-            ->assertSee('Download & Print PDF Invoice', false)
+            ->assertSee('Preview & Print Invoice')
+            ->assertSee('open-print-preview', false)
+            ->assertSee('embed', false)
             ->assertSee('Share Receipt on WhatsApp')
             ->assertSee('Send Invoice via Email');
 

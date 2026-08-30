@@ -15,6 +15,7 @@
 </head>
 <body class="bg-slate-100 text-slate-900 min-h-screen p-4 sm:p-8 flex flex-col items-center antialiased font-sans">
 
+    @unless(request()->boolean('embed'))
     <!-- Action Bar (Hidden on Print) -->
     <div class="no-print w-full max-w-4xl flex items-center justify-between gap-3 mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
         <div class="flex items-center gap-2">
@@ -34,6 +35,7 @@
             </button>
         </div>
     </div>
+    @endunless
 
     <!-- Official Tax Invoice Document Box -->
     <div class="invoice-box w-full max-w-4xl bg-white rounded-3xl p-8 sm:p-12 shadow-xl border border-slate-200/80 space-y-8">

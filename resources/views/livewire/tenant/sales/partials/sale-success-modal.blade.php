@@ -47,7 +47,7 @@
         <div class="space-y-3">
             <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ __("Receipt & Dispatch Options") }}</div>
 
-            <!-- 1. Print Now (desktop, silent) or Download / Print PDF Invoice -->
+            <!-- 1. Print Now (desktop, silent) or in-app invoice preview -->
             @if ($this->completedSaleDesktopPrintReady)
                 <button type="button"
                         wire:click="printCompletedSaleNow"
@@ -57,12 +57,12 @@
                     <span>{{ __("Print Receipt") }}</span>
                 </button>
             @else
-                <a href="{{ route('tenant.sales.pdf', $cSale) }}"
-                   target="_blank"
+                <button type="button"
+                   @click="$dispatch('open-print-preview', { url: '{{ route('tenant.sales.pdf', ['sale' => $cSale, 'embed' => 1]) }}' })"
                    class="w-full py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white font-extrabold text-xs shadow-md active:scale-[0.97] transition duration-150 ease-out flex items-center justify-center gap-2 cursor-pointer">
-                    <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    <span>{!! __("Download & Print PDF Invoice") !!}</span>
-                </a>
+                    <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z" /></svg>
+                    <span>{{ __("Preview & Print Invoice") }}</span>
+                </button>
             @endif
 
             <!-- 2. WhatsApp Direct Sharing -->

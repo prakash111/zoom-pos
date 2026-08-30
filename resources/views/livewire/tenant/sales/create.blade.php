@@ -22,8 +22,7 @@
      }"
      @keydown.f10.window.prevent="@if ($this->cartItemCount > 0) openCheckout(); $wire.openCheckoutModal() @endif"
      x-on:checkout-completed.window="checkoutOpen = false; document.documentElement.classList.remove('overflow-hidden')"
-     x-on:item-added-to-cart.window="playAddToCartBeep()"
-     x-on:open-print-preview.window="window.open($event.detail.url, '_blank')">
+     x-on:item-added-to-cart.window="playAddToCartBeep()">
 
     <!-- Top Layout Switcher & Global Status Bar -->
     <div class="flex items-center justify-between shrink-0 px-1 py-0.5">

@@ -290,13 +290,13 @@
                                 </span>
                             </td>
                             <td class="py-3.5 text-right pr-2 space-x-1.5 whitespace-nowrap">
-                                <!-- PDF Download -->
-                                <a href="{{ route('tenant.billing.invoices.pdf', $inv) }}"
-                                   target="_blank"
+                                <!-- PDF Preview -->
+                                <button type="button" x-data
+                                   x-on:click="$dispatch('open-print-preview', { url: @js(route('tenant.billing.invoices.pdf', $inv)), title: @js(__('Subscription Invoice Preview')) })"
                                    class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-700 dark:text-slate-200 font-bold text-[11px] transition inline-flex items-center gap-1 shadow-2xs"
-                                   title="{{ __("View & Download PDF Tax Invoice") }}">
+                                   title="{{ __("Preview PDF Tax Invoice") }}">
                                     <span>📄 PDF</span>
-                                </a>
+                                </button>
 
                                 <!-- Email Dispatch -->
                                 <button type="button"

@@ -364,6 +364,7 @@
 <body>
 
     <!-- Action Bar (Screen Only) -->
+    @unless(request()->boolean('embed'))
     <div class="no-print-bar">
         <div style="font-weight: 800; font-size: 14px; color: #334155;">
             {{ $documentTitle ?? 'Document' }} #{{ $sale->sale_number }}
@@ -389,6 +390,7 @@
             @endif
         </div>
     </div>
+    @endunless
 
     <!-- Printable Paper Area matching 1131w-Zy7QIPVSff8.png -->
     <div class="document-paper">

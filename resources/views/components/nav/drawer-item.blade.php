@@ -15,6 +15,11 @@
     'highlighted' => false,
 ])
 @php
+    // Interpolated component attributes arrive HTML-encoded. Decode that
+    // layer so the escaped output below renders entities exactly once.
+    $title = html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $subtitle = html_entity_decode($subtitle, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
     $linkHover = $hover === 'lime'
         ? 'hover:bg-lime-50 dark:hover:bg-lime-950/50 hover:text-lime-600'
         : 'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600';

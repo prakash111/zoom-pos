@@ -303,9 +303,13 @@
                 width: {{ $is58mm ? '58mm' : '80mm' }} !important;
                 min-width: {{ $is58mm ? '58mm' : '80mm' }} !important;
                 max-width: {{ $is58mm ? '58mm' : '80mm' }} !important;
+                height: auto !important;
+                min-height: 0 !important;
                 margin: 0 !important;
                 padding: {{ $is58mm ? '2mm 3mm' : '2mm 4mm' }} !important;
                 background: #ffffff !important;
+                display: block !important;
+                overflow: visible !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
@@ -321,6 +325,15 @@
                 margin: 0 !important;
                 border-radius: 0 !important;
                 border: none !important;
+                page-break-after: avoid !important;
+            }
+
+            /* Prevent flex/min-height rounding from emitting a trailing blank
+               sheet in Chromium's thermal print pipeline. */
+            body::before,
+            body::after {
+                display: none !important;
+                content: none !important;
             }
         }
     </style>
@@ -328,6 +341,7 @@
 <body>
 
     <!-- Top Action Bar (Screen Only) -->
+    @unless(request()->boolean('embed'))
     <div class="no-print-bar">
         <div style="font-weight: 800; font-size: 11px; color: #1e293b;">
             Receipt #{{ $sale->sale_number }}
@@ -358,6 +372,7 @@
             @endif
         </div>
     </div>
+    @endunless
 
     <!-- Thermal Cash Receipt Paper -->
     <div class="receipt-container">

@@ -1131,7 +1131,7 @@
             </header>
 
             <!-- Main Dynamic View Container with Smooth Transition -->
-            <main class="flex-1 p-3 sm:p-6 md:p-8 w-full max-w-none spa-page-enter" id="main-app-content">
+            <main class="flex-1 p-3 sm:p-6 md:p-8 w-full max-w-none" id="main-app-content">
                 <div class="w-full max-w-none">
                     {{ $slot ?? '' }}
                     @yield('content')

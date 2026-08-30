@@ -17,6 +17,11 @@
     'labelSize' => 'text-[10px] sm:text-[11px]',
 ])
 @php
+    $label = html_entity_decode($label, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $title = is_string($title)
+        ? html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8')
+        : $title;
+
     $activeClasses = match ($variant) {
         'lime' => 'bg-[#a3e635] text-slate-950 shadow-xl font-extrabold',
         default => 'bg-white text-blue-600 shadow-xl font-extrabold',
@@ -27,19 +32,24 @@
         default => 'text-blue-100 hover:text-white hover:bg-white/20 font-medium',
     };
 @endphp
+{{--
+    Active/inactive styling is decided client-side via isCurrentRoute(), not
+    the server-computed $active prop: this nav chrome is @persist'ed across
+    wire:navigate visits (see layouts/tenant.blade.php), so it's no longer
+    re-rendered by the server on every page — only a reactive Alpine binding
+    stays correct as the URL changes underneath a persisted DOM node.
+--}}
 <a @if($itemKey) x-show="isItemVisible('{{ $itemKey }}')" @endif wire:navigate.hover href="{{ $route }}"
    class="dockable-nav-item"
-   aria-selected="{{ $active ? 'true' : 'false' }}"
+   :aria-selected="isCurrentRoute('{{ $route }}') ? 'true' : 'false'"
    :class="{
        'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
+       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+       'transition-all group duration-200 cursor-pointer': true,
+       '{{ $activeClasses }}': isCurrentRoute('{{ $route }}'),
+       '{{ $inactiveClasses }}': !isCurrentRoute('{{ $route }}')
    }"
-   @class([
-       'transition-all group duration-200 cursor-pointer',
-       $activeClasses => $active,
-       $inactiveClasses => ! $active,
-   ])
    title="{{ $title ?? $label }}">
     {{ $slot }}
     <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label {{ $labelSize }}' : 'text-xs whitespace-nowrap font-bold'">{{ $label }}</span>

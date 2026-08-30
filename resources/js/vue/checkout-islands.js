@@ -58,7 +58,7 @@ const PaymentSelector = {
         };
 
         return () => h('div', {
-            class: 'grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-2',
+            class: 'grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(112px,1fr))] gap-2',
             role: 'radiogroup',
             'aria-label': props.host.dataset.label,
         }, props.methods.map((method) => h('button', {
@@ -67,10 +67,10 @@ const PaymentSelector = {
             role: 'radio',
             'aria-checked': selected.value === method.code ? 'true' : 'false',
             class: [
-                'min-h-14 py-2.5 px-3 rounded-xl text-xs font-bold text-center transition-colors capitalize cursor-pointer border flex flex-col items-center justify-center gap-1.5',
+                'min-h-16 py-3 px-3 rounded-xl text-xs font-bold text-center transition-all capitalize cursor-pointer border flex flex-col items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
                 selected.value === method.code
-                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400',
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/20 -translate-y-px'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-300 hover:bg-blue-50/60 dark:hover:bg-blue-950/30',
             ],
             onClick: () => choose(method.code),
         }, [paymentIcon(method.code), h('span', { class: 'leading-tight' }, method.name)])));

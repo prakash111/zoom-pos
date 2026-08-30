@@ -18,18 +18,29 @@
     'variant' => 'blue', // 'blue' (default) | 'lime' (restaurant POS)
 ])
 @php
+    $title = html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $subtitle = html_entity_decode($subtitle, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $navTitle = is_string($navTitle)
+        ? html_entity_decode($navTitle, ENT_QUOTES | ENT_HTML5, 'UTF-8')
+        : $navTitle;
+
     $activeClasses = $variant === 'lime' ? 'bg-[#a3e635] text-slate-950 shadow-md' : 'bg-white text-blue-700 shadow-md';
 @endphp
+{{--
+    Active/inactive styling is decided client-side via isCurrentRoute(), not
+    the server-computed $active prop: this nav chrome is @persist'ed across
+    wire:navigate visits (see layouts/tenant.blade.php), so it's no longer
+    re-rendered by the server on every page — only a reactive Alpine binding
+    stays correct as the URL changes underneath a persisted DOM node.
+--}}
 <a @if($itemKey) x-show="isItemVisible('{{ $itemKey }}')" @endif wire:navigate.hover href="{{ $route }}"
    :class="{
        'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
        'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
-       'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
+       'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating',
+       '{{ $activeClasses }}': isCurrentRoute('{{ $route }}'),
+       'text-white/80 hover:text-white hover:bg-white/15': !isCurrentRoute('{{ $route }}')
    }"
-   @class([
-       $activeClasses => $active,
-       'text-white/80 hover:text-white hover:bg-white/15' => ! $active,
-   ])
    title="{{ $navTitle ?? $title }}">
     {{ $slot }}
     <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">

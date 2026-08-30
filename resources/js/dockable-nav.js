@@ -77,6 +77,14 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
         showQuickMenu: false,
         showCustomizerModal: false,
         speedDialOpen: false,
+        // Nav chrome is wrapped in @persist so it survives wire:navigate page
+        // swaps instead of flickering as it's torn down and rebuilt on every
+        // click. Since the DOM (and this Alpine component) is no longer
+        // re-rendered per page, "active" nav-item highlighting can't rely on
+        // the server-computed $active prop baked in at first render anymore
+        // — it has to be tracked client-side and refreshed on every SPA
+        // navigation instead.
+        currentPath: window.location.pathname,
 
         getDefaultKeys() {
             if (this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin') {
@@ -226,6 +234,12 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
 
             this.applyDomAttributes();
             this.applyDynamicCssVars();
+
+            // Keep active-item highlighting correct across wire:navigate
+            // visits now that the nav chrome persists instead of re-rendering.
+            document.addEventListener('livewire:navigated', () => {
+                this.currentPath = window.location.pathname;
+            });
 
             // Handle window resize boundary clamping
             window.addEventListener('resize', () => {
@@ -476,6 +490,14 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
             this.navTextActiveColor = color || '#60a5fa';
             this.applyDynamicCssVars();
             this.saveState();
+        },
+
+        isCurrentRoute(href) {
+            try {
+                return new URL(href, window.location.origin).pathname === this.currentPath;
+            } catch (e) {
+                return false;
+            }
         },
 
         isItemVisible(itemKey) {

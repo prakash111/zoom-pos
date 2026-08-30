@@ -14,7 +14,7 @@
      x-cloak
      wire:cloak>
 
-    <div class="modal-backdrop absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+    <div class="modal-backdrop absolute inset-0 bg-slate-950/70 backdrop-blur-[3px] transition-opacity"
          aria-hidden="true"
          @click="closeCheckout()"></div>
 
@@ -28,12 +28,12 @@
              x-transition:leave-start="opacity-100 scale-100 translate-y-0"
              x-transition:leave-end="opacity-0 scale-95 translate-y-2"
              @click.outside="closeCheckout()"
-             class="modal-transition relative pointer-events-auto w-full max-w-3xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden text-left flex flex-col max-h-[90dvh]">
+             class="modal-transition relative pointer-events-auto w-full max-w-4xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-white/60 dark:border-slate-700 rounded-2xl shadow-[0_32px_80px_-20px_rgba(15,23,42,0.55)] overflow-hidden text-left flex flex-col max-h-[92dvh]">
 
         <!-- Modal Header Bar -->
-        <div class="px-5 sm:px-6 py-4 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+        <div class="px-5 sm:px-7 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900 shrink-0">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center text-lg font-black shadow-lg shadow-blue-500/10 shrink-0">
+                <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-lg font-black shadow-sm shrink-0">
                     💳
                 </div>
                 <div>
@@ -41,11 +41,11 @@
                         <span>{{ __("POS Checkout & Payment") }}</span>
                     </h3>
                     <p class="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-2">
-                        <span>{{ __("Order") }} <strong class="text-slate-300">#{{ $orderNumber }}</strong></span>
+                        <span>{{ __("Order") }} <strong class="text-slate-600 dark:text-slate-300">#{{ $orderNumber }}</strong></span>
                         <span>&bull;</span>
                         <span>{{ count($items) }} {{ __("Items") }}</span>
                         <span>&bull;</span>
-                        <span class="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold font-mono text-[11px]">
+                        <span class="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold font-mono text-[11px]">
                             {{ __("Total:") }} {{ $company->formatMoney($this->total) }}
                         </span>
                     </p>
@@ -73,24 +73,25 @@
         </div>
 
         <!-- Modal Body Scrollable Area -->
-        <div class="flex-1 min-h-0 overflow-y-auto space-y-4 px-5 sm:px-6 py-5 text-xs bg-white dark:bg-slate-900">
+        <div class="flex-1 min-h-0 overflow-y-auto space-y-4 px-5 sm:px-7 py-5 text-xs bg-white dark:bg-slate-900">
 
             <!-- 1. Interactive Customer Context & Selection Section -->
             <div wire:key="checkout-customer-panel">
             @if ($inModalNewCustomerOpen)
                 <!-- Mini Create Customer Form -->
-                <div class="p-4 rounded-2xl bg-blue-50/60 dark:bg-slate-800/60 border border-blue-200/80 dark:border-slate-700 space-y-3">
+                <div class="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-800/60 border-2 border-blue-200 dark:border-blue-900/70 space-y-4 shadow-sm">
                     <div class="flex items-center justify-between pb-2 border-b border-blue-100 dark:border-slate-700">
-                        <span class="font-black text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                        <span class="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            {{ __('Add & Select New Customer') }}
+                            {{ __('New Customer') }}
                         </span>
                         <button type="button" wire:click="closeInModalCustomer" class="text-[11px] text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 hover:underline font-bold">
                             {{ __('Back to Search') }}
                         </button>
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                        <div>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 -mt-2">{{ __('Create the customer profile and attach it to this sale.') }}</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="sm:col-span-2">
                             <label class="block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">{{ __('Full Name *') }}</label>
                             <input type="text" wire:model="inModalNewCustomerName" placeholder="{{ __('Customer name') }}" class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500">
                             @error('inModalNewCustomerName') <span class="text-[10px] text-red-400 font-semibold">{{ $message }}</span> @enderror
@@ -108,41 +109,41 @@
                         <button type="button" wire:click="closeInModalCustomer" class="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700">
                             {{ __('Cancel') }}
                         </button>
-                        <button type="button" wire:click="createInModalCustomer" class="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-xs">
+                        <button type="button" wire:click="createInModalCustomer" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-sm">
                             {{ __('Save & Select Customer') }}
                         </button>
                     </div>
                 </div>
             @elseif ($inModalCustomerSearchOpen)
                 <!-- Searchable Customer Selector Dropdown -->
-                <div class="p-3.5 rounded-2xl bg-slate-900/80 border border-blue-600/60 space-y-2.5 shadow-sm">
+                <div class="p-4 rounded-2xl bg-white dark:bg-slate-800/70 border-2 border-blue-200 dark:border-blue-900/70 space-y-3 shadow-sm">
                     <div class="flex items-center justify-between gap-2">
                         <div class="relative flex-1">
                             <input type="text"
                                    wire:model.live.debounce.250ms="inModalCustomerSearch"
                                    placeholder="{{ __('Type customer name, phone number, or email...') }}"
                                    autofocus
-                                   class="w-full text-xs font-medium rounded-xl border-blue-500 bg-slate-950 py-2 pl-8 pr-3 text-white focus:ring-2 focus:ring-blue-500">
+                                   class="w-full text-xs font-medium rounded-xl border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 py-2.5 pl-9 pr-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500">
                             <span class="absolute left-2.5 top-2.5 text-slate-400">🔍</span>
                         </div>
                         <button type="button" wire:click="openInModalNewCustomer" class="px-3 py-2 rounded-xl text-xs font-black bg-blue-600 text-white hover:bg-blue-700 shrink-0 shadow-xs flex items-center gap-1">
                             ➕ {{ __('New') }}
                         </button>
-                        <button type="button" wire:click="closeInModalCustomer" class="px-2.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:bg-slate-800 shrink-0">
+                        <button type="button" wire:click="closeInModalCustomer" class="px-2.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 shrink-0">
                             ✕
                         </button>
                     </div>
 
                     <!-- Results List -->
-                    <div class="max-h-48 overflow-y-auto divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-950">
+                    <div class="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
                         <!-- Walk-in option -->
                         <button type="button"
                                 wire:click="selectInModalCustomer(null)"
-                                class="w-full p-2.5 text-left flex items-center justify-between hover:bg-blue-950/40 transition">
+                                class="w-full p-3 text-left flex items-center justify-between hover:bg-blue-50 dark:hover:bg-blue-950/40 transition">
                             <div class="flex items-center gap-2">
                                 <span class="text-base">👤</span>
                                 <div>
-                                    <div class="font-black text-slate-200 text-xs">{{ __('Walk-in Regular Customer') }}</div>
+                                    <div class="font-black text-slate-800 dark:text-slate-200 text-xs">{{ __('Walk-in Regular Customer') }}</div>
                                     <div class="text-[10px] text-slate-400">{{ __('No loyalty account / anonymous walk-in') }}</div>
                                 </div>
                             </div>
@@ -152,11 +153,11 @@
                         @forelse ($this->inModalCustomerResults as $cust)
                             <button type="button"
                                     wire:click="selectInModalCustomer({{ $cust->id }})"
-                                    class="w-full p-2.5 text-left flex items-center justify-between hover:bg-blue-950/40 transition">
+                                    class="w-full p-3 text-left flex items-center justify-between hover:bg-blue-50 dark:hover:bg-blue-950/40 transition">
                                 <div class="flex items-center gap-2">
                                     <span class="text-base">👤</span>
                                     <div>
-                                        <div class="font-black text-white text-xs flex items-center gap-1.5">
+                                        <div class="font-black text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
                                             <span>{{ $cust->name }}</span>
                                             @if ($cust->loyalty_points > 0)
                                                 <span class="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-blue-950 text-blue-300 border border-blue-800">
@@ -220,9 +221,9 @@
                         </button>
                         <button type="button"
                                 wire:click="openInModalNewCustomer"
-                                class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-blue-950/80 text-blue-300 border border-blue-800 hover:bg-blue-900 transition cursor-pointer"
+                                class="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white border border-blue-600 hover:bg-blue-700 transition cursor-pointer flex items-center gap-1.5"
                                 title="{{ __('Add New Customer') }}">
-                            ➕
+                            <span>＋</span><span class="hidden sm:inline">{{ __('New') }}</span>
                         </button>
                         @if ($this->selectedCustomer)
                             <button type="button"
@@ -267,7 +268,7 @@
             <div wire:key="checkout-payment-panel">
             @if (! $isSplitPayment)
                 <!-- Single Payment Mode -->
-                <div class="space-y-3 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                <div class="space-y-4 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40">
                     <label class="block font-bold text-slate-500 dark:text-slate-300 uppercase tracking-wider text-[11px]">{{ __("Primary Payment Method") }}</label>
                     @php
                         $allMethods = collect($paymentMethods)->pluck('code')->all();
@@ -440,21 +441,21 @@
                         </div>
                     @elseif (in_array($paymentMethod, ['card', 'card_credit', 'card_debit']))
                         <!-- Card Processing & Merchant Fee Deductions (Taxa de Cartão) -->
-                        <div class="pt-2 border-t border-slate-800 space-y-3">
-                            <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                        <div class="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                            <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-4 shadow-sm">
                                 <div class="flex items-center justify-between">
-                                    <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                                    <span class="text-xs font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
                                         <span>💳</span> {{ __("Card Processing & Machine Fees") }}
                                     </span>
-                                    <div class="flex text-[10px] font-bold bg-slate-900 p-0.5 rounded-xl border border-slate-800">
+                                    <div class="flex text-[10px] font-bold bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                                         <button type="button"
                                                 wire:click="$set('cardType', 'debit')"
-                                                @class(['px-2.5 py-1 rounded-lg transition cursor-pointer', 'bg-blue-600 text-white shadow-xs' => $cardType === 'debit', 'text-slate-400 hover:text-white' => $cardType !== 'debit'])>
+                                                @class(['px-3 py-1.5 rounded-lg transition cursor-pointer', 'bg-white dark:bg-blue-600 text-blue-700 dark:text-white shadow-sm' => $cardType === 'debit', 'text-slate-500 hover:text-slate-800 dark:hover:text-white' => $cardType !== 'debit'])>
                                             {{ __("Debit Card") }}
                                         </button>
                                         <button type="button"
                                                 wire:click="$set('cardType', 'credit')"
-                                                @class(['px-2.5 py-1 rounded-lg transition cursor-pointer', 'bg-blue-600 text-white shadow-xs' => $cardType === 'credit', 'text-slate-400 hover:text-white' => $cardType !== 'credit'])>
+                                                @class(['px-3 py-1.5 rounded-lg transition cursor-pointer', 'bg-white dark:bg-blue-600 text-blue-700 dark:text-white shadow-sm' => $cardType === 'credit', 'text-slate-500 hover:text-slate-800 dark:hover:text-white' => $cardType !== 'credit'])>
                                             {{ __("Credit Card") }}
                                         </button>
                                     </div>
@@ -464,7 +465,7 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                                         <div>
                                             <label class="block text-[10px] font-bold text-slate-400 mb-1">{{ __("Installments") }}</label>
-                                            <select wire:model.live="installments" class="w-full text-xs rounded-xl border-slate-700 bg-slate-900 py-1.5 px-2.5 font-bold text-white">
+                                            <select wire:model.live="installments" class="w-full text-xs rounded-xl border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 py-2 px-3 font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500">
                                                 @foreach ($this->installmentOptions as $opt)
                                                     <option value="{{ $opt['installments'] }}">{{ $opt['label'] }}</option>
                                                 @endforeach
@@ -482,16 +483,16 @@
                                 @endif
 
                                 <!-- Financial Net Receivables Summary Matrix -->
-                                <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800/80 text-center">
-                                    <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3 border-t border-slate-200 dark:border-slate-700 text-center">
+                                    <div class="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
                                         <div class="text-[9px] font-bold text-slate-400 uppercase">{{ __("Gross (Customer)") }}</div>
-                                        <div class="text-xs font-black text-white font-mono mt-0.5">{{ $company->formatMoney($this->total) }}</div>
+                                        <div class="text-sm font-black text-slate-900 dark:text-white font-mono mt-0.5">{{ $company->formatMoney($this->total) }}</div>
                                     </div>
-                                    <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                    <div class="bg-rose-50 dark:bg-rose-950/30 p-2.5 rounded-xl border border-rose-200 dark:border-rose-900">
                                         <div class="text-[9px] font-bold text-rose-400 uppercase">{{ __("Fee (Deduction)") }}</div>
                                         <div class="text-xs font-black text-rose-400 font-mono mt-0.5">-{{ $company->formatMoney($this->merchantFeeAmount) }}</div>
                                     </div>
-                                    <div class="bg-emerald-950/50 p-2 rounded-xl border border-emerald-800/60">
+                                    <div class="bg-emerald-50 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900">
                                         <div class="text-[9px] font-bold text-emerald-400 uppercase">{{ __("Net (Receivable)") }}</div>
                                         <div class="text-xs font-black text-emerald-400 font-mono mt-0.5">+{{ $company->formatMoney($this->netReceivableAmount) }}</div>
                                     </div>
@@ -500,8 +501,8 @@
                         </div>
                     @elseif ($paymentMethod === 'credit')
                         <!-- Deferred / Credit Sale Configuration (Customer Account) -->
-                        <div class="pt-2 border-t border-slate-800 space-y-3">
-                            <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                        <div class="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                            <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-xs space-y-2">
                                 <div class="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                                     <span>📅</span>
                                     <span>{{ __("Credit / Deferred Sale (Customer Account)") }}</span>
@@ -510,19 +511,19 @@
                                     {{ __("No immediate payment is collected. The total balance of :amount will be recorded into Accounts Receivable.", ['amount' => $company->formatMoney($this->total)]) }}
                                 </p>
                                 @if (! $this->selectedCustomer)
-                                    <div class="text-rose-400 font-bold text-[11px] bg-rose-950/60 p-2 rounded-lg border border-rose-800">
+                                    <div class="text-rose-700 dark:text-rose-300 font-bold text-[11px] bg-rose-50 dark:bg-rose-950/40 p-2.5 rounded-lg border border-rose-200 dark:border-rose-900">
                                         ⚠️ {{ __("Please select a Customer in POS before confirming a credit sale.") }}
                                     </div>
                                 @endif
                             </div>
 
                             <div>
-                                <label class="block font-bold text-slate-300 mb-1 text-xs">
+                                <label class="block font-bold text-slate-600 dark:text-slate-300 mb-1.5 text-xs">
                                     {{ __("Receivable Due Date *") }}
                                 </label>
                                 <input type="date"
                                        wire:model="dueDate"
-                                       class="w-full py-2 px-3 rounded-xl border border-slate-700 bg-slate-900 text-xs font-bold text-white focus:ring-2 focus:ring-blue-500">
+                                       class="w-full py-2.5 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500">
                                 @error('dueDate') <span class="text-rose-400 text-[10px] font-bold">{{ $message }}</span> @enderror
                                 @error('customerId') <span class="text-rose-400 text-[10px] font-bold">{{ $message }}</span> @enderror
                             </div>
@@ -533,7 +534,7 @@
                 <!-- Multi / Split Payment Mode -->
                 <div class="space-y-3 p-3.5 rounded-2xl border border-blue-900/60 bg-blue-950/20">
                     <div class="flex items-center justify-between">
-                        <span class="font-extrabold text-blue-200 uppercase tracking-wider text-[11px]">{{ __("Split Payment Entries") }}</span>
+                        <span class="font-extrabold text-blue-700 dark:text-blue-300 uppercase tracking-wider text-[11px]">{{ __("Split Payment Entries") }}</span>
                         <button type="button"
                                 wire:click="addSplitRow"
                                 class="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] shadow-2xs transition active:scale-95 cursor-pointer">
@@ -643,32 +644,23 @@
         </div>
 
         <!-- Modal Footer Action Buttons -->
-        <div class="px-5 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 shrink-0">
-            <div class="flex items-center gap-2">
+        <div class="px-5 sm:px-7 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 shrink-0">
+            <div class="flex items-center">
                 <button type="button"
                         @click="closeCheckout()"
                         class="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs transition cursor-pointer flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 active:scale-95">
                     <span>{{ __("Cancel") }}</span>
                     <kbd class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-900 text-slate-400 font-black">Esc</kbd>
                 </button>
-
-                <!-- Live Invoice / Receipt Preview Button (0ms Instant Toggle) -->
-                <button type="button"
-                        @click="openPreview()"
-                        wire:click="openInvoicePreview"
-                        class="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer active:scale-95 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600">
-                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                    <span>{{ __("Preview Invoice") }}</span>
-                </button>
             </div>
 
-            <x-ui.button wire:click="save" wire:loading.attr="disabled" full class="!flex-1 !py-3 !rounded-2xl !font-black !text-sm">
-                <span wire:loading.remove class="flex items-center gap-2">
-                    <span>{{ __("Confirm & Complete Sale") }} ({{ $company->formatMoney($this->total) }})</span>
-                    <kbd class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-white/20 text-white font-black border border-white/30">F10</kbd>
-                </span>
-                <span wire:loading>{{ __("Processing Transaction...") }}</span>
-            </x-ui.button>
+            <button type="button"
+                    @click="openPreview()"
+                    wire:click="openInvoicePreview"
+                    class="flex-1 py-3 px-5 rounded-xl bg-[#006aff] hover:bg-[#0055d6] text-white font-black text-sm shadow-lg shadow-blue-500/20 transition active:scale-[0.98] inline-flex items-center justify-center gap-2 cursor-pointer">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                <span>{{ __("Review Invoice & Continue") }} ({{ $company->formatMoney($this->total) }})</span>
+            </button>
         </div>
 
     </div>

@@ -9,7 +9,7 @@
      x-transition:leave-end="opacity-0 translate-y-4">
     <button type="button" 
             @click="mobileCartOpen = true"
-            class="w-full max-w-md mx-auto py-3 px-3 sm:px-5 bg-theme-primary hover:opacity-90 text-white rounded-2xl shadow-xl flex items-center justify-between gap-2 font-bold active:scale-95 transition">
+            class="w-full max-w-md mx-auto py-3 px-3 sm:px-5 bg-[#006aff] hover:bg-[#0055d6] text-white rounded-2xl shadow-xl shadow-blue-500/25 flex items-center justify-between gap-2 font-bold active:scale-95 transition">
         <div class="flex items-center gap-2.5">
             <span class="bg-black/25 backdrop-blur-xs px-2.5 py-1 rounded-xl text-xs font-black tracking-wide border border-white/10">
                 {{ $this->cartItemCount }} {{ __("Items") }}
@@ -161,15 +161,15 @@
 
             <!-- Complete Checkout Action Button -->
             <div class="pt-1">
-                <x-ui.button
+                <button type="button"
                     @click="mobileCartOpen = false; openCheckout(); $wire.openCheckoutModal()"
-                    :disabled="$this->cartItemCount <= 0"
+                    @disabled($this->cartItemCount <= 0)
                     wire:loading.attr="disabled"
                     wire:target="openCheckoutModal"
-                    full size="lg" class="!font-black">
+                    class="w-full inline-flex items-center justify-center px-5 py-3.5 rounded-xl bg-[#006aff] hover:bg-[#0055d6] text-white text-base font-black shadow-lg shadow-blue-500/25 transition active:scale-[0.97] disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 disabled:shadow-none disabled:pointer-events-none cursor-pointer">
                     <span wire:loading.remove wire:target="openCheckoutModal">{{ __("Charge") }} {{ $company->formatMoney($this->total) }} / {{ __("Checkout") }}</span>
                     <span wire:loading.delay wire:target="openCheckoutModal">{{ __("Preparing...") }}</span>
-                </x-ui.button>
+                </button>
             </div>
         </div>
 

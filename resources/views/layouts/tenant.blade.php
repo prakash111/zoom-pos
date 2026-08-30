@@ -107,6 +107,16 @@
          }"
          class="app-main-frame bg-slate-100 dark:bg-slate-900/90 rounded-[2.5rem] shadow-2xl border border-slate-800/30 dark:border-slate-800 flex overflow-hidden {{ $isPosScreen ? 'h-full max-h-screen rounded-none sm:rounded-[2rem]' : 'min-h-[calc(100vh-2rem)] md:min-h-[calc(100vh-3rem)]' }} transition-all duration-300 relative w-full">
 
+        {{-- The nav chrome below (drag guides, rail/sidebar, macOS dock, speed-dial,
+             slide-out drawer & its backdrop) is wrapped in @persist so wire:navigate
+             keeps this exact DOM subtree — and its already-initialized dockableNav()
+             Alpine state — alive across page swaps instead of tearing it down and
+             re-mounting it on every click. Without this, Livewire's navigate.js
+             fully replaces <body> on each visit (nothing survives unless persisted),
+             forcing Alpine to destroy and re-hydrate this component from scratch and
+             replay its `transition-all duration-300` classes, which is what produced
+             the visible sidebar flicker/layout-jump on every navigation. --}}
+        @persist('tenant-nav-shell')
         <!-- Snap Dock Guides (Visible only while dragging menu) -->
         <div x-show="isDragging" x-cloak class="fixed inset-0 z-50 pointer-events-none transition-all duration-200">
             <div :class="snapZone === 'left' ? 'bg-blue-600/50 border-blue-400 scale-100 shadow-2xl shadow-blue-500/50' : 'bg-white/5 border-white/20'"
@@ -851,19 +861,19 @@
                     <div>
                         <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Administration & Settings') }}</div>
                         <div class="space-y-1">
-                            <x-nav.drawer-link :route="route('tenant.billing.index')" dot="blue" bold title="{{ __('Subscription & Billing') }}" badge="{{ __('Invoices') }}" badge-color="blue" />
+                            <x-nav.drawer-link :route="route('tenant.billing.index')" dot="blue" bold :title="__('Subscription & Billing')" :badge="__('Invoices')" badge-color="blue" />
 
                             @if ($canSettings)
-                                <x-nav.drawer-link :route="route('tenant.settings.index')" title="{{ __('Store Settings') }}" />
+                                <x-nav.drawer-link :route="route('tenant.settings.index')" :title="__('Store Settings')" />
                             @endif
 
-                            <x-nav.drawer-link :route="route('tenant.languages.index')" dot="emerald" title="{{ __('Languages & Translations') }}" badge="{{ __('Multi-Lang') }}" badge-color="emerald" />
+                            <x-nav.drawer-link :route="route('tenant.languages.index')" dot="emerald" :title="__('Languages & Translations')" :badge="__('Multi-Lang')" badge-color="emerald" />
 
                             @if ($canUsers)
-                                <x-nav.drawer-link :route="route('tenant.users.index')" title="{{ __('Users & Permissions') }}" />
+                                <x-nav.drawer-link :route="route('tenant.users.index')" :title="__('Users & Permissions')" />
                             @endif
 
-                            <x-nav.drawer-link :route="route('tenant.devices.index')" title="{{ __('Terminals & Devices') }}" />
+                            <x-nav.drawer-link :route="route('tenant.devices.index')" :title="__('Terminals & Devices')" />
                         </div>
                     </div>
 
@@ -889,6 +899,7 @@
              x-cloak
              x-on:click="sidebarOpen = false"
              class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40"></div>
+        @endpersist
 
         <!-- Main Body Area -->
         <div class="main-content-pane flex-1 min-w-0 w-full flex flex-col overflow-hidden transition-all duration-300"
@@ -997,7 +1008,7 @@
                     <!-- Appearance & Menu Layout Customizer Trigger -->
                     <button type="button"
                             @click="toggleCustomizerModal()"
-                            class="px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs border border-blue-200/50 dark:border-blue-800/50"
+                            class="hidden sm:flex px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-xs font-bold transition items-center gap-1.5 cursor-pointer shadow-2xs border border-blue-200/50 dark:border-blue-800/50"
                             title="{{ __('Navigation & Appearance Settings') }}">
                         <span class="text-sm">🎨</span>
                         <span class="hidden lg:inline text-[11px] font-bold uppercase">{{ __('Layout') }}</span>
@@ -1037,7 +1048,7 @@
             </header>
 
             <!-- Main Dynamic View Container with Smooth Transition -->
-            <main class="flex-1 w-full max-w-none spa-page-enter transition-all duration-200 {{ $isPosScreen ? 'p-1.5 sm:p-2.5 overflow-hidden flex flex-col min-h-0 h-full' : 'p-3 sm:p-5 md:p-6 overflow-y-auto' }}" id="main-app-content">
+            <main class="flex-1 w-full max-w-none transition-all duration-200 {{ $isPosScreen ? 'p-1.5 sm:p-2.5 overflow-hidden flex flex-col min-h-0 h-full' : 'p-3 sm:p-5 md:p-6 overflow-y-auto' }}" id="main-app-content">
                 <div class="w-full max-w-none {{ $isPosScreen ? 'flex-1 min-h-0 flex flex-col overflow-hidden h-full' : '' }}">
                     {{ $slot ?? '' }}
                     @yield('content')
@@ -1046,9 +1057,14 @@
         </div>
 
         <!-- Appearance & Layout Customizer Modal (Inside x-data scope) -->
+        @persist('tenant-nav-customizer')
         @include('layouts.partials.nav-customizer-modal')
+        @endpersist
 
     </div>
+
+    <!-- Shared invoice and quotation preview modal -->
+    @include('layouts.partials.document-print-preview-modal')
 
     <!-- Resume Fullscreen Nudge -->
     <div x-data

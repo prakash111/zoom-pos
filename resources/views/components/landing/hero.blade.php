@@ -16,8 +16,8 @@
     <div class="absolute inset-0 bg-gradient-to-br from-[#0c5966] via-[#10707e] to-[#6da734] dark:from-[#06242a] dark:via-[#09353c] dark:to-[#2b4414] -z-20"></div>
 
     <!-- Soft radial glow orbs behind the main container -->
-    <div class="absolute top-1/4 -left-20 w-96 h-96 rounded-full bg-teal-400/25 blur-[100px] pointer-events-none -z-10 animate-pulse-glow"></div>
-    <div class="absolute bottom-10 right-0 w-[500px] h-[500px] rounded-full bg-lime-400/25 blur-[120px] pointer-events-none -z-10 animate-pulse-glow" style="animation-delay: 2s;"></div>
+    <div class="landing-ambient absolute top-1/4 -left-20 w-96 h-96 rounded-full bg-teal-400/15 blur-3xl pointer-events-none -z-10"></div>
+    <div class="landing-ambient absolute bottom-10 right-0 w-[500px] h-[500px] rounded-full bg-lime-400/15 blur-3xl pointer-events-none -z-10"></div>
 
     <!-- Main Outer Container: The High-End Rounded Frame from Reference Design -->
     <div class="max-w-7xl mx-auto rounded-[2.5rem] sm:rounded-[3rem] bg-white dark:bg-slate-950 shadow-[0_30px_90px_-15px_rgba(0,0,0,0.35)] border border-white/60 dark:border-slate-800/80 relative overflow-hidden">
@@ -27,11 +27,11 @@
         <div class="absolute -top-10 -left-10 w-[400px] h-[400px] bg-gradient-to-br from-teal-300/20 via-cyan-200/10 to-transparent rounded-full blur-2xl pointer-events-none -z-0"></div>
 
         <!-- Integrated Top Nav Bar -->
-        <div class="relative z-10 px-6 sm:px-10 lg:px-12 pt-6 sm:pt-8 pb-4 flex items-center justify-between border-b border-slate-100/80 dark:border-slate-800/60">
+        <div class="relative z-10 px-6 sm:px-10 lg:px-12 pt-6 sm:pt-8 pb-4 hidden md:flex items-center justify-between border-b border-slate-100/80 dark:border-slate-800/60">
             <!-- Brand Logo -->
             <a href="{{ url('/') }}" class="inline-flex items-center gap-2.5 group">
                 @if ($branding->logo_url)
-                    <img src="{{ $branding->logo_url }}" alt="{{ $branding->platform_name }}" class="h-8 w-auto object-contain">
+                    <img src="{{ $branding->logo_url }}" alt="{{ $branding->platform_name }}" class="h-8 w-auto object-contain" decoding="async" fetchpriority="high">
                 @else
                     <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-lime to-emerald-400 p-1.5 flex items-center justify-center shadow-sm shadow-emerald-400/30 group-hover:scale-105 transition-transform">
                         <svg class="w-5 h-5 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round">
@@ -62,7 +62,7 @@
         </div>
 
         <!-- Main Hero Grid Content -->
-        <div class="relative z-10 px-6 sm:px-10 lg:px-12 pt-10 sm:pt-16 pb-12 sm:pb-16 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+        <div class="relative z-10 px-6 sm:px-10 lg:px-12 pt-8 sm:pt-16 pb-12 sm:pb-16 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
             
             <!-- Left Column: Typography & CTAs -->
             <div class="lg:col-span-6 xl:col-span-6 text-left">
@@ -113,7 +113,7 @@
                     @if ($customBannerUrl)
                         <!-- Custom Uploaded Banner Image from SuperAdmin -->
                         <div class="rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-2xl bg-slate-900">
-                            <img src="{{ $customBannerUrl }}" alt="{{ $heroTitle }}" class="w-full h-auto object-cover rounded-2xl sm:rounded-3xl">
+                            <img src="{{ $customBannerUrl }}" alt="{{ $heroTitle }}" class="w-full h-auto object-cover rounded-2xl sm:rounded-3xl" decoding="async" fetchpriority="high">
                         </div>
                     @else
                         <!-- Built-in Modern Smart Inventory & POS Live Dashboard Showcase -->
@@ -229,7 +229,7 @@
                         </div>
 
                         <!-- Layer 2: Floating 3D Smart POS Receipt & Live KOT Ticket -->
-                        <div class="absolute -left-4 sm:-left-8 -bottom-6 sm:-bottom-8 z-20 w-64 sm:w-80 rounded-2xl bg-gradient-to-br from-white via-slate-50 to-slate-100/95 dark:from-slate-850 dark:via-slate-900 dark:to-slate-950 backdrop-blur-2xl border border-white/90 dark:border-slate-700 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.38)] p-4 sm:p-5 flex flex-col justify-between animate-float-slow transition-all duration-300 hover:scale-105">
+                        <div class="absolute -left-4 sm:-left-8 -bottom-6 sm:-bottom-8 z-20 w-64 sm:w-80 rounded-2xl bg-gradient-to-br from-white via-slate-50 to-slate-100/95 dark:from-slate-850 dark:via-slate-900 dark:to-slate-950 border border-white/90 dark:border-slate-700 shadow-xl p-4 sm:p-5 flex flex-col justify-between">
                             
                             <!-- Ticket Top Bar -->
                             <div class="flex items-start justify-between pb-2 border-b border-slate-200/80 dark:border-slate-800">
@@ -318,5 +318,3 @@
 
     </div>
 </div>
-
-

@@ -24,3 +24,5 @@ docker-compose.override.yml
 /public/*.AppImage
 /public/*.deb
 /public/*.zip
+/mobile
+*.jks

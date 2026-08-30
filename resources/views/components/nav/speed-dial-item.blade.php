@@ -10,6 +10,9 @@
     'label',
     'variant' => 'blue', // 'blue' (default) | 'lime' (restaurant POS)
 ])
+@php
+    $label = html_entity_decode($label, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+@endphp
 <a @if($itemKey) x-show="isItemVisible('{{ $itemKey }}')" @endif wire:navigate.hover href="{{ $route }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
     <span>{{ $label }}</span>
     <span @class([

@@ -81,6 +81,9 @@ Route::prefix('v1/pos')->group(function () {
         // Outbound Delivery (WhatsApp / Email)
         Route::post('/send-delivery', [PosSyncApiController::class, 'sendDelivery'])->middleware('tenant.api.permission:pos,create');
 
+        // Invoice PDF (Preview / Print / Share)
+        Route::get('/sales/{id}/pdf', [PosSyncApiController::class, 'salePdf'])->middleware('tenant.api.permission:sales,view');
+
         // Taxes & Tax Rules Management
         Route::get('/taxes', [PosSyncApiController::class, 'taxRulesIndex']);
         Route::post('/taxes', [PosSyncApiController::class, 'taxRulesStore'])->middleware('tenant.api.permission:settings,view');
@@ -99,6 +102,7 @@ Route::prefix('v1/pos')->group(function () {
         Route::put('/quotations/{id}', [QuotationApiController::class, 'update'])->middleware('tenant.api.permission:quotes,edit');
         Route::delete('/quotations/{id}', [QuotationApiController::class, 'destroy'])->middleware('tenant.api.permission:quotes,edit');
         Route::post('/quotations/{id}/convert', [QuotationApiController::class, 'convert'])->middleware('tenant.api.permission:quotes,edit');
+        Route::get('/quotations/{id}/pdf', [QuotationApiController::class, 'pdf'])->middleware('tenant.api.permission:quotes,view');
 
         // Cash Register
         Route::get('/cash-register/current', [CashRegisterApiController::class, 'current'])->middleware('tenant.api.permission:cash_register,view');

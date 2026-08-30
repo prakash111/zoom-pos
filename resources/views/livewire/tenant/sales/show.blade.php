@@ -1,6 +1,4 @@
-<div class="max-w-3xl mx-auto space-y-6"
-     x-data
-     x-on:open-print-preview.window="window.open($event.detail.url, '_blank')">
+<div class="max-w-3xl mx-auto space-y-6" x-data>
     @if (session('status'))
         <div class="px-5 py-3 rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -44,14 +42,12 @@
 
             <div class="flex flex-wrap items-center gap-2">
                 <!-- Preview Document Button -->
-                <a href="{{ route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 0]) }}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   data-turbo="false"
+                <button type="button"
+                   x-on:click="$dispatch('open-print-preview', { url: @js(route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 0, 'embed' => 1])), title: @js(__('Invoice Preview')) })"
                    class="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm flex items-center gap-1.5 transition active:scale-95">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                     <span>{{ __("Preview") }}</span>
-                </a>
+                </button>
 
                 @if ($this->desktopPrintReady)
                     <button type="button"
