@@ -34,20 +34,21 @@ class CartSheet extends StatelessWidget {
     }
   }
 
+  /// Pops with the checkout result (or stays open on failure) — the caller
+  /// that opened this sheet (PosScreen, whose context outlives this one) is
+  /// responsible for following up with the invoice actions sheet, since by
+  /// the time this sheet's own context is usable again it may already be
+  /// disposed.
   Future<void> _checkout(BuildContext context) async {
     final pos = context.read<PosProvider>();
-    final success = await pos.checkout();
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await pos.checkout();
     if (!context.mounted) return;
 
-    if (success) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sale completed.')),
-      );
+    if (result != null) {
+      Navigator.of(context).pop(result);
     } else if (pos.checkoutError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(pos.checkoutError!)),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(pos.checkoutError!)));
     }
   }
 
@@ -159,12 +160,17 @@ class CartSheet extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
+                    _TotalsRow(label: 'Subtotal', value: formatter.format(pos.subtotal)),
+                    if (pos.discount > 0)
+                      _TotalsRow(label: 'Discount', value: '-${formatter.format(pos.discount)}'),
+                    if (pos.taxTotal > 0) _TotalsRow(label: 'Tax', value: formatter.format(pos.taxTotal)),
+                    const Divider(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
                         Text(
-                          formatter.format(pos.subtotal),
+                          formatter.format(pos.grandTotal),
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                         ),
                       ],
@@ -187,6 +193,27 @@ class CartSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _TotalsRow extends StatelessWidget {
+  const _TotalsRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.grey.shade600)),
+          Text(value, style: TextStyle(color: Colors.grey.shade800)),
+        ],
+      ),
     );
   }
 }

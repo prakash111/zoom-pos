@@ -23,7 +23,10 @@ class SaleModel {
       id: json['id'].toString(),
       saleNumber: json['sale_number'] as String? ?? '',
       customerName: json['customer_name'] as String?,
-      items: (json['items'] as List? ?? []).cast<Map<String, dynamic>>(),
+      items: (json['items'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList(),
       total: (json['total'] as num?)?.toDouble() ?? 0,
       discount: (json['discount'] as num?)?.toDouble() ?? 0,
       tax: (json['tax'] as num?)?.toDouble() ?? 0,

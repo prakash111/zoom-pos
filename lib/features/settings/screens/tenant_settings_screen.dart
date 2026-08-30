@@ -8,6 +8,7 @@ import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../settings_repository.dart';
 import 'payment_methods_screen.dart';
+import 'printer_settings_screen.dart';
 
 const _tabs = ['Profile', 'Receipts', 'Financial', 'Notifications'];
 
@@ -307,6 +308,19 @@ class _ReceiptsTabState extends State<_ReceiptsTab> {
           child: _saving
               ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : const Text('Save receipt settings'),
+        ),
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.print_outlined),
+          title: const Text('Bluetooth thermal printer'),
+          subtitle: const Text('Pair ESC/POS receipt printer for direct POS printing'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()),
+          ),
         ),
       ],
     );

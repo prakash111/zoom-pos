@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/api/api_client.dart';
-import '../../../core/config/app_config.dart';
 import '../../../core/models/quotation_model.dart';
+import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../auth/auth_provider.dart';
+import '../../pos/screens/invoice_actions_sheet.dart';
 import '../quotations_provider.dart';
 
 final _dateFormat = DateFormat('MMM d, y');
@@ -24,8 +26,6 @@ class QuotationDetailScreen extends StatefulWidget {
 }
 
 class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
-  bool _sending = false;
-
   Future<void> _convert() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -75,43 +75,25 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
     }
   }
 
-  Future<void> _sendEmail() async {
-    final controller = TextEditingController();
-    final email = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Send via email'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(labelText: 'Recipient email'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(controller.text.trim()), child: const Text('Send')),
-        ],
-      ),
+  InvoiceActionsData _actionsData(QuotationModel quote) {
+    final company = context.read<AuthProvider>().company;
+    return InvoiceActionsData(
+      documentType: 'quotation',
+      documentId: quote.id,
+      documentNumber: quote.quoteNumber,
+      companyName: company?.tradeName ?? company?.name ?? '',
+      customerName: quote.customerName,
+      currencySymbol: company?.currencySymbol ?? '\$',
+      subtotal: quote.subtotal,
+      discount: quote.discount,
+      tax: quote.tax,
+      total: quote.total,
+      lines: quote.items.map((item) {
+        final qty = (item['quantity'] as num?)?.toDouble() ?? 0;
+        final price = (item['price'] as num?)?.toDouble() ?? 0;
+        return ReceiptLine(name: item['name']?.toString() ?? 'Item', quantity: qty, unitPrice: price, lineTotal: qty * price);
+      }).toList(),
     );
-    if (email == null || email.isEmpty || !mounted) return;
-
-    setState(() => _sending = true);
-    try {
-      await context.read<ApiClient>().post(ApiEndpoints.sendDelivery, data: {
-        'type': 'email',
-        'document_type': 'quotation',
-        'recipient': email,
-        'document_id': widget.quotation.id,
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quotation sent.')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not send: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
   }
 
   @override
@@ -126,14 +108,11 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
       appBar: AppBar(
         title: Text('Quote #${quote.quoteNumber}'),
         actions: [
-          if (!quote.isConverted)
-            IconButton(
-              tooltip: 'Send via email',
-              icon: _sending
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.email_outlined),
-              onPressed: _sending ? null : _sendEmail,
-            ),
+          IconButton(
+            tooltip: 'Preview, print, or share',
+            icon: const Icon(Icons.ios_share_outlined),
+            onPressed: () => showInvoiceActionsSheet(context, _actionsData(quote)),
+          ),
           IconButton(
             tooltip: 'Delete',
             icon: const Icon(Icons.delete_outline),
@@ -186,12 +165,12 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
           if (quote.notes.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text('Notes', style: Theme.of(context).textTheme.titleSmall),
-            Text(quote.notes),
+            HtmlWidget(quote.notes),
           ],
           if (quote.terms.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text('Terms', style: Theme.of(context).textTheme.titleSmall),
-            Text(quote.terms),
+            HtmlWidget(quote.terms),
           ],
           const SizedBox(height: 24),
           if (!quote.isConverted)

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/models/sale_model.dart';
+import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../auth/auth_provider.dart';
+import '../../pos/screens/invoice_actions_sheet.dart';
 
 final _dateFormat = DateFormat('MMM d, y · h:mm a');
 
@@ -13,10 +17,48 @@ class SaleDetailScreen extends StatelessWidget {
   final SaleModel sale;
   final CurrencyFormatter formatter;
 
+  InvoiceActionsData _actionsData(BuildContext context) {
+    final company = context.read<AuthProvider>().company;
+    return InvoiceActionsData(
+      documentType: 'invoice',
+      documentId: sale.id,
+      documentNumber: sale.saleNumber,
+      companyName: company?.tradeName ?? company?.name ?? '',
+      customerName: sale.customerName,
+      currencySymbol: company?.currencySymbol ?? '\$',
+      subtotal: sale.total - sale.tax + sale.discount,
+      discount: sale.discount,
+      tax: sale.tax,
+      total: sale.total,
+      lines: sale.items
+          .map((item) {
+            final qty = ((item['quantity'] as num?) ?? (item['qty'] as num?) ?? 1).toDouble();
+            final price = ((item['price'] as num?) ?? 0).toDouble();
+            final total = ((item['total'] as num?) ?? (qty * price)).toDouble();
+            return ReceiptLine(
+              name: item['name']?.toString() ?? 'Item',
+              quantity: qty,
+              unitPrice: price,
+              lineTotal: total,
+            );
+          })
+          .toList(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Sale #${sale.saleNumber}')),
+      appBar: AppBar(
+        title: Text('Sale #${sale.saleNumber}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.ios_share_outlined),
+            tooltip: 'Preview, print, or share',
+            onPressed: () => showInvoiceActionsSheet(context, _actionsData(context)),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

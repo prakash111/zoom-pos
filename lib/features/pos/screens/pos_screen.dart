@@ -1,9 +1,13 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/models/product_model.dart';
+import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/image_url.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../auth/auth_provider.dart';
@@ -15,6 +19,7 @@ import '../../inventory/inventory_repository.dart';
 import '../pos_provider.dart';
 import '../sales_repository.dart';
 import 'cart_sheet.dart';
+import 'invoice_actions_sheet.dart';
 
 /// Entry point for the POS module. Owns a [PosProvider] scoped to this route
 /// so the cart resets whenever a fresh sale is started from the dashboard.
@@ -47,6 +52,15 @@ class _PosScreenBody extends StatefulWidget {
 
 class _PosScreenBodyState extends State<_PosScreenBody> {
   final _searchController = TextEditingController();
+  String? _baseUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<ApiClient>().currentBaseUrl().then((url) {
+      if (mounted) setState(() => _baseUrl = url);
+    });
+  }
 
   @override
   void dispose() {
@@ -71,17 +85,45 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     }
   }
 
-  void _openCart(BuildContext context) {
+  Future<void> _openCart(BuildContext context) async {
     final posProvider = context.read<PosProvider>();
     final customersRepository = CustomersRepository(context.read<ApiClient>());
+    final company = context.read<AuthProvider>().company;
 
-    showModalBottomSheet(
+    final result = await showModalBottomSheet<PosCheckoutResult>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) => ChangeNotifierProvider.value(
         value: posProvider,
         child: CartSheet(customersRepository: customersRepository),
+      ),
+    );
+
+    if (result == null || !context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sale completed.')));
+    await showInvoiceActionsSheet(
+      context,
+      InvoiceActionsData(
+        documentType: 'invoice',
+        documentId: result.saleId,
+        documentNumber: result.saleNumber,
+        companyName: company?.tradeName ?? company?.name ?? '',
+        customerName: result.customerName,
+        currencySymbol: company?.currencySymbol ?? '\$',
+        subtotal: result.subtotal,
+        discount: result.discount,
+        tax: result.tax,
+        total: result.total,
+        lines: result.items
+            .map((item) => ReceiptLine(
+                  name: item.product.name,
+                  quantity: item.quantity,
+                  unitPrice: item.product.salePrice,
+                  lineTotal: item.lineTotal,
+                ))
+            .toList(),
       ),
     );
   }
@@ -161,7 +203,7 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
               ),
             ),
           const SizedBox(height: 8),
-          Expanded(child: _buildBody(pos, formatter)),
+          Expanded(child: _buildBody(pos, formatter, _baseUrl)),
         ],
       ),
       bottomNavigationBar: pos.cartIsEmpty
@@ -172,7 +214,7 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
                 child: ElevatedButton(
                   onPressed: () => _openCart(context),
                   child: Text(
-                    'View cart · ${pos.cartCount} item${pos.cartCount == 1 ? '' : 's'} · ${formatter.format(pos.subtotal)}',
+                    'View cart · ${pos.cartCount} item${pos.cartCount == 1 ? '' : 's'} · ${formatter.format(pos.grandTotal)}',
                   ),
                 ),
               ),
@@ -180,7 +222,7 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     );
   }
 
-  Widget _buildBody(PosProvider pos, CurrencyFormatter formatter) {
+  Widget _buildBody(PosProvider pos, CurrencyFormatter formatter, String? baseUrl) {
     switch (pos.catalogStatus) {
       case CatalogStatus.loading:
         return const LoadingIndicator();
@@ -191,21 +233,26 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
         if (products.isEmpty) {
           return const Center(child: Text('No products found.'));
         }
-        return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 0.85,
-          ),
-          itemCount: products.length,
-          itemBuilder: (context, index) {
-            final product = products[index];
-            return _ProductCard(
-              product: product,
-              formatter: formatter,
-              onTap: product.isOutOfStock ? null : () => pos.addToCart(product),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            return GridView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: gridColumnsFor(constraints.maxWidth),
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.85,
+              ),
+              itemCount: products.length,
+              itemBuilder: (context, index) {
+                final product = products[index];
+                return _ProductCard(
+                  product: product,
+                  formatter: formatter,
+                  baseUrl: baseUrl,
+                  onTap: product.isOutOfStock ? null : () => pos.addToCart(product),
+                );
+              },
             );
           },
         );
@@ -214,15 +261,19 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
 }
 
 class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product, required this.formatter, required this.onTap});
+  const _ProductCard({required this.product, required this.formatter, required this.onTap, this.baseUrl});
 
   final ProductModel product;
   final CurrencyFormatter formatter;
   final VoidCallback? onTap;
+  final String? baseUrl;
 
   @override
   Widget build(BuildContext context) {
+    final resolvedImageUrl = resolveImageUrl(product.imageUrl, baseUrl: baseUrl);
+
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
@@ -232,8 +283,24 @@ class _ProductCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Center(
-                  child: Icon(Icons.inventory_2_outlined, size: 36, color: Colors.grey.shade400),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox.expand(
+                    child: resolvedImageUrl == null
+                        ? _ProductImagePlaceholder()
+                        : CachedNetworkImage(
+                            imageUrl: resolvedImageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => _ProductImagePlaceholder(),
+                          ),
+                  ),
                 ),
               ),
               Text(
@@ -259,6 +326,18 @@ class _ProductCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ProductImagePlaceholder extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.grey.shade100,
+      child: Center(
+        child: Icon(Icons.inventory_2_outlined, size: 36, color: Colors.grey.shade400),
       ),
     );
   }

@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  static const Color primary = Color(0xFF1E5F4E);
-  static const Color surface = Color(0xFFF7F8FA);
+  static const Color primary = Color(0xFF2563EB);
+  static const Color surface = Color(0xFFF8FAFC);
 
   static ThemeData light() {
     final colorScheme = ColorScheme.fromSeed(

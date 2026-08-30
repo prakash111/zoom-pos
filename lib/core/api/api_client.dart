@@ -31,6 +31,10 @@ class ApiClient {
   /// so the app can drop back to the login screen. Set by AuthProvider.
   void Function()? onUnauthenticated;
 
+  /// The configured server host (no `/api/v1/pos` suffix), for building
+  /// asset URLs (product images) or opening public web pages from the app.
+  Future<String> currentBaseUrl() => _preferences.readBaseUrl();
+
   Future<void> _prepare() async {
     final baseUrl = await _preferences.readBaseUrl();
     _dio.options.baseUrl = '$baseUrl${AppConfig.apiPrefix}';
@@ -54,6 +58,22 @@ class ApiClient {
         options: Options(responseType: ResponseType.plain),
       );
       return response.data ?? '';
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Like [get], but for endpoints that return raw binary bytes (the invoice
+  /// PDF endpoints) instead of the JSON success/data envelope.
+  Future<List<int>> getBytes(String path, {Map<String, dynamic>? query}) async {
+    await _prepare();
+    try {
+      final response = await _dio.get<List<int>>(
+        path,
+        queryParameters: query,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      return response.data ?? const [];
     } on DioException catch (e) {
       throw _mapDioError(e);
     }

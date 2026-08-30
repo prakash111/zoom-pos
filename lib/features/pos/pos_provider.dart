@@ -12,6 +12,31 @@ import 'sales_repository.dart';
 
 enum CatalogStatus { loading, loaded, error }
 
+/// Snapshot of a just-completed sale, handed back to the UI so it can open
+/// the post-checkout invoice actions sheet — by the time [PosProvider.checkout]
+/// returns, the cart itself has already been cleared.
+class PosCheckoutResult {
+  PosCheckoutResult({
+    required this.saleId,
+    required this.saleNumber,
+    required this.items,
+    required this.subtotal,
+    required this.discount,
+    required this.tax,
+    required this.total,
+    this.customerName,
+  });
+
+  final String saleId;
+  final String saleNumber;
+  final List<CartItem> items;
+  final double subtotal;
+  final double discount;
+  final double tax;
+  final double total;
+  final String? customerName;
+}
+
 /// Drives the point-of-sale screen: loads the product catalog, filters it by
 /// search/category, holds the in-memory cart, and submits the sale through
 /// [SalesRepository] on checkout.
@@ -63,6 +88,9 @@ class PosProvider extends ChangeNotifier {
   List<CartItem> get cartItems => _cart.values.toList();
   int get cartCount => _cart.values.fold<int>(0, (sum, item) => sum + item.quantity.ceil());
   double get subtotal => _cart.values.fold<double>(0, (sum, item) => sum + item.lineTotal);
+  double get taxTotal => _cart.values.fold<double>(0, (sum, item) => sum + item.taxAmount);
+  double get discount => 0;
+  double get grandTotal => subtotal - discount + taxTotal;
   bool get cartIsEmpty => _cart.isEmpty;
 
   Future<void> loadCatalog() async {
@@ -154,28 +182,40 @@ class PosProvider extends ChangeNotifier {
 
   /// Records the current cart as a completed sale. The cart (and selected
   /// customer/payment method) is only cleared once the server accepts it.
-  Future<bool> checkout() async {
-    if (_cart.isEmpty) return false;
+  /// Returns a snapshot of what was sold (for the post-checkout invoice
+  /// actions sheet) on success, or null on failure — see [checkoutError].
+  Future<PosCheckoutResult?> checkout() async {
+    if (_cart.isEmpty) return null;
 
     if (registerOpen == false) {
       checkoutError = 'Open a cash register before completing a sale.';
       notifyListeners();
-      return false;
+      return null;
     }
 
     isCheckingOut = true;
     checkoutError = null;
     notifyListeners();
 
+    final saleId = _uuid.v4();
+    final soldItems = _cart.values.toList();
+    final soldSubtotal = subtotal;
+    final soldTax = taxTotal;
+    final soldDiscount = discount;
+    final soldTotal = grandTotal;
+    final soldCustomerName = selectedCustomer?.name;
+
     try {
       await _salesRepository.pushSale(
-        id: _uuid.v4(),
-        total: subtotal,
-        discount: 0,
+        id: saleId,
+        total: soldTotal,
+        discount: soldDiscount,
+        taxAmount: soldTax,
+        taxName: soldTax > 0 ? 'Tax' : null,
         paymentMethod: paymentMethod,
         customerId: selectedCustomer?.id,
-        customerName: selectedCustomer?.name,
-        items: _cart.values
+        customerName: soldCustomerName,
+        items: soldItems
             .map((item) => {
                   'id': item.product.id,
                   'product_id': item.product.id,
@@ -188,12 +228,21 @@ class PosProvider extends ChangeNotifier {
       clearCart();
       isCheckingOut = false;
       notifyListeners();
-      return true;
+      return PosCheckoutResult(
+        saleId: saleId,
+        saleNumber: 'POS-${saleId.substring(0, 8).toUpperCase()}',
+        items: soldItems,
+        subtotal: soldSubtotal,
+        discount: soldDiscount,
+        tax: soldTax,
+        total: soldTotal,
+        customerName: soldCustomerName,
+      );
     } on ApiException catch (e) {
       checkoutError = e.message;
       isCheckingOut = false;
       notifyListeners();
-      return false;
+      return null;
     }
   }
 }

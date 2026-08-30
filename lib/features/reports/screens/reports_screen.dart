@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/report_models.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../auth/auth_provider.dart';
@@ -188,19 +189,21 @@ class _SummaryTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.6,
-            children: [
-              _KpiTile(label: 'Revenue', value: formatter.format(kpis.totalRevenue), growth: kpis.revenueGrowth),
-              _KpiTile(label: 'Transactions', value: '${kpis.transactionsCount}', growth: kpis.transactionsGrowth),
-              _KpiTile(label: 'Avg. order value', value: formatter.format(kpis.aov), growth: kpis.aovGrowth),
-              _KpiTile(label: 'Items sold', value: summary.itemsSoldCount.toStringAsFixed(0), growth: null),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) => GridView.count(
+              crossAxisCount: gridColumnsFor(constraints.maxWidth, mobile: 2, tablet: 3, desktop: 4),
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.6,
+              children: [
+                _KpiTile(label: 'Revenue', value: formatter.format(kpis.totalRevenue), growth: kpis.revenueGrowth),
+                _KpiTile(label: 'Transactions', value: '${kpis.transactionsCount}', growth: kpis.transactionsGrowth),
+                _KpiTile(label: 'Avg. order value', value: formatter.format(kpis.aov), growth: kpis.aovGrowth),
+                _KpiTile(label: 'Items sold', value: summary.itemsSoldCount.toStringAsFixed(0), growth: null),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           Card(

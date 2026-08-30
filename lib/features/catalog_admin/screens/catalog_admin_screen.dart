@@ -18,81 +18,38 @@ import 'category_form_sheet.dart';
 import 'supplier_form_sheet.dart';
 import 'unit_form_dialog.dart';
 
-/// Catalog admin hub: Categories / Brands / Units / Suppliers, mirroring
-/// the web "Products & Inventory" nav section's lookup-table pages.
-class CatalogAdminScreen extends StatefulWidget {
-  const CatalogAdminScreen({super.key});
+/// Categories management, reached from the "Inventory Management" hub
+/// (see lib/features/inventory/screens/inventory_management_screen.dart).
+/// This — along with [BrandsScreen], [UnitsScreen] and [SuppliersScreen]
+/// below — used to be a tab under a single "Catalog Admin" screen; each is
+/// now its own destination so it fits the Products/Categories/Brands
+/// sub-module structure the hub presents.
+class CategoriesScreen extends StatefulWidget {
+  const CategoriesScreen({super.key});
 
   @override
-  State<CatalogAdminScreen> createState() => _CatalogAdminScreenState();
+  State<CategoriesScreen> createState() => _CategoriesScreenState();
 }
 
-class _CatalogAdminScreenState extends State<CatalogAdminScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final apiClient = context.read<ApiClient>();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Catalog Admin'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [Tab(text: 'Categories'), Tab(text: 'Brands'), Tab(text: 'Units'), Tab(text: 'Suppliers')],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _CategoriesTab(repository: CategoriesRepository(apiClient)),
-          _BrandsTab(repository: BrandsRepository(apiClient)),
-          _UnitsTab(repository: UnitsRepository(apiClient)),
-          _SuppliersTab(repository: SuppliersRepository(apiClient)),
-        ],
-      ),
-    );
-  }
-}
-
-class _CategoriesTab extends StatefulWidget {
-  const _CategoriesTab({required this.repository});
-
-  final CategoriesRepository repository;
-
-  @override
-  State<_CategoriesTab> createState() => _CategoriesTabState();
-}
-
-class _CategoriesTabState extends State<_CategoriesTab> {
+class _CategoriesScreenState extends State<CategoriesScreen> {
+  late final CategoriesRepository repository;
   late Future<List<CategoryModel>> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = widget.repository.fetchCategories();
+    repository = CategoriesRepository(context.read<ApiClient>());
+    _future = repository.fetchCategories();
   }
 
-  void _reload() => setState(() => _future = widget.repository.fetchCategories());
+  void _reload() => setState(() => _future = repository.fetchCategories());
 
   Future<void> _openForm({CategoryModel? category}) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => CategoryFormSheet(repository: widget.repository, category: category),
+      builder: (_) => CategoryFormSheet(repository: repository, category: category),
     );
     if (saved == true) _reload();
   }
@@ -101,7 +58,7 @@ class _CategoriesTabState extends State<_CategoriesTab> {
     final confirmed = await _confirmDelete(context, category.name);
     if (confirmed != true) return;
     try {
-      await widget.repository.deleteCategory(category.id);
+      await repository.deleteCategory(category.id);
       _reload();
     } on ApiException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -111,6 +68,7 @@ class _CategoriesTabState extends State<_CategoriesTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('Categories')),
       floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)),
       body: FutureBuilder<List<CategoryModel>>(
         future: _future,
@@ -151,30 +109,30 @@ class _CategoriesTabState extends State<_CategoriesTab> {
   }
 }
 
-class _BrandsTab extends StatefulWidget {
-  const _BrandsTab({required this.repository});
-
-  final BrandsRepository repository;
+class BrandsScreen extends StatefulWidget {
+  const BrandsScreen({super.key});
 
   @override
-  State<_BrandsTab> createState() => _BrandsTabState();
+  State<BrandsScreen> createState() => _BrandsScreenState();
 }
 
-class _BrandsTabState extends State<_BrandsTab> {
+class _BrandsScreenState extends State<BrandsScreen> {
+  late final BrandsRepository repository;
   late Future<List<BrandModel>> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = widget.repository.fetchBrands();
+    repository = BrandsRepository(context.read<ApiClient>());
+    _future = repository.fetchBrands();
   }
 
-  void _reload() => setState(() => _future = widget.repository.fetchBrands());
+  void _reload() => setState(() => _future = repository.fetchBrands());
 
   Future<void> _openForm({BrandModel? brand}) async {
     final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => BrandFormDialog(repository: widget.repository, brand: brand),
+      builder: (_) => BrandFormDialog(repository: repository, brand: brand),
     );
     if (saved == true) _reload();
   }
@@ -183,7 +141,7 @@ class _BrandsTabState extends State<_BrandsTab> {
     final confirmed = await _confirmDelete(context, brand.name);
     if (confirmed != true) return;
     try {
-      await widget.repository.deleteBrand(brand.id);
+      await repository.deleteBrand(brand.id);
       _reload();
     } on ApiException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -193,6 +151,7 @@ class _BrandsTabState extends State<_BrandsTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('Brands')),
       floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)),
       body: FutureBuilder<List<BrandModel>>(
         future: _future,
@@ -231,30 +190,30 @@ class _BrandsTabState extends State<_BrandsTab> {
   }
 }
 
-class _UnitsTab extends StatefulWidget {
-  const _UnitsTab({required this.repository});
-
-  final UnitsRepository repository;
+class UnitsScreen extends StatefulWidget {
+  const UnitsScreen({super.key});
 
   @override
-  State<_UnitsTab> createState() => _UnitsTabState();
+  State<UnitsScreen> createState() => _UnitsScreenState();
 }
 
-class _UnitsTabState extends State<_UnitsTab> {
+class _UnitsScreenState extends State<UnitsScreen> {
+  late final UnitsRepository repository;
   late Future<List<UnitModel>> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = widget.repository.fetchUnits();
+    repository = UnitsRepository(context.read<ApiClient>());
+    _future = repository.fetchUnits();
   }
 
-  void _reload() => setState(() => _future = widget.repository.fetchUnits());
+  void _reload() => setState(() => _future = repository.fetchUnits());
 
   Future<void> _openForm({UnitModel? unit}) async {
     final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => UnitFormDialog(repository: widget.repository, unit: unit),
+      builder: (_) => UnitFormDialog(repository: repository, unit: unit),
     );
     if (saved == true) _reload();
   }
@@ -263,7 +222,7 @@ class _UnitsTabState extends State<_UnitsTab> {
     final confirmed = await _confirmDelete(context, unit.name);
     if (confirmed != true) return;
     try {
-      await widget.repository.deleteUnit(unit.id);
+      await repository.deleteUnit(unit.id);
       _reload();
     } on ApiException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -273,6 +232,7 @@ class _UnitsTabState extends State<_UnitsTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('Units')),
       floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)),
       body: FutureBuilder<List<UnitModel>>(
         future: _future,
@@ -312,32 +272,32 @@ class _UnitsTabState extends State<_UnitsTab> {
   }
 }
 
-class _SuppliersTab extends StatefulWidget {
-  const _SuppliersTab({required this.repository});
-
-  final SuppliersRepository repository;
+class SuppliersScreen extends StatefulWidget {
+  const SuppliersScreen({super.key});
 
   @override
-  State<_SuppliersTab> createState() => _SuppliersTabState();
+  State<SuppliersScreen> createState() => _SuppliersScreenState();
 }
 
-class _SuppliersTabState extends State<_SuppliersTab> {
+class _SuppliersScreenState extends State<SuppliersScreen> {
+  late final SuppliersRepository repository;
   late Future<List<SupplierModel>> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = widget.repository.fetchSuppliers();
+    repository = SuppliersRepository(context.read<ApiClient>());
+    _future = repository.fetchSuppliers();
   }
 
-  void _reload() => setState(() => _future = widget.repository.fetchSuppliers());
+  void _reload() => setState(() => _future = repository.fetchSuppliers());
 
   Future<void> _openForm({SupplierModel? supplier}) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => SupplierFormSheet(repository: widget.repository, supplier: supplier),
+      builder: (_) => SupplierFormSheet(repository: repository, supplier: supplier),
     );
     if (saved == true) _reload();
   }
@@ -346,7 +306,7 @@ class _SuppliersTabState extends State<_SuppliersTab> {
     final confirmed = await _confirmDelete(context, supplier.name);
     if (confirmed != true) return;
     try {
-      await widget.repository.deleteSupplier(supplier.id);
+      await repository.deleteSupplier(supplier.id);
       _reload();
     } on ApiException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -356,6 +316,7 @@ class _SuppliersTabState extends State<_SuppliersTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('Suppliers')),
       floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)),
       body: FutureBuilder<List<SupplierModel>>(
         future: _future,
