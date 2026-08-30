@@ -114,9 +114,10 @@ class AuthProvider extends ChangeNotifier {
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('AuthProvider._attempt unexpected error: $e');
-      _errorMessage = 'An unexpected error occurred. Please try again.';
+      debugPrintStack(stackTrace: stackTrace);
+      _errorMessage = 'Sign-in failed (${e.runtimeType}): $e';
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
