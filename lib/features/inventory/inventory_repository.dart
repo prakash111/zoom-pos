@@ -2,12 +2,18 @@ import '../../core/api/api_client.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/category_model.dart';
 import '../../core/models/product_model.dart';
+import '../../core/models/settings_models.dart';
 
 class InventoryCatalog {
-  InventoryCatalog({required this.products, required this.categories});
+  InventoryCatalog({
+    required this.products,
+    required this.categories,
+    this.paymentMethods = const [],
+  });
 
   final List<ProductModel> products;
   final List<CategoryModel> categories;
+  final List<PaymentMethodModel> paymentMethods;
 }
 
 /// Talks to the inventory endpoints on PosSyncApiController: GET /inventory,
@@ -21,13 +27,23 @@ class InventoryRepository {
     final response = await _client.get(ApiEndpoints.inventory);
 
     final products = (response['products'] as List? ?? [])
-        .map((e) => ProductModel.fromJson(e as Map<String, dynamic>))
+        .whereType<Map>()
+        .map((e) => ProductModel.fromJson(Map<String, dynamic>.from(e)))
         .toList();
     final categories = (response['categories'] as List? ?? [])
-        .map((e) => CategoryModel.fromJson(e as Map<String, dynamic>))
+        .whereType<Map>()
+        .map((e) => CategoryModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+    final paymentMethods = (response['payment_methods'] as List? ?? [])
+        .whereType<Map>()
+        .map((e) => PaymentMethodModel.fromJson(Map<String, dynamic>.from(e)))
         .toList();
 
-    return InventoryCatalog(products: products, categories: categories);
+    return InventoryCatalog(
+      products: products,
+      categories: categories,
+      paymentMethods: paymentMethods,
+    );
   }
 
   /// Creates a new product, or updates an existing one when [externalId] is

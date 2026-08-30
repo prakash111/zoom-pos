@@ -17,7 +17,7 @@ class AnalyticsModel {
   });
 
   factory AnalyticsModel.fromJson(Map<String, dynamic> json) {
-    final kpis = json['kpis'] as Map<String, dynamic>? ?? {};
+    final kpis = json['kpis'] is Map ? Map<String, dynamic>.from(json['kpis'] as Map) : <String, dynamic>{};
     return AnalyticsModel(
       todayRevenue: (kpis['today_revenue'] as num?)?.toDouble() ?? 0,
       todayOrders: (kpis['today_orders'] as num?)?.toInt() ?? 0,
@@ -29,13 +29,16 @@ class AnalyticsModel {
       totalReceivables: (kpis['total_receivables'] as num?)?.toDouble() ?? 0,
       lowStockCount: (kpis['low_stock_count'] as num?)?.toInt() ?? 0,
       paymentBreakdown: (json['payment_breakdown'] as List? ?? [])
-          .map((e) => PaymentBreakdownEntry.fromJson(e as Map<String, dynamic>))
+          .whereType<Map>()
+          .map((e) => PaymentBreakdownEntry.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       revenueTrend: (json['revenue_trend'] as List? ?? [])
-          .map((e) => RevenueTrendPoint.fromJson(e as Map<String, dynamic>))
+          .whereType<Map>()
+          .map((e) => RevenueTrendPoint.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       topProducts: (json['top_products'] as List? ?? [])
-          .map((e) => TopProductEntry.fromJson(e as Map<String, dynamic>))
+          .whereType<Map>()
+          .map((e) => TopProductEntry.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
     );
   }

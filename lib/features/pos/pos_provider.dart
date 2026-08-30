@@ -5,12 +5,39 @@ import '../../core/api/api_exception.dart';
 import '../../core/models/category_model.dart';
 import '../../core/models/customer_model.dart';
 import '../../core/models/product_model.dart';
+import '../../core/models/settings_models.dart';
 import '../cash_register/cash_register_repository.dart';
 import '../inventory/inventory_repository.dart';
 import 'cart_item.dart';
 import 'sales_repository.dart';
 
 enum CatalogStatus { loading, loaded, error }
+
+/// A parked/held cart that can be resumed at any time.
+class HeldCart {
+  HeldCart({
+    required this.id,
+    required this.name,
+    required this.cart,
+    required this.customer,
+    required this.notes,
+    required this.discount,
+    required this.isPercentDiscount,
+    required this.heldAt,
+  });
+
+  final String id;
+  final String name;
+  final Map<String, CartItem> cart;
+  final CustomerModel? customer;
+  final String notes;
+  final double discount;
+  final bool isPercentDiscount;
+  final DateTime heldAt;
+
+  int get itemCount => cart.values.fold<int>(0, (sum, item) => sum + item.quantity.ceil());
+  double get total => cart.values.fold<double>(0, (sum, item) => sum + item.lineTotal);
+}
 
 /// Snapshot of a just-completed sale, handed back to the UI so it can open
 /// the post-checkout invoice actions sheet — by the time [PosProvider.checkout]
@@ -25,6 +52,7 @@ class PosCheckoutResult {
     required this.tax,
     required this.total,
     this.customerName,
+    this.notes,
   });
 
   final String saleId;
@@ -35,6 +63,7 @@ class PosCheckoutResult {
   final double tax;
   final double total;
   final String? customerName;
+  final String? notes;
 }
 
 /// Drives the point-of-sale screen: loads the product catalog, filters it by
@@ -54,22 +83,26 @@ class PosProvider extends ChangeNotifier {
   final CashRegisterRepository _cashRegisterRepository;
   static final Uuid _uuid = Uuid();
 
-  /// Null until the first [checkRegisterStatus] call resolves — the register
-  /// banner and checkout gate stay hidden/permissive until then so a slow
-  /// network doesn't block a cashier who already has a shift open.
+  /// Null until the first [checkRegisterStatus] call resolves.
   bool? registerOpen;
 
   CatalogStatus catalogStatus = CatalogStatus.loading;
   String? catalogError;
   List<ProductModel> _products = [];
   List<CategoryModel> categories = [];
+  List<PaymentMethodModel> paymentMethods = [];
 
   String searchQuery = '';
   String? selectedCategoryId;
 
   final Map<String, CartItem> _cart = {};
+  final List<HeldCart> heldCarts = [];
   CustomerModel? selectedCustomer;
   String paymentMethod = 'cash';
+  String orderNotes = '';
+  double customDiscount = 0;
+  bool isPercentDiscount = false;
+
   bool isCheckingOut = false;
   String? checkoutError;
 
@@ -89,8 +122,16 @@ class PosProvider extends ChangeNotifier {
   int get cartCount => _cart.values.fold<int>(0, (sum, item) => sum + item.quantity.ceil());
   double get subtotal => _cart.values.fold<double>(0, (sum, item) => sum + item.lineTotal);
   double get taxTotal => _cart.values.fold<double>(0, (sum, item) => sum + item.taxAmount);
-  double get discount => 0;
-  double get grandTotal => subtotal - discount + taxTotal;
+
+  double get discount {
+    if (customDiscount <= 0) return 0;
+    if (isPercentDiscount) {
+      return (subtotal * (customDiscount / 100)).clamp(0, subtotal);
+    }
+    return customDiscount.clamp(0, subtotal);
+  }
+
+  double get grandTotal => (subtotal - discount + taxTotal).clamp(0, double.infinity);
   bool get cartIsEmpty => _cart.isEmpty;
 
   Future<void> loadCatalog() async {
@@ -101,6 +142,10 @@ class PosProvider extends ChangeNotifier {
       final catalog = await _inventoryRepository.fetchCatalog();
       _products = catalog.products;
       categories = catalog.categories;
+      paymentMethods = catalog.paymentMethods;
+      if (paymentMethods.isNotEmpty && !paymentMethods.any((p) => p.code == paymentMethod || p.id == paymentMethod)) {
+        paymentMethod = paymentMethods.first.code.isNotEmpty ? paymentMethods.first.code : paymentMethods.first.id;
+      }
       catalogStatus = CatalogStatus.loaded;
     } on ApiException catch (e) {
       catalogError = e.message;
@@ -114,8 +159,7 @@ class PosProvider extends ChangeNotifier {
       final register = await _cashRegisterRepository.fetchCurrent();
       registerOpen = register?.isOpen == true;
     } on ApiException {
-      // Leave registerOpen as-is (null on first load) rather than block
-      // checkout on a transient status-check failure.
+      // Leave registerOpen as-is on transient failure.
     }
     notifyListeners();
   }
@@ -173,17 +217,72 @@ class PosProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clearCart() {
-    _cart.clear();
-    selectedCustomer = null;
-    paymentMethod = 'cash';
+  void setOrderNotes(String notes) {
+    orderNotes = notes;
     notifyListeners();
   }
 
-  /// Records the current cart as a completed sale. The cart (and selected
-  /// customer/payment method) is only cleared once the server accepts it.
-  /// Returns a snapshot of what was sold (for the post-checkout invoice
-  /// actions sheet) on success, or null on failure — see [checkoutError].
+  void setDiscount(double amount, {bool isPercent = false}) {
+    customDiscount = amount;
+    isPercentDiscount = isPercent;
+    notifyListeners();
+  }
+
+  void holdCurrentCart({String? label}) {
+    if (_cart.isEmpty) return;
+    final heldId = _uuid.v4().substring(0, 6).toUpperCase();
+    final name = label != null && label.isNotEmpty
+        ? label
+        : (selectedCustomer?.name != null ? 'Cart (${selectedCustomer!.name})' : 'Held #$heldId');
+
+    heldCarts.add(
+      HeldCart(
+        id: heldId,
+        name: name,
+        cart: Map<String, CartItem>.from(_cart.map((k, v) => MapEntry(k, CartItem(product: v.product, quantity: v.quantity)))),
+        customer: selectedCustomer,
+        notes: orderNotes,
+        discount: customDiscount,
+        isPercentDiscount: isPercentDiscount,
+        heldAt: DateTime.now(),
+      ),
+    );
+    clearCart();
+  }
+
+  void resumeHeldCart(HeldCart held) {
+    _cart.clear();
+    for (final entry in held.cart.entries) {
+      _cart[entry.key] = CartItem(product: entry.value.product, quantity: entry.value.quantity);
+    }
+    selectedCustomer = held.customer;
+    orderNotes = held.notes;
+    customDiscount = held.discount;
+    isPercentDiscount = held.isPercentDiscount;
+    heldCarts.removeWhere((h) => h.id == held.id);
+    notifyListeners();
+  }
+
+  void deleteHeldCart(String id) {
+    heldCarts.removeWhere((h) => h.id == id);
+    notifyListeners();
+  }
+
+  void clearCart() {
+    _cart.clear();
+    selectedCustomer = null;
+    orderNotes = '';
+    customDiscount = 0;
+    isPercentDiscount = false;
+    if (paymentMethods.isNotEmpty) {
+      paymentMethod = paymentMethods.first.code.isNotEmpty ? paymentMethods.first.code : paymentMethods.first.id;
+    } else {
+      paymentMethod = 'cash';
+    }
+    notifyListeners();
+  }
+
+  /// Records the current cart as a completed sale.
   Future<PosCheckoutResult?> checkout() async {
     if (_cart.isEmpty) return null;
 
@@ -204,6 +303,7 @@ class PosProvider extends ChangeNotifier {
     final soldDiscount = discount;
     final soldTotal = grandTotal;
     final soldCustomerName = selectedCustomer?.name;
+    final soldNotes = orderNotes;
 
     try {
       await _salesRepository.pushSale(
@@ -237,6 +337,7 @@ class PosProvider extends ChangeNotifier {
         tax: soldTax,
         total: soldTotal,
         customerName: soldCustomerName,
+        notes: soldNotes,
       );
     } on ApiException catch (e) {
       checkoutError = e.message;

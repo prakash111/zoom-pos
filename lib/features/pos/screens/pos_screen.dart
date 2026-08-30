@@ -116,6 +116,9 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
         discount: result.discount,
         tax: result.tax,
         total: result.total,
+        taxId: company?.taxId,
+        taxLabel: company?.taxLabel ?? 'Tax',
+        isIndia: company?.isIndia ?? false,
         lines: result.items
             .map((item) => ReceiptLine(
                   name: item.product.name,
@@ -133,88 +136,121 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     final pos = context.watch<PosProvider>();
     final company = context.watch<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
+    final isDesktopOrTabletWide = isWide(context);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Point of Sale')),
-      body: Column(
-        children: [
-          if (pos.registerOpen == false)
-            Container(
-              width: double.infinity,
-              color: Colors.orange.shade50,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
-                children: [
-                  Icon(Icons.lock_clock_outlined, size: 18, color: Colors.orange.shade800),
-                  const SizedBox(width: 8),
-                  const Expanded(child: Text('No cash register is open. Sales are blocked until one is opened.')),
-                  TextButton(
-                    onPressed: () => _openRegisterPrompt(context),
-                    child: const Text('Open'),
-                  ),
-                ],
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
-              controller: _searchController,
-              onChanged: pos.setSearchQuery,
-              decoration: InputDecoration(
-                hintText: 'Search products, SKU, or barcode',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: pos.searchQuery.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          pos.setSearchQuery('');
-                        },
-                      ),
-              ),
+    final catalogWidget = Column(
+      children: [
+        if (pos.registerOpen == false)
+          Container(
+            width: double.infinity,
+            color: Colors.orange.shade50,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                Icon(Icons.lock_clock_outlined, size: 18, color: Colors.orange.shade800),
+                const SizedBox(width: 8),
+                const Expanded(child: Text('No cash register is open. Sales are blocked until one is opened.')),
+                TextButton(
+                  onPressed: () => _openRegisterPrompt(context),
+                  child: const Text('Open'),
+                ),
+              ],
             ),
           ),
-          if (pos.categories.isNotEmpty)
-            SizedBox(
-              height: 40,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: TextField(
+            controller: _searchController,
+            onChanged: pos.setSearchQuery,
+            decoration: InputDecoration(
+              hintText: 'Search products, SKU, or barcode',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: pos.searchQuery.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        pos.setSearchQuery('');
+                      },
+                    ),
+            ),
+          ),
+        ),
+        if (pos.categories.isNotEmpty)
+          SizedBox(
+            height: 40,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: const Text('All'),
+                    selected: pos.selectedCategoryId == null,
+                    onSelected: (_) => pos.setCategory(null),
+                  ),
+                ),
+                for (final category in pos.categories)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
-                      label: const Text('All'),
-                      selected: pos.selectedCategoryId == null,
-                      onSelected: (_) => pos.setCategory(null),
+                      label: Text(category.name),
+                      selected: pos.selectedCategoryId == category.id,
+                      onSelected: (_) => pos.setCategory(category.id),
                     ),
                   ),
-                  for (final category in pos.categories)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(category.name),
-                        selected: pos.selectedCategoryId == category.id,
-                        onSelected: (_) => pos.setCategory(category.id),
-                      ),
-                    ),
-                ],
-              ),
+              ],
             ),
-          const SizedBox(height: 8),
-          Expanded(child: _buildBody(pos, formatter, _baseUrl)),
+          ),
+        const SizedBox(height: 8),
+        Expanded(child: _buildBody(pos, formatter, _baseUrl)),
+      ],
+    );
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Point of Sale'),
+        actions: [
+          if (pos.heldCarts.isNotEmpty)
+            IconButton(
+              icon: Badge(
+                label: Text('${pos.heldCarts.length}'),
+                child: const Icon(Icons.pause_circle_outline),
+              ),
+              tooltip: 'Held orders',
+              onPressed: () => _openCart(context),
+            ),
         ],
       ),
-      bottomNavigationBar: pos.cartIsEmpty
+      body: isDesktopOrTabletWide
+          ? Row(
+              children: [
+                Expanded(flex: 6, child: catalogWidget),
+                const VerticalDivider(width: 1),
+                SizedBox(
+                  width: 400,
+                  child: CartSheet(customersRepository: CustomersRepository(context.read<ApiClient>())),
+                ),
+              ],
+            )
+          : catalogWidget,
+      bottomNavigationBar: isDesktopOrTabletWide || pos.cartIsEmpty
           ? null
           : SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: ElevatedButton(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                   onPressed: () => _openCart(context),
-                  child: Text(
-                    'View cart · ${pos.cartCount} item${pos.cartCount == 1 ? '' : 's'} · ${formatter.format(pos.grandTotal)}',
+                  icon: const Icon(Icons.shopping_cart_checkout),
+                  label: Text(
+                    'View Cart · ${pos.cartCount} item${pos.cartCount == 1 ? '' : 's'} · ${formatter.format(pos.grandTotal)}',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

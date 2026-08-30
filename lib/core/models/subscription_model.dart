@@ -17,21 +17,27 @@ class SubscriptionModel {
   });
 
   factory SubscriptionModel.fromJson(Map<String, dynamic> json) {
-    final sub = json['subscription'] as Map<String, dynamic>? ?? {};
-    final usage = json['usage'] as Map<String, dynamic>? ?? {};
+    final sub = json['subscription'] is Map
+        ? Map<String, dynamic>.from(json['subscription'] as Map)
+        : <String, dynamic>{};
+    final usage = json['usage'] is Map
+        ? Map<String, dynamic>.from(json['usage'] as Map)
+        : <String, dynamic>{};
+
     return SubscriptionModel(
-      planName: sub['plan_name'] as String? ?? 'trial',
-      displayName: sub['display_name'] as String? ?? 'Trial',
-      status: sub['status'] as String? ?? 'active',
-      expiresAt: DateTime.tryParse(sub['expires_at'] as String? ?? ''),
-      daysRemaining: (sub['days_remaining'] as num?)?.toInt(),
-      isLifetime: sub['is_lifetime'] as bool? ?? false,
+      planName: sub['plan_name']?.toString() ?? 'trial',
+      displayName: sub['display_name']?.toString() ?? 'Trial',
+      status: sub['status']?.toString() ?? 'active',
+      expiresAt: sub['expires_at'] != null ? DateTime.tryParse(sub['expires_at'].toString()) : null,
+      daysRemaining: sub['days_remaining'] != null ? (sub['days_remaining'] as num).toInt() : null,
+      isLifetime: sub['is_lifetime'] == true || sub['expires_at'] == null,
       productsCount: (usage['products_count'] as num?)?.toInt() ?? 0,
-      productsLimit: usage['products_limit'],
+      productsLimit: usage['products_limit'] ?? 'Unlimited',
       usersCount: (usage['users_count'] as num?)?.toInt() ?? 0,
-      usersLimit: usage['users_limit'],
+      usersLimit: usage['users_limit'] ?? 'Unlimited',
       availablePlans: (json['available_plans'] as List? ?? [])
-          .map((e) => SubscriptionPlan.fromJson(e as Map<String, dynamic>))
+          .whereType<Map>()
+          .map((e) => SubscriptionPlan.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
     );
   }
@@ -62,13 +68,18 @@ class SubscriptionPlan {
   });
 
   factory SubscriptionPlan.fromJson(Map<String, dynamic> json) {
+    final feats = json['features'];
+    final featuresList = feats is List
+        ? feats.map((e) => e.toString()).toList()
+        : <String>[];
+
     return SubscriptionPlan(
-      name: json['name'] as String? ?? '',
-      displayName: json['display_name'] as String? ?? '',
-      price: (json['price'] as num?)?.toDouble() ?? 0,
-      currency: json['currency'] as String? ?? 'USD',
-      billingCycle: json['billing_cycle'] as String?,
-      features: (json['features'] as List? ?? []).map((e) => e.toString()).toList(),
+      name: json['name']?.toString() ?? '',
+      displayName: json['display_name']?.toString() ?? '',
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      currency: json['currency']?.toString() ?? 'USD',
+      billingCycle: json['billing_cycle']?.toString(),
+      features: featuresList,
     );
   }
 

@@ -21,25 +21,76 @@ class ReceiptLine {
 class ThermalPrinterService {
   static const _savedDeviceKey = 'zoom_pos.thermal_printer_mac';
 
-  Future<bool> get bluetoothEnabled => PrintBluetoothThermal.bluetoothEnabled;
+  Future<bool> get bluetoothEnabled async {
+    try {
+      return await PrintBluetoothThermal.bluetoothEnabled.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => false,
+      );
+    } catch (_) {
+      return false;
+    }
+  }
 
-  Future<List<BluetoothInfo>> pairedDevices() => PrintBluetoothThermal.pairedBluetooths;
+  Future<List<BluetoothInfo>> pairedDevices() async {
+    try {
+      return await PrintBluetoothThermal.pairedBluetooths.timeout(
+        const Duration(seconds: 4),
+        onTimeout: () => <BluetoothInfo>[],
+      );
+    } catch (_) {
+      return <BluetoothInfo>[];
+    }
+  }
 
   Future<String?> savedDeviceAddress() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_savedDeviceKey);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_savedDeviceKey);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> saveDefaultDevice(String macAddress) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_savedDeviceKey, macAddress);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_savedDeviceKey, macAddress);
+    } catch (_) {}
   }
 
-  Future<bool> connect(String macAddress) => PrintBluetoothThermal.connect(macPrinterAddress: macAddress);
+  Future<bool> connect(String macAddress) async {
+    try {
+      return await PrintBluetoothThermal.connect(macPrinterAddress: macAddress).timeout(
+        const Duration(seconds: 6),
+        onTimeout: () => false,
+      );
+    } catch (_) {
+      return false;
+    }
+  }
 
-  Future<bool> get isConnected => PrintBluetoothThermal.connectionStatus;
+  Future<bool> get isConnected async {
+    try {
+      return await PrintBluetoothThermal.connectionStatus.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => false,
+      );
+    } catch (_) {
+      return false;
+    }
+  }
 
-  Future<bool> disconnect() => PrintBluetoothThermal.disconnect;
+  Future<bool> disconnect() async {
+    try {
+      return await PrintBluetoothThermal.disconnect.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => false,
+      );
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Formats and sends a simple 80mm receipt. Used for both sales and
   /// quotations — the same data already shown on the PDF/preview.
@@ -53,6 +104,10 @@ class ThermalPrinterService {
     required double total,
     String? customerName,
     String currencySymbol = '\$',
+    String? taxId,
+    String taxLabel = 'Tax',
+    bool isIndia = false,
+    double taxRate = 0,
   }) async {
     final connected = await isConnected;
     if (!connected) {
@@ -70,6 +125,9 @@ class ThermalPrinterService {
       companyName,
       styles: const PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2),
     ));
+    if (taxId != null && taxId.isNotEmpty) {
+      bytes.addAll(generator.text('${isIndia ? 'GSTIN' : 'Tax ID'}: $taxId', styles: const PosStyles(align: PosAlign.center)));
+    }
     bytes.addAll(generator.text(documentLabel, styles: const PosStyles(align: PosAlign.center)));
     if (customerName != null && customerName.isNotEmpty) {
       bytes.addAll(generator.text('Customer: $customerName'));
@@ -91,14 +149,30 @@ class ThermalPrinterService {
     bytes.addAll(generator.hr());
     bytes.addAll(_totalsRow(generator, 'Subtotal', subtotal, currencySymbol));
     if (discount > 0) bytes.addAll(_totalsRow(generator, 'Discount', -discount, currencySymbol));
-    if (tax > 0) bytes.addAll(_totalsRow(generator, 'Tax', tax, currencySymbol));
+    if (tax > 0) {
+      if (isIndia && taxRate > 0) {
+        final halfTax = tax / 2;
+        final halfRate = taxRate / 2;
+        bytes.addAll(_totalsRow(generator, 'CGST (${halfRate.toStringAsFixed(1)}%)', halfTax, currencySymbol));
+        bytes.addAll(_totalsRow(generator, 'SGST (${halfRate.toStringAsFixed(1)}%)', halfTax, currencySymbol));
+      } else {
+        bytes.addAll(_totalsRow(generator, taxLabel, tax, currencySymbol));
+      }
+    }
     bytes.addAll(_totalsRow(generator, 'Total', total, currencySymbol, emphasize: true));
 
     bytes.addAll(generator.feed(2));
     bytes.addAll(generator.text('Thank you!', styles: const PosStyles(align: PosAlign.center)));
     bytes.addAll(generator.cut());
 
-    return PrintBluetoothThermal.writeBytes(bytes);
+    try {
+      return await PrintBluetoothThermal.writeBytes(bytes).timeout(
+        const Duration(seconds: 6),
+        onTimeout: () => false,
+      );
+    } catch (_) {
+      return false;
+    }
   }
 
   List<int> _totalsRow(Generator generator, String label, double value, String currencySymbol, {bool emphasize = false}) {

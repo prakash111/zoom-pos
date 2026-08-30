@@ -28,6 +28,9 @@ class InvoiceActionsData {
     required this.total,
     this.customerName,
     this.currencySymbol = '\$',
+    this.taxId,
+    this.taxLabel = 'Tax',
+    this.isIndia = false,
   });
 
   final String documentType; // 'invoice' | 'quotation'
@@ -41,6 +44,9 @@ class InvoiceActionsData {
   final double total;
   final String? customerName;
   final String currencySymbol;
+  final String? taxId;
+  final String taxLabel;
+  final bool isIndia;
 
   String get _pdfPath =>
       documentType == 'quotation' ? ApiEndpoints.quotationPdf(documentId) : ApiEndpoints.salePdf(documentId);
@@ -62,9 +68,18 @@ Future<void> showInvoiceActionsSheet(BuildContext context, InvoiceActionsData da
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                data.documentNumber,
-                style: Theme.of(sheetContext).textTheme.titleMedium,
+              child: Column(
+                children: [
+                  Text(
+                    data.documentNumber,
+                    style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  if ((data.taxId ?? '').isNotEmpty)
+                    Text(
+                      '${data.isIndia ? 'GSTIN' : 'Tax ID'}: ${data.taxId}',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 8),
@@ -135,6 +150,9 @@ Future<void> _printThermal(BuildContext context, InvoiceActionsData data) async 
     total: data.total,
     customerName: data.customerName,
     currencySymbol: data.currencySymbol,
+    taxId: data.taxId,
+    taxLabel: data.taxLabel,
+    isIndia: data.isIndia,
   );
   messenger.showSnackBar(SnackBar(content: Text(ok ? 'Sent to printer.' : 'Could not reach the printer.')));
 }
