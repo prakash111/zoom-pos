@@ -43,8 +43,32 @@ class ApiClient {
     return _send(() => _dio.get(path, queryParameters: query));
   }
 
+  /// Like [get], but for endpoints that return a raw text body (e.g. the CSV
+  /// report export) instead of the JSON success/data envelope.
+  Future<String> getRaw(String path, {Map<String, dynamic>? query}) async {
+    await _prepare();
+    try {
+      final response = await _dio.get<String>(
+        path,
+        queryParameters: query,
+        options: Options(responseType: ResponseType.plain),
+      );
+      return response.data ?? '';
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
   Future<Map<String, dynamic>> post(String path, {Map<String, dynamic>? data}) {
     return _send(() => _dio.post(path, data: data));
+  }
+
+  Future<Map<String, dynamic>> put(String path, {Map<String, dynamic>? data}) {
+    return _send(() => _dio.put(path, data: data));
+  }
+
+  Future<Map<String, dynamic>> delete(String path) {
+    return _send(() => _dio.delete(path));
   }
 
   Future<Map<String, dynamic>> _send(Future<Response> Function() request) async {

@@ -5,6 +5,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/models/category_model.dart';
 import '../../core/models/customer_model.dart';
 import '../../core/models/product_model.dart';
+import '../cash_register/cash_register_repository.dart';
 import '../inventory/inventory_repository.dart';
 import 'cart_item.dart';
 import 'sales_repository.dart';
@@ -18,12 +19,20 @@ class PosProvider extends ChangeNotifier {
   PosProvider({
     required InventoryRepository inventoryRepository,
     required SalesRepository salesRepository,
+    required CashRegisterRepository cashRegisterRepository,
   })  : _inventoryRepository = inventoryRepository,
-        _salesRepository = salesRepository;
+        _salesRepository = salesRepository,
+        _cashRegisterRepository = cashRegisterRepository;
 
   final InventoryRepository _inventoryRepository;
   final SalesRepository _salesRepository;
+  final CashRegisterRepository _cashRegisterRepository;
   static final Uuid _uuid = Uuid();
+
+  /// Null until the first [checkRegisterStatus] call resolves — the register
+  /// banner and checkout gate stay hidden/permissive until then so a slow
+  /// network doesn't block a cashier who already has a shift open.
+  bool? registerOpen;
 
   CatalogStatus catalogStatus = CatalogStatus.loading;
   String? catalogError;
@@ -68,6 +77,17 @@ class PosProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       catalogError = e.message;
       catalogStatus = CatalogStatus.error;
+    }
+    notifyListeners();
+  }
+
+  Future<void> checkRegisterStatus() async {
+    try {
+      final register = await _cashRegisterRepository.fetchCurrent();
+      registerOpen = register?.isOpen == true;
+    } on ApiException {
+      // Leave registerOpen as-is (null on first load) rather than block
+      // checkout on a transient status-check failure.
     }
     notifyListeners();
   }
@@ -136,6 +156,12 @@ class PosProvider extends ChangeNotifier {
   /// customer/payment method) is only cleared once the server accepts it.
   Future<bool> checkout() async {
     if (_cart.isEmpty) return false;
+
+    if (registerOpen == false) {
+      checkoutError = 'Open a cash register before completing a sale.';
+      notifyListeners();
+      return false;
+    }
 
     isCheckingOut = true;
     checkoutError = null;

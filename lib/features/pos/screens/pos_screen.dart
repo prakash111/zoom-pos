@@ -7,6 +7,9 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../auth/auth_provider.dart';
+import '../../cash_register/cash_register_provider.dart';
+import '../../cash_register/cash_register_repository.dart';
+import '../../cash_register/screens/open_register_sheet.dart';
 import '../../customers/customers_repository.dart';
 import '../../inventory/inventory_repository.dart';
 import '../pos_provider.dart';
@@ -26,7 +29,10 @@ class PosScreen extends StatelessWidget {
       create: (_) => PosProvider(
         inventoryRepository: InventoryRepository(apiClient),
         salesRepository: SalesRepository(apiClient),
-      )..loadCatalog(),
+        cashRegisterRepository: CashRegisterRepository(apiClient),
+      )
+        ..loadCatalog()
+        ..checkRegisterStatus(),
       child: const _PosScreenBody(),
     );
   }
@@ -46,6 +52,23 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _openRegisterPrompt(BuildContext context) async {
+    final apiClient = context.read<ApiClient>();
+    final pos = context.read<PosProvider>();
+
+    await showDialog(
+      context: context,
+      builder: (_) => ChangeNotifierProvider(
+        create: (_) => CashRegisterProvider(repository: CashRegisterRepository(apiClient)),
+        child: const OpenRegisterSheet(),
+      ),
+    );
+
+    if (context.mounted) {
+      await pos.checkRegisterStatus();
+    }
   }
 
   void _openCart(BuildContext context) {
@@ -73,6 +96,23 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
       appBar: AppBar(title: const Text('Point of Sale')),
       body: Column(
         children: [
+          if (pos.registerOpen == false)
+            Container(
+              width: double.infinity,
+              color: Colors.orange.shade50,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_clock_outlined, size: 18, color: Colors.orange.shade800),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('No cash register is open. Sales are blocked until one is opened.')),
+                  TextButton(
+                    onPressed: () => _openRegisterPrompt(context),
+                    child: const Text('Open'),
+                  ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: TextField(

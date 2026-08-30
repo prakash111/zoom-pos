@@ -5,9 +5,13 @@ import '../../core/storage/app_preferences.dart';
 import '../../core/widgets/coming_soon_screen.dart';
 import '../analytics/screens/analytics_screen.dart';
 import '../auth/auth_provider.dart';
+import '../cash_register/screens/cash_register_screen.dart';
 import '../customers/screens/customers_screen.dart';
 import '../inventory/screens/inventory_screen.dart';
+import '../payables/screens/payables_screen.dart';
 import '../pos/screens/pos_screen.dart';
+import '../quotations/screens/quotations_screen.dart';
+import '../reports/screens/reports_screen.dart';
 import '../sales/screens/sales_screen.dart';
 import '../settings/server_settings_screen.dart';
 import '../subscription/screens/subscription_screen.dart';
@@ -27,8 +31,12 @@ class _FeatureTile {
 final List<_FeatureTile> _features = [
   _FeatureTile('Point of Sale', Icons.point_of_sale_outlined, (_) => const PosScreen()),
   _FeatureTile('Sales', Icons.receipt_long_outlined, (_) => const SalesScreen()),
+  _FeatureTile('Quotations', Icons.description_outlined, (_) => const QuotationsScreen()),
   _FeatureTile('Inventory', Icons.inventory_2_outlined, (_) => const InventoryScreen()),
   _FeatureTile('Customers', Icons.people_outline, (_) => const CustomersScreen()),
+  _FeatureTile('Cash Register', Icons.savings_outlined, (_) => const CashRegisterScreen()),
+  _FeatureTile('Payables', Icons.request_quote_outlined, (_) => const PayablesScreen()),
+  _FeatureTile('Reports', Icons.insights_outlined, (_) => const ReportsScreen()),
   _FeatureTile('Taxes', Icons.percent_outlined, (_) => const TaxesScreen()),
   _FeatureTile('Analytics', Icons.bar_chart_outlined, (_) => const AnalyticsScreen()),
   _FeatureTile('Subscription', Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),

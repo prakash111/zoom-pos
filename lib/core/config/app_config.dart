@@ -42,4 +42,27 @@ class ApiEndpoints {
 
   static const String subscription = '/subscription';
   static const String subscriptionRedeem = '/subscription/redeem';
+
+  static const String quotations = '/quotations';
+  static String quotation(String id) => '/quotations/$id';
+  static String quotationConvert(String id) => '/quotations/$id/convert';
+
+  static const String cashRegisterCurrent = '/cash-register/current';
+  static const String cashRegisterOpen = '/cash-register/open';
+  static const String cashRegisterHistory = '/cash-register/history';
+  static String cashRegister(String id) => '/cash-register/$id';
+  static String cashRegisterTransaction(String id) => '/cash-register/$id/transaction';
+  static String cashRegisterClose(String id) => '/cash-register/$id/close';
+
+  static const String payables = '/payables';
+  static String payable(String id) => '/payables/$id';
+  static String payablePay(String id) => '/payables/$id/pay';
+
+  static const String reportsSummary = '/reports/summary';
+  static const String reportsProfitLoss = '/reports/profit-loss';
+  static const String reportsPaymentMethods = '/reports/payment-methods';
+  static const String reportsTillClosings = '/reports/till-closings';
+  static const String reportsCommissions = '/reports/commissions';
+  static const String reportsAging = '/reports/aging';
+  static const String reportsExport = '/reports/export';
 }
