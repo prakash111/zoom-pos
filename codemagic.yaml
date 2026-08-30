@@ -22,7 +22,7 @@ workflows:
 
       - name: Build debug APK
         script: |
-          flutter build apk --debug
+          flutter build apk --debug --android-skip-build-dependency-validation
 
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
@@ -70,11 +70,11 @@ workflows:
 
       - name: Build signed release APK
         script: |
-          flutter build apk --release
+          flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Build signed release App Bundle
         script: |
-          flutter build appbundle --release
+          flutter build appbundle --release --android-skip-build-dependency-validation
 
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
