@@ -1,7 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\V1\CashRegisterApiController;
+use App\Http\Controllers\Api\V1\PayablesApiController;
 use App\Http\Controllers\Api\V1\PosDesktopSyncController;
 use App\Http\Controllers\Api\V1\PosSyncApiController;
+use App\Http\Controllers\Api\V1\QuotationApiController;
+use App\Http\Controllers\Api\V1\ReportsApiController;
 use App\Http\Controllers\Api\V1\TaxApiController;
 use App\Http\Middleware\AuthenticateTenantApi;
 use Illuminate\Support\Facades\Route;
@@ -74,5 +78,37 @@ Route::prefix('v1/pos')->group(function () {
         // Subscription & Billing
         Route::get('/subscription', [PosSyncApiController::class, 'subscription']);
         Route::post('/subscription/redeem', [PosSyncApiController::class, 'subscriptionRedeem']);
+
+        // Quotations (Sale rows with operation_type=quotation)
+        Route::get('/quotations', [QuotationApiController::class, 'index'])->middleware('tenant.api.permission:quotes,view');
+        Route::post('/quotations', [QuotationApiController::class, 'store'])->middleware('tenant.api.permission:quotes,create');
+        Route::get('/quotations/{id}', [QuotationApiController::class, 'show'])->middleware('tenant.api.permission:quotes,view');
+        Route::put('/quotations/{id}', [QuotationApiController::class, 'update'])->middleware('tenant.api.permission:quotes,edit');
+        Route::delete('/quotations/{id}', [QuotationApiController::class, 'destroy'])->middleware('tenant.api.permission:quotes,edit');
+        Route::post('/quotations/{id}/convert', [QuotationApiController::class, 'convert'])->middleware('tenant.api.permission:quotes,edit');
+
+        // Cash Register
+        Route::get('/cash-register/current', [CashRegisterApiController::class, 'current'])->middleware('tenant.api.permission:cash_register,view');
+        Route::post('/cash-register/open', [CashRegisterApiController::class, 'open'])->middleware('tenant.api.permission:cash_register,create');
+        Route::get('/cash-register/history', [CashRegisterApiController::class, 'history'])->middleware('tenant.api.permission:cash_register,view');
+        Route::get('/cash-register/{id}', [CashRegisterApiController::class, 'show'])->middleware('tenant.api.permission:cash_register,view');
+        Route::post('/cash-register/{id}/transaction', [CashRegisterApiController::class, 'recordTransaction'])->middleware('tenant.api.permission:cash_register,edit');
+        Route::post('/cash-register/{id}/close', [CashRegisterApiController::class, 'close'])->middleware('tenant.api.permission:cash_register,edit');
+
+        // Accounts Payable (Vendor Bills)
+        Route::get('/payables', [PayablesApiController::class, 'index'])->middleware('tenant.api.permission:finance,view');
+        Route::post('/payables', [PayablesApiController::class, 'store'])->middleware('tenant.api.permission:finance,create');
+        Route::put('/payables/{id}', [PayablesApiController::class, 'update'])->middleware('tenant.api.permission:finance,edit');
+        Route::delete('/payables/{id}', [PayablesApiController::class, 'destroy'])->middleware('tenant.api.permission:finance,edit');
+        Route::post('/payables/{id}/pay', [PayablesApiController::class, 'pay'])->middleware('tenant.api.permission:finance,edit');
+
+        // Reports (Sales Summary / DRE / Payment Methods / Till Closings / Commissions / Aging + CSV export)
+        Route::get('/reports/summary', [ReportsApiController::class, 'summary'])->middleware('tenant.api.permission:reports,view');
+        Route::get('/reports/profit-loss', [ReportsApiController::class, 'profitLoss'])->middleware('tenant.api.permission:reports,view');
+        Route::get('/reports/payment-methods', [ReportsApiController::class, 'paymentMethods'])->middleware('tenant.api.permission:reports,view');
+        Route::get('/reports/till-closings', [ReportsApiController::class, 'tillClosings'])->middleware('tenant.api.permission:reports,view');
+        Route::get('/reports/commissions', [ReportsApiController::class, 'commissions'])->middleware('tenant.api.permission:reports,view');
+        Route::get('/reports/aging', [ReportsApiController::class, 'aging'])->middleware('tenant.api.permission:reports,view');
+        Route::get('/reports/export', [ReportsApiController::class, 'export'])->middleware('tenant.api.permission:reports,view');
     });
 });
