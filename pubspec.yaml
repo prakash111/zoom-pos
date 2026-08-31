@@ -25,7 +25,19 @@ dependencies:
   sqflite: ^2.4.1
   # FFI-backed sqflite factory for Windows/Linux — see
   # lib/core/storage/sqflite_desktop_init.dart
-  sqflite_common_ffi: ^2.3.4
+  #
+  # Exact-pinned (not ^) to sqflite_common_ffi's last release on the
+  # sqlite3 v2 line. sqlite3 v3+ builds its native library via Dart's
+  # native-assets "build_hooks" system, which is broken on this project's
+  # Windows CI toolchain — flutter_assemble's kernel compile can't resolve
+  # the package path even after the hook itself finishes successfully
+  # (reproduced twice; see the "restore sqflite_common_ffi" and "drop
+  # sqflite_common_ffi" commits). sqlite3 v2 instead expects a plain
+  # sqlite3.dll placed next to the exe, which sqlite3_flutter_libs below
+  # provides as an ordinary bundled Flutter plugin — the same mechanism
+  # every other Windows plugin DLL in this app already goes through.
+  sqflite_common_ffi: 2.3.7+1
+  sqlite3_flutter_libs: ^0.5.42
 
   # Windows desktop window lifecycle (title bar, close-intercept for
   # session auto-logout). No-op on Android — guarded at the call site.
