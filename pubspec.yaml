@@ -27,7 +27,9 @@ dependencies:
   shared_preferences: ^2.3.3
 
   # Utilities
-  intl: ^0.19.0
+  # Pinned by flutter_localizations (SDK) — Flutter's bundled localizations
+  # package requires this exact intl major/minor to resolve.
+  intl: ^0.20.3
   uuid: ^4.5.1
   collection: ^1.18.0
   fl_chart: ^0.69.0
