@@ -56,7 +56,12 @@ jobs:
           "APP_VERSION=$appVersion" >> $env:GITHUB_OUTPUT
 
       - name: Build Windows release
-        run: flutter build windows --release
+        # --verbose is required here: `flutter build windows` normally
+        # swallows the real cmake_install.cmake error and only prints the
+        # generic MSB3073 wrapper (flutter/flutter#154977). With -v the
+        # underlying CMake/MSBuild error (e.g. a plugin's bundled-library
+        # path being wrong, flutter/flutter#143589) is printed to the log.
+        run: flutter build windows --release --verbose
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
