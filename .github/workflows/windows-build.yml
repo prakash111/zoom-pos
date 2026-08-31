@@ -61,46 +61,23 @@ jobs:
           }
 
       - name: Flutter pub get
-        shell: pwsh
-        run: |
-          flutter pub get
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "pub get failed, retrying once..."
-            Start-Sleep -Seconds 5
-            flutter pub get
-          }
+        run: flutter pub get
 
-      - name: Verify resolved packages actually exist on disk
-        # Self-heal for the exact failure seen before: flutter_assemble's
-        # kernel compile fails with "Error when reading .../lib/<pkg>.dart:
-        # The system cannot find the file specified" even though pub get
-        # exited 0 and package_config.json lists the package as resolved.
-        # Read package_config.json, resolve every rootUri to a real path,
-        # and if any is missing on disk, wipe just that cache entry and
-        # re-run pub get so it's forced to re-fetch instead of trusting a
-        # stale/incomplete cache entry.
-        shell: pwsh
+      - name: Repair pub cache and re-resolve
+        # The previous attempt's hand-rolled "does the file exist" check
+        # (parsing package_config.json's rootUri myself) reported nothing
+        # missing, yet flutter_assemble's kernel compile still failed with
+        # "Error when reading .../sqflite_common_ffi.dart: cannot find the
+        # file specified" -- so that check was unreliable (URI handling for
+        # package_config's rootUri is easy to get wrong by hand). Use the
+        # actual sanctioned tool for a corrupted/incompletely-materialized
+        # pub cache instead: `dart pub cache repair` deletes and reinstalls
+        # every package currently in the cache from scratch. Re-run pub get
+        # afterward so package_config.json is regenerated against the
+        # repaired cache.
         run: |
-          $configPath = ".dart_tool\package_config.json"
-          $config = Get-Content $configPath -Raw | ConvertFrom-Json
-          $missing = @()
-          foreach ($pkg in $config.packages) {
-            if ($pkg.rootUri -notlike "file://*") { continue }
-            $path = [System.Uri]::new($pkg.rootUri).LocalPath
-            if (-not (Test-Path $path)) {
-              Write-Host "MISSING on disk: $($pkg.name) -> $path"
-              $missing += $path
-            }
-          }
-          if ($missing.Count -gt 0) {
-            Write-Host "$($missing.Count) package(s) resolved but missing on disk. Clearing and re-fetching..."
-            foreach ($p in $missing) {
-              Remove-Item -Recurse -Force $p -ErrorAction SilentlyContinue
-            }
-            flutter pub get
-          } else {
-            Write-Host "All resolved packages verified present on disk."
-          }
+          dart pub cache repair
+          flutter pub get
 
       - name: Extract app version from pubspec.yaml
         id: version
