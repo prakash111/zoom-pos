@@ -99,6 +99,21 @@ class LocalizationService
             }
         }
 
+        // Priority 1a-api: `Accept-Language` header sent by the mobile app /
+        // other stateless API clients (bearer-token requests carry no
+        // session to read a chosen locale from). Only applied to /api/*
+        // requests so it can't change the browser-session web panel's
+        // locale resolution for a stray Accept-Language header.
+        if (app()->bound('request') && request()->is('api/*')) {
+            $headerLocale = request()->header('Accept-Language');
+            if (! empty($headerLocale) && is_string($headerLocale)) {
+                $primary = strtolower(trim(explode(';', explode(',', $headerLocale)[0])[0]));
+                if ($this->isValidLocale($primary)) {
+                    return $primary;
+                }
+            }
+        }
+
         // Priority 1b: User's explicitly chosen profile locale
         $user = auth('web')->user() ?? auth('platform_web')->user() ?? auth('tenant_api')->user();
         if ($user && ! empty($user->locale) && is_string($user->locale) && $this->isValidLocale($user->locale)) {

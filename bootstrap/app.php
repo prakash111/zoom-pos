@@ -43,7 +43,11 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->group(base_path('routes/sync.php'));
 
             // RESTful E-Invoicing & External Fiscal Tax Engine API (stateless, token/key auth).
-            Route::middleware([EnsureAppIsInstalled::class, CheckMaintenanceMode::class])
+            // SetLocale here honors the mobile app's `Accept-Language` header
+            // (see LocalizationService::getActiveLocale) so validation errors
+            // and any translated strings in API responses match the client's
+            // chosen locale.
+            Route::middleware([EnsureAppIsInstalled::class, CheckMaintenanceMode::class, SetLocale::class])
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
         },

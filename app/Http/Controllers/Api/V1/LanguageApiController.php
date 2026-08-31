@@ -29,6 +29,7 @@ class LanguageApiController extends Controller
             'name' => $l->name,
             'native_name' => $l->native_name,
             'flag' => $l->flag,
+            'direction' => $l->direction ?: 'ltr',
         ]);
 
         return response()->json([
