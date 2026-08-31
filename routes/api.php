@@ -67,6 +67,8 @@ Route::prefix('v1/pos')->group(function () {
         // Inventory Management
         Route::get('/inventory', [PosSyncApiController::class, 'inventoryIndex'])->middleware('tenant.api.permission:products,view');
         Route::post('/inventory/product', [PosSyncApiController::class, 'inventoryStoreProduct'])->middleware('tenant.api.permission:products,create');
+        Route::post('/inventory/product/{id}/image', [PosSyncApiController::class, 'inventoryUploadProductImage'])->middleware('tenant.api.permission:products,edit');
+        Route::post('/inventory/import', [PosSyncApiController::class, 'inventoryBulkImport'])->middleware('tenant.api.permission:products,create');
         Route::post('/inventory/adjust', [PosSyncApiController::class, 'inventoryAdjustStock'])->middleware('tenant.api.permission:products,edit');
 
         // Customer Ledger & Khata
@@ -152,6 +154,10 @@ Route::prefix('v1/pos')->group(function () {
         // Settings: Profile / Receipts / Financial / Notifications / Payment Methods
         Route::get('/settings', [SettingsApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
         Route::put('/settings/profile', [SettingsApiController::class, 'updateProfile'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/settings/profile/logo', [SettingsApiController::class, 'uploadLogo'])->middleware('tenant.api.permission:settings,edit');
+        Route::delete('/settings/profile/logo', [SettingsApiController::class, 'removeLogo'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/settings/profile/favicon', [SettingsApiController::class, 'uploadFavicon'])->middleware('tenant.api.permission:settings,edit');
+        Route::delete('/settings/profile/favicon', [SettingsApiController::class, 'removeFavicon'])->middleware('tenant.api.permission:settings,edit');
         Route::put('/settings/receipts', [SettingsApiController::class, 'updateReceipts'])->middleware('tenant.api.permission:settings,edit');
         Route::put('/settings/financial', [SettingsApiController::class, 'updateFinancial'])->middleware('tenant.api.permission:settings,edit');
         Route::put('/settings/notifications', [SettingsApiController::class, 'updateNotifications'])->middleware('tenant.api.permission:settings,edit');

@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -1516,6 +1517,119 @@ class PosSyncApiController extends Controller
                 'category_name' => $product->category_name,
                 'tax_rate' => (float) $product->tax_rate,
             ],
+        ]);
+    }
+
+    /**
+     * 9b. Inventory Management: Upload Product Image
+     * POST /api/v1/pos/inventory/product/{id}/image
+     */
+    public function inventoryUploadProductImage(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $product = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(function ($q) use ($id) {
+                $q->where('id', $id)->orWhere('external_id', $id);
+            })
+            ->first();
+
+        if (! $product) {
+            return response()->json(['success' => false, 'error' => 'Product not found.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'image' => ['required', 'image', 'max:5120'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error uploading image.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $path = $request->file('image')->store('products', 'public');
+        $product->update(['image_url' => '/storage/'.$path]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Image uploaded successfully.',
+            'image_url' => $product->image_url,
+        ]);
+    }
+
+    /**
+     * 9c. Inventory Management: Bulk Import Products (CSV/TXT)
+     * POST /api/v1/pos/inventory/import
+     */
+    public function inventoryBulkImport(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'file' => ['required', 'file', 'max:10240', 'extensions:csv,txt'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error importing file.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension());
+        $contents = (string) file_get_contents($file->getRealPath());
+
+        $lines = preg_split('/\R/', $contents, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $rows = array_map(
+            fn ($line) => $extension === 'csv' ? str_getcsv($line) : array_map('trim', explode('|', $line)),
+            $lines
+        );
+        if ($rows && strtolower(trim((string) ($rows[0][0] ?? ''))) === 'name') {
+            array_shift($rows);
+        }
+
+        $imported = 0;
+
+        DB::transaction(function () use ($rows, $company, &$imported) {
+            foreach ($rows as $row) {
+                if (count($row) < 2 || blank($row[0] ?? null)) {
+                    continue;
+                }
+                $categoryName = trim($row[1] ?: 'General');
+                $category = Category::withoutGlobalScope('company')
+                    ->firstOrCreate(['company_id' => $company->id, 'name' => $categoryName], ['active' => true]);
+
+                Product::create([
+                    'company_id' => $company->id,
+                    'name' => trim($row[0]),
+                    'category_id' => $category->id,
+                    'category_name' => $category->name,
+                    'code' => filled($row[2] ?? null) ? trim($row[2]) : 'SKU-'.random_int(100000, 999999),
+                    'barcode' => filled($row[3] ?? null) ? trim($row[3]) : null,
+                    'cost_price' => (float) ($row[4] ?? 0),
+                    'sale_price' => (float) ($row[5] ?? 0),
+                    'current_stock' => (float) ($row[6] ?? 0),
+                    'minimum_stock' => 0,
+                    'active' => true,
+                    'taxable' => true,
+                ]);
+                $imported++;
+            }
+        });
+
+        AuditLog::record('inventory.bulk_imported', $company->id, $user?->id, ['imported' => $imported]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$imported} product(s) imported.",
+            'imported' => $imported,
         ]);
     }
 

@@ -11,6 +11,7 @@ use App\Models\PaymentMethod;
 use App\Services\Invoice\InvoiceDeliveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -84,6 +85,90 @@ class SettingsApiController extends Controller
         AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'profile']);
 
         return response()->json(['success' => true, 'message' => 'Profile saved.', 'profile' => $this->presentProfile($company->fresh())]);
+    }
+
+    /**
+     * POST /api/v1/pos/settings/profile/logo
+     */
+    public function uploadLogo(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'logo' => ['required', 'file', 'image', 'mimes:jpeg,png,jpg,webp,svg', 'max:2048'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
+        }
+
+        $path = $request->file('logo')->store('tenant-logos', 'public');
+        $company->update(['logo' => Storage::url($path)]);
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'logo']);
+
+        return response()->json(['success' => true, 'message' => 'Logo uploaded.', 'logo_url' => $company->fresh()->getLogoUrl()]);
+    }
+
+    /**
+     * DELETE /api/v1/pos/settings/profile/logo
+     */
+    public function removeLogo(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        if ($company->logo && ! filter_var($company->logo, FILTER_VALIDATE_URL)) {
+            $cleanPath = preg_replace('#^/?storage/#', '', $company->logo);
+            Storage::disk('public')->delete($cleanPath);
+        }
+
+        $company->update(['logo' => null]);
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'logo_removed']);
+
+        return response()->json(['success' => true, 'message' => 'Logo removed.']);
+    }
+
+    /**
+     * POST /api/v1/pos/settings/profile/favicon
+     */
+    public function uploadFavicon(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'favicon' => ['required', 'file', 'mimes:png,ico,svg,jpg,jpeg,webp', 'max:1024'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
+        }
+
+        $path = $request->file('favicon')->store('tenant-favicons', 'public');
+        $company->update(['favicon' => Storage::url($path)]);
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'favicon']);
+
+        return response()->json(['success' => true, 'message' => 'Favicon uploaded.', 'favicon_url' => $company->fresh()->getFaviconUrl()]);
+    }
+
+    /**
+     * DELETE /api/v1/pos/settings/profile/favicon
+     */
+    public function removeFavicon(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        if ($company->favicon && ! filter_var($company->favicon, FILTER_VALIDATE_URL)) {
+            $cleanPath = preg_replace('#^/?storage/#', '', $company->favicon);
+            Storage::disk('public')->delete($cleanPath);
+        }
+
+        $company->update(['favicon' => null]);
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'favicon_removed']);
+
+        return response()->json(['success' => true, 'message' => 'Favicon removed.']);
     }
 
     public function updateReceipts(Request $request): JsonResponse
@@ -363,6 +448,8 @@ class SettingsApiController extends Controller
             'postal_code' => $company->postal_code ?? '',
             'country' => $company->country ?? 'US',
             'primary_color' => $company->primary_color ?: '#2563eb',
+            'logo_url' => $company->getLogoUrl(),
+            'favicon_url' => $company->getFaviconUrl(),
             'default_commission_rate' => (float) ($company->default_commission_rate ?? 0),
             'default_commission_type' => $company->default_commission_type ?: 'percentage',
         ];
