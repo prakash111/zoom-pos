@@ -24,6 +24,7 @@ use App\Services\Delivery\MessageQueueService;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Payment\SubscriptionPaymentGatewayService;
 use App\Services\Tenancy\TenantProvisioningService;
+use App\Services\TaxEngineService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -779,6 +780,7 @@ class PosSyncApiController extends Controller
 
                 $items = (array) ($saleData['items'] ?? []);
                 $normalizedItems = [];
+                $rateItems = [];
                 $calcSubtotal = 0;
 
                 foreach ($items as $item) {
@@ -800,6 +802,7 @@ class PosSyncApiController extends Controller
                     ];
 
                     // Decrement Stock in Cloud Database
+                    $product = null;
                     if ($productId) {
                         $product = Product::query()
                             ->withoutGlobalScope('company')
@@ -814,6 +817,18 @@ class PosSyncApiController extends Controller
                             $product->decrementStock($qty, "POS Offline Sync Sale #{$clientUuid}");
                         }
                     }
+
+                    // The product's own tax_rate is authoritative (it's what the POS
+                    // cart used to compute this line's tax); fall back to whatever
+                    // rate the client attached to the item itself.
+                    $itemTaxRate = (float) ($product->tax_rate ?? $item['tax_rate'] ?? 0);
+                    if ($itemTaxRate > 0) {
+                        $rateItems[] = [
+                            'rate' => $itemTaxRate,
+                            'taxable' => $lineTotal,
+                            'amount' => round($lineTotal * $itemTaxRate / 100, 2),
+                        ];
+                    }
                 }
 
                 $total = (float) ($saleData['total'] ?? $calcSubtotal);
@@ -821,6 +836,21 @@ class PosSyncApiController extends Controller
                 $taxAmount = (float) ($saleData['tax_amount'] ?? 0);
                 $taxName = $saleData['tax_name'] ?? null;
                 $taxRate = (float) ($saleData['tax_rate'] ?? 0);
+                $taxBreakdown = null;
+
+                if (! empty($rateItems)) {
+                    $taxBreakdown = TaxEngineService::buildTaxSummaryFromRates(
+                        $rateItems,
+                        TaxEngineService::isIndia($company),
+                        (string) ($taxName ?? '')
+                    );
+                    $firstTax = $taxBreakdown[0] ?? null;
+                    if ($firstTax) {
+                        $taxName = $firstTax['tax_name'];
+                        $taxRate = (float) $firstTax['rate'];
+                    }
+                }
+
                 $paymentMethod = $saleData['payment_method'] ?? 'cash';
                 $orderNumber = $saleData['order_number'] ?? $saleData['sale_number'] ?? ('POS-'.strtoupper(substr($clientUuid, 0, 8)));
                 $createdAt = isset($saleData['createdAt']) ? Carbon::parse($saleData['createdAt']) : now();
@@ -868,6 +898,7 @@ class PosSyncApiController extends Controller
                     'tax_amount' => $taxAmount,
                     'tax_name' => $taxName,
                     'tax_rate' => $taxRate,
+                    'tax_breakdown' => $taxBreakdown,
                     'payment_method' => $paymentMethod,
                     'status' => 'completed',
                     'payment_status' => $paymentStatus,

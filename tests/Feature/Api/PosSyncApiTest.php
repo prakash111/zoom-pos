@@ -514,6 +514,103 @@ class PosSyncApiTest extends TestCase
         $this->assertEquals(1, Sale::where('external_id', $clientSaleUuid)->count());
     }
 
+    /**
+     * Regression test: a synced sale's tax_rate/tax_name must be derived
+     * from its line items' product tax_rate, not left at 0/null — otherwise
+     * the printed receipt shows "Tax (0%)" even though tax_amount is
+     * correct (see TaxEngineService::buildTaxSummaryFromRates).
+     */
+    public function test_pos_sync_sales_push_computes_tax_rate_and_breakdown_from_product_tax_rate(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Imported Cheese',
+            'sale_price' => 10.00,
+            'tax_rate' => 8.25,
+            'current_stock' => 30,
+            'active' => true,
+        ]);
+
+        $clientSaleUuid = Str::uuid()->toString();
+
+        $payload = [
+            'sales' => [
+                [
+                    'id' => $clientSaleUuid,
+                    'order_number' => 'POS-TAX01',
+                    'total' => 10.83,
+                    'discount' => 0.00,
+                    'tax_amount' => 0.83,
+                    'payment_method' => 'cash',
+                    'items' => [
+                        [
+                            'id' => $product->id,
+                            'name' => 'Imported Cheese',
+                            'price' => 10.00,
+                            'quantity' => 1,
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiKey->token,
+        ])->postJson('/api/v1/pos/sync-sales', $payload)->assertStatus(200);
+
+        $sale = Sale::where('external_id', $clientSaleUuid)->firstOrFail();
+        $this->assertEquals(8.25, (float) $sale->tax_rate);
+        $this->assertNotEmpty($sale->tax_name);
+        $this->assertNotEmpty($sale->tax_breakdown);
+        $this->assertEquals(8.25, (float) $sale->tax_breakdown[0]['rate']);
+    }
+
+    /** Same fix, for the sale a converted quotation produces. */
+    public function test_quotation_store_and_convert_compute_tax_from_product_tax_rate(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Consulting Hour',
+            'sale_price' => 100.00,
+            'tax_rate' => 18,
+            'current_stock' => 999,
+            'active' => true,
+        ]);
+
+        $storeResponse = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiKey->token,
+        ])->postJson('/api/v1/pos/quotations', [
+            'customer_name' => 'Walk-in Client',
+            'items' => [
+                [
+                    'id' => $product->id,
+                    'product_id' => $product->id,
+                    'name' => 'Consulting Hour',
+                    'price' => 100.00,
+                    'quantity' => 1,
+                ],
+            ],
+        ]);
+
+        $storeResponse->assertStatus(201);
+        $this->assertEquals(18.0, (float) $storeResponse->json('quotation.tax_rate'));
+        $this->assertEquals(18.0, (float) $storeResponse->json('quotation.tax'));
+
+        $quoteId = $storeResponse->json('quotation.id');
+        $quote = Sale::where('external_id', $quoteId)->firstOrFail();
+        $this->assertNotEmpty($quote->tax_breakdown);
+        $this->assertEquals(18.0, (float) $quote->tax_rate);
+
+        $convertResponse = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiKey->token,
+        ])->postJson("/api/v1/pos/quotations/{$quoteId}/convert");
+
+        $convertResponse->assertStatus(200);
+        $sale = Sale::where('id', $convertResponse->json('sale.server_id'))->firstOrFail();
+        $this->assertEquals(18.0, (float) $sale->tax_rate);
+        $this->assertNotEmpty($sale->tax_breakdown);
+    }
+
     public function test_inventory_management_endpoints(): void
     {
         // 1. Create Product

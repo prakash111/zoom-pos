@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Services\TaxEngineService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -79,6 +80,7 @@ class QuotationApiController extends Controller
             'items.*.name' => ['required', 'string'],
             'items.*.price' => ['required', 'numeric', 'min:0'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.001'],
+            'items.*.tax_rate' => ['nullable', 'numeric', 'min:0'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'tax' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -98,10 +100,10 @@ class QuotationApiController extends Controller
         $data = $validator->validated();
         [$customerId, $customerName] = $this->resolveCustomer($company, $data);
 
-        $items = $this->normalizeItems($data['items']);
+        $items = $this->resolveItems($company, $data['items']);
         $subtotal = array_sum(array_column($items, 'total'));
         $discount = (float) ($data['discount'] ?? 0);
-        $tax = (float) ($data['tax'] ?? 0);
+        [$tax, $taxName, $taxRate, $taxBreakdown] = $this->computeTax($items, TaxEngineService::isIndia($company), (float) ($data['tax'] ?? 0));
         $total = max(0, $subtotal - $discount + $tax);
 
         $quote = Sale::create([
@@ -115,6 +117,9 @@ class QuotationApiController extends Controller
             'net_amount' => max(0, $total - $discount),
             'discount' => $discount,
             'tax_amount' => $tax,
+            'tax_name' => $taxName,
+            'tax_rate' => $taxRate,
+            'tax_breakdown' => $taxBreakdown,
             'status' => 'draft',
             'operation_type' => 'quotation',
             'notes' => $data['notes'] ?? null,
@@ -151,6 +156,7 @@ class QuotationApiController extends Controller
             'items.*.name' => ['required', 'string'],
             'items.*.price' => ['required', 'numeric', 'min:0'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.001'],
+            'items.*.tax_rate' => ['nullable', 'numeric', 'min:0'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'tax' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -170,10 +176,10 @@ class QuotationApiController extends Controller
         $data = $validator->validated();
         [$customerId, $customerName] = $this->resolveCustomer($company, $data);
 
-        $items = $this->normalizeItems($data['items']);
+        $items = $this->resolveItems($company, $data['items']);
         $subtotal = array_sum(array_column($items, 'total'));
         $discount = (float) ($data['discount'] ?? 0);
-        $tax = (float) ($data['tax'] ?? 0);
+        [$tax, $taxName, $taxRate, $taxBreakdown] = $this->computeTax($items, TaxEngineService::isIndia($company), (float) ($data['tax'] ?? 0));
         $total = max(0, $subtotal - $discount + $tax);
 
         $quote->update([
@@ -183,6 +189,9 @@ class QuotationApiController extends Controller
             'net_amount' => max(0, $total - $discount),
             'discount' => $discount,
             'tax_amount' => $tax,
+            'tax_name' => $taxName,
+            'tax_rate' => $taxRate,
+            'tax_breakdown' => $taxBreakdown,
             'status' => $data['status'] ?? $quote->status,
             'notes' => $data['notes'] ?? $quote->notes,
             'terms' => $data['terms'] ?? $quote->terms,
@@ -262,6 +271,9 @@ class QuotationApiController extends Controller
                 'net_amount' => $quote->net_amount,
                 'discount' => $quote->discount,
                 'tax_amount' => $quote->tax_amount,
+                'tax_name' => $quote->tax_name,
+                'tax_rate' => $quote->tax_rate,
+                'tax_breakdown' => $quote->tax_breakdown,
                 'status' => 'completed',
                 'payment_status' => 'paid',
                 'paid_amount' => $quote->total,
@@ -351,22 +363,80 @@ class QuotationApiController extends Controller
         return [$customerId, $customerName];
     }
 
-    private function normalizeItems(array $items): array
+    /**
+     * Resolve each item's product once (if it has one), attaching the
+     * product's own tax_rate (falling back to whatever rate the client
+     * attached to an ad-hoc item without a product_id) so both the
+     * normalized, persisted item shape and the tax breakdown below are
+     * built from a single consistent lookup instead of two.
+     */
+    private function resolveItems(Company $company, array $items): array
     {
-        return array_map(function ($item) {
+        return array_map(function ($item) use ($company) {
             $qty = (float) ($item['quantity'] ?? 1);
             $price = (float) ($item['price'] ?? 0);
-            $lineTotal = round($qty * $price, 2);
+            $productId = $item['id'] ?? $item['product_id'] ?? null;
+
+            $product = null;
+            if ($productId) {
+                $product = Product::query()
+                    ->withoutGlobalScope('company')
+                    ->where('company_id', $company->id)
+                    ->where(function ($q) use ($productId) {
+                        $q->where('id', $productId)->orWhere('external_id', (string) $productId);
+                    })
+                    ->first();
+            }
 
             return [
-                'id' => $item['id'] ?? $item['product_id'] ?? null,
-                'product_id' => $item['id'] ?? $item['product_id'] ?? null,
+                'id' => $productId,
+                'product_id' => $productId,
                 'name' => $item['name'] ?? 'Item',
                 'price' => $price,
                 'quantity' => $qty,
-                'total' => $lineTotal,
+                'total' => round($qty * $price, 2),
+                'tax_rate' => (float) ($product->tax_rate ?? $item['tax_rate'] ?? 0),
             ];
         }, $items);
+    }
+
+    /**
+     * Group already-resolved items (see [resolveItems]) by their tax rate
+     * into the tax_breakdown shape the PDF/receipt templates render — the
+     * same approach PosSyncApiController::processSalesBatch uses for POS
+     * sales. This is what lets a quotation's printed tax rate reflect its
+     * line items' actual assigned product tax rules instead of the flat
+     * manual "Tax" amount this endpoint used to accept as its only input.
+     *
+     * @return array{0: float, 1: ?string, 2: float, 3: ?array} [tax_amount, tax_name, tax_rate, tax_breakdown]
+     */
+    private function computeTax(array $resolvedItems, bool $isIndia, float $fallbackTax): array
+    {
+        $rateItems = [];
+
+        foreach ($resolvedItems as $item) {
+            $rate = (float) ($item['tax_rate'] ?? 0);
+            if ($rate > 0) {
+                $rateItems[] = [
+                    'rate' => $rate,
+                    'taxable' => (float) $item['total'],
+                    'amount' => round((float) $item['total'] * $rate / 100, 2),
+                ];
+            }
+        }
+
+        if (empty($rateItems)) {
+            // No item carries a resolvable tax rate — preserve the legacy
+            // flat manual "Tax" amount behavior rather than silently
+            // zeroing it out.
+            return [$fallbackTax, null, 0.0, null];
+        }
+
+        $breakdown = TaxEngineService::buildTaxSummaryFromRates($rateItems, $isIndia, '');
+        $taxAmount = round((float) array_sum(array_column($breakdown, 'tax_amount')), 2);
+        $firstTax = $breakdown[0] ?? null;
+
+        return [$taxAmount, $firstTax['tax_name'] ?? null, (float) ($firstTax['rate'] ?? 0), $breakdown];
     }
 
     private function nextQuoteNumber(Company $company): string
@@ -389,6 +459,8 @@ class QuotationApiController extends Controller
             'items' => $items,
             'discount' => (float) ($quote->discount ?? 0),
             'tax' => (float) ($quote->tax_amount ?? 0),
+            'tax_name' => $quote->tax_name,
+            'tax_rate' => (float) ($quote->tax_rate ?? 0),
             'total' => (float) ($quote->total ?? 0),
             'notes' => $quote->notes ?? '',
             'terms' => $quote->terms ?? '',
