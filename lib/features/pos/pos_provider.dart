@@ -195,6 +195,9 @@ class PosProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       catalogError = e.message;
       catalogStatus = CatalogStatus.error;
+    } catch (e) {
+      catalogError = e.toString();
+      catalogStatus = CatalogStatus.error;
     }
     notifyListeners();
   }
