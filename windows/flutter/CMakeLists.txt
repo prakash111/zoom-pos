@@ -60,6 +60,7 @@ add_library(flutter_wrapper_app STATIC
   ${CPP_WRAPPER_SOURCES_APP}
   ${CPP_WRAPPER_SOURCES_CORE}
 )
+apply_standard_settings(flutter_wrapper_app)
 target_link_libraries(flutter_wrapper_app PUBLIC flutter)
 target_include_directories(flutter_wrapper_app PUBLIC
   "${WRAPPER_ROOT}/include"
@@ -71,6 +72,7 @@ add_library(flutter_wrapper_plugin STATIC
   ${CPP_WRAPPER_SOURCES_PLUGIN}
   ${CPP_WRAPPER_SOURCES_CORE}
 )
+apply_standard_settings(flutter_wrapper_plugin)
 target_link_libraries(flutter_wrapper_plugin PUBLIC flutter)
 target_include_directories(flutter_wrapper_plugin PUBLIC
   "${WRAPPER_ROOT}/include"
