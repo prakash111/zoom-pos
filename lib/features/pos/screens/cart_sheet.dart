@@ -9,6 +9,7 @@ import '../../auth/auth_provider.dart';
 import '../../customers/customers_repository.dart';
 import '../pos_provider.dart';
 import 'customer_picker_sheet.dart';
+import 'invoice_preview_screen.dart';
 
 /// The modernized POS Cart & Checkout sheet supporting dynamic payment options,
 /// action pills (Hold, Customer, Note, More), and country-wise GST tax breakdown.
@@ -44,25 +45,34 @@ class CartSheet extends StatelessWidget {
             Text('Order Notes & Remarks'),
           ],
         ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         content: TextField(
           controller: controller,
           maxLines: 3,
           autofocus: true,
           decoration: const InputDecoration(
             hintText: 'e.g. Special packaging, delivery note, invoice memo',
+            border: OutlineInputBorder(),
           ),
         ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              pos.setOrderNotes(controller.text.trim());
-              Navigator.of(dialogCtx).pop();
-            },
-            child: const Text('Save Note'),
+          OverflowBar(
+            spacing: 8,
+            overflowSpacing: 8,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  pos.setOrderNotes(controller.text.trim());
+                  Navigator.of(dialogCtx).pop();
+                },
+                child: const Text('Save Note'),
+              ),
+            ],
           ),
         ],
       ),
@@ -87,6 +97,7 @@ class CartSheet extends StatelessWidget {
               Text('Apply Discount'),
             ],
           ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -122,26 +133,33 @@ class CartSheet extends StatelessWidget {
               ),
             ],
           ),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           actions: [
-            if (pos.customDiscount > 0)
-              TextButton(
-                onPressed: () {
-                  pos.setDiscount(0);
-                  Navigator.of(dialogCtx).pop();
-                },
-                child: const Text('Remove Discount', style: TextStyle(color: Colors.red)),
-              ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final val = double.tryParse(controller.text.trim()) ?? 0.0;
-                pos.setDiscount(val, isPercent: isPercent);
-                Navigator.of(dialogCtx).pop();
-              },
-              child: const Text('Apply'),
+            OverflowBar(
+              spacing: 8,
+              overflowSpacing: 8,
+              children: [
+                if (pos.customDiscount > 0)
+                  TextButton(
+                    onPressed: () {
+                      pos.setDiscount(0);
+                      Navigator.of(dialogCtx).pop();
+                    },
+                    child: const Text('Remove Discount', style: TextStyle(color: Colors.red)),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final val = double.tryParse(controller.text.trim()) ?? 0.0;
+                    pos.setDiscount(val, isPercent: isPercent);
+                    Navigator.of(dialogCtx).pop();
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
             ),
           ],
         ),
@@ -231,6 +249,34 @@ class CartSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _previewThenCheckout(BuildContext context) async {
+    final pos = context.read<PosProvider>();
+    final company = context.read<AuthProvider>().company;
+    final isIndia = company?.isIndia ?? false;
+
+    final confirmed = await showInvoicePreview(
+      context,
+      InvoicePreviewData(
+        documentType: 'Invoice',
+        companyName: company?.tradeName ?? company?.name ?? '',
+        items: pos.cartItems,
+        subtotal: pos.subtotal,
+        discount: pos.discount,
+        taxTotal: pos.taxTotal,
+        grandTotal: pos.grandTotal,
+        customerName: pos.selectedCustomer?.name,
+        notes: pos.orderNotes,
+        currencySymbol: company?.currencySymbol ?? '\$',
+        taxId: company?.taxId,
+        taxLabel: company?.taxLabel ?? 'Tax',
+        isIndia: isIndia,
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+    await _checkout(context);
   }
 
   Future<void> _checkout(BuildContext context) async {
@@ -492,52 +538,27 @@ class CartSheet extends StatelessWidget {
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
                     ),
                     const SizedBox(height: 6),
-                    SizedBox(
-                      height: 42,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: activeMethods.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, idx) {
-                          final method = activeMethods[idx];
-                          final code = method.code.isNotEmpty ? method.code : method.id;
-                          final isSelected = pos.paymentMethod == code || pos.paymentMethod == method.id;
-                          final methodColor = _colorForMethod(code, primaryColor);
-                          final methodIcon = _iconForMethod(code);
-
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(10),
-                            onTap: () => pos.setPaymentMethod(code),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 150),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected ? methodColor.withOpacity(0.15) : Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isSelected ? methodColor : Colors.grey.shade300,
-                                  width: isSelected ? 2 : 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(methodIcon, size: 18, color: isSelected ? methodColor : Colors.grey.shade700),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    method.name,
-                                    style: TextStyle(
-                                      color: isSelected ? methodColor : Colors.grey.shade800,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                    // A Wrap instead of a fixed-height horizontal scroller —
+                    // with 4-5 payment methods this app's default set (or a
+                    // tenant's longer custom list) doesn't reliably fit one
+                    // row width, and a scroller left the last method (e.g.
+                    // "UPI") visually clipped to a single letter with no
+                    // scroll affordance. Wrapping to a second line keeps
+                    // every method visible without requiring a swipe.
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final method in activeMethods)
+                          _PaymentMethodChip(
+                            method: method,
+                            isSelected: pos.paymentMethod == (method.code.isNotEmpty ? method.code : method.id) ||
+                                pos.paymentMethod == method.id,
+                            color: _colorForMethod(method.code.isNotEmpty ? method.code : method.id, primaryColor),
+                            icon: _iconForMethod(method.code.isNotEmpty ? method.code : method.id),
+                            onTap: () => pos.setPaymentMethod(method.code.isNotEmpty ? method.code : method.id),
+                          ),
+                      ],
                     ),
 
                     const SizedBox(height: 12),
@@ -614,7 +635,7 @@ class CartSheet extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: pos.cartIsEmpty || pos.isCheckingOut ? null : () => _checkout(context),
+                      onPressed: pos.cartIsEmpty || pos.isCheckingOut ? null : () => _previewThenCheckout(context),
                       child: pos.isCheckingOut
                           ? const SizedBox(
                               height: 22,
@@ -640,6 +661,57 @@ class CartSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _PaymentMethodChip extends StatelessWidget {
+  const _PaymentMethodChip({
+    required this.method,
+    required this.isSelected,
+    required this.color,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final PaymentMethodModel method;
+  final bool isSelected;
+  final Color color;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.15) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: isSelected ? color : Colors.grey.shade700),
+            const SizedBox(width: 6),
+            Text(
+              method.name,
+              style: TextStyle(
+                color: isSelected ? color : Colors.grey.shade800,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

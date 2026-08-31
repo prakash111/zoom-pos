@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/models/product_model.dart';
+import '../../../core/services/sync/sync_engine.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/image_url.dart';
@@ -34,6 +35,7 @@ class PosScreen extends StatelessWidget {
     final apiClient = context.read<ApiClient>();
 
     final heldCartsStore = context.read<HeldCartsStore>();
+    final syncEngine = context.read<SyncEngine>();
 
     return ChangeNotifierProvider(
       create: (_) => PosProvider(
@@ -41,6 +43,7 @@ class PosScreen extends StatelessWidget {
         salesRepository: SalesRepository(apiClient),
         cashRegisterRepository: CashRegisterRepository(apiClient),
         heldCartsStore: heldCartsStore,
+        syncEngine: syncEngine,
       )
         ..loadCatalog()
         ..checkRegisterStatus(),
@@ -117,6 +120,17 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     );
 
     if (result == null || !context.mounted) return;
+
+    if (result.isPendingSync) {
+      // No server-side sale exists yet to preview/print/share — it's only
+      // created once the outbox pushes successfully — so skip straight past
+      // the invoice actions sheet instead of pointing it at a document id
+      // the server doesn't have.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).saleQueuedOffline)),
+      );
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).saleCompleted)));
     await showInvoiceActionsSheet(

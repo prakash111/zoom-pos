@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/config/nav_dock_provider.dart';
 import '../../../core/config/tax_jurisdictions.dart';
 import '../../../core/config/theme.dart';
 import '../../../core/config/theme_provider.dart';
@@ -33,11 +34,13 @@ const List<Color> _brandColorSwatches = [
   Color(0xFF334155), // slate
 ];
 
-const _tabs = ['Profile', 'Receipts', 'Financial', 'Notifications'];
+const _tabs = ['Profile', 'Receipts', 'Financial', 'Notifications', 'Appearance'];
 
 /// Tenant Settings: Profile / Receipts / Financial / Notifications, mirroring
 /// those tabs on the web Settings page (Mode and API/AI-config tabs are out
-/// of scope for mobile). Each tab saves its own section independently.
+/// of scope for mobile), plus a mobile-only Appearance tab for local
+/// workspace preferences (the nav dock layout). Each tab saves its own
+/// section independently.
 class TenantSettingsScreen extends StatefulWidget {
   const TenantSettingsScreen({super.key});
 
@@ -66,37 +69,93 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen> with Single
 
   void _reload() => setState(() => _future = _repository.fetchAll());
 
+  /// Wraps one server-backed tab in its own [FutureBuilder] over the shared
+  /// [_future] — each tab gets its own loading/error state instead of one
+  /// failed fetch blanking every tab, which matters now that Appearance
+  /// (below) is a purely local, always-available tab in the same bar.
+  Widget _serverTab(Widget Function(TenantSettingsBundle bundle) builder) {
+    return FutureBuilder<TenantSettingsBundle>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) return const LoadingIndicator();
+        if (snapshot.hasError) {
+          final message = snapshot.error is ApiException ? (snapshot.error as ApiException).message : 'Could not load settings.';
+          return ErrorView(message: message, onRetry: _reload);
+        }
+        return builder(snapshot.data!);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final tabLabels = [l10n.tabProfile, l10n.tabReceipts, l10n.tabFinancial, l10n.tabNotifications];
+    final tabLabels = [l10n.tabProfile, l10n.tabReceipts, l10n.tabFinancial, l10n.tabNotifications, l10n.tabAppearance];
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.settingsTitle),
         bottom: TabBar(controller: _tabController, isScrollable: true, tabs: [for (final t in tabLabels) Tab(text: t)]),
       ),
-      body: FutureBuilder<TenantSettingsBundle>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) return const LoadingIndicator();
-          if (snapshot.hasError) {
-            final message = snapshot.error is ApiException ? (snapshot.error as ApiException).message : 'Could not load settings.';
-            return ErrorView(message: message, onRetry: _reload);
-          }
-
-          final bundle = snapshot.data!;
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              _ProfileTab(repository: _repository, initial: bundle.profile),
-              _ReceiptsTab(repository: _repository, initial: bundle.receipts),
-              _FinancialTab(repository: _repository, initial: bundle.financial),
-              _NotificationsTab(repository: _repository, initial: bundle.notifications),
-            ],
-          );
-        },
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _serverTab((bundle) => _ProfileTab(repository: _repository, initial: bundle.profile)),
+          _serverTab((bundle) => _ReceiptsTab(repository: _repository, initial: bundle.receipts)),
+          _serverTab((bundle) => _FinancialTab(repository: _repository, initial: bundle.financial)),
+          _serverTab((bundle) => _NotificationsTab(repository: _repository, initial: bundle.notifications)),
+          // A per-device workspace preference, not a tenant setting — never
+          // gated behind the server fetch above, so it's reachable offline.
+          const _AppearanceTab(),
+        ],
       ),
+    );
+  }
+}
+
+/// Settings > Appearance — the navigation-dock layout preference from the
+/// desktop-parity spec. Purely local (SharedPreferences via
+/// [NavDockProvider]), nothing here is synced to the server.
+class _AppearanceTab extends StatelessWidget {
+  const _AppearanceTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final navDock = context.watch<NavDockProvider>();
+
+    final options = <(NavDockPosition, IconData, String)>[
+      (NavDockPosition.left, Icons.arrow_back, l10n.navDockLeft),
+      (NavDockPosition.top, Icons.arrow_upward, l10n.navDockTop),
+      (NavDockPosition.right, Icons.arrow_forward, l10n.navDockRight),
+      (NavDockPosition.bottom, Icons.arrow_downward, l10n.navDockBottom),
+    ];
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(l10n.navDockTitle, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(l10n.navDockDescription, style: TextStyle(color: Colors.grey.shade600)),
+        const SizedBox(height: 12),
+        Card(
+          margin: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (final option in options)
+                RadioListTile<NavDockPosition>(
+                  value: option.$1,
+                  groupValue: navDock.position,
+                  onChanged: (value) {
+                    if (value != null) navDock.setPosition(value);
+                  },
+                  secondary: Icon(option.$2),
+                  title: Text(option.$3),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

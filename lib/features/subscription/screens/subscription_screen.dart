@@ -317,75 +317,82 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           final subscription = snapshot.data!;
           return RefreshIndicator(
             onRefresh: () async => _reload(),
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _PlanCard(subscription: subscription),
-                const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Usage', style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 12),
-                        _UsageRow(label: 'Products', count: subscription.productsCount, limit: subscription.productsLimit),
+            // Constrained and centered so the activation-code field and plan
+            // cards don't stretch edge-to-edge on a wide desktop window.
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _PlanCard(subscription: subscription),
+                    const SizedBox(height: 16),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Usage', style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 12),
+                            _UsageRow(label: 'Products', count: subscription.productsCount, limit: subscription.productsLimit),
+                            const SizedBox(height: 8),
+                            _UsageRow(label: 'Users', count: subscription.usersCount, limit: subscription.usersLimit),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Redeem activation code', style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _codeController,
+                              textCapitalization: TextCapitalization.characters,
+                              decoration: const InputDecoration(labelText: 'Activation code'),
+                            ),
+                            if (_redeemError != null) ...[
+                              const SizedBox(height: 8),
+                              Text(_redeemError!, style: TextStyle(color: Colors.red.shade400)),
+                            ],
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: _isRedeeming ? null : _redeem,
+                              child: _isRedeeming
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Text('Redeem'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (subscription.availablePlans.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      Text('Available plans', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      for (final plan in subscription.availablePlans) ...[
+                        _PlanOptionCard(
+                          plan: plan,
+                          isCurrent: plan.name == subscription.planName,
+                          canPurchase: subscription.enabledGateways.isNotEmpty,
+                          busy: _purchasingPlanName == plan.name,
+                          onBuy: () => _buyPlan(plan, subscription),
+                        ),
                         const SizedBox(height: 8),
-                        _UsageRow(label: 'Users', count: subscription.usersCount, limit: subscription.usersLimit),
                       ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Redeem activation code', style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _codeController,
-                          textCapitalization: TextCapitalization.characters,
-                          decoration: const InputDecoration(labelText: 'Activation code'),
-                        ),
-                        if (_redeemError != null) ...[
-                          const SizedBox(height: 8),
-                          Text(_redeemError!, style: TextStyle(color: Colors.red.shade400)),
-                        ],
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: _isRedeeming ? null : _redeem,
-                          child: _isRedeeming
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Text('Redeem'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (subscription.availablePlans.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  Text('Available plans', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  for (final plan in subscription.availablePlans) ...[
-                    _PlanOptionCard(
-                      plan: plan,
-                      isCurrent: plan.name == subscription.planName,
-                      canPurchase: subscription.enabledGateways.isNotEmpty,
-                      busy: _purchasingPlanName == plan.name,
-                      onBuy: () => _buyPlan(plan, subscription),
-                    ),
-                    const SizedBox(height: 8),
+                    ],
                   ],
-                ],
-              ],
+                ),
+              ),
             ),
           );
         },

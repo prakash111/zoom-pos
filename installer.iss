@@ -1,5 +1,6 @@
 ; ---------------------------------------------------------------------------
-; installer.iss — Inno Setup script for the ZoomPOS Windows desktop installer
+; installer.iss — Inno Setup script for the Sales and Inventory Windows
+; desktop installer
 ;
 ; Local build:
 ;   ISCC installer.iss
@@ -11,10 +12,10 @@
 ;   build\windows\x64\runner\Release\
 ; ---------------------------------------------------------------------------
 
-#define MyAppName "ZoomPOS"
+#define MyAppName "Sales and Inventory"
 #define MyAppPublisher "Zoom Nearby"
 #define MyAppURL "https://saas.zoomnearby.com"
-#define MyAppExeName "zoom_pos_mobile.exe"
+#define MyAppExeName "sales_and_inventory.exe"
 #define MyBuildDir "build\windows\x64\runner\Release"
 #define MyAppIcon "windows\runner\resources\app_icon.ico"
 

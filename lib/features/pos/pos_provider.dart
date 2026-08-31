@@ -1,3 +1,4 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -6,6 +7,7 @@ import '../../core/models/category_model.dart';
 import '../../core/models/customer_model.dart';
 import '../../core/models/product_model.dart';
 import '../../core/models/settings_models.dart';
+import '../../core/services/sync/sync_engine.dart';
 import '../cash_register/cash_register_repository.dart';
 import '../inventory/inventory_repository.dart';
 import 'cart_item.dart';
@@ -81,6 +83,7 @@ class PosCheckoutResult {
     required this.total,
     this.customerName,
     this.notes,
+    this.isPendingSync = false,
   });
 
   final String saleId;
@@ -92,6 +95,11 @@ class PosCheckoutResult {
   final double total;
   final String? customerName;
   final String? notes;
+
+  /// True when the sale couldn't reach the server (no connectivity) and was
+  /// queued in the offline outbox instead — it will push automatically once
+  /// the device is back online, or via a manual "Sync Now".
+  final bool isPendingSync;
 }
 
 /// Drives the point-of-sale screen: loads the product catalog, filters it by
@@ -103,14 +111,17 @@ class PosProvider extends ChangeNotifier {
     required SalesRepository salesRepository,
     required CashRegisterRepository cashRegisterRepository,
     required HeldCartsStore heldCartsStore,
+    required SyncEngine syncEngine,
   })  : _inventoryRepository = inventoryRepository,
         _salesRepository = salesRepository,
         _cashRegisterRepository = cashRegisterRepository,
-        _heldCartsStore = heldCartsStore;
+        _heldCartsStore = heldCartsStore,
+        _syncEngine = syncEngine;
 
   final InventoryRepository _inventoryRepository;
   final SalesRepository _salesRepository;
   final CashRegisterRepository _cashRegisterRepository;
+  final SyncEngine _syncEngine;
   final HeldCartsStore _heldCartsStore;
   static final Uuid _uuid = Uuid();
 
@@ -335,6 +346,7 @@ class PosProvider extends ChangeNotifier {
     notifyListeners();
 
     final saleId = _uuid.v4();
+    final soldAt = DateTime.now();
     final soldItems = _cart.values.toList();
     final soldSubtotal = subtotal;
     final soldTax = taxTotal;
@@ -342,31 +354,35 @@ class PosProvider extends ChangeNotifier {
     final soldTotal = grandTotal;
     final soldCustomerName = selectedCustomer?.name;
     final soldNotes = orderNotes;
+    final taxName = soldTax > 0 ? (taxLabel ?? 'Tax') : null;
+    final itemsPayload = soldItems
+        .map((item) => {
+              'id': item.product.id,
+              'product_id': item.product.id,
+              'name': item.product.name,
+              'price': item.product.salePrice,
+              'quantity': item.quantity,
+              'tax_rate': item.product.taxRate,
+            })
+        .toList();
 
-    try {
-      await _salesRepository.pushSale(
+    Future<void> queueOffline() {
+      final payload = SalesRepository.buildOfflineSalePayload(
         id: saleId,
         total: soldTotal,
         discount: soldDiscount,
         taxAmount: soldTax,
-        taxName: soldTax > 0 ? (taxLabel ?? 'Tax') : null,
+        taxName: taxName,
         paymentMethod: paymentMethod,
         customerId: selectedCustomer?.id,
         customerName: soldCustomerName,
-        items: soldItems
-            .map((item) => {
-                  'id': item.product.id,
-                  'product_id': item.product.id,
-                  'name': item.product.name,
-                  'price': item.product.salePrice,
-                  'quantity': item.quantity,
-                  'tax_rate': item.product.taxRate,
-                })
-            .toList(),
+        items: itemsPayload,
+        createdAt: soldAt,
       );
-      clearCart();
-      isCheckingOut = false;
-      notifyListeners();
+      return _syncEngine.queueOfflineSale(id: saleId, payload: payload, createdAt: soldAt);
+    }
+
+    PosCheckoutResult buildResult({required bool isPendingSync}) {
       return PosCheckoutResult(
         saleId: saleId,
         saleNumber: 'POS-${saleId.substring(0, 8).toUpperCase()}',
@@ -377,8 +393,50 @@ class PosProvider extends ChangeNotifier {
         total: soldTotal,
         customerName: soldCustomerName,
         notes: soldNotes,
+        isPendingSync: isPendingSync,
       );
+    }
+
+    final connectivity = await Connectivity().checkConnectivity();
+    final isOnline = connectivity.any((r) => r != ConnectivityResult.none);
+
+    if (!isOnline) {
+      await queueOffline();
+      clearCart();
+      isCheckingOut = false;
+      notifyListeners();
+      return buildResult(isPendingSync: true);
+    }
+
+    try {
+      await _salesRepository.pushSale(
+        id: saleId,
+        total: soldTotal,
+        discount: soldDiscount,
+        taxAmount: soldTax,
+        taxName: taxName,
+        paymentMethod: paymentMethod,
+        customerId: selectedCustomer?.id,
+        customerName: soldCustomerName,
+        items: itemsPayload,
+      );
+      clearCart();
+      isCheckingOut = false;
+      notifyListeners();
+      return buildResult(isPendingSync: false);
     } on ApiException catch (e) {
+      // No status code means the request never reached the server (timeout,
+      // no route to host, DNS failure, ...) rather than the server actively
+      // rejecting it — that's a connectivity problem, not a checkout error,
+      // so queue the sale instead of blocking the cashier.
+      if (e.statusCode == null) {
+        await queueOffline();
+        clearCart();
+        isCheckingOut = false;
+        notifyListeners();
+        return buildResult(isPendingSync: true);
+      }
+
       checkoutError = e.message;
       isCheckingOut = false;
       notifyListeners();

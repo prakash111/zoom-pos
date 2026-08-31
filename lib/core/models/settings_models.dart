@@ -230,6 +230,17 @@ class PaymentMethodModel {
   final String description;
   final bool isActive;
   final int orderIndex;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'code': code,
+      'description': description,
+      'is_active': isActive,
+      'order_index': orderIndex,
+    };
+  }
 }
 
 class TenantSettingsBundle {

@@ -1,7 +1,9 @@
 import '../../core/api/api_client.dart';
+import '../../core/api/api_exception.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/customer_model.dart';
 import '../../core/models/ledger_entry_model.dart';
+import '../../core/storage/app_database.dart';
 
 class CustomerLedger {
   CustomerLedger({required this.customer, required this.entries});
@@ -13,15 +15,27 @@ class CustomerLedger {
 /// Talks to the customer-ledger endpoints on PosSyncApiController:
 /// GET/POST /customers, GET /customers/{id}/ledger, POST /customers/{id}/payment.
 class CustomersRepository {
-  CustomersRepository(this._client);
+  CustomersRepository(this._client, {AppDatabase? database}) : _database = database ?? AppDatabase.instance;
 
   final ApiClient _client;
+  final AppDatabase _database;
 
+  /// Fetches customers and refreshes the offline cache, or falls back to it
+  /// if the request fails and a cache exists from a previous fetch — so the
+  /// customer picker in the POS cart still works offline.
   Future<List<CustomerModel>> fetchCustomers() async {
-    final response = await _client.get(ApiEndpoints.customers);
-    return (response['customers'] as List? ?? [])
-        .map((e) => CustomerModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      final response = await _client.get(ApiEndpoints.customers);
+      final customers = (response['customers'] as List? ?? [])
+          .map((e) => CustomerModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      await _database.replaceCacheBucket('customers', customers.map((c) => c.toJson()).toList());
+      return customers;
+    } on ApiException {
+      final cached = await _database.readCacheBucket('customers');
+      if (cached.isEmpty) rethrow;
+      return cached.map(CustomerModel.fromJson).toList();
+    }
   }
 
   /// Returns the saved customer as sent back by the server (with its

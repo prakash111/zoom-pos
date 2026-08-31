@@ -9,6 +9,7 @@ import '../config/app_config.dart';
 class AppPreferences {
   static const _baseUrlKey = 'zoom_pos.base_url';
   static const _localeKey = 'zoom_pos.locale';
+  static const _navDockPositionKey = 'zoom_pos.nav_dock_position';
 
   Future<String> readBaseUrl() async {
     try {
@@ -50,6 +51,29 @@ class AppPreferences {
       await prefs.setString(_localeKey, code);
     } catch (e) {
       debugPrint('AppPreferences.saveLocale error: $e');
+    }
+  }
+
+  /// Where the main app's navigation dock is docked (`left`, `top`, `right`,
+  /// `bottom`) — a per-device workspace preference, set from
+  /// Settings > Appearance. Returns `null` when nothing's been saved yet, so
+  /// the caller can apply its own default.
+  Future<String?> readNavDockPosition() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_navDockPositionKey);
+    } catch (e) {
+      debugPrint('AppPreferences.readNavDockPosition error: $e');
+      return null;
+    }
+  }
+
+  Future<void> saveNavDockPosition(String position) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_navDockPositionKey, position);
+    } catch (e) {
+      debugPrint('AppPreferences.saveNavDockPosition error: $e');
     }
   }
 }

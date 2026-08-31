@@ -1,19 +1,32 @@
 import '../../core/api/api_client.dart';
+import '../../core/api/api_exception.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/tax_rule_model.dart';
+import '../../core/storage/app_database.dart';
 
 /// Talks to the tax-rule endpoints on PosSyncApiController:
 /// GET/POST /taxes, PUT/DELETE /taxes/{id}, POST /taxes/{id}/set-default.
 class TaxesRepository {
-  TaxesRepository(this._client);
+  TaxesRepository(this._client, {AppDatabase? database}) : _database = database ?? AppDatabase.instance;
 
   final ApiClient _client;
+  final AppDatabase _database;
 
+  /// Fetches tax rules and refreshes the offline cache, or falls back to it
+  /// if the request fails and a cache exists from a previous fetch — so the
+  /// Taxes screen stays viewable (read-only) offline.
   Future<List<TaxRuleModel>> fetchTaxes() async {
-    final response = await _client.get(ApiEndpoints.taxes);
-    return (response['taxes'] as List? ?? [])
-        .map((e) => TaxRuleModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      final response = await _client.get(ApiEndpoints.taxes);
+      final taxes =
+          (response['taxes'] as List? ?? []).map((e) => TaxRuleModel.fromJson(e as Map<String, dynamic>)).toList();
+      await _database.replaceCacheBucket('taxes', taxes.map((t) => t.toJson()).toList());
+      return taxes;
+    } on ApiException {
+      final cached = await _database.readCacheBucket('taxes');
+      if (cached.isEmpty) rethrow;
+      return cached.map(TaxRuleModel.fromJson).toList();
+    }
   }
 
   Future<void> createTax({

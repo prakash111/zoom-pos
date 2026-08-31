@@ -22,4 +22,14 @@ class CategoryModel {
   final String? color;
   final String description;
   final bool active;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'color': color,
+      'description': description,
+      'active': active,
+    };
+  }
 }

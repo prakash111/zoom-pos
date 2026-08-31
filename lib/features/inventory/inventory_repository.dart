@@ -1,8 +1,10 @@
 import '../../core/api/api_client.dart';
+import '../../core/api/api_exception.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/category_model.dart';
 import '../../core/models/product_model.dart';
 import '../../core/models/settings_models.dart';
+import '../../core/storage/app_database.dart';
 
 class InventoryCatalog {
   InventoryCatalog({
@@ -19,31 +21,54 @@ class InventoryCatalog {
 /// Talks to the inventory endpoints on PosSyncApiController: GET /inventory,
 /// POST /inventory/product, and POST /inventory/adjust.
 class InventoryRepository {
-  InventoryRepository(this._client);
+  InventoryRepository(this._client, {AppDatabase? database}) : _database = database ?? AppDatabase.instance;
 
   final ApiClient _client;
+  final AppDatabase _database;
 
+  /// Fetches the live catalog and refreshes the offline cache, or — if the
+  /// request fails (no connectivity, server unreachable) and a cache exists
+  /// from a previous successful fetch — falls back to that cache so the POS
+  /// screen keeps working offline instead of showing an error.
   Future<InventoryCatalog> fetchCatalog() async {
-    final response = await _client.get(ApiEndpoints.inventory);
+    try {
+      final response = await _client.get(ApiEndpoints.inventory);
 
-    final products = (response['products'] as List? ?? [])
-        .whereType<Map>()
-        .map((e) => ProductModel.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
-    final categories = (response['categories'] as List? ?? [])
-        .whereType<Map>()
-        .map((e) => CategoryModel.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
-    final paymentMethods = (response['payment_methods'] as List? ?? [])
-        .whereType<Map>()
-        .map((e) => PaymentMethodModel.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
+      final products = (response['products'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => ProductModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+      final categories = (response['categories'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => CategoryModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+      final paymentMethods = (response['payment_methods'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => PaymentMethodModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
 
-    return InventoryCatalog(
-      products: products,
-      categories: categories,
-      paymentMethods: paymentMethods,
-    );
+      await _database.replaceCacheBucket('products', products.map((p) => p.toJson()).toList());
+      await _database.replaceCacheBucket('categories', categories.map((c) => c.toJson()).toList());
+      await _database.replaceCacheBucket('payment_methods', paymentMethods.map((p) => p.toJson()).toList());
+
+      return InventoryCatalog(
+        products: products,
+        categories: categories,
+        paymentMethods: paymentMethods,
+      );
+    } on ApiException {
+      final cachedProducts = await _database.readCacheBucket('products');
+      if (cachedProducts.isEmpty) rethrow;
+
+      final cachedCategories = await _database.readCacheBucket('categories');
+      final cachedPaymentMethods = await _database.readCacheBucket('payment_methods');
+
+      return InventoryCatalog(
+        products: cachedProducts.map(ProductModel.fromJson).toList(),
+        categories: cachedCategories.map(CategoryModel.fromJson).toList(),
+        paymentMethods: cachedPaymentMethods.map(PaymentMethodModel.fromJson).toList(),
+      );
+    }
   }
 
   /// Creates a new product, or updates an existing one when [externalId] is

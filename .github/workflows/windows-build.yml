@@ -26,11 +26,9 @@ jobs:
           cache: true
 
       - name: Ensure Windows platform scaffold exists
-        # This repo doesn't have windows/ committed yet (no local Windows
-        # dev machine to generate it from). Scaffold it here so the build
-        # below has something to compile. Once you do run `flutter create
-        # --platforms=windows .` locally and commit windows/, this step
-        # becomes a no-op and can eventually be deleted.
+        # windows/ is committed to the repo. This is a safety net only, in
+        # case it's ever removed — flutter build below regenerates the
+        # plugin registrant/cmake files regardless.
         shell: pwsh
         run: |
           if (-not (Test-Path "windows")) {
@@ -73,7 +71,7 @@ jobs:
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ZoomPOS-Windows-Installer-${{ env.APP_VERSION }}
+          name: SalesAndInventory-Windows-Installer-${{ env.APP_VERSION }}
           path: Output/*.exe
           if-no-files-found: error
 

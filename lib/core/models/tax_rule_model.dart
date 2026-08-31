@@ -23,6 +23,16 @@ class TaxRuleModel {
   final double rate;
   final bool isDefault;
   final bool active;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'rate': rate,
+      'is_default': isDefault,
+      'active': active,
+    };
+  }
 }
 
 /// One CGST/SGST/IGST-style component of a [TaxRulePreset].

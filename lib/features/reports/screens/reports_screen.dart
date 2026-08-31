@@ -1,5 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -96,21 +101,60 @@ class _ReportsScreenBodyState extends State<_ReportsScreenBody> with SingleTicke
     reports.setDateRange(picked.start, picked.end);
   }
 
+  /// Saves the report as a `.csv` file via the OS's native save-file dialog,
+  /// instead of the previous clipboard-copy — a desktop user expects a real
+  /// file they can open in a spreadsheet app, not a paste target.
   Future<void> _exportCsv(BuildContext context) async {
     final reports = context.read<ReportsProvider>();
     final key = _exportKeys[_tabController.index];
     if (key == null) return;
 
+    final isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
     try {
       final csv = await reports.exportCsv(key);
-      await Clipboard.setData(ClipboardData(text: csv));
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report CSV copied to clipboard.')));
+      final fileName = 'report_${key}_${DateTime.now().millisecondsSinceEpoch}.csv';
+
+      String? savedPath;
+      if (isDesktop) {
+        // On desktop, saveFile only opens the picker and returns the chosen
+        // path — the caller writes the file itself.
+        savedPath = await FilePicker.platform.saveFile(
+          dialogTitle: 'Save report',
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['csv'],
+        );
+        if (savedPath == null) return; // user cancelled
+        await File(savedPath).writeAsString(csv);
+      } else {
+        // On Android/iOS/web, the plugin needs the bytes up front and
+        // writes (or hands off) the file itself.
+        savedPath = await FilePicker.platform.saveFile(
+          dialogTitle: 'Save report',
+          fileName: fileName,
+          bytes: Uint8List.fromList(utf8.encode(csv)),
+        );
+        if (savedPath == null) return; // user cancelled
       }
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Report saved.'),
+          behavior: SnackBarBehavior.floating,
+          width: 360,
+        ),
+      );
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
-      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Export failed: $e'),
+          behavior: SnackBarBehavior.floating,
+          width: 360,
+        ),
+      );
     }
   }
 
@@ -132,8 +176,8 @@ class _ReportsScreenBodyState extends State<_ReportsScreenBody> with SingleTicke
             onPressed: () => _pickDateRange(context),
           ),
           IconButton(
-            tooltip: 'Copy CSV',
-            icon: const Icon(Icons.ios_share),
+            tooltip: 'Export CSV',
+            icon: const Icon(Icons.download_outlined),
             onPressed: canExport ? () => _exportCsv(context) : null,
           ),
         ],

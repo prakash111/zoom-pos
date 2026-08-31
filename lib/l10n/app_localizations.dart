@@ -133,6 +133,50 @@ class AppLocalizations {
   String get registerClosedBanner => _s('registerClosedBanner');
   String get open => _s('open');
   String get saleCompleted => _s('saleCompleted');
+  String get saleQueuedOffline => _s('saleQueuedOffline');
+
+  // Offline sync
+  String get syncNow => _s('syncNow');
+  String get syncing => _s('syncing');
+  String get syncStatusTitle => _s('syncStatusTitle');
+  String get syncNeverRun => _s('syncNeverRun');
+  String unsyncedSalesCount(int count) => _format('unsyncedSalesCount', {'n': '$count'});
+  String lastSyncedAt(String when) => _format('lastSyncedAt', {'when': when});
+  String get syncCompleted => _s('syncCompleted');
+  String get menu => _s('menu');
+
+  // Appearance / Workspace
+  String get tabAppearance => _s('tabAppearance');
+  String get navDockTitle => _s('navDockTitle');
+  String get navDockDescription => _s('navDockDescription');
+  String get navDockLeft => _s('navDockLeft');
+  String get navDockTop => _s('navDockTop');
+  String get navDockRight => _s('navDockRight');
+  String get navDockBottom => _s('navDockBottom');
+
+  // Navigation dock destinations — shared by the drawer, rail, top bar, and
+  // bottom bar (see DashboardScreen), so a locale change never leaves the
+  // menu in a different language than the rest of the app.
+  String get navHome => _s('navHome');
+  String get featurePos => _s('featurePos');
+  String get featureSales => _s('featureSales');
+  String get featureQuotations => _s('featureQuotations');
+  String get featureInventory => _s('featureInventory');
+  String get featureCustomers => _s('featureCustomers');
+  String get featureCashRegister => _s('featureCashRegister');
+  String get featurePayables => _s('featurePayables');
+  String get featureConsignments => _s('featureConsignments');
+  String get featureServiceOrders => _s('featureServiceOrders');
+  String get featureSalesTargets => _s('featureSalesTargets');
+  String get featureReports => _s('featureReports');
+  String get featureTaxes => _s('featureTaxes');
+  String get featureAnalytics => _s('featureAnalytics');
+  String get featureSubscription => _s('featureSubscription');
+  String get featureStaff => _s('featureStaff');
+  String get featureOnlineCatalog => _s('featureOnlineCatalog');
+  String get featureLanguages => _s('featureLanguages');
+  String get featureDevices => _s('featureDevices');
+  String get featureSettings => _s('featureSettings');
   String get orderCart => _s('orderCart');
   String get clearCart => _s('clearCart');
   String get cartEmptyTitle => _s('cartEmptyTitle');
