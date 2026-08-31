@@ -25,15 +25,17 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Flutter pub get
-        run: flutter pub get
-
       - name: Ensure Windows platform scaffold exists
         # This repo doesn't have windows/ committed yet (no local Windows
         # dev machine to generate it from). Scaffold it here so the build
         # below has something to compile. Once you do run `flutter create
         # --platforms=windows .` locally and commit windows/, this step
-        # becomes a no-op and can eventually be deleted.
+        # becomes a no-op and can eventually be deleted. Runs before the
+        # explicit pub get below since `flutter create` triggers its own
+        # internal pub get — doing that first, then a single pub get
+        # afterwards, avoids two back-to-back package downloads racing on
+        # the same PUB_CACHE (a known source of flaky "file not found in
+        # pub cache" build errors on GitHub-hosted Windows runners).
         shell: pwsh
         run: |
           if (-not (Test-Path "windows")) {
@@ -41,6 +43,16 @@ jobs:
             flutter create --platforms=windows .
           } else {
             Write-Host "windows/ already present, skipping scaffold."
+          }
+
+      - name: Flutter pub get
+        shell: pwsh
+        run: |
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "pub get failed, retrying once..."
+            Start-Sleep -Seconds 5
+            flutter pub get
           }
 
       - name: Extract app version from pubspec.yaml
