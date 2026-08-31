@@ -14,6 +14,7 @@ class SubscriptionModel {
     required this.usersCount,
     required this.usersLimit,
     required this.availablePlans,
+    required this.enabledGateways,
   });
 
   factory SubscriptionModel.fromJson(Map<String, dynamic> json) {
@@ -39,6 +40,7 @@ class SubscriptionModel {
           .whereType<Map>()
           .map((e) => SubscriptionPlan.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
+      enabledGateways: (json['enabled_gateways'] as List? ?? []).map((e) => e.toString()).toList(),
     );
   }
 
@@ -53,6 +55,11 @@ class SubscriptionModel {
   final int usersCount;
   final dynamic usersLimit;
   final List<SubscriptionPlan> availablePlans;
+
+  /// Gateway codes the platform has enabled (e.g. `razorpay`, `mercadopago`)
+  /// — empty when no gateway is configured yet, in which case no "Buy"
+  /// action is shown and activation-code redemption remains the only path.
+  final List<String> enabledGateways;
 
   bool get isExpired => status == 'expired';
 }

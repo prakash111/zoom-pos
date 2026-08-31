@@ -9,7 +9,6 @@ import '../../../core/config/tax_jurisdictions.dart';
 import '../../../core/config/theme.dart';
 import '../../../core/config/theme_provider.dart';
 import '../../../core/models/settings_models.dart';
-import '../../../core/config/locale_provider.dart';
 import '../../../core/utils/color_utils.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
@@ -386,28 +385,6 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           ),
         ]),
-        const SizedBox(height: 20),
-        Text(l10n.appLanguage, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(l10n.appLanguageNote, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-        const SizedBox(height: 10),
-        Consumer<LocaleProvider>(
-          builder: (context, localeProvider, _) => Wrap(
-            spacing: 8,
-            children: [
-              ChoiceChip(
-                label: const Text('English'),
-                selected: localeProvider.locale.languageCode == 'en',
-                onSelected: (_) => localeProvider.setLocale(const Locale('en')),
-              ),
-              ChoiceChip(
-                label: const Text('हिंदी'),
-                selected: localeProvider.locale.languageCode == 'hi',
-                onSelected: (_) => localeProvider.setLocale(const Locale('hi')),
-              ),
-            ],
-          ),
-        ),
         const SizedBox(height: 20),
         Text(l10n.brandColor, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),

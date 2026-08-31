@@ -62,8 +62,6 @@ const Map<String, String> kHiStrings = {
   'saveProfile': 'प्रोफ़ाइल सहेजें',
   'profileSaved': 'प्रोफ़ाइल सहेजी गई।',
   'storeNameRequired': 'स्टोर का नाम आवश्यक है।',
-  'appLanguage': 'ऐप की भाषा',
-  'appLanguageNote': 'यह केवल इस ऐप की अपनी प्रदर्शन भाषा बदलता है — अपने ऑनलाइन स्टोर की भाषा के लिए, मेनू में "Languages" का उपयोग करें।',
   'camera': 'कैमरा',
   'gallery': 'गैलरी',
   'remove': 'हटाएं',

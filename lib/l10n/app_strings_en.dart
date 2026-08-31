@@ -62,9 +62,6 @@ const Map<String, String> kEnStrings = {
   'saveProfile': 'Save profile',
   'profileSaved': 'Profile saved.',
   'storeNameRequired': 'Store name is required.',
-  'appLanguage': 'App language',
-  'appLanguageNote':
-      "Changes only this app's own display language — for your online store's language, use \"Languages\" in the menu.",
   'camera': 'Camera',
   'gallery': 'Gallery',
   'remove': 'Remove',

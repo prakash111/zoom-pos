@@ -52,6 +52,11 @@ class ApiEndpoints {
 
   static const String subscription = '/subscription';
   static const String subscriptionRedeem = '/subscription/redeem';
+  static String subscriptionActivateFree(String plan) => '/subscription/plans/$plan/activate-free';
+  static String subscriptionRazorpayOrder(String plan) => '/subscription/plans/$plan/razorpay/order';
+  static String subscriptionRazorpayVerify(String plan) => '/subscription/plans/$plan/razorpay/verify';
+  static String subscriptionMercadoPagoPreference(String plan) => '/subscription/plans/$plan/mercadopago/preference';
+  static String subscriptionMercadoPagoVerify(String plan) => '/subscription/plans/$plan/mercadopago/verify';
 
   static const String quotations = '/quotations';
   static String quotation(String id) => '/quotations/$id';

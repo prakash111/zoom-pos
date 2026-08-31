@@ -93,8 +93,6 @@ class AppLocalizations {
   String get saveProfile => _s('saveProfile');
   String get profileSaved => _s('profileSaved');
   String get storeNameRequired => _s('storeNameRequired');
-  String get appLanguage => _s('appLanguage');
-  String get appLanguageNote => _s('appLanguageNote');
   String get camera => _s('camera');
   String get gallery => _s('gallery');
   String get remove => _s('remove');

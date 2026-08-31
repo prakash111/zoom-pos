@@ -3,13 +3,17 @@ import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/config/locale_provider.dart';
 import '../../../core/models/language_model.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../languages_repository.dart';
 
-/// Store default language selector. The web page's per-phrase translation
-/// override editor is intentionally out of scope for mobile.
+/// Store default language selector — and, since this is the app's single
+/// language control point, also sets this app's own display language
+/// (LocaleProvider) for whichever locale is picked. The web page's
+/// per-phrase translation override editor is intentionally out of scope
+/// for mobile.
 class LanguagesScreen extends StatefulWidget {
   const LanguagesScreen({super.key});
 
@@ -35,6 +39,10 @@ class _LanguagesScreenState extends State<LanguagesScreen> {
     setState(() => _saving = true);
     try {
       await _repository.setDefault(code);
+      if (!mounted) return;
+      // Also drives this app's own display language — the single control
+      // point for both the storefront default and the app's own UI locale.
+      await context.read<LocaleProvider>().setLocale(Locale(code));
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Store default language updated.')));
       _reload();
     } on ApiException catch (e) {
@@ -59,10 +67,21 @@ class _LanguagesScreenState extends State<LanguagesScreen> {
 
           return ListView.separated(
             padding: const EdgeInsets.all(16),
-            itemCount: languages.length,
+            itemCount: languages.length + 1,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
-              final lang = languages[index];
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    "Sets your online store's default language, and this app's own display "
+                    'language (fully translated for English and Hindi so far — other '
+                    'languages fall back to English in the app UI).',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  ),
+                );
+              }
+              final lang = languages[index - 1];
               final selected = lang.code == defaultLanguage;
               return Card(
                 color: selected ? Theme.of(context).colorScheme.primaryContainer : null,

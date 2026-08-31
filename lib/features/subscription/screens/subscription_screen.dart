@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/subscription_model.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
+import '../../../core/widgets/webview_screen.dart';
 import '../subscription_repository.dart';
 
 final _dateFormat = DateFormat('MMM d, y');
 
-/// Plan status and activation-code redemption — GET /subscription and
-/// POST /subscription/redeem (PosSyncApiController::subscription /
-/// subscriptionRedeem).
+/// Plan status, activation-code redemption, and plan purchase — GET
+/// /subscription, POST /subscription/redeem, and the plan
+/// activation/purchase endpoints (PosSyncApiController::subscription*).
+/// Purchases mirror the web Billing page: Razorpay uses its hosted-checkout
+/// SDK (card/UPI data never touches this app's code), Mercado Pago uses a
+/// hosted-redirect WebView. Both require a gateway to actually be enabled
+/// server-side (Super Admin > Payment Gateways) — see `enabledGateways`.
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
 
@@ -28,6 +34,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _isRedeeming = false;
   String? _redeemError;
 
+  Razorpay? _razorpay;
+  String? _pendingRazorpayPlan;
+  String? _purchasingPlanName;
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +48,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   @override
   void dispose() {
     _codeController.dispose();
+    _razorpay?.clear();
     super.dispose();
   }
 
@@ -66,6 +77,223 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         _redeemError = e.message;
         _isRedeeming = false;
       });
+    }
+  }
+
+  void _showPurchaseSuccess(DateTime? expiresAt) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Plan activated 🎉'),
+        content: Text(
+          expiresAt != null
+              ? 'Your subscription is now active until ${_dateFormat.format(expiresAt)}.'
+              : 'Your subscription is now active.',
+        ),
+        actions: [ElevatedButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK'))],
+      ),
+    );
+  }
+
+  Future<void> _activateFree(SubscriptionPlan plan) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Activate ${plan.displayName}?'),
+        content: const Text('This plan is free — no payment required.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Activate')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _purchasingPlanName = plan.name);
+    try {
+      final expiresAt = await _repository.activateFreePlan(plan.name);
+      if (!mounted) return;
+      _showPurchaseSuccess(expiresAt);
+      _reload();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _purchasingPlanName = null);
+    }
+  }
+
+  Future<String?> _pickGateway(List<String> gateways) {
+    return showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (gateways.contains('razorpay'))
+              ListTile(
+                leading: const Icon(Icons.payment),
+                title: const Text('Pay with Razorpay'),
+                onTap: () => Navigator.of(ctx).pop('razorpay'),
+              ),
+            if (gateways.contains('mercadopago'))
+              ListTile(
+                leading: const Icon(Icons.payment),
+                title: const Text('Pay with Mercado Pago'),
+                onTap: () => Navigator.of(ctx).pop('mercadopago'),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmPurchase(SubscriptionPlan plan, String gateway) async {
+    // Preview only — the server computes and returns the exact charge total
+    // (same 18% rate the web Billing page already uses) before any gateway
+    // checkout actually opens.
+    final previewTotal = plan.price * 1.18;
+    final gatewayLabel = gateway == 'razorpay' ? 'Razorpay' : 'Mercado Pago';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Buy ${plan.displayName}?'),
+        content: Text('You will be charged approximately ${plan.currency} ${previewTotal.toStringAsFixed(2)} (incl. tax) via $gatewayLabel.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Continue')),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
+  Future<void> _buyPlan(SubscriptionPlan plan, SubscriptionModel subscription) async {
+    if (plan.price <= 0) {
+      await _activateFree(plan);
+      return;
+    }
+    if (subscription.enabledGateways.isEmpty) return;
+
+    final gateway = subscription.enabledGateways.length == 1
+        ? subscription.enabledGateways.first
+        : await _pickGateway(subscription.enabledGateways);
+    if (gateway == null) return;
+
+    if (!await _confirmPurchase(plan, gateway)) return;
+
+    if (gateway == 'razorpay') {
+      await _buyWithRazorpay(plan);
+    } else if (gateway == 'mercadopago') {
+      await _buyWithMercadoPago(plan);
+    }
+  }
+
+  Razorpay _ensureRazorpay() {
+    return _razorpay ??= Razorpay()
+      ..on(Razorpay.EVENT_PAYMENT_SUCCESS, _onRazorpaySuccess)
+      ..on(Razorpay.EVENT_PAYMENT_ERROR, _onRazorpayError)
+      ..on(Razorpay.EVENT_EXTERNAL_WALLET, _onRazorpayExternalWallet);
+  }
+
+  Future<void> _buyWithRazorpay(SubscriptionPlan plan) async {
+    setState(() => _purchasingPlanName = plan.name);
+    try {
+      final order = await _repository.createRazorpayOrder(plan.name);
+      _pendingRazorpayPlan = plan.name;
+      _ensureRazorpay().open({
+        'key': order.keyId,
+        'order_id': order.orderId,
+        'amount': order.amount,
+        'currency': order.currency,
+        'name': order.companyName,
+        'description': order.description,
+        'prefill': {'contact': order.userPhone, 'email': order.userEmail, 'name': order.userName},
+        'theme': {'color': order.color},
+      });
+    } on ApiException catch (e) {
+      _pendingRazorpayPlan = null;
+      if (mounted) {
+        setState(() => _purchasingPlanName = null);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
+  void _onRazorpaySuccess(PaymentSuccessResponse response) async {
+    final planName = _pendingRazorpayPlan;
+    _pendingRazorpayPlan = null;
+    if (planName == null) return;
+
+    try {
+      final expiresAt = await _repository.verifyRazorpayPayment(
+        planName: planName,
+        paymentId: response.paymentId ?? '',
+        orderId: response.orderId ?? '',
+        signature: response.signature ?? '',
+      );
+      if (!mounted) return;
+      _showPurchaseSuccess(expiresAt);
+      _reload();
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            'Payment succeeded but activation failed: ${e.message}. '
+            'Contact support with payment ID ${response.paymentId}.',
+          ),
+          duration: const Duration(seconds: 8),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _purchasingPlanName = null);
+    }
+  }
+
+  void _onRazorpayError(PaymentFailureResponse response) {
+    _pendingRazorpayPlan = null;
+    if (!mounted) return;
+    setState(() => _purchasingPlanName = null);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Payment failed: ${response.message ?? 'Cancelled'}')),
+    );
+  }
+
+  void _onRazorpayExternalWallet(ExternalWalletResponse response) {
+    _pendingRazorpayPlan = null;
+    if (mounted) setState(() => _purchasingPlanName = null);
+  }
+
+  Future<void> _buyWithMercadoPago(SubscriptionPlan plan) async {
+    setState(() => _purchasingPlanName = plan.name);
+    try {
+      final checkoutUrl = await _repository.createMercadoPagoPreference(plan.name);
+      if (!mounted) return;
+
+      final result = await Navigator.of(context).push<Map<String, String>>(
+        MaterialPageRoute(
+          builder: (_) => WebViewScreen(url: checkoutUrl, resultMarker: 'mp_status=', title: 'Mercado Pago'),
+        ),
+      );
+      if (result == null) return; // closed manually before completing
+
+      final status = result['mp_status'];
+      final paymentId = result['payment_id'] ?? result['collection_id'];
+      if (status == 'success' && paymentId != null && paymentId.isNotEmpty) {
+        final expiresAt = await _repository.verifyMercadoPagoPayment(planName: plan.name, paymentId: paymentId);
+        if (!mounted) return;
+        _showPurchaseSuccess(expiresAt);
+        _reload();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(status == 'pending' ? 'Payment is pending confirmation.' : 'Payment was not completed.'),
+        ));
+      }
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _purchasingPlanName = null);
     }
   }
 
@@ -147,7 +375,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   Text('Available plans', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   for (final plan in subscription.availablePlans) ...[
-                    _PlanOptionCard(plan: plan, isCurrent: plan.name == subscription.planName),
+                    _PlanOptionCard(
+                      plan: plan,
+                      isCurrent: plan.name == subscription.planName,
+                      canPurchase: subscription.enabledGateways.isNotEmpty,
+                      busy: _purchasingPlanName == plan.name,
+                      onBuy: () => _buyPlan(plan, subscription),
+                    ),
                     const SizedBox(height: 8),
                   ],
                 ],
@@ -220,13 +454,29 @@ class _UsageRow extends StatelessWidget {
 }
 
 class _PlanOptionCard extends StatelessWidget {
-  const _PlanOptionCard({required this.plan, required this.isCurrent});
+  const _PlanOptionCard({
+    required this.plan,
+    required this.isCurrent,
+    required this.canPurchase,
+    required this.busy,
+    required this.onBuy,
+  });
 
   final SubscriptionPlan plan;
   final bool isCurrent;
 
+  /// Whether a paid plan can actually be bought — false when no payment
+  /// gateway is enabled server-side, in which case no button is shown at
+  /// all (redeem-code stays the only path, same as before this feature).
+  final bool canPurchase;
+  final bool busy;
+  final VoidCallback onBuy;
+
   @override
   Widget build(BuildContext context) {
+    final isFree = plan.price <= 0;
+    final showButton = !isCurrent && (isFree || canPurchase);
+
     return Card(
       shape: isCurrent
           ? RoundedRectangleBorder(
@@ -236,33 +486,50 @@ class _PlanOptionCard extends StatelessWidget {
           : null,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(plan.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      if (isCurrent) ...[
-                        const SizedBox(width: 8),
-                        const Chip(
-                          label: Text('Current', style: TextStyle(fontSize: 11)),
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ],
+                      Row(
+                        children: [
+                          Text(plan.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          if (isCurrent) ...[
+                            const SizedBox(width: 8),
+                            const Chip(
+                              label: Text('Current', style: TextStyle(fontSize: 11)),
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (plan.billingCycle != null) Text('Billed ${plan.billingCycle}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                     ],
                   ),
-                  if (plan.billingCycle != null) Text('Billed ${plan.billingCycle}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                ],
+                ),
+                Text(
+                  isFree ? 'Free' : '${plan.currency} ${plan.price.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            if (showButton) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: busy ? null : onBuy,
+                  child: busy
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(isFree ? 'Activate' : 'Buy'),
+                ),
               ),
-            ),
-            Text(
-              plan.price <= 0 ? 'Free' : '${plan.currency} ${plan.price.toStringAsFixed(2)}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+            ],
           ],
         ),
       ),
