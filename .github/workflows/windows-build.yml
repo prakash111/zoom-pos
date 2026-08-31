@@ -14,19 +14,25 @@ permissions:
 jobs:
   build-windows-installer:
     runs-on: windows-latest
-    env:
-      # windows-latest keeps the OS/user profile on C: but checks out the
-      # workspace on D:. PUB_CACHE defaults under C:\Users\runneradmin\...,
-      # and packages resolved from a cache on a different drive than the
-      # project have been reported to end up referenced in
-      # .dart_tool/package_config.json without their files actually being
-      # reachable at build time (subosito/flutter-action#143). Force the
-      # cache onto the same drive as the workspace to rule that out.
-      PUB_CACHE: ${{ runner.temp }}\pub-cache
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Pin PUB_CACHE to the workspace drive
+        # windows-latest keeps the OS/user profile on C: but checks out the
+        # workspace on D:. PUB_CACHE defaults under C:\Users\runneradmin\...,
+        # and packages resolved from a cache on a different drive than the
+        # project have been reported to end up referenced in
+        # .dart_tool/package_config.json without their files actually being
+        # reachable at build time (subosito/flutter-action#143). Force the
+        # cache onto the same drive as the workspace to rule that out.
+        # (The `runner` context isn't allowed in a job-level `env:` block,
+        # so this is set via $GITHUB_ENV from the RUNNER_TEMP env var
+        # instead, which every step already has.)
+        shell: pwsh
+        run: |
+          "PUB_CACHE=$env:RUNNER_TEMP\pub-cache" >> $env:GITHUB_ENV
 
       - name: Setup Flutter (stable, cached)
         uses: subosito/flutter-action@v2
