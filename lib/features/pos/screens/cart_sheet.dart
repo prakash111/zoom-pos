@@ -488,46 +488,49 @@ class CartSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Action Pills: Hold, Customer, Note, Discount / More
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          // Customer Pill
-                          ActionChip(
-                            avatar: Icon(Icons.person_outline, size: 16, color: pos.selectedCustomer != null ? primaryColor : Colors.grey.shade700),
-                            label: Text(pos.selectedCustomer?.name ?? l10n.addCustomer),
-                            backgroundColor: pos.selectedCustomer != null ? primaryColor.withOpacity(0.12) : null,
-                            onPressed: () => _pickCustomer(context),
-                          ),
-                          const SizedBox(width: 8),
+                    // A Wrap instead of a horizontal scroller — same reason
+                    // as the payment method tiles below: with four pills
+                    // (plus their variable-width selected-state labels) this
+                    // reliably overflowed the 400px cart panel and left
+                    // "Note"/"Discount" clipped off-screen with no visible
+                    // scroll affordance. Wrapping to a second line keeps
+                    // every pill visible without requiring a swipe.
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        // Customer Pill
+                        ActionChip(
+                          avatar: Icon(Icons.person_outline, size: 16, color: pos.selectedCustomer != null ? primaryColor : Colors.grey.shade700),
+                          label: Text(pos.selectedCustomer?.name ?? l10n.addCustomer),
+                          backgroundColor: pos.selectedCustomer != null ? primaryColor.withOpacity(0.12) : null,
+                          onPressed: () => _pickCustomer(context),
+                        ),
 
-                          // Hold Cart Pill
-                          ActionChip(
-                            avatar: Icon(Icons.pause_circle_outline, size: 16, color: pos.heldCarts.isNotEmpty ? Colors.orange.shade800 : Colors.grey.shade700),
-                            label: Text(pos.heldCarts.isNotEmpty ? l10n.heldChip(pos.heldCarts.length) : l10n.hold),
-                            backgroundColor: pos.heldCarts.isNotEmpty ? Colors.orange.shade50 : null,
-                            onPressed: () => _showHoldCartsSheet(context),
-                          ),
-                          const SizedBox(width: 8),
+                        // Hold Cart Pill
+                        ActionChip(
+                          avatar: Icon(Icons.pause_circle_outline, size: 16, color: pos.heldCarts.isNotEmpty ? Colors.orange.shade800 : Colors.grey.shade700),
+                          label: Text(pos.heldCarts.isNotEmpty ? l10n.heldChip(pos.heldCarts.length) : l10n.hold),
+                          backgroundColor: pos.heldCarts.isNotEmpty ? Colors.orange.shade50 : null,
+                          onPressed: () => _showHoldCartsSheet(context),
+                        ),
 
-                          // Note Pill
-                          ActionChip(
-                            avatar: Icon(Icons.edit_note, size: 16, color: pos.orderNotes.isNotEmpty ? primaryColor : Colors.grey.shade700),
-                            label: Text(pos.orderNotes.isNotEmpty ? l10n.noteChecked : l10n.note),
-                            backgroundColor: pos.orderNotes.isNotEmpty ? primaryColor.withOpacity(0.12) : null,
-                            onPressed: () => _showNotesDialog(context),
-                          ),
-                          const SizedBox(width: 8),
+                        // Note Pill
+                        ActionChip(
+                          avatar: Icon(Icons.edit_note, size: 16, color: pos.orderNotes.isNotEmpty ? primaryColor : Colors.grey.shade700),
+                          label: Text(pos.orderNotes.isNotEmpty ? l10n.noteChecked : l10n.note),
+                          backgroundColor: pos.orderNotes.isNotEmpty ? primaryColor.withOpacity(0.12) : null,
+                          onPressed: () => _showNotesDialog(context),
+                        ),
 
-                          // Discount Pill
-                          ActionChip(
-                            avatar: Icon(Icons.local_offer_outlined, size: 16, color: pos.customDiscount > 0 ? Colors.green.shade800 : Colors.grey.shade700),
-                            label: Text(pos.customDiscount > 0 ? l10n.discountChecked : l10n.discount),
-                            backgroundColor: pos.customDiscount > 0 ? Colors.green.shade50 : null,
-                            onPressed: () => _showDiscountDialog(context),
-                          ),
-                        ],
-                      ),
+                        // Discount Pill
+                        ActionChip(
+                          avatar: Icon(Icons.local_offer_outlined, size: 16, color: pos.customDiscount > 0 ? Colors.green.shade800 : Colors.grey.shade700),
+                          label: Text(pos.customDiscount > 0 ? l10n.discountChecked : l10n.discount),
+                          backgroundColor: pos.customDiscount > 0 ? Colors.green.shade50 : null,
+                          onPressed: () => _showDiscountDialog(context),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 12),
