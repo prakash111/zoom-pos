@@ -5,6 +5,13 @@ project(sales_and_inventory LANGUAGES CXX)
 # accessible to Flutter tooling.
 set(BINARY_NAME "sales_and_inventory")
 
+# By default, "installing" just makes a relocatable bundle in the build
+# directory.
+set(BUILD_BUNDLE_DIR "${PROJECT_BINARY_DIR}/bundle")
+if(NOT CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
+endif()
+
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
 cmake_policy(SET CMP0063 NEW)
@@ -55,6 +62,11 @@ include(flutter/generated_plugins.cmake)
 # By default, "installing" just puts a copy of the file in the same directory
 # as the executable, which by default is in "build/windows/runner/Debug" (or
 # "Profile" or "Release").
+
+# Use a pre-install target to run any of the post-build steps that are
+# needed as part of the packaging process.
+set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
+set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
 
 # Set the install destinations for the runner executable and its dependent
 # files.
