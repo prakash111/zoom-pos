@@ -79,6 +79,55 @@ jobs:
           dart pub cache repair
           flutter pub get
 
+      - name: Diagnose sqflite_common_ffi path resolution
+        # `dart pub cache repair` -- the actual sanctioned fix for a
+        # corrupted/incomplete cache -- did NOT change the outcome of the
+        # previous run: identical error, identical file. That means the
+        # package's files were probably never actually missing, and the
+        # real bug is in how the Windows CMake/MSBuild build resolves the
+        # relative rootUri stored in package_config.json (it may be
+        # resolving it against the wrong base directory -- project root
+        # instead of .dart_tool/, which are one level apart). This step
+        # doesn't fix anything; it prints hard evidence for whichever of
+        # those two resolutions is correct, so the next fix is evidence-
+        # based instead of another guess.
+        shell: pwsh
+        run: |
+          Write-Host "PUB_CACHE = $env:PUB_CACHE"
+          Write-Host "CWD = $(Get-Location)"
+
+          $config = Get-Content ".dart_tool\package_config.json" -Raw | ConvertFrom-Json
+          $pkg = $config.packages | Where-Object { $_.name -eq "sqflite_common_ffi" }
+          Write-Host "package_config.json entry:"
+          Write-Host ($pkg | ConvertTo-Json)
+
+          if ($pkg) {
+            $rootUriRaw = $pkg.rootUri
+            Write-Host "rootUri raw string: [$rootUriRaw]"
+
+            if ($rootUriRaw -match '^[a-zA-Z][a-zA-Z0-9+.-]*://') {
+              $resolved = [System.Uri]::new($rootUriRaw).LocalPath
+              Write-Host "Parsed as an absolute URI -> $resolved"
+              Write-Host "  Exists: $(Test-Path $resolved)"
+            } else {
+              $fromProjectRoot = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $rootUriRaw))
+              Write-Host "Resolved relative to project root -> $fromProjectRoot"
+              Write-Host "  Exists: $(Test-Path $fromProjectRoot)"
+
+              $dartToolDir = Join-Path (Get-Location) ".dart_tool"
+              $fromDartTool = [System.IO.Path]::GetFullPath((Join-Path $dartToolDir $rootUriRaw))
+              Write-Host "Resolved relative to .dart_tool/ (per the package_config v2 spec) -> $fromDartTool"
+              Write-Host "  Exists: $(Test-Path $fromDartTool)"
+            }
+          } else {
+            Write-Host "sqflite_common_ffi not found in package_config.json at all!"
+          }
+
+          $hostedDir = Join-Path $env:PUB_CACHE "hosted\pub.dev"
+          Write-Host "Contents of $hostedDir matching sqflite*:"
+          Get-ChildItem -Path $hostedDir -Filter "sqflite*" -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host " - $($_.FullName)" }
+
       - name: Extract app version from pubspec.yaml
         id: version
         shell: pwsh
