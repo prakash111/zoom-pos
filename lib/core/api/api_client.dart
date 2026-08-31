@@ -47,6 +47,19 @@ class ApiClient {
     return _send(() => _dio.get(path, queryParameters: query));
   }
 
+  /// Like [get], but for endpoints outside the `/api/v1/pos` prefix (e.g.
+  /// `/api/v1/tax/*`). [path] must be a full path starting with `/api/...` —
+  /// Dio treats it as absolute (ignoring `_dio.options.baseUrl`) once it's
+  /// prefixed with the server's scheme, while [_prepare] still attaches the
+  /// same bearer token, which [AuthenticateTenantApi] accepts on both route
+  /// groups.
+  Future<Map<String, dynamic>> getAbsolute(String path, {Map<String, dynamic>? query}) {
+    return _send(() async {
+      final base = await currentBaseUrl();
+      return _dio.get('$base$path', queryParameters: query);
+    });
+  }
+
   /// Like [get], but for endpoints that return a raw text body (e.g. the CSV
   /// report export) instead of the JSON success/data envelope.
   Future<String> getRaw(String path, {Map<String, dynamic>? query}) async {
@@ -81,6 +94,24 @@ class ApiClient {
 
   Future<Map<String, dynamic>> post(String path, {Map<String, dynamic>? data}) {
     return _send(() => _dio.post(path, data: data));
+  }
+
+  /// Like [post], but for multipart file uploads (product images, business
+  /// logo/favicon). Dio sets the correct `multipart/form-data` content-type
+  /// and boundary itself whenever [data] is a [FormData] instance,
+  /// overriding this client's default JSON content-type for that request.
+  Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    required String fieldName,
+    required List<int> bytes,
+    required String filename,
+  }) {
+    return _send(() => _dio.post(
+          path,
+          data: FormData.fromMap({
+            fieldName: MultipartFile.fromBytes(bytes, filename: filename),
+          }),
+        ));
   }
 
   Future<Map<String, dynamic>> put(String path, {Map<String, dynamic>? data}) {

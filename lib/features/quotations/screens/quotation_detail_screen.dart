@@ -88,6 +88,10 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
       discount: quote.discount,
       tax: quote.tax,
       total: quote.total,
+      taxId: company?.taxId,
+      taxLabel: company?.taxLabel ?? 'Tax',
+      isIndia: company?.isIndia ?? false,
+      taxRate: (quote.subtotal - quote.discount) > 0 ? quote.tax / (quote.subtotal - quote.discount) * 100 : 0,
       lines: quote.items.map((item) {
         final qty = (item['quantity'] as num?)?.toDouble() ?? 0;
         final price = (item['price'] as num?)?.toDouble() ?? 0;
@@ -99,6 +103,8 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final quotations = context.watch<QuotationsProvider>();
+    final company = context.watch<AuthProvider>().company;
+    final isIndia = company?.isIndia ?? false;
     final quote = quotations.filteredQuotations.firstWhere(
       (q) => q.id == widget.quotation.id,
       orElse: () => widget.quotation,
@@ -159,7 +165,12 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
           const SizedBox(height: 12),
           _TotalsRow(label: 'Subtotal', value: widget.formatter.format(quote.subtotal)),
           _TotalsRow(label: 'Discount', value: '-${widget.formatter.format(quote.discount)}'),
-          _TotalsRow(label: 'Tax', value: widget.formatter.format(quote.tax)),
+          if (quote.tax > 0)
+            if (isIndia) ...[
+              _TotalsRow(label: 'CGST', value: widget.formatter.format(quote.tax / 2)),
+              _TotalsRow(label: 'SGST', value: widget.formatter.format(quote.tax / 2)),
+            ] else
+              _TotalsRow(label: company?.taxLabel ?? 'Tax', value: widget.formatter.format(quote.tax)),
           const Divider(),
           _TotalsRow(label: 'Total', value: widget.formatter.format(quote.total), bold: true),
           if (quote.notes.isNotEmpty) ...[

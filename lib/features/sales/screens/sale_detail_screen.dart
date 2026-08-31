@@ -30,6 +30,10 @@ class SaleDetailScreen extends StatelessWidget {
       discount: sale.discount,
       tax: sale.tax,
       total: sale.total,
+      taxId: company?.taxId,
+      taxLabel: company?.taxLabel ?? 'Tax',
+      isIndia: company?.isIndia ?? false,
+      taxRate: (sale.total - sale.tax) > 0 ? sale.tax / (sale.total - sale.tax) * 100 : 0,
       lines: sale.items
           .map((item) {
             final qty = ((item['quantity'] as num?) ?? (item['qty'] as num?) ?? 1).toDouble();
@@ -48,6 +52,9 @@ class SaleDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final company = context.watch<AuthProvider>().company;
+    final isIndia = company?.isIndia ?? false;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Sale #${sale.saleNumber}'),
@@ -106,7 +113,12 @@ class SaleDetailScreen extends StatelessWidget {
               child: Column(
                 children: [
                   _TotalRow('Discount', formatter.format(sale.discount)),
-                  _TotalRow('Tax', formatter.format(sale.tax)),
+                  if (sale.tax > 0)
+                    if (isIndia) ...[
+                      _TotalRow('CGST', formatter.format(sale.tax / 2)),
+                      _TotalRow('SGST', formatter.format(sale.tax / 2)),
+                    ] else
+                      _TotalRow(company?.taxLabel ?? 'Tax', formatter.format(sale.tax)),
                   const Divider(),
                   _TotalRow('Total', formatter.format(sale.total), bold: true),
                   _TotalRow('Paid', formatter.format(sale.paidAmount)),

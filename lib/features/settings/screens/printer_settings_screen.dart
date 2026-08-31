@@ -100,7 +100,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     if (_selectedMac == null) return;
     setState(() => _testing = true);
     final ok = await _service.printReceipt(
-      companyName: 'Zoom POS Test',
+      companyName: 'Sales & Inventory Test',
       documentLabel: 'Printer Test Receipt',
       lines: [
         ReceiptLine(name: 'Thermal Print Test Item', quantity: 1, unitPrice: 1.00, lineTotal: 1.00),

@@ -1,5 +1,5 @@
 name: zoom_pos_mobile
-description: "Zoom POS mobile client — Android app for the Zoom POS multi-tenant SaaS platform."
+description: "Sales & Inventory mobile client — Android app for the multi-tenant SaaS platform."
 publish_to: 'none'
 version: 1.0.1+2
 
@@ -8,6 +8,8 @@ environment:
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
@@ -37,6 +39,11 @@ dependencies:
   # Invoice / receipt PDF + printing
   printing: ^5.13.4
   pdf: ^3.11.1
+
+  # Product/logo images, bulk-import file picking, barcode/QR scanning
+  image_picker: ^1.1.2
+  file_picker: ^8.1.2
+  mobile_scanner: ^5.2.3
 
   # Thermal receipt printing (Android/iOS only — never imported from
   # web/desktop code paths, see lib/core/services/thermal/)

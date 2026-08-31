@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/storage/app_preferences.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../settings/server_settings_screen.dart';
 import '../auth_provider.dart';
 import 'register_screen.dart';
@@ -56,13 +57,14 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign in'),
+        title: Text(l10n.signIn),
         actions: [
           IconButton(
-            tooltip: 'Server address',
+            tooltip: l10n.serverAddress,
             icon: const Icon(Icons.dns_outlined),
             onPressed: _openServerSettings,
           ),
@@ -82,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Icon(Icons.storefront, size: 56, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(height: 12),
                     Text(
-                      'Zoom POS',
+                      'Sales & Inventory',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
@@ -91,25 +93,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Email or login',
-                        prefixIcon: Icon(Icons.person_outline),
+                      decoration: InputDecoration(
+                        labelText: l10n.emailOrLogin,
+                        prefixIcon: const Icon(Icons.person_outline),
                       ),
-                      validator: (value) => (value == null || value.trim().isEmpty) ? 'Required' : null,
+                      validator: (value) => (value == null || value.trim().isEmpty) ? l10n.required : null,
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
-                        labelText: 'Password',
+                        labelText: l10n.password,
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
                       ),
-                      validator: (value) => (value == null || value.isEmpty) ? 'Required' : null,
+                      validator: (value) => (value == null || value.isEmpty) ? l10n.required : null,
                       onFieldSubmitted: (_) => _submit(),
                     ),
                     if (_showAccountId) ...[
@@ -117,9 +119,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextFormField(
                         controller: _accountIdController,
                         autocorrect: false,
-                        decoration: const InputDecoration(
-                          labelText: 'Store account ID (optional)',
-                          prefixIcon: Icon(Icons.badge_outlined),
+                        decoration: InputDecoration(
+                          labelText: l10n.storeAccountIdOptional,
+                          prefixIcon: const Icon(Icons.badge_outlined),
                         ),
                       ),
                     ] else
@@ -127,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () => setState(() => _showAccountId = true),
-                          child: const Text('I have a store account ID'),
+                          child: Text(l10n.iHaveAccountId),
                         ),
                       ),
                     const SizedBox(height: 24),
@@ -139,20 +141,20 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text('Sign in'),
+                          : Text(l10n.signIn),
                     ),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text("Don't have a store yet?"),
+                        Text(l10n.noStoreYetPrompt),
                         TextButton(
                           onPressed: auth.isBusy
                               ? null
                               : () => Navigator.of(context).push(
                                     MaterialPageRoute(builder: (_) => const RegisterScreen()),
                                   ),
-                          child: const Text('Create one'),
+                          child: Text(l10n.createOne),
                         ),
                       ],
                     ),

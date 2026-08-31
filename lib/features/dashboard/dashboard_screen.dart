@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/config/theme_provider.dart';
 import '../../core/models/analytics_model.dart';
 import '../../core/storage/app_preferences.dart';
 import '../../core/utils/currency_formatter.dart';
-import '../../core/utils/responsive.dart';
 import '../../core/widgets/coming_soon_screen.dart';
+import '../../l10n/app_localizations.dart';
 import '../analytics/analytics_repository.dart';
 import '../analytics/screens/analytics_screen.dart';
 import '../analytics/widgets/analytics_widgets.dart';
@@ -27,6 +28,7 @@ import '../sales_targets/screens/sales_targets_screen.dart';
 import '../service_orders/screens/service_orders_screen.dart';
 import '../settings/screens/tenant_settings_screen.dart';
 import '../settings/server_settings_screen.dart';
+import '../settings/settings_repository.dart';
 import '../staff/screens/staff_screen.dart';
 import '../subscription/screens/subscription_screen.dart';
 import '../taxes/screens/taxes_screen.dart';
@@ -64,6 +66,22 @@ final List<_FeatureTile> _features = [
   _FeatureTile('Settings', Icons.settings_outlined, (_) => const TenantSettingsScreen()),
 ];
 
+/// The 4 most frequently used destinations, surfaced on the bottom
+/// navigation bar. Resolved once (by title, against [_features]) at module
+/// load rather than per-build/per-tap — a typo here throws immediately when
+/// the dashboard first builds instead of silently no-op'ing on a tap deep
+/// into a session.
+final List<_FeatureTile> _bottomNavTiles = [
+  _features.firstWhere((f) => f.title == 'Point of Sale'),
+  _features.firstWhere((f) => f.title == 'Inventory Management'),
+  _features.firstWhere((f) => f.title == 'Sales'),
+  _features.firstWhere((f) => f.title == 'Settings'),
+];
+
+/// Short labels for [_bottomNavTiles] — the tiles' own titles are too long
+/// for a fixed-type bottom bar with 5 items (e.g. "Inventory Management").
+const List<String> _bottomNavLabels = ['POS', 'Inventory', 'Sales', 'Settings'];
+
 /// The post-login home base. Each feature module still under construction
 /// falls back to a [ComingSoonScreen] placeholder — swap in the real screen
 /// as it lands and give its [_FeatureTile] a builder.
@@ -77,23 +95,26 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late final AnalyticsRepository _analyticsRepository;
   late Future<AnalyticsModel> _analyticsFuture;
+  int _bottomNavIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _analyticsRepository = AnalyticsRepository(context.read<ApiClient>());
     _analyticsFuture = _analyticsRepository.fetchAnalytics();
+    context.read<ThemeProvider>().refreshFromServer(SettingsRepository(context.read<ApiClient>()));
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sign out?'),
-        content: const Text("You'll need your password to sign back in."),
+        title: Text(l10n.signOutConfirmTitle),
+        content: Text(l10n.signOutConfirmBody),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Sign out')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.cancel)),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.signOut)),
         ],
       ),
     );
@@ -111,27 +132,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _onBottomNavTap(int index) {
+    if (index == 0) return; // Home — already showing.
+
+    setState(() => _bottomNavIndex = index);
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: _bottomNavTiles[index - 1].builder ??
+                (_) => ComingSoonScreen(title: _bottomNavTiles[index - 1].title, icon: _bottomNavTiles[index - 1].icon),
+          ),
+        )
+        .then((_) {
+      // The bar is a quick-launcher over the app's stack-based navigation,
+      // not a persistent multi-tab shell — always settle back on Home once
+      // the pushed screen is popped.
+      if (mounted) setState(() => _bottomNavIndex = 0);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final company = auth.company;
-    final user = auth.user;
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(company?.tradeName ?? company?.name ?? 'Zoom POS'),
+        title: Text(company?.tradeName ?? company?.name ?? 'Sales & Inventory'),
         elevation: 0,
         actions: [
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: l10n.refresh,
             icon: const Icon(Icons.refresh),
             onPressed: () => setState(() {
               _analyticsFuture = _analyticsRepository.fetchAnalytics();
             }),
           ),
           IconButton(
-            tooltip: 'Server address',
+            tooltip: l10n.serverAddress,
             icon: const Icon(Icons.dns_outlined),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
@@ -140,10 +179,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           IconButton(
-            tooltip: 'Sign out',
+            tooltip: l10n.signOut,
             icon: const Icon(Icons.logout),
             onPressed: () => _confirmLogout(context),
           ),
+        ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    company?.tradeName ?? company?.name ?? 'Sales & Inventory',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  if (company != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      company.planName.toUpperCase(),
+                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            for (final feature in _features)
+              ListTile(
+                leading: Icon(feature.icon),
+                title: Text(feature.title),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openFeature(context, feature);
+                },
+              ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _bottomNavIndex,
+        onTap: _onBottomNavTap,
+        type: BottomNavigationBarType.fixed,
+        items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
+          for (var i = 0; i < _bottomNavTiles.length; i++)
+            BottomNavigationBarItem(icon: Icon(_bottomNavTiles[i].icon), label: _bottomNavLabels[i]),
         ],
       ),
       body: RefreshIndicator(
@@ -158,67 +243,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [primaryColor, primaryColor.withOpacity(0.8)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withOpacity(0.25),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Welcome back, ${user?.name ?? 'Merchant'}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              company != null
-                                  ? '${company.name} · ${company.planName.toUpperCase()} PLAN'
-                                  : 'Point of Sale & Business Suite',
-                              style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.check_circle, color: Colors.white, size: 14),
-                            SizedBox(width: 4),
-                            Text('Online', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
                 FutureBuilder<AnalyticsModel>(
                   future: _analyticsFuture,
                   builder: (context, snapshot) {
@@ -231,49 +255,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     );
                   },
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'Quick Access',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                LayoutBuilder(
-                  builder: (context, constraints) => GridView.count(
-                    crossAxisCount: gridColumnsFor(constraints.maxWidth, mobile: 2, tablet: 3, desktop: 4),
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.3,
-                    children: [
-                      for (final feature in _features)
-                        Card(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          elevation: 1,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () => _openFeature(context, feature),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(feature.icon, size: 30, color: Theme.of(context).colorScheme.primary),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    feature.title,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -294,6 +276,8 @@ class _DashboardAnalytics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -308,9 +292,9 @@ class _DashboardAnalytics extends StatelessWidget {
               crossAxisSpacing: 10,
               childAspectRatio: isSmall ? 3.2 : 1.15,
               children: [
-                KpiCard(label: "Today's sales", value: formatter.format(analytics.todayRevenue)),
-                KpiCard(label: 'Orders today', value: analytics.todayOrders.toString()),
-                KpiCard(label: 'Avg. order', value: formatter.format(analytics.averageOrderValue)),
+                KpiCard(label: l10n.todaysSales, value: formatter.format(analytics.todayRevenue)),
+                KpiCard(label: l10n.ordersToday, value: analytics.todayOrders.toString()),
+                KpiCard(label: l10n.avgOrder, value: formatter.format(analytics.averageOrderValue)),
               ],
             );
           },
@@ -321,7 +305,7 @@ class _DashboardAnalytics extends StatelessWidget {
             color: Colors.orange.shade50,
             child: ListTile(
               leading: Icon(Icons.warning_amber_outlined, color: Colors.orange.shade800),
-              title: Text('${analytics.lowStockCount} product${analytics.lowStockCount == 1 ? '' : 's'} low on stock'),
+              title: Text(l10n.lowStockWarning(analytics.lowStockCount)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const InventoryManagementScreen()),
@@ -331,13 +315,13 @@ class _DashboardAnalytics extends StatelessWidget {
         ],
         if (analytics.revenueTrend.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text('Revenue trend', style: Theme.of(context).textTheme.titleMedium),
+          Text(l10n.revenueTrend, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           SizedBox(height: 140, child: RevenueTrendChart(points: analytics.revenueTrend)),
         ],
         if (analytics.topProducts.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text('Top selling', style: Theme.of(context).textTheme.titleMedium),
+          Text(l10n.topSelling, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Card(
             child: Column(

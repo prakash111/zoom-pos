@@ -29,6 +29,8 @@ class ApiEndpoints {
 
   static const String inventory = '/inventory';
   static const String inventoryStoreProduct = '/inventory/product';
+  static String inventoryProductImage(String id) => '/inventory/product/$id/image';
+  static const String inventoryImport = '/inventory/import';
   static const String inventoryAdjustStock = '/inventory/adjust';
 
   static const String customers = '/customers';
@@ -43,6 +45,10 @@ class ApiEndpoints {
   static const String taxes = '/taxes';
   static String tax(String id) => '/taxes/$id';
   static String taxSetDefault(String id) => '/taxes/$id/set-default';
+
+  /// Outside the `/api/v1/pos` prefix — use with [ApiClient.getAbsolute],
+  /// not [ApiClient.get].
+  static const String taxRatesAbsolute = '/api/v1/tax/rates';
 
   static const String subscription = '/subscription';
   static const String subscriptionRedeem = '/subscription/redeem';
@@ -84,6 +90,8 @@ class ApiEndpoints {
 
   static const String settings = '/settings';
   static const String settingsProfile = '/settings/profile';
+  static const String settingsProfileLogo = '/settings/profile/logo';
+  static const String settingsProfileFavicon = '/settings/profile/favicon';
   static const String settingsReceipts = '/settings/receipts';
   static const String settingsFinancial = '/settings/financial';
   static const String settingsNotifications = '/settings/notifications';

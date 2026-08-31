@@ -60,7 +60,7 @@ class _AuthGateState extends State<AuthGate> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Zoom POS',
+                  'Sales & Inventory',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),

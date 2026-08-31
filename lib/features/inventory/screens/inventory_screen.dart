@@ -10,6 +10,7 @@ import '../../auth/auth_provider.dart';
 import '../inventory_provider.dart';
 import '../inventory_repository.dart';
 import 'adjust_stock_sheet.dart';
+import 'bulk_import_screen.dart';
 import 'product_form_sheet.dart';
 
 /// Product catalog management: list/search/filter, create, edit, and stock
@@ -58,6 +59,14 @@ class _InventoryScreenBodyState extends State<_InventoryScreenBody> {
     );
   }
 
+  Future<void> _openBulkImport(BuildContext context) async {
+    final inventory = context.read<InventoryProvider>();
+    final imported = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const BulkImportScreen()),
+    );
+    if (imported == true) inventory.loadCatalog();
+  }
+
   void _openAdjustStock(BuildContext context, ProductModel product) {
     final inventory = context.read<InventoryProvider>();
 
@@ -79,7 +88,16 @@ class _InventoryScreenBodyState extends State<_InventoryScreenBody> {
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Inventory')),
+      appBar: AppBar(
+        title: const Text('Inventory'),
+        actions: [
+          IconButton(
+            tooltip: 'Bulk import',
+            icon: const Icon(Icons.upload_file_outlined),
+            onPressed: () => _openBulkImport(context),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openProductForm(context),
         child: const Icon(Icons.add),

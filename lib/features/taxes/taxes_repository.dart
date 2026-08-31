@@ -52,4 +52,14 @@ class TaxesRepository {
   Future<void> setDefaultTax(String id) {
     return _client.post(ApiEndpoints.taxSetDefault(id));
   }
+
+  /// The tenant's own country's suggested GST/VAT/sales-tax rules
+  /// (TaxApiController::getRates) — outside the `/api/v1/pos` prefix, so it
+  /// goes through [ApiClient.getAbsolute] rather than the other calls above.
+  Future<TaxJurisdictionPresets> fetchJurisdictionPresets() async {
+    final response = await _client.getAbsolute(ApiEndpoints.taxRatesAbsolute);
+    return TaxJurisdictionPresets.fromJson(
+      response['jurisdiction_presets'] as Map<String, dynamic>? ?? const {},
+    );
+  }
 }

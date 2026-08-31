@@ -4,7 +4,7 @@ import '../../core/config/app_config.dart';
 import '../../core/storage/app_preferences.dart';
 
 /// Lets the store owner point this terminal at wherever they self-hosted the
-/// Zoom POS platform, since [AppConfig.defaultBaseUrl] is only a fallback.
+/// Sales & Inventory platform, since [AppConfig.defaultBaseUrl] is only a fallback.
 class ServerSettingsScreen extends StatefulWidget {
   const ServerSettingsScreen({super.key, required this.preferences});
 
@@ -66,7 +66,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Enter the web address of your Zoom POS platform. Leave the '
+                      'Enter the web address of your Sales & Inventory platform. Leave the '
                       'default if you were not given a custom one.',
                       style: TextStyle(color: Colors.grey.shade600),
                     ),

@@ -1,8 +1,19 @@
+import 'dart:io';
+import 'dart:math';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/api/api_client.dart';
+import '../../../core/api/api_exception.dart';
 import '../../../core/models/product_model.dart';
+import '../../../core/models/tax_rule_model.dart';
+import '../../../core/widgets/barcode_scanner_screen.dart';
+import '../../taxes/taxes_repository.dart';
 import '../inventory_provider.dart';
+import '../inventory_repository.dart';
 
 /// Bottom sheet for POST /inventory/product, used for both creating a new
 /// product ([product] is null) and editing an existing one. Stock is only
@@ -31,12 +42,17 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
   late final TextEditingController _categoryController;
   late final TextEditingController _brandController;
   late final TextEditingController _taxRateController;
+  late final TaxesRepository _taxesRepository;
+  List<TaxRuleModel> _taxRules = [];
+  TaxRuleModel? _selectedTaxRule;
+  XFile? _pickedImage;
 
   bool get _isEditing => widget.product != null;
 
   @override
   void initState() {
     super.initState();
+    _taxesRepository = TaxesRepository(context.read<ApiClient>());
     final product = widget.product;
     _nameController = TextEditingController(text: product?.name ?? '');
     _salePriceController = TextEditingController(text: product == null ? '' : product.salePrice.toStringAsFixed(2));
@@ -50,6 +66,40 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
     _categoryController = TextEditingController(text: product?.categoryName ?? '');
     _brandController = TextEditingController(text: product?.brandName ?? '');
     _taxRateController = TextEditingController(text: product == null ? '0' : product.taxRate.toStringAsFixed(2));
+    _loadTaxRules();
+  }
+
+  Future<void> _loadTaxRules() async {
+    try {
+      final rules = await _taxesRepository.fetchTaxes();
+      if (!mounted) return;
+
+      TaxRuleModel? matched;
+      if (_isEditing) {
+        for (final rule in rules) {
+          if ((rule.rate - widget.product!.taxRate).abs() < 0.001) {
+            matched = rule;
+            break;
+          }
+        }
+      } else {
+        for (final rule in rules) {
+          if (rule.isDefault) {
+            matched = rule;
+            break;
+          }
+        }
+      }
+
+      setState(() {
+        _taxRules = rules;
+        _selectedTaxRule = matched;
+        if (matched != null) _taxRateController.text = matched.rate.toStringAsFixed(2);
+      });
+    } on ApiException {
+      // Tax rules are a convenience picker on top of the free-text rate
+      // field below — if they fail to load, leave the free-text field usable.
+    }
   }
 
   @override
@@ -72,7 +122,7 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
     if (!_formKey.currentState!.validate()) return;
 
     final inventory = context.read<InventoryProvider>();
-    final success = await inventory.saveProduct(
+    final productId = await inventory.saveProduct(
       externalId: widget.product?.id,
       name: _nameController.text.trim(),
       salePrice: double.parse(_salePriceController.text),
@@ -88,11 +138,65 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
     );
 
     if (!mounted) return;
-    if (success) {
-      Navigator.of(context).pop();
+    if (productId != null) {
+      final pickedImage = _pickedImage;
+      if (pickedImage != null) {
+        try {
+          final bytes = await pickedImage.readAsBytes();
+          await InventoryRepository(context.read<ApiClient>()).uploadProductImage(productId, bytes, pickedImage.name);
+        } on ApiException catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text('Product saved, but image upload failed: ${e.message}')));
+          }
+        }
+      }
+      if (mounted) Navigator.of(context).pop();
     } else if (inventory.actionError != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(inventory.actionError!)));
     }
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    if (picked != null) setState(() => _pickedImage = picked);
+  }
+
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+    );
+    if (code != null && code.isNotEmpty) {
+      setState(() => _barcodeController.text = code);
+    }
+  }
+
+  /// Mirrors PosSyncApiController::generateIdentifiers()'s algorithm (GS1
+  /// India-style EAN-13 barcode + category-prefixed SKU) client-side — only
+  /// fills fields that are currently blank, same as the backend's guard.
+  void _autoGenerateIdentifiers() {
+    setState(() {
+      if (_barcodeController.text.trim().isEmpty) _barcodeController.text = _generateBarcode();
+      if (_skuController.text.trim().isEmpty) _skuController.text = _generateSku();
+    });
+  }
+
+  String _generateBarcode() {
+    final rnd = Random();
+    final base = '890${rnd.nextInt(1000000000).toString().padLeft(9, '0')}';
+    var sum = 0;
+    for (var i = 0; i < base.length; i++) {
+      sum += int.parse(base[i]) * (i.isEven ? 1 : 3);
+    }
+    final checkDigit = (10 - (sum % 10)) % 10;
+    return '$base$checkDigit';
+  }
+
+  String _generateSku() {
+    final raw = _categoryController.text.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    final prefix = (raw.isEmpty ? 'PRD' : raw).padRight(3, 'X').substring(0, 3);
+    final number = 100000 + Random().nextInt(900000);
+    return '$prefix-$number';
   }
 
   @override
@@ -116,6 +220,52 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(_isEditing ? 'Edit product' : 'New product', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: 96,
+                            height: 96,
+                            color: Colors.grey.shade100,
+                            child: _pickedImage != null
+                                ? Image.file(File(_pickedImage!.path), fit: BoxFit.cover)
+                                : (widget.product?.imageUrl ?? '').isNotEmpty
+                                    ? CachedNetworkImage(imageUrl: widget.product!.imageUrl!, fit: BoxFit.cover)
+                                    : Icon(Icons.inventory_2_outlined, size: 36, color: Colors.grey.shade400),
+                          ),
+                        ),
+                        if (_pickedImage != null)
+                          Positioned(
+                            top: -8,
+                            right: -8,
+                            child: IconButton(
+                              icon: const Icon(Icons.cancel, color: Colors.redAccent),
+                              onPressed: () => setState(() => _pickedImage = null),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => _pickImage(ImageSource.camera),
+                        icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                        label: const Text('Camera'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed: () => _pickImage(ImageSource.gallery),
+                        icon: const Icon(Icons.photo_library_outlined, size: 18),
+                        label: const Text('Gallery'),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _nameController,
@@ -182,7 +332,14 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
                       Expanded(
                         child: TextFormField(
                           controller: _barcodeController,
-                          decoration: const InputDecoration(labelText: 'Barcode'),
+                          decoration: InputDecoration(
+                            labelText: 'Barcode',
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.qr_code_scanner, size: 20),
+                              tooltip: 'Scan barcode',
+                              onPressed: _scanBarcode,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -194,7 +351,15 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _autoGenerateIdentifiers,
+                      icon: const Icon(Icons.auto_awesome_outlined, size: 16),
+                      label: const Text('Auto-generate barcode & SKU'),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Expanded(
@@ -205,10 +370,37 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: TextFormField(
-                          controller: _taxRateController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: const InputDecoration(labelText: 'Tax rate %'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            DropdownButtonFormField<TaxRuleModel?>(
+                              value: _selectedTaxRule,
+                              isExpanded: true,
+                              decoration: const InputDecoration(labelText: 'Tax rule'),
+                              items: [
+                                for (final rule in _taxRules)
+                                  DropdownMenuItem(
+                                    value: rule,
+                                    child: Text('${rule.name} (${rule.rate.toStringAsFixed(0)}%)', overflow: TextOverflow.ellipsis),
+                                  ),
+                                const DropdownMenuItem(value: null, child: Text('Custom %')),
+                              ],
+                              onChanged: (rule) {
+                                setState(() {
+                                  _selectedTaxRule = rule;
+                                  if (rule != null) _taxRateController.text = rule.rate.toStringAsFixed(2);
+                                });
+                              },
+                            ),
+                            if (_selectedTaxRule == null) ...[
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _taxRateController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: const InputDecoration(labelText: 'Tax rate %'),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ],

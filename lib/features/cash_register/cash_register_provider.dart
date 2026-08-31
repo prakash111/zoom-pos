@@ -6,6 +6,8 @@ import 'cash_register_repository.dart';
 
 enum CashRegisterStatus { loading, loaded, error }
 
+enum HistoryStatus { loading, loaded, error }
+
 /// Drives the cash register screen: current shift status, open/close,
 /// movements, and shift history.
 class CashRegisterProvider extends ChangeNotifier {
@@ -17,6 +19,8 @@ class CashRegisterProvider extends ChangeNotifier {
   String? error;
   CashRegisterModel? current;
   List<CashRegisterModel> history = [];
+  HistoryStatus historyStatus = HistoryStatus.loading;
+  String? historyError;
 
   bool isSaving = false;
   String? actionError;
@@ -36,13 +40,17 @@ class CashRegisterProvider extends ChangeNotifier {
   }
 
   Future<void> loadHistory() async {
+    historyStatus = HistoryStatus.loading;
+    notifyListeners();
+
     try {
       history = await _repository.fetchHistory();
-      notifyListeners();
+      historyStatus = HistoryStatus.loaded;
     } on ApiException catch (e) {
-      actionError = e.message;
-      notifyListeners();
+      historyError = e.message;
+      historyStatus = HistoryStatus.error;
     }
+    notifyListeners();
   }
 
   Future<bool> openRegister({

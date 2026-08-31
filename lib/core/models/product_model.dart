@@ -57,4 +57,25 @@ class ProductModel {
   final bool isLowStock;
 
   bool get isOutOfStock => currentStock <= 0;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'barcode': barcode,
+      'sku': sku,
+      'sale_price': salePrice,
+      'cost_price': costPrice,
+      'current_stock': currentStock,
+      'minimum_stock': minimumStock,
+      'unit': unit,
+      'category_id': categoryId,
+      'category_name': categoryName,
+      'brand_name': brandName,
+      'image_url': imageUrl,
+      'tax_rate': taxRate,
+      'active': active,
+      'is_low_stock': isLowStock,
+    };
+  }
 }

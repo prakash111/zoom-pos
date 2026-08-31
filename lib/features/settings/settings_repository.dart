@@ -57,6 +57,30 @@ class SettingsRepository {
     return ProfileSettings.fromJson(response['profile'] as Map<String, dynamic>);
   }
 
+  Future<String?> uploadLogo(List<int> bytes, String filename) async {
+    final response = await _client.postMultipart(
+      ApiEndpoints.settingsProfileLogo,
+      fieldName: 'logo',
+      bytes: bytes,
+      filename: filename,
+    );
+    return response['logo_url'] as String?;
+  }
+
+  Future<void> removeLogo() => _client.delete(ApiEndpoints.settingsProfileLogo);
+
+  Future<String?> uploadFavicon(List<int> bytes, String filename) async {
+    final response = await _client.postMultipart(
+      ApiEndpoints.settingsProfileFavicon,
+      fieldName: 'favicon',
+      bytes: bytes,
+      filename: filename,
+    );
+    return response['favicon_url'] as String?;
+  }
+
+  Future<void> removeFavicon() => _client.delete(ApiEndpoints.settingsProfileFavicon);
+
   Future<ReceiptSettings> updateReceipts({
     String? invoicePrefix,
     String? quotationPrefix,

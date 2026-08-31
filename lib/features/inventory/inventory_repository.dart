@@ -48,9 +48,11 @@ class InventoryRepository {
 
   /// Creates a new product, or updates an existing one when [externalId] is
   /// passed (the same `id` value products come back with from
-  /// [fetchCatalog]). The response only echoes a partial product, so callers
-  /// should re-fetch the catalog afterwards rather than trust it directly.
-  Future<void> saveProduct({
+  /// [fetchCatalog]). Returns the product's id (from the response for a
+  /// create, or [externalId] itself for an edit) — the response only echoes
+  /// a partial product otherwise, so callers should re-fetch the catalog
+  /// afterwards rather than trust it directly for anything but this id.
+  Future<String?> saveProduct({
     String? externalId,
     required String name,
     required double salePrice,
@@ -63,8 +65,8 @@ class InventoryRepository {
     String categoryName = 'General',
     String? brandName,
     double taxRate = 0,
-  }) {
-    return _client.post(ApiEndpoints.inventoryStoreProduct, data: {
+  }) async {
+    final response = await _client.post(ApiEndpoints.inventoryStoreProduct, data: {
       if (externalId != null) 'external_id': externalId,
       'name': name,
       'sale_price': salePrice,
@@ -78,6 +80,35 @@ class InventoryRepository {
       if (brandName != null && brandName.isNotEmpty) 'brand_name': brandName,
       'tax_rate': taxRate,
     });
+    final product = response['product'];
+    if (product is Map && product['id'] != null) return product['id'].toString();
+    return externalId;
+  }
+
+  /// Uploads or replaces a product's image. [productId] is the same id
+  /// [saveProduct] returns (server id or external_id — the endpoint accepts
+  /// either).
+  Future<String?> uploadProductImage(String productId, List<int> bytes, String filename) async {
+    final response = await _client.postMultipart(
+      ApiEndpoints.inventoryProductImage(productId),
+      fieldName: 'image',
+      bytes: bytes,
+      filename: filename,
+    );
+    return response['image_url'] as String?;
+  }
+
+  /// Bulk-creates products from a `.csv`/`.txt` file (columns: name,
+  /// category, item_code, barcode, cost_price, sale_price, stock). Returns
+  /// the number of products imported.
+  Future<int> bulkImport(List<int> bytes, String filename) async {
+    final response = await _client.postMultipart(
+      ApiEndpoints.inventoryImport,
+      fieldName: 'file',
+      bytes: bytes,
+      filename: filename,
+    );
+    return (response['imported'] as num?)?.toInt() ?? 0;
   }
 
   /// [type] is one of 'add', 'subtract', or 'set'.

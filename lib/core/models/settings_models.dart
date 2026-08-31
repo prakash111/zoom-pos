@@ -15,6 +15,8 @@ class ProfileSettings {
     required this.postalCode,
     required this.country,
     required this.primaryColor,
+    this.logoUrl,
+    this.faviconUrl,
     required this.defaultCommissionRate,
     required this.defaultCommissionType,
   });
@@ -33,6 +35,8 @@ class ProfileSettings {
       postalCode: json['postal_code'] as String? ?? '',
       country: json['country'] as String? ?? 'US',
       primaryColor: json['primary_color'] as String? ?? '#2563eb',
+      logoUrl: json['logo_url'] as String?,
+      faviconUrl: json['favicon_url'] as String?,
       defaultCommissionRate: (json['default_commission_rate'] as num?)?.toDouble() ?? 0,
       defaultCommissionType: json['default_commission_type'] as String? ?? 'percentage',
     );
@@ -50,6 +54,8 @@ class ProfileSettings {
   final String postalCode;
   final String country;
   final String primaryColor;
+  final String? logoUrl;
+  final String? faviconUrl;
   final double defaultCommissionRate;
   final String defaultCommissionType;
 }

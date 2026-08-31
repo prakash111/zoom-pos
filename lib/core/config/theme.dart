@@ -6,9 +6,9 @@ class AppTheme {
   static const Color primary = Color(0xFF2563EB);
   static const Color surface = Color(0xFFF8FAFC);
 
-  static ThemeData light() {
+  static ThemeData light({Color? seedColor}) {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: primary,
+      seedColor: seedColor ?? primary,
       brightness: Brightness.light,
     );
 

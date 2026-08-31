@@ -8,14 +8,17 @@ import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/image_url.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/widgets/barcode_scanner_screen.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../auth/auth_provider.dart';
 import '../../cash_register/cash_register_provider.dart';
 import '../../cash_register/cash_register_repository.dart';
 import '../../cash_register/screens/open_register_sheet.dart';
 import '../../customers/customers_repository.dart';
 import '../../inventory/inventory_repository.dart';
+import '../held_carts_store.dart';
 import '../pos_provider.dart';
 import '../sales_repository.dart';
 import 'cart_sheet.dart';
@@ -30,11 +33,14 @@ class PosScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final apiClient = context.read<ApiClient>();
 
+    final heldCartsStore = context.read<HeldCartsStore>();
+
     return ChangeNotifierProvider(
       create: (_) => PosProvider(
         inventoryRepository: InventoryRepository(apiClient),
         salesRepository: SalesRepository(apiClient),
         cashRegisterRepository: CashRegisterRepository(apiClient),
+        heldCartsStore: heldCartsStore,
       )
         ..loadCatalog()
         ..checkRegisterStatus(),
@@ -66,6 +72,16 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _scanBarcode(BuildContext context) async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+    );
+    if (code == null || code.isEmpty || !context.mounted) return;
+
+    _searchController.text = code;
+    context.read<PosProvider>().setSearchQuery(code);
   }
 
   Future<void> _openRegisterPrompt(BuildContext context) async {
@@ -102,7 +118,7 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
 
     if (result == null || !context.mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sale completed.')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).saleCompleted)));
     await showInvoiceActionsSheet(
       context,
       InvoiceActionsData(
@@ -119,6 +135,7 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
         taxId: company?.taxId,
         taxLabel: company?.taxLabel ?? 'Tax',
         isIndia: company?.isIndia ?? false,
+        taxRate: (result.subtotal - result.discount) > 0 ? result.tax / (result.subtotal - result.discount) * 100 : 0,
         lines: result.items
             .map((item) => ReceiptLine(
                   name: item.product.name,
@@ -137,6 +154,7 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     final company = context.watch<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
     final isDesktopOrTabletWide = isWide(context);
+    final l10n = AppLocalizations.of(context);
 
     final catalogWidget = Column(
       children: [
@@ -149,10 +167,10 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
               children: [
                 Icon(Icons.lock_clock_outlined, size: 18, color: Colors.orange.shade800),
                 const SizedBox(width: 8),
-                const Expanded(child: Text('No cash register is open. Sales are blocked until one is opened.')),
+                Expanded(child: Text(l10n.registerClosedBanner)),
                 TextButton(
                   onPressed: () => _openRegisterPrompt(context),
-                  child: const Text('Open'),
+                  child: Text(l10n.open),
                 ),
               ],
             ),
@@ -163,17 +181,26 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
             controller: _searchController,
             onChanged: pos.setSearchQuery,
             decoration: InputDecoration(
-              hintText: 'Search products, SKU, or barcode',
+              hintText: l10n.searchProductsHint,
               prefixIcon: const Icon(Icons.search),
-              suffixIcon: pos.searchQuery.isEmpty
-                  ? null
-                  : IconButton(
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.qr_code_scanner),
+                    tooltip: l10n.scanBarcode,
+                    onPressed: () => _scanBarcode(context),
+                  ),
+                  if (pos.searchQuery.isNotEmpty)
+                    IconButton(
                       icon: const Icon(Icons.clear),
                       onPressed: () {
                         _searchController.clear();
                         pos.setSearchQuery('');
                       },
                     ),
+                ],
+              ),
             ),
           ),
         ),

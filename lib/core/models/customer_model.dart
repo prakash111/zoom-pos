@@ -39,4 +39,19 @@ class CustomerModel {
   final int loyaltyPoints;
 
   bool get hasBalanceDue => balanceDue > 0;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'phone': phone,
+      'email': email,
+      'document': document,
+      'address': address,
+      'city': city,
+      'state': state,
+      'balance_due': balanceDue,
+      'loyalty_points': loyaltyPoints,
+    };
+  }
 }

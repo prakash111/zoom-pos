@@ -64,7 +64,7 @@ class InventoryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> saveProduct({
+  Future<String?> saveProduct({
     String? externalId,
     required String name,
     required double salePrice,
@@ -77,21 +77,36 @@ class InventoryProvider extends ChangeNotifier {
     String categoryName = 'General',
     String? brandName,
     double taxRate = 0,
-  }) {
-    return _runAction(() => _repository.saveProduct(
-          externalId: externalId,
-          name: name,
-          salePrice: salePrice,
-          costPrice: costPrice,
-          currentStock: currentStock,
-          minimumStock: minimumStock,
-          barcode: barcode,
-          sku: sku,
-          unit: unit,
-          categoryName: categoryName,
-          brandName: brandName,
-          taxRate: taxRate,
-        ));
+  }) async {
+    isSaving = true;
+    actionError = null;
+    notifyListeners();
+
+    try {
+      final id = await _repository.saveProduct(
+        externalId: externalId,
+        name: name,
+        salePrice: salePrice,
+        costPrice: costPrice,
+        currentStock: currentStock,
+        minimumStock: minimumStock,
+        barcode: barcode,
+        sku: sku,
+        unit: unit,
+        categoryName: categoryName,
+        brandName: brandName,
+        taxRate: taxRate,
+      );
+      await loadCatalog();
+      isSaving = false;
+      notifyListeners();
+      return id;
+    } on ApiException catch (e) {
+      actionError = e.message;
+      isSaving = false;
+      notifyListeners();
+      return null;
+    }
   }
 
   Future<bool> adjustStock({

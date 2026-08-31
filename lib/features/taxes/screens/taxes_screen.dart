@@ -32,6 +32,31 @@ class _TaxesScreenState extends State<TaxesScreen> {
     setState(() => _future = _repository.fetchTaxes());
   }
 
+  Future<void> _loadCountryDefaults() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final presets = await _repository.fetchJurisdictionPresets();
+      final existing = await _repository.fetchTaxes();
+      final existingNames = existing.map((t) => t.name.trim().toLowerCase()).toSet();
+
+      final missing = presets.rules.where((r) => !existingNames.contains(r.name.trim().toLowerCase())).toList();
+      if (missing.isEmpty) {
+        messenger.showSnackBar(SnackBar(content: Text('Already up to date with ${presets.country} defaults.')));
+        return;
+      }
+
+      for (final preset in missing) {
+        await _repository.createTax(name: preset.name, rate: preset.rate, isDefault: preset.isDefault, active: true);
+      }
+
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('Added ${missing.length} tax rule(s) for ${presets.country}.')));
+      _reload();
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
   Future<void> _openTaxForm({TaxRuleModel? tax}) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -77,7 +102,16 @@ class _TaxesScreenState extends State<TaxesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Taxes')),
+      appBar: AppBar(
+        title: const Text('Taxes'),
+        actions: [
+          IconButton(
+            tooltip: 'Load default tax rules for my country',
+            icon: const Icon(Icons.auto_awesome_outlined),
+            onPressed: _loadCountryDefaults,
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openTaxForm,
         child: const Icon(Icons.add),

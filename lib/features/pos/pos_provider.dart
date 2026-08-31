@@ -9,6 +9,7 @@ import '../../core/models/settings_models.dart';
 import '../cash_register/cash_register_repository.dart';
 import '../inventory/inventory_repository.dart';
 import 'cart_item.dart';
+import 'held_carts_store.dart';
 import 'sales_repository.dart';
 
 enum CatalogStatus { loading, loaded, error }
@@ -37,6 +38,33 @@ class HeldCart {
 
   int get itemCount => cart.values.fold<int>(0, (sum, item) => sum + item.quantity.ceil());
   double get total => cart.values.fold<double>(0, (sum, item) => sum + item.lineTotal);
+
+  factory HeldCart.fromJson(Map<String, dynamic> json) {
+    final cartJson = json['cart'] as Map<String, dynamic>? ?? const {};
+    return HeldCart(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      cart: cartJson.map((key, value) => MapEntry(key, CartItem.fromJson(value as Map<String, dynamic>))),
+      customer: json['customer'] != null ? CustomerModel.fromJson(json['customer'] as Map<String, dynamic>) : null,
+      notes: json['notes'] as String? ?? '',
+      discount: (json['discount'] as num?)?.toDouble() ?? 0,
+      isPercentDiscount: json['is_percent_discount'] as bool? ?? false,
+      heldAt: DateTime.tryParse(json['held_at'] as String? ?? '') ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'cart': cart.map((key, value) => MapEntry(key, value.toJson())),
+      'customer': customer?.toJson(),
+      'notes': notes,
+      'discount': discount,
+      'is_percent_discount': isPercentDiscount,
+      'held_at': heldAt.toIso8601String(),
+    };
+  }
 }
 
 /// Snapshot of a just-completed sale, handed back to the UI so it can open
@@ -74,13 +102,16 @@ class PosProvider extends ChangeNotifier {
     required InventoryRepository inventoryRepository,
     required SalesRepository salesRepository,
     required CashRegisterRepository cashRegisterRepository,
+    required HeldCartsStore heldCartsStore,
   })  : _inventoryRepository = inventoryRepository,
         _salesRepository = salesRepository,
-        _cashRegisterRepository = cashRegisterRepository;
+        _cashRegisterRepository = cashRegisterRepository,
+        _heldCartsStore = heldCartsStore;
 
   final InventoryRepository _inventoryRepository;
   final SalesRepository _salesRepository;
   final CashRegisterRepository _cashRegisterRepository;
+  final HeldCartsStore _heldCartsStore;
   static final Uuid _uuid = Uuid();
 
   /// Null until the first [checkRegisterStatus] call resolves.
@@ -96,7 +127,10 @@ class PosProvider extends ChangeNotifier {
   String? selectedCategoryId;
 
   final Map<String, CartItem> _cart = {};
-  final List<HeldCart> heldCarts = [];
+
+  /// Backed by [HeldCartsStore], which persists independently of this
+  /// provider's lifecycle so held carts survive navigating away from POS.
+  List<HeldCart> get heldCarts => _heldCartsStore.carts;
   CustomerModel? selectedCustomer;
   String paymentMethod = 'cash';
   String orderNotes = '';
@@ -235,7 +269,7 @@ class PosProvider extends ChangeNotifier {
         ? label
         : (selectedCustomer?.name != null ? 'Cart (${selectedCustomer!.name})' : 'Held #$heldId');
 
-    heldCarts.add(
+    _heldCartsStore.add(
       HeldCart(
         id: heldId,
         name: name,
@@ -259,12 +293,12 @@ class PosProvider extends ChangeNotifier {
     orderNotes = held.notes;
     customDiscount = held.discount;
     isPercentDiscount = held.isPercentDiscount;
-    heldCarts.removeWhere((h) => h.id == held.id);
+    _heldCartsStore.remove(held.id);
     notifyListeners();
   }
 
   void deleteHeldCart(String id) {
-    heldCarts.removeWhere((h) => h.id == id);
+    _heldCartsStore.remove(id);
     notifyListeners();
   }
 
@@ -283,7 +317,11 @@ class PosProvider extends ChangeNotifier {
   }
 
   /// Records the current cart as a completed sale.
-  Future<PosCheckoutResult?> checkout() async {
+  ///
+  /// [taxLabel] is only used to name the tax line on the persisted sale
+  /// (e.g. "GST" for Indian tenants) — pass the caller's
+  /// `company.taxLabel` where available.
+  Future<PosCheckoutResult?> checkout({String? taxLabel}) async {
     if (_cart.isEmpty) return null;
 
     if (registerOpen == false) {
@@ -311,7 +349,7 @@ class PosProvider extends ChangeNotifier {
         total: soldTotal,
         discount: soldDiscount,
         taxAmount: soldTax,
-        taxName: soldTax > 0 ? 'Tax' : null,
+        taxName: soldTax > 0 ? (taxLabel ?? 'Tax') : null,
         paymentMethod: paymentMethod,
         customerId: selectedCustomer?.id,
         customerName: soldCustomerName,
