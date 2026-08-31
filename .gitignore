@@ -13,3 +13,6 @@ android/**/*.keystore
 android/**/*.jks
 
 *.g.dart
+
+# Inno Setup output (generated installer .exe)
+Output/

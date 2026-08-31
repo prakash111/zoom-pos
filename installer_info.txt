@@ -1,0 +1,8 @@
+Welcome to the ZoomPOS Setup Wizard
+
+This will install ZoomPOS — the Sales & Inventory desktop client — on your
+computer. It is recommended that you close all other applications before
+continuing.
+
+Replace this text with your own release notes / welcome message before
+shipping a release build.

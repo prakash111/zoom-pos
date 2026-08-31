@@ -1,0 +1,7 @@
+ZoomPOS — End User License Agreement
+
+Copyright (c) 2026 Zoom Nearby. All rights reserved.
+
+This is a placeholder license file shown on the installer's license page.
+Replace this text with your actual EULA or license terms before shipping
+a release build.
