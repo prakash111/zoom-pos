@@ -19,21 +19,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Pin PUB_CACHE to the workspace drive
-        # windows-latest keeps the OS/user profile on C: but checks out the
-        # workspace on D:. PUB_CACHE defaults under C:\Users\runneradmin\...,
-        # and packages resolved from a cache on a different drive than the
-        # project have been reported to end up referenced in
-        # .dart_tool/package_config.json without their files actually being
-        # reachable at build time (subosito/flutter-action#143). Force the
-        # cache onto the same drive as the workspace to rule that out.
-        # (The `runner` context isn't allowed in a job-level `env:` block,
-        # so this is set via $GITHUB_ENV from the RUNNER_TEMP env var
-        # instead, which every step already has.)
-        shell: pwsh
-        run: |
-          "PUB_CACHE=$env:RUNNER_TEMP\pub-cache" >> $env:GITHUB_ENV
-
       - name: Setup Flutter (stable, cached)
         uses: subosito/flutter-action@v2
         with:
@@ -45,12 +30,7 @@ jobs:
         # dev machine to generate it from). Scaffold it here so the build
         # below has something to compile. Once you do run `flutter create
         # --platforms=windows .` locally and commit windows/, this step
-        # becomes a no-op and can eventually be deleted. Runs before the
-        # explicit pub get below since `flutter create` triggers its own
-        # internal pub get — doing that first, then a single pub get
-        # afterwards, avoids two back-to-back package downloads racing on
-        # the same PUB_CACHE (a known source of flaky "file not found in
-        # pub cache" build errors on GitHub-hosted Windows runners).
+        # becomes a no-op and can eventually be deleted.
         shell: pwsh
         run: |
           if (-not (Test-Path "windows")) {
@@ -62,71 +42,6 @@ jobs:
 
       - name: Flutter pub get
         run: flutter pub get
-
-      - name: Repair pub cache and re-resolve
-        # The previous attempt's hand-rolled "does the file exist" check
-        # (parsing package_config.json's rootUri myself) reported nothing
-        # missing, yet flutter_assemble's kernel compile still failed with
-        # "Error when reading .../sqflite_common_ffi.dart: cannot find the
-        # file specified" -- so that check was unreliable (URI handling for
-        # package_config's rootUri is easy to get wrong by hand). Use the
-        # actual sanctioned tool for a corrupted/incompletely-materialized
-        # pub cache instead: `dart pub cache repair` deletes and reinstalls
-        # every package currently in the cache from scratch. Re-run pub get
-        # afterward so package_config.json is regenerated against the
-        # repaired cache.
-        run: |
-          dart pub cache repair
-          flutter pub get
-
-      - name: Diagnose sqflite_common_ffi path resolution
-        # `dart pub cache repair` -- the actual sanctioned fix for a
-        # corrupted/incomplete cache -- did NOT change the outcome of the
-        # previous run: identical error, identical file. That means the
-        # package's files were probably never actually missing, and the
-        # real bug is in how the Windows CMake/MSBuild build resolves the
-        # relative rootUri stored in package_config.json (it may be
-        # resolving it against the wrong base directory -- project root
-        # instead of .dart_tool/, which are one level apart). This step
-        # doesn't fix anything; it prints hard evidence for whichever of
-        # those two resolutions is correct, so the next fix is evidence-
-        # based instead of another guess.
-        shell: pwsh
-        run: |
-          Write-Host "PUB_CACHE = $env:PUB_CACHE"
-          Write-Host "CWD = $(Get-Location)"
-
-          $config = Get-Content ".dart_tool\package_config.json" -Raw | ConvertFrom-Json
-          $pkg = $config.packages | Where-Object { $_.name -eq "sqflite_common_ffi" }
-          Write-Host "package_config.json entry:"
-          Write-Host ($pkg | ConvertTo-Json)
-
-          if ($pkg) {
-            $rootUriRaw = $pkg.rootUri
-            Write-Host "rootUri raw string: [$rootUriRaw]"
-
-            if ($rootUriRaw -match '^[a-zA-Z][a-zA-Z0-9+.-]*://') {
-              $resolved = [System.Uri]::new($rootUriRaw).LocalPath
-              Write-Host "Parsed as an absolute URI -> $resolved"
-              Write-Host "  Exists: $(Test-Path $resolved)"
-            } else {
-              $fromProjectRoot = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $rootUriRaw))
-              Write-Host "Resolved relative to project root -> $fromProjectRoot"
-              Write-Host "  Exists: $(Test-Path $fromProjectRoot)"
-
-              $dartToolDir = Join-Path (Get-Location) ".dart_tool"
-              $fromDartTool = [System.IO.Path]::GetFullPath((Join-Path $dartToolDir $rootUriRaw))
-              Write-Host "Resolved relative to .dart_tool/ (per the package_config v2 spec) -> $fromDartTool"
-              Write-Host "  Exists: $(Test-Path $fromDartTool)"
-            }
-          } else {
-            Write-Host "sqflite_common_ffi not found in package_config.json at all!"
-          }
-
-          $hostedDir = Join-Path $env:PUB_CACHE "hosted\pub.dev"
-          Write-Host "Contents of $hostedDir matching sqflite*:"
-          Get-ChildItem -Path $hostedDir -Filter "sqflite*" -ErrorAction SilentlyContinue |
-            ForEach-Object { Write-Host " - $($_.FullName)" }
 
       - name: Extract app version from pubspec.yaml
         id: version

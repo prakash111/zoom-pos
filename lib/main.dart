@@ -8,7 +8,6 @@ import 'core/config/theme.dart';
 import 'core/config/theme_provider.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/storage/secure_storage_service.dart';
-import 'core/storage/sqflite_desktop_init.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_repository.dart';
 import 'features/auth/screens/auth_gate.dart';
@@ -17,7 +16,6 @@ import 'l10n/app_localizations.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  initializeSqfliteForDesktop();
 
   final secureStorage = SecureStorageService();
   final preferences = AppPreferences();
