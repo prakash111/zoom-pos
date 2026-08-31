@@ -75,8 +75,8 @@ class _LanguagesScreenState extends State<LanguagesScreen> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
                     "Sets your online store's default language, and this app's own display "
-                    'language (fully translated for English and Hindi so far — other '
-                    'languages fall back to English in the app UI).',
+                    'language. Also sent as the Accept-Language header on every request, so '
+                    "the backend's replies match your choice.",
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                   ),
                 );

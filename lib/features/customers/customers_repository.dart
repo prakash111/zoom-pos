@@ -24,7 +24,9 @@ class CustomersRepository {
         .toList();
   }
 
-  Future<void> saveCustomer({
+  /// Returns the saved customer as sent back by the server (with its
+  /// server-assigned `id`), so callers can immediately select it.
+  Future<CustomerModel> saveCustomer({
     String? externalId,
     required String name,
     String? phone,
@@ -33,8 +35,8 @@ class CustomersRepository {
     String? address,
     String? city,
     String? state,
-  }) {
-    return _client.post(ApiEndpoints.customers, data: {
+  }) async {
+    final response = await _client.post(ApiEndpoints.customers, data: {
       if (externalId != null) 'external_id': externalId,
       'name': name,
       if (phone != null && phone.isNotEmpty) 'phone': phone,
@@ -44,6 +46,7 @@ class CustomersRepository {
       if (city != null && city.isNotEmpty) 'city': city,
       if (state != null && state.isNotEmpty) 'state': state,
     });
+    return CustomerModel.fromJson(response['customer'] as Map<String, dynamic>);
   }
 
   Future<CustomerLedger> fetchLedger(String customerId) async {

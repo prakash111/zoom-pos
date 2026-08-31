@@ -3,10 +3,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
 
-/// Non-secret, per-device settings — currently just which server this
-/// terminal talks to, since store owners can self-host on a custom domain.
+/// Non-secret, per-device settings — which server this terminal talks to
+/// (store owners can self-host on a custom domain) and the app's own
+/// display/API locale.
 class AppPreferences {
   static const _baseUrlKey = 'zoom_pos.base_url';
+  static const _localeKey = 'zoom_pos.locale';
 
   Future<String> readBaseUrl() async {
     try {
@@ -25,6 +27,29 @@ class AppPreferences {
       await prefs.setString(_baseUrlKey, normalized);
     } catch (e) {
       debugPrint('AppPreferences.saveBaseUrl error: $e');
+    }
+  }
+
+  /// The locale code (e.g. `en`, `ar`, `hi`) used both for this app's own
+  /// display language and as the `Accept-Language` header sent on every
+  /// request to the Laravel backend, so server-rendered content (PDFs,
+  /// emails, validation messages) matches what the user picked.
+  Future<String> readLocale() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_localeKey) ?? 'en';
+    } catch (e) {
+      debugPrint('AppPreferences.readLocale error: $e');
+      return 'en';
+    }
+  }
+
+  Future<void> saveLocale(String code) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_localeKey, code);
+    } catch (e) {
+      debugPrint('AppPreferences.saveLocale error: $e');
     }
   }
 }

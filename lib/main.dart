@@ -33,7 +33,7 @@ void main() {
 
   final heldCartsStore = HeldCartsStore()..load();
   final themeProvider = ThemeProvider()..load();
-  final localeProvider = LocaleProvider()..load();
+  final localeProvider = LocaleProvider(preferences: preferences)..load();
 
   runApp(ZoomPosApp(
     preferences: preferences,
@@ -82,7 +82,7 @@ class ZoomPosApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light(seedColor: theme.seedColor),
             locale: locale,
-            supportedLocales: const [Locale('en'), Locale('hi')],
+            supportedLocales: LocaleProvider.supportedCodes.map(Locale.new),
             localizationsDelegates: const [
               AppLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,

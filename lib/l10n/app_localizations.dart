@@ -1,18 +1,48 @@
 import 'package:flutter/material.dart';
 
+import 'app_strings_ar.dart';
+import 'app_strings_de.dart';
 import 'app_strings_en.dart';
+import 'app_strings_es.dart';
+import 'app_strings_fr.dart';
 import 'app_strings_hi.dart';
+import 'app_strings_id.dart';
+import 'app_strings_it.dart';
+import 'app_strings_ja.dart';
+import 'app_strings_pt.dart';
+import 'app_strings_ru.dart';
+import 'app_strings_tr.dart';
+import 'app_strings_zh.dart';
 
 /// Hand-written localizations (not Flutter's `.arb`/codegen pipeline — see
 /// the Phase 5 plan for why) for the highest-traffic screens: login/splash,
-/// dashboard chrome, POS, and Settings' Profile tab. A missing key in the
-/// active locale falls back to English rather than crashing or showing a
-/// blank string.
+/// dashboard chrome, POS, and Settings' Profile tab. Covers every locale the
+/// Laravel backend's language catalog supports (see LocalizationService and
+/// LanguagesScreen). A missing key in the active locale falls back to
+/// English rather than crashing or showing a blank string.
 class AppLocalizations {
-  AppLocalizations(this.localeName) : _strings = localeName == 'hi' ? kHiStrings : kEnStrings;
+  AppLocalizations(this.localeName) : _strings = _stringsFor(localeName);
 
   final String localeName;
   final Map<String, String> _strings;
+
+  static const _byLocale = <String, Map<String, String>>{
+    'en': kEnStrings,
+    'es': kEsStrings,
+    'fr': kFrStrings,
+    'de': kDeStrings,
+    'ar': kArStrings,
+    'hi': kHiStrings,
+    'pt': kPtStrings,
+    'it': kItStrings,
+    'zh': kZhStrings,
+    'ja': kJaStrings,
+    'ru': kRuStrings,
+    'id': kIdStrings,
+    'tr': kTrStrings,
+  };
+
+  static Map<String, String> _stringsFor(String localeName) => _byLocale[localeName] ?? kEnStrings;
 
   static AppLocalizations of(BuildContext context) {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
@@ -133,10 +163,8 @@ class AppLocalizations {
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
-  static const _supportedLocales = ['en', 'hi'];
-
   @override
-  bool isSupported(Locale locale) => _supportedLocales.contains(locale.languageCode);
+  bool isSupported(Locale locale) => AppLocalizations._byLocale.containsKey(locale.languageCode);
 
   @override
   Future<AppLocalizations> load(Locale locale) async => AppLocalizations(locale.languageCode);

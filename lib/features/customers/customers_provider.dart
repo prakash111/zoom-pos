@@ -49,7 +49,9 @@ class CustomersProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> saveCustomer({
+  /// Returns the saved customer on success, or null (with [actionError] set)
+  /// on failure.
+  Future<CustomerModel?> saveCustomer({
     String? externalId,
     required String name,
     String? phone,
@@ -64,7 +66,7 @@ class CustomersProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _repository.saveCustomer(
+      final saved = await _repository.saveCustomer(
         externalId: externalId,
         name: name,
         phone: phone,
@@ -77,12 +79,12 @@ class CustomersProvider extends ChangeNotifier {
       await loadCustomers();
       isSaving = false;
       notifyListeners();
-      return true;
+      return saved;
     } on ApiException catch (e) {
       actionError = e.message;
       isSaving = false;
       notifyListeners();
-      return false;
+      return null;
     }
   }
 }

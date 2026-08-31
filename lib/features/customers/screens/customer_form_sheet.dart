@@ -56,7 +56,7 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
     if (!_formKey.currentState!.validate()) return;
 
     final customers = context.read<CustomersProvider>();
-    final success = await customers.saveCustomer(
+    final saved = await customers.saveCustomer(
       externalId: widget.customer?.id,
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
@@ -68,7 +68,7 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
     );
 
     if (!mounted) return;
-    if (success) {
+    if (saved != null) {
       Navigator.of(context).pop();
     } else if (customers.actionError != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(customers.actionError!)));

@@ -41,6 +41,9 @@ class ApiClient {
 
     final token = await _secureStorage.readToken();
     _dio.options.headers['Authorization'] = token != null ? 'Bearer $token' : null;
+
+    final locale = await _preferences.readLocale();
+    _dio.options.headers['Accept-Language'] = locale;
   }
 
   Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query}) {
