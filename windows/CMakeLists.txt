@@ -65,8 +65,8 @@ include(flutter/generated_plugins.cmake)
 
 # Use a pre-install target to run any of the post-build steps that are
 # needed as part of the packaging process.
-set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}")
-set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
+set(INSTALL_BUNDLE_DATA_DIR "${PROJECT_BINARY_DIR}/runner/$<CONFIG>")
+set(INSTALL_BUNDLE_LIB_DIR "${PROJECT_BINARY_DIR}/runner/$<CONFIG>")
 
 # Set the install destinations for the runner executable and its dependent
 # files.
