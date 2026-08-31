@@ -443,6 +443,24 @@ class TenantProvisioningService
     }
 
     /**
+     * Activate a plan on a company and generate its invoice — the shared
+     * tail end of every "plan becomes active" path (free-trial activation,
+     * activation-code redemption, and each payment gateway's verified
+     * purchase), previously duplicated inline at each call site.
+     */
+    public function activatePlan(Company $company, Plan $plan, string $paymentMethod, array $options = []): SubscriptionInvoice
+    {
+        $expiresAt = $this->calculateExpiry($plan->name);
+        $company->update([
+            'plan_name' => $plan->name,
+            'status' => 'active',
+            'expires_at' => $expiresAt,
+        ]);
+
+        return $this->createSubscriptionInvoice($company, $plan, $paymentMethod, $options);
+    }
+
+    /**
      * Calculate expiry date from plan duration.
      */
     public function calculateExpiry(?string $planName): ?Carbon

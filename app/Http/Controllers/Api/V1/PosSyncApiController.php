@@ -22,6 +22,7 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Services\Delivery\MessageQueueService;
 use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\Payment\SubscriptionPaymentGatewayService;
 use App\Services\Tenancy\TenantProvisioningService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -2104,7 +2105,7 @@ class PosSyncApiController extends Controller
      * 16. Subscription Management: Plan Status & Available Plans
      * GET /api/v1/pos/subscription
      */
-    public function subscription(Request $request): JsonResponse
+    public function subscription(Request $request, SubscriptionPaymentGatewayService $gatewayService): JsonResponse
     {
         $company = $this->resolveCompany($request);
 
@@ -2156,6 +2157,7 @@ class PosSyncApiController extends Controller
                 'users_limit' => $company->max_users ?? $plan?->limits['usuarios'] ?? 'Unlimited',
             ],
             'available_plans' => $availablePlans,
+            'enabled_gateways' => array_keys($gatewayService->getEnabledGateways()),
         ]);
     }
 
@@ -2201,6 +2203,199 @@ class PosSyncApiController extends Controller
                 'success' => false,
                 'error' => 'Redemption failed: '.$e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * 17b. Subscription Management: Activate a Free ($0) Plan
+     * POST /api/v1/pos/subscription/plans/{plan}/activate-free
+     */
+    public function subscriptionActivateFree(Request $request, string $plan, TenantProvisioningService $provisioner): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $planModel = Plan::find($plan);
+        if (! $planModel) {
+            return response()->json(['success' => false, 'error' => 'Subscription plan not found.'], 404);
+        }
+        if ((float) $planModel->price > 0) {
+            return response()->json(['success' => false, 'error' => 'This plan requires payment and cannot be activated for free.'], 422);
+        }
+
+        try {
+            $provisioner->activatePlan($company, $planModel, 'free_trial', ['user' => $user]);
+            $company->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Plan activated.',
+                'plan_name' => $company->plan_name,
+                'expires_at' => $company->expires_at?->toIso8601String(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Free Plan Activation Failed: '.$e->getMessage(), ['exception' => $e]);
+
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * 17c. Subscription Management: Create Razorpay Order for Plan Purchase
+     * POST /api/v1/pos/subscription/plans/{plan}/razorpay/order
+     */
+    public function subscriptionRazorpayOrder(Request $request, string $plan, SubscriptionPaymentGatewayService $gatewayService): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $planModel = Plan::find($plan);
+        if (! $planModel) {
+            return response()->json(['success' => false, 'error' => 'Subscription plan not found.'], 404);
+        }
+
+        try {
+            $basePrice = (float) $planModel->price;
+            $taxRate = 18.00;
+            $totalAmount = $basePrice + round(($basePrice * $taxRate) / 100, 2);
+
+            $order = $gatewayService->createRazorpayOrder($planModel, $totalAmount, $company->currency ?: 'USD', $company, $user);
+
+            return response()->json(array_merge(['success' => true, 'total_amount' => $totalAmount], $order));
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * 17d. Subscription Management: Verify Razorpay Payment & Activate Plan
+     * POST /api/v1/pos/subscription/plans/{plan}/razorpay/verify
+     */
+    public function subscriptionRazorpayVerify(
+        Request $request,
+        string $plan,
+        SubscriptionPaymentGatewayService $gatewayService,
+        TenantProvisioningService $provisioner
+    ): JsonResponse {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $planModel = Plan::find($plan);
+        if (! $planModel) {
+            return response()->json(['success' => false, 'error' => 'Subscription plan not found.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'payment_id' => ['required', 'string'],
+            'order_id' => ['required', 'string'],
+            'signature' => ['required', 'string'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Missing payment verification details.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            $gatewayService->verifyRazorpayPayment(
+                $request->input('payment_id'),
+                $request->input('order_id'),
+                $request->input('signature')
+            );
+
+            $provisioner->activatePlan($company, $planModel, 'razorpay', [
+                'user' => $user,
+                'activation_code' => $request->input('payment_id'),
+            ]);
+            $company->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment verified. Plan activated.',
+                'plan_name' => $company->plan_name,
+                'expires_at' => $company->expires_at?->toIso8601String(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Razorpay Payment Verification Failed: '.$e->getMessage(), ['exception' => $e]);
+
+            return response()->json(['success' => false, 'error' => 'Payment verification failed: '.$e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * 17e. Subscription Management: Create Mercado Pago Checkout Preference
+     * POST /api/v1/pos/subscription/plans/{plan}/mercadopago/preference
+     */
+    public function subscriptionMercadoPagoPreference(Request $request, string $plan, SubscriptionPaymentGatewayService $gatewayService): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $planModel = Plan::find($plan);
+        if (! $planModel) {
+            return response()->json(['success' => false, 'error' => 'Subscription plan not found.'], 404);
+        }
+
+        try {
+            $totalAmount = (float) $planModel->price * 1.18;
+            $preference = $gatewayService->createMercadoPagoPreference($planModel, $totalAmount, $company->currency ?: 'USD', $company, $user);
+
+            return response()->json([
+                'success' => true,
+                'checkout_url' => $preference['checkout_url'],
+                'total_amount' => $totalAmount,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * 17f. Subscription Management: Verify Mercado Pago Payment & Activate Plan
+     * POST /api/v1/pos/subscription/plans/{plan}/mercadopago/verify
+     */
+    public function subscriptionMercadoPagoVerify(
+        Request $request,
+        string $plan,
+        SubscriptionPaymentGatewayService $gatewayService,
+        TenantProvisioningService $provisioner
+    ): JsonResponse {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $planModel = Plan::find($plan);
+        if (! $planModel) {
+            return response()->json(['success' => false, 'error' => 'Subscription plan not found.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'payment_id' => ['required', 'string'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => 'Missing payment_id.', 'details' => $validator->errors()], 422);
+        }
+
+        try {
+            $gatewayService->verifyMercadoPagoPayment($request->input('payment_id'), $company);
+
+            $provisioner->activatePlan($company, $planModel, 'mercadopago', [
+                'user' => $user,
+                'activation_code' => $request->input('payment_id'),
+            ]);
+            $company->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment verified. Plan activated.',
+                'plan_name' => $company->plan_name,
+                'expires_at' => $company->expires_at?->toIso8601String(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Mercado Pago Payment Verification Failed: '.$e->getMessage(), ['exception' => $e]);
+
+            return response()->json(['success' => false, 'error' => 'Payment verification failed: '.$e->getMessage()], 422);
         }
     }
 

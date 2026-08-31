@@ -27,9 +27,7 @@ class Index extends Component
             $company = $this->getCompany();
             $payment = $gatewayService->verifyMercadoPagoPayment($paymentId, $company);
             $plan = Plan::findOrFail($payment['metadata']['plan_name']);
-            $expiresAt = $provisioner->calculateExpiry($plan->name);
-            $company->update(['plan_name' => $plan->name, 'status' => 'active', 'expires_at' => $expiresAt]);
-            $provisioner->createSubscriptionInvoice($company, $plan, 'mercadopago', ['user' => auth('web')->user(), 'activation_code' => $paymentId]);
+            $provisioner->activatePlan($company, $plan, 'mercadopago', ['user' => auth('web')->user(), 'activation_code' => $paymentId]);
             $this->successMessage = __('Mercado Pago payment approved. Your subscription is active.');
         } catch (\Throwable $e) {
             $this->errorMessage = $e->getMessage();
@@ -111,14 +109,7 @@ class Index extends Component
         // If plan is free trial ($0.00), activate directly without requiring payment
         if ((float) $plan->price <= 0) {
             try {
-                $expiresAt = $provisioner->calculateExpiry($planName);
-                $company->update([
-                    'plan_name' => $planName,
-                    'status' => 'active',
-                    'expires_at' => $expiresAt,
-                ]);
-
-                $provisioner->createSubscriptionInvoice($company, $plan, 'free_trial', [
+                $provisioner->activatePlan($company, $plan, 'free_trial', [
                     'user' => auth('web')->user(),
                 ]);
 
@@ -211,19 +202,12 @@ class Index extends Component
             // 1. Verify cryptographic HMAC signature and confirm payment capture
             $verified = $gatewayService->verifyRazorpayPayment($paymentId, $orderId, $signature);
 
-            // 2. Activate store subscription
-            $expiresAt = $provisioner->calculateExpiry($plan->name);
-            $company->update([
-                'plan_name' => $plan->name,
-                'status' => 'active',
-                'expires_at' => $expiresAt,
-            ]);
-
-            // 3. Generate official paid tax invoice with actual Razorpay reference
-            $invoice = $provisioner->createSubscriptionInvoice($company, $plan, 'razorpay', [
+            // 2. Activate store subscription and generate its paid tax invoice
+            $invoice = $provisioner->activatePlan($company, $plan, 'razorpay', [
                 'user' => auth('web')->user(),
                 'activation_code' => $paymentId,
             ]);
+            $expiresAt = $company->refresh()->expires_at;
 
             $this->showPaymentModal = false;
             $this->reset(['selectedPlanId', 'cardNumber', 'cardHolder', 'cardExpiry', 'cardCvv', 'paymentActivationCode', 'paymentError']);

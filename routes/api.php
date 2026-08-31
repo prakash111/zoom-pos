@@ -96,6 +96,11 @@ Route::prefix('v1/pos')->group(function () {
         // Subscription & Billing
         Route::get('/subscription', [PosSyncApiController::class, 'subscription']);
         Route::post('/subscription/redeem', [PosSyncApiController::class, 'subscriptionRedeem']);
+        Route::post('/subscription/plans/{plan}/activate-free', [PosSyncApiController::class, 'subscriptionActivateFree']);
+        Route::post('/subscription/plans/{plan}/razorpay/order', [PosSyncApiController::class, 'subscriptionRazorpayOrder']);
+        Route::post('/subscription/plans/{plan}/razorpay/verify', [PosSyncApiController::class, 'subscriptionRazorpayVerify']);
+        Route::post('/subscription/plans/{plan}/mercadopago/preference', [PosSyncApiController::class, 'subscriptionMercadoPagoPreference']);
+        Route::post('/subscription/plans/{plan}/mercadopago/verify', [PosSyncApiController::class, 'subscriptionMercadoPagoVerify']);
 
         // Quotations (Sale rows with operation_type=quotation)
         Route::get('/quotations', [QuotationApiController::class, 'index'])->middleware('tenant.api.permission:quotes,view');
