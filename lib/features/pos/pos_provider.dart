@@ -360,6 +360,7 @@ class PosProvider extends ChangeNotifier {
                   'name': item.product.name,
                   'price': item.product.salePrice,
                   'quantity': item.quantity,
+                  'tax_rate': item.product.taxRate,
                 })
             .toList(),
       );
