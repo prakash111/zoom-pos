@@ -299,6 +299,7 @@ class RestaurantApiController extends Controller
             'items.*.modifiers' => ['nullable', 'array'],
             'items.*.modifiers.*.name' => ['nullable', 'string'],
             'items.*.modifiers.*.price' => ['nullable', 'numeric'],
+            'items.*.spice_level' => ['nullable', 'string', 'max:150'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
             'items.*.seat' => ['nullable', 'integer'],
         ]);
@@ -326,6 +327,7 @@ class RestaurantApiController extends Controller
                 'quantity' => (float) $item['quantity'],
                 'variant' => $item['variant'] ?? null,
                 'modifiers' => $item['modifiers'] ?? [],
+                'spice_level' => $item['spice_level'] ?? null,
                 'note' => $item['note'] ?? '',
                 'seat' => $item['seat'] ?? 1,
             ];

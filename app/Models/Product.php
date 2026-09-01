@@ -13,7 +13,7 @@ class Product extends Model
 
     protected $fillable = [
         'company_id', 'external_id', 'code', 'sku', 'barcode', 'name', 'image_url', 'category_id', 'category_name',
-        'brand_id', 'brand_name', 'unit', 'cost_price', 'sale_price', 'variants', 'modifiers', 'profit_margin',
+        'brand_id', 'brand_name', 'unit', 'cost_price', 'sale_price', 'variants', 'modifiers', 'spice_levels', 'profit_margin',
         'current_stock', 'minimum_stock', 'active', 'hsn_code', 'sac_code', 'tax_rate',
         'taxable', 'tax_exempt', 'zero_rate', 'reverse_charge',
     ];
@@ -32,6 +32,7 @@ class Product extends Model
             'minimum_stock' => 'decimal:3',
             'variants' => 'array',
             'modifiers' => 'array',
+            'spice_levels' => 'array',
         ];
     }
 

@@ -313,6 +313,12 @@
                                 </div>
                             @endif
 
+                            @if (!empty($item['spice_level']))
+                                <div class="text-[10px] font-bold text-rose-400">
+                                    🌶️ {{ $item['spice_level'] }}
+                                </div>
+                            @endif
+
                             @if (!empty($item['note']))
                                 <div class="text-[10px] font-extrabold text-amber-400">
                                     {{ __("Note:") }} {{ $item["note"] }}
@@ -477,6 +483,29 @@
                                         <span>{{ $m['name'] }}</span>
                                     </span>
                                     <span class="text-lime-400 font-extrabold">+{{ $company->formatMoney((float)$m['price']) }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                <!-- Spice Level -->
+                @if (!empty($selectedProduct->spice_levels) && count($selectedProduct->spice_levels) > 0)
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">{{ __("Spice Level") }}</label>
+                        <div class="flex flex-wrap gap-1.5">
+                            @foreach ($selectedProduct->spice_levels as $s)
+                                <button type="button"
+                                        wire:click="selectSpiceLevel('{{ $s['name'] }}', {{ (float)$s['price'] }})"
+                                        @class([
+                                            'px-3 py-2 rounded-2xl border text-xs font-bold transition',
+                                            'border-lime-500 bg-lime-500/15 text-white' => $selectedSpiceLevelName === $s['name'],
+                                            'border-slate-800 bg-slate-800/60 text-slate-300' => $selectedSpiceLevelName !== $s['name'],
+                                        ])>
+                                    {{ $s['name'] }}
+                                    @if ((float) $s['price'] != 0)
+                                        <span class="text-lime-400 font-extrabold">+{{ $company->formatMoney((float)$s['price']) }}</span>
+                                    @endif
                                 </button>
                             @endforeach
                         </div>

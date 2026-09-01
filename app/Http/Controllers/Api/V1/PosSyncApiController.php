@@ -451,6 +451,9 @@ class PosSyncApiController extends Controller
                 'image_url' => $p->getImageUrlOrDefault(),
                 'tax_rate' => (float) ($p->tax_rate ?? 0),
                 'active' => (bool) $p->active,
+                'variants' => $p->variants ?? [],
+                'modifiers' => $p->modifiers ?? [],
+                'spice_levels' => $p->spice_levels ?? [],
                 'updated_at' => $p->updated_at?->toIso8601String() ?? now()->toIso8601String(),
             ];
         });
@@ -1474,6 +1477,9 @@ class PosSyncApiController extends Controller
                     'image_url' => $p->getImageUrlOrDefault(),
                     'tax_rate' => $p->tax_rate !== null && (float) $p->tax_rate > 0 ? (float) $p->tax_rate : $defaultTaxRate,
                     'active' => (bool) $p->active,
+                    'variants' => $p->variants ?? [],
+                    'modifiers' => $p->modifiers ?? [],
+                    'spice_levels' => $p->spice_levels ?? [],
                     'updated_at' => $p->updated_at?->toIso8601String(),
                 ];
             });

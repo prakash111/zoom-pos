@@ -139,6 +139,13 @@
             margin-left: 24px;
         }
 
+        .item-spice {
+            font-size: 11px;
+            font-weight: 800;
+            color: #b91c1c;
+            margin-left: 24px;
+        }
+
         .item-note {
             font-size: 11px;
             font-weight: 800;
@@ -252,6 +259,10 @@
                         <div class="item-modifiers">
                             + {{ implode(', ', array_column($item['modifiers'], 'name')) }}
                         </div>
+                    @endif
+
+                    @if (!empty($item['spice_level']))
+                        <div class="item-spice">🌶 {{ $item['spice_level'] }}</div>
                     @endif
 
                     @if (!empty($item['note']))

@@ -153,6 +153,78 @@
                 </div>
             </div>
 
+            @if ($isRestaurantMode)
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800 mt-2">
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Portion Sizes / Styles') }}</label>
+                        <p class="text-[10px] text-slate-400">{{ __('Single-select at POS. Price replaces the base sale price.') }}</p>
+                        <div class="space-y-1.5">
+                            @foreach ($variants as $i => $v)
+                                <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs">
+                                    <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $v['name'] }}</span>
+                                    <span class="flex items-center gap-2">
+                                        <span class="text-slate-500 dark:text-slate-400">{{ number_format((float) $v['price'], 2) }}</span>
+                                        <button type="button" wire:click="removeVariant({{ $i }})" class="text-rose-500 hover:text-rose-600 font-black">&times;</button>
+                                    </span>
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="flex gap-1.5">
+                            <input type="text" wire:model="newVariantName" placeholder="{{ __('Name (e.g. Large)') }}" class="flex-1 min-w-0 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                            <input type="number" step="0.01" wire:model="newVariantPrice" placeholder="{{ __('Price') }}" class="w-20 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                            <button type="button" wire:click="addVariant" class="px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold">+</button>
+                        </div>
+                        @error('newVariantName') <p class="text-rose-600 text-[10px]">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Add-ons & Extras') }}</label>
+                        <p class="text-[10px] text-slate-400">{{ __('Multi-select at POS. Price is added on top.') }}</p>
+                        <div class="space-y-1.5">
+                            @foreach ($modifiers as $i => $m)
+                                <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs">
+                                    <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $m['name'] }}</span>
+                                    <span class="flex items-center gap-2">
+                                        <span class="text-slate-500 dark:text-slate-400">+{{ number_format((float) $m['price'], 2) }}</span>
+                                        <button type="button" wire:click="removeModifier({{ $i }})" class="text-rose-500 hover:text-rose-600 font-black">&times;</button>
+                                    </span>
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="flex gap-1.5">
+                            <input type="text" wire:model="newModifierName" placeholder="{{ __('Name (e.g. Extra Cheese)') }}" class="flex-1 min-w-0 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                            <input type="number" step="0.01" wire:model="newModifierPrice" placeholder="{{ __('Price') }}" class="w-20 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                            <button type="button" wire:click="addModifier" class="px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold">+</button>
+                        </div>
+                        @error('newModifierName') <p class="text-rose-600 text-[10px]">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Spice Levels') }}</label>
+                        <p class="text-[10px] text-slate-400">{{ __('Single-select at POS (e.g. Mild/Medium/Hot).') }}</p>
+                        <div class="space-y-1.5">
+                            @foreach ($spiceLevels as $i => $s)
+                                <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs">
+                                    <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $s['name'] }}</span>
+                                    <span class="flex items-center gap-2">
+                                        @if ((float) $s['price'] != 0)
+                                            <span class="text-slate-500 dark:text-slate-400">+{{ number_format((float) $s['price'], 2) }}</span>
+                                        @endif
+                                        <button type="button" wire:click="removeSpiceLevel({{ $i }})" class="text-rose-500 hover:text-rose-600 font-black">&times;</button>
+                                    </span>
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="flex gap-1.5">
+                            <input type="text" wire:model="newSpiceLevelName" placeholder="{{ __('Name (e.g. Extra Hot)') }}" class="flex-1 min-w-0 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                            <input type="number" step="0.01" wire:model="newSpiceLevelPrice" placeholder="{{ __('Price') }}" class="w-20 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                            <button type="button" wire:click="addSpiceLevel" class="px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold">+</button>
+                        </div>
+                        @error('newSpiceLevelName') <p class="text-rose-600 text-[10px]">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+            @endif
+
             <div class="flex justify-end gap-2.5 pt-3">
                 <button wire:click="$set('showForm', false)" type="button" class="px-5 py-2.5 rounded-2xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-[0.97] transition duration-150 ease-out cursor-pointer">
                     {{ __('Cancel') }}

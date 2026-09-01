@@ -67,6 +67,7 @@ class TableOrderController extends Controller
             'items.*.price' => ['required', 'numeric', 'min:0'],
             'items.*.variant' => ['nullable', 'string'],
             'items.*.modifiers' => ['nullable', 'array'],
+            'items.*.spice_level' => ['nullable', 'string'],
             'items.*.note' => ['nullable', 'string'],
             'items.*.seat' => ['nullable'],
         ]);
@@ -87,6 +88,7 @@ class TableOrderController extends Controller
                 'price' => $price,
                 'variant' => $item['variant'] ?? null,
                 'modifiers' => $item['modifiers'] ?? [],
+                'spice_level' => $item['spice_level'] ?? null,
                 'note' => $item['note'] ?? null,
                 'seat' => $item['seat'] ?? 1,
             ];

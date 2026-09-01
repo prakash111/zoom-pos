@@ -143,6 +143,12 @@
                                     </div>
                                 @endif
 
+                                @if (!empty($item['spice_level']))
+                                    <div class="text-[11px] font-black text-rose-600 dark:text-rose-400 pl-8">
+                                        🌶 {{ $item['spice_level'] }}
+                                    </div>
+                                @endif
+
                                 @if (!empty($item['note']))
                                     <div class="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 p-1.5 rounded-xl ml-8">
                                         ⚠️ {{ $item['note'] }}

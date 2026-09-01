@@ -60,6 +60,27 @@ class Index extends Component
 
     public string $adjustmentReason = '';
 
+    /** @var array<int, array{name: string, price: float}> Portion sizes / styles (e.g. Small/Medium/Large). */
+    public array $variants = [];
+
+    /** @var array<int, array{name: string, price: float}> Add-ons & extras (multi-select at POS). */
+    public array $modifiers = [];
+
+    /** @var array<int, array{name: string, price: float}> Spice levels (single-select at POS). */
+    public array $spiceLevels = [];
+
+    public string $newVariantName = '';
+
+    public float $newVariantPrice = 0;
+
+    public string $newModifierName = '';
+
+    public float $newModifierPrice = 0;
+
+    public string $newSpiceLevelName = '';
+
+    public float $newSpiceLevelPrice = 0;
+
     public function updatingSearch(): void
     {
         $this->resetPage();
@@ -92,11 +113,50 @@ class Index extends Component
     {
         $this->reset([
             'editingId', 'name', 'code', 'barcode', 'imageFile', 'imageUrl', 'categoryId', 'brandId', 'unit',
-            'costPrice', 'salePrice', 'currentStock', 'minimumStock',
+            'costPrice', 'salePrice', 'currentStock', 'minimumStock', 'variants', 'modifiers', 'spiceLevels',
         ]);
         $this->active = true;
         $this->taxable = true;
         $this->showForm = true;
+    }
+
+    public function addVariant(): void
+    {
+        $this->validate(['newVariantName' => ['required', 'string', 'max:100']]);
+        $this->variants[] = ['name' => $this->newVariantName, 'price' => round($this->newVariantPrice, 2)];
+        $this->reset(['newVariantName', 'newVariantPrice']);
+    }
+
+    public function removeVariant(int $index): void
+    {
+        unset($this->variants[$index]);
+        $this->variants = array_values($this->variants);
+    }
+
+    public function addModifier(): void
+    {
+        $this->validate(['newModifierName' => ['required', 'string', 'max:100']]);
+        $this->modifiers[] = ['name' => $this->newModifierName, 'price' => round($this->newModifierPrice, 2)];
+        $this->reset(['newModifierName', 'newModifierPrice']);
+    }
+
+    public function removeModifier(int $index): void
+    {
+        unset($this->modifiers[$index]);
+        $this->modifiers = array_values($this->modifiers);
+    }
+
+    public function addSpiceLevel(): void
+    {
+        $this->validate(['newSpiceLevelName' => ['required', 'string', 'max:100']]);
+        $this->spiceLevels[] = ['name' => $this->newSpiceLevelName, 'price' => round($this->newSpiceLevelPrice, 2)];
+        $this->reset(['newSpiceLevelName', 'newSpiceLevelPrice']);
+    }
+
+    public function removeSpiceLevel(int $index): void
+    {
+        unset($this->spiceLevels[$index]);
+        $this->spiceLevels = array_values($this->spiceLevels);
     }
 
     public function generateItemCode(): void
@@ -184,6 +244,9 @@ class Index extends Component
         $this->minimumStock = (float) $product->minimum_stock;
         $this->active = $product->active;
         $this->taxable = $product->taxable;
+        $this->variants = $product->variants ?? [];
+        $this->modifiers = $product->modifiers ?? [];
+        $this->spiceLevels = $product->spice_levels ?? [];
         $this->showForm = true;
     }
 
@@ -215,6 +278,9 @@ class Index extends Component
             'minimum_stock' => $data['minimumStock'],
             'active' => $this->active,
             'taxable' => $this->taxable,
+            'variants' => $this->variants ?: null,
+            'modifiers' => $this->modifiers ?: null,
+            'spice_levels' => $this->spiceLevels ?: null,
         ]);
 
         AuditLog::record($this->editingId ? 'product.updated' : 'product.created', $product->company_id, auth('web')->id(), ['product_id' => $product->id]);
@@ -276,6 +342,7 @@ class Index extends Component
             'products' => $products,
             'categories' => Category::orderBy('name')->get(),
             'brands' => Brand::orderBy('name')->get(),
+            'isRestaurantMode' => (bool) auth('web')->user()?->company?->isRestaurantMode(),
         ]);
     }
 }

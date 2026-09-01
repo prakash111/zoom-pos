@@ -65,6 +65,10 @@ class Pos extends Component
 
     public array $selectedModifiers = [];
 
+    public ?string $selectedSpiceLevelName = null;
+
+    public float $selectedSpiceLevelPrice = 0.0;
+
     public string $itemNote = '';
 
     // Cart Items array
@@ -320,6 +324,14 @@ class Pos extends Component
             $this->selectedVariantPrice = (float) $product->sale_price;
         }
 
+        if (! empty($product->spice_levels) && count($product->spice_levels) > 0) {
+            $this->selectedSpiceLevelName = $product->spice_levels[0]['name'] ?? null;
+            $this->selectedSpiceLevelPrice = (float) ($product->spice_levels[0]['price'] ?? 0);
+        } else {
+            $this->selectedSpiceLevelName = null;
+            $this->selectedSpiceLevelPrice = 0.0;
+        }
+
         $this->selectedModifiers = [];
         $this->itemNote = '';
         $this->showModifierModal = true;
@@ -329,6 +341,12 @@ class Pos extends Component
     {
         $this->selectedVariantName = $name;
         $this->selectedVariantPrice = $price;
+    }
+
+    public function selectSpiceLevel(string $name, float $price): void
+    {
+        $this->selectedSpiceLevelName = $name;
+        $this->selectedSpiceLevelPrice = $price;
     }
 
     public function toggleModifier(string $name, float $price): void
@@ -356,7 +374,7 @@ class Pos extends Component
         }
 
         $modTotal = array_sum(array_column($this->selectedModifiers, 'price'));
-        $finalPrice = $this->selectedVariantPrice + $modTotal;
+        $finalPrice = $this->selectedVariantPrice + $modTotal + $this->selectedSpiceLevelPrice;
 
         $this->items[] = [
             'id' => (string) Str::uuid(),
@@ -368,12 +386,13 @@ class Pos extends Component
             'quantity' => 1,
             'variant' => $this->selectedVariantName,
             'modifiers' => $this->selectedModifiers,
+            'spice_level' => $this->selectedSpiceLevelName,
             'note' => $this->itemNote,
             'seat' => $this->activeSeat,
         ];
 
         $this->showModifierModal = false;
-        $this->reset(['selectedProduct', 'selectedVariantName', 'selectedModifiers', 'itemNote']);
+        $this->reset(['selectedProduct', 'selectedVariantName', 'selectedModifiers', 'selectedSpiceLevelName', 'itemNote']);
         $this->dispatch('item-added-to-cart');
     }
 
@@ -381,7 +400,7 @@ class Pos extends Component
     {
         $product = Product::findOrFail($productId);
 
-        if ((! empty($product->variants) && count($product->variants) > 0) || (! empty($product->modifiers) && count($product->modifiers) > 0)) {
+        if ((! empty($product->variants) && count($product->variants) > 0) || (! empty($product->modifiers) && count($product->modifiers) > 0) || (! empty($product->spice_levels) && count($product->spice_levels) > 0)) {
             $this->openModifierModal($productId);
 
             return;
@@ -655,7 +674,7 @@ class Pos extends Component
     {
         $this->showKotSuccessModal = false;
         $this->items = [];
-        $this->reset(['selectedProduct', 'selectedVariantName', 'selectedModifiers', 'itemNote']);
+        $this->reset(['selectedProduct', 'selectedVariantName', 'selectedModifiers', 'selectedSpiceLevelName', 'itemNote']);
     }
 
     public function closeKotModalKeepOrder(): void
