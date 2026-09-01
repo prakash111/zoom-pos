@@ -100,6 +100,11 @@ class Index extends Component
 
     public bool $enableConsignments = true;
 
+    /// Read-only display of the tenant's operating mode — set once at
+    /// registration and only ever changeable by a superadmin (via the
+    /// `restaurant_mode_locked` override on the tenant's Company record).
+    /// This property is hydrated in mount() but never written back to the
+    /// database from this component.
     public string $posMode = 'general';
 
     // SMTP / Mail Configuration State
@@ -378,7 +383,6 @@ class Index extends Component
             'receiptFormat' => ['required', 'in:80mm,58mm'],
             'defaultCommissionRate' => ['numeric', 'min:0'],
             'defaultCommissionType' => ['required', 'in:percentage,fixed,profit_percentage,profit'],
-            'posMode' => ['required', 'in:general,restaurant'],
             'logo' => ['nullable', 'string', 'max:500'],
             'favicon' => ['nullable', 'string', 'max:500'],
             'logoFile' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp,svg', 'max:2048'],
@@ -419,14 +423,6 @@ class Index extends Component
     public function setReceiptFormat(string $format): void
     {
         $this->receiptFormat = $format;
-    }
-
-    public function setPosMode(string $mode): void
-    {
-        if ($mode === 'restaurant' && $this->company->restaurant_mode_locked) {
-            return;
-        }
-        $this->posMode = $mode;
     }
 
     public function getRestaurantModeLockedProperty(): bool
@@ -595,7 +591,6 @@ class Index extends Component
             'default_commission_rate' => $this->defaultCommissionRate,
             'default_commission_type' => $this->defaultCommissionType ?: 'percentage',
             'enable_consignments' => $this->enableConsignments,
-            'pos_mode' => ($this->posMode === 'restaurant' && $this->company->restaurant_mode_locked) ? 'general' : ($this->posMode ?: 'general'),
             'pix_key_type' => $this->pixKeyType,
             'pix_key' => $this->pixKey ?: null,
             'pix_merchant_name' => $this->pixMerchantName ?: null,
@@ -609,7 +604,6 @@ class Index extends Component
         ]);
 
         $this->dispatch('set-ui-accent-color', color: $this->primaryColor ?: '#2563eb');
-        $this->dispatch('operating-mode-updated', mode: $this->posMode ?: 'general');
 
         // Save SMTP & Custom configurations
         $configsToSave = [

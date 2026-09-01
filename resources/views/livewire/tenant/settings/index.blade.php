@@ -115,73 +115,42 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <!-- Mode 1: General POS & Retail -->
-                <div wire:click="setPosMode('general')"
-                     @class([
-                         'p-5 rounded-3xl border-2 cursor-pointer transition-all flex flex-col justify-between gap-3 relative',
-                         'border-blue-600 bg-blue-50/50 dark:bg-blue-950/40 dark:border-blue-500 shadow-md shadow-blue-500/10' => $posMode === 'general',
-                         'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700' => $posMode !== 'general',
-                     ])>
-                    <div class="flex items-center justify-between">
-                        <div class="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl font-black">
-                            🏪
-                        </div>
-                        <span @class([
-                            'w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-black',
-                            'border-blue-600 bg-blue-600 text-white' => $posMode === 'general',
-                            'border-slate-300 dark:border-slate-600' => $posMode !== 'general',
-                        ])>
-                            @if ($posMode === 'general') ✓ @endif
-                        </span>
-                    </div>
-                    <div>
-                        <h4 class="font-extrabold text-sm text-slate-900 dark:text-white">{{ __('General Retail POS (Default)') }}</h4>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                            {{ __('For supermarkets, clothing, electronics & retail shops. Includes barcode scanning, cash register, quotations, invoices, and standard stock management.') }}
-                        </p>
-                    </div>
-                    <div class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 font-black">
-                        {{ __('Includes: Retail Counter • Barcode POS • Quotes') }}
-                    </div>
+            <div class="p-5 sm:p-6 rounded-3xl border-2 flex flex-col sm:flex-row sm:items-center gap-4
+                        @if ($posMode === 'restaurant' && ! $this->restaurantModeLocked)
+                            border-lime-500 bg-lime-50/50 dark:bg-lime-950/40 dark:border-lime-400
+                        @else
+                            border-blue-600 bg-blue-50/50 dark:bg-blue-950/40 dark:border-blue-500
+                        @endif">
+                <div @class([
+                        'w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center text-2xl font-black',
+                        'bg-lime-100 dark:bg-lime-900/60 text-lime-700 dark:text-lime-400' => $posMode === 'restaurant' && ! $this->restaurantModeLocked,
+                        'bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400' => $posMode !== 'restaurant' || $this->restaurantModeLocked,
+                    ])>
+                    {{ $posMode === 'restaurant' && ! $this->restaurantModeLocked ? '🍽️' : '🏪' }}
                 </div>
-
-                <!-- Mode 2: Food & Restaurant Mode -->
-                <div @if (! $this->restaurantModeLocked) wire:click="setPosMode('restaurant')" @endif
-                     @class([
-                         'p-5 rounded-3xl border-2 transition-all flex flex-col justify-between gap-3 relative',
-                         'cursor-pointer' => ! $this->restaurantModeLocked,
-                         'cursor-not-allowed opacity-60' => $this->restaurantModeLocked,
-                         'border-lime-500 bg-lime-50/50 dark:bg-lime-950/40 dark:border-lime-400 shadow-md shadow-lime-500/10' => $posMode === 'restaurant' && ! $this->restaurantModeLocked,
-                         'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700' => $posMode !== 'restaurant' || $this->restaurantModeLocked,
-                     ])>
-                    <div class="flex items-center justify-between">
-                        <div class="w-10 h-10 rounded-2xl bg-lime-100 dark:bg-lime-900/60 text-lime-700 dark:text-lime-400 flex items-center justify-center text-xl font-black">
-                            🍽️
-                        </div>
-                        <span @class([
-                            'w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-black',
-                            'border-lime-500 bg-lime-500 text-slate-950' => $posMode === 'restaurant' && ! $this->restaurantModeLocked,
-                            'border-slate-300 dark:border-slate-600' => $posMode !== 'restaurant' || $this->restaurantModeLocked,
-                        ])>
-                            @if ($posMode === 'restaurant' && ! $this->restaurantModeLocked) ✓ @endif
-                        </span>
-                    </div>
-                    <div>
-                        <h4 class="font-extrabold text-sm text-slate-900 dark:text-white">{{ __('Food & Restaurant Mode') }}</h4>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                            {{ __('For restaurants, cafes, bars & food trucks. Includes floor plans & live tables, KOT tickets, Kitchen Display (KDS), Dine-In/Takeaway routing, and QR table ordering.') }}
+                <div class="flex-1">
+                    <h4 class="font-extrabold text-sm text-slate-900 dark:text-white">
+                        @if ($posMode === 'restaurant' && ! $this->restaurantModeLocked)
+                            {{ __('Food & Restaurant Mode') }}
+                        @else
+                            {{ __('General Retail POS') }}
+                        @endif
+                    </h4>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                        @if ($posMode === 'restaurant' && ! $this->restaurantModeLocked)
+                            {{ __('Floor plans & live tables, KOT tickets, Kitchen Display (KDS), Dine-In/Takeaway routing, and QR table ordering.') }}
+                        @else
+                            {{ __('Barcode scanning, cash register, quotations, invoices, and standard stock management for retail shops.') }}
+                        @endif
+                    </p>
+                    @if ($posMode === 'restaurant' && $this->restaurantModeLocked)
+                        <p class="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 mt-2">
+                            {{ __('Restaurant Mode disabled by platform administrator — running in General Retail POS until re-enabled.') }}
                         </p>
-                    </div>
-                    @if ($this->restaurantModeLocked)
-                        <div class="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 font-black">
-                            {{ __('Disabled by platform administrator') }}
-                        </div>
-                    @else
-                        <div class="text-[10px] font-extrabold uppercase tracking-wider text-lime-600 dark:text-lime-400 font-black">
-                            {{ __('Includes: Tables • KOT • Kitchen KDS • QR Menus') }}
-                        </div>
                     @endif
+                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-2">
+                        {{ __('Operating mode is fixed at registration and can only be changed by platform support.') }}
+                    </p>
                 </div>
             </div>
 

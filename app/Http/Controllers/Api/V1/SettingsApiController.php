@@ -38,6 +38,8 @@ class SettingsApiController extends Controller
 
         return response()->json([
             'success' => true,
+            'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
+            'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
             'profile' => $this->presentProfile($company),
             'receipts' => $this->presentReceipts($company),
             'financial' => $this->presentFinancial($company),

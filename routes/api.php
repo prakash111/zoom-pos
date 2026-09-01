@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\PosDesktopSyncController;
 use App\Http\Controllers\Api\V1\PosSyncApiController;
 use App\Http\Controllers\Api\V1\QuotationApiController;
 use App\Http\Controllers\Api\V1\ReportsApiController;
+use App\Http\Controllers\Api\V1\RestaurantApiController;
 use App\Http\Controllers\Api\V1\SalesTargetApiController;
 use App\Http\Controllers\Api\V1\ServiceOrderApiController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
@@ -201,6 +202,24 @@ Route::prefix('v1/pos')->group(function () {
         Route::put('/service-orders/{id}', [ServiceOrderApiController::class, 'update'])->middleware('tenant.api.permission:service_orders,edit');
         Route::post('/service-orders/{id}/status', [ServiceOrderApiController::class, 'updateStatus'])->middleware('tenant.api.permission:service_orders,edit');
         Route::delete('/service-orders/{id}', [ServiceOrderApiController::class, 'destroy'])->middleware('tenant.api.permission:service_orders,edit');
+
+        // Restaurant Mode: floors/tables, send-to-kitchen, KOT, settle bill
+        Route::get('/restaurant/floors', [RestaurantApiController::class, 'floorsIndex'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/restaurant/floors', [RestaurantApiController::class, 'floorsStore'])->middleware('tenant.api.permission:pos,edit');
+        Route::put('/restaurant/floors/{id}', [RestaurantApiController::class, 'floorsUpdate'])->middleware('tenant.api.permission:pos,edit');
+        Route::delete('/restaurant/floors/{id}', [RestaurantApiController::class, 'floorsDestroy'])->middleware('tenant.api.permission:pos,edit');
+
+        Route::post('/restaurant/tables', [RestaurantApiController::class, 'tablesStore'])->middleware('tenant.api.permission:pos,edit');
+        Route::get('/restaurant/tables/{id}', [RestaurantApiController::class, 'tableShow'])->middleware('tenant.api.permission:pos,view');
+        Route::put('/restaurant/tables/{id}', [RestaurantApiController::class, 'tablesUpdate'])->middleware('tenant.api.permission:pos,edit');
+        Route::post('/restaurant/tables/{id}/status', [RestaurantApiController::class, 'tablesSetStatus'])->middleware('tenant.api.permission:pos,edit');
+        Route::delete('/restaurant/tables/{id}', [RestaurantApiController::class, 'tablesDestroy'])->middleware('tenant.api.permission:pos,edit');
+
+        Route::post('/restaurant/orders/send-to-kitchen', [RestaurantApiController::class, 'sendToKitchen'])->middleware('tenant.api.permission:pos,create');
+        Route::post('/restaurant/orders/{saleId}/settle', [RestaurantApiController::class, 'settle'])->middleware('tenant.api.permission:pos,create');
+
+        Route::get('/restaurant/kot', [RestaurantApiController::class, 'kotIndex'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/restaurant/kot/{id}/status', [RestaurantApiController::class, 'kotUpdateStatus'])->middleware('tenant.api.permission:pos,edit');
 
         // Sales Targets & Goals
         Route::get('/sales-targets', [SalesTargetApiController::class, 'index'])->middleware('tenant.api.permission:targets,view');
