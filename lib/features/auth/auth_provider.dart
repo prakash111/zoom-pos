@@ -108,6 +108,20 @@ class AuthProvider extends ChangeNotifier {
       await _secureStorage.saveToken(result.token);
       _user = result.user;
       _company = result.company;
+
+      // The login/register responses omit a few company fields (notably
+      // pos_mode/restaurant_mode_locked) that only GET /auth/session
+      // returns in full — refresh from there so mode-dependent UI (e.g.
+      // the dashboard's retail vs. restaurant POS branch) is correct
+      // immediately after signing in, not just after an app restart.
+      try {
+        final refreshed = await _authRepository.session();
+        _company = refreshed.company;
+        if (refreshed.user != null) _user = refreshed.user;
+      } catch (_) {
+        // Keep the company from the login/register response if this fails.
+      }
+
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;

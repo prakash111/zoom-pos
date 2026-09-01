@@ -5,10 +5,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/receivable_model.dart';
+import '../../../core/models/settings_models.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../auth/auth_provider.dart';
+import '../../settings/settings_repository.dart';
 import '../receivables_repository.dart';
 
 /// Due Payments / Receivables: every unpaid or partially-paid sale, with a
@@ -23,11 +25,13 @@ class DueReceivablesScreen extends StatefulWidget {
 class _DueReceivablesScreenState extends State<DueReceivablesScreen> {
   late Future<List<ReceivableModel>> _future;
   late ReceivablesRepository _repository;
+  late SettingsRepository _settingsRepository;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _repository = ReceivablesRepository(context.read<ApiClient>());
+    _settingsRepository = SettingsRepository(context.read<ApiClient>());
     _future = _repository.fetchDueReceivables();
   }
 
@@ -36,6 +40,16 @@ class _DueReceivablesScreenState extends State<DueReceivablesScreen> {
   }
 
   Future<void> _pickChannelAndRemind(ReceivableModel receivable) async {
+    List<CustomNotificationChannelModel> customChannels = const [];
+    try {
+      customChannels = (await _settingsRepository.fetchNotificationChannels())
+          .where((c) => c.isActive && c.eventTypes.contains('due_reminder'))
+          .toList();
+    } catch (_) {
+      // Fall back to just WhatsApp/Email below rather than blocking the sheet.
+    }
+    if (!mounted) return;
+
     final channel = await showModalBottomSheet<String>(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
@@ -57,11 +71,12 @@ class _DueReceivablesScreenState extends State<DueReceivablesScreen> {
               title: const Text('Email'),
               onTap: () => Navigator.of(sheetCtx).pop('email'),
             ),
-            ListTile(
-              leading: const Icon(Icons.webhook_outlined, color: Colors.deepPurple),
-              title: const Text('Custom Notification Channel'),
-              onTap: () => Navigator.of(sheetCtx).pop('custom'),
-            ),
+            for (final c in customChannels)
+              ListTile(
+                leading: const Icon(Icons.webhook_outlined, color: Colors.deepPurple),
+                title: Text(c.name.isEmpty ? 'Custom Notification Channel' : c.name),
+                onTap: () => Navigator.of(sheetCtx).pop('custom'),
+              ),
             const SizedBox(height: 8),
           ],
         ),

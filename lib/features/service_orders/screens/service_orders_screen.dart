@@ -9,6 +9,7 @@ import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../auth/auth_provider.dart';
 import '../service_orders_repository.dart';
+import 'service_order_details_screen.dart';
 import 'service_order_form_sheet.dart';
 
 /// Service Orders (repairs/warranty): list with status/priority filters and
@@ -42,6 +43,15 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
       builder: (_) => ServiceOrderFormSheet(repository: _repository, formatter: formatter, order: order),
     );
     if (saved == true) _reload();
+  }
+
+  Future<void> _openDetails(CurrencyFormatter formatter, ServiceOrderModel order) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ServiceOrderDetailsScreen(repository: _repository, formatter: formatter, order: order),
+      ),
+    );
+    _reload();
   }
 
   Future<void> _changeStatus(ServiceOrderModel order, String status) async {
@@ -133,7 +143,7 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
                             final order = orders[index];
                             return Card(
                               child: ListTile(
-                                onTap: () => _openForm(formatter, order: order),
+                                onTap: () => _openDetails(formatter, order),
                                 title: Text('#${order.orderNumber} · ${order.equipmentName}'),
                                 subtitle: Text('${order.customerName} · ${order.statusLabel} · ${order.priority}'),
                                 trailing: Column(

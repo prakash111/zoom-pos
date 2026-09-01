@@ -173,4 +173,43 @@ class SettingsRepository {
   Future<void> deletePaymentMethod(String id) {
     return _client.delete(ApiEndpoints.settingsPaymentMethod(id));
   }
+
+  Future<List<CustomNotificationChannelModel>> fetchNotificationChannels() async {
+    final response = await _client.get(ApiEndpoints.settingsNotificationChannels);
+    return (response['channels'] as List? ?? [])
+        .map((e) => CustomNotificationChannelModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> saveNotificationChannel({
+    String? id,
+    required String name,
+    required String url,
+    required String method,
+    Map<String, dynamic>? headers,
+    required String authType,
+    String? authValue,
+    String? payloadTemplate,
+    required List<String> eventTypes,
+    required bool isActive,
+  }) {
+    final data = {
+      'name': name,
+      'url': url,
+      'method': method,
+      if (headers != null) 'headers': headers,
+      'auth_type': authType,
+      if (authValue != null && authValue.isNotEmpty) 'auth_value': authValue,
+      if (payloadTemplate != null) 'payload_template': payloadTemplate,
+      'event_types': eventTypes,
+      'is_active': isActive,
+    };
+    return id == null
+        ? _client.post(ApiEndpoints.settingsNotificationChannels, data: data)
+        : _client.put(ApiEndpoints.settingsNotificationChannel(id), data: data);
+  }
+
+  Future<void> deleteNotificationChannel(String id) {
+    return _client.delete(ApiEndpoints.settingsNotificationChannel(id));
+  }
 }

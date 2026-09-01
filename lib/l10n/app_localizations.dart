@@ -159,6 +159,7 @@ class AppLocalizations {
   // menu in a different language than the rest of the app.
   String get navHome => _s('navHome');
   String get featurePos => _s('featurePos');
+  String get featureKitchenDisplay => _s('featureKitchenDisplay');
   String get featureSales => _s('featureSales');
   String get featureQuotations => _s('featureQuotations');
   String get featureInventory => _s('featureInventory');

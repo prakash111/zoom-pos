@@ -250,6 +250,73 @@ class PaymentMethodModel {
   }
 }
 
+class CustomNotificationChannelModel {
+  CustomNotificationChannelModel({
+    required this.id,
+    required this.name,
+    required this.url,
+    required this.method,
+    required this.headers,
+    required this.authType,
+    required this.hasAuthValue,
+    required this.payloadTemplate,
+    required this.eventTypes,
+    required this.isActive,
+    this.authValue,
+  });
+
+  factory CustomNotificationChannelModel.fromJson(Map<String, dynamic> json) {
+    return CustomNotificationChannelModel(
+      id: json['id'].toString(),
+      name: json['name'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      method: json['method'] as String? ?? 'POST',
+      headers: (json['headers'] is Map) ? Map<String, dynamic>.from(json['headers'] as Map) : null,
+      authType: json['auth_type'] as String? ?? 'none',
+      hasAuthValue: json['has_auth_value'] as bool? ?? false,
+      payloadTemplate: json['payload_template'] as String? ?? '',
+      eventTypes: (json['event_types'] as List? ?? []).map((e) => e.toString()).toList(),
+      isActive: json['is_active'] as bool? ?? true,
+    );
+  }
+
+  final String id;
+  final String name;
+  final String url;
+  final String method;
+  final Map<String, dynamic>? headers;
+  final String authType;
+
+  /// True if a secret is already stored server-side. The server never echoes
+  /// the plaintext secret back, so this is the only signal the form has for
+  /// showing "Secret is set" instead of a blank field.
+  final bool hasAuthValue;
+  final String payloadTemplate;
+  final List<String> eventTypes;
+  final bool isActive;
+
+  /// Write-only: only populated when the user is actively typing a new
+  /// secret in the form. Never set from [fromJson].
+  final String? authValue;
+
+  /// Request-body shape for POST/PUT. [authValue] is only included when the
+  /// caller passed a non-null value, so leaving a secret untouched during an
+  /// edit doesn't overwrite it with an empty string server-side.
+  Map<String, dynamic> toRequestBody() {
+    return {
+      'name': name,
+      'url': url,
+      'method': method,
+      if (headers != null) 'headers': headers,
+      'auth_type': authType,
+      if (authValue != null) 'auth_value': authValue,
+      'payload_template': payloadTemplate,
+      'event_types': eventTypes,
+      'is_active': isActive,
+    };
+  }
+}
+
 class TenantSettingsBundle {
   TenantSettingsBundle({
     required this.profile,

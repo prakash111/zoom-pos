@@ -76,6 +76,11 @@ class ServiceOrdersRepository {
     return ServiceOrderModel.fromJson(response['service_order'] as Map<String, dynamic>);
   }
 
+  Future<ServiceOrderModel> fetchOrder(String id) async {
+    final response = await _client.get(ApiEndpoints.serviceOrder(id));
+    return ServiceOrderModel.fromJson(response['service_order'] as Map<String, dynamic>);
+  }
+
   Future<ServiceOrderModel> updateStatus(String id, String status) async {
     final response = await _client.post(ApiEndpoints.serviceOrderStatus(id), data: {'status': status});
     return ServiceOrderModel.fromJson(response['service_order'] as Map<String, dynamic>);

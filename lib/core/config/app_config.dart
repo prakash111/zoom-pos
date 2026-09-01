@@ -107,6 +107,9 @@ class ApiEndpoints {
   static String settingsPaymentMethod(String id) => '/settings/payment-methods/$id';
   static String settingsPaymentMethodToggle(String id) => '/settings/payment-methods/$id/toggle';
 
+  static const String settingsNotificationChannels = '/settings/notification-channels';
+  static String settingsNotificationChannel(String id) => '/settings/notification-channels/$id';
+
   static const String consignments = '/consignments';
   static String consignment(String id) => '/consignments/$id';
   static String consignmentDispatch(String id) => '/consignments/$id/dispatch';
@@ -136,4 +139,14 @@ class ApiEndpoints {
 
   static const String languages = '/languages';
   static const String languagesDefault = '/languages/default';
+
+  static const String restaurantFloors = '/restaurant/floors';
+  static String restaurantFloor(String id) => '/restaurant/floors/$id';
+  static const String restaurantTables = '/restaurant/tables';
+  static String restaurantTable(String id) => '/restaurant/tables/$id';
+  static String restaurantTableStatus(String id) => '/restaurant/tables/$id/status';
+  static const String restaurantSendToKitchen = '/restaurant/orders/send-to-kitchen';
+  static String restaurantSettle(String saleId) => '/restaurant/orders/$saleId/settle';
+  static const String restaurantKot = '/restaurant/kot';
+  static String restaurantKotStatus(String id) => '/restaurant/kot/$id/status';
 }

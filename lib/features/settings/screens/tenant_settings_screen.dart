@@ -16,6 +16,7 @@ import '../../../core/widgets/loading_indicator.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../taxes/screens/taxes_screen.dart';
 import '../settings_repository.dart';
+import 'custom_notification_channel_settings_screen.dart';
 import 'payment_methods_screen.dart';
 import 'printer_settings_screen.dart';
 
@@ -1021,6 +1022,19 @@ class _NotificationsTabState extends State<_NotificationsTab> {
           child: _saving
               ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : const Text('Save notification settings'),
+        ),
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.webhook_outlined),
+          title: const Text('Custom Notification Channels'),
+          subtitle: const Text('Dispatch invoices, quotations, or due reminders to your own webhook endpoint'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => CustomNotificationChannelSettingsScreen(repository: widget.repository)),
+          ),
         ),
       ],
     );

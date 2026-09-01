@@ -28,6 +28,8 @@ import '../pos/screens/pos_screen.dart';
 import '../quotations/screens/quotations_screen.dart';
 import '../receivables/screens/due_receivables_screen.dart';
 import '../reports/screens/reports_screen.dart';
+import '../restaurant/screens/restaurant_kds_screen.dart';
+import '../restaurant/screens/restaurant_tables_screen.dart';
 import '../sales/screens/sales_screen.dart';
 import '../sales_targets/screens/sales_targets_screen.dart';
 import '../service_orders/screens/service_orders_screen.dart';
@@ -53,28 +55,40 @@ class _FeatureTile {
   final WidgetBuilder? builder;
 }
 
-final List<_FeatureTile> _features = [
-  _FeatureTile((l10n) => l10n.featurePos, Icons.point_of_sale_outlined, (_) => const PosScreen()),
-  _FeatureTile((l10n) => l10n.featureSales, Icons.receipt_long_outlined, (_) => const SalesScreen()),
-  _FeatureTile((l10n) => l10n.featureQuotations, Icons.description_outlined, (_) => const QuotationsScreen()),
-  _FeatureTile((l10n) => l10n.featureInventory, Icons.inventory_2_outlined, (_) => const InventoryManagementScreen()),
-  _FeatureTile((l10n) => l10n.featureCustomers, Icons.people_outline, (_) => const CustomersScreen()),
-  _FeatureTile((l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen()),
-  _FeatureTile((l10n) => l10n.featurePayables, Icons.request_quote_outlined, (_) => const PayablesScreen()),
-  _FeatureTile((l10n) => l10n.featureDueReceivables, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen()),
-  _FeatureTile((l10n) => l10n.featureConsignments, Icons.local_shipping_outlined, (_) => const ConsignmentsScreen()),
-  _FeatureTile((l10n) => l10n.featureServiceOrders, Icons.handyman_outlined, (_) => const ServiceOrdersScreen()),
-  _FeatureTile((l10n) => l10n.featureSalesTargets, Icons.flag_outlined, (_) => const SalesTargetsScreen()),
-  _FeatureTile((l10n) => l10n.featureReports, Icons.insights_outlined, (_) => const ReportsScreen()),
-  _FeatureTile((l10n) => l10n.featureTaxes, Icons.percent_outlined, (_) => const TaxesScreen()),
-  _FeatureTile((l10n) => l10n.featureAnalytics, Icons.bar_chart_outlined, (_) => const AnalyticsScreen()),
-  _FeatureTile((l10n) => l10n.featureSubscription, Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),
-  _FeatureTile((l10n) => l10n.featureStaff, Icons.badge_outlined, (_) => const StaffScreen()),
-  _FeatureTile((l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen()),
-  _FeatureTile((l10n) => l10n.featureLanguages, Icons.translate_outlined, (_) => const LanguagesScreen()),
-  _FeatureTile((l10n) => l10n.featureDevices, Icons.devices_other_outlined, (_) => const DevicesScreen()),
-  _FeatureTile((l10n) => l10n.featureSettings, Icons.settings_outlined, (_) => const TenantSettingsScreen()),
-];
+/// Feature tiles for the dock (drawer/rail/top bar/bottom bar). The POS tile
+/// (and an extra Kitchen Display tile) swap in the restaurant-mode screens
+/// when the signed-in tenant is registered as Cafe & Restaurant — every
+/// other tile, and retail tenants entirely, are unaffected.
+List<_FeatureTile> _featuresFor(CompanyModel? company) {
+  final isRestaurant = company?.isRestaurantMode ?? false;
+
+  return [
+    isRestaurant
+        ? _FeatureTile((l10n) => l10n.featurePos, Icons.table_restaurant_outlined, (_) => const RestaurantTablesScreen())
+        : _FeatureTile((l10n) => l10n.featurePos, Icons.point_of_sale_outlined, (_) => const PosScreen()),
+    _FeatureTile((l10n) => l10n.featureSales, Icons.receipt_long_outlined, (_) => const SalesScreen()),
+    _FeatureTile((l10n) => l10n.featureQuotations, Icons.description_outlined, (_) => const QuotationsScreen()),
+    _FeatureTile((l10n) => l10n.featureInventory, Icons.inventory_2_outlined, (_) => const InventoryManagementScreen()),
+    _FeatureTile((l10n) => l10n.featureCustomers, Icons.people_outline, (_) => const CustomersScreen()),
+    _FeatureTile((l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen()),
+    _FeatureTile((l10n) => l10n.featurePayables, Icons.request_quote_outlined, (_) => const PayablesScreen()),
+    _FeatureTile((l10n) => l10n.featureDueReceivables, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen()),
+    _FeatureTile((l10n) => l10n.featureConsignments, Icons.local_shipping_outlined, (_) => const ConsignmentsScreen()),
+    _FeatureTile((l10n) => l10n.featureServiceOrders, Icons.handyman_outlined, (_) => const ServiceOrdersScreen()),
+    if (isRestaurant)
+      _FeatureTile((l10n) => l10n.featureKitchenDisplay, Icons.soup_kitchen_outlined, (_) => const RestaurantKdsScreen()),
+    _FeatureTile((l10n) => l10n.featureSalesTargets, Icons.flag_outlined, (_) => const SalesTargetsScreen()),
+    _FeatureTile((l10n) => l10n.featureReports, Icons.insights_outlined, (_) => const ReportsScreen()),
+    _FeatureTile((l10n) => l10n.featureTaxes, Icons.percent_outlined, (_) => const TaxesScreen()),
+    _FeatureTile((l10n) => l10n.featureAnalytics, Icons.bar_chart_outlined, (_) => const AnalyticsScreen()),
+    _FeatureTile((l10n) => l10n.featureSubscription, Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),
+    _FeatureTile((l10n) => l10n.featureStaff, Icons.badge_outlined, (_) => const StaffScreen()),
+    _FeatureTile((l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen()),
+    _FeatureTile((l10n) => l10n.featureLanguages, Icons.translate_outlined, (_) => const LanguagesScreen()),
+    _FeatureTile((l10n) => l10n.featureDevices, Icons.devices_other_outlined, (_) => const DevicesScreen()),
+    _FeatureTile((l10n) => l10n.featureSettings, Icons.settings_outlined, (_) => const TenantSettingsScreen()),
+  ];
+}
 
 /// The post-login home base. Each feature module still under construction
 /// falls back to a [ComingSoonScreen] placeholder — swap in the real screen
@@ -91,8 +105,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late final AnalyticsRepository _analyticsRepository;
   late Future<AnalyticsModel> _analyticsFuture;
 
-  /// 0 = Home (this screen); 1..N = `_features[index - 1]`. Shared by
-  /// whichever nav dock is active — see [NavDockProvider].
+  /// 0 = Home (this screen); 1..N = `_featuresFor(company)[index - 1]`.
+  /// Shared by whichever nav dock is active — see [NavDockProvider].
   int _dockIndex = 0;
 
   @override
@@ -133,7 +147,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     setState(() => _dockIndex = index);
-    final feature = _features[index - 1];
+    final feature = _featuresFor(context.read<AuthProvider>().company)[index - 1];
     final title = feature.titleOf(AppLocalizations.of(context));
     Navigator.of(context)
         .push(MaterialPageRoute(builder: feature.builder ?? (_) => ComingSoonScreen(title: title, icon: feature.icon)))
@@ -146,48 +160,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// [_FeatureTile], with titles resolved from the active locale — shared by
   /// every dock rendering below so none of them can drift out of sync (or
   /// out of language) with each other.
-  List<(IconData, String)> _dockDestinationsFor(AppLocalizations l10n) => [
+  List<(IconData, String)> _dockDestinationsFor(AppLocalizations l10n, CompanyModel? company) => [
         (Icons.home_outlined, l10n.navHome),
-        for (final feature in _features) (feature.icon, feature.titleOf(l10n)),
+        for (final feature in _featuresFor(company)) (feature.icon, feature.titleOf(l10n)),
       ];
 
   Widget _buildDrawer(BuildContext context, CompanyModel? company) {
-    final destinations = _dockDestinationsFor(AppLocalizations.of(context));
+    final destinations = _dockDestinationsFor(AppLocalizations.of(context), company);
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DrawerHeader(
-            decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  company?.tradeName ?? company?.name ?? 'Sales & Inventory',
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                if (company != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    company.planName.toUpperCase(),
-                    style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12),
-                  ),
-                ],
-              ],
-            ),
+      child: SafeArea(
+        top: false,
+        bottom: true,
+        child: ListView(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).padding.bottom + 16,
           ),
-          for (var i = 0; i < destinations.length; i++)
-            ListTile(
-              leading: Icon(destinations[i].$1),
-              title: Text(destinations[i].$2),
-              selected: _dockIndex == i,
-              onTap: () {
-                Navigator.of(context).pop();
-                _onDockItemSelected(context, i);
-              },
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    company?.tradeName ?? company?.name ?? 'Sales & Inventory',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  if (company != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      company.planName.toUpperCase(),
+                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12),
+                    ),
+                  ],
+                ],
+              ),
             ),
-        ],
+            for (var i = 0; i < destinations.length; i++)
+              ListTile(
+                leading: Icon(destinations[i].$1),
+                title: Text(destinations[i].$2),
+                selected: _dockIndex == i,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _onDockItemSelected(context, i);
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -205,7 +225,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onDestinationSelected: (index) => _onDockItemSelected(context, index),
         labelType: extended ? NavigationRailLabelType.none : NavigationRailLabelType.all,
         destinations: [
-          for (final destination in _dockDestinationsFor(AppLocalizations.of(context)))
+          for (final destination in _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company))
             NavigationRailDestination(icon: Icon(destination.$1), label: Text(destination.$2)),
         ],
       ),
@@ -213,7 +233,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   PreferredSizeWidget _buildTopDock(BuildContext context) {
-    final destinations = _dockDestinationsFor(AppLocalizations.of(context));
+    final destinations = _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company);
     return PreferredSize(
       preferredSize: const Size.fromHeight(52),
       child: SizedBox(
@@ -236,7 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildBottomDock(BuildContext context) {
-    final destinations = _dockDestinationsFor(AppLocalizations.of(context));
+    final destinations = _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company);
     return Material(
       elevation: 8,
       child: SafeArea(

@@ -96,6 +96,7 @@ const Map<String, String> kEnStrings = {
   // Navigation dock destinations
   'navHome': 'Home',
   'featurePos': 'Point of Sale',
+  'featureKitchenDisplay': 'Kitchen Display',
   'featureSales': 'Sales',
   'featureQuotations': 'Quotations',
   'featureInventory': 'Inventory Management',

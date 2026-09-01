@@ -556,7 +556,7 @@ class CartSheet extends StatelessWidget {
       expand: false,
       builder: (context, scrollController) {
         return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
           child: SafeArea(
             top: false,
             child: Column(
@@ -601,110 +601,122 @@ class CartSheet extends StatelessWidget {
               ),
               const Divider(height: 1),
 
-              // Items List
+              // Items List + Bottom Section share one scroll view (with the
+              // sheet's own scrollController) so the cash-tender field,
+              // preset chips, totals, and Complete Sale button are never
+              // stranded below the keyboard or the sheet's bottom edge —
+              // they scroll into view instead of being clipped.
               Expanded(
-                child: pos.cartItems.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.shopping_cart_outlined, size: 56, color: Colors.grey.shade300),
-                            const SizedBox(height: 12),
-                            Text(l10n.cartEmptyTitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
-                            const SizedBox(height: 4),
-                            Text(l10n.cartEmptySubtitle, style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-                          ],
-                        ),
-                      )
-                    : ListView.separated(
-                        controller: scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        itemCount: pos.cartItems.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final item = pos.cartItems[index];
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  flex: 3,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.product.name,
-                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${formatter.format(item.product.salePrice)} / ${item.product.unit}',
-                                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                                      ),
-                                      if (item.product.taxRate > 0)
-                                        Text(
-                                          '${isIndia ? 'GST' : 'Tax'} (${item.product.taxRate.toStringAsFixed(0)}%): +${formatter.format(item.taxAmount)}',
-                                          style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
-                                        ),
-                                    ],
-                                  ),
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  physics: const ClampingScrollPhysics(),
+                  child: Column(
+                    children: [
+                      pos.cartItems.isEmpty
+                          ? SizedBox(
+                              height: 260,
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.shopping_cart_outlined, size: 56, color: Colors.grey.shade300),
+                                    const SizedBox(height: 12),
+                                    Text(l10n.cartEmptyTitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
+                                    const SizedBox(height: 4),
+                                    Text(l10n.cartEmptySubtitle, style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                                  ],
                                 ),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
+                              ),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              itemCount: pos.cartItems.length,
+                              separatorBuilder: (_, __) => const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final item = pos.cartItems[index];
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 6),
                                   child: Row(
-                                    mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove, size: 16),
-                                        padding: const EdgeInsets.all(4),
-                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                        onPressed: () => pos.decrementQuantity(item.product.id),
+                                      Expanded(
+                                        flex: 3,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item.product.name,
+                                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${formatter.format(item.product.salePrice)} / ${item.product.unit}',
+                                              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                            ),
+                                            if (item.product.taxRate > 0)
+                                              Text(
+                                                '${isIndia ? 'GST' : 'Tax'} (${item.product.taxRate.toStringAsFixed(0)}%): +${formatter.format(item.taxAmount)}',
+                                                style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                                              ),
+                                          ],
+                                        ),
                                       ),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade100,
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.remove, size: 16),
+                                              padding: const EdgeInsets.all(4),
+                                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              onPressed: () => pos.decrementQuantity(item.product.id),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                                              child: Text(
+                                                item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 2),
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.add, size: 16),
+                                              padding: const EdgeInsets.all(4),
+                                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              onPressed: () => pos.incrementQuantity(item.product.id),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      SizedBox(
+                                        width: 75,
                                         child: Text(
-                                          item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 2),
+                                          formatter.format(item.lineTotal),
+                                          textAlign: TextAlign.right,
                                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                         ),
                                       ),
-                                      IconButton(
-                                        icon: const Icon(Icons.add, size: 16),
-                                        padding: const EdgeInsets.all(4),
-                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                        onPressed: () => pos.incrementQuantity(item.product.id),
-                                      ),
                                     ],
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                SizedBox(
-                                  width: 75,
-                                  child: Text(
-                                    formatter.format(item.lineTotal),
-                                    textAlign: TextAlign.right,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                  ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-              ),
 
-              const Divider(height: 1),
+                      const Divider(height: 1),
 
-              // Bottom Section
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+                      // Bottom Section
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                     // Action Pills: Hold, Customer, Note, Discount / More
                     // A Wrap instead of a horizontal scroller — same reason
                     // as the payment method tiles below: with four pills
@@ -952,6 +964,10 @@ class CartSheet extends StatelessWidget {
                             ),
                     ),
                   ],
+                ),
+              ),
+                    ],
+                  ),
                 ),
               ),
             ],

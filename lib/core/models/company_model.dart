@@ -14,6 +14,8 @@ class CompanyModel {
     this.postalCode = '',
     this.phone = '',
     this.email = '',
+    this.posMode = 'general',
+    this.restaurantModeLocked = false,
   });
 
   factory CompanyModel.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,8 @@ class CompanyModel {
       postalCode: json['postal_code']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
+      posMode: json['pos_mode']?.toString() ?? 'general',
+      restaurantModeLocked: json['restaurant_mode_locked'] as bool? ?? false,
     );
   }
 
@@ -49,6 +53,14 @@ class CompanyModel {
   final String postalCode;
   final String phone;
   final String email;
+  final String posMode;
+  final bool restaurantModeLocked;
+
+  /// True when this tenant should see the restaurant POS (table
+  /// management + KOT) instead of the standard retail POS. Mirrors
+  /// `Company::isRestaurantMode()` on the backend: the superadmin lock
+  /// always wins over the tenant's own registered mode.
+  bool get isRestaurantMode => !restaurantModeLocked && (posMode == 'restaurant' || posMode == 'food_restaurant');
 
   bool get isIndia {
     final c = country.trim().toUpperCase();
