@@ -99,6 +99,7 @@ class RestaurantOrderItemModel {
     required this.quantity,
     this.variant,
     this.modifiers = const [],
+    this.spiceLevel,
     this.note = '',
     this.seat = 1,
   }) : basePrice = basePrice ?? price;
@@ -113,6 +114,7 @@ class RestaurantOrderItemModel {
       quantity: (json['quantity'] as num?)?.toDouble() ?? 1,
       variant: json['variant'] as String?,
       modifiers: (json['modifiers'] as List? ?? []).cast<Map<String, dynamic>>(),
+      spiceLevel: json['spice_level'] as String?,
       note: json['note'] as String? ?? '',
       seat: (json['seat'] as num?)?.toInt() ?? 1,
     );
@@ -126,10 +128,38 @@ class RestaurantOrderItemModel {
   final double quantity;
   final String? variant;
   final List<Map<String, dynamic>> modifiers;
+  final String? spiceLevel;
   final String note;
   final int seat;
 
   double get lineTotal => price * quantity;
+
+  /// True once the price has been changed away from [basePrice] via a
+  /// cashier's inline price override, mirroring Pos.php's is_overridden flag.
+  bool get isOverridden => (price - basePrice).abs() > 0.001;
+
+  /// Returns a copy with the given fields replaced. [basePrice] is always
+  /// carried over from this instance unless explicitly passed, so bumping
+  /// quantity or seat never resets the audit trail for a price override.
+  RestaurantOrderItemModel copyWith({
+    double? price,
+    double? quantity,
+    int? seat,
+  }) {
+    return RestaurantOrderItemModel(
+      id: id,
+      productId: productId,
+      name: name,
+      price: price ?? this.price,
+      basePrice: basePrice,
+      quantity: quantity ?? this.quantity,
+      variant: variant,
+      modifiers: modifiers,
+      spiceLevel: spiceLevel,
+      note: note,
+      seat: seat ?? this.seat,
+    );
+  }
 
   Map<String, dynamic> toRequestJson() => {
         if (productId != null) 'product_id': productId,
@@ -139,6 +169,7 @@ class RestaurantOrderItemModel {
         'quantity': quantity,
         if (variant != null) 'variant': variant,
         if (modifiers.isNotEmpty) 'modifiers': modifiers,
+        if (spiceLevel != null) 'spice_level': spiceLevel,
         if (note.isNotEmpty) 'note': note,
         'seat': seat,
       };

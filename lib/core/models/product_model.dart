@@ -16,6 +16,9 @@ class ProductModel {
     required this.taxRate,
     required this.active,
     required this.isLowStock,
+    this.variants = const [],
+    this.modifiers = const [],
+    this.spiceLevels = const [],
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -36,7 +39,15 @@ class ProductModel {
       taxRate: (json['tax_rate'] as num?)?.toDouble() ?? 0,
       active: json['active'] as bool? ?? true,
       isLowStock: json['is_low_stock'] as bool? ?? false,
+      variants: _parseOptions(json['variants']),
+      modifiers: _parseOptions(json['modifiers']),
+      spiceLevels: _parseOptions(json['spice_levels']),
     );
+  }
+
+  static List<Map<String, dynamic>> _parseOptions(Object? raw) {
+    if (raw is! List) return const [];
+    return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
   final String id;
@@ -55,8 +66,16 @@ class ProductModel {
   final double taxRate;
   final bool active;
   final bool isLowStock;
+  final List<Map<String, dynamic>> variants;
+  final List<Map<String, dynamic>> modifiers;
+  final List<Map<String, dynamic>> spiceLevels;
 
   bool get isOutOfStock => currentStock <= 0;
+
+  /// Whether this product needs the customization sheet (portion/style,
+  /// add-ons, or spice level) before it can be added to a restaurant order,
+  /// mirroring Pos.php's addItemDirect() gate on the web app.
+  bool get hasCustomizations => variants.isNotEmpty || modifiers.isNotEmpty || spiceLevels.isNotEmpty;
 
   Map<String, dynamic> toJson() {
     return {
@@ -76,6 +95,9 @@ class ProductModel {
       'tax_rate': taxRate,
       'active': active,
       'is_low_stock': isLowStock,
+      'variants': variants,
+      'modifiers': modifiers,
+      'spice_levels': spiceLevels,
     };
   }
 }
