@@ -107,6 +107,7 @@ const Map<String, String> kPtStrings = {
   'featureCustomers': 'Clientes',
   'featureCashRegister': 'Caixa',
   'featurePayables': 'Contas a Pagar',
+  'featureDueReceivables': 'Contas a Receber / Cobranças',
   'featureConsignments': 'Consignações',
   'featureServiceOrders': 'Ordens de Serviço',
   'featureSalesTargets': 'Metas de Vendas',

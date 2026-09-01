@@ -108,6 +108,10 @@ class ThermalPrinterService {
     String taxLabel = 'Tax',
     bool isIndia = false,
     double taxRate = 0,
+    double? paidAmount,
+    double dueAmount = 0,
+    double? cashTendered,
+    double changeDue = 0,
   }) async {
     final connected = await isConnected;
     if (!connected) {
@@ -160,6 +164,16 @@ class ThermalPrinterService {
       }
     }
     bytes.addAll(_totalsRow(generator, 'Total', total, currencySymbol, emphasize: true));
+
+    if (dueAmount > 0.001) {
+      bytes.addAll(generator.hr());
+      bytes.addAll(_totalsRow(generator, 'Amount Paid', paidAmount ?? total, currencySymbol));
+      bytes.addAll(_totalsRow(generator, 'Due Balance', dueAmount, currencySymbol, emphasize: true));
+    } else if (cashTendered != null) {
+      bytes.addAll(generator.hr());
+      bytes.addAll(_totalsRow(generator, 'Cash Tendered', cashTendered, currencySymbol));
+      bytes.addAll(_totalsRow(generator, 'Change Due', changeDue, currencySymbol));
+    }
 
     bytes.addAll(generator.feed(2));
     bytes.addAll(generator.text('Thank you!', styles: const PosStyles(align: PosAlign.center)));

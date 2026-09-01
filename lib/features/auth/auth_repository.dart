@@ -40,6 +40,7 @@ class AuthRepository {
     required String password,
     String? phone,
     String? currency,
+    String posMode = 'general',
   }) async {
     final response = await _client.post(ApiEndpoints.register, data: {
       'store_name': storeName,
@@ -48,6 +49,7 @@ class AuthRepository {
       'password': password,
       if (phone != null && phone.isNotEmpty) 'phone': phone,
       if (currency != null && currency.isNotEmpty) 'currency': currency,
+      'pos_mode': posMode,
     });
 
     return _loginResult(response);

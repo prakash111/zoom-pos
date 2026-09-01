@@ -85,6 +85,7 @@ class AuthProvider extends ChangeNotifier {
     required String password,
     String? phone,
     String? currency,
+    String posMode = 'general',
   }) {
     return _attempt(() => _authRepository.register(
           storeName: storeName,
@@ -93,6 +94,7 @@ class AuthProvider extends ChangeNotifier {
           password: password,
           phone: phone,
           currency: currency,
+          posMode: posMode,
         ));
   }
 

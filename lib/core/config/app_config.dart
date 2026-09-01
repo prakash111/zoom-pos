@@ -39,6 +39,8 @@ class ApiEndpoints {
 
   static const String analytics = '/analytics';
   static const String sendDelivery = '/send-delivery';
+  static const String receivablesDue = '/receivables/due';
+  static String receivableRemind(String saleId) => '/receivables/$saleId/remind';
   static String salePdf(String id) => '/sales/$id/pdf';
   static String quotationPdf(String id) => '/quotations/$id/pdf';
 

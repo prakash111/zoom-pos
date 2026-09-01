@@ -26,6 +26,7 @@ import '../languages/screens/languages_screen.dart';
 import '../payables/screens/payables_screen.dart';
 import '../pos/screens/pos_screen.dart';
 import '../quotations/screens/quotations_screen.dart';
+import '../receivables/screens/due_receivables_screen.dart';
 import '../reports/screens/reports_screen.dart';
 import '../sales/screens/sales_screen.dart';
 import '../sales_targets/screens/sales_targets_screen.dart';
@@ -60,6 +61,7 @@ final List<_FeatureTile> _features = [
   _FeatureTile((l10n) => l10n.featureCustomers, Icons.people_outline, (_) => const CustomersScreen()),
   _FeatureTile((l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen()),
   _FeatureTile((l10n) => l10n.featurePayables, Icons.request_quote_outlined, (_) => const PayablesScreen()),
+  _FeatureTile((l10n) => l10n.featureDueReceivables, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen()),
   _FeatureTile((l10n) => l10n.featureConsignments, Icons.local_shipping_outlined, (_) => const ConsignmentsScreen()),
   _FeatureTile((l10n) => l10n.featureServiceOrders, Icons.handyman_outlined, (_) => const ServiceOrdersScreen()),
   _FeatureTile((l10n) => l10n.featureSalesTargets, Icons.flag_outlined, (_) => const SalesTargetsScreen()),
@@ -467,6 +469,21 @@ class _DashboardAnalytics extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const InventoryManagementScreen()),
+              ),
+            ),
+          ),
+        ],
+        if (analytics.totalReceivables > 0) ...[
+          const SizedBox(height: 12),
+          Card(
+            color: Colors.amber.shade50,
+            child: ListTile(
+              leading: Icon(Icons.request_page_outlined, color: Colors.amber.shade800),
+              title: Text(l10n.featureDueReceivables),
+              subtitle: Text('${formatter.format(analytics.totalReceivables)} outstanding'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DueReceivablesScreen()),
               ),
             ),
           ),

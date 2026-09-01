@@ -18,6 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   bool _obscurePassword = true;
+  String _posMode = 'general';
 
   @override
   void dispose() {
@@ -39,6 +40,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       email: _emailController.text.trim(),
       password: _passwordController.text,
       phone: _phoneController.text.trim(),
+      posMode: _posMode,
     );
 
     if (success && mounted) {
@@ -126,6 +128,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         prefixIcon: Icon(Icons.phone_outlined),
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Store type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StoreTypeCard(
+                            icon: Icons.storefront_outlined,
+                            label: 'Retail',
+                            description: 'Shops, electronics, general stores',
+                            selected: _posMode == 'general',
+                            onTap: () => setState(() => _posMode = 'general'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _StoreTypeCard(
+                            icon: Icons.restaurant_outlined,
+                            label: 'Cafe & Restaurant',
+                            description: 'Tables, KOT, kitchen display',
+                            selected: _posMode == 'restaurant',
+                            onTap: () => setState(() => _posMode = 'restaurant'),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: auth.isBusy ? null : _submit,
@@ -142,6 +173,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StoreTypeCard extends StatelessWidget {
+  const _StoreTypeCard({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String description;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? primaryColor.withOpacity(0.08) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: selected ? primaryColor : Colors.grey.shade300, width: selected ? 2 : 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: selected ? primaryColor : Colors.grey.shade700),
+            const SizedBox(height: 6),
+            Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: selected ? primaryColor : Colors.grey.shade900)),
+            const SizedBox(height: 2),
+            Text(description, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+          ],
         ),
       ),
     );

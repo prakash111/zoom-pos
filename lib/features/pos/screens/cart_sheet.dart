@@ -23,6 +23,7 @@ class CartSheet extends StatelessWidget {
     final customer = await showModalBottomSheet<CustomerModel>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) => CustomerPickerSheet(customersRepository: customersRepository),
     );
@@ -272,6 +273,8 @@ class CartSheet extends StatelessWidget {
         taxId: company?.taxId,
         taxLabel: company?.taxLabel ?? 'Tax',
         isIndia: isIndia,
+        paidAmount: pos.amountPaid,
+        dueAmount: pos.dueAmount,
       ),
     );
 
@@ -313,6 +316,219 @@ class CartSheet extends StatelessWidget {
     return defaultPrimary;
   }
 
+  /// Bank/UPI metadata (bank_name, account_no, ifsc_code, upi_id,
+  /// holder_name) configured for the currently-selected payment method, if
+  /// it looks like a bank transfer or UPI method and has any details set.
+  Map<String, dynamic>? _bankMetadataFor(List<PaymentMethodModel> methods, String selectedCode) {
+    final match = methods.where((m) => (m.code.isNotEmpty ? m.code : m.id) == selectedCode || m.id == selectedCode);
+    if (match.isEmpty) return null;
+    final method = match.first;
+    final code = (method.code.isNotEmpty ? method.code : method.id).toLowerCase();
+    if (!code.contains('bank') && !code.contains('transfer') && !code.contains('upi')) return null;
+    final metadata = method.metadata;
+    if (metadata == null || metadata.values.every((v) => v == null || v.toString().isEmpty)) return null;
+    return metadata;
+  }
+
+  Future<void> _showAmountPaidDialog(BuildContext context) async {
+    final pos = context.read<PosProvider>();
+    final company = context.read<AuthProvider>().company;
+    final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
+    final controller = TextEditingController(text: pos.amountPaid.toStringAsFixed(2));
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.price_check, size: 22),
+            SizedBox(width: 8),
+            Text('Amount Paid'),
+          ],
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Grand Total: ${formatter.format(pos.grandTotal)}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Amount Paid Now',
+                prefixText: company?.currencySymbol ?? '\$',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              children: [
+                ActionChip(
+                  label: const Text('Full Amount'),
+                  onPressed: () => controller.text = pos.grandTotal.toStringAsFixed(2),
+                ),
+                ActionChip(
+                  label: const Text('Zero Payment (Full Due)'),
+                  onPressed: () => controller.text = '0',
+                ),
+              ],
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogCtx).pop(), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final val = double.tryParse(controller.text.trim()) ?? pos.grandTotal;
+              pos.setAmountPaid(val);
+              Navigator.of(dialogCtx).pop();
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openSplitPaymentEditor(BuildContext context, List<PaymentMethodModel> activeMethods) async {
+    final pos = context.read<PosProvider>();
+    final company = context.read<AuthProvider>().company;
+    final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
+
+    if (!pos.isSplitPayment) {
+      pos.toggleSplitPayment();
+    }
+    if (pos.payments.isEmpty) {
+      pos.addSplitRow();
+    }
+
+    final controllers = <TextEditingController>[
+      for (final p in pos.payments) TextEditingController(text: p.amount.toStringAsFixed(2)),
+    ];
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          while (controllers.length < pos.payments.length) {
+            controllers.add(TextEditingController(text: pos.payments[controllers.length].amount.toStringAsFixed(2)));
+          }
+          while (controllers.length > pos.payments.length) {
+            controllers.removeLast().dispose();
+          }
+
+          String codeFor(int i) => activeMethods.any((m) => (m.code.isNotEmpty ? m.code : m.id) == pos.payments[i].methodCode)
+              ? pos.payments[i].methodCode
+              : (activeMethods.isNotEmpty ? (activeMethods.first.code.isNotEmpty ? activeMethods.first.code : activeMethods.first.id) : 'cash');
+
+          return AlertDialog(
+            title: const Text('Split Payment'),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (int i = 0; i < pos.payments.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: DropdownButtonFormField<String>(
+                                value: codeFor(i),
+                                isExpanded: true,
+                                items: [
+                                  for (final m in activeMethods)
+                                    DropdownMenuItem(
+                                      value: m.code.isNotEmpty ? m.code : m.id,
+                                      child: Text(m.name, overflow: TextOverflow.ellipsis),
+                                    ),
+                                ],
+                                onChanged: (val) {
+                                  if (val == null) return;
+                                  pos.updateSplitRow(i, methodCode: val);
+                                  setDialogState(() {});
+                                },
+                                decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: TextField(
+                                controller: controllers[i],
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: InputDecoration(isDense: true, prefixText: company?.currencySymbol ?? '\$', border: const OutlineInputBorder()),
+                                onChanged: (val) {
+                                  pos.updateSplitRow(i, amount: double.tryParse(val) ?? 0);
+                                  setDialogState(() {});
+                                },
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                              onPressed: pos.payments.length <= 1
+                                  ? null
+                                  : () {
+                                      pos.removeSplitRow(i);
+                                      setDialogState(() {});
+                                    },
+                            ),
+                          ],
+                        ),
+                      ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          pos.addSplitRow();
+                          setDialogState(() {});
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Payment Row'),
+                      ),
+                    ),
+                    const Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Remaining Due', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(formatter.format(pos.remainingSplitBalance), style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  pos.toggleSplitPayment();
+                  Navigator.of(dialogCtx).pop();
+                },
+                child: const Text('Cancel Split', style: TextStyle(color: Colors.red)),
+              ),
+              ElevatedButton(onPressed: () => Navigator.of(dialogCtx).pop(), child: const Text('Done')),
+            ],
+          );
+        },
+      ),
+    );
+
+    for (final c in controllers) {
+      c.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final pos = context.watch<PosProvider>();
@@ -341,7 +557,9 @@ class CartSheet extends StatelessWidget {
       builder: (context, scrollController) {
         return Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: Column(
+          child: SafeArea(
+            top: false,
+            child: Column(
             children: [
               const SizedBox(height: 12),
               Container(
@@ -530,39 +748,104 @@ class CartSheet extends StatelessWidget {
                           backgroundColor: pos.customDiscount > 0 ? Colors.green.shade50 : null,
                           onPressed: () => _showDiscountDialog(context),
                         ),
+
+                        // Split Payment Pill
+                        ActionChip(
+                          avatar: Icon(Icons.call_split, size: 16, color: pos.isSplitPayment ? primaryColor : Colors.grey.shade700),
+                          label: Text(pos.isSplitPayment ? 'Split (${pos.payments.length})' : 'Split Payment'),
+                          backgroundColor: pos.isSplitPayment ? primaryColor.withOpacity(0.12) : null,
+                          onPressed: () => _openSplitPaymentEditor(context, activeMethods),
+                        ),
+
+                        // Amount Paid Pill (only meaningful outside split mode)
+                        if (!pos.isSplitPayment)
+                          ActionChip(
+                            avatar: Icon(Icons.price_check, size: 16, color: pos.dueAmount > 0.001 ? Colors.amber.shade800 : Colors.grey.shade700),
+                            label: Text(pos.dueAmount > 0.001 ? 'Paid: ${formatter.format(pos.amountPaid)}' : 'Amount Paid'),
+                            backgroundColor: pos.dueAmount > 0.001 ? Colors.amber.shade50 : null,
+                            onPressed: () => _showAmountPaidDialog(context),
+                          ),
                       ],
                     ),
+
+                    if (pos.requiresCustomerForDue)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Attach a customer for due, partial, or credit sales.',
+                          style: TextStyle(color: Colors.red.shade600, fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                      ),
 
                     const SizedBox(height: 12),
 
                     // Dynamic Payment Selection Tiles
-                    Text(
-                      l10n.paymentMethod,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
-                    ),
-                    const SizedBox(height: 6),
-                    // A Wrap instead of a fixed-height horizontal scroller —
-                    // with 4-5 payment methods this app's default set (or a
-                    // tenant's longer custom list) doesn't reliably fit one
-                    // row width, and a scroller left the last method (e.g.
-                    // "UPI") visually clipped to a single letter with no
-                    // scroll affordance. Wrapping to a second line keeps
-                    // every method visible without requiring a swipe.
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final method in activeMethods)
-                          _PaymentMethodChip(
-                            method: method,
-                            isSelected: pos.paymentMethod == (method.code.isNotEmpty ? method.code : method.id) ||
-                                pos.paymentMethod == method.id,
-                            color: _colorForMethod(method.code.isNotEmpty ? method.code : method.id, primaryColor),
-                            icon: _iconForMethod(method.code.isNotEmpty ? method.code : method.id),
-                            onTap: () => pos.setPaymentMethod(method.code.isNotEmpty ? method.code : method.id),
-                          ),
+                    if (pos.isSplitPayment)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: primaryColor.withOpacity(0.25)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Split Payment (${pos.payments.length} methods)',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor, fontSize: 13)),
+                            const SizedBox(height: 4),
+                            for (final p in pos.payments)
+                              Text('• ${p.methodCode} — ${formatter.format(p.amount)}', style: const TextStyle(fontSize: 12)),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () => _openSplitPaymentEditor(context, activeMethods),
+                                child: const Text('Edit Split'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else ...[
+                      Text(
+                        l10n.paymentMethod,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 6),
+                      // A Wrap instead of a fixed-height horizontal scroller —
+                      // with 4-5 payment methods this app's default set (or a
+                      // tenant's longer custom list) doesn't reliably fit one
+                      // row width, and a scroller left the last method (e.g.
+                      // "UPI") visually clipped to a single letter with no
+                      // scroll affordance. Wrapping to a second line keeps
+                      // every method visible without requiring a swipe.
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final method in activeMethods)
+                            _PaymentMethodChip(
+                              method: method,
+                              isSelected: pos.paymentMethod == (method.code.isNotEmpty ? method.code : method.id) ||
+                                  pos.paymentMethod == method.id,
+                              color: _colorForMethod(method.code.isNotEmpty ? method.code : method.id, primaryColor),
+                              icon: _iconForMethod(method.code.isNotEmpty ? method.code : method.id),
+                              onTap: () => pos.setPaymentMethod(method.code.isNotEmpty ? method.code : method.id),
+                            ),
+                        ],
+                      ),
+
+                      if (_bankMetadataFor(activeMethods, pos.paymentMethod) != null) ...[
+                        const SizedBox(height: 10),
+                        _BankDetailsBox(metadata: _bankMetadataFor(activeMethods, pos.paymentMethod)!),
                       ],
-                    ),
+
+                      if (pos.paymentMethod == 'cash') ...[
+                        const SizedBox(height: 12),
+                        _CashTenderSection(payableAmount: pos.amountPaid, currencySymbol: company?.currencySymbol ?? '\$'),
+                      ],
+                    ],
 
                     const SizedBox(height: 12),
 
@@ -626,6 +909,15 @@ class CartSheet extends StatelessWidget {
                               ),
                             ],
                           ),
+                          if (pos.dueAmount > 0.001) ...[
+                            const Divider(height: 12),
+                            _TotalsRow(label: 'Amount Paid', value: formatter.format(pos.amountPaid)),
+                            _TotalsRow(
+                              label: 'Due Balance',
+                              value: formatter.format(pos.dueAmount),
+                              valueColor: Colors.red.shade600,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -638,7 +930,9 @@ class CartSheet extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: pos.cartIsEmpty || pos.isCheckingOut ? null : () => _previewThenCheckout(context),
+                      onPressed: pos.cartIsEmpty || pos.isCheckingOut || pos.requiresCustomerForDue
+                          ? null
+                          : () => _previewThenCheckout(context),
                       child: pos.isCheckingOut
                           ? const SizedBox(
                               height: 22,
@@ -661,6 +955,7 @@ class CartSheet extends StatelessWidget {
                 ),
               ),
             ],
+            ),
           ),
         );
       },
@@ -756,6 +1051,163 @@ class _TotalsRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Read-only bank/UPI details configured for the selected payment method
+/// (Settings > Financial > Payment Methods), shown at checkout so the
+/// cashier can share them with the customer.
+class _BankDetailsBox extends StatelessWidget {
+  const _BankDetailsBox({required this.metadata});
+
+  final Map<String, dynamic> metadata;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <String, String>{
+      if ((metadata['bank_name'] ?? '').toString().isNotEmpty) 'Bank': metadata['bank_name'].toString(),
+      if ((metadata['holder_name'] ?? '').toString().isNotEmpty) 'Account Holder': metadata['holder_name'].toString(),
+      if ((metadata['account_no'] ?? '').toString().isNotEmpty) 'Account No.': metadata['account_no'].toString(),
+      if ((metadata['ifsc_code'] ?? '').toString().isNotEmpty) 'IFSC': metadata['ifsc_code'].toString(),
+      if ((metadata['upi_id'] ?? '').toString().isNotEmpty) 'UPI ID': metadata['upi_id'].toString(),
+    };
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.teal.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.teal.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Account Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.teal.shade800)),
+          const SizedBox(height: 6),
+          for (final entry in rows.entries)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 1),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(entry.key, style: TextStyle(fontSize: 12, color: Colors.teal.shade700)),
+                  Text(entry.value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Cash Tendered by Customer" input + live change-due calculation + quick
+/// rounding presets, shown when Cash is the active (non-split) payment
+/// method. Owns its own [TextEditingController] so the field keeps its
+/// cursor/focus across the ancestor [CartSheet]'s frequent rebuilds
+/// (it watches [PosProvider], which notifies on every cart change).
+class _CashTenderSection extends StatefulWidget {
+  const _CashTenderSection({required this.payableAmount, required this.currencySymbol});
+
+  final double payableAmount;
+  final String currencySymbol;
+
+  @override
+  State<_CashTenderSection> createState() => _CashTenderSectionState();
+}
+
+class _CashTenderSectionState extends State<_CashTenderSection> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final pos = context.read<PosProvider>();
+    _controller = TextEditingController(text: pos.effectiveCashTendered.toStringAsFixed(2));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  List<double> _presetAmounts(double total) {
+    if (total <= 0) return const [0];
+    final result = <double>{double.parse(total.toStringAsFixed(2))};
+    const steps = [1.0, 5.0, 10.0, 50.0, 100.0, 500.0];
+    for (final step in steps) {
+      final rounded = (total / step).ceil() * step;
+      if (rounded > total) {
+        result.add(rounded);
+      }
+    }
+    final sorted = result.toList()..sort();
+    return sorted.take(5).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pos = context.watch<PosProvider>();
+    final formatter = CurrencyFormatter(widget.currencySymbol);
+    final presets = _presetAmounts(widget.payableAmount);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Cash Tendered by Customer',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            prefixText: widget.currencySymbol,
+            border: const OutlineInputBorder(),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          onChanged: (val) => pos.setCashTendered(double.tryParse(val) ?? 0),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.shade200),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('CHANGE DUE TO CUSTOMER',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade800, fontSize: 11)),
+              Text(formatter.format(pos.changeDue),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade800, fontSize: 16)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final preset in presets)
+              ActionChip(
+                label: Text(preset == presets.first ? 'Exact' : formatter.format(preset)),
+                onPressed: () {
+                  _controller.text = preset.toStringAsFixed(2);
+                  pos.setCashTendered(preset);
+                },
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

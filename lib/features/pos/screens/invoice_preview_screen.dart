@@ -63,6 +63,8 @@ class InvoicePreviewData {
     this.taxId,
     this.taxLabel = 'Tax',
     this.isIndia = false,
+    this.paidAmount,
+    this.dueAmount = 0,
   });
 
   final String documentType; // 'Invoice' | 'Quotation'
@@ -78,6 +80,10 @@ class InvoicePreviewData {
   final String? taxId;
   final String taxLabel;
   final bool isIndia;
+
+  /// Null means "fully paid" (no separate Paid/Due breakdown needed).
+  final double? paidAmount;
+  final double dueAmount;
 }
 
 /// Shows a full-screen "Preview Invoice" step before a sale is finalized.
@@ -305,6 +311,10 @@ pw.Widget _thermalLayout(InvoicePreviewData data, CurrencyFormatter currency) {
           _thermalTotalRow(data.taxLabel, '+${currency.format(data.taxTotal)}'),
       pw.Divider(thickness: 0.5),
       _thermalTotalRow('TOTAL', currency.format(data.grandTotal), bold: true),
+      if (data.dueAmount > 0.001) ...[
+        _thermalTotalRow('Paid', currency.format(data.paidAmount ?? data.grandTotal)),
+        _thermalTotalRow('Due Balance', currency.format(data.dueAmount), bold: true),
+      ],
       if ((data.notes ?? '').isNotEmpty) ...[
         pw.SizedBox(height: 6),
         pw.Text('Note: ${data.notes}', style: const pw.TextStyle(fontSize: 7)),
@@ -409,6 +419,10 @@ pw.Widget _standardLayout(InvoicePreviewData data, CurrencyFormatter currency) {
                   _standardTotalRow(data.taxLabel, '+${currency.format(data.taxTotal)}'),
               pw.Divider(thickness: 0.5),
               _standardTotalRow('Grand Total', currency.format(data.grandTotal), bold: true),
+              if (data.dueAmount > 0.001) ...[
+                _standardTotalRow('Amount Paid', currency.format(data.paidAmount ?? data.grandTotal)),
+                _standardTotalRow('Due Balance', currency.format(data.dueAmount), bold: true),
+              ],
             ],
           ),
         ),

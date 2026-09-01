@@ -112,6 +112,7 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     final result = await showModalBottomSheet<PosCheckoutResult>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) => ChangeNotifierProvider.value(
         value: posProvider,
@@ -150,6 +151,8 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
         taxLabel: company?.taxLabel ?? 'Tax',
         isIndia: company?.isIndia ?? false,
         taxRate: (result.subtotal - result.discount) > 0 ? result.tax / (result.subtotal - result.discount) * 100 : 0,
+        paidAmount: result.paidAmount,
+        dueAmount: result.dueAmount,
         lines: result.items
             .map((item) => ReceiptLine(
                   name: item.product.name,

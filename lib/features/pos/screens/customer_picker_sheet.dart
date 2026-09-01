@@ -44,7 +44,9 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
       builder: (context, scrollController) {
         return Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: Column(children: [
+          child: SafeArea(
+            top: false,
+            child: Column(children: [
             const SizedBox(height: 12),
             Container(
               width: 40,
@@ -133,6 +135,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                 ),
               ),
           ]),
+          ),
         );
       },
     );

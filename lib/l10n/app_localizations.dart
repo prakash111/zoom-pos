@@ -165,6 +165,7 @@ class AppLocalizations {
   String get featureCustomers => _s('featureCustomers');
   String get featureCashRegister => _s('featureCashRegister');
   String get featurePayables => _s('featurePayables');
+  String get featureDueReceivables => _s('featureDueReceivables');
   String get featureConsignments => _s('featureConsignments');
   String get featureServiceOrders => _s('featureServiceOrders');
   String get featureSalesTargets => _s('featureSalesTargets');

@@ -211,6 +211,7 @@ class PaymentMethodModel {
     required this.description,
     required this.isActive,
     required this.orderIndex,
+    this.metadata,
   });
 
   factory PaymentMethodModel.fromJson(Map<String, dynamic> json) {
@@ -221,6 +222,7 @@ class PaymentMethodModel {
       description: json['description'] as String? ?? '',
       isActive: json['is_active'] as bool? ?? true,
       orderIndex: (json['order_index'] as num?)?.toInt() ?? 0,
+      metadata: (json['metadata'] is Map) ? Map<String, dynamic>.from(json['metadata'] as Map) : null,
     );
   }
 
@@ -231,6 +233,10 @@ class PaymentMethodModel {
   final bool isActive;
   final int orderIndex;
 
+  /// Bank/UPI details (bank_name, account_no, ifsc_code, upi_id,
+  /// holder_name) shown at checkout when this method is selected.
+  final Map<String, dynamic>? metadata;
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -239,6 +245,7 @@ class PaymentMethodModel {
       'description': description,
       'is_active': isActive,
       'order_index': orderIndex,
+      if (metadata != null) 'metadata': metadata,
     };
   }
 }

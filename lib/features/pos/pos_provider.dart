@@ -12,6 +12,7 @@ import '../cash_register/cash_register_repository.dart';
 import '../inventory/inventory_repository.dart';
 import 'cart_item.dart';
 import 'held_carts_store.dart';
+import 'payment_entry.dart';
 import 'sales_repository.dart';
 
 enum CatalogStatus { loading, loaded, error }
@@ -84,6 +85,9 @@ class PosCheckoutResult {
     this.customerName,
     this.notes,
     this.isPendingSync = false,
+    this.paidAmount,
+    this.dueAmount = 0,
+    this.changeDue = 0,
   });
 
   final String saleId;
@@ -95,6 +99,11 @@ class PosCheckoutResult {
   final double total;
   final String? customerName;
   final String? notes;
+
+  /// Null means "the full total was paid" (kept for callers that don't care).
+  final double? paidAmount;
+  final double dueAmount;
+  final double changeDue;
 
   /// True when the sale couldn't reach the server (no connectivity) and was
   /// queued in the offline outbox instead — it will push automatically once
@@ -150,6 +159,98 @@ class PosProvider extends ChangeNotifier {
 
   bool isCheckingOut = false;
   String? checkoutError;
+
+  // --- Partial / split payments & cash tendering ---
+  bool isSplitPayment = false;
+  List<PaymentEntry> payments = [];
+  double? _manualAmountPaid;
+  double cashTendered = 0;
+  bool _cashTenderedManuallySet = false;
+
+  /// How much of [grandTotal] is being paid right now. Defaults to the full
+  /// total unless the cashier explicitly lowers it (down to and including
+  /// zero, for a full credit/due sale) or switches on split payment.
+  double get amountPaid {
+    if (isSplitPayment) {
+      final sum = payments.fold<double>(0, (total, p) => total + p.amount);
+      return sum.clamp(0, grandTotal);
+    }
+    return (_manualAmountPaid ?? grandTotal).clamp(0, grandTotal);
+  }
+
+  double get dueAmount => (grandTotal - amountPaid).clamp(0, double.infinity);
+
+  /// Mirrors the backend's payment_status computation so the UI can show
+  /// the same PAID / PARTIALLY_PAID / UNPAID state before submitting.
+  String get orderStatus {
+    if (dueAmount <= 0.001) return 'paid';
+    if (amountPaid > 0) return 'partially_paid';
+    return 'pending';
+  }
+
+  bool get requiresCustomerForDue => dueAmount > 0.001 && selectedCustomer == null;
+
+  double get remainingSplitBalance => (grandTotal - amountPaid).clamp(0, double.infinity);
+
+  void setAmountPaid(double amount) {
+    _manualAmountPaid = amount.clamp(0, grandTotal);
+    notifyListeners();
+  }
+
+  void resetAmountPaidToFull() {
+    _manualAmountPaid = null;
+    notifyListeners();
+  }
+
+  /// Cash tendered by the customer, defaulting to the payable amount until
+  /// the cashier types a different figure.
+  double get effectiveCashTendered => _cashTenderedManuallySet ? cashTendered : amountPaid;
+
+  double get changeDue => (effectiveCashTendered - amountPaid).clamp(0, double.infinity);
+
+  void setCashTendered(double amount) {
+    cashTendered = amount;
+    _cashTenderedManuallySet = true;
+    notifyListeners();
+  }
+
+  void resetCashTendered() {
+    _cashTenderedManuallySet = false;
+    cashTendered = 0;
+    notifyListeners();
+  }
+
+  void toggleSplitPayment() {
+    isSplitPayment = !isSplitPayment;
+    if (isSplitPayment && payments.isEmpty) {
+      payments.add(PaymentEntry(methodCode: paymentMethod, amount: grandTotal));
+    }
+    notifyListeners();
+  }
+
+  void addSplitRow() {
+    payments.add(PaymentEntry(methodCode: paymentMethod, amount: remainingSplitBalance));
+    notifyListeners();
+  }
+
+  void updateSplitRow(int index, {String? methodCode, double? amount, double? tendered, String? referenceNo}) {
+    if (index < 0 || index >= payments.length) return;
+    final row = payments[index];
+    if (methodCode != null) row.methodCode = methodCode;
+    if (amount != null) row.amount = amount;
+    if (tendered != null) {
+      row.tendered = tendered;
+      row.changeReturned = (tendered - row.amount).clamp(0, double.infinity);
+    }
+    if (referenceNo != null) row.referenceNo = referenceNo;
+    notifyListeners();
+  }
+
+  void removeSplitRow(int index) {
+    if (index < 0 || index >= payments.length) return;
+    payments.removeAt(index);
+    notifyListeners();
+  }
 
   List<ProductModel> get filteredProducts {
     final query = searchQuery.trim().toLowerCase();
@@ -322,6 +423,11 @@ class PosProvider extends ChangeNotifier {
     orderNotes = '';
     customDiscount = 0;
     isPercentDiscount = false;
+    isSplitPayment = false;
+    payments = [];
+    _manualAmountPaid = null;
+    _cashTenderedManuallySet = false;
+    cashTendered = 0;
     if (paymentMethods.isNotEmpty) {
       paymentMethod = paymentMethods.first.code.isNotEmpty ? paymentMethods.first.code : paymentMethods.first.id;
     } else {
@@ -344,6 +450,12 @@ class PosProvider extends ChangeNotifier {
       return null;
     }
 
+    if (requiresCustomerForDue) {
+      checkoutError = 'Attach a customer for due, partial, or credit sales.';
+      notifyListeners();
+      return null;
+    }
+
     isCheckingOut = true;
     checkoutError = null;
     notifyListeners();
@@ -357,6 +469,9 @@ class PosProvider extends ChangeNotifier {
     final soldTotal = grandTotal;
     final soldCustomerName = selectedCustomer?.name;
     final soldNotes = orderNotes;
+    final soldPaidAmount = amountPaid;
+    final soldDueAmount = dueAmount;
+    final soldChangeDue = paymentMethod == 'cash' && !isSplitPayment ? changeDue : 0.0;
     final taxName = soldTax > 0 ? (taxLabel ?? 'Tax') : null;
     final itemsPayload = soldItems
         .map((item) => {
@@ -368,6 +483,13 @@ class PosProvider extends ChangeNotifier {
               'tax_rate': item.product.taxRate,
             })
         .toList();
+
+    // Only sent when it changes what the backend would otherwise assume
+    // (full payment, non-cash): a split breakdown, an explicit partial/zero
+    // amount, or the cash tendered/change for a simple cash sale.
+    final paymentsPayload = isSplitPayment ? payments.map((p) => p.toJson()).toList() : null;
+    final needsPaidAmountOverride = !isSplitPayment && soldPaidAmount < soldTotal - 0.001;
+    final dueDate = soldDueAmount > 0 ? soldAt.add(const Duration(days: 15)) : null;
 
     Future<void> queueOffline() {
       final payload = SalesRepository.buildOfflineSalePayload(
@@ -381,6 +503,11 @@ class PosProvider extends ChangeNotifier {
         customerName: soldCustomerName,
         items: itemsPayload,
         createdAt: soldAt,
+        payments: paymentsPayload,
+        paidAmount: needsPaidAmountOverride ? soldPaidAmount : null,
+        tendered: paymentMethod == 'cash' && !isSplitPayment ? effectiveCashTendered : null,
+        changeReturned: soldChangeDue,
+        dueDate: dueDate,
       );
       return _syncEngine.queueOfflineSale(id: saleId, payload: payload, createdAt: soldAt);
     }
@@ -397,6 +524,9 @@ class PosProvider extends ChangeNotifier {
         customerName: soldCustomerName,
         notes: soldNotes,
         isPendingSync: isPendingSync,
+        paidAmount: soldPaidAmount,
+        dueAmount: soldDueAmount,
+        changeDue: soldChangeDue,
       );
     }
 
@@ -422,6 +552,11 @@ class PosProvider extends ChangeNotifier {
         customerId: selectedCustomer?.id,
         customerName: soldCustomerName,
         items: itemsPayload,
+        payments: paymentsPayload,
+        paidAmount: needsPaidAmountOverride ? soldPaidAmount : null,
+        tendered: paymentMethod == 'cash' && !isSplitPayment ? effectiveCashTendered : null,
+        changeReturned: soldChangeDue,
+        dueDate: dueDate,
       );
       clearCart();
       isCheckingOut = false;

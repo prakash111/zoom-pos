@@ -35,6 +35,11 @@ class SalesRepository {
     String? customerName,
     required List<Map<String, dynamic>> items,
     DateTime? createdAt,
+    List<Map<String, dynamic>>? payments,
+    double? paidAmount,
+    double? tendered,
+    double changeReturned = 0,
+    DateTime? dueDate,
   }) {
     return _client.post(ApiEndpoints.syncPush, data: {
       'sales': [
@@ -50,6 +55,11 @@ class SalesRepository {
           customerName: customerName,
           items: items,
           createdAt: createdAt,
+          payments: payments,
+          paidAmount: paidAmount,
+          tendered: tendered,
+          changeReturned: changeReturned,
+          dueDate: dueDate,
         ),
       ],
     });
@@ -84,6 +94,11 @@ class SalesRepository {
     String? customerName,
     required List<Map<String, dynamic>> items,
     DateTime? createdAt,
+    List<Map<String, dynamic>>? payments,
+    double? paidAmount,
+    double? tendered,
+    double changeReturned = 0,
+    DateTime? dueDate,
   }) {
     return {
       'id': id,
@@ -100,6 +115,15 @@ class SalesRepository {
       // replayed later — otherwise the server would stamp it with the sync
       // time instead of when the sale actually happened.
       if (createdAt != null) 'createdAt': createdAt.toIso8601String(),
+      // Split-tender rows (PosSyncApiController::processSalesBatch sums
+      // these for paid_amount when present, overriding everything below).
+      if (payments != null && payments.isNotEmpty) 'payments': payments,
+      // Explicit zero/partial single-tender override — ignored server-side
+      // when `payments` above is non-empty.
+      if (paidAmount != null) 'paid_amount': paidAmount,
+      if (tendered != null) 'tendered': tendered,
+      'change_returned': changeReturned,
+      if (dueDate != null) 'due_date': dueDate.toIso8601String().split('T').first,
     };
   }
 
@@ -119,6 +143,11 @@ class SalesRepository {
     String? customerName,
     required List<Map<String, dynamic>> items,
     required DateTime createdAt,
+    List<Map<String, dynamic>>? payments,
+    double? paidAmount,
+    double? tendered,
+    double changeReturned = 0,
+    DateTime? dueDate,
   }) {
     return _salePayload(
       id: id,
@@ -132,6 +161,11 @@ class SalesRepository {
       customerName: customerName,
       items: items,
       createdAt: createdAt,
+      payments: payments,
+      paidAmount: paidAmount,
+      tendered: tendered,
+      changeReturned: changeReturned,
+      dueDate: dueDate,
     );
   }
 }

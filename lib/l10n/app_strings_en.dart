@@ -102,6 +102,7 @@ const Map<String, String> kEnStrings = {
   'featureCustomers': 'Customers',
   'featureCashRegister': 'Cash Register',
   'featurePayables': 'Payables',
+  'featureDueReceivables': 'Due Payments / Receivables',
   'featureConsignments': 'Consignments',
   'featureServiceOrders': 'Service Orders',
   'featureSalesTargets': 'Sales Targets',

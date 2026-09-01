@@ -32,6 +32,8 @@ class InvoiceActionsData {
     this.taxLabel = 'Tax',
     this.isIndia = false,
     this.taxRate = 0,
+    this.paidAmount,
+    this.dueAmount = 0,
   });
 
   final String documentType; // 'invoice' | 'quotation'
@@ -52,6 +54,10 @@ class InvoiceActionsData {
   /// Effective tax rate (%), used only to label the CGST/SGST split on
   /// thermal receipts — see [ThermalPrinterService.printReceipt].
   final double taxRate;
+
+  /// Null means "fully paid" (no separate Paid/Due breakdown on the receipt).
+  final double? paidAmount;
+  final double dueAmount;
 
   String get _pdfPath =>
       documentType == 'quotation' ? ApiEndpoints.quotationPdf(documentId) : ApiEndpoints.salePdf(documentId);
@@ -159,6 +165,8 @@ Future<void> _printThermal(BuildContext context, InvoiceActionsData data) async 
     taxLabel: data.taxLabel,
     isIndia: data.isIndia,
     taxRate: data.taxRate,
+    paidAmount: data.paidAmount,
+    dueAmount: data.dueAmount,
   );
   messenger.showSnackBar(SnackBar(content: Text(ok ? 'Sent to printer.' : 'Could not reach the printer.')));
 }
