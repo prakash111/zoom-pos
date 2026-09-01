@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\Sale;
 use App\Models\User;
+use App\Observers\SaleObserver;
 use App\Services\Auth\PermissionChecker;
 use App\Support\Desktop;
 use App\View\Composers\TenantNavigationComposer;
@@ -27,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Sale::observe(SaleObserver::class);
+
         $storageDirs = [
             storage_path('framework/views'),
             storage_path('framework/sessions'),

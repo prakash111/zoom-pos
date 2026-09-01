@@ -30,6 +30,8 @@ class Show extends Component
 
     public ?int $maxDevices = null;
 
+    public bool $restaurantModeLocked = false;
+
     public function mount(Company $company): void
     {
         $this->company = $company;
@@ -41,6 +43,7 @@ class Show extends Component
         $this->expiresAt = $company->expires_at?->format('Y-m-d');
         $this->maxUsers = $company->max_users;
         $this->maxDevices = $company->max_devices;
+        $this->restaurantModeLocked = (bool) $company->restaurant_mode_locked;
     }
 
     protected function rules(): array
@@ -54,6 +57,7 @@ class Show extends Component
             'expiresAt' => ['nullable', 'date'],
             'maxUsers' => ['nullable', 'integer', 'min:0'],
             'maxDevices' => ['nullable', 'integer', 'min:0'],
+            'restaurantModeLocked' => ['boolean'],
         ];
     }
 
@@ -71,6 +75,7 @@ class Show extends Component
             'expires_at' => $data['expiresAt'] ?: null,
             'max_users' => $data['maxUsers'],
             'max_devices' => $data['maxDevices'],
+            'restaurant_mode_locked' => $data['restaurantModeLocked'] ?? false,
         ]);
 
         AuditLog::record('tenant.updated', $this->company->id, auth('platform_web')->id(), [

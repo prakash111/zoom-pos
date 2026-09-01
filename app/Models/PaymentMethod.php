@@ -12,7 +12,7 @@ class PaymentMethod extends Model
     use BelongsToCompany, HasLegacyStringId;
 
     protected $fillable = [
-        'company_id', 'name', 'code', 'is_active', 'order_index', 'description',
+        'company_id', 'name', 'code', 'is_active', 'order_index', 'description', 'metadata',
     ];
 
     protected function casts(): array
@@ -20,6 +20,7 @@ class PaymentMethod extends Model
         return [
             'is_active' => 'boolean',
             'order_index' => 'integer',
+            'metadata' => 'array',
         ];
     }
 

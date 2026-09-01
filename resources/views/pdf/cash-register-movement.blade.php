@@ -247,9 +247,11 @@
 
         <div class="footer-attribution">
             <div>{{ $company->trade_name ?? $company->name }} &bull; Internal Cash Ledger Voucher</div>
+            @if (setting('show_powered_by', true))
             <div style="margin-top: 2px; font-weight: bold;">
                 Powered by {{ $platformName }}
             </div>
+            @endif
             <div>Issued via {{ $platformUrl }}</div>
         </div>
     </div>

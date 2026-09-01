@@ -21,6 +21,7 @@ use App\Models\TenantApiKey;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\Delivery\MessageQueueService;
+use App\Services\Financial\CustomerLedgerService;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Payment\SubscriptionPaymentGatewayService;
 use App\Services\Tenancy\TenantProvisioningService;
@@ -327,6 +328,8 @@ class PosSyncApiController extends Controller
                 'email' => $company->email ?? '',
                 'plan_name' => $company->plan_name ?? 'trial',
                 'expires_at' => $company->expires_at?->toIso8601String(),
+                'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
+                'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
             ],
         ]);
     }
@@ -395,6 +398,7 @@ class PosSyncApiController extends Controller
                 'customer_ledger' => true,
                 'analytics' => true,
                 'subscription_management' => true,
+                'show_powered_by' => (bool) setting('show_powered_by', true),
                 'version' => '1.0.0',
             ],
         ]);
@@ -725,12 +729,13 @@ class PosSyncApiController extends Controller
         }
 
         $salesPayload = $request->input('sales', []);
-        $syncedIds = $this->processSalesBatch($salesPayload, $company, $user);
+        [$syncedIds, $rejected] = $this->processSalesBatch($salesPayload, $company, $user);
 
         return response()->json([
             'success' => true,
             'message' => sprintf('Successfully synchronized %d sale(s).', count($syncedIds)),
             'synced_ids' => $syncedIds,
+            'rejected' => $rejected,
             'server_time' => now()->toIso8601String(),
         ]);
     }
@@ -760,8 +765,9 @@ class PosSyncApiController extends Controller
     protected function processSalesBatch(array $salesPayload, Company $company, ?User $user): array
     {
         $syncedIds = [];
+        $rejected = [];
 
-        DB::transaction(function () use ($salesPayload, $company, $user, &$syncedIds) {
+        DB::transaction(function () use ($salesPayload, $company, $user, &$syncedIds, &$rejected) {
             foreach ($salesPayload as $saleData) {
                 $clientUuid = (string) ($saleData['id'] ?? $saleData['client_uuid'] ?? Str::uuid()->toString());
 
@@ -879,13 +885,42 @@ class PosSyncApiController extends Controller
                     }
                 }
 
-                // If payment method is credit/khata, record as due_amount
+                // Split/multi-tender payments: an optional `payments` array of
+                // {payment_method, amount, tendered?, change_returned?,
+                // reference_number?} rows. Falls back to the legacy
+                // credit/khata-vs-full-payment behavior when absent, so
+                // payloads queued offline before this field existed keep
+                // working unchanged.
+                $paymentsInput = array_values(array_filter((array) ($saleData['payments'] ?? []), fn ($p) => is_array($p)));
                 $isCredit = strtolower($paymentMethod) === 'credit' || strtolower($paymentMethod) === 'khata';
-                $paidAmount = $isCredit ? 0 : $total;
-                $dueAmount = $isCredit ? $total : 0;
-                $paymentStatus = $isCredit ? 'pending' : 'paid';
 
-                Sale::create([
+                if (! empty($paymentsInput)) {
+                    $paidAmount = min($total, round(array_sum(array_map(fn ($p) => (float) ($p['amount'] ?? 0), $paymentsInput)), 2));
+                } elseif (array_key_exists('paid_amount', $saleData)) {
+                    // Explicit override for a zero/partial payment made with a
+                    // single tender (no split rows needed) — takes precedence
+                    // over the legacy credit/khata string-matching below.
+                    $paidAmount = min($total, max(0, round((float) $saleData['paid_amount'], 2)));
+                } else {
+                    $paidAmount = $isCredit ? 0 : $total;
+                }
+
+                $dueAmount = max(0, round($total - $paidAmount, 2));
+                $paymentStatus = $dueAmount <= 0.001 ? 'paid' : ($paidAmount > 0 ? 'partially_paid' : 'pending');
+
+                // A due/credit/partial sale must be attached to a customer so
+                // the balance has somewhere to be tracked — reject just this
+                // sale rather than the whole batch.
+                if ($dueAmount > 0 && empty($customerId)) {
+                    $rejected[] = [
+                        'id' => $clientUuid,
+                        'error' => 'A customer must be selected for due, partial, or credit sales.',
+                    ];
+
+                    continue;
+                }
+
+                $sale = Sale::create([
                     'company_id' => $company->id,
                     'external_id' => $clientUuid,
                     'sale_number' => $orderNumber,
@@ -899,21 +934,53 @@ class PosSyncApiController extends Controller
                     'tax_name' => $taxName,
                     'tax_rate' => $taxRate,
                     'tax_breakdown' => $taxBreakdown,
-                    'payment_method' => $paymentMethod,
+                    'payment_method' => ! empty($paymentsInput) ? 'split' : $paymentMethod,
                     'status' => 'completed',
                     'payment_status' => $paymentStatus,
                     'paid_amount' => $paidAmount,
                     'due_amount' => $dueAmount,
+                    'due_date' => $dueAmount > 0 ? ($saleData['due_date'] ?? null) : null,
                     'items' => $normalizedItems,
                     'created_at' => $createdAt,
                     'updated_at' => now(),
                 ]);
 
+                if (! empty($paymentsInput)) {
+                    foreach ($paymentsInput as $row) {
+                        $rowAmount = (float) ($row['amount'] ?? 0);
+                        if ($rowAmount <= 0) {
+                            continue;
+                        }
+
+                        OrderPayment::create([
+                            'company_id' => $company->id,
+                            'sale_id' => $sale->id,
+                            'payment_method' => $row['payment_method'] ?? $paymentMethod,
+                            'amount' => $rowAmount,
+                            'tendered' => $row['tendered'] ?? null,
+                            'change_returned' => (float) ($row['change_returned'] ?? 0),
+                            'reference_number' => $row['reference_number'] ?? null,
+                        ]);
+                    }
+                } elseif ($paidAmount > 0) {
+                    OrderPayment::create([
+                        'company_id' => $company->id,
+                        'sale_id' => $sale->id,
+                        'payment_method' => $paymentMethod,
+                        'amount' => $paidAmount,
+                        'tendered' => $saleData['tendered'] ?? null,
+                        'change_returned' => (float) ($saleData['change_returned'] ?? 0),
+                    ]);
+                }
+
+                // Ledger entry for any due balance is written automatically
+                // by SaleObserver on Sale creation.
+
                 $syncedIds[] = $clientUuid;
             }
         });
 
-        return $syncedIds;
+        return [$syncedIds, $rejected];
     }
 
     /**
@@ -1154,7 +1221,7 @@ class PosSyncApiController extends Controller
 
             // 3. Process Sales
             if ($request->has('sales') && is_array($request->input('sales')) && count($request->input('sales')) > 0) {
-                $syncedSales = $this->processSalesBatch($request->input('sales'), $company, $user);
+                [$syncedSales] = $this->processSalesBatch($request->input('sales'), $company, $user);
             }
 
             // 4. Process Inventory Adjustments
@@ -1246,7 +1313,7 @@ class PosSyncApiController extends Controller
                                     'payment_status' => $newDue <= 0.001 ? 'paid' : 'partially_paid',
                                 ]);
 
-                                OrderPayment::create([
+                                $orderPayment = OrderPayment::create([
                                     'company_id' => $company->id,
                                     'sale_id' => $sale->id,
                                     'payment_method' => $method,
@@ -1256,6 +1323,7 @@ class PosSyncApiController extends Controller
                                     'reference_number' => $ref,
                                     'notes' => $notes,
                                 ]);
+                                app(CustomerLedgerService::class)->recordPayment($sale, $orderPayment);
                                 $rem -= $apply;
                             }
                         }
@@ -1993,7 +2061,7 @@ class PosSyncApiController extends Controller
                     'payment_status' => $newDue <= 0.001 ? 'paid' : 'partially_paid',
                 ]);
 
-                OrderPayment::create([
+                $orderPayment = OrderPayment::create([
                     'company_id' => $company->id,
                     'sale_id' => $sale->id,
                     'payment_method' => $method,
@@ -2003,6 +2071,8 @@ class PosSyncApiController extends Controller
                     'reference_number' => $ref,
                     'notes' => $notes,
                 ]);
+
+                app(CustomerLedgerService::class)->recordPayment($sale, $orderPayment);
 
                 $appliedTo[] = [
                     'sale_id' => (string) ($sale->external_id ?: $sale->id),
@@ -2783,5 +2853,123 @@ class PosSyncApiController extends Controller
         $taxRule->delete();
 
         return response()->json(['success' => true, 'message' => 'Tax rule deleted.']);
+    }
+
+    /**
+     * 24. Due Payments / Receivables: per-invoice due list for the mobile
+     * dashboard's "Due Payments / Receivables" panel.
+     * GET /api/v1/pos/receivables/due
+     */
+    public function dueReceivables(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $sales = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', '!=', 'cancelled')
+            ->where('due_amount', '>', 0)
+            ->with('customer')
+            ->orderBy('due_date')
+            ->orderByDesc('created_at')
+            ->paginate((int) $request->input('per_page', 50));
+
+        return response()->json([
+            'success' => true,
+            'receivables' => collect($sales->items())->map(fn (Sale $sale) => [
+                'sale_id' => (string) ($sale->external_id ?: $sale->id),
+                'sale_number' => $sale->sale_number,
+                'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? 'Walk-in',
+                'phone' => $sale->customer?->phone,
+                'email' => $sale->customer?->email,
+                'date' => $sale->created_at?->toIso8601String(),
+                'due_date' => $sale->due_date?->toIso8601String(),
+                'total' => (float) $sale->total,
+                'paid_amount' => (float) $sale->paid_amount,
+                'due_amount' => (float) $sale->due_amount,
+                'status' => $sale->payment_status,
+            ])->values(),
+            'total' => $sales->total(),
+            'current_page' => $sales->currentPage(),
+            'last_page' => $sales->lastPage(),
+        ]);
+    }
+
+    /**
+     * 25. Due Payments / Receivables: dispatch a reminder for one sale.
+     * POST /api/v1/pos/receivables/{sale}/remind
+     */
+    public function remindReceivable(Request $request, string $sale): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $validator = Validator::make($request->all(), [
+            'channel' => ['required', 'string', 'in:whatsapp,email,custom'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
+        }
+
+        $saleModel = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(fn ($q) => $q->where('id', $sale)->orWhere('external_id', $sale))
+            ->with('customer')
+            ->first();
+
+        if (! $saleModel) {
+            return response()->json(['success' => false, 'error' => 'Sale not found.'], 404);
+        }
+
+        $delivery = app(InvoiceDeliveryService::class);
+        $channel = $request->input('channel');
+
+        if ($channel === 'whatsapp') {
+            $phone = $saleModel->customer?->phone;
+            if (empty($phone)) {
+                return response()->json(['success' => false, 'error' => 'This customer has no phone number on file.'], 422);
+            }
+
+            $result = app(MessageQueueService::class)->sendOrQueueWhatsApp($saleModel, $phone, $delivery->buildDueReminderMessage($saleModel));
+
+            if ($result['status'] === 'manual_link') {
+                return response()->json(['success' => true, 'fallback_url' => $result['url']]);
+            }
+
+            return response()->json(['success' => true, 'message' => 'Reminder sent via WhatsApp.']);
+        }
+
+        if ($channel === 'email') {
+            $email = $saleModel->customer?->email;
+            $smtp = $delivery->getSmtpConfig($company);
+
+            if ($email && ! empty($smtp['host'])) {
+                try {
+                    $delivery->sendDueReminderEmail($saleModel, $email);
+
+                    return response()->json(['success' => true, 'message' => 'Reminder sent via email.']);
+                } catch (\Throwable $e) {
+                    return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+                }
+            }
+
+            $subject = rawurlencode("Payment Reminder: Invoice #{$saleModel->sale_number}");
+            $body = rawurlencode($delivery->buildDueReminderMessage($saleModel));
+
+            return response()->json([
+                'success' => true,
+                'fallback_mailto' => "mailto:{$email}?subject={$subject}&body={$body}",
+            ]);
+        }
+
+        // custom
+        app(\App\Services\Delivery\WebhookDispatchService::class)->dispatchEvent($company->id, 'due_reminder', [
+            'customer_name' => $saleModel->customer?->name ?? $saleModel->customer_name ?? '',
+            'invoice_no' => $saleModel->sale_number,
+            'due_amount' => (float) $saleModel->due_amount,
+            'due_date' => $saleModel->due_date?->toDateString() ?? '',
+            'receipt_link' => route('sales.public', $saleModel->sale_number),
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Reminder dispatched to custom notification channels.']);
     }
 }

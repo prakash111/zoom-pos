@@ -7,6 +7,10 @@ use App\Models\Customer;
 use App\Models\OrderPayment;
 use App\Models\PaymentMethod;
 use App\Models\Sale;
+use App\Services\Delivery\MessageQueueService;
+use App\Services\Delivery\WebhookDispatchService;
+use App\Services\Financial\CustomerLedgerService;
+use App\Services\Invoice\InvoiceDeliveryService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
@@ -118,7 +122,7 @@ class Receivables extends Component
             $newDue = max(0, round((float) $sale->total - $newPaid, 2));
             $newStatus = $newDue <= 0.001 ? 'paid' : 'partially_paid';
 
-            OrderPayment::create([
+            $orderPayment = OrderPayment::create([
                 'company_id' => $companyId,
                 'sale_id' => $sale->id,
                 'payment_method' => $this->paymentMethod,
@@ -136,6 +140,8 @@ class Receivables extends Component
                 'payment_status' => $newStatus,
             ]);
 
+            app(CustomerLedgerService::class)->recordPayment($sale, $orderPayment);
+
             AuditLog::record('financials.receivable_collected', $companyId, auth('web')->id(), [
                 'sale_id' => $sale->id,
                 'sale_number' => $sale->sale_number,
@@ -147,6 +153,64 @@ class Receivables extends Component
 
         session()->flash('status', 'Payment of $'.number_format($this->paymentAmount, 2)." logged successfully for Sale #{$this->selectedSale->sale_number}.");
         $this->closePaymentModal();
+    }
+
+    /**
+     * "Send Reminder" action per due invoice row — WhatsApp/email if the
+     * tenant has credentials configured, otherwise a browser event opens
+     * the wa.me/mailto fallback link, or dispatches to custom channels.
+     */
+    public function sendReminder(int $saleId, string $channel): void
+    {
+        $sale = Sale::with('customer')->findOrFail($saleId);
+        $delivery = app(InvoiceDeliveryService::class);
+
+        if ($channel === 'whatsapp') {
+            $phone = $sale->customer?->phone;
+            if (! $phone) {
+                session()->flash('status', 'This customer has no phone number on file.');
+
+                return;
+            }
+
+            $result = app(MessageQueueService::class)->sendOrQueueWhatsApp($sale, $phone, $delivery->buildDueReminderMessage($sale));
+            if ($result['status'] === 'manual_link') {
+                $this->dispatch('open-external-url', url: $result['url']);
+            } else {
+                session()->flash('status', 'Reminder sent via WhatsApp.');
+            }
+
+            return;
+        }
+
+        if ($channel === 'email') {
+            $email = $sale->customer?->email;
+            $smtp = $delivery->getSmtpConfig();
+            if ($email && ! empty($smtp['host'])) {
+                try {
+                    $delivery->sendDueReminderEmail($sale, $email);
+                    session()->flash('status', 'Reminder sent via email.');
+                } catch (\Throwable $e) {
+                    session()->flash('status', 'Failed to send reminder: '.$e->getMessage());
+                }
+            } else {
+                $subject = rawurlencode("Payment Reminder: Invoice #{$sale->sale_number}");
+                $body = rawurlencode($delivery->buildDueReminderMessage($sale));
+                $this->dispatch('open-external-url', url: "mailto:{$email}?subject={$subject}&body={$body}");
+            }
+
+            return;
+        }
+
+        // custom notification channels
+        app(WebhookDispatchService::class)->dispatchEvent($sale->company_id, 'due_reminder', [
+            'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? '',
+            'invoice_no' => $sale->sale_number,
+            'due_amount' => (float) $sale->due_amount,
+            'due_date' => $sale->due_date?->toDateString() ?? '',
+            'receipt_link' => route('sales.public', $sale->sale_number),
+        ]);
+        session()->flash('status', 'Reminder dispatched to custom notification channels.');
     }
 
     public function render()

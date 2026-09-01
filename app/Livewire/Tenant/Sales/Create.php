@@ -1314,6 +1314,9 @@ class Create extends Component
                 ]);
             }
 
+            // Ledger entry for any due balance is written automatically by
+            // SaleObserver on Sale creation (skips consignment sales).
+
             foreach ($this->items as $item) {
                 $product = Product::find($item['product_id']);
                 if ($product) {

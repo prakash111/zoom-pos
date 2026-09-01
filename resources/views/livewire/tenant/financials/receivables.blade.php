@@ -250,6 +250,19 @@
                                                 class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition shadow-2xs active:scale-95 cursor-pointer">
                                             + {{ __("Collect Pay") }}
                                         </button>
+
+                                        <div x-data="{ open: false }" class="relative inline-block">
+                                            <button type="button" x-on:click="open = !open"
+                                                    class="px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 font-bold text-[10px] transition" title="{{ __('Send Reminder') }}">
+                                                🔔
+                                            </button>
+                                            <div x-show="open" x-on:click.outside="open = false" x-cloak
+                                                 class="absolute right-0 z-20 mt-1 w-40 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 py-1 text-left">
+                                                <button type="button" wire:click="sendReminder({{ $inv->id }}, 'whatsapp')" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer">{{ __('WhatsApp') }}</button>
+                                                <button type="button" wire:click="sendReminder({{ $inv->id }}, 'email')" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer">{{ __('Email') }}</button>
+                                                <button type="button" wire:click="sendReminder({{ $inv->id }}, 'custom')" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer">{{ __('Custom Channel') }}</button>
+                                            </div>
+                                        </div>
                                     @endif
 
                                     <button type="button" x-data
@@ -432,4 +445,5 @@
         </div>
     @endif
 
+    <div x-data x-on:open-external-url.window="window.open($event.detail.url, '_blank')"></div>
 </div>

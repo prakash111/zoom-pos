@@ -301,9 +301,11 @@
                 </div>
             @endif
             <div>{{ $company->trade_name ?? $company->name }} &bull; {{ __("Cash Drawer Voucher") }}</div>
+            @if (setting('show_powered_by', true))
             <div style="font-weight: 700; margin-top: 3px;">
                 {{ __("Powered by") }} {{ $platformName }}
             </div>
+            @endif
             <div>{{ __("Issued via") }} {{ $platformUrl }}</div>
         </div>
 

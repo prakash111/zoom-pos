@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\OrderPayment;
 use App\Models\Sale;
+use App\Services\Financial\CustomerLedgerService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -208,7 +209,7 @@ class Index extends Component
             $newDue = max(0, round((float) $sale->total - $newPaid, 2));
             $newStatus = $newDue <= 0.001 ? 'paid' : 'partially_paid';
 
-            OrderPayment::create([
+            $orderPayment = OrderPayment::create([
                 'company_id' => $companyId,
                 'sale_id' => $sale->id,
                 'payment_method' => $this->paymentMethod,
@@ -223,6 +224,8 @@ class Index extends Component
                 'due_amount' => $newDue,
                 'payment_status' => $newStatus,
             ]);
+
+            app(CustomerLedgerService::class)->recordPayment($sale, $orderPayment);
 
             AuditLog::record('customer.debt_settled', $companyId, auth('web')->id(), [
                 'customer_id' => $sale->customer_id,

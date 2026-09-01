@@ -211,7 +211,7 @@ class ReportingCommissionsAndReceivablesTest extends TestCase
             'due_date' => now()->addDays(15),
         ]);
 
-        $this->assertSame(300.0, $customer->total_due);
+        $this->assertSame(300.0, $customer->fresh()->total_due);
 
         // Open customer ledger and perform partial debt settlement of $120
         Livewire::test(CustomersIndex::class)

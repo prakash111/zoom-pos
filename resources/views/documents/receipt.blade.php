@@ -620,9 +620,11 @@
                     $platformName = $platformBranding?->platform_name ?? config('app.name');
                     $platformDomain = config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'saas.zoomnearby.com';
                 @endphp
+                @if (setting('show_powered_by', true))
                 <div style="font-size: {{ $subSize }}; color: #64748b; margin-top: 4px; border-top: 1px dashed #cbd5e1; padding-top: 4px;">
                     {{ __("Powered by") }} {{ $platformName }} &bull; {{ __("Issued via") }} {{ $platformDomain }}
                 </div>
+                @endif
             </div>
         </div>
 

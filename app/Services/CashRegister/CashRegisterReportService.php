@@ -136,8 +136,10 @@ class CashRegisterReportService
         }
 
         $message .= "----------------------------\n"
-            ."Issued via *{$companyName}*\n"
-            ."⚡ Powered by {$platformName}";
+            ."Issued via *{$companyName}*";
+        if (setting('show_powered_by', true)) {
+            $message .= "\n⚡ Powered by {$platformName}";
+        }
 
         $sanitizedPhone = $phone ? preg_replace('/[^0-9]/', '', $phone) : '';
         if (! empty($sanitizedPhone)) {
@@ -211,8 +213,10 @@ class CashRegisterReportService
             $message .= "*Closing Remarks:* {$register->notes}\n----------------------------\n";
         }
 
-        $message .= "Issued via *{$companyName}*\n"
-            ."⚡ Powered by {$platformName}";
+        $message .= "Issued via *{$companyName}*";
+        if (setting('show_powered_by', true)) {
+            $message .= "\n⚡ Powered by {$platformName}";
+        }
 
         $sanitizedPhone = $phone ? preg_replace('/[^0-9]/', '', $phone) : '';
         if (! empty($sanitizedPhone)) {

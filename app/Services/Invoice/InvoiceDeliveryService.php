@@ -2,6 +2,7 @@
 
 namespace App\Services\Invoice;
 
+use App\Mail\DueReminderMailable;
 use App\Mail\InvoiceMailable;
 use App\Mail\QuotationMailable;
 use App\Models\AuditLog;
@@ -710,6 +711,92 @@ class InvoiceDeliveryService
         }
 
         return $this->generateInvoiceWhatsAppUrl($sale, $phone, $customMessage);
+    }
+
+    /**
+     * Plain-text WhatsApp body for a due-payment reminder against a
+     * partially-paid or unpaid sale.
+     */
+    public function buildDueReminderMessage(Sale $sale): string
+    {
+        $company = $sale->company ?? Company::find($sale->company_id);
+        $companyName = $company?->trade_name ?? $company?->name ?? 'Store';
+        $customerName = $sale->customer_name ?: 'Valued Customer';
+        $sym = $company?->currency_symbol ?: '$';
+        $due = number_format((float) $sale->due_amount, 2);
+        $total = number_format((float) $sale->total, 2);
+        $paid = number_format((float) $sale->paid_amount, 2);
+        $dueDate = $sale->due_date ? $sale->due_date->format('d M Y') : 'as soon as possible';
+        $publicLink = route('sales.public', $sale->sale_number);
+
+        return "💳 *Payment Reminder*\n"
+            ."*Store:* {$companyName}\n"
+            ."*Invoice:* #{$sale->sale_number}\n"
+            ."Hi {$customerName}, this is a friendly reminder of an outstanding balance:\n\n"
+            ."*Total:* {$sym}{$total}\n"
+            ."*Paid:* {$sym}{$paid}\n"
+            ."*Due:* {$sym}{$due}\n"
+            ."*Due Date:* {$dueDate}\n\n"
+            ."🔗 *View Invoice:*\n{$publicLink}\n\n"
+            ."Thank you for your business — {$companyName}";
+    }
+
+    public function generateDueReminderWhatsAppUrl(Sale $sale, ?string $phone = null): string
+    {
+        $message = $this->buildDueReminderMessage($sale);
+
+        $sanitizedPhone = '';
+        if ($phone) {
+            $sanitizedPhone = preg_replace('/[^0-9]/', '', $phone);
+        } elseif ($sale->customer?->phone) {
+            $sanitizedPhone = preg_replace('/[^0-9]/', '', $sale->customer->phone);
+        }
+
+        if (! empty($sanitizedPhone)) {
+            return "https://wa.me/{$sanitizedPhone}?text=".rawurlencode($message);
+        }
+
+        return 'https://api.whatsapp.com/send?text='.rawurlencode($message);
+    }
+
+    /**
+     * Send a due-payment reminder email. Throws if no SMTP host resolves
+     * (tenant, then platform, then .env) — callers should build a mailto:
+     * fallback instead of calling this when that's the case.
+     */
+    public function sendDueReminderEmail(Sale $sale, string $recipientEmail): void
+    {
+        $cleanEmail = trim($recipientEmail);
+        if (! filter_var($cleanEmail, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException("Invalid recipient email address: '{$recipientEmail}'. Please enter a valid email.");
+        }
+
+        $company = $sale->company ?? Company::find($sale->company_id);
+        $smtp = $this->getSmtpConfig($company);
+
+        if (empty($smtp['host'])) {
+            throw new \RuntimeException('SMTP host is not configured for your store or platform.');
+        }
+
+        $mailable = new DueReminderMailable($sale, $company);
+
+        if (app()->environment('testing') || config('mail.default') === 'array') {
+            Mail::to($cleanEmail)->send($mailable);
+
+            return;
+        }
+
+        Config::set('mail.mailers.tenant_dynamic', [
+            'transport' => 'smtp',
+            'host' => $smtp['host'],
+            'port' => $smtp['port'],
+            'encryption' => $smtp['encryption'],
+            'username' => $smtp['username'],
+            'password' => $smtp['password'],
+            'timeout' => 15,
+        ]);
+
+        Mail::mailer('tenant_dynamic')->to($cleanEmail)->send($mailable);
     }
 
     /**

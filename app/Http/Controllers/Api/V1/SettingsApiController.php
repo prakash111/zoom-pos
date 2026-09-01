@@ -389,6 +389,12 @@ class SettingsApiController extends Controller
             'description' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
             'order_index' => ['nullable', 'integer', 'min:0'],
+            'metadata' => ['nullable', 'array'],
+            'metadata.bank_name' => ['nullable', 'string', 'max:150'],
+            'metadata.account_no' => ['nullable', 'string', 'max:60'],
+            'metadata.ifsc_code' => ['nullable', 'string', 'max:20'],
+            'metadata.upi_id' => ['nullable', 'string', 'max:100'],
+            'metadata.holder_name' => ['nullable', 'string', 'max:150'],
         ]);
 
         if ($validator->fails()) {
@@ -517,6 +523,192 @@ class SettingsApiController extends Controller
             'description' => $pm->description ?? '',
             'is_active' => (bool) $pm->is_active,
             'order_index' => (int) $pm->order_index,
+            'metadata' => $pm->metadata ?: (object) [],
+        ];
+    }
+
+    /**
+     * Per-method transaction history (Settings > Payment Methods > [method]
+     * > ledger). Matched by the free-string order_payments.payment_method
+     * against this method's code/name — order_payments has no FK to
+     * payment_methods (see PaymentMethod model docs).
+     */
+    public function paymentMethodTransactions(Request $request): JsonResponse
+    {
+        [$company, $pm, $rows] = $this->paymentMethodLedgerRows($request);
+        if (! $pm) {
+            return response()->json(['success' => false, 'error' => 'Payment method not found.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'payment_method' => $this->presentPaymentMethod($pm),
+            'transactions' => $rows->map(fn ($row) => $this->presentLedgerRow($row))->values(),
+        ]);
+    }
+
+    public function paymentMethodTransactionsExport(Request $request)
+    {
+        [$company, $pm, $rows] = $this->paymentMethodLedgerRows($request);
+        if (! $pm) {
+            return response()->json(['success' => false, 'error' => 'Payment method not found.'], 404);
+        }
+
+        $lines = [['Date', 'Time', 'Order ID', 'Payment Method', 'Customer', 'Amount', 'Reference No', 'Status']];
+        foreach ($rows as $row) {
+            $data = $this->presentLedgerRow($row);
+            $lines[] = [
+                $data['date'], $data['time'], $data['order_id'], $data['payment_method'],
+                $data['customer'], $data['amount'], $data['reference_no'], $data['status'],
+            ];
+        }
+
+        $csv = '';
+        foreach ($lines as $line) {
+            $csv .= implode(',', array_map(fn ($v) => '"'.str_replace('"', '""', (string) $v).'"', $line))."\r\n";
+        }
+
+        $filename = 'payment-method-'.($pm->code ?: $pm->id).'-'.now()->format('Ymd-His').'.csv';
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+    }
+
+    private function paymentMethodLedgerRows(Request $request): array
+    {
+        $company = $this->resolveCompany($request);
+        $pm = PaymentMethod::where('company_id', $company->id)->find($request->route('id'));
+        if (! $pm) {
+            return [$company, null, collect()];
+        }
+
+        $matches = array_values(array_unique(array_filter([$pm->code, $pm->name])));
+
+        $query = \App\Models\OrderPayment::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with('sale.customer')
+            ->whereIn('payment_method', $matches);
+
+        if ($request->filled('from')) {
+            $query->whereDate('created_at', '>=', $request->input('from'));
+        }
+        if ($request->filled('to')) {
+            $query->whereDate('created_at', '<=', $request->input('to'));
+        }
+
+        return [$company, $pm, $query->orderByDesc('created_at')->get()];
+    }
+
+    private function presentLedgerRow(\App\Models\OrderPayment $payment): array
+    {
+        $sale = $payment->sale;
+
+        return [
+            'date' => $payment->created_at?->format('Y-m-d'),
+            'time' => $payment->created_at?->format('H:i:s'),
+            'order_id' => $sale?->sale_number ?? (string) $payment->sale_id,
+            'payment_method' => $payment->payment_method,
+            'customer' => $sale?->customer?->name ?? $sale?->customer_name ?? '',
+            'amount' => (float) $payment->amount,
+            'reference_no' => $payment->reference_number ?? '',
+            'status' => $sale?->payment_status ?? '',
+        ];
+    }
+
+    // ---- Custom Notification Channels ----
+
+    public function notificationChannelsIndex(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $channels = \App\Models\CustomNotificationChannel::where('company_id', $company->id)->orderBy('name')->get();
+
+        return response()->json(['success' => true, 'channels' => $channels->map(fn ($c) => $this->presentChannel($c))->all()]);
+    }
+
+    public function notificationChannelsStore(Request $request): JsonResponse
+    {
+        return $this->saveNotificationChannel($request);
+    }
+
+    public function notificationChannelsUpdate(Request $request, string $id): JsonResponse
+    {
+        return $this->saveNotificationChannel($request, $id);
+    }
+
+    public function notificationChannelsDestroy(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $channel = \App\Models\CustomNotificationChannel::where('company_id', $company->id)->find($id);
+        if (! $channel) {
+            return response()->json(['success' => false, 'error' => 'Notification channel not found.'], 404);
+        }
+        $channel->delete();
+
+        return response()->json(['success' => true, 'message' => 'Deleted.']);
+    }
+
+    private function saveNotificationChannel(Request $request, ?string $id = null): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $validator = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'max:100'],
+            'url' => ['required', 'string', 'max:500', 'url'],
+            'method' => ['nullable', 'string', 'in:POST,GET'],
+            'headers' => ['nullable', 'array'],
+            'auth_type' => ['nullable', 'string', 'in:none,bearer,api_key'],
+            'auth_value' => ['nullable', 'string', 'max:1000'],
+            'payload_template' => ['nullable', 'string', 'max:5000'],
+            'event_types' => ['nullable', 'array'],
+            'event_types.*' => ['string', 'in:invoice,quotation,due_reminder'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+        $data['method'] = $data['method'] ?? 'POST';
+        $data['auth_type'] = $data['auth_type'] ?? 'none';
+        $data['is_active'] = $data['is_active'] ?? true;
+
+        if ($id !== null) {
+            $channel = \App\Models\CustomNotificationChannel::where('company_id', $company->id)->find($id);
+            if (! $channel) {
+                return response()->json(['success' => false, 'error' => 'Notification channel not found.'], 404);
+            }
+            $channel->update($data);
+        } else {
+            $channel = \App\Models\CustomNotificationChannel::create(array_merge($data, ['company_id' => $company->id]));
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Saved.',
+            'channel' => $this->presentChannel($channel->fresh()),
+        ], $id === null ? 201 : 200);
+    }
+
+    private function presentChannel(\App\Models\CustomNotificationChannel $channel): array
+    {
+        return [
+            'id' => (string) $channel->id,
+            'name' => $channel->name,
+            'url' => $channel->url,
+            'method' => $channel->method,
+            'headers' => $channel->headers ?: (object) [],
+            'auth_type' => $channel->auth_type,
+            'has_auth_value' => filled($channel->auth_value),
+            'payload_template' => $channel->payload_template ?? '',
+            'event_types' => $channel->event_types ?: [],
+            'is_active' => (bool) $channel->is_active,
         ];
     }
 }

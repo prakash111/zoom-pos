@@ -134,6 +134,30 @@ class Index extends Component
 
     public bool $hasWhatsappApiToken = false;
 
+    // Custom Notification Channels (Settings > Notifications > Custom Notification Channels)
+    public bool $showChannelModal = false;
+
+    public ?int $editingChannelId = null;
+
+    public string $channelName = '';
+
+    public string $channelUrl = '';
+
+    public string $channelMethod = 'POST';
+
+    public string $channelHeaders = '';
+
+    public string $channelAuthType = 'none';
+
+    public string $channelAuthValue = '';
+
+    public string $channelPayloadTemplate = '';
+
+    /** @var array<int, string> */
+    public array $channelEventTypes = [];
+
+    public bool $channelIsActive = true;
+
     // Payment Methods Management Modal State
     public bool $showPaymentMethodModal = false;
 
@@ -148,6 +172,16 @@ class Index extends Component
     public bool $pmIsActive = true;
 
     public int $pmOrderIndex = 0;
+
+    public string $pmBankName = '';
+
+    public string $pmAccountNo = '';
+
+    public string $pmIfscCode = '';
+
+    public string $pmUpiId = '';
+
+    public string $pmHolderName = '';
 
     // PIX & Merchant Fees & Scale Configuration
     public string $pixKeyType = 'cpf_cnpj'; // cpf_cnpj, email, phone, random
@@ -389,7 +423,15 @@ class Index extends Component
 
     public function setPosMode(string $mode): void
     {
+        if ($mode === 'restaurant' && $this->company->restaurant_mode_locked) {
+            return;
+        }
         $this->posMode = $mode;
+    }
+
+    public function getRestaurantModeLockedProperty(): bool
+    {
+        return (bool) $this->company->restaurant_mode_locked;
     }
 
     public function getLogoPreviewUrlProperty(): ?string
@@ -553,7 +595,7 @@ class Index extends Component
             'default_commission_rate' => $this->defaultCommissionRate,
             'default_commission_type' => $this->defaultCommissionType ?: 'percentage',
             'enable_consignments' => $this->enableConsignments,
-            'pos_mode' => $this->posMode ?: 'general',
+            'pos_mode' => ($this->posMode === 'restaurant' && $this->company->restaurant_mode_locked) ? 'general' : ($this->posMode ?: 'general'),
             'pix_key_type' => $this->pixKeyType,
             'pix_key' => $this->pixKey ?: null,
             'pix_merchant_name' => $this->pixMerchantName ?: null,
@@ -687,9 +729,93 @@ class Index extends Component
         $this->dispatch('toast', ['type' => 'success', 'message' => __('AI Vision & model configuration updated successfully.')]);
     }
 
+    public function openAddChannelModal(): void
+    {
+        $this->reset(['editingChannelId', 'channelName', 'channelUrl', 'channelHeaders', 'channelAuthValue', 'channelPayloadTemplate', 'channelEventTypes']);
+        $this->channelMethod = 'POST';
+        $this->channelAuthType = 'none';
+        $this->channelIsActive = true;
+        $this->showChannelModal = true;
+    }
+
+    public function openEditChannelModal(int $id): void
+    {
+        $channel = \App\Models\CustomNotificationChannel::where('company_id', $this->company->id)->findOrFail($id);
+        $this->editingChannelId = $channel->id;
+        $this->channelName = $channel->name;
+        $this->channelUrl = $channel->url;
+        $this->channelMethod = $channel->method;
+        $this->channelHeaders = $channel->headers ? json_encode($channel->headers, JSON_PRETTY_PRINT) : '';
+        $this->channelAuthType = $channel->auth_type;
+        $this->channelAuthValue = '';
+        $this->channelPayloadTemplate = (string) $channel->payload_template;
+        $this->channelEventTypes = $channel->event_types ?? [];
+        $this->channelIsActive = (bool) $channel->is_active;
+        $this->showChannelModal = true;
+    }
+
+    public function saveChannel(): void
+    {
+        $this->validate([
+            'channelName' => ['required', 'string', 'max:100'],
+            'channelUrl' => ['required', 'url', 'max:500'],
+            'channelMethod' => ['required', 'in:POST,GET'],
+            'channelHeaders' => ['nullable', 'string'],
+            'channelAuthType' => ['required', 'in:none,bearer,api_key'],
+            'channelPayloadTemplate' => ['nullable', 'string', 'max:5000'],
+            'channelEventTypes' => ['array'],
+        ]);
+
+        $headers = null;
+        if (filled($this->channelHeaders)) {
+            $decoded = json_decode($this->channelHeaders, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->addError('channelHeaders', 'Headers must be valid JSON, e.g. {"X-Api-Key": "..."}');
+
+                return;
+            }
+            $headers = $decoded;
+        }
+
+        $data = [
+            'name' => $this->channelName,
+            'url' => $this->channelUrl,
+            'method' => $this->channelMethod,
+            'headers' => $headers,
+            'auth_type' => $this->channelAuthType,
+            'payload_template' => $this->channelPayloadTemplate ?: null,
+            'event_types' => $this->channelEventTypes,
+            'is_active' => $this->channelIsActive,
+        ];
+
+        if (filled($this->channelAuthValue)) {
+            $data['auth_value'] = $this->channelAuthValue;
+        }
+
+        if ($this->editingChannelId) {
+            $channel = \App\Models\CustomNotificationChannel::where('company_id', $this->company->id)->findOrFail($this->editingChannelId);
+            $channel->update($data);
+            session()->flash('status', "Notification channel {$channel->name} updated.");
+        } else {
+            \App\Models\CustomNotificationChannel::create(array_merge($data, ['company_id' => $this->company->id]));
+            session()->flash('status', "Notification channel {$this->channelName} added.");
+        }
+
+        $this->showChannelModal = false;
+        $this->reset(['editingChannelId', 'channelName', 'channelUrl', 'channelHeaders', 'channelAuthValue', 'channelPayloadTemplate', 'channelEventTypes']);
+    }
+
+    public function deleteChannel(int $id): void
+    {
+        $channel = \App\Models\CustomNotificationChannel::where('company_id', $this->company->id)->findOrFail($id);
+        $name = $channel->name;
+        $channel->delete();
+        session()->flash('status', "Notification channel {$name} deleted.");
+    }
+
     public function openAddPaymentMethodModal(): void
     {
-        $this->reset(['editingPaymentMethodId', 'pmName', 'pmCode', 'pmDescription']);
+        $this->reset(['editingPaymentMethodId', 'pmName', 'pmCode', 'pmDescription', 'pmBankName', 'pmAccountNo', 'pmIfscCode', 'pmUpiId', 'pmHolderName']);
         $this->pmIsActive = true;
         $this->pmOrderIndex = PaymentMethod::where('company_id', $this->company->id)->count() + 1;
         $this->showPaymentMethodModal = true;
@@ -704,6 +830,12 @@ class Index extends Component
         $this->pmDescription = (string) $pm->description;
         $this->pmIsActive = $pm->is_active;
         $this->pmOrderIndex = $pm->order_index;
+        $metadata = $pm->metadata ?? [];
+        $this->pmBankName = (string) ($metadata['bank_name'] ?? '');
+        $this->pmAccountNo = (string) ($metadata['account_no'] ?? '');
+        $this->pmIfscCode = (string) ($metadata['ifsc_code'] ?? '');
+        $this->pmUpiId = (string) ($metadata['upi_id'] ?? '');
+        $this->pmHolderName = (string) ($metadata['holder_name'] ?? '');
         $this->showPaymentMethodModal = true;
     }
 
@@ -714,9 +846,21 @@ class Index extends Component
             'pmCode' => ['nullable', 'string', 'max:50'],
             'pmDescription' => ['nullable', 'string', 'max:255'],
             'pmOrderIndex' => ['integer', 'min:0'],
+            'pmBankName' => ['nullable', 'string', 'max:150'],
+            'pmAccountNo' => ['nullable', 'string', 'max:60'],
+            'pmIfscCode' => ['nullable', 'string', 'max:20'],
+            'pmUpiId' => ['nullable', 'string', 'max:100'],
+            'pmHolderName' => ['nullable', 'string', 'max:150'],
         ]);
 
         $code = $this->pmCode ?: Str::slug($this->pmName, '_');
+        $metadata = array_filter([
+            'bank_name' => $this->pmBankName ?: null,
+            'account_no' => $this->pmAccountNo ?: null,
+            'ifsc_code' => $this->pmIfscCode ?: null,
+            'upi_id' => $this->pmUpiId ?: null,
+            'holder_name' => $this->pmHolderName ?: null,
+        ]);
 
         if ($this->editingPaymentMethodId) {
             $pm = PaymentMethod::where('company_id', $this->company->id)->findOrFail($this->editingPaymentMethodId);
@@ -726,6 +870,7 @@ class Index extends Component
                 'description' => $this->pmDescription ?: null,
                 'is_active' => $this->pmIsActive,
                 'order_index' => $this->pmOrderIndex,
+                'metadata' => $metadata ?: null,
             ]);
             session()->flash('status', "Payment method {$pm->name} updated.");
         } else {
@@ -736,12 +881,13 @@ class Index extends Component
                 'description' => $this->pmDescription ?: null,
                 'is_active' => $this->pmIsActive,
                 'order_index' => $this->pmOrderIndex,
+                'metadata' => $metadata ?: null,
             ]);
             session()->flash('status', "Payment method {$pm->name} added successfully.");
         }
 
         $this->showPaymentMethodModal = false;
-        $this->reset(['editingPaymentMethodId', 'pmName', 'pmCode', 'pmDescription']);
+        $this->reset(['editingPaymentMethodId', 'pmName', 'pmCode', 'pmDescription', 'pmBankName', 'pmAccountNo', 'pmIfscCode', 'pmUpiId', 'pmHolderName']);
     }
 
     public function togglePaymentMethodStatus(string $id): void
@@ -955,6 +1101,7 @@ class Index extends Component
             'taxRules' => TaxRule::where('company_id', $this->company->id)->orderByDesc('is_default')->orderBy('tax_name')->get(),
             'apiKeys' => TenantApiKey::where('company_id', $this->company->id)->orderByDesc('created_at')->get(),
             'jurisdictionPresets' => $taxService->getJurisdictionPresets($this->company->country),
+            'notificationChannels' => \App\Models\CustomNotificationChannel::where('company_id', $this->company->id)->orderBy('name')->get(),
         ]);
     }
 }

@@ -147,11 +147,13 @@
                 </div>
 
                 <!-- Mode 2: Food & Restaurant Mode -->
-                <div wire:click="setPosMode('restaurant')"
+                <div @if (! $this->restaurantModeLocked) wire:click="setPosMode('restaurant')" @endif
                      @class([
-                         'p-5 rounded-3xl border-2 cursor-pointer transition-all flex flex-col justify-between gap-3 relative',
-                         'border-lime-500 bg-lime-50/50 dark:bg-lime-950/40 dark:border-lime-400 shadow-md shadow-lime-500/10' => $posMode === 'restaurant',
-                         'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700' => $posMode !== 'restaurant',
+                         'p-5 rounded-3xl border-2 transition-all flex flex-col justify-between gap-3 relative',
+                         'cursor-pointer' => ! $this->restaurantModeLocked,
+                         'cursor-not-allowed opacity-60' => $this->restaurantModeLocked,
+                         'border-lime-500 bg-lime-50/50 dark:bg-lime-950/40 dark:border-lime-400 shadow-md shadow-lime-500/10' => $posMode === 'restaurant' && ! $this->restaurantModeLocked,
+                         'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700' => $posMode !== 'restaurant' || $this->restaurantModeLocked,
                      ])>
                     <div class="flex items-center justify-between">
                         <div class="w-10 h-10 rounded-2xl bg-lime-100 dark:bg-lime-900/60 text-lime-700 dark:text-lime-400 flex items-center justify-center text-xl font-black">
@@ -159,10 +161,10 @@
                         </div>
                         <span @class([
                             'w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-black',
-                            'border-lime-500 bg-lime-500 text-slate-950' => $posMode === 'restaurant',
-                            'border-slate-300 dark:border-slate-600' => $posMode !== 'restaurant',
+                            'border-lime-500 bg-lime-500 text-slate-950' => $posMode === 'restaurant' && ! $this->restaurantModeLocked,
+                            'border-slate-300 dark:border-slate-600' => $posMode !== 'restaurant' || $this->restaurantModeLocked,
                         ])>
-                            @if ($posMode === 'restaurant') ✓ @endif
+                            @if ($posMode === 'restaurant' && ! $this->restaurantModeLocked) ✓ @endif
                         </span>
                     </div>
                     <div>
@@ -171,9 +173,15 @@
                             {{ __('For restaurants, cafes, bars & food trucks. Includes floor plans & live tables, KOT tickets, Kitchen Display (KDS), Dine-In/Takeaway routing, and QR table ordering.') }}
                         </p>
                     </div>
-                    <div class="text-[10px] font-extrabold uppercase tracking-wider text-lime-600 dark:text-lime-400 font-black">
-                        {{ __('Includes: Tables • KOT • Kitchen KDS • QR Menus') }}
-                    </div>
+                    @if ($this->restaurantModeLocked)
+                        <div class="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 font-black">
+                            {{ __('Disabled by platform administrator') }}
+                        </div>
+                    @else
+                        <div class="text-[10px] font-extrabold uppercase tracking-wider text-lime-600 dark:text-lime-400 font-black">
+                            {{ __('Includes: Tables • KOT • Kitchen KDS • QR Menus') }}
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -961,6 +969,10 @@
                                     </span>
                                 </td>
                                 <td class="px-4 py-3.5 text-right space-x-2">
+                                    <a href="{{ route('tenant.financials.payment_method_ledger', $pm->id) }}"
+                                       class="text-slate-500 hover:underline font-bold text-xs cursor-pointer">
+                                        {{ __('Ledger') }}
+                                    </a>
                                     <button type="button"
                                             wire:click="openEditPaymentMethodModal('{{ $pm->id }}')"
                                             class="text-blue-600 hover:underline font-bold text-xs cursor-pointer">
@@ -1262,7 +1274,140 @@
                 </button>
             </div>
         </div>
+
+        <!-- Custom Notification Channels -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-5">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white">{{ __('Custom Notification Channels') }}</h3>
+                    <p class="text-xs text-slate-400">{{ __('Dispatch invoices, quotations, and due payment reminders to your own webhook endpoints.') }}</p>
+                </div>
+                <button type="button" wire:click="openAddChannelModal" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-sm cursor-pointer">
+                    + {{ __('Add Channel') }}
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="text-[10px] uppercase tracking-wider text-slate-400 font-extrabold">
+                        <tr>
+                            <th class="px-3 py-2">{{ __('Name') }}</th>
+                            <th class="px-3 py-2">{{ __('URL') }}</th>
+                            <th class="px-3 py-2">{{ __('Events') }}</th>
+                            <th class="px-3 py-2 text-center">{{ __('Status') }}</th>
+                            <th class="px-3 py-2 text-right">{{ __('Actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                        @forelse ($notificationChannels as $channel)
+                            <tr>
+                                <td class="px-3 py-3 font-bold text-slate-800 dark:text-slate-100">{{ $channel->name }}</td>
+                                <td class="px-3 py-3 text-slate-500 font-mono text-[11px] truncate max-w-xs">{{ $channel->url }}</td>
+                                <td class="px-3 py-3 text-slate-500">{{ implode(', ', $channel->event_types ?? []) ?: '—' }}</td>
+                                <td class="px-3 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold {{ $channel->is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500' }}">
+                                        {{ $channel->is_active ? __('Active') : __('Disabled') }}
+                                    </span>
+                                </td>
+                                <td class="px-3 py-3 text-right space-x-2">
+                                    <button type="button" wire:click="openEditChannelModal({{ $channel->id }})" class="text-blue-600 hover:underline font-bold text-xs cursor-pointer">{{ __('Edit') }}</button>
+                                    <button type="button" wire:click="deleteChannel({{ $channel->id }})" wire:confirm="{{ __('Delete this notification channel?') }}" class="text-rose-500 hover:underline font-bold text-xs cursor-pointer">{{ __('Delete') }}</button>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="px-3 py-6 text-center text-slate-400">{{ __('No custom notification channels configured yet.') }}</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
+
+    <!-- Add / Edit Custom Notification Channel Modal -->
+    @if ($showChannelModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4 max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <h3 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
+                        {{ $editingChannelId ? __('Edit Notification Channel') : __('Add Notification Channel') }}
+                    </h3>
+                    <button type="button" wire:click="$set('showChannelModal', false)" class="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">&times;</button>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Channel Name *') }}</label>
+                        <input type="text" wire:model="channelName" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                        @error('channelName') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Endpoint URL *') }}</label>
+                            <input type="text" wire:model="channelUrl" placeholder="https://" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                            @error('channelUrl') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Method') }}</label>
+                            <select wire:model="channelMethod" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                                <option value="POST">POST</option>
+                                <option value="GET">GET</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Headers (JSON, optional)') }}</label>
+                        <textarea wire:model="channelHeaders" rows="2" placeholder='{"X-Api-Key": "..."}' class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-mono"></textarea>
+                        @error('channelHeaders') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Authentication') }}</label>
+                            <select wire:model="channelAuthType" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                                <option value="none">{{ __('None') }}</option>
+                                <option value="bearer">{{ __('Bearer Token') }}</option>
+                                <option value="api_key">{{ __('API Key') }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Secret Value') }}</label>
+                            <input type="password" wire:model="channelAuthValue" placeholder="{{ __('Leave blank to keep existing') }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Payload Template') }}</label>
+                        <textarea wire:model="channelPayloadTemplate" rows="4" placeholder='{"customer": "{customer_name}", "invoice": "{invoice_no}", "due": "{due_amount}", "due_date": "{due_date}", "link": "{receipt_link}"}' class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-mono"></textarea>
+                        <p class="text-[10px] text-slate-400 mt-1">{{ __('Available variables: {customer_name}, {invoice_no}, {due_amount}, {due_date}, {receipt_link}') }}</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Dispatch On') }}</label>
+                        <div class="flex flex-wrap gap-3">
+                            @foreach (['invoice' => __('Invoice'), 'quotation' => __('Quotation'), 'due_reminder' => __('Due Reminder')] as $value => $label)
+                                <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                    <input type="checkbox" wire:model="channelEventTypes" value="{{ $value }}" class="rounded-md border-slate-300">
+                                    {{ $label }}
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-300">
+                        <input type="checkbox" wire:model="channelIsActive" class="w-4 h-4 rounded-md border-slate-300">
+                        <span>{{ __('Active') }}</span>
+                    </label>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" wire:click="$set('showChannelModal', false)" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 cursor-pointer">{{ __('Cancel') }}</button>
+                    <button type="button" wire:click="saveChannel" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow-sm cursor-pointer">{{ __('Save Channel') }}</button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <!-- TAB 5: TAXES & COMPLIANCE -->
     @include('livewire.tenant.settings.partials.taxes-tab')
@@ -1312,6 +1457,19 @@
                             <input type="checkbox" wire:model="pmIsActive" class="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500">
                             <span>{{ __('Enable this payment method for POS checkout') }}</span>
                         </label>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2">
+                            {{ __('Bank / UPI Details (shown at checkout when this method is selected)') }}
+                        </p>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" wire:model="pmBankName" placeholder="{{ __('Bank Name') }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs focus:ring-blue-500">
+                            <input type="text" wire:model="pmHolderName" placeholder="{{ __('Account Holder') }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs focus:ring-blue-500">
+                            <input type="text" wire:model="pmAccountNo" placeholder="{{ __('Account No.') }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs focus:ring-blue-500">
+                            <input type="text" wire:model="pmIfscCode" placeholder="{{ __('IFSC Code') }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs focus:ring-blue-500">
+                            <input type="text" wire:model="pmUpiId" placeholder="{{ __('UPI ID') }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs focus:ring-blue-500 col-span-2">
+                        </div>
                     </div>
                 </div>
 

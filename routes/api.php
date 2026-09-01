@@ -77,6 +77,10 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/customers/{id}/ledger', [PosSyncApiController::class, 'customerLedger'])->middleware('tenant.api.permission:customers,view');
         Route::post('/customers/{id}/payment', [PosSyncApiController::class, 'customerRecordPayment'])->middleware('tenant.api.permission:finance,edit');
 
+        // Due Payments / Receivables dashboard panel
+        Route::get('/receivables/due', [PosSyncApiController::class, 'dueReceivables'])->middleware('tenant.api.permission:customers,view');
+        Route::post('/receivables/{sale}/remind', [PosSyncApiController::class, 'remindReceivable'])->middleware('tenant.api.permission:finance,edit');
+
         // Analytics & Reports
         Route::get('/analytics', [PosSyncApiController::class, 'analytics'])->middleware('tenant.api.permission:reports,view');
 
@@ -173,6 +177,13 @@ Route::prefix('v1/pos')->group(function () {
         Route::put('/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsUpdate'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsDestroy'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/payment-methods/{id}/toggle', [SettingsApiController::class, 'paymentMethodsToggle'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/settings/payment-methods/{id}/transactions', [SettingsApiController::class, 'paymentMethodTransactions'])->middleware('tenant.api.permission:settings,view');
+        Route::get('/settings/payment-methods/{id}/transactions/export', [SettingsApiController::class, 'paymentMethodTransactionsExport'])->middleware('tenant.api.permission:settings,view');
+
+        Route::get('/settings/notification-channels', [SettingsApiController::class, 'notificationChannelsIndex'])->middleware('tenant.api.permission:settings,view');
+        Route::post('/settings/notification-channels', [SettingsApiController::class, 'notificationChannelsStore'])->middleware('tenant.api.permission:settings,edit');
+        Route::put('/settings/notification-channels/{id}', [SettingsApiController::class, 'notificationChannelsUpdate'])->middleware('tenant.api.permission:settings,edit');
+        Route::delete('/settings/notification-channels/{id}', [SettingsApiController::class, 'notificationChannelsDestroy'])->middleware('tenant.api.permission:settings,edit');
 
         // Consignments (draft -> dispatched -> reconciled -> finalized)
         Route::get('/consignments', [ConsignmentApiController::class, 'index'])->middleware('tenant.api.permission:consignments,view');

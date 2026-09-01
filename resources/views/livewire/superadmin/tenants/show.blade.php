@@ -106,6 +106,19 @@
             </div>
         </div>
 
+        <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Disable Restaurant Mode") }}</label>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-md">
+                    {{ __("When enabled, this tenant's Restaurant Mode (tables, KOT, kitchen display) is locked off regardless of the store's own mode selection.") }}
+                </p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" wire:model="restaurantModeLocked" class="sr-only peer">
+                <div class="w-12 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-rose-600"></div>
+            </label>
+        </div>
+
         <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
             <button wire:click="save" type="button" class="px-6 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/25 active:scale-95 transition cursor-pointer">
                 Save Tenant Changes

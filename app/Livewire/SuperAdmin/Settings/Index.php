@@ -43,6 +43,8 @@ class Index extends Component
 
     public string $appVersion = '1.0.0';
 
+    public bool $showPoweredBy = true;
+
     // --- TAB 2: SMTP SETTINGS ---
     public string $smtpHost = '';
 
@@ -141,6 +143,7 @@ class Index extends Component
         $this->maintenanceMessage = (string) PlatformSystem::get('maintenance_message', '');
         $this->minClientBuildVersion = (string) PlatformSystem::get('min_client_build_version', '0');
         $this->appVersion = (string) PlatformSystem::get('app_version', '1.0.0');
+        $this->showPoweredBy = filter_var(PlatformSystem::get('show_powered_by', true), FILTER_VALIDATE_BOOLEAN);
 
         // Load Platform Branding & SMTP
         $branding = PlatformBranding::current();
@@ -305,6 +308,7 @@ class Index extends Component
         PlatformSystem::set('maintenance_message', $this->maintenanceMessage);
         PlatformSystem::set('min_client_build_version', $this->minClientBuildVersion);
         PlatformSystem::set('app_version', $this->appVersion);
+        PlatformSystem::set('show_powered_by', $this->showPoweredBy ? '1' : '0');
 
         AuditLog::record('system.settings_updated', null, auth('platform_web')->id(), [
             'before' => $before,

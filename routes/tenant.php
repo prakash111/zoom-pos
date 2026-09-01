@@ -145,6 +145,7 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
             Route::get('/finance/cash-register/movement/{tx}/pdf', [CashRegisterSlipController::class, 'pdfMovement'])->middleware('tenant.permission:cash_register,view')->name('cash_register.movement.pdf');
             Route::get('/finance/receivables', Financials\Receivables::class)->middleware('tenant.permission:finance,view')->name('financials.receivables');
             Route::get('/finance/payables', Financials\Payables::class)->middleware('tenant.permission:finance,view')->name('financials.payables');
+            Route::get('/finance/payment-methods/{paymentMethod}/ledger', Financials\PaymentMethodLedger::class)->middleware('tenant.permission:settings,view')->name('financials.payment_method_ledger');
 
             // Reports & Financial Analytics
             Route::get('/reports', Reports\Index::class)->middleware('tenant.permission:reports,view')->name('reports.index');

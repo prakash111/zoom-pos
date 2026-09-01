@@ -7,6 +7,8 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\CustomerLedger;
+use App\Models\OrderPayment;
 use App\Models\Plan;
 use App\Models\Product;
 use App\Models\Sale;
@@ -698,6 +700,83 @@ class PosSyncApiTest extends TestCase
         $sale->refresh();
         $this->assertEquals(40.00, $sale->paid_amount);
         $this->assertEquals(60.00, $sale->due_amount);
+    }
+
+    public function test_sync_push_rejects_due_sale_without_customer(): void
+    {
+        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+            ->postJson('/api/v1/pos/sync-push', [
+                'sales' => [[
+                    'id' => (string) Str::uuid(),
+                    'total' => 100.0,
+                    'payment_method' => 'cash',
+                    'paid_amount' => 40.0,
+                    'items' => [['name' => 'Widget', 'price' => 100, 'quantity' => 1]],
+                ]],
+            ]);
+
+        $response->assertStatus(200)->assertJsonPath('success', true);
+        $this->assertCount(0, $response->json('synced_ids'));
+        $this->assertCount(1, $response->json('rejected'));
+        $this->assertDatabaseMissing('sales', ['company_id' => $this->company->id, 'total' => 100.0]);
+    }
+
+    public function test_sync_push_partial_payment_with_customer_creates_ledger_entry(): void
+    {
+        $customer = Customer::create(['company_id' => $this->company->id, 'name' => 'Partial Pay Customer']);
+        $saleUuid = (string) Str::uuid();
+
+        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+            ->postJson('/api/v1/pos/sync-push', [
+                'sales' => [[
+                    'id' => $saleUuid,
+                    'total' => 500.0,
+                    'payment_method' => 'cash',
+                    'customer_id' => $customer->id,
+                    'paid_amount' => 200.0,
+                    'items' => [['name' => 'Bulk Order', 'price' => 500, 'quantity' => 1]],
+                ]],
+            ]);
+
+        $response->assertStatus(200)->assertJsonPath('success', true);
+        $this->assertContains($saleUuid, $response->json('synced_ids'));
+
+        $sale = Sale::where('external_id', $saleUuid)->firstOrFail();
+        $this->assertEquals(200.0, (float) $sale->paid_amount);
+        $this->assertEquals(300.0, (float) $sale->due_amount);
+        $this->assertEquals('partially_paid', $sale->payment_status);
+        $this->assertSame(1, OrderPayment::where('sale_id', $sale->id)->count());
+        $this->assertEquals(300.0, (float) $customer->fresh()->due_balance);
+        $this->assertSame(1, CustomerLedger::where('customer_id', $customer->id)->count());
+    }
+
+    public function test_sync_push_split_payment_creates_multiple_order_payments(): void
+    {
+        $customer = Customer::create(['company_id' => $this->company->id, 'name' => 'Split Pay Customer']);
+        $saleUuid = (string) Str::uuid();
+
+        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+            ->postJson('/api/v1/pos/sync-push', [
+                'sales' => [[
+                    'id' => $saleUuid,
+                    'total' => 500.0,
+                    'payment_method' => 'split',
+                    'customer_id' => $customer->id,
+                    'payments' => [
+                        ['payment_method' => 'cash', 'amount' => 200.0],
+                        ['payment_method' => 'upi', 'amount' => 100.0],
+                    ],
+                    'items' => [['name' => 'Split Sale Item', 'price' => 500, 'quantity' => 1]],
+                ]],
+            ]);
+
+        $response->assertStatus(200)->assertJsonPath('success', true);
+
+        $sale = Sale::where('external_id', $saleUuid)->firstOrFail();
+        $this->assertEquals(300.0, (float) $sale->paid_amount);
+        $this->assertEquals(200.0, (float) $sale->due_amount);
+        $this->assertSame(2, OrderPayment::where('sale_id', $sale->id)->count());
+        $this->assertEquals(200.0, (float) $customer->fresh()->due_balance);
     }
 
     public function test_analytics_and_subscription_endpoints(): void
