@@ -1,5 +1,6 @@
 import '../../core/api/api_client.dart';
 import '../../core/config/app_config.dart';
+import '../../core/config/bootstrap_cache.dart';
 import '../../core/models/settings_models.dart';
 
 /// Talks to SettingsApiController: GET /settings, PUT /settings/{section},
@@ -19,7 +20,18 @@ class SettingsRepository {
       paymentMethods: (response['payment_methods'] as List? ?? [])
           .map((e) => PaymentMethodModel.fromJson(e as Map<String, dynamic>))
           .toList(),
+      nav: NavConfig.fromJson(response['nav'] as Map<String, dynamic>? ?? const {}),
     );
+  }
+
+  /// Persists this tenant's nav customization (AppBootstrapController) and
+  /// refreshes [BootstrapCache] so the drawer/rail/bars pick it up without
+  /// waiting for the next locale switch or app restart.
+  Future<NavConfig> updateNavConfig(NavConfig nav) async {
+    final response = await _client.post(ApiEndpoints.settingsNavConfig, data: nav.toJson());
+    final updated = NavConfig.fromJson(response['nav'] as Map<String, dynamic>? ?? nav.toJson());
+    await BootstrapCache.instance.applyNav(updated);
+    return updated;
   }
 
   Future<ProfileSettings> updateProfile({

@@ -253,6 +253,31 @@ class RestaurantSaleModel {
   final String? paymentMethod;
   final String? kotStatus;
   final String? notes;
+
+  RestaurantSaleModel copyWith({String? customerPhone, String? customerEmail}) {
+    return RestaurantSaleModel(
+      id: id,
+      saleNumber: saleNumber,
+      customerId: customerId,
+      customerName: customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      customerEmail: customerEmail ?? this.customerEmail,
+      status: status,
+      serviceType: serviceType,
+      diningTableId: diningTableId,
+      tableName: tableName,
+      guestCount: guestCount,
+      items: items,
+      discount: discount,
+      total: total,
+      paidAmount: paidAmount,
+      dueAmount: dueAmount,
+      paymentStatus: paymentStatus,
+      paymentMethod: paymentMethod,
+      kotStatus: kotStatus,
+      notes: notes,
+    );
+  }
 }
 
 /// A kitchen order ticket, as returned by RestaurantApiController::presentKot().

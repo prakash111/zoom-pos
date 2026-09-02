@@ -74,6 +74,7 @@ class AppLocalizations {
   String get signOut => _s('signOut');
   String get signOutConfirmTitle => _s('signOutConfirmTitle');
   String get signOutConfirmBody => _s('signOutConfirmBody');
+  String get changePassword => _s('changePassword');
 
   // Login
   String get signIn => _s('signIn');
@@ -153,6 +154,10 @@ class AppLocalizations {
 
   // Appearance / Workspace
   String get tabAppearance => _s('tabAppearance');
+  String get tabNavigationMenu => _s('tabNavigationMenu');
+  String get navMenuDescription => _s('navMenuDescription');
+  String get navMenuSectionOrderHint => _s('navMenuSectionOrderHint');
+  String get navMenuSaved => _s('navMenuSaved');
   String get navDockTitle => _s('navDockTitle');
   String get navDockDescription => _s('navDockDescription');
   String get navDockLeft => _s('navDockLeft');

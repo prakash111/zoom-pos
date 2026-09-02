@@ -270,17 +270,64 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
     final company = context.read<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
 
-    final settled = await showModalBottomSheet<bool>(
+    final sale = await showModalBottomSheet<RestaurantSaleModel>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) =>
           _SettleBillSheet(repository: widget.repository, saleId: _saleId!, total: _committedTotal, formatter: formatter),
     );
+    if (sale == null) return;
 
-    if (settled == true) {
-      _changed = true;
-      if (mounted) Navigator.of(context).pop(true);
+    _changed = true;
+    if (!mounted) return;
+    setState(() {
+      _saleId = null;
+      _committedItems = [];
+      _draftItems = [];
+    });
+
+    // Show the invoice actions on this (still-live) screen rather than
+    // auto-navigating back to the table list: "Preview & Print" pushes a
+    // full-screen PDF viewer on top of this route, and popping back to the
+    // table list right after would immediately close that viewer again
+    // (Navigator.pop() targets whatever is now on top of the stack, not
+    // necessarily the route this method thinks it's closing). The user
+    // leaves via the app bar's back button (already wired to `_changed`)
+    // once they're done previewing/printing/sharing.
+    final subtotal = sale.items.fold(0.0, (sum, i) => sum + i.price * i.quantity);
+    final tax = (sale.total - subtotal + sale.discount).clamp(0, double.infinity).toDouble();
+    try {
+      await showInvoiceActionsSheet(
+        context,
+        InvoiceActionsData(
+          documentType: 'invoice',
+          documentId: sale.id,
+          documentNumber: sale.saleNumber,
+          companyName: company?.tradeName ?? company?.name ?? '',
+          customerName: sale.customerName,
+          customerPhone: sale.customerPhone,
+          customerEmail: sale.customerEmail,
+          currencySymbol: company?.currencySymbol ?? '\$',
+          subtotal: subtotal,
+          discount: sale.discount,
+          tax: tax,
+          total: sale.total,
+          taxId: company?.taxId,
+          taxLabel: company?.taxLabel ?? 'Tax',
+          isIndia: company?.isIndia ?? false,
+          paidAmount: sale.paidAmount,
+          dueAmount: sale.dueAmount,
+          lines: sale.items
+              .map((i) => ReceiptLine(name: i.name, quantity: i.quantity, unitPrice: i.price, lineTotal: i.price * i.quantity))
+              .toList(),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Could not open the invoice actions for this bill.')));
+      }
     }
   }
 
@@ -833,6 +880,9 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
       _error = null;
     });
     try {
+      // customerPhone/customerEmail on the settled sale don't always echo back
+      // the walk-in customer picked in this sheet, so fall back to it here —
+      // the caller (which builds InvoiceActionsData) only sees what we return.
       final sale = await widget.repository.settle(
         saleId: widget.saleId,
         paymentMethod: _isSplit ? null : _method,
@@ -843,36 +893,14 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
         customerId: _selectedCustomer?.id,
       );
       if (!mounted) return;
-
-      final company = context.read<AuthProvider>().company;
-      final subtotal = sale.items.fold(0.0, (sum, i) => sum + i.price * i.quantity);
-      final tax = (sale.total - subtotal + sale.discount).clamp(0, double.infinity).toDouble();
-      await showInvoiceActionsSheet(
-        context,
-        InvoiceActionsData(
-          documentType: 'invoice',
-          documentId: sale.id,
-          documentNumber: sale.saleNumber,
-          companyName: company?.tradeName ?? company?.name ?? '',
-          customerName: sale.customerName,
-          customerPhone: sale.customerPhone ?? _selectedCustomer?.phone,
-          customerEmail: sale.customerEmail ?? _selectedCustomer?.email,
-          currencySymbol: company?.currencySymbol ?? '\$',
-          subtotal: subtotal,
-          discount: sale.discount,
-          tax: tax,
-          total: sale.total,
-          taxId: company?.taxId,
-          taxLabel: company?.taxLabel ?? 'Tax',
-          isIndia: company?.isIndia ?? false,
-          paidAmount: sale.paidAmount,
-          dueAmount: sale.dueAmount,
-          lines: sale.items
-              .map((i) => ReceiptLine(name: i.name, quantity: i.quantity, unitPrice: i.price, lineTotal: i.price * i.quantity))
-              .toList(),
-        ),
+      Navigator.of(context).pop(
+        sale.customerPhone != null && sale.customerEmail != null
+            ? sale
+            : sale.copyWith(
+                customerPhone: sale.customerPhone ?? _selectedCustomer?.phone,
+                customerEmail: sale.customerEmail ?? _selectedCustomer?.email,
+              ),
       );
-      if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } finally {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/translations_cache.dart';
 import '../api/api_client.dart';
 import '../storage/app_preferences.dart';
+import 'bootstrap_cache.dart';
 
 /// Holds the app's own UI display language (distinct from the tenant's
 /// storefront default language, see features/languages/), persisted locally
@@ -36,13 +37,14 @@ class LocaleProvider extends ChangeNotifier {
     if (supportedCodes.contains(code)) {
       locale = Locale(code);
     }
+    await BootstrapCache.instance.loadFromDisk();
     await _applyTranslations(locale.languageCode);
   }
 
-  /// Re-fetches the current locale's translations — call once an
-  /// unauthenticated startup's session restore completes, since the first
-  /// [load] may have run before the API client had a token to send.
-  Future<void> refreshFromServer() => TranslationsCache.instance.refresh(locale.languageCode, _apiClient).then((_) {
+  /// Re-fetches the current locale's translations (plus nav/config) — call
+  /// once an unauthenticated startup's session restore completes, since the
+  /// first [load] may have run before the API client had a token to send.
+  Future<void> refreshFromServer() => BootstrapCache.instance.refresh(locale.languageCode, _apiClient).then((_) {
         notifyListeners();
       });
 
@@ -55,12 +57,13 @@ class LocaleProvider extends ChangeNotifier {
 
   /// Hydrates from disk first for an instant, non-blocking dictionary swap,
   /// then refreshes from the network in the background — one lightweight
-  /// GET per switch, no polling loop or persistent connection.
+  /// GET per switch (translations + nav + config bundled together by
+  /// [BootstrapCache]), no polling loop or persistent connection.
   Future<void> _applyTranslations(String code) async {
     await TranslationsCache.instance.loadFromDisk(code);
     notifyListeners();
 
-    await TranslationsCache.instance.refresh(code, _apiClient);
+    await BootstrapCache.instance.refresh(code, _apiClient);
     notifyListeners();
   }
 }

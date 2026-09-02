@@ -9,6 +9,11 @@ const Map<String, String> kEnStrings = {
   'signOut': 'Sign out',
   'signOutConfirmTitle': 'Sign out?',
   'signOutConfirmBody': "You'll need your password to sign back in.",
+  'changePassword': 'Change Password',
+  'tabNavigationMenu': 'Navigation Menu',
+  'navMenuDescription': 'Hide destinations your team doesn\'t use and reorder the drawer\'s section groups. Applies to every device signed in to this store.',
+  'navMenuSectionOrderHint': 'Drag to reorder sections',
+  'navMenuSaved': 'Navigation menu updated.',
 
   // Login
   'signIn': 'Sign in',

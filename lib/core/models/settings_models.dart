@@ -327,6 +327,7 @@ class TenantSettingsBundle {
     required this.financial,
     required this.notifications,
     required this.paymentMethods,
+    required this.nav,
   });
 
   final ProfileSettings profile;
@@ -334,4 +335,25 @@ class TenantSettingsBundle {
   final FinancialSettings financial;
   final NotificationSettings notifications;
   final List<PaymentMethodModel> paymentMethods;
+  final NavConfig nav;
+}
+
+/// This tenant's drawer/rail/bar customization — see AppBootstrapController
+/// and DashboardScreen's `_sectionsFor`. Both lists hold the opaque
+/// `_FeatureTile.key`/`_NavSection.key` values the client itself defines;
+/// the server only stores and echoes them back.
+class NavConfig {
+  const NavConfig({required this.hiddenTiles, required this.sectionOrder});
+
+  factory NavConfig.fromJson(Map<String, dynamic> json) {
+    return NavConfig(
+      hiddenTiles: List<String>.from(json['hidden_tiles'] as List? ?? const []),
+      sectionOrder: List<String>.from(json['section_order'] as List? ?? const []),
+    );
+  }
+
+  final List<String> hiddenTiles;
+  final List<String> sectionOrder;
+
+  Map<String, dynamic> toJson() => {'hidden_tiles': hiddenTiles, 'section_order': sectionOrder};
 }

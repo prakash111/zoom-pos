@@ -45,18 +45,30 @@ class TranslationsCache {
   /// from the backend and persists it to disk for next launch. Silent on
   /// failure (offline, server error) — callers just keep whatever was
   /// already cached or the bundled fallback.
+  ///
+  /// Prefer [BootstrapCache.refresh] for a locale switch/app start — it
+  /// fetches this same dictionary as part of one combined call and forwards
+  /// it to [applyFetched]. This method remains as a narrow, single-purpose
+  /// fetch for anything that only needs the phrase dictionary.
   Future<void> refresh(String locale, ApiClient client) async {
     try {
       final response = await client.get(ApiEndpoints.languageTranslations(locale));
       final raw = response['translations'];
       if (raw is! Map || raw.isEmpty) return;
-      final translations = raw.map((key, value) => MapEntry(key.toString(), value.toString()));
-      _byLocale[locale] = translations;
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('$_cacheKeyPrefix$locale', jsonEncode(translations));
+      await applyFetched(locale, raw.map((key, value) => MapEntry(key.toString(), value.toString())));
     } catch (_) {
       // Offline or the endpoint errored — keep the disk cache/bundled copy.
     }
+  }
+
+  /// Stores an already-fetched dictionary for [locale] in memory and on
+  /// disk, same as [refresh] but for a caller (namely [BootstrapCache]) that
+  /// obtained the translations from a different endpoint.
+  Future<void> applyFetched(String locale, Map<String, String> translations) async {
+    if (translations.isEmpty) return;
+    _byLocale[locale] = translations;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('$_cacheKeyPrefix$locale', jsonEncode(translations));
   }
 }

@@ -151,6 +151,9 @@ class ApiEndpoints {
   static const String languagesDefault = '/languages/default';
   static String languageTranslations(String locale) => '/languages/translations/$locale';
 
+  static const String appBootstrap = '/app/bootstrap';
+  static const String settingsNavConfig = '/settings/nav-config';
+
   static const String restaurantFloors = '/restaurant/floors';
   static String restaurantFloor(String id) => '/restaurant/floors/$id';
   static const String restaurantTables = '/restaurant/tables';
