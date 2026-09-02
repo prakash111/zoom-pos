@@ -472,6 +472,8 @@ class PosProvider extends ChangeNotifier {
     final soldDiscount = discount;
     final soldTotal = grandTotal;
     final soldCustomerName = selectedCustomer?.name;
+    final soldCustomerPhone = selectedCustomer?.phone;
+    final soldCustomerEmail = selectedCustomer?.email;
     final soldNotes = orderNotes;
     final soldPaidAmount = amountPaid;
     final soldDueAmount = dueAmount;
@@ -526,8 +528,8 @@ class PosProvider extends ChangeNotifier {
         tax: soldTax,
         total: soldTotal,
         customerName: soldCustomerName,
-        customerPhone: selectedCustomer?.phone,
-        customerEmail: selectedCustomer?.email,
+        customerPhone: soldCustomerPhone,
+        customerEmail: soldCustomerEmail,
         notes: soldNotes,
         isPendingSync: isPendingSync,
         paidAmount: soldPaidAmount,
