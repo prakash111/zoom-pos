@@ -17,5 +17,5 @@ Color? parseHexColor(String hex) {
 /// Formats a [Color] as `#RRGGBB` (alpha channel dropped — the backend field
 /// only stores an opaque brand color).
 String toHexColor(Color color) {
-  return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+  return '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
 }

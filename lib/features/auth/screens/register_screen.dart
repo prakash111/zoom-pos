@@ -205,7 +205,7 @@ class _StoreTypeCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? primaryColor.withOpacity(0.08) : Colors.grey.shade50,
+          color: selected ? primaryColor.withValues(alpha: 0.08) : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: selected ? primaryColor : Colors.grey.shade300, width: selected ? 2 : 1),
         ),

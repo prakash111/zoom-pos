@@ -42,7 +42,7 @@ class _CategoryFormSheetState extends State<CategoryFormSheet> {
     return Color(0xFF000000 | value);
   }
 
-  String _colorToHex(Color color) => '#${color.value.toRadixString(16).substring(2)}';
+  String _colorToHex(Color color) => '#${color.toARGB32().toRadixString(16).substring(2)}';
 
   @override
   void dispose() {
@@ -115,7 +115,7 @@ class _CategoryFormSheetState extends State<CategoryFormSheet> {
                       child: CircleAvatar(
                         backgroundColor: swatch,
                         radius: 16,
-                        child: _color.value == swatch.value ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+                        child: _color.toARGB32() == swatch.toARGB32() ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
                       ),
                     ),
                 ],

@@ -116,6 +116,41 @@ const Map<String, String> kEnStrings = {
   'featureLanguages': 'Languages',
   'featureDevices': 'Devices',
   'featureSettings': 'Settings',
+
+  // Restaurant-mode-only nav labels (mirror the web tenant sidebar's
+  // Cafe & Restaurant category structure — see TenantNavigationComposer
+  // and layouts/tenant.blade.php on the web side).
+  'featureRestaurantPos': 'Restaurant POS Terminal',
+  'featureFloorPlan': 'Floor Plan & Tables',
+  'featureDiningHistory': 'Dining & Sales History',
+  'featureAccountsReceivable': 'Accounts Receivable',
+  'featureAccountsPayable': 'Accounts Payable',
+  'featureReportsAnalytics': 'Reports & Analytics',
+  'featureMenuDishes': 'Menu Dishes & Stock',
+  'featureCategories': 'Categories',
+  'featureBrands': 'Brands & Modifiers',
+  'featureUnits': 'Units of Measure',
+  'featureSuppliers': 'Food Suppliers',
+  'featureGuestDirectory': 'Guest Directory',
+
+  // Drawer section headers, shared by the retail and restaurant nav trees.
+  'navHeaderRestaurantOperations': 'Restaurant Operations',
+  'navHeaderOrdersCash': 'Orders & Cash',
+  'navHeaderFinancialManagement': 'Financial Management',
+  'navHeaderKitchenMenuCatalog': 'Kitchen Menu & Catalog',
+  'navHeaderAdministration': 'Administration & Settings',
+  'navHeaderCashierSales': 'Cashier & Sales',
+  'navHeaderProductsInventory': 'Products & Inventory',
+
+  'restaurantPosStartOrder': 'Start a new order',
+  'restaurantPosSubtitle': 'Dine-In, Takeaway & Delivery',
+  'restaurantPosDineIn': 'Dine-In',
+  'restaurantPosDineInSubtitle': 'Pick a table from the floor plan',
+  'restaurantPosTakeaway': 'Takeaway',
+  'restaurantPosTakeawaySubtitle': 'Counter pickup, no table needed',
+  'restaurantPosDelivery': 'Delivery',
+  'restaurantPosDeliverySubtitle': 'Send the order out for delivery',
+
   'orderCart': 'Order Cart',
   'clearCart': 'Clear Cart',
   'cartEmptyTitle': 'Your cart is empty',

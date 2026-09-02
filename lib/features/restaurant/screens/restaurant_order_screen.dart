@@ -857,7 +857,7 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                           Expanded(
                             flex: 2,
                             child: DropdownButtonFormField<String>(
-                              value: _splitPayments[i].methodCode,
+                              initialValue: _splitPayments[i].methodCode,
                               decoration: const InputDecoration(labelText: 'Method', isDense: true),
                               items: const [
                                 DropdownMenuItem(value: 'cash', child: Text('Cash')),

@@ -279,7 +279,7 @@ class _ChannelFormScreenState extends State<_ChannelFormScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _method,
+              initialValue: _method,
               decoration: const InputDecoration(labelText: 'HTTP Method'),
               items: const [
                 DropdownMenuItem(value: 'POST', child: Text('POST')),
@@ -299,7 +299,7 @@ class _ChannelFormScreenState extends State<_ChannelFormScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _authType,
+              initialValue: _authType,
               decoration: const InputDecoration(labelText: 'Authentication'),
               items: const [
                 DropdownMenuItem(value: 'none', child: Text('None')),

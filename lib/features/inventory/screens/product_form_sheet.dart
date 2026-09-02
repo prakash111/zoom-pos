@@ -374,7 +374,7 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             DropdownButtonFormField<TaxRuleModel?>(
-                              value: _selectedTaxRule,
+                              initialValue: _selectedTaxRule,
                               isExpanded: true,
                               decoration: const InputDecoration(labelText: 'Tax rule'),
                               items: [

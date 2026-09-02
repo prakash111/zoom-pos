@@ -112,7 +112,7 @@ class _ConsignmentDetailScreenState extends State<ConsignmentDetailScreen> {
           builder: (context, setDialogState) => AlertDialog(
             title: const Text('Finalize to sale'),
             content: DropdownButtonFormField<String>(
-              value: selected,
+              initialValue: selected,
               decoration: const InputDecoration(labelText: 'Payment method'),
               items: [for (final m in _paymentMethods) DropdownMenuItem(value: m, child: Text(m.replaceAll('_', ' ')))],
               onChanged: (value) => setDialogState(() => selected = value ?? selected),

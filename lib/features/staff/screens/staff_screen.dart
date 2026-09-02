@@ -88,7 +88,7 @@ class _StaffScreenState extends State<StaffScreen> {
               TextField(controller: rateController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Rate')),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: type,
+                initialValue: type,
                 decoration: const InputDecoration(labelText: 'Type'),
                 items: const [
                   DropdownMenuItem(value: 'percentage', child: Text('Percentage')),

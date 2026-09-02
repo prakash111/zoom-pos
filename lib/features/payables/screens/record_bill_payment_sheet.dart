@@ -78,7 +78,7 @@ class _RecordBillPaymentSheetState extends State<RecordBillPaymentSheet> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            value: _method,
+            initialValue: _method,
             decoration: const InputDecoration(labelText: 'Payment method'),
             items: [for (final m in _paymentMethods) DropdownMenuItem(value: m, child: Text(m.replaceAll('_', ' ')))],
             onChanged: (value) => setState(() => _method = value ?? _method),

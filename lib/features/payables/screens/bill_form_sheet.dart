@@ -118,7 +118,7 @@ class _BillFormSheetState extends State<BillFormSheet> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _category,
+                    initialValue: _category,
                     decoration: const InputDecoration(labelText: 'Category'),
                     items: [for (final c in _categories) DropdownMenuItem(value: c, child: Text(c))],
                     onChanged: (value) => setState(() => _category = value ?? _category),

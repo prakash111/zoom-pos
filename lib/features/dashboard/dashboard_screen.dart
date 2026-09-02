@@ -18,6 +18,7 @@ import '../analytics/widgets/analytics_widgets.dart';
 import '../auth/auth_provider.dart';
 import '../cash_register/screens/cash_register_screen.dart';
 import '../catalog/screens/catalog_screen.dart';
+import '../catalog_admin/screens/catalog_admin_screen.dart';
 import '../consignments/screens/consignments_screen.dart';
 import '../customers/screens/customers_screen.dart';
 import '../devices/screens/devices_screen.dart';
@@ -29,6 +30,7 @@ import '../quotations/screens/quotations_screen.dart';
 import '../receivables/screens/due_receivables_screen.dart';
 import '../reports/screens/reports_screen.dart';
 import '../restaurant/screens/restaurant_kds_screen.dart';
+import '../restaurant/screens/restaurant_pos_screen.dart';
 import '../restaurant/screens/restaurant_tables_screen.dart';
 import '../sales/screens/sales_screen.dart';
 import '../sales_targets/screens/sales_targets_screen.dart';
@@ -55,40 +57,137 @@ class _FeatureTile {
   final WidgetBuilder? builder;
 }
 
-/// Feature tiles for the dock (drawer/rail/top bar/bottom bar). The POS tile
-/// (and an extra Kitchen Display tile) swap in the restaurant-mode screens
-/// when the signed-in tenant is registered as Cafe & Restaurant — every
-/// other tile, and retail tenants entirely, are unaffected.
-List<_FeatureTile> _featuresFor(CompanyModel? company) {
-  final isRestaurant = company?.isRestaurantMode ?? false;
+/// One labeled group of [_FeatureTile]s in the drawer — e.g. web's
+/// "RESTAURANT OPERATIONS" or "FINANCIAL MANAGEMENT" headers. [header] is
+/// `null` for a group that renders with no heading of its own.
+class _NavSection {
+  const _NavSection(this.header, this.tiles, {this.headerColor});
 
-  return [
-    isRestaurant
-        ? _FeatureTile((l10n) => l10n.featurePos, Icons.table_restaurant_outlined, (_) => const RestaurantTablesScreen())
-        : _FeatureTile((l10n) => l10n.featurePos, Icons.point_of_sale_outlined, (_) => const PosScreen()),
-    _FeatureTile((l10n) => l10n.featureSales, Icons.receipt_long_outlined, (_) => const SalesScreen()),
-    _FeatureTile((l10n) => l10n.featureQuotations, Icons.description_outlined, (_) => const QuotationsScreen()),
-    _FeatureTile((l10n) => l10n.featureInventory, Icons.inventory_2_outlined, (_) => const InventoryManagementScreen()),
-    _FeatureTile((l10n) => l10n.featureCustomers, Icons.people_outline, (_) => const CustomersScreen()),
-    _FeatureTile((l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen()),
-    _FeatureTile((l10n) => l10n.featurePayables, Icons.request_quote_outlined, (_) => const PayablesScreen()),
-    _FeatureTile((l10n) => l10n.featureDueReceivables, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen()),
-    _FeatureTile((l10n) => l10n.featureConsignments, Icons.local_shipping_outlined, (_) => const ConsignmentsScreen()),
-    _FeatureTile((l10n) => l10n.featureServiceOrders, Icons.handyman_outlined, (_) => const ServiceOrdersScreen()),
-    if (isRestaurant)
-      _FeatureTile((l10n) => l10n.featureKitchenDisplay, Icons.soup_kitchen_outlined, (_) => const RestaurantKdsScreen()),
-    _FeatureTile((l10n) => l10n.featureSalesTargets, Icons.flag_outlined, (_) => const SalesTargetsScreen()),
-    _FeatureTile((l10n) => l10n.featureReports, Icons.insights_outlined, (_) => const ReportsScreen()),
-    _FeatureTile((l10n) => l10n.featureTaxes, Icons.percent_outlined, (_) => const TaxesScreen()),
-    _FeatureTile((l10n) => l10n.featureAnalytics, Icons.bar_chart_outlined, (_) => const AnalyticsScreen()),
-    _FeatureTile((l10n) => l10n.featureSubscription, Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),
-    _FeatureTile((l10n) => l10n.featureStaff, Icons.badge_outlined, (_) => const StaffScreen()),
-    _FeatureTile((l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen()),
-    _FeatureTile((l10n) => l10n.featureLanguages, Icons.translate_outlined, (_) => const LanguagesScreen()),
-    _FeatureTile((l10n) => l10n.featureDevices, Icons.devices_other_outlined, (_) => const DevicesScreen()),
-    _FeatureTile((l10n) => l10n.featureSettings, Icons.settings_outlined, (_) => const TenantSettingsScreen()),
-  ];
+  final String Function(AppLocalizations l10n)? header;
+  final Color? headerColor;
+  final List<_FeatureTile> tiles;
 }
+
+/// Retail (general) mode's nav tree — the drawer/rail/top bar/bottom bar all
+/// render this same structure, just flattened differently. Mirrors the web
+/// tenant sidebar's general-mode sections (see layouts/tenant.blade.php's
+/// "GENERAL RETAIL DRAWER ITEMS" branch): Cashier & Sales, Financial
+/// Management, Products & Inventory, Administration & Settings.
+List<_NavSection> _retailSections() => [
+      _NavSection(
+        (l10n) => l10n.navHeaderCashierSales,
+        [
+          _FeatureTile((l10n) => l10n.featurePos, Icons.point_of_sale_outlined, (_) => const PosScreen()),
+          _FeatureTile((l10n) => l10n.featureSales, Icons.receipt_long_outlined, (_) => const SalesScreen()),
+          _FeatureTile((l10n) => l10n.featureQuotations, Icons.description_outlined, (_) => const QuotationsScreen()),
+          _FeatureTile((l10n) => l10n.featureConsignments, Icons.local_shipping_outlined, (_) => const ConsignmentsScreen()),
+          _FeatureTile((l10n) => l10n.featureServiceOrders, Icons.handyman_outlined, (_) => const ServiceOrdersScreen()),
+          _FeatureTile((l10n) => l10n.featureCustomers, Icons.people_outline, (_) => const CustomersScreen()),
+        ],
+        headerColor: Colors.blue.shade700,
+      ),
+      _NavSection(
+        (l10n) => l10n.navHeaderFinancialManagement,
+        [
+          _FeatureTile((l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen()),
+          _FeatureTile((l10n) => l10n.featureDueReceivables, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen()),
+          _FeatureTile((l10n) => l10n.featurePayables, Icons.request_quote_outlined, (_) => const PayablesScreen()),
+          _FeatureTile((l10n) => l10n.featureSalesTargets, Icons.flag_outlined, (_) => const SalesTargetsScreen()),
+          _FeatureTile((l10n) => l10n.featureReports, Icons.insights_outlined, (_) => const ReportsScreen()),
+          _FeatureTile((l10n) => l10n.featureAnalytics, Icons.bar_chart_outlined, (_) => const AnalyticsScreen()),
+        ],
+      ),
+      _NavSection(
+        (l10n) => l10n.navHeaderProductsInventory,
+        [
+          _FeatureTile((l10n) => l10n.featureInventory, Icons.inventory_2_outlined, (_) => const InventoryManagementScreen()),
+          _FeatureTile((l10n) => l10n.featureCategories, Icons.sell_outlined, (_) => const CategoriesScreen()),
+          _FeatureTile((l10n) => l10n.featureBrands, Icons.auto_awesome_outlined, (_) => const BrandsScreen()),
+          _FeatureTile((l10n) => l10n.featureUnits, Icons.straighten_outlined, (_) => const UnitsScreen()),
+          _FeatureTile((l10n) => l10n.featureSuppliers, Icons.local_shipping_outlined, (_) => const SuppliersScreen()),
+          _FeatureTile((l10n) => l10n.featureTaxes, Icons.percent_outlined, (_) => const TaxesScreen()),
+          _FeatureTile((l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen()),
+        ],
+      ),
+      _NavSection(
+        (l10n) => l10n.navHeaderAdministration,
+        [
+          _FeatureTile((l10n) => l10n.featureSubscription, Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),
+          _FeatureTile((l10n) => l10n.featureSettings, Icons.settings_outlined, (_) => const TenantSettingsScreen()),
+          _FeatureTile((l10n) => l10n.featureLanguages, Icons.translate_outlined, (_) => const LanguagesScreen()),
+          _FeatureTile((l10n) => l10n.featureStaff, Icons.badge_outlined, (_) => const StaffScreen()),
+          _FeatureTile((l10n) => l10n.featureDevices, Icons.devices_other_outlined, (_) => const DevicesScreen()),
+        ],
+      ),
+    ];
+
+/// Cafe & Restaurant mode's nav tree — a 1:1 mirror of the web tenant
+/// sidebar's restaurant-mode sections (see layouts/tenant.blade.php's
+/// `$isRestaurant` branch): RESTAURANT OPERATIONS, ORDERS & CASH, FINANCIAL
+/// MANAGEMENT, KITCHEN MENU & CATALOG, ADMINISTRATION & SETTINGS. Service
+/// Orders and Consignments are retail-only and never appear here.
+List<_NavSection> _restaurantSections() => [
+      _NavSection(
+        (l10n) => l10n.navHeaderRestaurantOperations,
+        [
+          _FeatureTile((l10n) => l10n.featureRestaurantPos, Icons.restaurant_outlined, (_) => const RestaurantPosScreen()),
+          _FeatureTile((l10n) => l10n.featureFloorPlan, Icons.table_restaurant_outlined, (_) => const RestaurantTablesScreen()),
+          _FeatureTile((l10n) => l10n.featureKitchenDisplay, Icons.soup_kitchen_outlined, (_) => const RestaurantKdsScreen()),
+        ],
+        headerColor: Colors.lime.shade800,
+      ),
+      _NavSection(
+        (l10n) => l10n.navHeaderOrdersCash,
+        [
+          _FeatureTile((l10n) => l10n.featureDiningHistory, Icons.receipt_long_outlined, (_) => const SalesScreen()),
+          _FeatureTile((l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen()),
+        ],
+      ),
+      _NavSection(
+        (l10n) => l10n.navHeaderFinancialManagement,
+        [
+          _FeatureTile((l10n) => l10n.featureAccountsReceivable, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen()),
+          _FeatureTile((l10n) => l10n.featureAccountsPayable, Icons.request_quote_outlined, (_) => const PayablesScreen()),
+          _FeatureTile((l10n) => l10n.featureReportsAnalytics, Icons.insights_outlined, (_) => const ReportsScreen()),
+        ],
+      ),
+      _NavSection(
+        (l10n) => l10n.navHeaderKitchenMenuCatalog,
+        [
+          _FeatureTile((l10n) => l10n.featureMenuDishes, Icons.inventory_2_outlined, (_) => const InventoryManagementScreen()),
+          _FeatureTile((l10n) => l10n.featureCategories, Icons.sell_outlined, (_) => const CategoriesScreen()),
+          _FeatureTile((l10n) => l10n.featureBrands, Icons.auto_awesome_outlined, (_) => const BrandsScreen()),
+          _FeatureTile((l10n) => l10n.featureUnits, Icons.straighten_outlined, (_) => const UnitsScreen()),
+          _FeatureTile((l10n) => l10n.featureSuppliers, Icons.local_shipping_outlined, (_) => const SuppliersScreen()),
+          _FeatureTile((l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen()),
+          _FeatureTile((l10n) => l10n.featureGuestDirectory, Icons.people_outline, (_) => const CustomersScreen()),
+        ],
+      ),
+      _NavSection(
+        (l10n) => l10n.navHeaderAdministration,
+        [
+          _FeatureTile((l10n) => l10n.featureSubscription, Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),
+          _FeatureTile((l10n) => l10n.featureSettings, Icons.settings_outlined, (_) => const TenantSettingsScreen()),
+          _FeatureTile((l10n) => l10n.featureLanguages, Icons.translate_outlined, (_) => const LanguagesScreen()),
+          _FeatureTile((l10n) => l10n.featureStaff, Icons.badge_outlined, (_) => const StaffScreen()),
+          _FeatureTile((l10n) => l10n.featureDevices, Icons.devices_other_outlined, (_) => const DevicesScreen()),
+        ],
+      ),
+    ];
+
+/// The active nav tree for this tenant — retail (general) or Cafe &
+/// Restaurant, chosen by [CompanyModel.isRestaurantMode] exactly as the web
+/// picks between its two sidebar branches.
+List<_NavSection> _sectionsFor(CompanyModel? company) =>
+    (company?.isRestaurantMode ?? false) ? _restaurantSections() : _retailSections();
+
+/// Every tile across all sections, in order — the flat form every dock
+/// rendering except the drawer (rail/top bar/bottom bar don't group with
+/// headers) uses, and what the drawer's tile-to-index mapping is built from
+/// so `_dockIndex` stays in sync across all four.
+List<_FeatureTile> _featuresFor(CompanyModel? company) => [
+      for (final section in _sectionsFor(company)) ...section.tiles,
+    ];
 
 /// The post-login home base. Each feature module still under construction
 /// falls back to a [ComingSoonScreen] placeholder — swap in the real screen
@@ -165,8 +264,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
         for (final feature in _featuresFor(company)) (feature.icon, feature.titleOf(l10n)),
       ];
 
+  /// Structured, mode-isolated drawer: a Home tile followed by every
+  /// [_NavSection] with its own header — the mobile equivalent of the web
+  /// tenant sidebar's slide-out drawer (see layouts/tenant.blade.php).
+  /// Section headers are omitted from the rail/top bar/bottom bar (see
+  /// [_dockDestinationsFor]), which just render the same tiles flat.
   Widget _buildDrawer(BuildContext context, CompanyModel? company) {
-    final destinations = _dockDestinationsFor(AppLocalizations.of(context), company);
+    final l10n = AppLocalizations.of(context);
+    final isRestaurant = company?.isRestaurantMode ?? false;
+
+    final children = <Widget>[
+      DrawerHeader(
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text(
+              company?.tradeName ?? company?.name ?? 'Sales & Inventory',
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            if (company != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                isRestaurant ? 'CAFE & RESTAURANT' : company.planName.toUpperCase(),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+      ),
+      ListTile(
+        leading: const Icon(Icons.home_outlined),
+        title: Text(l10n.navHome),
+        selected: _dockIndex == 0,
+        onTap: () {
+          Navigator.of(context).pop();
+          _onDockItemSelected(context, 0);
+        },
+      ),
+    ];
+
+    var index = 1;
+    for (final section in _sectionsFor(company)) {
+      if (section.header != null) {
+        children.add(Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+          child: Text(
+            section.header!(l10n).toUpperCase(),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+              color: section.headerColor ?? Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ));
+      }
+      for (final tile in section.tiles) {
+        final i = index++;
+        children.add(ListTile(
+          leading: Icon(tile.icon),
+          title: Text(tile.titleOf(l10n)),
+          selected: _dockIndex == i,
+          onTap: () {
+            Navigator.of(context).pop();
+            _onDockItemSelected(context, i);
+          },
+        ));
+      }
+    }
+
     return Drawer(
       child: SafeArea(
         top: false,
@@ -175,38 +343,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).padding.bottom + 16,
           ),
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    company?.tradeName ?? company?.name ?? 'Sales & Inventory',
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  if (company != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      company.planName.toUpperCase(),
-                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            for (var i = 0; i < destinations.length; i++)
-              ListTile(
-                leading: Icon(destinations[i].$1),
-                title: Text(destinations[i].$2),
-                selected: _dockIndex == i,
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _onDockItemSelected(context, i);
-                },
-              ),
-          ],
+          children: children,
         ),
       ),
     );

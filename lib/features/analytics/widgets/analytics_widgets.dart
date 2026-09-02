@@ -91,7 +91,7 @@ class RevenueTrendChart extends StatelessWidget {
             color: primary,
             barWidth: 3,
             dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(show: true, color: primary.withOpacity(0.15)),
+            belowBarData: BarAreaData(show: true, color: primary.withValues(alpha: 0.15)),
           ),
         ],
       ),

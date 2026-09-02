@@ -179,6 +179,39 @@ class AppLocalizations {
   String get featureLanguages => _s('featureLanguages');
   String get featureDevices => _s('featureDevices');
   String get featureSettings => _s('featureSettings');
+
+  // Restaurant-mode-only nav labels — see DashboardScreen's restaurant nav
+  // section list.
+  String get featureRestaurantPos => _s('featureRestaurantPos');
+  String get featureFloorPlan => _s('featureFloorPlan');
+  String get featureDiningHistory => _s('featureDiningHistory');
+  String get featureAccountsReceivable => _s('featureAccountsReceivable');
+  String get featureAccountsPayable => _s('featureAccountsPayable');
+  String get featureReportsAnalytics => _s('featureReportsAnalytics');
+  String get featureMenuDishes => _s('featureMenuDishes');
+  String get featureCategories => _s('featureCategories');
+  String get featureBrands => _s('featureBrands');
+  String get featureUnits => _s('featureUnits');
+  String get featureSuppliers => _s('featureSuppliers');
+  String get featureGuestDirectory => _s('featureGuestDirectory');
+
+  String get navHeaderRestaurantOperations => _s('navHeaderRestaurantOperations');
+  String get navHeaderOrdersCash => _s('navHeaderOrdersCash');
+  String get navHeaderFinancialManagement => _s('navHeaderFinancialManagement');
+  String get navHeaderKitchenMenuCatalog => _s('navHeaderKitchenMenuCatalog');
+  String get navHeaderAdministration => _s('navHeaderAdministration');
+  String get navHeaderCashierSales => _s('navHeaderCashierSales');
+  String get navHeaderProductsInventory => _s('navHeaderProductsInventory');
+
+  String get restaurantPosStartOrder => _s('restaurantPosStartOrder');
+  String get restaurantPosSubtitle => _s('restaurantPosSubtitle');
+  String get restaurantPosDineIn => _s('restaurantPosDineIn');
+  String get restaurantPosDineInSubtitle => _s('restaurantPosDineInSubtitle');
+  String get restaurantPosTakeaway => _s('restaurantPosTakeaway');
+  String get restaurantPosTakeawaySubtitle => _s('restaurantPosTakeawaySubtitle');
+  String get restaurantPosDelivery => _s('restaurantPosDelivery');
+  String get restaurantPosDeliverySubtitle => _s('restaurantPosDeliverySubtitle');
+
   String get orderCart => _s('orderCart');
   String get clearCart => _s('clearCart');
   String get cartEmptyTitle => _s('cartEmptyTitle');

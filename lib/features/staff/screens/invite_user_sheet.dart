@@ -153,7 +153,7 @@ class _InviteUserSheetState extends State<InviteUserSheet> {
           TextFormField(controller: _phoneController, decoration: const InputDecoration(labelText: 'Phone (optional, for WhatsApp share)')),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            value: _role,
+            initialValue: _role,
             decoration: const InputDecoration(labelText: 'Role'),
             items: [for (final entry in widget.roles.entries) DropdownMenuItem(value: entry.key, child: Text(entry.value))],
             onChanged: (value) => setState(() => _role = value ?? _role),
@@ -170,7 +170,7 @@ class _InviteUserSheetState extends State<InviteUserSheet> {
             const SizedBox(width: 12),
             Expanded(
               child: DropdownButtonFormField<String>(
-                value: _commissionType,
+                initialValue: _commissionType,
                 decoration: const InputDecoration(labelText: 'Type'),
                 items: const [
                   DropdownMenuItem(value: 'percentage', child: Text('Percentage')),

@@ -264,7 +264,7 @@ class _ServiceOrderFormSheetState extends State<ServiceOrderFormSheet> {
                   Row(children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _status,
+                        initialValue: _status,
                         decoration: const InputDecoration(labelText: 'Status'),
                         items: [for (final s in kServiceOrderStatuses) DropdownMenuItem(value: s, child: Text(kServiceOrderStatusLabels[s] ?? s))],
                         onChanged: (value) => setState(() => _status = value ?? _status),
@@ -273,7 +273,7 @@ class _ServiceOrderFormSheetState extends State<ServiceOrderFormSheet> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _priority,
+                        initialValue: _priority,
                         decoration: const InputDecoration(labelText: 'Priority'),
                         items: [for (final p in kServiceOrderPriorities) DropdownMenuItem(value: p, child: Text(p))],
                         onChanged: (value) => setState(() => _priority = value ?? _priority),

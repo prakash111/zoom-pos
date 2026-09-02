@@ -241,7 +241,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                             ),
                             child: ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: device.macAdress == _selectedMac ? primaryColor.withOpacity(0.15) : Colors.grey.shade100,
+                                backgroundColor: device.macAdress == _selectedMac ? primaryColor.withValues(alpha: 0.15) : Colors.grey.shade100,
                                 child: Icon(
                                   Icons.print_outlined,
                                   color: device.macAdress == _selectedMac ? primaryColor : Colors.grey.shade700,

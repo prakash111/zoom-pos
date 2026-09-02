@@ -81,7 +81,7 @@ class _PublishCatalogSheetState extends State<PublishCatalogSheet> {
                     TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Catalog title')),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
-                      value: _ttlDays,
+                      initialValue: _ttlDays,
                       decoration: const InputDecoration(labelText: 'Link expires in'),
                       items: [
                         for (final days in _ttlOptions)

@@ -69,7 +69,7 @@ class _CashMovementSheetState extends State<CashMovementSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<String>(
-            value: _category,
+            initialValue: _category,
             decoration: const InputDecoration(labelText: 'Category'),
             items: [for (final c in categories) DropdownMenuItem(value: c, child: Text(c.replaceAll('_', ' ')))],
             onChanged: (value) => setState(() => _category = value ?? _category),

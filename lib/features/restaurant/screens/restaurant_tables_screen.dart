@@ -115,7 +115,7 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: floorId,
+                  initialValue: floorId,
                   decoration: const InputDecoration(labelText: 'Floor / Area'),
                   items: [for (final f in floors) DropdownMenuItem(value: f.id, child: Text(f.name))],
                   onChanged: (v) => setDialogState(() => floorId = v),
@@ -123,7 +123,7 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
                 if (table != null) ...[
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: status,
+                    initialValue: status,
                     decoration: const InputDecoration(labelText: 'Status'),
                     items: [for (final s in kDiningTableStatuses) DropdownMenuItem(value: s, child: Text(kDiningTableStatusLabels[s]!))],
                     onChanged: (v) => setDialogState(() => status = v ?? status),
@@ -311,8 +311,8 @@ class _TableCard extends StatelessWidget {
         width: 110,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: table.statusColor.withOpacity(0.12),
-          border: Border.all(color: table.statusColor.withOpacity(0.5)),
+          color: table.statusColor.withValues(alpha: 0.12),
+          border: Border.all(color: table.statusColor.withValues(alpha: 0.5)),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(

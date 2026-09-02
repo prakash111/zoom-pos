@@ -46,7 +46,7 @@ class ThemeProvider extends ChangeNotifier {
     try {
       final bundle = await repository.fetchAll();
       final parsed = parseHexColor(bundle.profile.primaryColor);
-      if (parsed != null && parsed.value != seedColor.value) {
+      if (parsed != null && parsed.toARGB32() != seedColor.toARGB32()) {
         await setColor(parsed);
       }
     } catch (e) {

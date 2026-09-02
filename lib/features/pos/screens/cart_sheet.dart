@@ -443,7 +443,7 @@ class CartSheet extends StatelessWidget {
                             Expanded(
                               flex: 3,
                               child: DropdownButtonFormField<String>(
-                                value: codeFor(i),
+                                initialValue: codeFor(i),
                                 isExpanded: true,
                                 items: [
                                   for (final m in activeMethods)
@@ -579,7 +579,7 @@ class CartSheet extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: primaryColor.withOpacity(0.12),
+                            color: primaryColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -733,7 +733,7 @@ class CartSheet extends StatelessWidget {
                         ActionChip(
                           avatar: Icon(Icons.person_outline, size: 16, color: pos.selectedCustomer != null ? primaryColor : Colors.grey.shade700),
                           label: Text(pos.selectedCustomer?.name ?? l10n.addCustomer),
-                          backgroundColor: pos.selectedCustomer != null ? primaryColor.withOpacity(0.12) : null,
+                          backgroundColor: pos.selectedCustomer != null ? primaryColor.withValues(alpha: 0.12) : null,
                           onPressed: () => _pickCustomer(context),
                         ),
 
@@ -749,7 +749,7 @@ class CartSheet extends StatelessWidget {
                         ActionChip(
                           avatar: Icon(Icons.edit_note, size: 16, color: pos.orderNotes.isNotEmpty ? primaryColor : Colors.grey.shade700),
                           label: Text(pos.orderNotes.isNotEmpty ? l10n.noteChecked : l10n.note),
-                          backgroundColor: pos.orderNotes.isNotEmpty ? primaryColor.withOpacity(0.12) : null,
+                          backgroundColor: pos.orderNotes.isNotEmpty ? primaryColor.withValues(alpha: 0.12) : null,
                           onPressed: () => _showNotesDialog(context),
                         ),
 
@@ -765,7 +765,7 @@ class CartSheet extends StatelessWidget {
                         ActionChip(
                           avatar: Icon(Icons.call_split, size: 16, color: pos.isSplitPayment ? primaryColor : Colors.grey.shade700),
                           label: Text(pos.isSplitPayment ? 'Split (${pos.payments.length})' : 'Split Payment'),
-                          backgroundColor: pos.isSplitPayment ? primaryColor.withOpacity(0.12) : null,
+                          backgroundColor: pos.isSplitPayment ? primaryColor.withValues(alpha: 0.12) : null,
                           onPressed: () => _openSplitPaymentEditor(context, activeMethods),
                         ),
 
@@ -797,9 +797,9 @@ class CartSheet extends StatelessWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: primaryColor.withOpacity(0.06),
+                          color: primaryColor.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: primaryColor.withOpacity(0.25)),
+                          border: Border.all(color: primaryColor.withValues(alpha: 0.25)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1003,7 +1003,7 @@ class _PaymentMethodChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.15) : Colors.grey.shade100,
+          color: isSelected ? color.withValues(alpha: 0.15) : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? color : Colors.grey.shade300,

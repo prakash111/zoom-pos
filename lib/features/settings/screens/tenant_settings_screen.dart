@@ -139,21 +139,23 @@ class _AppearanceTab extends StatelessWidget {
         const SizedBox(height: 4),
         Text(l10n.navDockDescription, style: TextStyle(color: Colors.grey.shade600)),
         const SizedBox(height: 12),
-        Card(
-          margin: EdgeInsets.zero,
-          child: Column(
-            children: [
-              for (final option in options)
-                RadioListTile<NavDockPosition>(
-                  value: option.$1,
-                  groupValue: navDock.position,
-                  onChanged: (value) {
-                    if (value != null) navDock.setPosition(value);
-                  },
-                  secondary: Icon(option.$2),
-                  title: Text(option.$3),
-                ),
-            ],
+        RadioGroup<NavDockPosition>(
+          groupValue: navDock.position,
+          onChanged: (value) {
+            if (value != null) navDock.setPosition(value);
+          },
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (final option in options)
+                  RadioListTile<NavDockPosition>(
+                    value: option.$1,
+                    secondary: Icon(option.$2),
+                    title: Text(option.$3),
+                  ),
+              ],
+            ),
           ),
         ),
       ],
@@ -403,7 +405,7 @@ class _ProfileTabState extends State<_ProfileTab> {
           const SizedBox(width: 12),
           Expanded(
             child: DropdownButtonFormField<String>(
-              value: _countryCode,
+              initialValue: _countryCode,
               decoration: InputDecoration(labelText: l10n.country),
               items: [
                 for (final entry in kTaxJurisdictions.entries)
@@ -435,7 +437,7 @@ class _ProfileTabState extends State<_ProfileTab> {
           const SizedBox(width: 12),
           Expanded(
             child: DropdownButtonFormField<String>(
-              value: _commissionType,
+              initialValue: _commissionType,
               decoration: InputDecoration(labelText: l10n.type),
               items: [
                 DropdownMenuItem(value: 'percentage', child: Text(l10n.commissionPercentage)),
@@ -464,11 +466,11 @@ class _ProfileTabState extends State<_ProfileTab> {
                   decoration: BoxDecoration(
                     color: swatch,
                     shape: BoxShape.circle,
-                    border: swatch.value == _primaryColor.value
+                    border: swatch.toARGB32() == _primaryColor.toARGB32()
                         ? Border.all(color: Colors.black87, width: 2.5)
                         : Border.all(color: Colors.grey.shade300),
                   ),
-                  child: swatch.value == _primaryColor.value
+                  child: swatch.toARGB32() == _primaryColor.toARGB32()
                       ? const Icon(Icons.check, color: Colors.white, size: 18)
                       : null,
                 ),
@@ -794,7 +796,7 @@ class _FinancialTabState extends State<_FinancialTab> {
           const SizedBox(width: 12),
           Expanded(
             child: DropdownButtonFormField<String>(
-              value: _symbolPosition,
+              initialValue: _symbolPosition,
               decoration: const InputDecoration(labelText: 'Symbol position'),
               items: const [
                 DropdownMenuItem(value: 'prefix', child: Text('Prefix (\$10)')),
@@ -956,7 +958,7 @@ class _NotificationsTabState extends State<_NotificationsTab> {
           const SizedBox(width: 12),
           Expanded(
             child: DropdownButtonFormField<String>(
-              value: _smtpEncryption,
+              initialValue: _smtpEncryption,
               decoration: const InputDecoration(labelText: 'Encryption'),
               items: const [
                 DropdownMenuItem(value: 'tls', child: Text('TLS')),

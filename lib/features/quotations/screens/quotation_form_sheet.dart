@@ -338,7 +338,7 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<TaxRuleModel?>(
-                  value: _taxRuleOverride,
+                  initialValue: _taxRuleOverride,
                   decoration: const InputDecoration(
                     labelText: 'Tax rule',
                     helperText: 'Auto uses each item\'s own product tax rate',
