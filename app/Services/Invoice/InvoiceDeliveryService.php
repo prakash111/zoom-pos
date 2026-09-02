@@ -205,7 +205,12 @@ class InvoiceDeliveryService
                     'sale' => $sale,
                     'company' => $company,
                     'logoBase64' => $logoBase64,
-                ])->setPaper('a4', 'portrait');
+                ])->setPaper('a4', 'portrait')
+                  ->setOptions([
+                      'isHtml5ParserEnabled' => true,
+                      'isRemoteEnabled' => true,
+                      'defaultFont' => 'sans-serif',
+                  ]);
 
                 return $pdf->output();
             }
@@ -231,7 +236,7 @@ class InvoiceDeliveryService
             $itemsHeightMm = 0;
             foreach ($sale->items ?? [] as $it) {
                 $name = (string) ($it['name'] ?? 'Item');
-                $nameLines = max(1, (int) ceil(strlen($name) / ($is58mm ? 16 : 24)));
+                $nameLines = max(1, (int) ceil(mb_strlen($name) / ($is58mm ? 16 : 24)));
                 $qty = (float) ($it['quantity'] ?? 1);
                 $hasSubline = ($qty > 1 || ! empty($it['is_overridden']));
                 $rowHeight = ($nameLines * 3.8) + ($hasSubline ? 3.2 : 0) + 2.0;
@@ -253,8 +258,8 @@ class InvoiceDeliveryService
                 $totalsHeightMm += ($paymentCount * 3.5);
             }
 
-            $notesHeightMm = $hasNotes ? max(8, (int) ceil(strlen((string) $sale->notes) / ($is58mm ? 25 : 38)) * 4.0) : 0;
-            $termsHeightMm = $hasTerms ? max(8, (int) ceil(strlen((string) ($sale->terms ?? ($company?->invoice_terms ?? ''))) / ($is58mm ? 25 : 38)) * 4.0) : 0;
+            $notesHeightMm = $hasNotes ? max(8, (int) ceil(mb_strlen((string) $sale->notes) / ($is58mm ? 25 : 38)) * 4.0) : 0;
+            $termsHeightMm = $hasTerms ? max(8, (int) ceil(mb_strlen((string) ($sale->terms ?? ($company?->invoice_terms ?? ''))) / ($is58mm ? 25 : 38)) * 4.0) : 0;
             $qrFooterHeightMm = ($hasQr ? ($is58mm ? 30 : 38) : 0) + ($is58mm ? 18 : 20); // QR code + caption + ref code + thank you + website
 
             $totalHeightMm = $headerHeightMm + $metaHeightMm + $tableHeadMm + $itemsHeightMm + $totalsHeightMm + $notesHeightMm + $termsHeightMm + $qrFooterHeightMm;
@@ -276,7 +281,7 @@ class InvoiceDeliveryService
                 'qrCodeSvg' => $qrCodeData['svg'],
                 'verificationUrl' => $qrCodeData['url'],
             ])->setPaper($customPaper, 'portrait')
-                ->setOption(['isRemoteEnabled' => true, 'isHtml5ParserEnabled' => true]);
+                ->setOption(['isRemoteEnabled' => true, 'isHtml5ParserEnabled' => true, 'defaultFont' => 'sans-serif']);
 
             return $pdf->output();
         } finally {

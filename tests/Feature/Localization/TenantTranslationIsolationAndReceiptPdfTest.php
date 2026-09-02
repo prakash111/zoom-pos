@@ -266,6 +266,74 @@ class TenantTranslationIsolationAndReceiptPdfTest extends TestCase
     }
 
     /**
+     * Multi-byte UTF-8 item names/notes/terms (e.g. a retail catalog with
+     * non-Latin product names, unlike a curated ASCII demo menu) must
+     * render intact on both PDF formats — regression test for the receipt
+     * height estimator using byte-length strlen() instead of character-length
+     * mb_strlen(), which overestimated wrapped line counts for any multi-byte
+     * text and only ever showed up as extra blank space on that content.
+     */
+    public function test_multibyte_item_names_and_terms_render_on_both_pdf_formats(): void
+    {
+        [$company, $admin] = $this->createTenant('Bharat Kirana Store', 'en');
+        $company->update([
+            'invoice_terms' => 'सभी बिक्री अंतिम हैं। कृपया मूल रसीद के साथ 7 दिनों के भीतर वापस करें।',
+        ]);
+
+        $sale = Sale::create([
+            'company_id' => $company->id,
+            'user_id' => $admin->id,
+            'sale_number' => 'S-'.date('YmdHis').'-MB',
+            'customer_name' => 'रवि कुमार',
+            'total' => 250.00,
+            'paid_amount' => 250.00,
+            'due_amount' => 0.00,
+            'payment_method' => 'upi',
+            'payment_status' => 'paid',
+            'status' => 'completed',
+            'notes' => 'ग्राहक ने डिजिटल चालान की प्रति मांगी',
+            'items' => [
+                ['name' => 'बासमती चावल प्रीमियम पैकेट', 'quantity' => 2, 'price' => 100.00],
+                ['name' => 'तूर दाल', 'quantity' => 1, 'price' => 50.00],
+            ],
+        ]);
+
+        $deliveryService = app(InvoiceDeliveryService::class);
+
+        $thermalPdf = $deliveryService->generateInvoicePdf($sale, '80mm');
+        $this->assertStringStartsWith('%PDF-', $thermalPdf);
+
+        $a4Pdf = $deliveryService->generateInvoicePdf($sale, 'standard');
+        $this->assertStringStartsWith('%PDF-', $a4Pdf);
+
+        app()->instance('tenant.company_id', $company->id);
+
+        $receiptHtml = view('pdf.receipt', [
+            'sale' => $sale,
+            'company' => $company,
+            'logoBase64' => null,
+            'is58mm' => false,
+            'paperWidth' => '80mm',
+            'qrCodeDataUri' => null,
+            'qrCodeSvg' => null,
+            'verificationUrl' => 'https://example.com/receipt/mb',
+        ])->render();
+
+        $this->assertStringContainsString('बासमती चावल प्रीमियम पैकेट', $receiptHtml);
+        $this->assertStringContainsString('रवि कुमार', $receiptHtml);
+        $this->assertStringContainsString('सभी बिक्री अंतिम हैं', $receiptHtml);
+
+        $invoiceHtml = view('pdf.invoice', [
+            'sale' => $sale,
+            'company' => $company,
+            'logoBase64' => null,
+        ])->render();
+
+        $this->assertStringContainsString('बासमती चावल प्रीमियम पैकेट', $invoiceHtml);
+        $this->assertStringContainsString('रवि कुमार', $invoiceHtml);
+    }
+
+    /**
      * 6. Test Print Media CSS (@media print) and Unescaped HTML Terms Rendering.
      */
     public function test_print_media_css_and_unescaped_html_terms_rendering(): void

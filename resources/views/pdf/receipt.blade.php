@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>Receipt #{{ $sale->sale_number }}</title>
     @php
         $is58mm = $is58mm ?? false;
