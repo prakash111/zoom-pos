@@ -197,6 +197,20 @@ class PosSyncApiController extends Controller
      * 2. Public Tenant Registration
      * POST /api/v1/pos/auth/register
      */
+    /**
+     * Pre-auth config for the "Create your store" screen — which store-type
+     * cards (Retail / Cafe & Restaurant) it should offer, per the Superadmin's
+     * global "Allowed Registration Modes" setting.
+     * GET /api/v1/pos/auth/registration-config
+     */
+    public function registrationConfig(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'allowed_registration_modes' => (string) \App\Models\PlatformSystem::get('allowed_registration_modes', 'both'),
+        ]);
+    }
+
     public function register(Request $request, TenantProvisioningService $provisioner): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -219,6 +233,15 @@ class PosSyncApiController extends Controller
                 'error' => 'Validation error during tenant registration.',
                 'details' => $validator->errors(),
             ], 422);
+        }
+
+        $requestedIsRestaurant = in_array($request->input('pos_mode', 'general'), ['restaurant', 'food_restaurant'], true);
+        $allowedModes = (string) \App\Models\PlatformSystem::get('allowed_registration_modes', 'both');
+        if ($allowedModes === 'retail_only' && $requestedIsRestaurant) {
+            return response()->json(['success' => false, 'error' => 'Cafe & Restaurant registration is currently disabled.'], 422);
+        }
+        if ($allowedModes === 'restaurant_only' && ! $requestedIsRestaurant) {
+            return response()->json(['success' => false, 'error' => 'Retail registration is currently disabled.'], 422);
         }
 
         try {
@@ -1558,6 +1581,7 @@ class PosSyncApiController extends Controller
             'brand_name' => ['nullable', 'string', 'max:100'],
             'tax_rate' => ['nullable', 'numeric', 'min:0'],
             'external_id' => ['nullable', 'string'],
+            'image_url' => ['nullable', 'string', 'max:2000'],
         ]);
 
         if ($validator->fails()) {
@@ -1598,6 +1622,10 @@ class PosSyncApiController extends Controller
             'active' => true,
         ];
 
+        if ($request->filled('image_url')) {
+            $data['image_url'] = $request->input('image_url');
+        }
+
         if ($product) {
             $product->update($data);
         } else {
@@ -1626,6 +1654,7 @@ class PosSyncApiController extends Controller
                 'unit' => $product->unit,
                 'category_name' => $product->category_name,
                 'tax_rate' => (float) $product->tax_rate,
+                'image_url' => $product->image_url,
             ],
         ]);
     }
@@ -2520,9 +2549,10 @@ class PosSyncApiController extends Controller
         $user = $this->resolveUser($request, $company);
 
         $validator = Validator::make($request->all(), [
-            'type' => ['required', 'string', 'in:email,whatsapp'],
+            'type' => ['required', 'string', 'in:email,whatsapp,custom'],
             'document_type' => ['required', 'string', 'in:invoice,quotation'],
-            'recipient' => ['required', 'string'],
+            'recipient' => ['required_unless:type,custom', 'nullable', 'string'],
+            'channel_id' => ['required_if:type,custom', 'nullable', 'integer'],
             'document_id' => ['nullable', 'string'],
             'custom_message' => ['nullable', 'string'],
             'document_data' => ['nullable', 'array'],
@@ -2538,7 +2568,7 @@ class PosSyncApiController extends Controller
 
         $type = $request->input('type');
         $docType = $request->input('document_type');
-        $recipient = trim($request->input('recipient'));
+        $recipient = trim((string) $request->input('recipient'));
         $docId = $request->input('document_id');
         $customMessage = $request->input('custom_message');
         $docData = $request->input('document_data', []);
@@ -2593,6 +2623,37 @@ class PosSyncApiController extends Controller
         $messageQueue = app(MessageQueueService::class);
 
         try {
+            if ($type === 'custom') {
+                $channel = \App\Models\CustomNotificationChannel::where('company_id', $company->id)
+                    ->where('is_active', true)
+                    ->find($request->input('channel_id'));
+
+                if (! $channel || ! $channel->handlesEvent($docType)) {
+                    return response()->json(['success' => false, 'error' => 'That notification channel is unavailable.'], 422);
+                }
+
+                app(\App\Services\Delivery\WebhookDispatchService::class)->dispatch($channel, [
+                    'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? '',
+                    'invoice_no' => $sale->sale_number,
+                    'total' => (float) $sale->total,
+                    'due_amount' => (float) $sale->due_amount,
+                    'receipt_link' => route('sales.public', $sale->sale_number),
+                ]);
+
+                AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
+                    'type' => 'custom',
+                    'channel_id' => $channel->id,
+                    'document_type' => $docType,
+                    'document_number' => $sale->sale_number,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => "Dispatched to {$channel->name}.",
+                    'document_number' => $sale->sale_number,
+                ]);
+            }
+
             if ($type === 'email') {
                 $result = $messageQueue->sendOrQueueEmail($sale, $recipient, $customMessage, true);
 
@@ -2674,6 +2735,8 @@ class PosSyncApiController extends Controller
         return response($pdf, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="'.$sale->sale_number.'.pdf"',
+            'Cache-Control' => 'no-store, must-revalidate',
+            'Pragma' => 'no-cache',
         ]);
     }
 

@@ -1516,7 +1516,9 @@ class Create extends Component
     public function render()
     {
         $productsQuery = Product::query()
-            ->where('active', true)
+            ->where(function ($q) {
+                $q->where('active', true)->orWhereNull('active');
+            })
             ->when($this->selectedCategoryId, fn ($q) => $q->where('category_id', $this->selectedCategoryId))
             ->when($this->search, function ($q) {
                 $term = '%'.$this->search.'%';
@@ -1532,9 +1534,13 @@ class Create extends Component
             : (auth('web')->user()?->company_id ?? auth('tenant_api')->user()?->company_id);
 
         // Keep unrelated modal updates from repeatedly loading the entire POS catalog.
-        // Searches are applied before this cap, so barcode/name lookup remains complete.
-        $products = $productsQuery->orderBy('name')->limit(80)->get();
-        $totalProductsCount = Cache::remember("pos:{$companyId}:active-product-count", 60, fn () => Product::where('active', true)->count());
+        // Searches/category filters are applied before this cap, so those lookups
+        // remain complete; only the unfiltered "browse everything" view is capped.
+        $isFiltered = (bool) ($this->selectedCategoryId || filled($this->search));
+        $products = $productsQuery->orderBy('name')->limit($isFiltered ? 500 : 200)->get();
+        $totalProductsCount = Cache::remember("pos:{$companyId}:active-product-count", 60, fn () => Product::where(function ($q) {
+            $q->where('active', true)->orWhereNull('active');
+        })->count());
         $loadCategories = fn () => Category::where(function ($q) {
             $q->where('active', true)->orWhereNull('active');
         })->withCount(['products' => fn ($q) => $q->where('active', true)])->orderBy('name')->get();

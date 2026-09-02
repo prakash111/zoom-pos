@@ -108,15 +108,14 @@
 
         <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Disable Restaurant Mode") }}</label>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Store Mode") }}</label>
                 <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-md">
-                    {{ __("When enabled, this tenant's Restaurant Mode (tables, KOT, kitchen display) is locked off regardless of the store's own mode selection.") }}
+                    {{ __("Chosen by the tenant at registration, subject to the platform's Allowed Registration Modes setting. This is no longer editable per tenant here.") }}
                 </p>
             </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" wire:model="restaurantModeLocked" class="sr-only peer">
-                <div class="w-12 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-rose-600"></div>
-            </label>
+            <span class="px-3 py-1 rounded-full text-[10px] font-extrabold {{ $company->isRestaurantMode() ? 'bg-lime-100 text-lime-700' : 'bg-slate-100 text-slate-600' }}">
+                {{ $company->isRestaurantMode() ? __('Cafe & Restaurant') : __('Retail') }}
+            </span>
         </div>
 
         <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">

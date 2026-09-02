@@ -74,7 +74,7 @@
             @php
                 $mins = $kot->getElapsedMinutes();
             @endphp
-            <div @class([
+            <div data-kot-id="{{ $kot->id }}" @class([
                 'rounded-3xl p-5 border-2 transition-all flex flex-col justify-between shadow-md relative',
                 'bg-white dark:bg-slate-900 border-amber-500/60 shadow-amber-500/10' => $kot->status === 'pending',
                 'bg-white dark:bg-slate-900 border-blue-500/60 shadow-blue-500/10' => $kot->status === 'preparing',
@@ -114,6 +114,13 @@
                             <span>{{ $mins }}{{ __("m ago") }}</span>
                         </div>
                     </div>
+
+                    @if ($kot->target_completion_at)
+                        <div class="kds-countdown-badge mb-3 px-2.5 py-1 rounded-xl text-[11px] font-black inline-flex items-center gap-1 {{ $kot->isOverdue() ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 animate-pulse' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' }}"
+                             data-target="{{ $kot->target_completion_at->toIso8601String() }}">
+                            🎯 <span class="kds-countdown-text">{{ __('Calculating...') }}</span>
+                        </div>
+                    @endif
 
                     <!-- Items List -->
                     <div class="space-y-2.5 py-1">
@@ -208,3 +215,89 @@
     </div>
 
 </div>
+
+<script>
+(function () {
+    const alertIntervalMs = {{ (int) $alertIntervalMinutes }} * 60000;
+    const soundPreset = @js($alertSoundPreset);
+    const soundUrl = @js($alertSoundUrl);
+
+    function playPresetTone(pattern) {
+        try {
+            const ctx = window.__kdsAudioCtx || (window.__kdsAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+            let t = ctx.currentTime;
+            pattern.forEach(([freq, duration]) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.2, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(t);
+                osc.stop(t + duration);
+                t += duration;
+            });
+        } catch (e) { /* Web Audio unavailable — fail silently */ }
+    }
+
+    function playAlert() {
+        if (soundUrl) {
+            const audio = new Audio(soundUrl);
+            audio.play().catch(() => {});
+            return;
+        }
+        const patterns = {
+            chime: [[880, 0.15], [1175, 0.2]],
+            bell: [[1046, 0.35]],
+            alert: [[660, 0.12], [660, 0.12], [660, 0.12]],
+        };
+        playPresetTone(patterns[soundPreset] || patterns.chime);
+    }
+
+    function formatRemaining(ms) {
+        const overdue = ms < 0;
+        const abs = Math.abs(ms);
+        const mins = Math.floor(abs / 60000);
+        const secs = Math.floor((abs % 60000) / 1000);
+        const label = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+        return overdue ? `Overdue by ${label}` : `Due in ${label}`;
+    }
+
+    function tickCountdowns() {
+        document.querySelectorAll('.kds-countdown-badge').forEach((badge) => {
+            const target = new Date(badge.dataset.target).getTime();
+            const remaining = target - Date.now();
+            const textEl = badge.querySelector('.kds-countdown-text');
+            if (textEl) textEl.textContent = formatRemaining(remaining);
+            badge.classList.toggle('bg-rose-100', remaining < 0);
+            badge.classList.toggle('text-rose-700', remaining < 0);
+            badge.classList.toggle('animate-pulse', remaining < 0);
+        });
+    }
+
+    function checkForNewTickets() {
+        const currentIds = new Set(
+            Array.from(document.querySelectorAll('[data-kot-id]')).map((el) => el.dataset.kotId)
+        );
+        if (window.__kdsKnownIds) {
+            let hasNew = false;
+            currentIds.forEach((id) => {
+                if (!window.__kdsKnownIds.has(id)) hasNew = true;
+            });
+            if (hasNew) playAlert();
+        }
+        window.__kdsKnownIds = currentIds;
+    }
+
+    function checkForOverdueChime() {
+        const anyOverdue = document.querySelector('[data-kot-id] .kds-countdown-badge.bg-rose-100');
+        if (anyOverdue) playAlert();
+    }
+
+    checkForNewTickets();
+    setInterval(tickCountdowns, 1000);
+    setInterval(checkForNewTickets, 5000);
+    if (alertIntervalMs > 0) setInterval(checkForOverdueChime, alertIntervalMs);
+})();
+</script>

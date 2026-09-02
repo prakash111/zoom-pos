@@ -210,6 +210,7 @@
                 </div>
 
                 <!-- Operating Mode Selector Pills -->
+                @if ($this->allowedRegistrationModes === 'both')
                 <div class="space-y-1.5 pt-1">
                     <div class="flex items-center justify-between text-xs font-bold text-slate-300">
                         <span>{{ __('Select Operating Mode:') }}</span>
@@ -240,6 +241,12 @@
                         </button>
                     </div>
                 </div>
+                @else
+                    <div class="pt-1 text-xs font-bold text-slate-300">
+                        {{ $this->allowedRegistrationModes === 'restaurant_only' ? __('🍽️ Restaurant & Dining KOT') : __('🏪 Retail & Store POS') }}
+                    </div>
+                @endif
+                @error('posMode') <p class="text-rose-400 text-[11px] mt-0.5">{{ $message }}</p> @enderror
 
                 <!-- Domain & Subdomain Setup (Optional Accordion) -->
                 @php

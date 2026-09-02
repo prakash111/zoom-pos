@@ -65,7 +65,9 @@
                         @error('imageFile') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <button type="button" wire:click="generateAiPhoto" wire:loading.attr="disabled" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-sm transition">✨ {{ __('Generate with AI') }}</button>
+                    @if ($this->aiImageAvailable)
+                        <button type="button" wire:click="generateAiPhoto" wire:loading.attr="disabled" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-sm transition">✨ {{ __('Generate with AI') }}</button>
+                    @endif
 
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">{{ __('Or Direct Image URL') }}</label>

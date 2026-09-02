@@ -62,6 +62,13 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         ->middleware('guest:web')
         ->name('register');
 
+    Route::middleware('guest:web')->group(function () {
+        Route::get('/forgot-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'showForgotForm'])->name('password.request');
+        Route::post('/forgot-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'sendResetLink'])->name('password.email');
+        Route::get('/reset-password/{token}', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'showResetForm'])->name('password.reset.form');
+        Route::post('/reset-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'reset'])->name('password.reset');
+    });
+
     Route::get('/verify-otp', VerifyOtp::class)
         ->middleware('auth:web')
         ->name('verify_otp');
@@ -82,6 +89,7 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
 
         // Store Settings & Languages (Reachable by tenant admin to manage store configs)
         Route::get('/settings', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.index');
+        Route::post('/settings/change-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'changePassword'])->name('settings.change-password');
         Route::redirect('/settings-redirect', '/tenant/settings')->name('settings');
         Route::get('/settings/backup/download', [BackupDownloadController::class, 'download'])->middleware('tenant.permission:settings,view')->name('settings.backup.download');
         Route::get('/languages', Languages\Index::class)->middleware('tenant.permission:settings,view')->name('languages.index');
@@ -103,6 +111,7 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
             Route::get('/sales/{sale}', Sales\Show::class)->middleware('tenant.permission:sales,view')->name('sales.show');
             Route::get('/sales/{sale}/pdf', [InvoiceController::class, 'pdf'])->middleware('tenant.permission:sales,view')->name('sales.pdf');
             Route::post('/sales/{sale}/send', [InvoiceController::class, 'send'])->middleware('tenant.permission:sales,export')->name('sales.send');
+            Route::post('/sales/{sale}/send-custom', [InvoiceController::class, 'sendCustom'])->middleware('tenant.permission:sales,export')->name('sales.send-custom');
 
             // Invoice named route aliases for compatibility
             Route::get('/invoices', Sales\Index::class)->middleware('tenant.permission:sales,view')->name('invoices.index');

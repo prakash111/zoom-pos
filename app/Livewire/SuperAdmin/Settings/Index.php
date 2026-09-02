@@ -45,6 +45,25 @@ class Index extends Component
 
     public bool $showPoweredBy = true;
 
+    public string $allowedRegistrationModes = 'both';
+
+    // Platform-wide AI Product Image Generation
+    public bool $aiImageEnabled = false;
+
+    public string $aiImageProvider = 'openai';
+
+    public string $aiImageOpenaiApiKey = '';
+
+    public string $aiImageGeminiApiKey = '';
+
+    public string $aiImageClaudeApiKey = '';
+
+    public bool $hasAiImageOpenaiApiKey = false;
+
+    public bool $hasAiImageGeminiApiKey = false;
+
+    public bool $hasAiImageClaudeApiKey = false;
+
     // --- TAB 2: SMTP SETTINGS ---
     public string $smtpHost = '';
 
@@ -144,6 +163,12 @@ class Index extends Component
         $this->minClientBuildVersion = (string) PlatformSystem::get('min_client_build_version', '0');
         $this->appVersion = (string) PlatformSystem::get('app_version', '1.0.0');
         $this->showPoweredBy = filter_var(PlatformSystem::get('show_powered_by', true), FILTER_VALIDATE_BOOLEAN);
+        $this->allowedRegistrationModes = (string) PlatformSystem::get('allowed_registration_modes', 'both');
+        $this->aiImageEnabled = filter_var(PlatformSystem::get('ai_image_enabled', false), FILTER_VALIDATE_BOOLEAN);
+        $this->aiImageProvider = (string) PlatformSystem::get('ai_image_provider', 'openai');
+        $this->hasAiImageOpenaiApiKey = filled(PlatformSystem::get('ai_image_openai_api_key'));
+        $this->hasAiImageGeminiApiKey = filled(PlatformSystem::get('ai_image_gemini_api_key'));
+        $this->hasAiImageClaudeApiKey = filled(PlatformSystem::get('ai_image_claude_api_key'));
 
         // Load Platform Branding & SMTP
         $branding = PlatformBranding::current();
@@ -294,6 +319,12 @@ class Index extends Component
             'maintenanceMessage' => ['nullable', 'string', 'max:500'],
             'minClientBuildVersion' => ['required', 'string', 'max:50'],
             'appVersion' => ['required', 'string', 'max:50'],
+            'allowedRegistrationModes' => ['required', 'in:both,retail_only,restaurant_only'],
+            'aiImageEnabled' => ['boolean'],
+            'aiImageProvider' => ['required', 'in:openai,gemini,claude'],
+            'aiImageOpenaiApiKey' => ['nullable', 'string', 'max:500'],
+            'aiImageGeminiApiKey' => ['nullable', 'string', 'max:500'],
+            'aiImageClaudeApiKey' => ['nullable', 'string', 'max:500'],
         ]);
 
         $before = [
@@ -309,6 +340,21 @@ class Index extends Component
         PlatformSystem::set('min_client_build_version', $this->minClientBuildVersion);
         PlatformSystem::set('app_version', $this->appVersion);
         PlatformSystem::set('show_powered_by', $this->showPoweredBy ? '1' : '0');
+        PlatformSystem::set('allowed_registration_modes', $this->allowedRegistrationModes);
+        PlatformSystem::set('ai_image_enabled', $this->aiImageEnabled ? '1' : '0');
+        PlatformSystem::set('ai_image_provider', $this->aiImageProvider);
+
+        foreach ([
+            'ai_image_openai_api_key' => 'aiImageOpenaiApiKey',
+            'ai_image_gemini_api_key' => 'aiImageGeminiApiKey',
+            'ai_image_claude_api_key' => 'aiImageClaudeApiKey',
+        ] as $settingKey => $property) {
+            if (filled($this->{$property})) {
+                PlatformSystem::set($settingKey, trim($this->{$property}));
+                $this->{'has'.ucfirst($property)} = true;
+                $this->{$property} = '';
+            }
+        }
 
         AuditLog::record('system.settings_updated', null, auth('platform_web')->id(), [
             'before' => $before,

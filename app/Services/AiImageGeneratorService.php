@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Configuration;
+use App\Models\PlatformSystem;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -128,12 +129,50 @@ class AiImageGeneratorService
 
     protected function key(string $setting, string $config, ?string $companyId): string
     {
-        $key = (string) $this->setting($setting, config('services.'.$config), $companyId);
-        if ($key === '') {
-            throw new RuntimeException('The selected AI provider is not configured in Settings > API & Integrations.');
+        $tenantKey = (string) $this->setting($setting, '', $companyId);
+        if ($tenantKey !== '') {
+            return $tenantKey;
         }
 
-        return $key;
+        if (filter_var(PlatformSystem::get('ai_image_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
+            $platformKey = (string) PlatformSystem::get('ai_image_'.$setting, '');
+            if ($platformKey !== '') {
+                return $platformKey;
+            }
+        }
+
+        $envKey = (string) config('services.'.$config);
+        if ($envKey !== '') {
+            return $envKey;
+        }
+
+        throw new RuntimeException('The selected AI provider is not configured in Settings > API & Integrations.');
+    }
+
+    /**
+     * Whether AI product image generation should be offered to this tenant
+     * at all: either they've supplied their own API key for any provider
+     * under Store Settings > Integrations, or the Superadmin has enabled and
+     * configured a platform-wide key. Used to hide the feature entirely
+     * (Flutter & web) when neither is true.
+     */
+    public function isAvailable(?string $companyId = null): bool
+    {
+        $hasTenantKey = filled($this->setting('openai_api_key', '', $companyId))
+            || filled($this->setting('gemini_api_key', '', $companyId))
+            || filled($this->setting('claude_api_key', '', $companyId));
+
+        if ($hasTenantKey) {
+            return true;
+        }
+
+        if (! filter_var(PlatformSystem::get('ai_image_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
+            return false;
+        }
+
+        return filled(PlatformSystem::get('ai_image_openai_api_key', ''))
+            || filled(PlatformSystem::get('ai_image_gemini_api_key', ''))
+            || filled(PlatformSystem::get('ai_image_claude_api_key', ''));
     }
 
     protected function setting(string $key, mixed $default, ?string $companyId): mixed

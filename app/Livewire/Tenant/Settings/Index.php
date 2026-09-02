@@ -131,6 +131,13 @@ class Index extends Component
 
     public string $whatsappCustomNote = '';
 
+    // Restaurant / KDS order alert settings
+    public int $restaurantAlertIntervalMinutes = 3;
+
+    public string $restaurantAlertSoundPreset = 'chime';
+
+    public string $restaurantAlertSoundUrl = '';
+
     // WhatsApp Cloud API (real automated sending — leave blank to keep the
     // wa.me manual-link fallback used when no credentials are configured)
     public string $whatsappPhoneNumberId = '';
@@ -145,6 +152,8 @@ class Index extends Component
     public ?int $editingChannelId = null;
 
     public string $channelName = '';
+
+    public string $channelIcon = 'webhook';
 
     public string $channelUrl = '';
 
@@ -338,6 +347,9 @@ class Index extends Component
 
         $this->whatsappPhonePrefix = (string) ($configs['whatsapp_phone_prefix'] ?? '');
         $this->whatsappCustomNote = (string) ($configs['whatsapp_custom_note'] ?? '');
+        $this->restaurantAlertIntervalMinutes = (int) ($configs['restaurant_alert_interval_minutes'] ?? 3);
+        $this->restaurantAlertSoundPreset = (string) ($configs['restaurant_alert_sound_preset'] ?? 'chime');
+        $this->restaurantAlertSoundUrl = (string) ($configs['restaurant_alert_sound_url'] ?? '');
         $this->whatsappPhoneNumberId = (string) ($configs['whatsapp_phone_number_id'] ?? '');
         $this->hasWhatsappApiToken = filled($configs['whatsapp_api_token'] ?? null);
 
@@ -402,6 +414,9 @@ class Index extends Component
             'openaiApiKey' => ['nullable', 'string', 'max:500'],
             'geminiApiKey' => ['nullable', 'string', 'max:500'],
             'claudeApiKey' => ['nullable', 'string', 'max:500'],
+            'restaurantAlertIntervalMinutes' => ['required', 'integer', 'in:2,3,5'],
+            'restaurantAlertSoundPreset' => ['required', 'in:chime,bell,alert'],
+            'restaurantAlertSoundUrl' => ['nullable', 'string', 'max:2000', 'url'],
         ];
     }
 
@@ -620,6 +635,9 @@ class Index extends Component
             'openai_model' => $this->openaiModel,
             'gemini_model' => $this->geminiModel,
             'claude_model' => $this->claudeModel,
+            'restaurant_alert_interval_minutes' => (string) $this->restaurantAlertIntervalMinutes,
+            'restaurant_alert_sound_preset' => $this->restaurantAlertSoundPreset,
+            'restaurant_alert_sound_url' => $this->restaurantAlertSoundUrl,
         ];
 
         foreach (['openai_api_key' => 'openaiApiKey', 'gemini_api_key' => 'geminiApiKey', 'claude_api_key' => 'claudeApiKey'] as $key => $property) {
@@ -726,6 +744,7 @@ class Index extends Component
     public function openAddChannelModal(): void
     {
         $this->reset(['editingChannelId', 'channelName', 'channelUrl', 'channelHeaders', 'channelAuthValue', 'channelPayloadTemplate', 'channelEventTypes']);
+        $this->channelIcon = 'webhook';
         $this->channelMethod = 'POST';
         $this->channelAuthType = 'none';
         $this->channelIsActive = true;
@@ -737,6 +756,7 @@ class Index extends Component
         $channel = \App\Models\CustomNotificationChannel::where('company_id', $this->company->id)->findOrFail($id);
         $this->editingChannelId = $channel->id;
         $this->channelName = $channel->name;
+        $this->channelIcon = $channel->icon ?: 'webhook';
         $this->channelUrl = $channel->url;
         $this->channelMethod = $channel->method;
         $this->channelHeaders = $channel->headers ? json_encode($channel->headers, JSON_PRETTY_PRINT) : '';
@@ -752,6 +772,7 @@ class Index extends Component
     {
         $this->validate([
             'channelName' => ['required', 'string', 'max:100'],
+            'channelIcon' => ['nullable', 'string', 'max:255'],
             'channelUrl' => ['required', 'url', 'max:500'],
             'channelMethod' => ['required', 'in:POST,GET'],
             'channelHeaders' => ['nullable', 'string'],
@@ -773,6 +794,7 @@ class Index extends Component
 
         $data = [
             'name' => $this->channelName,
+            'icon' => $this->channelIcon ?: 'webhook',
             'url' => $this->channelUrl,
             'method' => $this->channelMethod,
             'headers' => $headers,

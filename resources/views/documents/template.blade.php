@@ -632,6 +632,16 @@
             @if (!empty($company->website))
                 <div>🌐 {{ $company->website }}</div>
             @endif
+            @php
+                $platformBranding = \App\Models\PlatformBranding::current();
+                $platformName = $platformBranding?->platform_name ?? config('app.name');
+                $platformDomain = config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'saas.zoomnearby.com';
+            @endphp
+            @if (setting('show_powered_by', true))
+                <div style="margin-top: 4px; font-size: 9px; color: #94a3b8;">
+                    {{ __('Powered by') }} {{ $platformName }} &bull; {{ __('Issued via') }} {{ $platformDomain }}
+                </div>
+            @endif
         </div>
 
     </div>

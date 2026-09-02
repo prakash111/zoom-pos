@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\CustomNotificationChannel;
 use App\Models\Sale;
 use App\Services\Delivery\MessageQueueService;
+use App\Services\Delivery\WebhookDispatchService;
 use App\Services\Invoice\InvoiceDeliveryService;
 use Illuminate\Http\Request;
 
@@ -55,6 +57,8 @@ class InvoiceController extends Controller
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="'.$fileName.'"',
                 'Content-Length' => strlen($pdfContent),
+                'Cache-Control' => 'no-store, must-revalidate',
+                'Pragma' => 'no-cache',
             ]);
         }
 
@@ -64,6 +68,16 @@ class InvoiceController extends Controller
         $qrCodeData = $deliveryService->generateReceiptQrCode($sale, $is58mm);
 
         $view = ($format === 'standard' || $format === 'a4') ? 'documents.template' : 'documents.receipt';
+
+        $sale->loadMissing('customer');
+        $dispatchChannels = [];
+        if (auth('web')->check()) {
+            $dispatchChannels = CustomNotificationChannel::where('company_id', $sale->company_id)
+                ->where('is_active', true)
+                ->get()
+                ->filter(fn (CustomNotificationChannel $c) => $c->handlesEvent('invoice'))
+                ->values();
+        }
 
         return view($view, [
             'sale' => $sale,
@@ -75,7 +89,48 @@ class InvoiceController extends Controller
             'qrCodeSvg' => $qrCodeData['svg'],
             'qrCodeDataUri' => $qrCodeData['data_uri'],
             'verificationUrl' => $qrCodeData['url'],
+            'customerEmail' => $sale->customer?->email,
+            'customerPhone' => $sale->customer?->phone,
+            'dispatchChannels' => $dispatchChannels,
         ]);
+    }
+
+    /**
+     * Dispatch an invoice/receipt to one of the tenant's custom notification
+     * channels (Slack/Telegram/generic webhook, etc.) — the "Custom
+     * Notification Channel" option in the post-settlement dispatch sheet.
+     */
+    public function sendCustom(Request $request, Sale $sale)
+    {
+        $validated = $request->validate([
+            'channel_id' => ['required', 'integer'],
+        ]);
+
+        $channel = CustomNotificationChannel::where('company_id', $sale->company_id)
+            ->where('is_active', true)
+            ->find($validated['channel_id']);
+
+        if (! $channel || ! $channel->handlesEvent('invoice')) {
+            $message = 'That notification channel is unavailable.';
+
+            return $request->wantsJson()
+                ? response()->json(['success' => false, 'message' => $message], 422)
+                : redirect()->back()->with('error', $message);
+        }
+
+        app(WebhookDispatchService::class)->dispatch($channel, [
+            'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? '',
+            'invoice_no' => $sale->sale_number,
+            'total' => (float) $sale->total,
+            'due_amount' => (float) $sale->due_amount,
+            'receipt_link' => route('sales.public', $sale->sale_number),
+        ]);
+
+        $message = "Invoice #{$sale->sale_number} dispatched to {$channel->name}.";
+
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => $message])
+            : redirect()->back()->with('status', $message);
     }
 
     /**

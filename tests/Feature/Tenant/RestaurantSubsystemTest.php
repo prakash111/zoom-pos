@@ -132,13 +132,70 @@ class RestaurantSubsystemTest extends TestCase
             'status' => 'pending',
         ]);
 
-        // 3. Settle Bill (Clears table to Available)
+        // 3. Settle Bill (Clears table to Available, shows the post-settlement dispatch modal)
         $component
             ->set('paymentMethod', 'cash')
             ->call('settleBill')
-            ->assertRedirect();
+            ->assertSet('showSettledDispatchModal', true);
 
         $this->assertSame(DiningTable::STATUS_AVAILABLE, $table->fresh()->status);
+    }
+
+    public function test_restaurant_settle_bill_with_customer_records_ledger_entry_for_due_balance(): void
+    {
+        [$company, $admin] = $this->actingAsTenantAdmin();
+        $company->update(['pos_mode' => 'restaurant']);
+
+        $floor = DiningFloor::create(['company_id' => $company->id, 'name' => 'Indoor']);
+        $table = DiningTable::create(['company_id' => $company->id, 'dining_floor_id' => $floor->id, 'table_number' => 'Table 20', 'seating_capacity' => 4]);
+
+        $category = Category::create(['company_id' => $company->id, 'name' => 'Mains']);
+        $dish = Product::create([
+            'company_id' => $company->id,
+            'category_id' => $category->id,
+            'name' => 'Grilled Chicken',
+            'sale_price' => 20.00,
+            'cost_price' => 8.00,
+            'current_stock' => 50,
+            'active' => true,
+        ]);
+
+        $customer = \App\Models\Customer::create([
+            'company_id' => $company->id,
+            'name' => 'Jane Diner',
+            'phone' => '5551234567',
+            'email' => 'jane@example.com',
+        ]);
+
+        $component = Livewire::test(RestaurantPos::class, ['table_id' => $table->id]);
+
+        $component
+            ->call('selectTable', $table->id)
+            ->call('openModifierModal', $dish->id)
+            ->call('addCustomizedItemToCart')
+            ->call('sendToKitchen')
+            ->call('selectCheckoutCustomer', $customer->id)
+            ->call('toggleSplitPayment')
+            ->set('splitPayments.0.payment_method', 'cash')
+            ->set('splitPayments.0.amount', 5.00)
+            ->set('dueDate', now()->addDays(7)->toDateString())
+            ->call('settleBill')
+            ->assertSet('showSettledDispatchModal', true);
+
+        $sale = Sale::where('company_id', $company->id)->where('status', 'completed')->firstOrFail();
+
+        $this->assertSame($customer->id, $sale->customer_id);
+        $this->assertGreaterThan(0, (float) $sale->due_amount);
+
+        // The customer_id fix means SaleObserver -> CustomerLedgerService now
+        // records this due-creating restaurant sale, where it previously
+        // silently skipped it for lacking a customer_id.
+        $this->assertDatabaseHas('customer_ledgers', [
+            'customer_id' => $customer->id,
+            'sale_id' => $sale->id,
+            'type' => 'invoice',
+        ]);
+        $this->assertEquals((float) $sale->due_amount, (float) $customer->fresh()->due_balance);
     }
 
     public function test_restaurant_pos_table_transfer(): void

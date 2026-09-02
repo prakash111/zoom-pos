@@ -6,6 +6,8 @@ use App\Models\AuditLog;
 use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Company;
+use App\Models\Customer;
+use App\Models\CustomNotificationChannel;
 use App\Models\DiningFloor;
 use App\Models\DiningTable;
 use App\Models\KitchenTicket;
@@ -48,6 +50,9 @@ class Pos extends Component
     public string $driverName = '';
 
     public string $driverPhone = '';
+
+    // Estimated Preparation Time (set when sending an order to the kitchen)
+    public int $prepMinutes = 15;
 
     // Menu Browser State
     public ?int $selectedCategoryId = null;
@@ -102,6 +107,34 @@ class Pos extends Component
     public string $notes = '';
 
     public ?string $dueDate = null;
+
+    // Checkout Customer Attachment (Settle Bill)
+    public ?int $checkoutCustomerId = null;
+
+    public bool $showCustomerPickerModal = false;
+
+    public bool $showNewCustomerForm = false;
+
+    public string $customerSearchTerm = '';
+
+    public string $newCustomerQuickName = '';
+
+    public string $newCustomerQuickPhone = '';
+
+    public string $newCustomerQuickEmail = '';
+
+    // Post-Settlement Dispatch Modal
+    public bool $showSettledDispatchModal = false;
+
+    public ?int $lastSettledSaleId = null;
+
+    public ?string $lastSettledSaleNumber = null;
+
+    public ?string $lastSettledCustomerName = null;
+
+    public ?string $lastSettledCustomerPhone = null;
+
+    public ?string $lastSettledCustomerEmail = null;
 
     // KOT Dispatched Success Modal
     public bool $showKotSuccessModal = false;
@@ -642,6 +675,8 @@ class Pos extends Component
             'status' => 'pending',
             'server_name' => auth('web')->user()?->name ?? 'POS Staff',
             'items' => $this->items,
+            'prep_minutes' => $this->prepMinutes,
+            'target_completion_at' => now()->addMinutes($this->prepMinutes),
         ]);
 
         // 3. Mark Table Occupied
@@ -720,6 +755,145 @@ class Pos extends Component
     /**
      * Settle Bill and complete checkout.
      */
+    public function getCheckoutCustomerProperty(): ?Customer
+    {
+        return $this->checkoutCustomerId ? Customer::find($this->checkoutCustomerId) : null;
+    }
+
+    public function getCheckoutCustomerResultsProperty()
+    {
+        $term = trim($this->customerSearchTerm);
+
+        return Customer::query()
+            ->when($term !== '', function ($q) use ($term) {
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('name', 'like', "%{$term}%")
+                        ->orWhere('phone', 'like', "%{$term}%")
+                        ->orWhere('email', 'like', "%{$term}%");
+                });
+            })
+            ->orderBy('name')
+            ->limit(10)
+            ->get();
+    }
+
+    public function openCustomerPicker(): void
+    {
+        $this->customerSearchTerm = '';
+        $this->showNewCustomerForm = false;
+        $this->showCustomerPickerModal = true;
+    }
+
+    public function closeCustomerPicker(): void
+    {
+        $this->showCustomerPickerModal = false;
+        $this->showNewCustomerForm = false;
+    }
+
+    public function selectCheckoutCustomer(?int $id): void
+    {
+        $this->checkoutCustomerId = $id;
+        $this->showCustomerPickerModal = false;
+        $this->showNewCustomerForm = false;
+    }
+
+    public function clearCheckoutCustomer(): void
+    {
+        $this->checkoutCustomerId = null;
+    }
+
+    public function openNewCheckoutCustomerForm(): void
+    {
+        $this->reset(['newCustomerQuickName', 'newCustomerQuickPhone', 'newCustomerQuickEmail']);
+        $this->showNewCustomerForm = true;
+    }
+
+    public function createCheckoutCustomer(): void
+    {
+        $this->validate([
+            'newCustomerQuickName' => ['required', 'string', 'max:255'],
+            'newCustomerQuickPhone' => ['nullable', 'string', 'max:50'],
+            'newCustomerQuickEmail' => ['nullable', 'email'],
+        ]);
+
+        $companyId = app()->bound('tenant.company_id')
+            ? app('tenant.company_id')
+            : auth('web')->user()?->company_id;
+
+        $customer = Customer::create([
+            'company_id' => $companyId,
+            'name' => $this->newCustomerQuickName,
+            'phone' => $this->newCustomerQuickPhone ?: null,
+            'email' => $this->newCustomerQuickEmail ?: null,
+            'loyalty_points' => 0,
+        ]);
+
+        $this->checkoutCustomerId = $customer->id;
+        $this->showCustomerPickerModal = false;
+        $this->showNewCustomerForm = false;
+        $this->reset(['newCustomerQuickName', 'newCustomerQuickPhone', 'newCustomerQuickEmail']);
+    }
+
+    public function closeSettledDispatchModal(): void
+    {
+        $this->showSettledDispatchModal = false;
+        $this->lastSettledSaleId = null;
+    }
+
+    public function dispatchSettledInvoiceEmail(string $email): void
+    {
+        if (! $this->lastSettledSaleId || ! filled($email)) {
+            return;
+        }
+        $sale = Sale::find($this->lastSettledSaleId);
+        if (! $sale) {
+            return;
+        }
+        try {
+            app(\App\Services\Delivery\MessageQueueService::class)->sendOrQueueEmail($sale, $email, null, true);
+            session()->flash('status', "Invoice emailed to {$email}.");
+        } catch (\Throwable $e) {
+            session()->flash('error', 'Failed to email invoice: '.$e->getMessage());
+        }
+    }
+
+    public function dispatchSettledInvoiceCustomChannel(int $channelId): void
+    {
+        if (! $this->lastSettledSaleId) {
+            return;
+        }
+        $sale = Sale::find($this->lastSettledSaleId);
+        $channel = $sale ? CustomNotificationChannel::where('company_id', $sale->company_id)->find($channelId) : null;
+        if (! $sale || ! $channel || ! $channel->handlesEvent('invoice')) {
+            session()->flash('error', 'That notification channel is unavailable.');
+
+            return;
+        }
+
+        app(\App\Services\Delivery\WebhookDispatchService::class)->dispatch($channel, [
+            'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? '',
+            'invoice_no' => $sale->sale_number,
+            'total' => (float) $sale->total,
+            'due_amount' => (float) $sale->due_amount,
+            'receipt_link' => route('sales.public', $sale->sale_number),
+        ]);
+
+        session()->flash('status', "Invoice dispatched to {$channel->name}.");
+    }
+
+    public function getSettledDispatchChannelsProperty()
+    {
+        $companyId = app()->bound('tenant.company_id')
+            ? app('tenant.company_id')
+            : auth('web')->user()?->company_id;
+
+        return CustomNotificationChannel::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->get()
+            ->filter(fn (CustomNotificationChannel $c) => $c->handlesEvent('invoice'))
+            ->values();
+    }
+
     public function settleBill()
     {
         // Enforce Cash Register Lifecycle
@@ -783,11 +957,14 @@ class Pos extends Component
             $commAmount = $commType === 'fixed' ? $commRate : round(($this->total * $commRate) / 100, 2);
         }
 
-        $sale = DB::transaction(function () use ($companyId, $saleNumber, $paidAmount, $dueAmount, $paymentStatus, $commRate, $commAmount) {
+        $checkoutCustomer = $this->checkoutCustomer;
+
+        $sale = DB::transaction(function () use ($companyId, $saleNumber, $paidAmount, $dueAmount, $paymentStatus, $commRate, $commAmount, $checkoutCustomer) {
             $sale = Sale::create([
                 'company_id' => $companyId,
                 'sale_number' => $saleNumber,
-                'customer_name' => $this->customerName ?: ($this->activeTable ? $this->activeTable->table_number : 'Valued Guest'),
+                'customer_id' => $checkoutCustomer?->id,
+                'customer_name' => $checkoutCustomer?->name ?: ($this->customerName ?: ($this->activeTable ? $this->activeTable->table_number : 'Valued Guest')),
                 'user_id' => auth('web')->id(),
                 'commission_rate' => $commRate,
                 'commission_amount' => $commAmount,
@@ -860,9 +1037,15 @@ class Pos extends Component
             ]);
         }
 
-        session()->flash('status', "Bill {$saleNumber} settled! Receipt generated.");
+        $this->checkoutCustomerId = null;
+        $this->lastSettledSaleId = $sale->id;
+        $this->lastSettledSaleNumber = $sale->sale_number;
+        $this->lastSettledCustomerName = $checkoutCustomer?->name;
+        $this->lastSettledCustomerPhone = $checkoutCustomer?->phone;
+        $this->lastSettledCustomerEmail = $checkoutCustomer?->email;
+        $this->showSettledDispatchModal = true;
 
-        return redirect()->route('tenant.sales.pdf', $sale);
+        session()->flash('status', "Bill {$saleNumber} settled! Receipt generated.");
     }
 
     public function render()
@@ -881,7 +1064,9 @@ class Pos extends Component
 
         $productsQuery = Product::query()
             ->where('company_id', $companyId)
-            ->where('active', true)
+            ->where(function ($q) {
+                $q->where('active', true)->orWhereNull('active');
+            })
             ->when($this->selectedCategoryId, fn ($q) => $q->where('category_id', $this->selectedCategoryId))
             ->when($this->search, function ($q) {
                 $term = '%'.$this->search.'%';

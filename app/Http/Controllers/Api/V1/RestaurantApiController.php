@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\CashRegister;
 use App\Models\Company;
+use App\Models\Customer;
 use App\Models\DiningFloor;
 use App\Models\DiningTable;
 use App\Models\KitchenTicket;
@@ -289,6 +290,7 @@ class RestaurantApiController extends Controller
             'driver_phone' => ['nullable', 'string', 'max:50'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'prep_minutes' => ['nullable', 'integer', 'min:1', 'max:240'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable'],
             'items.*.name' => ['required', 'string', 'max:255'],
@@ -389,6 +391,7 @@ class RestaurantApiController extends Controller
                 ]);
             }
 
+            $prepMinutes = (int) ($data['prep_minutes'] ?? 15);
             $kotCount = KitchenTicket::withoutGlobalScope('company')->where('company_id', $company->id)->count();
             $kot = KitchenTicket::create([
                 'company_id' => $company->id,
@@ -400,6 +403,8 @@ class RestaurantApiController extends Controller
                 'status' => KitchenTicket::STATUS_PENDING,
                 'server_name' => $user?->name ?? 'POS Staff',
                 'items' => $items,
+                'prep_minutes' => $prepMinutes,
+                'target_completion_at' => now()->addMinutes($prepMinutes),
             ]);
 
             if ($table) {
@@ -460,11 +465,22 @@ class RestaurantApiController extends Controller
             'split_payments.*.amount' => ['required', 'numeric', 'min:0'],
             'split_payments.*.reference_number' => ['nullable', 'string'],
             'due_date' => ['nullable', 'date'],
+            'customer_id' => ['nullable', 'integer'],
         ]);
         if ($validator->fails()) {
             return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
         }
         $data = $validator->validated();
+
+        $customer = null;
+        if (! empty($data['customer_id'])) {
+            $customer = Customer::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->find($data['customer_id']);
+            if (! $customer) {
+                return response()->json(['success' => false, 'error' => 'Selected customer was not found.'], 422);
+            }
+        }
 
         $isSplit = (bool) ($data['is_split_payment'] ?? false);
         $discount = (float) ($data['discount'] ?? $sale->discount ?? 0);
@@ -489,7 +505,7 @@ class RestaurantApiController extends Controller
 
         $saleNumber = 'INV-'.sprintf('%04d', Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1);
 
-        $sale = DB::transaction(function () use ($sale, $saleNumber, $total, $discount, $isSplit, $paidAmount, $dueAmount, $paymentStatus, $data, $splitPayments, $company, $user) {
+        $sale = DB::transaction(function () use ($sale, $saleNumber, $total, $discount, $isSplit, $paidAmount, $dueAmount, $paymentStatus, $data, $splitPayments, $company, $user, $customer) {
             $sale->update([
                 'sale_number' => $saleNumber,
                 'total' => $total,
@@ -502,6 +518,8 @@ class RestaurantApiController extends Controller
                 'due_date' => $dueAmount > 0 ? ($data['due_date'] ?? null) : null,
                 'payment_status' => $paymentStatus,
                 'kot_status' => 'served',
+                'customer_id' => $customer?->id ?? $sale->customer_id,
+                'customer_name' => $customer?->name ?? $sale->customer_name,
             ]);
 
             if ($isSplit) {
@@ -590,6 +608,11 @@ class RestaurantApiController extends Controller
                 'pending' => KitchenTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', KitchenTicket::STATUS_PENDING)->count(),
                 'preparing' => KitchenTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', KitchenTicket::STATUS_PREPARING)->count(),
                 'ready' => KitchenTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', KitchenTicket::STATUS_READY)->count(),
+            ],
+            'alert_settings' => [
+                'interval_minutes' => (int) \App\Models\Configuration::withoutGlobalScopes()->where('company_id', $company->id)->where('key', 'restaurant_alert_interval_minutes')->value('value') ?: 3,
+                'sound_preset' => \App\Models\Configuration::withoutGlobalScopes()->where('company_id', $company->id)->where('key', 'restaurant_alert_sound_preset')->value('value') ?: 'chime',
+                'sound_url' => \App\Models\Configuration::withoutGlobalScopes()->where('company_id', $company->id)->where('key', 'restaurant_alert_sound_url')->value('value') ?: '',
             ],
         ]);
     }
@@ -683,15 +706,22 @@ class RestaurantApiController extends Controller
             'status' => $table->status,
             'current_sale_id' => $table->current_sale_id,
             'guest_count' => $table->guest_count,
+            'qr_token' => $table->qr_token,
+            'qr_order_url' => $table->getQrOrderUrl(),
         ];
     }
 
     private function presentSale(Sale $sale): array
     {
+        $sale->loadMissing('customer');
+
         return [
             'id' => (string) $sale->id,
             'sale_number' => $sale->sale_number,
-            'customer_name' => $sale->customer_name,
+            'customer_id' => $sale->customer_id ? (string) $sale->customer_id : null,
+            'customer_name' => $sale->customer?->name ?? $sale->customer_name,
+            'customer_phone' => $sale->customer?->phone,
+            'customer_email' => $sale->customer?->email,
             'status' => $sale->status,
             'service_type' => $sale->service_type,
             'dining_table_id' => $sale->dining_table_id,
@@ -728,6 +758,9 @@ class RestaurantApiController extends Controller
             'ready_at' => $kot->ready_at?->toIso8601String(),
             'served_at' => $kot->served_at?->toIso8601String(),
             'created_at' => $kot->created_at?->toIso8601String(),
+            'prep_minutes' => $kot->prep_minutes,
+            'target_completion_at' => $kot->target_completion_at?->toIso8601String(),
+            'is_overdue' => $kot->isOverdue(),
         ];
     }
 }

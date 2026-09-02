@@ -392,6 +392,24 @@
                 </div>
             </div>
 
+            <!-- Estimated Preparation Time -->
+            <div class="flex items-center gap-1.5 pb-1">
+                <span class="text-[10px] font-bold text-slate-400 uppercase shrink-0">{{ __('Prep Time') }}</span>
+                <div class="flex items-center gap-1 flex-wrap">
+                    @foreach ([5, 10, 15, 20, 30] as $mins)
+                        <button type="button"
+                                wire:click="$set('prepMinutes', {{ $mins }})"
+                                @class([
+                                    'px-2.5 py-1 rounded-lg text-[10px] font-bold transition',
+                                    'bg-lime-400 text-slate-950' => $prepMinutes === $mins,
+                                    'bg-slate-800 text-slate-300 hover:bg-slate-700' => $prepMinutes !== $mins,
+                                ])>
+                            {{ $mins }}m
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+
             <!-- Action Buttons matching food-idea-pos.png -->
             <div class="flex items-center gap-2">
                 <button type="button"
@@ -624,6 +642,23 @@
                         <div class="text-3xl font-black text-lime-400">{{ $company->formatMoney($this->total) }}</div>
                     </div>
 
+                    <!-- Customer Attachment -->
+                    <div class="bg-slate-800/60 rounded-2xl p-3 flex items-center justify-between gap-2">
+                        @if ($this->checkoutCustomer)
+                            <div class="min-w-0">
+                                <div class="text-[9px] font-extrabold uppercase text-slate-400">{{ __('Customer') }}</div>
+                                <div class="text-xs font-bold text-white truncate">{{ $this->checkoutCustomer->name }}</div>
+                                @if ($this->checkoutCustomer->phone)
+                                    <div class="text-[10px] text-slate-400">{{ $this->checkoutCustomer->phone }}</div>
+                                @endif
+                            </div>
+                            <button type="button" wire:click="clearCheckoutCustomer" class="text-[10px] font-bold text-rose-400 hover:text-rose-300 shrink-0">{{ __('Remove') }}</button>
+                        @else
+                            <div class="text-xs text-slate-400">{{ __('No customer assigned') }}</div>
+                            <button type="button" wire:click="openCustomerPicker" class="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold shrink-0">👤 {{ __('Add Customer') }}</button>
+                        @endif
+                    </div>
+
                     @if (! $isSplitPayment)
                         <div>
                             <label class="block text-xs font-bold text-slate-400 mb-1.5">{{ __("Payment Method") }}</label>
@@ -722,6 +757,91 @@
                         {{ __("Complete & Print Receipt") }}
                     </button>
                 </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Customer Picker Modal (Settle Bill) -->
+    @if ($showCustomerPickerModal)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
+            <div class="bg-slate-900 rounded-3xl max-w-sm w-full p-5 space-y-3 border border-slate-800 max-h-[85vh] overflow-y-auto">
+                <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                    <h3 class="text-sm font-black text-white">{{ __('Select Customer') }}</h3>
+                    <button type="button" wire:click="closeCustomerPicker" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+                </div>
+
+                @if (! $showNewCustomerForm)
+                    <input type="text" wire:model.live.debounce.250ms="customerSearchTerm" placeholder="{{ __('Search name or phone...') }}" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white placeholder-slate-500">
+
+                    <div class="max-h-64 overflow-y-auto space-y-1">
+                        @forelse ($this->checkoutCustomerResults as $cust)
+                            <button type="button" wire:click="selectCheckoutCustomer({{ $cust->id }})" class="w-full text-left px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-xs">
+                                <div class="font-bold text-white">{{ $cust->name }}</div>
+                                <div class="text-[10px] text-slate-400">{{ $cust->phone ?: $cust->email ?: '—' }}</div>
+                            </button>
+                        @empty
+                            <div class="text-center text-slate-500 text-xs py-4">{{ __('No customers found.') }}</div>
+                        @endforelse
+                    </div>
+
+                    <button type="button" wire:click="openNewCheckoutCustomerForm" class="w-full py-2 rounded-xl bg-lime-400 hover:bg-lime-500 text-slate-950 font-black text-xs">+ {{ __('Add Customer') }}</button>
+                @else
+                    <div class="space-y-2">
+                        <input type="text" wire:model="newCustomerQuickName" placeholder="{{ __('Name') }}" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white placeholder-slate-500">
+                        @error('newCustomerQuickName') <p class="text-rose-400 text-[10px]">{{ $message }}</p> @enderror
+                        <input type="text" wire:model="newCustomerQuickPhone" placeholder="{{ __('Phone') }}" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white placeholder-slate-500">
+                        <input type="email" wire:model="newCustomerQuickEmail" placeholder="{{ __('Email') }}" class="w-full rounded-xl bg-slate-800 border-slate-700 text-xs text-white placeholder-slate-500">
+                        @error('newCustomerQuickEmail') <p class="text-rose-400 text-[10px]">{{ $message }}</p> @enderror
+                        <div class="flex gap-2 pt-1">
+                            <button type="button" wire:click="$set('showNewCustomerForm', false)" class="flex-1 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold">{{ __('Back') }}</button>
+                            <button type="button" wire:click="createCheckoutCustomer" class="flex-1 py-2 rounded-xl bg-lime-400 hover:bg-lime-500 text-slate-950 font-black text-xs">{{ __('Create & Select') }}</button>
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
+
+    <!-- Post-Settlement Dispatch Modal -->
+    @if ($showSettledDispatchModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
+            <div class="bg-slate-900 rounded-3xl max-w-sm w-full p-6 space-y-4 border border-lime-500/40 shadow-2xl text-center">
+                <div class="w-14 h-14 rounded-full bg-lime-500/20 text-lime-400 text-2xl font-black flex items-center justify-center mx-auto ring-8 ring-lime-500/10">✅</div>
+                <div>
+                    <h3 class="text-base font-black text-white">{{ __('Bill Settled!') }}</h3>
+                    <p class="text-xs text-slate-400 mt-1">{{ __('Invoice') }} #{{ $lastSettledSaleNumber }}</p>
+                </div>
+
+                <a href="{{ $lastSettledSaleId ? route('tenant.sales.pdf', $lastSettledSaleId) : '#' }}" target="_blank" class="block w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold">🖨️ {{ __('Print / PDF Receipt') }}</a>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $lastSettledCustomerPhone ?? '') }}" target="_blank" @class(['py-2 rounded-xl text-white text-xs font-bold' => true, 'bg-emerald-600 hover:bg-emerald-700' => $lastSettledCustomerPhone, 'bg-slate-800 opacity-50 pointer-events-none' => ! $lastSettledCustomerPhone])>💬 {{ __('WhatsApp') }}</a>
+
+                    <div x-data="{ open: false, email: @js($lastSettledCustomerEmail ?? '') }" class="relative">
+                        <button type="button" @click="open = !open" class="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold">✉️ {{ __('Email') }}</button>
+                        <div x-show="open" x-on:click.outside="open = false" x-cloak class="absolute left-0 right-0 z-10 mt-1 bg-slate-800 rounded-xl p-2 shadow-xl space-y-1.5">
+                            <input type="email" x-model="email" placeholder="{{ __('Email address') }}" class="w-full rounded-lg bg-slate-900 border-slate-700 text-[11px] text-white">
+                            <button type="button" x-on:click="$wire.dispatchSettledInvoiceEmail(email); open = false" class="w-full py-1.5 rounded-lg bg-lime-400 hover:bg-lime-500 text-slate-950 text-[10px] font-black">{{ __('Send') }}</button>
+                        </div>
+                    </div>
+                </div>
+
+                @if ($this->settledDispatchChannels->isNotEmpty())
+                    <div class="flex flex-wrap justify-center gap-2 pt-1">
+                        @foreach ($this->settledDispatchChannels as $dc)
+                            <button type="button" wire:click="dispatchSettledInvoiceCustomChannel({{ $dc->id }})" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-[10px] font-bold flex items-center gap-1.5">
+                                @if ($dc->isIconUrl())
+                                    <img src="{{ $dc->iconDisplay() }}" alt="" class="w-3.5 h-3.5 rounded object-cover">
+                                @else
+                                    <span class="leading-none">{{ $dc->iconDisplay() }}</span>
+                                @endif
+                                {{ $dc->name }}
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
+
+                <button type="button" wire:click="closeSettledDispatchModal" class="w-full py-2 rounded-xl text-slate-400 hover:text-white text-xs font-bold">{{ __('Done') }}</button>
             </div>
         </div>
     @endif

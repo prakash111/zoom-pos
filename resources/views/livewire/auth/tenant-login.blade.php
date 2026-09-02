@@ -114,6 +114,9 @@
                         </button>
                     </div>
                     @error('password') <p class="text-rose-400 text-[11px] mt-0.5">{{ $message }}</p> @enderror
+                    <div class="text-right mt-1.5">
+                        <a href="{{ route('tenant.password.request') }}" class="text-[11px] font-bold text-brand-lime hover:underline">{{ __('Forgot password?') }}</a>
+                    </div>
                 </div>
 
                 <!-- Keep me signed in Toggle -->

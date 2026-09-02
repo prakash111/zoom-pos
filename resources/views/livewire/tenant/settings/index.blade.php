@@ -747,6 +747,40 @@
                 </button>
             </div>
         </div>
+
+        <!-- Change Password -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-5">
+            <div class="flex items-center gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div class="w-10 h-10 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">🔑</div>
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white">{{ __('Change Password') }}</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">{{ __('Update the password for your own account.') }}</p>
+                </div>
+            </div>
+
+            <form method="POST" action="{{ route('tenant.settings.change-password') }}" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                @csrf
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Current Password') }}</label>
+                    <input type="password" name="current_password" required class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
+                    @error('current_password') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('New Password') }}</label>
+                    <input type="password" name="new_password" required minlength="6" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
+                    @error('new_password') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Confirm New Password') }}</label>
+                    <input type="password" name="new_password_confirmation" required minlength="6" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
+                </div>
+                <div class="sm:col-span-3 flex justify-end">
+                    <button type="submit" class="px-8 py-3 rounded-2xl text-xs sm:text-sm font-extrabold bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-500/25 active:scale-95 transition-all cursor-pointer">
+                        {{ __('Update Password') }}
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- =========================================================================
@@ -1163,6 +1197,41 @@
             </div>
         </div>
 
+        <!-- Restaurant / KDS Order Alerts -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-5">
+            <div class="flex items-center gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div class="w-10 h-10 rounded-2xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold">🔔</div>
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white">{{ __('Restaurant Order Alerts') }}</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">{{ __('Controls the KDS/dashboard sound alert for new and delayed orders.') }}</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Re-chime Every') }}</label>
+                    <select wire:model="restaurantAlertIntervalMinutes" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
+                        <option value="2">{{ __('2 minutes') }}</option>
+                        <option value="3">{{ __('3 minutes') }}</option>
+                        <option value="5">{{ __('5 minutes') }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Sound Preset') }}</label>
+                    <select wire:model="restaurantAlertSoundPreset" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
+                        <option value="chime">{{ __('Chime') }}</option>
+                        <option value="bell">{{ __('Bell') }}</option>
+                        <option value="alert">{{ __('Alert') }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Or Custom Sound URL') }}</label>
+                    <input type="text" wire:model="restaurantAlertSoundUrl" placeholder="https://.../alert.mp3" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
+                    @error('restaurantAlertSoundUrl') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+            </div>
+        </div>
+
         <livewire:tenant.desktop-printer-settings />
 
         <!-- SMTP Email Settings -->
@@ -1260,6 +1329,7 @@
                 <table class="w-full text-left text-xs">
                     <thead class="text-[10px] uppercase tracking-wider text-slate-400 font-extrabold">
                         <tr>
+                            <th class="px-3 py-2"></th>
                             <th class="px-3 py-2">{{ __('Name') }}</th>
                             <th class="px-3 py-2">{{ __('URL') }}</th>
                             <th class="px-3 py-2">{{ __('Events') }}</th>
@@ -1270,6 +1340,13 @@
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                         @forelse ($notificationChannels as $channel)
                             <tr>
+                                <td class="px-3 py-3 text-center">
+                                    @if ($channel->isIconUrl())
+                                        <img src="{{ $channel->iconDisplay() }}" alt="" class="w-5 h-5 rounded object-cover inline-block">
+                                    @else
+                                        <span class="text-base leading-none">{{ $channel->iconDisplay() }}</span>
+                                    @endif
+                                </td>
                                 <td class="px-3 py-3 font-bold text-slate-800 dark:text-slate-100">{{ $channel->name }}</td>
                                 <td class="px-3 py-3 text-slate-500 font-mono text-[11px] truncate max-w-xs">{{ $channel->url }}</td>
                                 <td class="px-3 py-3 text-slate-500">{{ implode(', ', $channel->event_types ?? []) ?: '—' }}</td>
@@ -1284,7 +1361,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="px-3 py-6 text-center text-slate-400">{{ __('No custom notification channels configured yet.') }}</td></tr>
+                            <tr><td colspan="6" class="px-3 py-6 text-center text-slate-400">{{ __('No custom notification channels configured yet.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -1304,10 +1381,21 @@
                 </div>
 
                 <div class="space-y-3">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Channel Name *') }}</label>
-                        <input type="text" wire:model="channelName" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
-                        @error('channelName') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
+                    <div class="grid grid-cols-4 gap-2">
+                        <div class="col-span-3">
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Channel Name *') }}</label>
+                            <input type="text" wire:model="channelName" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                            @error('channelName') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Icon') }}</label>
+                            <select wire:model="channelIcon" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
+                                @foreach (\App\Models\CustomNotificationChannel::ICON_PRESETS as $preset)
+                                    <option value="{{ $preset }}">{{ ucfirst($preset) }}</option>
+                                @endforeach
+                            </select>
+                            @error('channelIcon') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-3 gap-2">

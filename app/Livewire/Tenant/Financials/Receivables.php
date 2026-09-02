@@ -4,6 +4,7 @@ namespace App\Livewire\Tenant\Financials;
 
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\CustomNotificationChannel;
 use App\Models\OrderPayment;
 use App\Models\PaymentMethod;
 use App\Models\Sale;
@@ -160,7 +161,7 @@ class Receivables extends Component
      * tenant has credentials configured, otherwise a browser event opens
      * the wa.me/mailto fallback link, or dispatches to custom channels.
      */
-    public function sendReminder(int $saleId, string $channel): void
+    public function sendReminder(int $saleId, string $channel, ?int $channelId = null): void
     {
         $sale = Sale::with('customer')->findOrFail($saleId);
         $delivery = app(InvoiceDeliveryService::class);
@@ -203,13 +204,27 @@ class Receivables extends Component
         }
 
         // custom notification channels
-        app(WebhookDispatchService::class)->dispatchEvent($sale->company_id, 'due_reminder', [
+        $variables = [
             'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? '',
             'invoice_no' => $sale->sale_number,
             'due_amount' => (float) $sale->due_amount,
             'due_date' => $sale->due_date?->toDateString() ?? '',
             'receipt_link' => route('sales.public', $sale->sale_number),
-        ]);
+        ];
+
+        if ($channelId) {
+            $customChannel = CustomNotificationChannel::where('company_id', $sale->company_id)->find($channelId);
+            if ($customChannel && $customChannel->handlesEvent('due_reminder')) {
+                app(WebhookDispatchService::class)->dispatch($customChannel, $variables);
+                session()->flash('status', "Reminder dispatched to {$customChannel->name}.");
+            } else {
+                session()->flash('error', 'That notification channel is unavailable.');
+            }
+
+            return;
+        }
+
+        app(WebhookDispatchService::class)->dispatchEvent($sale->company_id, 'due_reminder', $variables);
         session()->flash('status', 'Reminder dispatched to custom notification channels.');
     }
 
@@ -281,6 +296,12 @@ class Receivables extends Component
         $allCustomers = Customer::where('company_id', $companyId)->orderBy('name')->get();
         $paymentMethods = PaymentMethod::getForCompany($companyId);
 
+        $reminderChannels = CustomNotificationChannel::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->get()
+            ->filter(fn (CustomNotificationChannel $c) => $c->handlesEvent('due_reminder'))
+            ->values();
+
         return view('livewire.tenant.financials.receivables', [
             'invoices' => $invoices,
             'customersWithBalances' => $customersWithBalances,
@@ -290,6 +311,7 @@ class Receivables extends Component
             'totalOverdue' => $totalOverdue,
             'collectedThisMonth' => $collectedThisMonth,
             'pendingInvoicesCount' => $pendingInvoicesCount,
+            'reminderChannels' => $reminderChannels,
         ]);
     }
 }

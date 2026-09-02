@@ -81,6 +81,9 @@ class Kds extends Component
             'pendingCount' => KitchenTicket::where('status', KitchenTicket::STATUS_PENDING)->count(),
             'preparingCount' => KitchenTicket::where('status', KitchenTicket::STATUS_PREPARING)->count(),
             'readyCount' => KitchenTicket::where('status', KitchenTicket::STATUS_READY)->count(),
+            'alertIntervalMinutes' => (int) tenant_setting('restaurant_alert_interval_minutes', 3),
+            'alertSoundPreset' => (string) tenant_setting('restaurant_alert_sound_preset', 'chime'),
+            'alertSoundUrl' => (string) tenant_setting('restaurant_alert_sound_url', ''),
         ]);
     }
 }

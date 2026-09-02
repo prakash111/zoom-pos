@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\PendingRegistration;
 use App\Models\Plan;
 use App\Models\PlatformBranding;
+use App\Models\PlatformSystem;
 use App\Services\Auth\DesktopAuthBootstrapService;
 use App\Services\Auth\OtpVerificationService;
 use App\Services\Tenancy\TenantProvisioningService;
@@ -25,6 +26,17 @@ class TenantRegister extends Component
             $this->ownerName = (string) ($profile['name'] ?? '');
             $this->email = (string) ($profile['email'] ?? '');
         }
+
+        if ($this->allowedRegistrationModes === 'restaurant_only') {
+            $this->posMode = 'restaurant';
+        } elseif ($this->allowedRegistrationModes === 'retail_only') {
+            $this->posMode = 'general';
+        }
+    }
+
+    public function getAllowedRegistrationModesProperty(): string
+    {
+        return (string) PlatformSystem::get('allowed_registration_modes', 'both');
     }
 
     public int $step = 1; // 1 = Registration Form, 2 = OTP Verification
@@ -131,6 +143,18 @@ class TenantRegister extends Component
         ];
 
         $this->validate($rules);
+
+        $allowedModes = $this->allowedRegistrationModes;
+        if ($allowedModes === 'retail_only' && $this->posMode === 'restaurant') {
+            $this->addError('posMode', 'Cafe & Restaurant registration is currently disabled.');
+
+            return;
+        }
+        if ($allowedModes === 'restaurant_only' && $this->posMode !== 'restaurant') {
+            $this->addError('posMode', 'Retail registration is currently disabled.');
+
+            return;
+        }
 
         $payload = [
             'store_name' => $this->storeName,

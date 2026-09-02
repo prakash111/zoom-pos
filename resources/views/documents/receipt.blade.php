@@ -365,6 +365,20 @@
                 </a>
             @endif
 
+            @if (auth('web')->check() && !$isQuotation)
+                <button type="button" onclick="posDispatchEmail()" class="btn btn-secondary" title="{{ __('Email') }}">✉️</button>
+
+                @foreach ($dispatchChannels ?? [] as $dc)
+                    <button type="button" onclick="posDispatchCustom({{ $dc->id }}, {{ Js::from($dc->name) }})" class="btn btn-secondary" title="{{ $dc->name }}">
+                        @if ($dc->isIconUrl())
+                            <img src="{{ $dc->iconDisplay() }}" alt="" style="width:13px;height:13px;border-radius:3px;object-fit:cover;">
+                        @else
+                            <span style="line-height:1;">{{ $dc->iconDisplay() }}</span>
+                        @endif
+                    </button>
+                @endforeach
+            @endif
+
             @if (auth('web')->check())
                 <a href="{{ $backRoute ?? route('tenant.sales.index') }}" class="btn btn-secondary">
                     <span>{{ __("Back") }}</span>
@@ -373,6 +387,36 @@
         </div>
     </div>
     @endunless
+
+    @if (auth('web')->check() && !$isQuotation)
+    <script>
+        function posCsrfToken() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            return meta ? meta.content : '{{ csrf_token() }}';
+        }
+
+        function posDispatchEmail() {
+            const email = prompt('{{ __('Send invoice to which email address?') }}', {{ Js::from($customerEmail ?? '') }});
+            if (!email) return;
+            fetch({{ Js::from(route('tenant.sales.send', $sale)) }}, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': posCsrfToken() },
+                body: JSON.stringify({ recipient_email: email }),
+            }).then(r => r.json()).then(data => alert(data.message || (data.success ? 'Sent.' : 'Failed to send.')))
+              .catch(() => alert('Failed to send invoice.'));
+        }
+
+        function posDispatchCustom(channelId, channelName) {
+            if (!confirm('{{ __('Send this invoice to') }} ' + channelName + '?')) return;
+            fetch({{ Js::from(route('tenant.sales.send-custom', $sale)) }}, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': posCsrfToken() },
+                body: JSON.stringify({ channel_id: channelId }),
+            }).then(r => r.json()).then(data => alert(data.message || (data.success ? 'Dispatched.' : 'Failed to dispatch.')))
+              .catch(() => alert('Failed to dispatch invoice.'));
+        }
+    </script>
+    @endif
 
     <!-- Thermal Cash Receipt Paper -->
     <div class="receipt-container">

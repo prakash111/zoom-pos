@@ -260,7 +260,18 @@
                                                  class="absolute right-0 z-20 mt-1 w-40 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 py-1 text-left">
                                                 <button type="button" wire:click="sendReminder({{ $inv->id }}, 'whatsapp')" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer">{{ __('WhatsApp') }}</button>
                                                 <button type="button" wire:click="sendReminder({{ $inv->id }}, 'email')" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer">{{ __('Email') }}</button>
-                                                <button type="button" wire:click="sendReminder({{ $inv->id }}, 'custom')" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer">{{ __('Custom Channel') }}</button>
+                                                @forelse ($reminderChannels as $rc)
+                                                    <button type="button" wire:click="sendReminder({{ $inv->id }}, 'custom', {{ $rc->id }})" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer flex items-center gap-1.5">
+                                                        @if ($rc->isIconUrl())
+                                                            <img src="{{ $rc->iconDisplay() }}" alt="" class="w-3.5 h-3.5 rounded object-cover">
+                                                        @else
+                                                            <span class="leading-none">{{ $rc->iconDisplay() }}</span>
+                                                        @endif
+                                                        <span>{{ $rc->name }}</span>
+                                                    </button>
+                                                @empty
+                                                    <button type="button" wire:click="sendReminder({{ $inv->id }}, 'custom')" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer">{{ __('Custom Channel') }}</button>
+                                                @endforelse
                                             </div>
                                         </div>
                                     @endif

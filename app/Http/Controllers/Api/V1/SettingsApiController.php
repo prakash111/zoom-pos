@@ -262,6 +262,9 @@ class SettingsApiController extends Controller
             'whatsapp_custom_note' => ['nullable', 'string', 'max:500'],
             'whatsapp_phone_number_id' => ['nullable', 'string', 'max:100'],
             'whatsapp_api_token' => ['nullable', 'string', 'max:1000'],
+            'restaurant_alert_interval_minutes' => ['nullable', 'integer', 'in:2,3,5'],
+            'restaurant_alert_sound_preset' => ['nullable', 'string', 'in:chime,bell,alert'],
+            'restaurant_alert_sound_url' => ['nullable', 'string', 'max:2000', 'url'],
         ]);
 
         if ($validator->fails()) {
@@ -277,6 +280,7 @@ class SettingsApiController extends Controller
         $configKeys = [
             'smtp_host', 'smtp_port', 'smtp_username', 'smtp_encryption', 'smtp_from_address', 'smtp_from_name',
             'whatsapp_phone_prefix', 'whatsapp_custom_note', 'whatsapp_phone_number_id',
+            'restaurant_alert_interval_minutes', 'restaurant_alert_sound_preset', 'restaurant_alert_sound_url',
         ];
         foreach ($configKeys as $key) {
             if (array_key_exists($key, $data)) {
@@ -503,6 +507,11 @@ class SettingsApiController extends Controller
                 'phone_number_id' => $configs['whatsapp_phone_number_id'] ?? '',
                 'has_api_token' => ! empty($configs['whatsapp_api_token']),
             ],
+            'restaurant_alerts' => [
+                'interval_minutes' => ! empty($configs['restaurant_alert_interval_minutes']) ? (int) $configs['restaurant_alert_interval_minutes'] : 3,
+                'sound_preset' => $configs['restaurant_alert_sound_preset'] ?? 'chime',
+                'sound_url' => $configs['restaurant_alert_sound_url'] ?? '',
+            ],
         ];
     }
 
@@ -657,6 +666,7 @@ class SettingsApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:100'],
+            'icon' => ['nullable', 'string', 'max:255'],
             'url' => ['required', 'string', 'max:500', 'url'],
             'method' => ['nullable', 'string', 'in:POST,GET'],
             'headers' => ['nullable', 'array'],
@@ -677,6 +687,7 @@ class SettingsApiController extends Controller
         }
 
         $data = $validator->validated();
+        $data['icon'] = $data['icon'] ?? 'webhook';
         $data['method'] = $data['method'] ?? 'POST';
         $data['auth_type'] = $data['auth_type'] ?? 'none';
         $data['is_active'] = $data['is_active'] ?? true;
@@ -703,6 +714,9 @@ class SettingsApiController extends Controller
         return [
             'id' => (string) $channel->id,
             'name' => $channel->name,
+            'icon' => $channel->icon ?: 'webhook',
+            'icon_display' => $channel->iconDisplay(),
+            'icon_is_url' => $channel->isIconUrl(),
             'url' => $channel->url,
             'method' => $channel->method,
             'headers' => $channel->headers ?: (object) [],

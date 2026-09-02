@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\ServiceOrderApiController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
 use App\Http\Controllers\Api\V1\TaxApiController;
 use App\Http\Controllers\Api\V1\UserApiController;
+use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Middleware\AuthenticateTenantApi;
 use Illuminate\Support\Facades\Route;
 
@@ -38,6 +39,19 @@ Route::prefix('v1/tax')->middleware([AuthenticateTenantApi::class])->group(funct
 
 /*
 |--------------------------------------------------------------------------
+| Tenant Password Reset & Change (Mobile / Desktop)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('tenant/password')->group(function () {
+    Route::post('/email', [PasswordResetController::class, 'sendResetLink']);
+    Route::post('/reset', [PasswordResetController::class, 'reset']);
+});
+
+Route::post('/tenant/profile/change-password', [PasswordResetController::class, 'changePassword'])
+    ->middleware([AuthenticateTenantApi::class]);
+
+/*
+|--------------------------------------------------------------------------
 | Dual-Mode POS Offline / Online Synchronization Engine
 |--------------------------------------------------------------------------
 | Endpoints for standalone desktop / PWA terminals to authenticate, sync
@@ -48,6 +62,7 @@ Route::prefix('v1/pos')->group(function () {
     // Public Tenant Auth & Registration Endpoints for Standalone / Dual-Mode Desktop Client
     Route::post('/auth/login', [PosSyncApiController::class, 'login']);
     Route::post('/auth/register', [PosSyncApiController::class, 'register']);
+    Route::get('/auth/registration-config', [PosSyncApiController::class, 'registrationConfig']);
 
     // Protected POS Endpoints (Require API Key or Bearer Token)
     Route::middleware([AuthenticateTenantApi::class])->group(function () {
@@ -71,6 +86,10 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/inventory/product/{id}/image', [PosSyncApiController::class, 'inventoryUploadProductImage'])->middleware('tenant.api.permission:products,edit');
         Route::post('/inventory/import', [PosSyncApiController::class, 'inventoryBulkImport'])->middleware('tenant.api.permission:products,create');
         Route::post('/inventory/adjust', [PosSyncApiController::class, 'inventoryAdjustStock'])->middleware('tenant.api.permission:products,edit');
+
+        // AI Product Image Generation (mobile parity for the web "Generate with AI" button)
+        Route::get('/ai-image/availability', [\App\Http\Controllers\Api\V1\AiImageApiController::class, 'availability'])->middleware('tenant.api.permission:products,view');
+        Route::post('/ai-image/generate', [\App\Http\Controllers\Api\V1\AiImageApiController::class, 'generate'])->middleware('tenant.api.permission:products,edit');
 
         // Customer Ledger & Khata
         Route::get('/customers', [PosSyncApiController::class, 'customersIndex'])->middleware('tenant.api.permission:customers,view');

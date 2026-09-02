@@ -210,6 +210,11 @@ class Index extends Component
         }
     }
 
+    public function getAiImageAvailableProperty(): bool
+    {
+        return app(AiImageGeneratorService::class)->isAvailable();
+    }
+
     public function generateAiPhoto(AiImageGeneratorService $generator): void
     {
         $this->validateOnly('name');

@@ -449,13 +449,16 @@ class QuotationApiController extends Controller
     private function present(Sale $quote): array
     {
         $items = is_array($quote->items) ? $quote->items : [];
+        $quote->loadMissing('customer');
 
         return [
             'id' => (string) ($quote->external_id ?: $quote->id),
             'server_id' => $quote->id,
             'quote_number' => $quote->sale_number,
             'customer_id' => $quote->customer_id ? (string) $quote->customer_id : null,
-            'customer_name' => $quote->customer_name ?: 'Customer',
+            'customer_name' => $quote->customer?->name ?: ($quote->customer_name ?: 'Customer'),
+            'customer_phone' => $quote->customer?->phone,
+            'customer_email' => $quote->customer?->email,
             'items' => $items,
             'discount' => (float) ($quote->discount ?? 0),
             'tax' => (float) ($quote->tax_amount ?? 0),
