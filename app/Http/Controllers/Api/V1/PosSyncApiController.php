@@ -176,6 +176,8 @@ class PosSyncApiController extends Controller
                 'email' => $company->email ?? '',
                 'plan_name' => $company->plan_name ?? 'trial',
                 'expires_at' => $company->expires_at?->toIso8601String(),
+                'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
+                'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
             ],
             // Only present when the tenant is actually on a plan — lets a fresh
             // desktop device provision a local mirror of both rows (companies.plan_name
@@ -271,6 +273,8 @@ class PosSyncApiController extends Controller
                     'currency_symbol' => $company->currency_symbol ?? '$',
                     'plan_name' => $company->plan_name ?? 'trial',
                     'expires_at' => $company->expires_at?->toIso8601String(),
+                    'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
+                    'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                 ],
                 'plan' => $company->plan ? $company->plan->only([
                     'name', 'display_name', 'billing_cycle', 'duration_days', 'price', 'currency', 'features', 'limits', 'active',
