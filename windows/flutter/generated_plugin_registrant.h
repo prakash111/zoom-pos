@@ -1,8 +1,5 @@
 //
-// Generated file. Do not edit.
-//
-// Placeholder produced without the Flutter SDK available; run
-// `flutter pub get` from mobile/ to regenerate with the real plugin list.
+//  Generated file. Do not edit.
 //
 
 // clang-format off

@@ -20,6 +20,7 @@ class ApiEndpoints {
 
   static const String login = '/auth/login';
   static const String register = '/auth/register';
+  static const String registrationConfig = '/auth/registration-config';
   static const String session = '/auth/session';
   static const String status = '/status';
 
@@ -30,6 +31,8 @@ class ApiEndpoints {
   static const String inventory = '/inventory';
   static const String inventoryStoreProduct = '/inventory/product';
   static String inventoryProductImage(String id) => '/inventory/product/$id/image';
+  static const String aiImageAvailability = '/ai-image/availability';
+  static const String aiImageGenerate = '/ai-image/generate';
   static const String inventoryImport = '/inventory/import';
   static const String inventoryAdjustStock = '/inventory/adjust';
 
@@ -51,6 +54,11 @@ class ApiEndpoints {
   /// Outside the `/api/v1/pos` prefix — use with [ApiClient.getAbsolute],
   /// not [ApiClient.get].
   static const String taxRatesAbsolute = '/api/v1/tax/rates';
+
+  /// Outside the `/api/v1/pos` prefix — use with [ApiClient.postAbsolute].
+  static const String passwordEmailAbsolute = '/api/tenant/password/email';
+  static const String passwordResetAbsolute = '/api/tenant/password/reset';
+  static const String changePasswordAbsolute = '/api/tenant/profile/change-password';
 
   static const String subscription = '/subscription';
   static const String subscriptionRedeem = '/subscription/redeem';

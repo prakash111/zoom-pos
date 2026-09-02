@@ -1,6 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/models/product_model.dart';
+import '../../../core/utils/image_url.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../inventory/inventory_repository.dart';
@@ -18,11 +22,15 @@ class ProductPickerSheet extends StatefulWidget {
 class _ProductPickerSheetState extends State<ProductPickerSheet> {
   late Future<InventoryCatalog> _future;
   String _query = '';
+  String? _baseUrl;
 
   @override
   void initState() {
     super.initState();
     _future = widget.inventoryRepository.fetchCatalog();
+    context.read<ApiClient>().currentBaseUrl().then((url) {
+      if (mounted) setState(() => _baseUrl = url);
+    });
   }
 
   @override
@@ -75,8 +83,29 @@ class _ProductPickerSheetState extends State<ProductPickerSheet> {
                     itemCount: products.length,
                     itemBuilder: (context, index) {
                       final product = products[index];
+                      final resolvedImageUrl = resolveImageUrl(product.imageUrl, baseUrl: _baseUrl);
                       return ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.inventory_2_outlined)),
+                        leading: ClipOval(
+                          child: SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: resolvedImageUrl == null
+                                ? CircleAvatar(child: const Icon(Icons.inventory_2_outlined))
+                                : CachedNetworkImage(
+                                    imageUrl: resolvedImageUrl,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) => const Center(
+                                      child: SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                    ),
+                                    errorWidget: (context, url, error) =>
+                                        CircleAvatar(child: const Icon(Icons.inventory_2_outlined)),
+                                  ),
+                          ),
+                        ),
                         title: Text(product.name),
                         subtitle: Text('${product.salePrice.toStringAsFixed(2)} · Stock ${product.currentStock}'),
                         onTap: () => Navigator.of(context).pop(product),

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/restaurant_models.dart';
+import '../../../core/services/sound_alert_service.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../restaurant_repository.dart';
@@ -22,30 +23,69 @@ class RestaurantKdsScreen extends StatefulWidget {
 
 class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
   late final RestaurantRepository _repository;
-  Future<({List<KitchenTicketModel> tickets, List<KitchenTicketModel> completedTickets, Map<String, int> counts})>? _future;
+  Future<({List<KitchenTicketModel> tickets, List<KitchenTicketModel> completedTickets, Map<String, int> counts, KdsAlertSettings alertSettings})>?
+      _future;
   Timer? _pollTimer;
+  Timer? _overdueChimeTimer;
+  Set<String> _knownTicketIds = {};
+  KdsAlertSettings _alertSettings = const KdsAlertSettings(intervalMinutes: 3, soundPreset: 'chime', soundUrl: '');
 
   @override
   void initState() {
     super.initState();
     _repository = RestaurantRepository(context.read<ApiClient>());
     _reload();
-    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) => _reload(showLoading: false));
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _reload(showLoading: false));
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _overdueChimeTimer?.cancel();
     super.dispose();
+  }
+
+  void _restartOverdueChimeTimer() {
+    _overdueChimeTimer?.cancel();
+    _overdueChimeTimer = Timer.periodic(Duration(minutes: _alertSettings.intervalMinutes), (_) {
+      final tickets = _future;
+      if (tickets == null) return;
+      tickets.then((result) {
+        if (result.tickets.any((t) => t.isOverdue)) {
+          SoundAlertService.instance.play(preset: _alertSettings.soundPreset, soundUrl: _alertSettings.soundUrl);
+        }
+      });
+    });
+  }
+
+  void _handleResult(({List<KitchenTicketModel> tickets, List<KitchenTicketModel> completedTickets, Map<String, int> counts, KdsAlertSettings alertSettings}) result) {
+    final currentIds = result.tickets.map((t) => t.id).toSet();
+    final hasNewTicket = _knownTicketIds.isNotEmpty && currentIds.difference(_knownTicketIds).isNotEmpty;
+    if (hasNewTicket) {
+      SoundAlertService.instance.play(preset: result.alertSettings.soundPreset, soundUrl: result.alertSettings.soundUrl);
+    }
+    _knownTicketIds = currentIds;
+    if (_alertSettings.intervalMinutes != result.alertSettings.intervalMinutes || _overdueChimeTimer == null) {
+      _alertSettings = result.alertSettings;
+      _restartOverdueChimeTimer();
+    } else {
+      _alertSettings = result.alertSettings;
+    }
   }
 
   void _reload({bool showLoading = true}) {
     final future = _repository.fetchKot();
     if (showLoading) {
+      future.then((result) {
+        if (mounted) _handleResult(result);
+      }).catchError((_) {});
       setState(() => _future = future);
     } else {
       future.then((result) {
-        if (mounted) setState(() => _future = Future.value(result));
+        if (mounted) {
+          _handleResult(result);
+          setState(() => _future = Future.value(result));
+        }
       }).catchError((_) {
         // Silent — the periodic background refresh shouldn't surface errors
         // over whatever's already on screen; pull-to-refresh still reports them.
@@ -190,6 +230,10 @@ class _KotSection extends StatelessWidget {
                       '${ticket.tableName ?? ticket.serviceType} · ${ticket.serviceType}',
                       style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                     ),
+                    if (ticket.targetCompletionAt != null) ...[
+                      const SizedBox(height: 4),
+                      _CountdownBadge(target: ticket.targetCompletionAt!),
+                    ],
                     const SizedBox(height: 6),
                     for (final item in ticket.items)
                       Text('${item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 1)} × ${item.name}'),
@@ -221,6 +265,53 @@ class _KotSection extends StatelessWidget {
               ),
             ),
       ],
+    );
+  }
+}
+
+/// Ticks every second to show a live "Due in Xm Ys" / "Overdue by Xm Ys"
+/// badge against a KOT's `target_completion_at`.
+class _CountdownBadge extends StatefulWidget {
+  const _CountdownBadge({required this.target});
+
+  final DateTime target;
+
+  @override
+  State<_CountdownBadge> createState() => _CountdownBadgeState();
+}
+
+class _CountdownBadgeState extends State<_CountdownBadge> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = widget.target.difference(DateTime.now());
+    final overdue = remaining.isNegative;
+    final abs = remaining.abs();
+    final label = abs.inMinutes > 0 ? '${abs.inMinutes}m ${abs.inSeconds % 60}s' : '${abs.inSeconds}s';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: overdue ? Colors.red.shade50 : Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        overdue ? '⚠️ Overdue by $label' : '🎯 Due in $label',
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: overdue ? Colors.red.shade700 : Colors.blue.shade700),
+      ),
     );
   }
 }

@@ -27,6 +27,8 @@ class InvoiceActionsData {
     required this.tax,
     required this.total,
     this.customerName,
+    this.customerPhone,
+    this.customerEmail,
     this.currencySymbol = '\$',
     this.taxId,
     this.taxLabel = 'Tax',
@@ -46,6 +48,8 @@ class InvoiceActionsData {
   final double tax;
   final double total;
   final String? customerName;
+  final String? customerPhone;
+  final String? customerEmail;
   final String currencySymbol;
   final String? taxId;
   final String taxLabel;
@@ -118,6 +122,17 @@ Future<void> showInvoiceActionsSheet(BuildContext context, InvoiceActionsData da
             ListTile(
               leading: const Icon(Icons.chat_outlined),
               title: const Text('Share via WhatsApp'),
+              subtitle: (data.customerPhone ?? '').isNotEmpty ? Text('to ${data.customerPhone}') : null,
+              trailing: (data.customerPhone ?? '').isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      tooltip: 'Change recipient',
+                      onPressed: () async {
+                        Navigator.of(sheetContext).pop();
+                        await _sendDelivery(context, apiClient, data, type: 'whatsapp', forcePrompt: true);
+                      },
+                    )
+                  : null,
               onTap: () async {
                 Navigator.of(sheetContext).pop();
                 await _sendDelivery(context, apiClient, data, type: 'whatsapp');
@@ -126,9 +141,28 @@ Future<void> showInvoiceActionsSheet(BuildContext context, InvoiceActionsData da
             ListTile(
               leading: const Icon(Icons.email_outlined),
               title: const Text('Send via Email'),
+              subtitle: (data.customerEmail ?? '').isNotEmpty ? Text('to ${data.customerEmail}') : null,
+              trailing: (data.customerEmail ?? '').isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      tooltip: 'Change recipient',
+                      onPressed: () async {
+                        Navigator.of(sheetContext).pop();
+                        await _sendDelivery(context, apiClient, data, type: 'email', forcePrompt: true);
+                      },
+                    )
+                  : null,
               onTap: () async {
                 Navigator.of(sheetContext).pop();
                 await _sendDelivery(context, apiClient, data, type: 'email');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.hub_outlined),
+              title: const Text('Custom Notification Channel'),
+              onTap: () async {
+                Navigator.of(sheetContext).pop();
+                await _sendViaCustomChannel(context, apiClient, data);
               },
             ),
             const SizedBox(height: 8),
@@ -176,11 +210,17 @@ Future<void> _sendDelivery(
   ApiClient apiClient,
   InvoiceActionsData data, {
   required String type,
+  bool forcePrompt = false,
 }) async {
-  final recipient = await showDialog<String>(
-    context: context,
-    builder: (dialogContext) => _RecipientDialog(type: type),
-  );
+  final knownRecipient = type == 'email' ? data.customerEmail : data.customerPhone;
+  String? recipient = (!forcePrompt && (knownRecipient ?? '').isNotEmpty) ? knownRecipient : null;
+
+  if (recipient == null) {
+    recipient = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => _RecipientDialog(type: type, initialValue: knownRecipient),
+    );
+  }
   if (recipient == null || recipient.trim().isEmpty) return;
   if (!context.mounted) return;
 
@@ -208,17 +248,78 @@ Future<void> _sendDelivery(
   }
 }
 
+Future<void> _sendViaCustomChannel(BuildContext context, ApiClient apiClient, InvoiceActionsData data) async {
+  final messenger = ScaffoldMessenger.of(context);
+  List<dynamic> channels;
+  try {
+    final response = await apiClient.get(ApiEndpoints.settingsNotificationChannels);
+    channels = (response['channels'] as List? ?? [])
+        .where((c) => (c['is_active'] as bool? ?? true) && (c['event_types'] as List? ?? []).contains(data.documentType))
+        .toList();
+  } on ApiException catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    return;
+  }
+
+  if (channels.isEmpty) {
+    messenger.showSnackBar(const SnackBar(content: Text('No custom notification channels are configured for this document type.')));
+    return;
+  }
+
+  if (!context.mounted) return;
+  final selected = await showDialog<Map<String, dynamic>>(
+    context: context,
+    builder: (dialogContext) => SimpleDialog(
+      title: const Text('Send via'),
+      children: channels.map((c) {
+        final map = Map<String, dynamic>.from(c as Map);
+        final iconIsUrl = map['icon_is_url'] as bool? ?? false;
+        final iconDisplay = map['icon_display']?.toString() ?? '🔗';
+        return SimpleDialogOption(
+          onPressed: () => Navigator.of(dialogContext).pop(map),
+          child: Row(
+            children: [
+              iconIsUrl
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.network(iconDisplay, width: 18, height: 18, errorBuilder: (_, __, ___) => const Text('🔗')),
+                    )
+                  : Text(iconDisplay, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 10),
+              Text(map['name']?.toString() ?? 'Channel'),
+            ],
+          ),
+        );
+      }).toList(),
+    ),
+  );
+  if (selected == null || !context.mounted) return;
+
+  try {
+    final response = await apiClient.post(ApiEndpoints.sendDelivery, data: {
+      'type': 'custom',
+      'document_type': data.documentType,
+      'channel_id': int.tryParse(selected['id'].toString()),
+      'document_id': data.documentId,
+    });
+    messenger.showSnackBar(SnackBar(content: Text(response['message']?.toString() ?? 'Dispatched.')));
+  } on ApiException catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text(e.message)));
+  }
+}
+
 class _RecipientDialog extends StatefulWidget {
-  const _RecipientDialog({required this.type});
+  const _RecipientDialog({required this.type, this.initialValue});
 
   final String type;
+  final String? initialValue;
 
   @override
   State<_RecipientDialog> createState() => _RecipientDialogState();
 }
 
 class _RecipientDialogState extends State<_RecipientDialog> {
-  final _controller = TextEditingController();
+  late final _controller = TextEditingController(text: widget.initialValue ?? '');
 
   @override
   void dispose() {

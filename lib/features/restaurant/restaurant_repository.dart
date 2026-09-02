@@ -78,6 +78,7 @@ class RestaurantRepository {
     String? driverPhone,
     double? discount,
     String? notes,
+    int? prepMinutes,
     required List<RestaurantOrderItemModel> items,
   }) async {
     final data = {
@@ -93,6 +94,7 @@ class RestaurantRepository {
       if (driverPhone != null && driverPhone.isNotEmpty) 'driver_phone': driverPhone,
       if (discount != null) 'discount': discount,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
+      if (prepMinutes != null) 'prep_minutes': prepMinutes,
       'items': items.map((e) => e.toRequestJson()).toList(),
     };
 
@@ -112,6 +114,7 @@ class RestaurantRepository {
     bool isSplitPayment = false,
     List<Map<String, dynamic>>? splitPayments,
     String? dueDate,
+    String? customerId,
   }) async {
     final data = {
       if (paymentMethod != null) 'payment_method': paymentMethod,
@@ -121,12 +124,14 @@ class RestaurantRepository {
       'is_split_payment': isSplitPayment,
       if (splitPayments != null) 'split_payments': splitPayments,
       if (dueDate != null) 'due_date': dueDate,
+      if (customerId != null) 'customer_id': int.tryParse(customerId),
     };
     final response = await _client.post(ApiEndpoints.restaurantSettle(saleId), data: data);
     return RestaurantSaleModel.fromJson(response['sale'] as Map<String, dynamic>);
   }
 
-  Future<({List<KitchenTicketModel> tickets, List<KitchenTicketModel> completedTickets, Map<String, int> counts})> fetchKot({
+  Future<({List<KitchenTicketModel> tickets, List<KitchenTicketModel> completedTickets, Map<String, int> counts, KdsAlertSettings alertSettings})>
+      fetchKot({
     String? status,
     String? serviceType,
   }) async {
@@ -139,6 +144,7 @@ class RestaurantRepository {
       completedTickets:
           (response['completed_tickets'] as List? ?? []).map((e) => KitchenTicketModel.fromJson(e as Map<String, dynamic>)).toList(),
       counts: (response['counts'] as Map<String, dynamic>? ?? {}).map((k, v) => MapEntry(k, (v as num).toInt())),
+      alertSettings: KdsAlertSettings.fromJson(response['alert_settings'] as Map<String, dynamic>?),
     );
   }
 

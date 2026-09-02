@@ -5,6 +5,7 @@ import '../../../core/storage/app_preferences.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../settings/server_settings_screen.dart';
 import '../auth_provider.dart';
+import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -113,6 +114,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       validator: (value) => (value == null || value.isEmpty) ? l10n.required : null,
                       onFieldSubmitted: (_) => _submit(),
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                        ),
+                        child: const Text('Forgot password?'),
+                      ),
                     ),
                     if (_showAccountId) ...[
                       const SizedBox(height: 14),

@@ -99,6 +99,15 @@ class ApiClient {
     return _send(() => _dio.post(path, data: data));
   }
 
+  /// Like [post], but for endpoints outside the `/api/v1/pos` prefix — see
+  /// [getAbsolute].
+  Future<Map<String, dynamic>> postAbsolute(String path, {Map<String, dynamic>? data}) {
+    return _send(() async {
+      final base = await currentBaseUrl();
+      return _dio.post('$base$path', data: data);
+    });
+  }
+
   /// Like [post], but for multipart file uploads (product images, business
   /// logo/favicon). Dio sets the correct `multipart/form-data` content-type
   /// and boundary itself whenever [data] is a [FormData] instance,

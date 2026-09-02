@@ -90,6 +90,7 @@ class InventoryRepository {
     String categoryName = 'General',
     String? brandName,
     double taxRate = 0,
+    String? imageUrl,
   }) async {
     final response = await _client.post(ApiEndpoints.inventoryStoreProduct, data: {
       if (externalId != null) 'external_id': externalId,
@@ -104,6 +105,7 @@ class InventoryRepository {
       'category_name': categoryName,
       if (brandName != null && brandName.isNotEmpty) 'brand_name': brandName,
       'tax_rate': taxRate,
+      if (imageUrl != null && imageUrl.isNotEmpty) 'image_url': imageUrl,
     });
     final product = response['product'];
     if (product is Map && product['id'] != null) return product['id'].toString();

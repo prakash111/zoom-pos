@@ -77,6 +77,7 @@ class InventoryProvider extends ChangeNotifier {
     String categoryName = 'General',
     String? brandName,
     double taxRate = 0,
+    String? imageUrl,
   }) async {
     isSaving = true;
     actionError = null;
@@ -96,6 +97,7 @@ class InventoryProvider extends ChangeNotifier {
         categoryName: categoryName,
         brandName: brandName,
         taxRate: taxRate,
+        imageUrl: imageUrl,
       );
       await loadCatalog();
       isSaving = false;

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/config/nav_dock_provider.dart';
 import '../../../core/config/tax_jurisdictions.dart';
 import '../../../core/config/theme.dart';
@@ -535,7 +536,107 @@ class _ProfileTabState extends State<_ProfileTab> {
               ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : Text(l10n.saveProfile),
         ),
+        const SizedBox(height: 28),
+        const Divider(),
+        const SizedBox(height: 16),
+        const _ChangePasswordSection(),
       ],
+    );
+  }
+}
+
+/// Settings > Profile "Change Password" card — POST
+/// /api/tenant/profile/change-password, mirroring the web tenant Settings
+/// page's own Change Password form.
+class _ChangePasswordSection extends StatefulWidget {
+  const _ChangePasswordSection();
+
+  @override
+  State<_ChangePasswordSection> createState() => _ChangePasswordSectionState();
+}
+
+class _ChangePasswordSectionState extends State<_ChangePasswordSection> {
+  final _formKey = GlobalKey<FormState>();
+  final _currentController = TextEditingController();
+  final _newController = TextEditingController();
+  final _confirmController = TextEditingController();
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _currentController.dispose();
+    _newController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final response = await context.read<ApiClient>().postAbsolute(
+        ApiEndpoints.changePasswordAbsolute,
+        data: {
+          'current_password': _currentController.text,
+          'new_password': _newController.text,
+          'new_password_confirmation': _confirmController.text,
+        },
+      );
+      messenger.showSnackBar(SnackBar(content: Text(response['message']?.toString() ?? 'Password changed.')));
+      _currentController.clear();
+      _newController.clear();
+      _confirmController.clear();
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Change Password', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _currentController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Current Password'),
+                validator: (value) => (value == null || value.isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _newController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'New Password'),
+                validator: (value) => (value == null || value.length < 6) ? 'At least 6 characters' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _confirmController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Confirm New Password'),
+                validator: (value) => value != _newController.text ? 'Passwords do not match' : null,
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton(
+                onPressed: _isSaving ? null : _submit,
+                child: _isSaving
+                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Update Password'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

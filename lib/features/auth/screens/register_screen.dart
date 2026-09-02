@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/api/api_client.dart';
+import '../../../core/config/app_config.dart';
 import '../auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -19,6 +21,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   bool _obscurePassword = true;
   String _posMode = 'general';
+  String _allowedRegistrationModes = 'both';
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<ApiClient>().get(ApiEndpoints.registrationConfig).then((response) {
+      final modes = response['allowed_registration_modes']?.toString() ?? 'both';
+      if (!mounted) return;
+      setState(() {
+        _allowedRegistrationModes = modes;
+        if (modes == 'restaurant_only') _posMode = 'restaurant';
+        if (modes == 'retail_only') _posMode = 'general';
+      });
+    }).catchError((_) {
+      // Pre-auth config fetch is best-effort — fall back to showing both cards.
+    });
+  }
 
   @override
   void dispose() {
@@ -136,25 +155,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Expanded(
-                          child: _StoreTypeCard(
-                            icon: Icons.storefront_outlined,
-                            label: 'Retail',
-                            description: 'Shops, electronics, general stores',
-                            selected: _posMode == 'general',
-                            onTap: () => setState(() => _posMode = 'general'),
+                        if (_allowedRegistrationModes != 'restaurant_only')
+                          Expanded(
+                            child: _StoreTypeCard(
+                              icon: Icons.storefront_outlined,
+                              label: 'Retail',
+                              description: 'Shops, electronics, general stores',
+                              selected: _posMode == 'general',
+                              onTap: () => setState(() => _posMode = 'general'),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _StoreTypeCard(
-                            icon: Icons.restaurant_outlined,
-                            label: 'Cafe & Restaurant',
-                            description: 'Tables, KOT, kitchen display',
-                            selected: _posMode == 'restaurant',
-                            onTap: () => setState(() => _posMode = 'restaurant'),
+                        if (_allowedRegistrationModes == 'both') const SizedBox(width: 10),
+                        if (_allowedRegistrationModes != 'retail_only')
+                          Expanded(
+                            child: _StoreTypeCard(
+                              icon: Icons.restaurant_outlined,
+                              label: 'Cafe & Restaurant',
+                              description: 'Tables, KOT, kitchen display',
+                              selected: _posMode == 'restaurant',
+                              onTap: () => setState(() => _posMode = 'restaurant'),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 24),

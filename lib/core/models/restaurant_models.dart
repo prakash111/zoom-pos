@@ -37,6 +37,8 @@ class DiningTableModel {
     required this.status,
     required this.currentSaleId,
     required this.guestCount,
+    this.qrToken,
+    this.qrOrderUrl,
   });
 
   factory DiningTableModel.fromJson(Map<String, dynamic> json) {
@@ -49,6 +51,8 @@ class DiningTableModel {
       status: json['status'] as String? ?? 'available',
       currentSaleId: json['current_sale_id']?.toString(),
       guestCount: (json['guest_count'] as num?)?.toInt() ?? 0,
+      qrToken: json['qr_token'] as String?,
+      qrOrderUrl: json['qr_order_url'] as String?,
     );
   }
 
@@ -60,6 +64,8 @@ class DiningTableModel {
   final String status;
   final String? currentSaleId;
   final int guestCount;
+  final String? qrToken;
+  final String? qrOrderUrl;
 
   Color get statusColor => kDiningTableStatusColors[status] ?? Colors.grey;
   String get statusLabel => kDiningTableStatusLabels[status] ?? status;
@@ -180,7 +186,10 @@ class RestaurantSaleModel {
   RestaurantSaleModel({
     required this.id,
     required this.saleNumber,
+    this.customerId,
     required this.customerName,
+    this.customerPhone,
+    this.customerEmail,
     required this.status,
     required this.serviceType,
     this.diningTableId,
@@ -201,7 +210,10 @@ class RestaurantSaleModel {
     return RestaurantSaleModel(
       id: json['id'].toString(),
       saleNumber: json['sale_number'] as String? ?? '',
+      customerId: json['customer_id']?.toString(),
       customerName: json['customer_name'] as String? ?? '',
+      customerPhone: json['customer_phone'] as String?,
+      customerEmail: json['customer_email'] as String?,
       status: json['status'] as String? ?? 'pending',
       serviceType: json['service_type'] as String? ?? 'dine_in',
       diningTableId: json['dining_table_id']?.toString(),
@@ -223,7 +235,10 @@ class RestaurantSaleModel {
 
   final String id;
   final String saleNumber;
+  final String? customerId;
   final String customerName;
+  final String? customerPhone;
+  final String? customerEmail;
   final String status;
   final String serviceType;
   final String? diningTableId;
@@ -258,6 +273,9 @@ class KitchenTicketModel {
     this.readyAt,
     this.servedAt,
     this.createdAt,
+    this.prepMinutes,
+    this.targetCompletionAt,
+    this.isOverdue = false,
   });
 
   factory KitchenTicketModel.fromJson(Map<String, dynamic> json) {
@@ -279,6 +297,9 @@ class KitchenTicketModel {
       readyAt: json['ready_at'] != null ? DateTime.tryParse(json['ready_at'] as String) : null,
       servedAt: json['served_at'] != null ? DateTime.tryParse(json['served_at'] as String) : null,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
+      prepMinutes: (json['prep_minutes'] as num?)?.toInt(),
+      targetCompletionAt: json['target_completion_at'] != null ? DateTime.tryParse(json['target_completion_at'] as String) : null,
+      isOverdue: json['is_overdue'] as bool? ?? false,
     );
   }
 
@@ -297,6 +318,28 @@ class KitchenTicketModel {
   final DateTime? readyAt;
   final DateTime? servedAt;
   final DateTime? createdAt;
+  final int? prepMinutes;
+  final DateTime? targetCompletionAt;
+  final bool isOverdue;
 
   String get statusLabel => kKotStatusLabels[status] ?? status;
+}
+
+/// Tenant-configured KDS/dashboard order alert preferences (Settings >
+/// Notifications > Restaurant Order Alerts), returned alongside the KOT list
+/// so the KDS screen doesn't need a second round-trip to fetch them.
+class KdsAlertSettings {
+  const KdsAlertSettings({required this.intervalMinutes, required this.soundPreset, required this.soundUrl});
+
+  factory KdsAlertSettings.fromJson(Map<String, dynamic>? json) {
+    return KdsAlertSettings(
+      intervalMinutes: (json?['interval_minutes'] as num?)?.toInt() ?? 3,
+      soundPreset: json?['sound_preset'] as String? ?? 'chime',
+      soundUrl: json?['sound_url'] as String? ?? '',
+    );
+  }
+
+  final int intervalMinutes;
+  final String soundPreset;
+  final String soundUrl;
 }

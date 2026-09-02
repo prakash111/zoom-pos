@@ -1,16 +1,21 @@
 #
 # Generated file, do not edit.
 #
-# This is a placeholder produced without the Flutter SDK available. Run
-# `flutter pub get` from mobile/ once a Flutter toolchain is available to
-# regenerate this file with the actual Windows-compatible plugin list
-# (connectivity_plus, flutter_secure_storage, sqflite, printing, etc.).
-#
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  connectivity_plus
+  file_selector_windows
+  flutter_secure_storage_windows
+  print_bluetooth_thermal
+  printing
+  screen_retriever_windows
+  share_plus
+  url_launcher_windows
+  window_manager
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
+  jni
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)
@@ -24,4 +29,5 @@ endforeach(plugin)
 
 foreach(ffi_plugin ${FLUTTER_FFI_PLUGIN_LIST})
   add_subdirectory(flutter/ephemeral/.plugin_symlinks/${ffi_plugin}/windows plugins/${ffi_plugin})
+  list(APPEND PLUGIN_BUNDLED_LIBRARIES ${${ffi_plugin}_bundled_libraries})
 endforeach(ffi_plugin)

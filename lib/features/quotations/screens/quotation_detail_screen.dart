@@ -83,6 +83,8 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
       documentNumber: quote.quoteNumber,
       companyName: company?.tradeName ?? company?.name ?? '',
       customerName: quote.customerName,
+      customerPhone: quote.customerPhone,
+      customerEmail: quote.customerEmail,
       currencySymbol: company?.currencySymbol ?? '\$',
       subtotal: quote.subtotal,
       discount: quote.discount,

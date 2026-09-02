@@ -83,6 +83,8 @@ class PosCheckoutResult {
     required this.tax,
     required this.total,
     this.customerName,
+    this.customerPhone,
+    this.customerEmail,
     this.notes,
     this.isPendingSync = false,
     this.paidAmount,
@@ -98,6 +100,8 @@ class PosCheckoutResult {
   final double tax;
   final double total;
   final String? customerName;
+  final String? customerPhone;
+  final String? customerEmail;
   final String? notes;
 
   /// Null means "the full total was paid" (kept for callers that don't care).
@@ -522,6 +526,8 @@ class PosProvider extends ChangeNotifier {
         tax: soldTax,
         total: soldTotal,
         customerName: soldCustomerName,
+        customerPhone: selectedCustomer?.phone,
+        customerEmail: selectedCustomer?.email,
         notes: soldNotes,
         isPendingSync: isPendingSync,
         paidAmount: soldPaidAmount,

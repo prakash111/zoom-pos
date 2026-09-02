@@ -6,7 +6,9 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/models/restaurant_models.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
+import '../../auth/auth_provider.dart';
 import '../restaurant_repository.dart';
+import '../widgets/qr_stand_dialog.dart';
 import 'restaurant_order_screen.dart';
 
 /// Restaurant Mode home screen: floor plan of dining tables, colored by
@@ -159,6 +161,14 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
     }
   }
 
+  void _showQrStand(DiningTableModel table) {
+    final company = context.read<AuthProvider>().company;
+    showDialog(
+      context: context,
+      builder: (_) => QrStandDialog(table: table, businessName: company?.tradeName ?? company?.name ?? 'Restaurant Business'),
+    );
+  }
+
   Future<void> _deleteTable(DiningTableModel table) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -255,6 +265,7 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
                           onTap: () => _openTable(table),
                           onEdit: () => _openTableForm(floors, table: table),
                           onDelete: () => _deleteTable(table),
+                          onQrStand: () => _showQrStand(table),
                         ),
                     ],
                   ),
@@ -270,12 +281,13 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
 }
 
 class _TableCard extends StatelessWidget {
-  const _TableCard({required this.table, required this.onTap, required this.onEdit, required this.onDelete});
+  const _TableCard({required this.table, required this.onTap, required this.onEdit, required this.onDelete, required this.onQrStand});
 
   final DiningTableModel table;
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onQrStand;
 
   @override
   Widget build(BuildContext context) {
@@ -286,6 +298,14 @@ class _TableCard extends StatelessWidget {
         builder: (context) => SafeArea(
           child: Wrap(
             children: [
+              ListTile(
+                leading: const Icon(Icons.qr_code_2_outlined),
+                title: const Text('QR Stand'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onQrStand();
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.edit_outlined),
                 title: const Text('Edit table'),

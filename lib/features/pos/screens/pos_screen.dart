@@ -142,6 +142,8 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
         documentNumber: result.saleNumber,
         companyName: company?.tradeName ?? company?.name ?? '',
         customerName: result.customerName,
+        customerPhone: result.customerPhone,
+        customerEmail: result.customerEmail,
         currencySymbol: company?.currencySymbol ?? '\$',
         subtotal: result.subtotal,
         discount: result.discount,

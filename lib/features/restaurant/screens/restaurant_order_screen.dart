@@ -3,14 +3,19 @@ import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/models/customer_model.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/models/restaurant_models.dart';
+import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../auth/auth_provider.dart';
+import '../../customers/customers_repository.dart';
 import '../../inventory/inventory_repository.dart';
 import '../../pos/payment_entry.dart';
+import '../../pos/screens/customer_picker_sheet.dart';
+import '../../pos/screens/invoice_actions_sheet.dart';
 import '../../quotations/screens/product_picker_sheet.dart';
 import '../restaurant_repository.dart';
 
@@ -56,6 +61,7 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
   List<RestaurantOrderItemModel> _committedItems = [];
   List<RestaurantOrderItemModel> _draftItems = [];
   int _guestCount = 1;
+  int _prepMinutes = 15;
   final _notesController = TextEditingController();
 
   /// Seat numbers for splitting a dine-in table's order (mirrors Pos.php's
@@ -241,6 +247,7 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
         saleId: _saleId,
         guestCount: _guestCount,
         notes: _notesController.text.trim(),
+        prepMinutes: _prepMinutes,
         items: _draftItems,
       );
       _changed = true;
@@ -381,6 +388,29 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
                                 ),
                               ],
                               const SizedBox(height: 10),
+                              if (_draftItems.isNotEmpty) ...[
+                                Row(
+                                  children: [
+                                    Text('Prep time', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Wrap(
+                                        spacing: 6,
+                                        children: [
+                                          for (final mins in const [5, 10, 15, 20, 30])
+                                            ChoiceChip(
+                                              label: Text('${mins}m', style: const TextStyle(fontSize: 11)),
+                                              visualDensity: VisualDensity.compact,
+                                              selected: _prepMinutes == mins,
+                                              onSelected: (_) => setState(() => _prepMinutes = mins),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                              ],
                               Row(
                                 children: [
                                   Expanded(
@@ -723,6 +753,19 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
   final List<PaymentEntry> _splitPayments = [];
   final List<TextEditingController> _splitAmountControllers = [];
   DateTime? _dueDate;
+  CustomerModel? _selectedCustomer;
+
+  Future<void> _pickCustomer() async {
+    final repository = CustomersRepository(context.read<ApiClient>());
+    final customer = await showModalBottomSheet<CustomerModel>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => CustomerPickerSheet(customersRepository: repository),
+    );
+    if (customer != null) setState(() => _selectedCustomer = customer);
+  }
 
   @override
   void dispose() {
@@ -780,13 +823,44 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
       _error = null;
     });
     try {
-      await widget.repository.settle(
+      final sale = await widget.repository.settle(
         saleId: widget.saleId,
         paymentMethod: _isSplit ? null : _method,
         cashTendered: (!_isSplit && _method == 'cash') ? double.tryParse(_tenderedController.text.trim()) : null,
         isSplitPayment: _isSplit,
         splitPayments: _isSplit ? _splitPayments.map((p) => p.toJson()).toList() : null,
         dueDate: _dueDate != null ? _dueDate!.toIso8601String().split('T').first : null,
+        customerId: _selectedCustomer?.id,
+      );
+      if (!mounted) return;
+
+      final company = context.read<AuthProvider>().company;
+      final subtotal = sale.items.fold(0.0, (sum, i) => sum + i.price * i.quantity);
+      final tax = (sale.total - subtotal + sale.discount).clamp(0, double.infinity).toDouble();
+      await showInvoiceActionsSheet(
+        context,
+        InvoiceActionsData(
+          documentType: 'invoice',
+          documentId: sale.id,
+          documentNumber: sale.saleNumber,
+          companyName: company?.tradeName ?? company?.name ?? '',
+          customerName: sale.customerName,
+          customerPhone: sale.customerPhone ?? _selectedCustomer?.phone,
+          customerEmail: sale.customerEmail ?? _selectedCustomer?.email,
+          currencySymbol: company?.currencySymbol ?? '\$',
+          subtotal: subtotal,
+          discount: sale.discount,
+          tax: tax,
+          total: sale.total,
+          taxId: company?.taxId,
+          taxLabel: company?.taxLabel ?? 'Tax',
+          isIndia: company?.isIndia ?? false,
+          paidAmount: sale.paidAmount,
+          dueAmount: sale.dueAmount,
+          lines: sale.items
+              .map((i) => ReceiptLine(name: i.name, quantity: i.quantity, unitPrice: i.price, lineTotal: i.price * i.quantity))
+              .toList(),
+        ),
       );
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -822,6 +896,40 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                 ),
                 const SizedBox(height: 4),
                 Text('Total due: ${widget.formatter.format(widget.total)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_outline, size: 18, color: Colors.grey.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _selectedCustomer == null
+                            ? const Text('No customer assigned', style: TextStyle(fontSize: 13))
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(_selectedCustomer!.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  if (_selectedCustomer!.phone.isNotEmpty)
+                                    Text(_selectedCustomer!.phone, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                ],
+                              ),
+                      ),
+                      if (_selectedCustomer != null)
+                        TextButton(
+                          onPressed: () => setState(() => _selectedCustomer = null),
+                          child: const Text('Remove'),
+                        )
+                      else
+                        TextButton.icon(
+                          onPressed: _pickCustomer,
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('Add Customer'),
+                        ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
                 if (_error != null) ...[
                   Text(_error!, style: TextStyle(color: Colors.red.shade700)),

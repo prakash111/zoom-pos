@@ -5,6 +5,8 @@ class QuotationModel {
     required this.quoteNumber,
     required this.customerId,
     required this.customerName,
+    this.customerPhone,
+    this.customerEmail,
     required this.items,
     required this.discount,
     required this.tax,
@@ -22,6 +24,8 @@ class QuotationModel {
       quoteNumber: json['quote_number'] as String? ?? '',
       customerId: json['customer_id']?.toString(),
       customerName: json['customer_name'] as String? ?? 'Customer',
+      customerPhone: json['customer_phone'] as String?,
+      customerEmail: json['customer_email'] as String?,
       items: (json['items'] as List? ?? []).cast<Map<String, dynamic>>(),
       discount: (json['discount'] as num?)?.toDouble() ?? 0,
       tax: (json['tax'] as num?)?.toDouble() ?? 0,
@@ -38,6 +42,8 @@ class QuotationModel {
   final String quoteNumber;
   final String? customerId;
   final String customerName;
+  final String? customerPhone;
+  final String? customerEmail;
   final List<Map<String, dynamic>> items;
   final double discount;
   final double tax;

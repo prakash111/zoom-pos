@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/models/tax_rule_model.dart';
 import '../../../core/widgets/barcode_scanner_screen.dart';
@@ -46,6 +47,9 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
   List<TaxRuleModel> _taxRules = [];
   TaxRuleModel? _selectedTaxRule;
   XFile? _pickedImage;
+  String? _aiImageUrl;
+  bool _aiAvailable = false;
+  bool _isGeneratingAi = false;
 
   bool get _isEditing => widget.product != null;
 
@@ -53,6 +57,9 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
   void initState() {
     super.initState();
     _taxesRepository = TaxesRepository(context.read<ApiClient>());
+    context.read<ApiClient>().get(ApiEndpoints.aiImageAvailability).then((response) {
+      if (mounted) setState(() => _aiAvailable = response['available'] as bool? ?? false);
+    }).catchError((_) {});
     final product = widget.product;
     _nameController = TextEditingController(text: product?.name ?? '');
     _salePriceController = TextEditingController(text: product == null ? '' : product.salePrice.toStringAsFixed(2));
@@ -135,6 +142,7 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
       categoryName: _categoryController.text.trim().isEmpty ? 'General' : _categoryController.text.trim(),
       brandName: _brandController.text.trim(),
       taxRate: double.tryParse(_taxRateController.text) ?? 0,
+      imageUrl: _pickedImage == null ? _aiImageUrl : null,
     );
 
     if (!mounted) return;
@@ -154,6 +162,34 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
       if (mounted) Navigator.of(context).pop();
     } else if (inventory.actionError != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(inventory.actionError!)));
+    }
+  }
+
+  Future<void> _generateAiImage() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a product name first.')));
+      return;
+    }
+    setState(() => _isGeneratingAi = true);
+    try {
+      final response = await context.read<ApiClient>().post(ApiEndpoints.aiImageGenerate, data: {
+        'name': name,
+        if (_categoryController.text.trim().isNotEmpty) 'category': _categoryController.text.trim(),
+      });
+      final url = response['image_url']?.toString();
+      if (mounted) {
+        setState(() {
+          if (url != null && url.isNotEmpty) {
+            _aiImageUrl = url;
+            _pickedImage = null;
+          }
+        });
+      }
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _isGeneratingAi = false);
     }
   }
 
@@ -232,18 +268,27 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
                             color: Colors.grey.shade100,
                             child: _pickedImage != null
                                 ? Image.file(File(_pickedImage!.path), fit: BoxFit.cover)
-                                : (widget.product?.imageUrl ?? '').isNotEmpty
-                                    ? CachedNetworkImage(imageUrl: widget.product!.imageUrl!, fit: BoxFit.cover)
-                                    : Icon(Icons.inventory_2_outlined, size: 36, color: Colors.grey.shade400),
+                                : (_aiImageUrl ?? '').isNotEmpty
+                                    ? CachedNetworkImage(imageUrl: _aiImageUrl!, fit: BoxFit.cover)
+                                    : (widget.product?.imageUrl ?? '').isNotEmpty
+                                        ? CachedNetworkImage(imageUrl: widget.product!.imageUrl!, fit: BoxFit.cover)
+                                        : Icon(Icons.inventory_2_outlined, size: 36, color: Colors.grey.shade400),
                           ),
                         ),
-                        if (_pickedImage != null)
+                        if (_isGeneratingAi)
+                          const Positioned.fill(
+                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          ),
+                        if (_pickedImage != null || (_aiImageUrl ?? '').isNotEmpty)
                           Positioned(
                             top: -8,
                             right: -8,
                             child: IconButton(
                               icon: const Icon(Icons.cancel, color: Colors.redAccent),
-                              onPressed: () => setState(() => _pickedImage = null),
+                              onPressed: () => setState(() {
+                                _pickedImage = null;
+                                _aiImageUrl = null;
+                              }),
                             ),
                           ),
                       ],
@@ -264,6 +309,14 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
                         icon: const Icon(Icons.photo_library_outlined, size: 18),
                         label: const Text('Gallery'),
                       ),
+                      if (_aiAvailable) ...[
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: _isGeneratingAi ? null : _generateAiImage,
+                          icon: const Icon(Icons.auto_awesome, size: 18),
+                          label: const Text('Generate with AI'),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 16),
