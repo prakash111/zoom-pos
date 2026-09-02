@@ -12,9 +12,12 @@ use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RestaurantDemoSeeder;
+use Database\Seeders\TenantDemoSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -149,6 +152,9 @@ class TenantProvisioningService
                 'activation_code' => $activationCode,
             ]);
 
+            // 6. Automatically Import Default Demo Data (Categories, Products, Tables, Customers, etc.)
+            $this->seedTenantDemoData($company, $posMode, $admin);
+
             AuditLog::record('tenant.self_registered', $company->id, $admin->id, [
                 'store_name' => $company->name,
                 'plan' => $planName,
@@ -162,6 +168,22 @@ class TenantProvisioningService
                 'invoice' => $invoice->fresh(),
             ];
         });
+    }
+
+    /**
+     * Automatically seed demo data for a newly registered tenant based on active POS mode.
+     */
+    public function seedTenantDemoData(Company $company, string $posMode = 'general', ?User $admin = null): void
+    {
+        try {
+            if ($posMode === 'restaurant') {
+                app(RestaurantDemoSeeder::class)->run($company);
+            } else {
+                app(TenantDemoSeeder::class)->run($company);
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Failed to auto-seed demo data for tenant [{$company->id}]: ".$e->getMessage());
+        }
     }
 
     /**
