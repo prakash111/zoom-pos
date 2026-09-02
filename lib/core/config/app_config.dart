@@ -21,6 +21,7 @@ class ApiEndpoints {
   static const String login = '/auth/login';
   static const String register = '/auth/register';
   static const String registrationConfig = '/auth/registration-config';
+  static const String authBranding = '/auth/branding';
   static const String session = '/auth/session';
   static const String status = '/status';
 
@@ -107,6 +108,7 @@ class ApiEndpoints {
   static const String settingsProfile = '/settings/profile';
   static const String settingsProfileLogo = '/settings/profile/logo';
   static const String settingsProfileFavicon = '/settings/profile/favicon';
+  static const String settingsProfileDrawerCover = '/settings/profile/drawer-cover';
   static const String settingsReceipts = '/settings/receipts';
   static const String settingsFinancial = '/settings/financial';
   static const String settingsNotifications = '/settings/notifications';
@@ -147,6 +149,7 @@ class ApiEndpoints {
 
   static const String languages = '/languages';
   static const String languagesDefault = '/languages/default';
+  static String languageTranslations(String locale) => '/languages/translations/$locale';
 
   static const String restaurantFloors = '/restaurant/floors';
   static String restaurantFloor(String id) => '/restaurant/floors/$id';

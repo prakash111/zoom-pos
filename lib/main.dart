@@ -36,17 +36,19 @@ Future<void> main() async {
     apiClient: apiClient,
   );
 
-  // Restore session in background
-  authProvider.restoreSession();
+  final heldCartsStore = HeldCartsStore()..load();
+  final themeProvider = ThemeProvider()..load();
+  final localeProvider = LocaleProvider(preferences: preferences, apiClient: apiClient)..load();
+  final navDockProvider = NavDockProvider(preferences: preferences)..load();
+
+  // Restore session in background, then re-fetch translations now that
+  // requests carry a token (LocaleProvider's own initial load may have run
+  // before restoreSession finished).
+  authProvider.restoreSession().then((_) => localeProvider.refreshFromServer());
 
   // Windows only: clear the session when the window is closed so the next
   // launch always starts at the login screen. No-op on Android.
   await WindowCloseGuard(authProvider).install();
-
-  final heldCartsStore = HeldCartsStore()..load();
-  final themeProvider = ThemeProvider()..load();
-  final localeProvider = LocaleProvider(preferences: preferences)..load();
-  final navDockProvider = NavDockProvider(preferences: preferences)..load();
 
   final syncEngine = SyncEngine(
     database: AppDatabase.instance,

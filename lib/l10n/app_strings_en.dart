@@ -59,6 +59,7 @@ const Map<String, String> kEnStrings = {
   'brandingDescription': 'Shown on invoices, quotations, and the web portal.',
   'logo': 'Logo',
   'favicon': 'Favicon',
+  'drawerCoverImage': 'Drawer Cover Image',
   'saveProfile': 'Save profile',
   'profileSaved': 'Profile saved.',
   'storeNameRequired': 'Store name is required.',

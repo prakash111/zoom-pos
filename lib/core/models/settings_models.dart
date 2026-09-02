@@ -17,6 +17,7 @@ class ProfileSettings {
     required this.primaryColor,
     this.logoUrl,
     this.faviconUrl,
+    this.drawerCoverUrl,
     required this.defaultCommissionRate,
     required this.defaultCommissionType,
   });
@@ -37,6 +38,7 @@ class ProfileSettings {
       primaryColor: json['primary_color'] as String? ?? '#2563eb',
       logoUrl: json['logo_url'] as String?,
       faviconUrl: json['favicon_url'] as String?,
+      drawerCoverUrl: json['drawer_cover_url'] as String?,
       defaultCommissionRate: (json['default_commission_rate'] as num?)?.toDouble() ?? 0,
       defaultCommissionType: json['default_commission_type'] as String? ?? 'percentage',
     );
@@ -56,6 +58,7 @@ class ProfileSettings {
   final String primaryColor;
   final String? logoUrl;
   final String? faviconUrl;
+  final String? drawerCoverUrl;
   final double defaultCommissionRate;
   final String defaultCommissionType;
 }

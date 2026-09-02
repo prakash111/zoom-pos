@@ -13,12 +13,16 @@ import 'app_strings_pt.dart';
 import 'app_strings_ru.dart';
 import 'app_strings_tr.dart';
 import 'app_strings_zh.dart';
+import 'translations_cache.dart';
 
-/// Hand-written localizations (not Flutter's `.arb`/codegen pipeline — see
-/// the Phase 5 plan for why) for the highest-traffic screens: login/splash,
-/// dashboard chrome, POS, and Settings' Profile tab. Covers every locale the
-/// Laravel backend's language catalog supports (see LocalizationService and
-/// LanguagesScreen). A missing key in the active locale falls back to
+/// Small hand-written dictionaries (not Flutter's `.arb`/codegen pipeline —
+/// see the Phase 5 plan for why) for the highest-traffic screens:
+/// login/splash, dashboard chrome, POS, and Settings' Profile tab — kept
+/// intentionally minimal so the APK doesn't bundle every locale's full
+/// catalog. The full phrase catalog (including any tenant-specific
+/// overrides) is fetched on demand from the backend and cached to disk by
+/// [TranslationsCache]; a key found there always wins over the bundled
+/// dictionary. A key missing everywhere in the active locale falls back to
 /// English rather than crashing or showing a blank string.
 class AppLocalizations {
   AppLocalizations(this.localeName) : _strings = _stringsFor(localeName);
@@ -50,7 +54,8 @@ class AppLocalizations {
 
   static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
-  String _s(String key) => _strings[key] ?? kEnStrings[key] ?? key;
+  String _s(String key) =>
+      TranslationsCache.instance.forLocale(localeName)[key] ?? _strings[key] ?? kEnStrings[key] ?? key;
 
   /// Substitutes `{name}` placeholders in a template string, e.g.
   /// `_format('{n} items', {'n': '3'})` → `'3 items'`.
@@ -120,6 +125,7 @@ class AppLocalizations {
   String get brandingDescription => _s('brandingDescription');
   String get logo => _s('logo');
   String get favicon => _s('favicon');
+  String get drawerCoverImage => _s('drawerCoverImage');
   String get saveProfile => _s('saveProfile');
   String get profileSaved => _s('profileSaved');
   String get storeNameRequired => _s('storeNameRequired');

@@ -193,8 +193,10 @@ class _ProfileTabState extends State<_ProfileTab> {
   late Color _primaryColor;
   String? _logoUrl;
   String? _faviconUrl;
+  String? _drawerCoverUrl;
   bool _uploadingLogo = false;
   bool _uploadingFavicon = false;
+  bool _uploadingDrawerCover = false;
   bool _saving = false;
 
   /// Whether GSTIN labeling should apply, computed live from the dropdown
@@ -231,6 +233,7 @@ class _ProfileTabState extends State<_ProfileTab> {
 
     _logoUrl = p.logoUrl;
     _faviconUrl = p.faviconUrl;
+    _drawerCoverUrl = p.drawerCoverUrl;
   }
 
   @override
@@ -323,6 +326,34 @@ class _ProfileTabState extends State<_ProfileTab> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _uploadingFavicon = false);
+    }
+  }
+
+  Future<void> _pickDrawerCover(ImageSource source) async {
+    final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    if (picked == null) return;
+
+    setState(() => _uploadingDrawerCover = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final url = await widget.repository.uploadDrawerCover(bytes, picked.name);
+      if (mounted) setState(() => _drawerCoverUrl = url);
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _uploadingDrawerCover = false);
+    }
+  }
+
+  Future<void> _removeDrawerCover() async {
+    setState(() => _uploadingDrawerCover = true);
+    try {
+      await widget.repository.removeDrawerCover();
+      if (mounted) setState(() => _drawerCoverUrl = null);
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _uploadingDrawerCover = false);
     }
   }
 
@@ -529,6 +560,14 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           ],
         ),
+        const SizedBox(height: 16),
+        _BrandImagePicker(
+          label: l10n.drawerCoverImage,
+          imageUrl: _drawerCoverUrl,
+          busy: _uploadingDrawerCover,
+          onPick: (source) => _pickDrawerCover(source),
+          onRemove: _drawerCoverUrl != null ? _removeDrawerCover : null,
+        ),
         const SizedBox(height: 20),
         ElevatedButton(
           onPressed: _saving ? null : _save,
@@ -628,6 +667,11 @@ class _ChangePasswordSectionState extends State<_ChangePasswordSection> {
               ),
               const SizedBox(height: 14),
               ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
                 onPressed: _isSaving ? null : _submit,
                 child: _isSaving
                     ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))

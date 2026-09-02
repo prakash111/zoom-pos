@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,6 +7,7 @@ import '../../core/config/nav_dock_provider.dart';
 import '../../core/config/theme_provider.dart';
 import '../../core/models/analytics_model.dart';
 import '../../core/models/company_model.dart';
+import '../../core/models/user_model.dart';
 import '../../core/services/sync/sync_status_badge.dart';
 import '../../core/storage/app_preferences.dart';
 import '../../core/utils/currency_formatter.dart';
@@ -43,7 +45,7 @@ import '../subscription/screens/subscription_screen.dart';
 import '../taxes/screens/taxes_screen.dart';
 
 class _FeatureTile {
-  _FeatureTile(this.titleOf, this.icon, [this.builder]);
+  _FeatureTile(this.titleOf, this.icon, [this.builder, this.permissionModule]);
 
   /// Resolves the display title from the active locale — a plain [String]
   /// would freeze at whatever locale was active when this module-level list
@@ -55,6 +57,15 @@ class _FeatureTile {
   /// Screen this tile opens. Falls back to [ComingSoonScreen] when a module
   /// hasn't been built yet.
   final WidgetBuilder? builder;
+
+  /// [PermissionChecker::MODULES] slug this tile belongs to, e.g. `'pos'` or
+  /// `'products'` — hidden from the menu unless the signed-in user has
+  /// `{module}.view`. `null` means the tile is never permission-gated (no
+  /// dedicated backend module, e.g. Subscription/Devices).
+  final String? permissionModule;
+
+  bool visibleTo(UserModel? user) =>
+      permissionModule == null || user == null || user.can('$permissionModule.view');
 }
 
 /// One labeled group of [_FeatureTile]s in the drawer — e.g. web's
@@ -77,45 +88,45 @@ List<_NavSection> _retailSections() => [
       _NavSection(
         (l10n) => l10n.navHeaderCashierSales,
         [
-          _FeatureTile((l10n) => l10n.featurePos, Icons.point_of_sale_outlined, (_) => const PosScreen()),
-          _FeatureTile((l10n) => l10n.featureSales, Icons.receipt_long_outlined, (_) => const SalesScreen()),
-          _FeatureTile((l10n) => l10n.featureQuotations, Icons.description_outlined, (_) => const QuotationsScreen()),
-          _FeatureTile((l10n) => l10n.featureConsignments, Icons.local_shipping_outlined, (_) => const ConsignmentsScreen()),
-          _FeatureTile((l10n) => l10n.featureServiceOrders, Icons.handyman_outlined, (_) => const ServiceOrdersScreen()),
-          _FeatureTile((l10n) => l10n.featureCustomers, Icons.people_outline, (_) => const CustomersScreen()),
+          _FeatureTile((l10n) => l10n.featurePos, Icons.point_of_sale_outlined, (_) => const PosScreen(), 'pos'),
+          _FeatureTile((l10n) => l10n.featureSales, Icons.receipt_long_outlined, (_) => const SalesScreen(), 'sales'),
+          _FeatureTile((l10n) => l10n.featureQuotations, Icons.description_outlined, (_) => const QuotationsScreen(), 'quotes'),
+          _FeatureTile((l10n) => l10n.featureConsignments, Icons.local_shipping_outlined, (_) => const ConsignmentsScreen(), 'consignments'),
+          _FeatureTile((l10n) => l10n.featureServiceOrders, Icons.handyman_outlined, (_) => const ServiceOrdersScreen(), 'service_orders'),
+          _FeatureTile((l10n) => l10n.featureCustomers, Icons.people_outline, (_) => const CustomersScreen(), 'customers'),
         ],
         headerColor: Colors.blue.shade700,
       ),
       _NavSection(
         (l10n) => l10n.navHeaderFinancialManagement,
         [
-          _FeatureTile((l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen()),
-          _FeatureTile((l10n) => l10n.featureDueReceivables, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen()),
-          _FeatureTile((l10n) => l10n.featurePayables, Icons.request_quote_outlined, (_) => const PayablesScreen()),
-          _FeatureTile((l10n) => l10n.featureSalesTargets, Icons.flag_outlined, (_) => const SalesTargetsScreen()),
-          _FeatureTile((l10n) => l10n.featureReports, Icons.insights_outlined, (_) => const ReportsScreen()),
-          _FeatureTile((l10n) => l10n.featureAnalytics, Icons.bar_chart_outlined, (_) => const AnalyticsScreen()),
+          _FeatureTile((l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen(), 'cash_register'),
+          _FeatureTile((l10n) => l10n.featureDueReceivables, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen(), 'finance'),
+          _FeatureTile((l10n) => l10n.featurePayables, Icons.request_quote_outlined, (_) => const PayablesScreen(), 'finance'),
+          _FeatureTile((l10n) => l10n.featureSalesTargets, Icons.flag_outlined, (_) => const SalesTargetsScreen(), 'targets'),
+          _FeatureTile((l10n) => l10n.featureReports, Icons.insights_outlined, (_) => const ReportsScreen(), 'reports'),
+          _FeatureTile((l10n) => l10n.featureAnalytics, Icons.bar_chart_outlined, (_) => const AnalyticsScreen(), 'reports'),
         ],
       ),
       _NavSection(
         (l10n) => l10n.navHeaderProductsInventory,
         [
-          _FeatureTile((l10n) => l10n.featureInventory, Icons.inventory_2_outlined, (_) => const InventoryManagementScreen()),
-          _FeatureTile((l10n) => l10n.featureCategories, Icons.sell_outlined, (_) => const CategoriesScreen()),
-          _FeatureTile((l10n) => l10n.featureBrands, Icons.auto_awesome_outlined, (_) => const BrandsScreen()),
-          _FeatureTile((l10n) => l10n.featureUnits, Icons.straighten_outlined, (_) => const UnitsScreen()),
-          _FeatureTile((l10n) => l10n.featureSuppliers, Icons.local_shipping_outlined, (_) => const SuppliersScreen()),
-          _FeatureTile((l10n) => l10n.featureTaxes, Icons.percent_outlined, (_) => const TaxesScreen()),
-          _FeatureTile((l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen()),
+          _FeatureTile((l10n) => l10n.featureInventory, Icons.inventory_2_outlined, (_) => const InventoryManagementScreen(), 'products'),
+          _FeatureTile((l10n) => l10n.featureCategories, Icons.sell_outlined, (_) => const CategoriesScreen(), 'categories'),
+          _FeatureTile((l10n) => l10n.featureBrands, Icons.auto_awesome_outlined, (_) => const BrandsScreen(), 'categories'),
+          _FeatureTile((l10n) => l10n.featureUnits, Icons.straighten_outlined, (_) => const UnitsScreen(), 'units'),
+          _FeatureTile((l10n) => l10n.featureSuppliers, Icons.local_shipping_outlined, (_) => const SuppliersScreen(), 'suppliers'),
+          _FeatureTile((l10n) => l10n.featureTaxes, Icons.percent_outlined, (_) => const TaxesScreen(), 'settings'),
+          _FeatureTile((l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen(), 'catalog'),
         ],
       ),
       _NavSection(
         (l10n) => l10n.navHeaderAdministration,
         [
           _FeatureTile((l10n) => l10n.featureSubscription, Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),
-          _FeatureTile((l10n) => l10n.featureSettings, Icons.settings_outlined, (_) => const TenantSettingsScreen()),
-          _FeatureTile((l10n) => l10n.featureLanguages, Icons.translate_outlined, (_) => const LanguagesScreen()),
-          _FeatureTile((l10n) => l10n.featureStaff, Icons.badge_outlined, (_) => const StaffScreen()),
+          _FeatureTile((l10n) => l10n.featureSettings, Icons.settings_outlined, (_) => const TenantSettingsScreen(), 'settings'),
+          _FeatureTile((l10n) => l10n.featureLanguages, Icons.translate_outlined, (_) => const LanguagesScreen(), 'settings'),
+          _FeatureTile((l10n) => l10n.featureStaff, Icons.badge_outlined, (_) => const StaffScreen(), 'users'),
           _FeatureTile((l10n) => l10n.featureDevices, Icons.devices_other_outlined, (_) => const DevicesScreen()),
         ],
       ),
@@ -130,46 +141,46 @@ List<_NavSection> _restaurantSections() => [
       _NavSection(
         (l10n) => l10n.navHeaderRestaurantOperations,
         [
-          _FeatureTile((l10n) => l10n.featureRestaurantPos, Icons.restaurant_outlined, (_) => const RestaurantPosScreen()),
-          _FeatureTile((l10n) => l10n.featureFloorPlan, Icons.table_restaurant_outlined, (_) => const RestaurantTablesScreen()),
-          _FeatureTile((l10n) => l10n.featureKitchenDisplay, Icons.soup_kitchen_outlined, (_) => const RestaurantKdsScreen()),
+          _FeatureTile((l10n) => l10n.featureRestaurantPos, Icons.restaurant_outlined, (_) => const RestaurantPosScreen(), 'pos'),
+          _FeatureTile((l10n) => l10n.featureFloorPlan, Icons.table_restaurant_outlined, (_) => const RestaurantTablesScreen(), 'pos'),
+          _FeatureTile((l10n) => l10n.featureKitchenDisplay, Icons.soup_kitchen_outlined, (_) => const RestaurantKdsScreen(), 'pos'),
         ],
         headerColor: Colors.lime.shade800,
       ),
       _NavSection(
         (l10n) => l10n.navHeaderOrdersCash,
         [
-          _FeatureTile((l10n) => l10n.featureDiningHistory, Icons.receipt_long_outlined, (_) => const SalesScreen()),
-          _FeatureTile((l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen()),
+          _FeatureTile((l10n) => l10n.featureDiningHistory, Icons.receipt_long_outlined, (_) => const SalesScreen(), 'sales'),
+          _FeatureTile((l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen(), 'cash_register'),
         ],
       ),
       _NavSection(
         (l10n) => l10n.navHeaderFinancialManagement,
         [
-          _FeatureTile((l10n) => l10n.featureAccountsReceivable, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen()),
-          _FeatureTile((l10n) => l10n.featureAccountsPayable, Icons.request_quote_outlined, (_) => const PayablesScreen()),
-          _FeatureTile((l10n) => l10n.featureReportsAnalytics, Icons.insights_outlined, (_) => const ReportsScreen()),
+          _FeatureTile((l10n) => l10n.featureAccountsReceivable, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen(), 'finance'),
+          _FeatureTile((l10n) => l10n.featureAccountsPayable, Icons.request_quote_outlined, (_) => const PayablesScreen(), 'finance'),
+          _FeatureTile((l10n) => l10n.featureReportsAnalytics, Icons.insights_outlined, (_) => const ReportsScreen(), 'reports'),
         ],
       ),
       _NavSection(
         (l10n) => l10n.navHeaderKitchenMenuCatalog,
         [
-          _FeatureTile((l10n) => l10n.featureMenuDishes, Icons.inventory_2_outlined, (_) => const InventoryManagementScreen()),
-          _FeatureTile((l10n) => l10n.featureCategories, Icons.sell_outlined, (_) => const CategoriesScreen()),
-          _FeatureTile((l10n) => l10n.featureBrands, Icons.auto_awesome_outlined, (_) => const BrandsScreen()),
-          _FeatureTile((l10n) => l10n.featureUnits, Icons.straighten_outlined, (_) => const UnitsScreen()),
-          _FeatureTile((l10n) => l10n.featureSuppliers, Icons.local_shipping_outlined, (_) => const SuppliersScreen()),
-          _FeatureTile((l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen()),
-          _FeatureTile((l10n) => l10n.featureGuestDirectory, Icons.people_outline, (_) => const CustomersScreen()),
+          _FeatureTile((l10n) => l10n.featureMenuDishes, Icons.inventory_2_outlined, (_) => const InventoryManagementScreen(), 'products'),
+          _FeatureTile((l10n) => l10n.featureCategories, Icons.sell_outlined, (_) => const CategoriesScreen(), 'categories'),
+          _FeatureTile((l10n) => l10n.featureBrands, Icons.auto_awesome_outlined, (_) => const BrandsScreen(), 'categories'),
+          _FeatureTile((l10n) => l10n.featureUnits, Icons.straighten_outlined, (_) => const UnitsScreen(), 'units'),
+          _FeatureTile((l10n) => l10n.featureSuppliers, Icons.local_shipping_outlined, (_) => const SuppliersScreen(), 'suppliers'),
+          _FeatureTile((l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen(), 'catalog'),
+          _FeatureTile((l10n) => l10n.featureGuestDirectory, Icons.people_outline, (_) => const CustomersScreen(), 'customers'),
         ],
       ),
       _NavSection(
         (l10n) => l10n.navHeaderAdministration,
         [
           _FeatureTile((l10n) => l10n.featureSubscription, Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),
-          _FeatureTile((l10n) => l10n.featureSettings, Icons.settings_outlined, (_) => const TenantSettingsScreen()),
-          _FeatureTile((l10n) => l10n.featureLanguages, Icons.translate_outlined, (_) => const LanguagesScreen()),
-          _FeatureTile((l10n) => l10n.featureStaff, Icons.badge_outlined, (_) => const StaffScreen()),
+          _FeatureTile((l10n) => l10n.featureSettings, Icons.settings_outlined, (_) => const TenantSettingsScreen(), 'settings'),
+          _FeatureTile((l10n) => l10n.featureLanguages, Icons.translate_outlined, (_) => const LanguagesScreen(), 'settings'),
+          _FeatureTile((l10n) => l10n.featureStaff, Icons.badge_outlined, (_) => const StaffScreen(), 'users'),
           _FeatureTile((l10n) => l10n.featureDevices, Icons.devices_other_outlined, (_) => const DevicesScreen()),
         ],
       ),
@@ -178,15 +189,26 @@ List<_NavSection> _restaurantSections() => [
 /// The active nav tree for this tenant — retail (general) or Cafe &
 /// Restaurant, chosen by [CompanyModel.isRestaurantMode] exactly as the web
 /// picks between its two sidebar branches.
-List<_NavSection> _sectionsFor(CompanyModel? company) =>
-    (company?.isRestaurantMode ?? false) ? _restaurantSections() : _retailSections();
+/// Mode-appropriate sections with every tile the signed-in [user] isn't
+/// authorized for (see [_FeatureTile.visibleTo]) filtered out, and any
+/// section left with no visible tiles dropped entirely — this is the single
+/// point all four dock renderings (drawer/rail/top bar/bottom bar) go
+/// through, so their tile-to-index mapping stays consistent with each other.
+List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
+  final sections = (company?.isRestaurantMode ?? false) ? _restaurantSections() : _retailSections();
+  return [
+    for (final section in sections)
+      if (section.tiles.any((t) => t.visibleTo(user)))
+        _NavSection(section.header, section.tiles.where((t) => t.visibleTo(user)).toList(), headerColor: section.headerColor),
+  ];
+}
 
 /// Every tile across all sections, in order — the flat form every dock
 /// rendering except the drawer (rail/top bar/bottom bar don't group with
 /// headers) uses, and what the drawer's tile-to-index mapping is built from
 /// so `_dockIndex` stays in sync across all four.
-List<_FeatureTile> _featuresFor(CompanyModel? company) => [
-      for (final section in _sectionsFor(company)) ...section.tiles,
+List<_FeatureTile> _featuresFor(CompanyModel? company, UserModel? user) => [
+      for (final section in _sectionsFor(company, user)) ...section.tiles,
     ];
 
 /// The post-login home base. Each feature module still under construction
@@ -246,7 +268,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     setState(() => _dockIndex = index);
-    final feature = _featuresFor(context.read<AuthProvider>().company)[index - 1];
+    final auth = context.read<AuthProvider>();
+    final feature = _featuresFor(auth.company, auth.user)[index - 1];
     final title = feature.titleOf(AppLocalizations.of(context));
     Navigator.of(context)
         .push(MaterialPageRoute(builder: feature.builder ?? (_) => ComingSoonScreen(title: title, icon: feature.icon)))
@@ -259,9 +282,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// [_FeatureTile], with titles resolved from the active locale — shared by
   /// every dock rendering below so none of them can drift out of sync (or
   /// out of language) with each other.
-  List<(IconData, String)> _dockDestinationsFor(AppLocalizations l10n, CompanyModel? company) => [
+  List<(IconData, String)> _dockDestinationsFor(AppLocalizations l10n, CompanyModel? company, UserModel? user) => [
         (Icons.home_outlined, l10n.navHome),
-        for (final feature in _featuresFor(company)) (feature.icon, feature.titleOf(l10n)),
+        for (final feature in _featuresFor(company, user)) (feature.icon, feature.titleOf(l10n)),
       ];
 
   /// Structured, mode-isolated drawer: a Home tile followed by every
@@ -269,16 +292,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// tenant sidebar's slide-out drawer (see layouts/tenant.blade.php).
   /// Section headers are omitted from the rail/top bar/bottom bar (see
   /// [_dockDestinationsFor]), which just render the same tiles flat.
-  Widget _buildDrawer(BuildContext context, CompanyModel? company) {
+  Widget _buildDrawer(BuildContext context, CompanyModel? company, UserModel? user) {
     final l10n = AppLocalizations.of(context);
     final isRestaurant = company?.isRestaurantMode ?? false;
 
+    final coverUrl = company?.drawerCoverUrl;
+    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
+
     final children = <Widget>[
-      DrawerHeader(
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary),
+      Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 12, 16, 14),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          image: hasCover
+              ? DecorationImage(
+                  image: CachedNetworkImageProvider(coverUrl),
+                  fit: BoxFit.cover,
+                )
+              : null,
+          gradient: hasCover
+              ? LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.black.withValues(alpha: 0.15), Colors.black.withValues(alpha: 0.55)],
+                )
+              : null,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               company?.tradeName ?? company?.name ?? 'Sales & Inventory',
@@ -306,7 +349,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ];
 
     var index = 1;
-    for (final section in _sectionsFor(company)) {
+    for (final section in _sectionsFor(company, user)) {
       if (section.header != null) {
         children.add(Padding(
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
@@ -362,7 +405,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onDestinationSelected: (index) => _onDockItemSelected(context, index),
         labelType: extended ? NavigationRailLabelType.none : NavigationRailLabelType.all,
         destinations: [
-          for (final destination in _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company))
+          for (final destination in _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company, context.read<AuthProvider>().user))
             NavigationRailDestination(icon: Icon(destination.$1), label: Text(destination.$2)),
         ],
       ),
@@ -370,7 +413,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   PreferredSizeWidget _buildTopDock(BuildContext context) {
-    final destinations = _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company);
+    final destinations = _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company, context.read<AuthProvider>().user);
     return PreferredSize(
       preferredSize: const Size.fromHeight(52),
       child: SizedBox(
@@ -393,7 +436,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildBottomDock(BuildContext context) {
-    final destinations = _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company);
+    final destinations = _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company, context.read<AuthProvider>().user);
     return Material(
       elevation: 8,
       child: SafeArea(
@@ -440,14 +483,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (wide) {
           leftRail = _buildRail(context);
         } else {
-          drawer = _buildDrawer(context, company);
+          drawer = _buildDrawer(context, company, auth.user);
         }
         break;
       case NavDockPosition.right:
         if (wide) {
           rightRail = _buildRail(context);
         } else {
-          endDrawer = _buildDrawer(context, company);
+          endDrawer = _buildDrawer(context, company, auth.user);
         }
         break;
       case NavDockPosition.top:

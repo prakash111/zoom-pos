@@ -755,6 +755,10 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
   DateTime? _dueDate;
   CustomerModel? _selectedCustomer;
 
+  double get _tenderedAmount => double.tryParse(_tenderedController.text.trim()) ?? 0.0;
+  double get _changeDue => (_tenderedAmount - widget.total).clamp(0, double.infinity).toDouble();
+  double get _remainingDue => (widget.total - _tenderedAmount).clamp(0, double.infinity).toDouble();
+
   Future<void> _pickCustomer() async {
     final repository = CustomersRepository(context.read<ApiClient>());
     final customer = await showModalBottomSheet<CustomerModel>(
@@ -765,6 +769,12 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
       builder: (_) => CustomerPickerSheet(customersRepository: repository),
     );
     if (customer != null) setState(() => _selectedCustomer = customer);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _tenderedController.addListener(() => setState(() {}));
   }
 
   @override
@@ -955,6 +965,36 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(labelText: 'Cash Tendered by Customer'),
                     ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _tenderedAmount >= widget.total ? Colors.green.shade50 : Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _tenderedAmount >= widget.total ? Colors.green.shade200 : Colors.orange.shade200),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _tenderedAmount >= widget.total ? 'CHANGE DUE TO CUSTOMER' : 'REMAINING DUE BALANCE',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _tenderedAmount >= widget.total ? Colors.green.shade800 : Colors.orange.shade800,
+                              fontSize: 11,
+                            ),
+                          ),
+                          Text(
+                            widget.formatter.format(_tenderedAmount >= widget.total ? _changeDue : _remainingDue),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _tenderedAmount >= widget.total ? Colors.green.shade800 : Colors.orange.shade800,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ] else ...[
                   for (var i = 0; i < _splitPayments.length; i++)
@@ -1022,6 +1062,11 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                 ],
                 const SizedBox(height: 20),
                 FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                   onPressed: _isSaving ? null : _settle,
                   child: _isSaving
                       ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))

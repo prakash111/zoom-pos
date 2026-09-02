@@ -1,6 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/api/api_client.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/storage/app_preferences.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../settings/server_settings_screen.dart';
@@ -22,6 +25,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final _accountIdController = TextEditingController();
   bool _obscurePassword = true;
   bool _showAccountId = false;
+  String? _brandLogoUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<ApiClient>().get(ApiEndpoints.authBranding).then((response) {
+      final url = response['brand_logo_url']?.toString();
+      if (!mounted || url == null || url.isEmpty) return;
+      setState(() => _brandLogoUrl = url);
+    }).catchError((_) {
+      // Pre-auth branding fetch is best-effort — fall back to the store icon.
+    });
+  }
 
   @override
   void dispose() {
@@ -82,7 +98,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.storefront, size: 56, color: Theme.of(context).colorScheme.primary),
+                    (_brandLogoUrl?.isNotEmpty ?? false)
+                        ? CachedNetworkImage(
+                            imageUrl: _brandLogoUrl!,
+                            height: 64,
+                            placeholder: (context, url) => const Icon(Icons.store, size: 64, color: Color(0xFF4A3B32)),
+                            errorWidget: (context, url, error) => const Icon(Icons.store, size: 64, color: Color(0xFF4A3B32)),
+                          )
+                        : const Icon(Icons.store, size: 64, color: Color(0xFF4A3B32)),
                     const SizedBox(height: 12),
                     Text(
                       'Sales & Inventory',

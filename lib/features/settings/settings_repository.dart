@@ -81,6 +81,18 @@ class SettingsRepository {
 
   Future<void> removeFavicon() => _client.delete(ApiEndpoints.settingsProfileFavicon);
 
+  Future<String?> uploadDrawerCover(List<int> bytes, String filename) async {
+    final response = await _client.postMultipart(
+      ApiEndpoints.settingsProfileDrawerCover,
+      fieldName: 'drawer_cover',
+      bytes: bytes,
+      filename: filename,
+    );
+    return response['drawer_cover_url'] as String?;
+  }
+
+  Future<void> removeDrawerCover() => _client.delete(ApiEndpoints.settingsProfileDrawerCover);
+
   Future<ReceiptSettings> updateReceipts({
     String? invoicePrefix,
     String? quotationPrefix,
