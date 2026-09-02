@@ -27,7 +27,7 @@ class Company extends Model
     protected $fillable = [
         'unique_account_id', 'name', 'slug', 'custom_domain', 'trade_name', 'legal_name', 'tax_id', 'tax_id_label',
         'email', 'phone', 'website', 'address', 'city', 'state', 'postal_code', 'country', 'currency',
-        'language', 'default_locale', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'receipt_format', 'status', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
+        'language', 'default_locale', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'nav_config', 'receipt_format', 'status', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
         'max_users', 'max_devices', 'pricing_mode', 'tax_api_mode', 'tax_api_key', 'tax_api_endpoint',
         'invoice_prefix', 'quotation_prefix', 'tax_settings', 'invoice_terms', 'quote_terms', 'bank_details',
         'currency_symbol', 'currency_decimals', 'currency_symbol_position', 'other_currencies',
@@ -47,6 +47,7 @@ class Company extends Model
             'currency_decimals' => 'integer',
             'other_currencies' => 'array',
             'restaurant_mode_locked' => 'boolean',
+            'nav_config' => 'array',
             'default_commission_rate' => 'decimal:2',
             'card_fee_debit' => 'decimal:2',
             'card_fee_credit_1x' => 'decimal:2',

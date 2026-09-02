@@ -36,6 +36,8 @@ class SettingsApiController extends Controller
             ->pluck('value', 'key')
             ->all();
 
+        $navConfig = $company->nav_config ?? [];
+
         return response()->json([
             'success' => true,
             'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
@@ -45,6 +47,14 @@ class SettingsApiController extends Controller
             'financial' => $this->presentFinancial($company),
             'notifications' => $this->presentNotifications($company, $configs),
             'payment_methods' => $this->paymentMethods($company),
+            // Read-only mirror of AppBootstrapController::bootstrap()'s `nav`
+            // block, for Settings > Navigation Menu to render its current
+            // state without a second call — saved back through
+            // AppBootstrapController::updateNav().
+            'nav' => [
+                'hidden_tiles' => array_values($navConfig['hidden_tiles'] ?? []),
+                'section_order' => array_values($navConfig['section_order'] ?? []),
+            ],
         ]);
     }
 

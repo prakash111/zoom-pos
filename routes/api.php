@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AppBootstrapController;
 use App\Http\Controllers\Api\V1\CashRegisterApiController;
 use App\Http\Controllers\Api\V1\CatalogAdminApiController;
 use App\Http\Controllers\Api\V1\CatalogApiController;
@@ -271,5 +272,9 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/languages', [LanguageApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
         Route::put('/languages/default', [LanguageApiController::class, 'setDefault'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/languages/translations/{locale}', [LanguageApiController::class, 'translations']);
+
+        // App bootstrap (translations + nav customization + config in one call)
+        Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
+        Route::post('/settings/nav-config', [AppBootstrapController::class, 'updateNav'])->middleware('tenant.api.permission:settings,edit');
     });
 });
