@@ -78,6 +78,8 @@ class Index extends Component
 
     public $faviconFile = null;
 
+    public $drawerCoverFile = null;
+
     public $newLogo;
 
     public $newFavicon;
@@ -85,6 +87,8 @@ class Index extends Component
     public string $logo = '';
 
     public string $favicon = '';
+
+    public string $drawerCover = '';
 
     public string $primaryColor = '#2d7a58';
 
@@ -303,6 +307,7 @@ class Index extends Component
         // Branding
         $this->logo = (string) ($this->company->logo ?? '');
         $this->favicon = (string) ($this->company->favicon ?? '');
+        $this->drawerCover = (string) ($this->company->drawer_cover ?? '');
         $this->primaryColor = (string) ($this->company->primary_color ?: '#2d7a58');
         $this->themeColor = (string) ($this->company->theme_color ?: 'blue');
         $this->posLayout = (string) ($this->company->pos_layout ?: 'standard');
@@ -397,8 +402,10 @@ class Index extends Component
             'defaultCommissionType' => ['required', 'in:percentage,fixed,profit_percentage,profit'],
             'logo' => ['nullable', 'string', 'max:500'],
             'favicon' => ['nullable', 'string', 'max:500'],
+            'drawerCover' => ['nullable', 'string', 'max:500'],
             'logoFile' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp,svg', 'max:2048'],
             'faviconFile' => ['nullable', 'file', 'mimes:png,ico,svg,jpg,jpeg,webp', 'max:1024'],
+            'drawerCoverFile' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:4096'],
             'smtpHost' => ['nullable', 'string', 'max:255'],
             'smtpPort' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'smtpUsername' => ['nullable', 'string', 'max:255'],
@@ -469,6 +476,18 @@ class Index extends Component
         }
     }
 
+    public function getDrawerCoverPreviewUrlProperty(): ?string
+    {
+        if (! $this->drawerCoverFile) {
+            return null;
+        }
+        try {
+            return $this->drawerCoverFile->temporaryUrl();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public function updatedLogoFile(): void
     {
         try {
@@ -503,6 +522,23 @@ class Index extends Component
         }
     }
 
+    public function updatedDrawerCoverFile(): void
+    {
+        try {
+            $this->validateOnly('drawerCoverFile', [
+                'drawerCoverFile' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:4096'],
+            ]);
+        } catch (ValidationException $e) {
+            $this->drawerCoverFile = null;
+            $msg = $e->validator->errors()->first('drawerCoverFile') ?: __('Invalid image format. Please upload a valid image file (.png, .jpg, .jpeg, .webp) under 4MB.');
+            $this->dispatch('notify', ['type' => 'error', 'message' => $msg]);
+            $this->addError('drawerCoverFile', $msg);
+        } catch (\Throwable $e) {
+            $this->drawerCoverFile = null;
+            $this->dispatch('notify', ['type' => 'error', 'message' => __('Invalid image format. Please upload a valid image file.')]);
+        }
+    }
+
     public function removeLogo(): void
     {
         if ($this->company->logo && ! filter_var($this->company->logo, FILTER_VALIDATE_URL)) {
@@ -528,6 +564,19 @@ class Index extends Component
         $this->favicon = '';
         $this->faviconFile = null;
         session()->flash('status', 'Favicon removed successfully.');
+    }
+
+    public function removeDrawerCover(): void
+    {
+        if ($this->company->drawer_cover && ! filter_var($this->company->drawer_cover, FILTER_VALIDATE_URL)) {
+            $cleanPath = preg_replace('#^/?storage/#', '', $this->company->drawer_cover);
+            Storage::disk('public')->delete($cleanPath);
+        }
+
+        $this->company->update(['drawer_cover' => null]);
+        $this->drawerCover = '';
+        $this->drawerCoverFile = null;
+        session()->flash('status', 'Drawer cover image removed successfully.');
     }
 
     public function addOtherCurrency(): void
@@ -562,6 +611,13 @@ class Index extends Component
             $path = $this->faviconFile->store('tenant-favicons', 'public');
             $this->favicon = Storage::url($path);
             $this->faviconFile = null;
+        }
+
+        // Handle Drawer Cover Upload
+        if ($this->drawerCoverFile) {
+            $path = $this->drawerCoverFile->store('tenant-drawer-covers', 'public');
+            $this->drawerCover = Storage::url($path);
+            $this->drawerCoverFile = null;
         }
 
         $this->company->update([
@@ -599,6 +655,7 @@ class Index extends Component
             'bank_details' => $this->bankDetails ?: null,
             'logo' => $this->logo ?: null,
             'favicon' => $this->favicon ?: null,
+            'drawer_cover' => $this->drawerCover ?: null,
             'primary_color' => $this->primaryColor ?: '#2563eb',
             'theme_color' => $this->themeColor ?: 'blue',
             'pos_layout' => $this->posLayout ?: 'standard',

@@ -27,7 +27,7 @@ class Company extends Model
     protected $fillable = [
         'unique_account_id', 'name', 'slug', 'custom_domain', 'trade_name', 'legal_name', 'tax_id', 'tax_id_label',
         'email', 'phone', 'website', 'address', 'city', 'state', 'postal_code', 'country', 'currency',
-        'language', 'default_locale', 'logo', 'favicon', 'primary_color', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'receipt_format', 'status', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
+        'language', 'default_locale', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'receipt_format', 'status', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
         'max_users', 'max_devices', 'pricing_mode', 'tax_api_mode', 'tax_api_key', 'tax_api_endpoint',
         'invoice_prefix', 'quotation_prefix', 'tax_settings', 'invoice_terms', 'quote_terms', 'bank_details',
         'currency_symbol', 'currency_decimals', 'currency_symbol_position', 'other_currencies',
@@ -108,6 +108,29 @@ class Company extends Model
 
         if (str_starts_with($this->favicon, '/')) {
             return asset(ltrim($this->favicon, '/'));
+        }
+
+        return asset('storage/'.ltrim($cleanPath, '/'));
+    }
+
+    public function getDrawerCoverUrl(): ?string
+    {
+        if (empty($this->drawer_cover)) {
+            return null;
+        }
+
+        if (str_starts_with($this->drawer_cover, 'http://') || str_starts_with($this->drawer_cover, 'https://') || str_starts_with($this->drawer_cover, 'data:')) {
+            return $this->drawer_cover;
+        }
+
+        $cleanPath = preg_replace('#^/?storage/#', '', $this->drawer_cover);
+
+        if (Storage::disk('public')->exists($cleanPath)) {
+            return Storage::disk('public')->url($cleanPath);
+        }
+
+        if (str_starts_with($this->drawer_cover, '/')) {
+            return asset(ltrim($this->drawer_cover, '/'));
         }
 
         return asset('storage/'.ltrim($cleanPath, '/'));

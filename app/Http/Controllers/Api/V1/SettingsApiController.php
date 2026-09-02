@@ -173,6 +173,48 @@ class SettingsApiController extends Controller
         return response()->json(['success' => true, 'message' => 'Favicon removed.']);
     }
 
+    /**
+     * POST /api/v1/pos/settings/profile/drawer-cover
+     */
+    public function uploadDrawerCover(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'drawer_cover' => ['required', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:4096'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
+        }
+
+        $path = $request->file('drawer_cover')->store('tenant-drawer-covers', 'public');
+        $company->update(['drawer_cover' => Storage::url($path)]);
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'drawer_cover']);
+
+        return response()->json(['success' => true, 'message' => 'Drawer cover uploaded.', 'drawer_cover_url' => $company->fresh()->getDrawerCoverUrl()]);
+    }
+
+    /**
+     * DELETE /api/v1/pos/settings/profile/drawer-cover
+     */
+    public function removeDrawerCover(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        if ($company->drawer_cover && ! filter_var($company->drawer_cover, FILTER_VALIDATE_URL)) {
+            $cleanPath = preg_replace('#^/?storage/#', '', $company->drawer_cover);
+            Storage::disk('public')->delete($cleanPath);
+        }
+
+        $company->update(['drawer_cover' => null]);
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'drawer_cover_removed']);
+
+        return response()->json(['success' => true, 'message' => 'Drawer cover removed.']);
+    }
+
     public function updateReceipts(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
@@ -462,6 +504,7 @@ class SettingsApiController extends Controller
             'primary_color' => $company->primary_color ?: '#2563eb',
             'logo_url' => $company->getLogoUrl(),
             'favicon_url' => $company->getFaviconUrl(),
+            'drawer_cover_url' => $company->getDrawerCoverUrl(),
             'default_commission_rate' => (float) ($company->default_commission_rate ?? 0),
             'default_commission_type' => $company->default_commission_type ?: 'percentage',
         ];

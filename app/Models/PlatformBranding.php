@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class PlatformBranding extends Model
 {
@@ -31,6 +32,35 @@ class PlatformBranding extends Model
             'landing_page_enabled' => 'boolean',
             'landing_sections_config' => 'array',
         ];
+    }
+
+    /**
+     * Full public URL for the platform logo. `logo_url` is normally a
+     * superadmin-pasted external link (see the Branding settings page), but
+     * this also resolves a bare local storage path defensively — same
+     * fallback chain as Company::getLogoUrl().
+     */
+    public function getLogoPublicUrl(): ?string
+    {
+        if (empty($this->logo_url)) {
+            return null;
+        }
+
+        if (str_starts_with($this->logo_url, 'http://') || str_starts_with($this->logo_url, 'https://') || str_starts_with($this->logo_url, 'data:')) {
+            return $this->logo_url;
+        }
+
+        $cleanPath = preg_replace('#^/?storage/#', '', $this->logo_url);
+
+        if (Storage::disk('public')->exists($cleanPath)) {
+            return Storage::disk('public')->url($cleanPath);
+        }
+
+        if (str_starts_with($this->logo_url, '/')) {
+            return asset(ltrim($this->logo_url, '/'));
+        }
+
+        return asset('storage/'.ltrim($cleanPath, '/'));
     }
 
     public function landingPage()

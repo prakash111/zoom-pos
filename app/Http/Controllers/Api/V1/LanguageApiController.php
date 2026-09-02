@@ -39,6 +39,28 @@ class LanguageApiController extends Controller
         ]);
     }
 
+    /**
+     * Full merged translation dictionary (base language JSON + this
+     * tenant's phrase overrides) for one locale — lets the mobile app fetch
+     * language packs on demand instead of bundling every locale's full
+     * catalog in the APK. GET /api/v1/pos/languages/translations/{locale}
+     */
+    public function translations(Request $request, string $locale, LocalizationService $localization): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $clean = strtolower(trim($locale));
+        if (! $localization->isValidLocale($clean)) {
+            return response()->json(['success' => false, 'error' => 'Unsupported locale.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'locale' => $clean,
+            'translations' => $localization->getMergedTranslations($clean, $company->id),
+        ]);
+    }
+
     public function setDefault(Request $request, LocalizationService $localization): JsonResponse
     {
         $company = $this->resolveCompany($request);

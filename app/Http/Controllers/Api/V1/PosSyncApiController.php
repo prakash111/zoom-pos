@@ -45,8 +45,9 @@ class PosSyncApiController extends Controller
 
     protected function desktopPermissions(User $user): array
     {
-        return [
+        $permissions = [
             'pos.create' => $user->hasPermission('pos', 'create'),
+            'pos.edit' => $user->hasPermission('pos', 'edit'),
             'products.view' => $user->hasPermission('products', 'view'),
             'products.create' => $user->hasPermission('products', 'create'),
             'products.edit' => $user->hasPermission('products', 'edit'),
@@ -56,6 +57,16 @@ class PosSyncApiController extends Controller
             'reports.view' => $user->hasPermission('reports', 'view'),
             'settings.view' => $user->hasPermission('settings', 'view'),
         ];
+
+        // A `.view` flag for every remaining module (mirrors
+        // PermissionChecker::MODULES exactly) so the mobile drawer/menu can
+        // gate each feature tile by the user's own authorized modules
+        // instead of showing every module to every role.
+        foreach (array_keys(\App\Services\Auth\PermissionChecker::MODULES) as $module) {
+            $permissions["{$module}.view"] ??= $user->hasPermission($module, 'view');
+        }
+
+        return $permissions;
     }
 
     /**
@@ -178,6 +189,7 @@ class PosSyncApiController extends Controller
                 'expires_at' => $company->expires_at?->toIso8601String(),
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
+                'drawer_cover_url' => $company->getDrawerCoverUrl(),
             ],
             // Only present when the tenant is actually on a plan — lets a fresh
             // desktop device provision a local mirror of both rows (companies.plan_name
@@ -208,6 +220,22 @@ class PosSyncApiController extends Controller
         return response()->json([
             'success' => true,
             'allowed_registration_modes' => (string) \App\Models\PlatformSystem::get('allowed_registration_modes', 'both'),
+        ]);
+    }
+
+    /**
+     * Platform-wide (not tenant-scoped) branding for pre-auth screens —
+     * currently just the Sign In screen's logo, set by the Superadmin in
+     * Branding settings. GET /api/v1/pos/auth/branding
+     */
+    public function branding(): JsonResponse
+    {
+        $branding = \App\Models\PlatformBranding::current();
+
+        return response()->json([
+            'success' => true,
+            'platform_name' => $branding->platform_name ?: config('app.name', 'Smart Inventory & Sales'),
+            'brand_logo_url' => $branding->getLogoPublicUrl(),
         ]);
     }
 
@@ -298,6 +326,7 @@ class PosSyncApiController extends Controller
                     'expires_at' => $company->expires_at?->toIso8601String(),
                     'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                     'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
+                    'drawer_cover_url' => $company->getDrawerCoverUrl(),
                 ],
                 'plan' => $company->plan ? $company->plan->only([
                     'name', 'display_name', 'billing_cycle', 'duration_days', 'price', 'currency', 'features', 'limits', 'active',
@@ -357,6 +386,7 @@ class PosSyncApiController extends Controller
                 'expires_at' => $company->expires_at?->toIso8601String(),
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
+                'drawer_cover_url' => $company->getDrawerCoverUrl(),
             ],
         ]);
     }

@@ -63,6 +63,7 @@ Route::prefix('v1/pos')->group(function () {
     Route::post('/auth/login', [PosSyncApiController::class, 'login']);
     Route::post('/auth/register', [PosSyncApiController::class, 'register']);
     Route::get('/auth/registration-config', [PosSyncApiController::class, 'registrationConfig']);
+    Route::get('/auth/branding', [PosSyncApiController::class, 'branding']);
 
     // Protected POS Endpoints (Require API Key or Bearer Token)
     Route::middleware([AuthenticateTenantApi::class])->group(function () {
@@ -187,6 +188,8 @@ Route::prefix('v1/pos')->group(function () {
         Route::delete('/settings/profile/logo', [SettingsApiController::class, 'removeLogo'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/profile/favicon', [SettingsApiController::class, 'uploadFavicon'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/settings/profile/favicon', [SettingsApiController::class, 'removeFavicon'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/settings/profile/drawer-cover', [SettingsApiController::class, 'uploadDrawerCover'])->middleware('tenant.api.permission:settings,edit');
+        Route::delete('/settings/profile/drawer-cover', [SettingsApiController::class, 'removeDrawerCover'])->middleware('tenant.api.permission:settings,edit');
         Route::put('/settings/receipts', [SettingsApiController::class, 'updateReceipts'])->middleware('tenant.api.permission:settings,edit');
         Route::put('/settings/financial', [SettingsApiController::class, 'updateFinancial'])->middleware('tenant.api.permission:settings,edit');
         Route::put('/settings/notifications', [SettingsApiController::class, 'updateNotifications'])->middleware('tenant.api.permission:settings,edit');
@@ -267,5 +270,6 @@ Route::prefix('v1/pos')->group(function () {
         // Languages (store default language only — see LanguageApiController)
         Route::get('/languages', [LanguageApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
         Route::put('/languages/default', [LanguageApiController::class, 'setDefault'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/languages/translations/{locale}', [LanguageApiController::class, 'translations']);
     });
 });
