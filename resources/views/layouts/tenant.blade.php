@@ -38,6 +38,7 @@
          early-in-<head> placement the superadmin layout already uses for
          its own (working) SortableJS menu builder. --}}
     <script src="{{ asset('assets/libs/sortable.min.js') }}"></script>
+    <script src="{{ asset('assets/js/tenant-navigation-builder.js') }}"></script>
 
     {{-- Cloak/nprogress/font-family/dockable-nav/theme-utility CSS used to be
          duplicated here as an inline <style> block, re-sent and re-parsed on
@@ -875,7 +876,7 @@
 
                             @if ($canSettings)
                                 <x-nav.drawer-link item-key="settings" :route="route('tenant.settings.index')" :title="__('Store Settings')" />
-                                <div class="pl-4 space-y-1 nav-children-container" data-parent-key="settings">
+                                <div class="pl-8 space-y-1 nav-children-container" data-parent-key="settings">
                                     <x-nav.drawer-link item-key="settings_mode" :route="route('tenant.settings.index').'#mode'" :title="__('Store Operating Mode')" />
                                     <x-nav.drawer-link item-key="settings_profile" :route="route('tenant.settings.index').'#profile'" :title="__('Store Profile & Branding')" />
                                     <x-nav.drawer-link item-key="settings_receipts" :route="route('tenant.settings.index').'#receipts'" :title="__('Receipt Prefixes & Bank Terms')" />
@@ -899,25 +900,19 @@
 
                 </nav>
 
-                {{-- Applies Settings > Navigation Menu's section/item order,
-                     any item moved to a different section, and any item
-                     nested under (or un-nested from) another item, directly
-                     to the already-rendered (permission-gated) drawer
-                     markup — see AppBootstrapController::updateNav() and
-                     Company::normalizedNavConfig(). Pure DOM reordering, no
-                     Blade restructuring: an item/section this tenant never
-                     touched simply keeps its compiled-in position (a stable
-                     sort over an all-equal order is a no-op), so a tenant
-                     with no saved config sees the drawer completely
-                     unchanged. childrenContainerFor() and the loops below
-                     work on whatever item key an item names as its parent
-                     with no depth limit of their own — Settings > Navigation
-                     Menu's builder is what actually caps nesting at three
-                     levels (Main Menu / Sub-Menu / Sub-Sub-Menu), by simply
-                     never saving a `parent` chain deeper than that. --}}
+{{-- Applies the canonical navigation hierarchy to the
+                     permission-gated drawer markup, then turns every item
+                     with children into an accessible accordion. The saved
+                     parent_id/level contract is shared with Flutter. --}}
                 <script>
                     (function () {
-                        const navConfig = @json($tenantNavConfig ?? ['sections' => [], 'items' => []]);
+                        let navConfig = @json($tenantNavConfig ?? ['sections' => [], 'items' => [], 'tree' => []]);
+                        const expandedByKey = new Map();
+                        const toggleLabel = @json(__('Toggle submenu'));
+
+                        function parentKeyFor(meta) {
+                            return meta?.parent_id ?? meta?.parent ?? null;
+                        }
 
                         function childrenContainerFor(navEl, parentEl) {
                             const parentKey = parentEl.getAttribute('data-item-key');
@@ -926,39 +921,142 @@
                             );
                             if (!container) {
                                 container = document.createElement('div');
-                                container.className = 'pl-4 space-y-1 nav-children-container';
+                                container.className = 'pl-8 space-y-1 nav-children-container';
                                 container.setAttribute('data-parent-key', parentKey);
                                 parentEl.after(container);
+                            } else {
+                                container.classList.remove('pl-4');
+                                container.classList.add('pl-8');
                             }
+
                             return container;
+                        }
+
+                        function removeAccordionControls(navEl) {
+                            navEl.querySelectorAll('.nav-accordion-toggle').forEach((toggle) => {
+                                const key = toggle.getAttribute('data-parent-key');
+                                expandedByKey.set(key, toggle.getAttribute('aria-expanded') === 'true');
+                                toggle.remove();
+                            });
+                            navEl.querySelectorAll('.nav-children-container').forEach((container) => {
+                                container.hidden = false;
+                            });
+                            navEl.querySelectorAll('[data-nav-has-children]').forEach((parent) => {
+                                parent.removeAttribute('data-nav-has-children');
+                                parent.removeAttribute('aria-expanded');
+                                parent.removeAttribute('aria-controls');
+                            });
+                        }
+
+                        function linkMatchesLocation(link) {
+                            try {
+                                const candidate = new URL(link.href, window.location.href);
+                                const current = new URL(window.location.href);
+                                return candidate.pathname === current.pathname
+                                    && candidate.search === current.search
+                                    && candidate.hash === current.hash;
+                            } catch (error) {
+                                return false;
+                            }
+                        }
+
+                        function setupAccordions(navEl) {
+                            const containers = Array.from(navEl.querySelectorAll('.nav-children-container'));
+                            containers.forEach((container) => {
+                                const parentKey = container.getAttribute('data-parent-key');
+                                const parentEl = navEl.querySelector(
+                                    '[data-item-key="' + CSS.escape(parentKey) + '"]'
+                                );
+                                const hasChildren = Boolean(
+                                    container.querySelector(':scope > [data-item-key]')
+                                );
+
+                                if (!parentEl || !hasChildren) {
+                                    container.hidden = true;
+                                    return;
+                                }
+
+                                const controlId = 'tenant-nav-children-' + parentKey.replace(/[^a-zA-Z0-9_-]/g, '-');
+                                const containsCurrentLink = Array.from(
+                                    container.querySelectorAll('a[href]')
+                                ).some(linkMatchesLocation);
+                                const parentIsCurrent = linkMatchesLocation(parentEl);
+                                const expanded = expandedByKey.has(parentKey)
+                                    ? expandedByKey.get(parentKey)
+                                    : (containsCurrentLink || parentIsCurrent);
+
+                                container.id = controlId;
+                                container.hidden = !expanded;
+                                parentEl.setAttribute('data-nav-has-children', 'true');
+                                parentEl.setAttribute('aria-expanded', String(expanded));
+                                parentEl.setAttribute('aria-controls', controlId);
+
+                                const toggle = document.createElement('span');
+                                toggle.className = 'nav-accordion-toggle ml-auto shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200';
+                                toggle.setAttribute('role', 'button');
+                                toggle.setAttribute('tabindex', '0');
+                                toggle.setAttribute('data-parent-key', parentKey);
+                                toggle.setAttribute('aria-label', toggleLabel);
+                                toggle.setAttribute('aria-controls', controlId);
+                                toggle.setAttribute('aria-expanded', String(expanded));
+                                toggle.innerHTML = '<svg aria-hidden="true" class="h-3.5 w-3.5 transition-transform" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 4.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>';
+
+                                const update = (nextExpanded) => {
+                                    expandedByKey.set(parentKey, nextExpanded);
+                                    container.hidden = !nextExpanded;
+                                    parentEl.setAttribute('aria-expanded', String(nextExpanded));
+                                    toggle.setAttribute('aria-expanded', String(nextExpanded));
+                                    const icon = toggle.querySelector('svg');
+                                    if (icon) icon.style.transform = nextExpanded ? 'rotate(90deg)' : '';
+                                };
+                                const activate = (event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    update(toggle.getAttribute('aria-expanded') !== 'true');
+                                };
+
+                                toggle.addEventListener('click', activate);
+                                toggle.addEventListener('keydown', (event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') activate(event);
+                                });
+                                parentEl.appendChild(toggle);
+                                update(Boolean(expanded));
+                            });
                         }
 
                         function applyTenantNavOrder() {
                             const navEl = document.getElementById('tenant-drawer-nav');
                             if (!navEl) return;
+                            removeAccordionControls(navEl);
 
                             const sectionOrder = {};
-                            (navConfig.sections || []).forEach((s) => { sectionOrder[s.key] = s.order; });
+                            (navConfig.sections || []).forEach((section) => {
+                                sectionOrder[section.key] = section.order;
+                            });
                             const itemMeta = {};
-                            (navConfig.items || []).forEach((i) => { itemMeta[i.key] = i; });
-
-                            const sectionsByKey = {};
-                            navEl.querySelectorAll(':scope > [data-section-key]').forEach((sec) => {
-                                sectionsByKey[sec.getAttribute('data-section-key')] = sec;
+                            (navConfig.items || []).forEach((item) => {
+                                itemMeta[item.key] = item;
                             });
 
-                            // Move an item into a different section, or nest
-                            // it under / un-nest it from another item, if
-                            // this tenant saved that change. An item with no
-                            // saved override at all is left exactly where it
-                            // was compiled/rendered.
-                            navEl.querySelectorAll('[data-item-key]').forEach((itemEl) => {
+                            const sectionsByKey = {};
+                            navEl.querySelectorAll(':scope > [data-section-key]').forEach((section) => {
+                                sectionsByKey[section.getAttribute('data-section-key')] = section;
+                            });
+
+                            // Apply parent placement before sorting. A missing
+                            // parent (for example, one hidden by permissions)
+                            // promotes the child to its configured section root.
+                            Array.from(navEl.querySelectorAll('[data-item-key]')).forEach((itemEl) => {
                                 const key = itemEl.getAttribute('data-item-key');
                                 const meta = itemMeta[key];
                                 if (!meta) return;
 
-                                if (meta.parent) {
-                                    const parentEl = navEl.querySelector('[data-item-key="' + CSS.escape(meta.parent) + '"]');
+                                itemEl.setAttribute('data-nav-level', String(Math.max(0, Math.min(2, Number(meta.level) || 0))));
+                                const parentKey = parentKeyFor(meta);
+                                if (parentKey) {
+                                    const parentEl = navEl.querySelector(
+                                        '[data-item-key="' + CSS.escape(parentKey) + '"]'
+                                    );
                                     if (parentEl && parentEl !== itemEl) {
                                         const container = childrenContainerFor(navEl, parentEl);
                                         if (itemEl.parentElement !== container) container.appendChild(itemEl);
@@ -966,10 +1064,13 @@
                                     }
                                 }
 
-                                const currentSectionEl = itemEl.closest('[data-section-key]');
-                                const targetSectionKey = meta.section || (currentSectionEl ? currentSectionEl.getAttribute('data-section-key') : null);
-                                const targetSection = targetSectionKey ? sectionsByKey[targetSectionKey] : null;
-                                const targetList = targetSection ? targetSection.querySelector(':scope > .space-y-1') : null;
+                                const currentSection = itemEl.closest('[data-section-key]');
+                                const targetSectionKey = meta.section
+                                    || currentSection?.getAttribute('data-section-key');
+                                const targetSection = targetSectionKey
+                                    ? sectionsByKey[targetSectionKey]
+                                    : null;
+                                const targetList = targetSection?.querySelector(':scope > .space-y-1');
                                 if (targetList && targetList !== itemEl.parentElement) {
                                     targetList.appendChild(itemEl);
                                 }
@@ -977,44 +1078,53 @@
 
                             function sortByOrder(list) {
                                 Array.from(list.children)
+                                    .filter((element) => element.hasAttribute('data-item-key'))
                                     .sort((a, b) => {
-                                        const ao = itemMeta[a.getAttribute('data-item-key')]?.order ?? Number.MAX_SAFE_INTEGER;
-                                        const bo = itemMeta[b.getAttribute('data-item-key')]?.order ?? Number.MAX_SAFE_INTEGER;
-                                        return ao - bo;
+                                        const first = itemMeta[a.getAttribute('data-item-key')]?.order
+                                            ?? Number.MAX_SAFE_INTEGER;
+                                        const second = itemMeta[b.getAttribute('data-item-key')]?.order
+                                            ?? Number.MAX_SAFE_INTEGER;
+                                        return first - second;
                                     })
-                                    .forEach((el) => list.appendChild(el));
+                                    .forEach((element) => list.appendChild(element));
                             }
 
-                            // Sort each section's root items, then every
-                            // nested children container, then the sections
-                            // themselves — all stable sorts, so anything
-                            // without an explicit order keeps its current
-                            // relative position.
-                            Object.values(sectionsByKey).forEach((sec) => {
-                                const list = sec.querySelector(':scope > .space-y-1');
+                            Object.values(sectionsByKey).forEach((section) => {
+                                const list = section.querySelector(':scope > .space-y-1');
                                 if (list) sortByOrder(list);
                             });
                             navEl.querySelectorAll('.nav-children-container').forEach(sortByOrder);
 
-                            // Keep each children container immediately after
-                            // its own parent item, wherever that item ended
-                            // up after the moves/sorts above.
+                            // A child container is a sibling of its parent
+                            // link. Reattach it after sorting so nested
+                            // branches move as one visual accordion tree.
                             navEl.querySelectorAll('.nav-children-container').forEach((container) => {
-                                const parentEl = navEl.querySelector('[data-item-key="' + CSS.escape(container.getAttribute('data-parent-key')) + '"]');
+                                const parentKey = container.getAttribute('data-parent-key');
+                                const parentEl = navEl.querySelector(
+                                    '[data-item-key="' + CSS.escape(parentKey) + '"]'
+                                );
                                 if (parentEl) parentEl.after(container);
                             });
 
                             Array.from(navEl.querySelectorAll(':scope > [data-section-key]'))
                                 .sort((a, b) => {
-                                    const ao = sectionOrder[a.getAttribute('data-section-key')] ?? Number.MAX_SAFE_INTEGER;
-                                    const bo = sectionOrder[b.getAttribute('data-section-key')] ?? Number.MAX_SAFE_INTEGER;
-                                    return ao - bo;
+                                    const first = sectionOrder[a.getAttribute('data-section-key')]
+                                        ?? Number.MAX_SAFE_INTEGER;
+                                    const second = sectionOrder[b.getAttribute('data-section-key')]
+                                        ?? Number.MAX_SAFE_INTEGER;
+                                    return first - second;
                                 })
-                                .forEach((el) => navEl.appendChild(el));
+                                .forEach((section) => navEl.appendChild(section));
+
+                            setupAccordions(navEl);
                         }
 
                         document.addEventListener('DOMContentLoaded', applyTenantNavOrder);
                         document.addEventListener('livewire:navigated', applyTenantNavOrder);
+                        window.addEventListener('tenant-navigation-updated', (event) => {
+                            if (event.detail?.nav) navConfig = event.detail.nav;
+                            applyTenantNavOrder();
+                        });
                     })();
                 </script>
             </div>

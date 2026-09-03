@@ -256,14 +256,60 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertFalse($quotationsItem['visible']);
     }
 
+    public function test_navigation_menu_endpoint_persists_a_canonical_three_level_tree(): void
+    {
+        [$company] = $this->actingAsTenantAdmin();
+
+        $payload = [
+            'sections' => [['key' => 'cashier_sales', 'order' => 0]],
+            'tree' => [[
+                'key' => 'cashier_sales',
+                'order' => 0,
+                'items' => [[
+                    'key' => 'pos',
+                    'parent_id' => null,
+                    'level' => 0,
+                    'order' => 0,
+                    'visible' => true,
+                    'children' => [[
+                        'key' => 'sales',
+                        'parent_id' => 'pos',
+                        'level' => 1,
+                        'order' => 0,
+                        'visible' => true,
+                        'children' => [[
+                            'key' => 'quotations',
+                            'parent_id' => 'sales',
+                            'level' => 2,
+                            'order' => 0,
+                            'visible' => false,
+                            'children' => [],
+                        ]],
+                    ]],
+                ]],
+            ]],
+        ];
+
+        $this->postJson(route('tenant.settings.navigation-menu.store'), $payload)
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('nav.items.0.parent_id', null)
+            ->assertJsonPath('nav.items.1.parent_id', 'pos')
+            ->assertJsonPath('nav.items.1.level', 1)
+            ->assertJsonPath('nav.items.2.parent_id', 'sales')
+            ->assertJsonPath('nav.items.2.level', 2)
+            ->assertJsonPath('nav.tree.0.items.0.children.0.children.0.key', 'quotations');
+
+        $saved = $company->fresh()->normalizedNavConfig();
+        $this->assertSame(['pos', 'sales', 'quotations'], array_column($saved['items'], 'key'));
+        $this->assertSame([0, 1, 2], array_column($saved['items'], 'level'));
+        $this->assertSame('quotations', $saved['tree'][0]['items'][0]['children'][0]['children'][0]['key']);
+    }
+
     /**
-     * Regression test: @json() inside a double-quoted x-data="..." attribute
-     * breaks on the JSON's own double quotes, prematurely closing the
-     * attribute — everything after that point (the rest of the Alpine
-     * component's JS) then renders as literal, visible page text instead of
-     * being parsed as an attribute. @js() (Illuminate\Support\Js) escapes
-     * quotes to "/' specifically so its output is safe to embed in
-     * either a single- or double-quoted HTML attribute.
+     * The tree builder is an external Alpine component. Its serialized
+     * payload is passed with @js() so the attribute remains valid HTML even
+     * when item labels or keys contain quotes.
      */
     public function test_navigation_tab_x_data_attribute_is_not_broken_by_raw_json_quotes(): void
     {
@@ -271,33 +317,22 @@ class NavigationMenuBuilderTest extends TestCase
 
         $html = Livewire::test(SettingsIndex::class)->html();
 
-        $this->assertStringContainsString('x-data="{', $html);
+        $this->assertStringContainsString('x-data="tenantNavigationBuilder(', $html);
         $this->assertStringNotContainsString(
             'sections: {"key":',
             $html,
             'nav_config JSON leaked into the attribute as raw, unescaped double quotes — this breaks the attribute.'
         );
 
-        // The rest of the Alpine component's JS must stay inside the
-        // attribute, not spill out as visible page text.
-        $this->assertStringNotContainsString('>{ try { s.destroy(); }', $html);
-        $this->assertStringContainsString('initSortables()', $html);
-
-        // The template markup that actually renders the section/item rows
-        // must follow as real (child) HTML, not get swallowed into a
-        // mis-parsed tag the way the broken attribute did.
         $this->assertStringContainsString('id="nav-sections-container"', $html);
         $this->assertStringContainsString('x-for="section in sections"', $html);
-        $this->assertStringContainsString('x-for="item in section.items"', $html);
+        $this->assertStringContainsString('x-for="item in flattenedItems(section)"', $html);
         $this->assertStringContainsString('x-model="item.visible"', $html);
         $this->assertStringContainsString('class="nav-section-drag-handle', $html);
         $this->assertStringContainsString('class="nav-item-drag-handle', $html);
-
-        // Sub-Sub-Menu level (WordPress-style three-level nesting): a
-        // Sub-Menu row must render its own nested grandchildren list.
-        $this->assertStringContainsString('x-for="child in item.children"', $html);
-        $this->assertStringContainsString('x-for="grandchild in child.children"', $html);
-        $this->assertStringContainsString('nav-grandchildren-container', $html);
+        $this->assertStringContainsString('data-nav-level', $html);
+        $this->assertStringContainsString('nav-depth-guide', $html);
+        $this->assertStringNotContainsString('nav-grandchildren-container', $html);
     }
 
     /**
@@ -325,48 +360,62 @@ class NavigationMenuBuilderTest extends TestCase
         $this->actingAsTenantAdmin();
 
         $html = Livewire::test(SettingsIndex::class)->html();
+        $script = file_get_contents(public_path('assets/js/tenant-navigation-builder.js'));
 
-        $this->assertStringNotContainsString('forceFallback: true', $html);
-        $this->assertStringNotContainsString('fallbackOnBody: true', $html);
-        $this->assertStringContainsString('class="nav-children-container ml-8', $html);
+        $this->assertIsString($script);
+        $this->assertStringNotContainsString('forceFallback: true', $script);
+        $this->assertStringNotContainsString('fallbackOnBody: true', $script);
+        $this->assertStringContainsString('const TAB_SIZE = 32', $script);
+        $this->assertStringContainsString('const MAX_LEVEL = 2', $script);
+        $this->assertStringContainsString('Math.round(snappedOffset / TAB_SIZE)', $script);
+        $this->assertStringContainsString('maxLevels: MAX_LEVEL + 1', $script);
+        $this->assertStringContainsString('isTree: true', $script);
+        $this->assertStringContainsString("draggable: '>[data-item-key]'", $script);
+        $this->assertStringContainsString("CustomEvent('tenant-navigation-updated'", $script);
+        $this->assertStringContainsString('nav-depth-guide', $html);
     }
 
     /**
-     * Regression test: this page also polls for desktop-sync-status
-     * (livewire:tenant.desktop-sync-status), and Livewire's morph.updated
-     * hook fires for *any* Livewire request completing anywhere on the
-     * page, not just one scoped to this tab. Without a guard,
-     * initSortables() destroying and recreating every Sortable instance
-     * whenever that hook fires — including mid-drag, if a poll happens to
-     * land while the user is dragging — leaves a native `dragover` event
-     * still firing against an instance that was just destroy()'d, whose
-     * own `el` reference is now null: SortableJS's internal _onDragOver
-     * throws trying to read a property off it, repeatedly, until the drag
-     * ends. initSortables() must skip re-running while a drag is active.
+     * Regression test: a document-global morph.updated hook survives
+     * component navigation and also fires once per changed element for
+     * unrelated Livewire components. A stale Alpine scope can therefore
+     * attach another Sortable to the current navigation tree, then destroy
+     * that instance during an active native drag. SortableJS sets `el` to
+     * null in destroy(), but an already-dispatched dragover still reaches
+     * _onDragOver and crashes in its lastElementChild helper. Initialization
+     * must be component-scoped, idempotent, and guarded by Sortable's global
+     * active instance in addition to the local Alpine flag.
      */
     public function test_navigation_tab_does_not_reinit_sortable_instances_mid_drag(): void
     {
         $this->actingAsTenantAdmin();
 
         $html = Livewire::test(SettingsIndex::class)->html();
+        $script = file_get_contents(public_path('assets/js/tenant-navigation-builder.js'));
 
-        $this->assertStringContainsString('if (this.dragging) return;', $html);
-        $this->assertStringContainsString('onStart: () => { this.dragging = true; }', $html);
-        $this->assertStringContainsString('this.dragging = false;', $html);
+        $this->assertStringContainsString('id="nav-sections-container"', $html);
+        $this->assertIsString($script);
+        $this->assertStringContainsString('if (typeof Sortable === \'undefined\' || this.dragging || Sortable.active) return;', $script);
+        $this->assertStringContainsString('onStart: () => { this.dragging = true; }', $script);
+        $this->assertStringContainsString('whenSortableIdle', $script);
+        $this->assertStringNotContainsString('Sortable.active && attempts <', $script);
+        $this->assertStringContainsString('this.dragging = false;', $script);
+        $this->assertStringContainsString('$wire.$hook(\'morphed\'', $script);
+        $this->assertStringNotContainsString('Livewire.hook(\'morph.updated\'', $script);
+        $this->assertStringContainsString('const root = this.$root;', $script);
+        $this->assertStringContainsString('Sortable.get(element) || Sortable.create(element, options)', $script);
+
+        $dragEnd = substr($script, strpos($script, 'finishItemDrag(event)'));
+        $timeoutPos = strpos($dragEnd, 'whenSortableIdle');
+        $draggingFalsePos = strpos($dragEnd, 'this.dragging = false;');
+        $syncPos = strpos($dragEnd, 'this.syncFromDom();');
+
+        $this->assertNotFalse($timeoutPos);
+        $this->assertGreaterThan($timeoutPos, $draggingFalsePos);
+        $this->assertGreaterThan($draggingFalsePos, $syncPos);
     }
 
-    /**
-     * Regression test: a stray literal `"` anywhere inside the Navigation
-     * Menu tab's `x-data="{ ... }"` — even inside a `//` JS comment, not
-     * just templated data — prematurely closes the double-quoted HTML
-     * attribute, spilling the rest of initSortables()/syncFromDom()/save()
-     * onto the page as visible text (this bug has now recurred twice: once
-     * from unescaped @json() data, once from a comment literally containing
-     * the word "in" in quotes). @js() only protects templated data, not
-     * hand-written JS/comments in the template itself, so this asserts the
-     * invariant directly: nothing between the tab's `x-data="{` and its
-     * matching `x-init="` may contain a raw double-quote character.
-     */
+    /** Ensure the external component invocation is a complete HTML attribute. */
     public function test_navigation_tab_x_data_contains_no_stray_double_quotes(): void
     {
         $this->actingAsTenantAdmin();
@@ -375,24 +424,14 @@ class NavigationMenuBuilderTest extends TestCase
 
         $start = strpos($html, "x-show=\"activeTab === 'navigation'\"");
         $this->assertNotFalse($start, 'Navigation Menu tab wrapper not found.');
-        $dataStart = strpos($html, 'x-data="{', $start);
+        $dataStart = strpos($html, 'x-data="tenantNavigationBuilder(', $start);
         $this->assertNotFalse($dataStart);
-        $initStart = strpos($html, 'x-init="', $dataStart);
-        $this->assertNotFalse($initStart);
-
-        // Everything from just after x-data=" up to (not including) x-init="
-        // — trimmed of trailing whitespace, that must end in the attribute's
-        // own closing quote, which is excluded below since it isn't part of
-        // the JS body itself.
-        $beforeInit = rtrim(substr($html, $dataStart + strlen('x-data="'), $initStart - ($dataStart + strlen('x-data="'))));
-        $this->assertStringEndsWith('"', $beforeInit, 'x-data attribute does not close properly right before x-init.');
-        $xDataBody = substr($beforeInit, 0, -1);
-
-        $this->assertStringNotContainsString(
-            '"',
-            $xDataBody,
-            'A raw double-quote inside x-data breaks out of the HTML attribute, leaking the rest of the JS onto the page as visible text.'
-        );
+        $attributeEnd = strpos($html, '">', $dataStart);
+        $this->assertNotFalse($attributeEnd, 'Navigation builder x-data attribute is not closed.');
+        $attribute = substr($html, $dataStart, $attributeEnd - $dataStart + 2);
+        $this->assertStringContainsString('tenantNavigationBuilder(', $attribute);
+        $this->assertStringContainsString('JSON.parse', $attribute);
+        $this->assertStringNotContainsString('x-init=', $attribute);
     }
 
     public function test_save_nav_config_requires_settings_permission(): void
@@ -406,5 +445,10 @@ class NavigationMenuBuilderTest extends TestCase
         ]);
 
         $response->assertStatus(403);
+
+        $this->postJson(route('tenant.settings.navigation-menu.store'), [
+            'sections' => [],
+            'items' => [],
+        ])->assertForbidden();
     }
 }

@@ -238,10 +238,12 @@ class Company extends Model
     /**
      * This tenant's nav customization (Settings > Navigation Menu, mobile
      * and web), normalized to the current `{sections: [{key, order}],
-     * items: [{key, section, parent, order, visible}]}` shape regardless of
+     * items: [{key, section, parent, parent_id, level, order, visible}],
+     * tree: [{key, order, items: [{..., children: []}]}]}` shape regardless of
      * which shape `nav_config` actually holds — including this app's older
      * `{hidden_tiles, section_order}` shape (no per-item order, explicit
-     * section, or parent existed yet, so those come back null: callers fall
+     * section, or parent existed yet, so those come back null/defaulted:
+     * callers fall
      * back to whatever section/position/nesting that item's key defaults to
      * further up the stack — see DashboardScreen._sectionsFor and
      * ALL_DOCK_ITEMS on web). `parent` is another item's key in the same
@@ -257,17 +259,14 @@ class Company extends Model
     {
         $raw = $this->nav_config ?? [];
 
-        if (isset($raw['items']) || isset($raw['sections'])) {
-            return [
-                'sections' => array_values($raw['sections'] ?? []),
-                'items' => array_values($raw['items'] ?? []),
-            ];
+        if (isset($raw['items']) || isset($raw['sections']) || isset($raw['tree'])) {
+            return app(\App\Services\Navigation\TenantNavigationConfigService::class)->normalize($raw);
         }
 
         $sectionOrder = array_values($raw['section_order'] ?? []);
         $hiddenTiles = array_values($raw['hidden_tiles'] ?? []);
 
-        return [
+        return app(\App\Services\Navigation\TenantNavigationConfigService::class)->normalize([
             'sections' => array_map(
                 fn ($key, $order) => ['key' => $key, 'order' => $order],
                 $sectionOrder,
@@ -277,7 +276,7 @@ class Company extends Model
                 fn ($key) => ['key' => $key, 'section' => null, 'parent' => null, 'order' => null, 'visible' => false],
                 $hiddenTiles
             ),
-        ];
+        ]);
     }
 
     /**

@@ -5,6 +5,7 @@ use App\Http\Controllers\Tenant\BackupDownloadController;
 use App\Http\Controllers\Tenant\CashRegisterSlipController;
 use App\Http\Controllers\Tenant\ImpersonationController;
 use App\Http\Controllers\Tenant\InvoiceController;
+use App\Http\Controllers\Tenant\NavigationMenuController;
 use App\Http\Controllers\Tenant\PwaManifestController;
 use App\Http\Controllers\Tenant\QuotationController;
 use App\Http\Controllers\Tenant\Restaurant\KotController;
@@ -89,6 +90,9 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
 
         // Store Settings & Languages (Reachable by tenant admin to manage store configs)
         Route::get('/settings', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.index');
+        Route::post('/settings/navigation-menu', [NavigationMenuController::class, 'store'])
+            ->middleware('tenant.permission:settings,edit')
+            ->name('settings.navigation-menu.store');
         Route::post('/settings/change-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'changePassword'])->name('settings.change-password');
         Route::redirect('/settings-redirect', '/tenant/settings')->name('settings');
         Route::get('/settings/backup/download', [BackupDownloadController::class, 'download'])->middleware('tenant.permission:settings,view')->name('settings.backup.download');

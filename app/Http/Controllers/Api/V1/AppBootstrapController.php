@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Services\Localization\LocalizationService;
+use App\Services\Navigation\TenantNavigationConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -73,35 +74,18 @@ class AppBootstrapController extends Controller
      * server round-trip first. Shared by both the mobile app and the web
      * tenant Settings > Navigation Menu tab.
      */
-    public function updateNav(Request $request): JsonResponse
+    public function updateNav(Request $request, TenantNavigationConfigService $navigation): JsonResponse
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
-        $validator = Validator::make($request->all(), [
-            'sections' => ['nullable', 'array'],
-            'sections.*.key' => ['required', 'string', 'max:60'],
-            'sections.*.order' => ['required', 'integer', 'min:0'],
-            'items' => ['nullable', 'array'],
-            'items.*.key' => ['required', 'string', 'max:60'],
-            'items.*.section' => ['nullable', 'string', 'max:60'],
-            'items.*.parent' => ['nullable', 'string', 'max:60'],
-            'items.*.order' => ['nullable', 'integer', 'min:0'],
-            'items.*.visible' => ['required', 'boolean'],
-        ]);
+        $validator = Validator::make($request->all(), TenantNavigationConfigService::validationRules());
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
         }
 
-        $dedupeByKey = fn (array $rows) => array_values(
-            collect($rows)->unique('key')->all()
-        );
-
-        $navConfig = [
-            'sections' => $dedupeByKey($request->input('sections', [])),
-            'items' => $dedupeByKey($request->input('items', [])),
-        ];
+        $navConfig = $navigation->normalize($validator->validated());
         $company->update(['nav_config' => $navConfig]);
 
         AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'nav_config']);

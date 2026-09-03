@@ -1209,10 +1209,6 @@ class Index extends Component
         foreach ($compiled as $section) {
             foreach ($section['items'] as $itemIndex => $item) {
                 $override = $itemOverrides->get($item['key']);
-                if ($override && $override['visible'] === false) {
-                    continue;
-                }
-
                 $targetSectionKey = ($override && $override['section'] && $compiledByKey->has($override['section']))
                     ? $override['section']
                     : $section['key'];
@@ -1222,7 +1218,9 @@ class Index extends Component
                     'label' => $item['label'],
                     'visible' => $override['visible'] ?? true,
                     'section' => $targetSectionKey,
-                    'parent' => $override ? ($override['parent'] ?? null) : ($item['parent'] ?? null),
+                    'parent' => $override
+                        ? ($override['parent_id'] ?? $override['parent'] ?? null)
+                        : ($item['parent'] ?? null),
                     'order' => $override['order'] ?? $itemIndex,
                 ];
             }
@@ -1353,11 +1351,10 @@ class Index extends Component
      * payload rather than incremental diffs, mirroring how the mobile app's
      * NavMenuSettingsTab saves. Every item at any depth becomes its own
      * flat nav_config['items'] row carrying its parent's key, so
-     * buildNavSections() can re-nest it on read; the flatten below itself
-     * doesn't enforce the two-level cap (a payload nested deeper than that
-     * shouldn't occur — the builder UI and its drag guards never construct
-     * one) since buildNavSections() is what actually enforces it, falling
-     * an over-deep item back to its section root rather than dropping it.
+     * buildNavSections() can re-nest it on read. The shared normalizer also
+     * repairs invalid links and promotes any over-deep row to the section
+     * root, keeping this legacy Livewire entry point consistent with the
+     * JSON endpoint used by the current web and mobile editors.
      */
     public function saveNavConfig(array $sections): void
     {
@@ -1366,35 +1363,14 @@ class Index extends Component
             abort(403, 'Unauthorized.');
         }
 
-        $navSections = [];
-        $navItems = [];
-        $flatten = function (array $items, string $sectionKey, ?string $parentKey) use (&$flatten, &$navItems) {
-            foreach (array_values($items) as $order => $item) {
-                $itemKey = (string) ($item['key'] ?? '');
-                if ($itemKey === '') {
-                    continue;
-                }
-                $navItems[] = [
-                    'key' => $itemKey,
-                    'section' => $sectionKey,
-                    'parent' => $parentKey,
-                    'order' => $order,
-                    'visible' => (bool) ($item['visible'] ?? true),
-                ];
-                $flatten($item['children'] ?? [], $sectionKey, $itemKey);
-            }
-        };
+        $tree = array_values(array_map(
+            fn (array $section, int $order) => $section + ['order' => $order],
+            $sections,
+            array_keys($sections)
+        ));
+        $navConfig = app(\App\Services\Navigation\TenantNavigationConfigService::class)->normalize(['tree' => $tree]);
 
-        foreach (array_values($sections) as $sectionOrder => $section) {
-            $sectionKey = (string) ($section['key'] ?? '');
-            if ($sectionKey === '') {
-                continue;
-            }
-            $navSections[] = ['key' => $sectionKey, 'order' => $sectionOrder];
-            $flatten($section['items'] ?? [], $sectionKey, null);
-        }
-
-        $this->company->update(['nav_config' => ['sections' => $navSections, 'items' => $navItems]]);
+        $this->company->update(['nav_config' => $navConfig]);
         AuditLog::record('company.settings_updated', $this->company->id, $user?->id, ['section' => 'nav_config']);
 
         session()->flash('status', 'Navigation menu updated.');

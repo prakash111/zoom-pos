@@ -1,10 +1,20 @@
 <div class="space-y-6 w-full" 
      x-data="{
          sortableInstance: null,
+         morphUnhook: null,
+         dragging: false,
          initSortable() {
-             const container = document.getElementById('sortable-menu-container');
-             if (!container || typeof Sortable === 'undefined') return;
-             if (this.sortableInstance) {
+             if (typeof Sortable === 'undefined' || this.dragging || Sortable.active) return;
+             const container = this.$root.querySelector('#sortable-menu-container');
+             if (!container || !container.isConnected) return;
+
+             const registered = Sortable.get(container);
+             if (registered) {
+                 this.sortableInstance = registered;
+                 return;
+             }
+
+             if (this.sortableInstance && this.sortableInstance.el !== container) {
                  try { this.sortableInstance.destroy(); } catch(e) {}
              }
              this.sortableInstance = Sortable.create(container, {
@@ -13,24 +23,41 @@
                  ghostClass: 'opacity-30',
                  chosenClass: 'scale-[1.01]',
                  dragClass: 'shadow-2xl',
+                 onStart: () => { this.dragging = true; },
                  onEnd: () => {
-                     const orderedIds = Array.from(container.querySelectorAll('.menu-drag-item'))
-                         .map(el => parseInt(el.getAttribute('data-id')))
-                         .filter(id => !isNaN(id));
-                     if (orderedIds.length > 0) {
-                         $wire.updateMenuOrder(orderedIds);
-                     }
+                     setTimeout(() => {
+                         this.dragging = false;
+                         const orderedIds = Array.from(container.querySelectorAll('.menu-drag-item'))
+                             .map(el => parseInt(el.getAttribute('data-id')))
+                             .filter(id => !isNaN(id));
+                         if (orderedIds.length > 0) {
+                             this.$wire.updateMenuOrder(orderedIds);
+                         }
+                     }, 0);
                  }
              });
+         },
+         destroy() {
+             if (this.morphUnhook) {
+                 this.morphUnhook();
+                 this.morphUnhook = null;
+             }
+
+             const instance = this.sortableInstance;
+             this.sortableInstance = null;
+             const destroyWhenIdle = () => {
+                 if (typeof Sortable !== 'undefined' && Sortable.active) {
+                     setTimeout(destroyWhenIdle, 50);
+                     return;
+                 }
+                 try { if (instance && instance.el) instance.destroy(); } catch(e) {}
+             };
+             destroyWhenIdle();
          }
      }"
      x-init="
          $nextTick(() => initSortable());
-         if (window.Livewire) {
-             Livewire.hook('morph.updated', () => {
-                 $nextTick(() => initSortable());
-             });
-         }
+         morphUnhook = $wire.$hook('morphed', () => $nextTick(() => initSortable()));
      ">
     
     <!-- Page Header -->

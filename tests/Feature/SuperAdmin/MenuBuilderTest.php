@@ -159,6 +159,21 @@ class MenuBuilderTest extends TestCase
         $this->assertSame(1, $item1->fresh()->order_index);
     }
 
+    public function test_sortable_lifecycle_is_scoped_and_cannot_be_destroyed_mid_drag(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        $html = Livewire::test(MenuBuilderComponent::class)->html();
+
+        $this->assertStringContainsString('this.dragging || Sortable.active', $html);
+        $this->assertStringContainsString('this.$root.querySelector(\'#sortable-menu-container\')', $html);
+        $this->assertStringContainsString('Sortable.get(container)', $html);
+        $this->assertStringContainsString('$wire.$hook(\'morphed\'', $html);
+        $this->assertStringNotContainsString('Livewire.hook(\'morph.updated\'', $html);
+        $this->assertStringContainsString('onStart: () => { this.dragging = true; }', $html);
+        $this->assertStringContainsString('setTimeout(() => {', $html);
+    }
+
     public function test_can_toggle_status_and_delete_menu_items(): void
     {
         $this->actingAsSuperAdmin();

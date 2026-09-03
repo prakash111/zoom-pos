@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Tenant;
 
-use App\Models\Company;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\ActsAsTenantUser;
 use Tests\TestCase;
@@ -65,7 +64,9 @@ class NavigationMenuCustomizationTest extends TestCase
         $response->assertSee('id="tenant-drawer-nav"', false);
         $response->assertSee('data-section-key="cashier_sales"', false);
         $response->assertSee('"key":"financial_management","order":0', false);
-        $response->assertSee('"key":"pos","section":"financial_management","order":0,"visible":true', false);
+        $response->assertSee('"key":"pos","section":"financial_management"', false);
+        $response->assertSee('"parent_id":null,"level":0,"order":0,"visible":true', false);
+        $response->assertSee("window.addEventListener('tenant-navigation-updated'", false);
     }
 
     public function test_no_saved_config_leaves_the_drawer_completely_unchanged(): void

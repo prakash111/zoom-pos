@@ -45,17 +45,25 @@ class NavigationMenuFullPageDiagTest extends TestCase
         $html = $response->getContent();
 
         $this->assertStringContainsString('sortable.min.js', $html);
+        $this->assertStringContainsString('tenant-navigation-builder.js', $html);
         $this->assertSame(1, substr_count($html, 'id="nav-sections-container"'));
-        $this->assertStringContainsString('sections: JSON.parse(', $html);
+        $this->assertStringContainsString('tenantNavigationBuilder(', $html);
 
         $sortablePos = strpos($html, 'sortable.min.js');
+        $builderScriptPos = strpos($html, 'tenant-navigation-builder.js');
         $navBuilderPos = strpos($html, 'id="nav-sections-container"');
         $this->assertNotFalse($sortablePos);
+        $this->assertNotFalse($builderScriptPos);
         $this->assertNotFalse($navBuilderPos);
         $this->assertLessThan(
-            $navBuilderPos,
+            $builderScriptPos,
             $sortablePos,
-            'sortable.min.js must be loaded before the nav builder markup, or its Sortable.create() calls silently no-op.'
+            'SortableJS must load before the external navigation builder script.'
+        );
+        $this->assertLessThan(
+            $navBuilderPos,
+            $builderScriptPos,
+            'The navigation builder script must load before Alpine initializes the markup.'
         );
     }
 }

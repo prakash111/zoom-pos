@@ -14,6 +14,7 @@ class AppBootstrapApiTest extends TestCase
     use RefreshDatabase;
 
     protected Company $company;
+
     protected User $admin;
 
     protected function setUp(): void
@@ -90,21 +91,27 @@ class AppBootstrapApiTest extends TestCase
                 ['key' => 'pos', 'section' => 'financial_management', 'order' => 0, 'visible' => true],
             ],
         ];
+        $expectedItems = [
+            ['key' => 'pos', 'section' => 'financial_management', 'parent' => null, 'parent_id' => null, 'level' => 0, 'order' => 0, 'visible' => true],
+            ['key' => 'quotations', 'section' => 'cashier_sales', 'parent' => null, 'parent_id' => null, 'level' => 0, 'order' => 0, 'visible' => false],
+            ['key' => 'consignments', 'section' => 'cashier_sales', 'parent' => null, 'parent_id' => null, 'level' => 0, 'order' => 1, 'visible' => false],
+        ];
 
         $this->withToken($token)->postJson('/api/v1/pos/settings/nav-config', $payload)
             ->assertOk()
             ->assertJsonPath('nav.sections', $payload['sections'])
-            ->assertJsonPath('nav.items', $payload['items']);
+            ->assertJsonPath('nav.items', $expectedItems)
+            ->assertJsonPath('nav.tree.0.items.0.key', 'pos');
 
         $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap?locale=en')
             ->assertOk()
             ->assertJsonPath('nav.sections', $payload['sections'])
-            ->assertJsonPath('nav.items', $payload['items']);
+            ->assertJsonPath('nav.items', $expectedItems);
 
         $this->withToken($token)->getJson('/api/v1/pos/settings')
             ->assertOk()
             ->assertJsonPath('nav.sections', $payload['sections'])
-            ->assertJsonPath('nav.items', $payload['items']);
+            ->assertJsonPath('nav.items', $expectedItems);
     }
 
     public function test_nested_item_parent_round_trips_through_update_and_bootstrap(): void
@@ -123,14 +130,20 @@ class AppBootstrapApiTest extends TestCase
                 ['key' => 'settings_profile', 'section' => 'administration', 'parent' => 'settings', 'order' => 0, 'visible' => true],
             ],
         ];
+        $expectedItems = [
+            ['key' => 'settings', 'section' => 'administration', 'parent' => null, 'parent_id' => null, 'level' => 0, 'order' => 0, 'visible' => true],
+            ['key' => 'settings_profile', 'section' => 'administration', 'parent' => 'settings', 'parent_id' => 'settings', 'level' => 1, 'order' => 0, 'visible' => true],
+            ['key' => 'settings_navigation', 'section' => 'administration', 'parent' => null, 'parent_id' => null, 'level' => 0, 'order' => 1, 'visible' => true],
+        ];
 
         $this->withToken($token)->postJson('/api/v1/pos/settings/nav-config', $payload)
             ->assertOk()
-            ->assertJsonPath('nav.items', $payload['items']);
+            ->assertJsonPath('nav.items', $expectedItems)
+            ->assertJsonPath('nav.tree.0.items.0.children.0.key', 'settings_profile');
 
         $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap?locale=en')
             ->assertOk()
-            ->assertJsonPath('nav.items', $payload['items']);
+            ->assertJsonPath('nav.items', $expectedItems);
     }
 
     public function test_legacy_hidden_tiles_and_section_order_shape_upgrades_on_read(): void
@@ -152,7 +165,15 @@ class AppBootstrapApiTest extends TestCase
             $nav['sections']
         );
         $this->assertSame(
-            [['key' => 'quotations', 'section' => null, 'parent' => null, 'order' => null, 'visible' => false]],
+            [[
+                'key' => 'quotations',
+                'section' => null,
+                'parent' => null,
+                'parent_id' => null,
+                'level' => 0,
+                'order' => null,
+                'visible' => false,
+            ]],
             $nav['items']
         );
     }

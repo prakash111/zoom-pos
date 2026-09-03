@@ -1464,183 +1464,108 @@
          TAB 8: NAVIGATION MENU (item-level drag-and-drop customization)
          ========================================================================= -->
     <div x-show="activeTab === 'navigation'" x-cloak class="space-y-4"
-         x-data="{
-             sections: @js($navSections),
-             saving: false,
-             sortableInstances: [],
-             dragging: false,
-             initSortables() {
-                 // Livewire's morph.updated hook fires for *any* Livewire
-                 // request completing anywhere on the page (this settings
-                 // page also polls for desktop-sync-status), not just one
-                 // scoped to this tab — so without this guard, destroying
-                 // and recreating every Sortable instance mid-drag (a
-                 // native `dragover` event keeps firing against an
-                 // instance that was just destroy()'d, whose own `el`
-                 // reference is now null) throws a null-property-access
-                 // error inside SortableJS's own _onDragOver repeatedly
-                 // (reading lastElementChild off it) until the drag
-                 // ends. onEnd (below) already calls this again once the
-                 // drag actually finishes, so skipping a re-init while one
-                 // is in progress loses nothing.
-                 if (this.dragging) return;
+         x-data="tenantNavigationBuilder(
+             @js($navSections),
+             @js(route('tenant.settings.navigation-menu.store')),
+             @js(csrf_token()),
+             @js([
+                 'level0' => __('Main Menu'),
+                 'level1' => __('Sub-Menu'),
+                 'level2' => __('Sub-Sub-Menu'),
+                 'saved' => __('Navigation menu updated.'),
+                 'saveError' => __('The navigation menu could not be saved.'),
+             ])
+         )">
+        <style>
+            #nav-sections-container .nav-items-container {
+                overflow-x: clip;
+            }
 
-                 this.sortableInstances.forEach((s) => { try { s.destroy(); } catch (e) {} });
-                 this.sortableInstances = [];
-                 if (typeof Sortable === 'undefined') return;
+            #nav-sections-container .nav-tree-item {
+                --nav-indent: 0px;
+                box-sizing: border-box;
+                margin-left: var(--nav-indent);
+                width: calc(100% - var(--nav-indent));
+                min-width: 0;
+                transition: margin-left 120ms ease, width 120ms ease;
+            }
 
-                 // forceFallback (SortableJS's own JS-simulated drag,
-                 // rather than native HTML5 drag-and-drop) was tried here
-                 // to fix a cosmetic bug — its floating drag-preview
-                 // rendered pinned near the page's edge instead of
-                 // following the cursor, likely due to a transformed
-                 // ancestor elsewhere in the shared tenant layout hijacking
-                 // its `position: fixed` containing block. But
-                 // forceFallback's preview is a raw cloneNode() of the
-                 // dragged row, which still carries that row's Alpine
-                 // directives (x-model, :data-item-key, etc.) even though
-                 // it's no longer inside the x-for scope that gave `item`/
-                 // `child`/`grandchild` meaning — and per SortableJS's own
-                 // source (_dragStarted calls _appendGhost(), which clones
-                 // via cloneNode(), *before* dispatching the public onStart
-                 // callback), there is no public hook that runs early
-                 // enough to strip those directives before the clone is
-                 // made. Livewire's global mutation observer reprocesses
-                 // the clone's attributes on every position update while
-                 // dragging, throwing a reference error each time —
-                 // expensive enough that dragging looked like it did
-                 // nothing at all. Native drag-and-drop (SortableJS's
-                 // default without forceFallback) renders its drag image
-                 // as a browser-level snapshot, not a DOM clone, so it's
-                 // categorically immune to this — a correctly-tracking but
-                 // possibly cosmetically-imperfect preview beats a
-                 // completely broken drag.
-                 const commonSortableOptions = {
-                     animation: 200,
-                     ghostClass: 'opacity-30',
-                     onStart: () => { this.dragging = true; },
-                 };
-                 const onDragEnd = () => {
-                     this.dragging = false;
-                     this.syncFromDom();
-                 };
+            #nav-sections-container .nav-item-row {
+                box-sizing: border-box;
+                min-height: 38px;
+                border: 1px solid transparent;
+                transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+            }
 
-                 const sectionContainer = document.getElementById('nav-sections-container');
-                 if (sectionContainer) {
-                     this.sortableInstances.push(Sortable.create(sectionContainer, {
-                         ...commonSortableOptions,
-                         handle: '.nav-section-drag-handle',
-                         onEnd: onDragEnd,
-                     }));
-                 }
+            #nav-sections-container .nav-tree-item[data-nav-level="1"] > .nav-item-row,
+            #nav-sections-container .nav-tree-item[data-nav-level="2"] > .nav-item-row {
+                border-left-color: rgb(203 213 225);
+            }
 
-                 // Shared `group` lets an item drag from one section's root
-                 // list straight into another's (not just reorder within its
-                 // own), and — since every item's nested `.nav-children-
-                 // container` (Sub-Menu level) and `.nav-grandchildren-
-                 // container` (Sub-Sub-Menu level) share the same group —
-                 // drag it into or out of another item to nest/un-nest it,
-                 // one level at a time. Which zone the pointer counts as
-                 // being inside is pure geometry (see .nav-children-
-                 // container's `ml-8` / .nav-grandchildren-container's
-                 // `ml-16` in the markup below: real margins, not just
-                 // padding, narrow each zone's own hoverable box so they're
-                 // genuinely distinct drop targets from the full-width root
-                 // list — dragging left past a margin hands the pointer back
-                 // to the shallower zone on its own, no custom pointer-
-                 // tracking needed). A Sub-Sub-Menu row renders no nested
-                 // list of its own at all, so there's nothing to drop
-                 // further into — that's what caps nesting at three levels.
-                 // onMove additionally blocks dropping an item that already
-                 // has children into any nested zone: nesting something
-                 // that itself has children would push its own children one
-                 // level deeper than the cap allows, silently losing them
-                 // once synced.
-                 document.querySelectorAll('.nav-items-container, .nav-children-container, .nav-grandchildren-container').forEach((el) => {
-                     this.sortableInstances.push(Sortable.create(el, {
-                         ...commonSortableOptions,
-                         group: 'tenant-nav-items',
-                         handle: '.nav-item-drag-handle',
-                         onMove: (evt) => {
-                             const childrenHolder = evt.dragged.querySelector(':scope > .nav-children-container, :scope > .nav-grandchildren-container');
-                             const draggedHasChildren = childrenHolder && childrenHolder.children.length > 0;
-                             const droppingIntoNestedZone = evt.to.classList.contains('nav-children-container') || evt.to.classList.contains('nav-grandchildren-container');
-                             return !(draggedHasChildren && droppingIntoNestedZone);
-                         },
-                         onEnd: onDragEnd,
-                     }));
-                 });
-             },
-             syncFromDom() {
-                 const sectionContainer = document.getElementById('nav-sections-container');
-                 if (!sectionContainer) return;
+            .dark #nav-sections-container .nav-tree-item[data-nav-level="1"] > .nav-item-row,
+            .dark #nav-sections-container .nav-tree-item[data-nav-level="2"] > .nav-item-row {
+                border-left-color: rgb(71 85 105);
+            }
 
-                 const findAnywhere = (key) => {
-                     const inList = (items) => {
-                         for (const it of items) {
-                             if (it.key === key) return it;
-                             const found = inList(it.children || []);
-                             if (found) return found;
-                         }
-                         return null;
-                     };
-                     for (const s of this.sections) {
-                         const found = inList(s.items);
-                         if (found) return found;
-                     }
-                     return null;
-                 };
+            #nav-sections-container .nav-depth-guide {
+                display: none;
+            }
 
-                 // Reads one level of a nested list: `listEl` is the
-                 // container holding this level's rows, `nestedSelector` is
-                 // the class name of the NEXT level's container to recurse
-                 // into (null once there's no deeper level left, i.e. at
-                 // Sub-Sub-Menu rows).
-                 const readLevel = (listEl, nestedSelector) => {
-                     if (!listEl) return [];
-                     return Array.from(listEl.querySelectorAll(':scope > [data-item-key]')).flatMap((rowEl) => {
-                         const existing = findAnywhere(rowEl.getAttribute('data-item-key'));
-                         if (!existing) return [];
-                         const nestedRoot = nestedSelector ? rowEl.querySelector(':scope > ' + nestedSelector) : null;
-                         const nextSelector = nestedSelector === '.nav-children-container' ? '.nav-grandchildren-container' : null;
-                         const children = nestedRoot ? readLevel(nestedRoot, nextSelector) : [];
-                         return [{ key: existing.key, label: existing.label, visible: existing.visible, children }];
-                     });
-                 };
+            #nav-sections-container .nav-depth-preview > .nav-item-row .nav-depth-guide {
+                display: inline-flex;
+            }
 
-                 const next = [];
-                 sectionContainer.querySelectorAll(':scope > [data-section-key]').forEach((secEl) => {
-                     const key = secEl.getAttribute('data-section-key');
-                     const existingSection = this.sections.find((s) => s.key === key);
-                     if (!existingSection) return;
+            #nav-sections-container .nav-drop-placeholder > .nav-item-row {
+                border: 2px dashed rgb(59 130 246);
+                background: rgb(239 246 255);
+                box-shadow: 0 0 0 3px rgb(59 130 246 / 12%);
+            }
 
-                     const itemsRoot = secEl.querySelector(':scope > .nav-items-container');
-                     const items = readLevel(itemsRoot, '.nav-children-container');
+            .dark #nav-sections-container .nav-drop-placeholder > .nav-item-row {
+                border-color: rgb(96 165 250);
+                background: rgb(30 58 138 / 24%);
+            }
 
-                     next.push({ key: existingSection.key, label: existingSection.label, items });
-                 });
-                 this.sections = next;
-                 this.$nextTick(() => this.initSortables());
-             },
-             async save() {
-                 this.saving = true;
-                 try {
-                     await this.$wire.saveNavConfig(this.sections);
-                 } finally {
-                     this.saving = false;
-                 }
-             },
-         }"
-         x-init="
-             $nextTick(() => initSortables());
-             if (window.Livewire) { Livewire.hook('morph.updated', () => $nextTick(() => initSortables())); }
-         ">
+            #nav-sections-container .nav-item-chosen > .nav-item-row {
+                cursor: grabbing;
+            }
+
+            #nav-sections-container .nav-section-placeholder {
+                border-color: rgb(59 130 246);
+                background: rgb(239 246 255 / 70%);
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                #nav-sections-container .nav-tree-item,
+                #nav-sections-container .nav-item-row {
+                    transition: none;
+                }
+            }
+        </style>
 
         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
             <h3 class="text-sm font-black text-slate-800 dark:text-slate-100">{{ __('Navigation Menu') }}</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {{ __('Hide destinations your team doesn\'t use, drag to reorder sections, or drag a destination into a different section. Drag it right, into the indented zone under another destination, to nest it as a Sub-Menu item — drag it right again to nest a Sub-Sub-Menu under that. Drag left, past an indent, to promote it back up one level at a time. Applies to every device signed in to this store — the mobile app included.') }}
+                {{ __('Drag vertically to reorder or move a destination. While dragging, move right or left to snap it between Main Menu, Sub-Menu, and Sub-Sub-Menu levels. Each step is 32 px; the first item always remains a Main Menu item. Changes apply to the web sidebar and mobile drawer.') }}
             </p>
+
+            <div class="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/40 p-3 overflow-hidden" aria-label="{{ __('Navigation indentation guide') }}">
+                <div class="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">{{ __('Indent guide') }}</div>
+                <div class="space-y-1.5 text-[10px] font-bold">
+                    <div class="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                        <span class="h-px w-4 bg-slate-400"></span>
+                        <span>{{ __('Main Menu') }} · 0 px</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-blue-700 dark:text-blue-300" style="margin-left: 32px">
+                        <span class="h-px w-4 bg-blue-400"></span>
+                        <span>{{ __('Sub-Menu') }} · 32 px</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-violet-700 dark:text-violet-300" style="margin-left: 64px">
+                        <span class="h-px w-4 bg-violet-400"></span>
+                        <span>{{ __('Sub-Sub-Menu') }} · 64 px</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="nav-sections-container" class="space-y-3">
@@ -1648,53 +1573,37 @@
                 <div :data-section-key="section.key" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="section.label"></span>
-                        <span class="nav-section-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder this section') }}">
+                        <button type="button"
+                                class="nav-section-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1"
+                                title="{{ __('Drag to reorder this section') }}"
+                                aria-label="{{ __('Drag to reorder this section') }}">
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
-                        </span>
+                        </button>
                     </div>
-                    <div class="nav-items-container space-y-0.5 min-h-[10px]">
-                        <template x-for="item in section.items" :key="item.key">
-                            <div :data-item-key="item.key">
-                                <div class="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">
-                                    <input type="checkbox" x-model="item.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
-                                    <span class="flex-1 text-xs font-semibold text-slate-700 dark:text-slate-300" x-text="item.label"></span>
-                                    <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder or move to another section, or drag right into the indented zone below to nest it') }}">
+
+                    <div class="nav-items-container space-y-1 min-h-[44px] border-l border-transparent">
+                        <template x-for="item in flattenedItems(section)" :key="section.key + ':' + item.key">
+                            <div class="nav-tree-item"
+                                 :data-item-key="item.key"
+                                 :data-nav-level="item.level"
+                                 :style="rowStyle(item.level)">
+                                <div class="nav-item-row flex items-center gap-2 px-2 py-1.5 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">
+                                    <span class="nav-depth-guide shrink-0 rounded-md bg-blue-600 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white"
+                                          aria-live="polite"></span>
+                                    <input type="checkbox"
+                                           x-model="item.visible"
+                                           class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
+                                    <span class="flex-1 min-w-0 truncate text-xs font-semibold text-slate-700 dark:text-slate-300" x-text="item.label"></span>
+                                    <span class="shrink-0 rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[9px] font-extrabold text-slate-500 dark:text-slate-400"
+                                          x-text="levelLabel(item.level)"></span>
+                                    <button type="button"
+                                            class="nav-item-drag-handle shrink-0 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1"
+                                            style="touch-action: none"
+                                            @pointerdown="rememberPointer($event)"
+                                            title="{{ __('Drag vertically to reorder and horizontally to change menu level') }}"
+                                            aria-label="{{ __('Drag vertically to reorder and horizontally to change menu level') }}">
                                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
-                                    </span>
-                                </div>
-                                {{-- A real left margin (not just padding) narrows this
-                                     list's own hoverable box relative to the full-width
-                                     root list above, so SortableJS's ordinary cross-list
-                                     collision detection — not custom pointer-math — is
-                                     what decides indent (drag right, into this box) vs.
-                                     outdent (drag left, back into the root list). --}}
-                                <div class="nav-children-container ml-8 pl-2 border-l-2 border-dashed border-slate-200 dark:border-slate-700 space-y-0.5 min-h-[10px] mt-0.5" :data-parent-key="item.key">
-                                    <template x-for="child in item.children" :key="child.key">
-                                        <div :data-item-key="child.key">
-                                            <div class="flex items-center gap-2 px-2 py-1 rounded-xl border-l-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
-                                                <input type="checkbox" x-model="child.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
-                                                <span class="flex-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400" x-text="child.label"></span>
-                                                <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, drag left past the indent to un-nest, or drag right again to nest a Sub-Sub-Menu under it') }}">
-                                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
-                                                </span>
-                                            </div>
-                                            {{-- Sub-Sub-Menu level — the deepest this builder supports.
-                                                 A Sub-Sub-Menu row (below) has no nested list of its own,
-                                                 which is what caps nesting at three levels: there's simply
-                                                 nowhere further to drop into. --}}
-                                            <div class="nav-grandchildren-container ml-8 pl-2 border-l-2 border-dashed border-slate-200 dark:border-slate-700 space-y-0.5 min-h-[10px] mt-0.5" :data-parent-key="child.key">
-                                                <template x-for="grandchild in child.children" :key="grandchild.key">
-                                                    <div :data-item-key="grandchild.key" class="flex items-center gap-2 px-2 py-1 rounded-xl border-l-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
-                                                        <input type="checkbox" x-model="grandchild.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
-                                                        <span class="flex-1 text-[10px] font-semibold text-slate-500 dark:text-slate-500" x-text="grandchild.label"></span>
-                                                        <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, or drag left past the indent to un-nest') }}">
-                                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
-                                                        </span>
-                                                    </div>
-                                                </template>
-                                            </div>
-                                        </div>
-                                    </template>
+                                    </button>
                                 </div>
                             </div>
                         </template>
