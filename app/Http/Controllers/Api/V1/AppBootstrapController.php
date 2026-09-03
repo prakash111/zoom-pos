@@ -7,26 +7,26 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\PushNotificationSetting;
 use App\Services\Localization\LocalizationService;
+use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\TenantNavigationConfigService;
+use App\Services\Navigation\TenantNavRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * Single mobile-app cold-start call: the active locale's merged translation
- * dictionary, this tenant's nav customization (hidden destinations/section
- * order), and the handful of company config values the app otherwise had to
- * fetch from several endpoints separately. Nothing here is cached
- * server-side beyond normal Eloquent/query caching — the mobile client is
- * responsible for its own on-disk cache (see TranslationsCache/BootstrapCache)
- * so the app stays usable offline between calls.
+ * Server-Driven UI (SDUI) Bootstrap Controller.
+ *
+ * Hydrates client apps (mobile & web) on launch and tenant/mode switch:
+ * store configuration, active module schemas, dynamic menus, translations,
+ * UI schemas (payment options, status labels, tax rules), and push settings.
  */
 class AppBootstrapController extends Controller
 {
     use ResolvesTenantSyncContext;
 
     /**
-     * GET /api/v1/pos/app/bootstrap?locale=xx
+     * GET /api/app/bootstrap?locale=xx or GET /api/v1/pos/app/bootstrap?locale=xx
      */
     public function bootstrap(Request $request, LocalizationService $localization): JsonResponse
     {
@@ -37,9 +37,30 @@ class AppBootstrapController extends Controller
             $locale = $company->default_locale ?: ($company->language ?: 'en');
         }
 
+        $activeMode = ModuleRegistry::resolveActiveMode($company);
+        $allModules = ModuleRegistry::allModules();
+        $availableModes = ModuleRegistry::availableModes($company);
+        $activeModule = ModuleRegistry::getModule($activeMode);
+        $menuStructure = TenantNavRegistry::menuStructureForMode($activeMode);
+
         return response()->json([
             'success' => true,
             'locale' => $locale,
+            'tenant' => [
+                'id' => (string) $company->id,
+                'business_name' => $company->trade_name ?? $company->name,
+                'active_mode' => $activeMode,
+                'available_modes' => $availableModes,
+            ],
+            'modules' => $allModules,
+            'active_module' => $activeModule,
+            'menu_structure' => $menuStructure,
+            'ui_schema' => [
+                'payment_methods' => ModuleRegistry::paymentMethodsSchema($company),
+                'status_labels' => ModuleRegistry::statusLabelsSchema(),
+                'tax_configuration' => ModuleRegistry::taxConfigurationSchema($company),
+                'action_pills' => ModuleRegistry::actionPillsSchema($company),
+            ],
             'translations' => $localization->getMergedTranslations($locale, $company->id),
             'nav' => $company->normalizedNavConfig(),
             'push' => PushNotificationSetting::current()->publicConfig(),
@@ -52,29 +73,18 @@ class AppBootstrapController extends Controller
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
                 'tax_id' => $company->tax_id ?? '',
+                'tax_label' => $company->tax_label ?? ($company->country === 'IN' ? 'GST' : 'Tax'),
                 'logo_url' => $company->getLogoUrl(),
                 'favicon_url' => $company->getFaviconUrl(),
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
             ],
-            // Reserved for tenant-wide status/announcement banners — no
-            // authoring surface exists yet, so this is always empty today.
+            // Reserved for tenant-wide status/announcement banners.
             'messages' => [],
         ]);
     }
 
     /**
      * POST /api/v1/pos/settings/nav-config
-     *
-     * Persists this tenant's nav customization: which section groups exist
-     * and in what order, and — for every item — which section it's placed
-     * in (letting an item move to a different section than it defaults
-     * to), its order within that section, and whether it's hidden. `key`/
-     * `section` are opaque tile/section keys owned by the client (see
-     * _FeatureTile.key / _NavSection.key in dashboard_screen.dart and
-     * ALL_DOCK_ITEMS on web) — this endpoint doesn't validate them against
-     * a fixed list so new client versions can introduce keys without a
-     * server round-trip first. Shared by both the mobile app and the web
-     * tenant Settings > Navigation Menu tab.
      */
     public function updateNav(Request $request, TenantNavigationConfigService $navigation): JsonResponse
     {
@@ -93,5 +103,45 @@ class AppBootstrapController extends Controller
         AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'nav_config']);
 
         return response()->json(['success' => true, 'message' => 'Navigation menu updated.', 'nav' => $navConfig]);
+    }
+
+    /**
+     * POST /api/app/mode or POST /api/v1/pos/app/mode
+     * Switch tenant operating mode dynamically.
+     */
+    public function switchMode(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'mode' => ['required', 'string', 'max:40'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => 'Invalid mode specified.', 'details' => $validator->errors()], 422);
+        }
+
+        $mode = strtolower(trim((string) $request->input('mode')));
+        $all = ModuleRegistry::allModules();
+
+        if (! isset($all[$mode])) {
+            return response()->json(['success' => false, 'error' => "Mode '{$mode}' is not registered."], 422);
+        }
+
+        if ($company->restaurant_mode_locked && $mode !== 'restaurant') {
+            return response()->json(['success' => false, 'error' => 'Restaurant mode is locked for this company.'], 403);
+        }
+
+        $company->update(['pos_mode' => $mode]);
+        AuditLog::record('company.mode_switched', $company->id, $user?->id, ['pos_mode' => $mode]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Operating mode switched to {$all[$mode]['title']}.",
+            'active_mode' => $mode,
+            'module' => $all[$mode],
+            'menu_structure' => TenantNavRegistry::menuStructureForMode($mode),
+        ]);
     }
 }

@@ -196,4 +196,55 @@ class AppBootstrapApiTest extends TestCase
             'items' => [['key' => 'pos', 'visible' => false]],
         ])->assertForbidden();
     }
+
+    public function test_bootstrap_returns_sdui_modular_schema(): void
+    {
+        $response = $this->withToken($this->token())->getJson('/api/v1/pos/app/bootstrap?locale=en');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('tenant.id', (string) $this->company->id)
+            ->assertJsonPath('tenant.business_name', 'Metro Mart')
+            ->assertJsonPath('tenant.active_mode', 'retail')
+            ->assertJsonPath('tenant.available_modes', ['retail', 'restaurant', 'pharmacy', 'service_booking'])
+            ->assertJsonPath('modules.retail.id', 'retail')
+            ->assertJsonPath('modules.retail.layout_type', 'standard_grid')
+            ->assertJsonPath('modules.retail.features.has_tables', false)
+            ->assertJsonPath('modules.retail.features.has_barcode_scanner', true)
+            ->assertJsonPath('modules.restaurant.id', 'restaurant')
+            ->assertJsonPath('modules.restaurant.layout_type', 'table_floor_plan')
+            ->assertJsonPath('modules.restaurant.features.has_tables', true)
+            ->assertJsonPath('modules.restaurant.features.has_kot', true)
+            ->assertJsonPath('modules.pharmacy.id', 'pharmacy')
+            ->assertJsonPath('modules.service_booking.id', 'service_booking')
+            ->assertJsonStructure([
+                'tenant' => ['id', 'business_name', 'active_mode', 'available_modes'],
+                'modules' => [
+                    'retail' => ['id', 'title', 'layout_type', 'features', 'cart_configuration'],
+                    'restaurant' => ['id', 'title', 'layout_type', 'features', 'cart_configuration'],
+                ],
+                'menu_structure',
+                'ui_schema' => ['payment_methods', 'status_labels', 'tax_configuration', 'action_pills'],
+            ]);
+    }
+
+    public function test_switch_mode_dynamically(): void
+    {
+        $token = $this->token();
+
+        // Switch to restaurant mode
+        $res = $this->withToken($token)->postJson('/api/v1/pos/app/mode', [
+            'mode' => 'restaurant',
+        ]);
+
+        $res->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('active_mode', 'restaurant')
+            ->assertJsonPath('module.id', 'restaurant');
+
+        // Check bootstrap now returns restaurant active mode
+        $boot = $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap');
+        $boot->assertOk()
+            ->assertJsonPath('tenant.active_mode', 'restaurant');
+    }
 }

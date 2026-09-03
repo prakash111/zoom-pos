@@ -52,6 +52,12 @@ Route::prefix('tenant/password')->group(function () {
 Route::post('/tenant/profile/change-password', [PasswordResetController::class, 'changePassword'])
     ->middleware([AuthenticateTenantApi::class]);
 
+// Server-Driven UI Bootstrap routes accessible directly via /api/app/*
+Route::middleware([AuthenticateTenantApi::class])->group(function () {
+    Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
+    Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
+});
+
 /*
 |--------------------------------------------------------------------------
 | Dual-Mode POS Offline / Online Synchronization Engine
@@ -272,8 +278,9 @@ Route::prefix('v1/pos')->group(function () {
         Route::put('/languages/default', [LanguageApiController::class, 'setDefault'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/languages/translations/{locale}', [LanguageApiController::class, 'translations']);
 
-        // App bootstrap (translations + nav customization + config in one call)
+        // App bootstrap (translations + nav customization + config + SDUI modules in one call)
         Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
+        Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/nav-config', [AppBootstrapController::class, 'updateNav'])->middleware('tenant.api.permission:settings,edit');
     });
 });

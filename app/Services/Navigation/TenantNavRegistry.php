@@ -2,39 +2,41 @@
 
 namespace App\Services\Navigation;
 
+use App\Services\Modular\ModuleRegistry;
+
 /**
- * The compiled-in nav tree for the web tenant sidebar/drawer (layouts/
- * tenant.blade.php's "RESTAURANT MODE DRAWER ITEMS" / "GENERAL RETAIL
- * DRAWER ITEMS" / "Administration & Settings" sections), as plain data —
- * used by Settings > Navigation Menu to build its editable working state
- * and to validate what a saved nav_config actually references. Section and
- * item keys are the exact same ones the mobile app's DashboardScreen uses
- * (_NavSection.key / _FeatureTile.key) and the same ones the `item-key`/
- * `data-section-key` attributes in layouts/tenant.blade.php carry, so a
- * store's nav_config customization applies identically on both platforms.
- *
- * This is intentionally a second, hand-maintained copy of the tree rather
- * than something introspected from the blade file at runtime — the two are
- * kept in sync by hand (adding a drawer item means adding it here too),
- * the same tradeoff the mobile app's own DashboardScreen tree already makes
- * against the web sidebar.
- *
- * An item may carry a `parent` key naming another item's key in the same
- * section — it then renders nested under that item by default (Settings'
- * eight tabs are the only compiled-in example, nested under `settings`) and
- * an admin can drag it back out to the section root, or nest any other
- * item, from Settings > Navigation Menu. Up to two levels of nesting are
- * supported (Main Menu / Sub-Menu / Sub-Sub-Menu) — see
- * Index::buildNavSections()'s depth cap.
+ * The nav tree for the tenant sidebar/drawer and mobile client,
+ * supporting general retail, restaurant & cafe, pharmacy, service booking,
+ * and future pluggable business modules.
  */
 class TenantNavRegistry
 {
     /**
-     * @return list<array{key: string, label: string, items: list<array{key: string, label: string, parent?: string}>}>
+     * @param  bool|string  $isRestaurantOrMode
+     * @return list<array{key: string, label: string, color?: string, items: list<array{key: string, label: string, icon?: string, component?: string, permission?: ?string, parent?: string}>}>
      */
-    public static function sectionsFor(bool $isRestaurant): array
+    public static function sectionsFor(bool|string $isRestaurantOrMode): array
     {
-        return $isRestaurant ? self::restaurantSections() : self::retailSections();
+        if (is_bool($isRestaurantOrMode)) {
+            return $isRestaurantOrMode ? self::restaurantSections() : self::retailSections();
+        }
+
+        return match ($isRestaurantOrMode) {
+            'restaurant', 'food_restaurant' => self::restaurantSections(),
+            'pharmacy' => self::pharmacySections(),
+            'service_booking' => self::serviceBookingSections(),
+            default => self::retailSections(),
+        };
+    }
+
+    /**
+     * Return enriched menu structure for a given mode.
+     *
+     * @return list<array{key: string, label: string, color: string, items: list<array{key: string, label: string, icon: string, component: string, permission: ?string, parent?: string}>}>
+     */
+    public static function menuStructureForMode(string $mode): array
+    {
+        return self::sectionsFor($mode);
     }
 
     private static function retailSections(): array
@@ -43,33 +45,41 @@ class TenantNavRegistry
             [
                 'key' => 'cashier_sales',
                 'label' => 'Cashier & Sales',
+                'color' => '#1d4ed8',
                 'items' => [
-                    ['key' => 'pos', 'label' => 'Cashier POS Terminal'],
-                    ['key' => 'sales', 'label' => 'Sales & Invoices'],
-                    ['key' => 'quotations', 'label' => 'Quotations & Proposals'],
-                    ['key' => 'customers', 'label' => 'Customers & CRM'],
+                    ['key' => 'pos', 'label' => 'Point of Sale', 'icon' => 'point_of_sale', 'component' => 'pos', 'permission' => 'pos'],
+                    ['key' => 'sales', 'label' => 'Sales & Invoices', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales'],
+                    ['key' => 'quotations', 'label' => 'Quotations & Proposals', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes'],
+                    ['key' => 'consignments', 'label' => 'Consignments', 'icon' => 'local_shipping', 'component' => 'consignments', 'permission' => 'consignments'],
+                    ['key' => 'service_orders', 'label' => 'Service Orders', 'icon' => 'handyman', 'component' => 'service_orders', 'permission' => 'service_orders'],
+                    ['key' => 'customers', 'label' => 'Customers & CRM', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers'],
                 ],
             ],
             [
                 'key' => 'financial_management',
                 'label' => 'Financial Management',
+                'color' => '#0f766e',
                 'items' => [
-                    ['key' => 'cash_register', 'label' => 'Cash Register'],
-                    ['key' => 'due_receivables', 'label' => 'Accounts Receivable'],
-                    ['key' => 'payables', 'label' => 'Accounts Payable'],
-                    ['key' => 'reports', 'label' => 'Reports & Analytics'],
+                    ['key' => 'cash_register', 'label' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register'],
+                    ['key' => 'due_receivables', 'label' => 'Accounts Receivable', 'icon' => 'notifications_active', 'component' => 'due_receivables', 'permission' => 'finance'],
+                    ['key' => 'payables', 'label' => 'Accounts Payable', 'icon' => 'request_quote', 'component' => 'payables', 'permission' => 'finance'],
+                    ['key' => 'sales_targets', 'label' => 'Sales Targets', 'icon' => 'flag', 'component' => 'sales_targets', 'permission' => 'targets'],
+                    ['key' => 'reports', 'label' => 'Reports', 'icon' => 'insights', 'component' => 'reports', 'permission' => 'reports'],
+                    ['key' => 'analytics', 'label' => 'Analytics', 'icon' => 'bar_chart', 'component' => 'analytics', 'permission' => 'reports'],
                 ],
             ],
             [
                 'key' => 'products_inventory',
                 'label' => 'Products & Inventory',
+                'color' => '#b45309',
                 'items' => [
-                    ['key' => 'inventory', 'label' => 'All Products'],
-                    ['key' => 'categories', 'label' => 'Categories'],
-                    ['key' => 'brands', 'label' => 'Brands & Manufacturers'],
-                    ['key' => 'units', 'label' => 'Units of Measure'],
-                    ['key' => 'suppliers', 'label' => 'Suppliers & Vendors'],
-                    ['key' => 'catalog', 'label' => 'Online Digital Catalog'],
+                    ['key' => 'inventory', 'label' => 'All Products', 'icon' => 'inventory_2', 'component' => 'inventory', 'permission' => 'products'],
+                    ['key' => 'categories', 'label' => 'Categories', 'icon' => 'sell', 'component' => 'categories', 'permission' => 'categories'],
+                    ['key' => 'brands', 'label' => 'Brands & Manufacturers', 'icon' => 'auto_awesome', 'component' => 'brands', 'permission' => 'categories'],
+                    ['key' => 'units', 'label' => 'Units of Measure', 'icon' => 'straighten', 'component' => 'units', 'permission' => 'units'],
+                    ['key' => 'suppliers', 'label' => 'Suppliers & Vendors', 'icon' => 'local_shipping', 'component' => 'suppliers', 'permission' => 'suppliers'],
+                    ['key' => 'taxes', 'label' => 'Taxes & Compliance', 'icon' => 'percent', 'component' => 'taxes', 'permission' => 'settings'],
+                    ['key' => 'catalog', 'label' => 'Online Digital Catalog', 'icon' => 'qr_code', 'component' => 'catalog', 'permission' => 'catalog'],
                 ],
             ],
             self::administrationSection(),
@@ -82,40 +92,117 @@ class TenantNavRegistry
             [
                 'key' => 'restaurant_operations',
                 'label' => 'Restaurant Operations',
+                'color' => '#4d7c0f',
                 'items' => [
-                    ['key' => 'restaurant_pos', 'label' => 'Restaurant POS Terminal'],
-                    ['key' => 'floor_plan', 'label' => 'Floor Plan & Tables'],
-                    ['key' => 'kitchen_display', 'label' => 'Kitchen Display (KDS)'],
+                    ['key' => 'restaurant_pos', 'label' => 'Restaurant POS Terminal', 'icon' => 'restaurant', 'component' => 'restaurant_pos', 'permission' => 'pos'],
+                    ['key' => 'floor_plan', 'label' => 'Floor Plan & Tables', 'icon' => 'table_restaurant', 'component' => 'floor_plan', 'permission' => 'pos'],
+                    ['key' => 'kitchen_display', 'label' => 'Kitchen Display (KDS)', 'icon' => 'soup_kitchen', 'component' => 'kitchen_display', 'permission' => 'pos'],
                 ],
             ],
             [
                 'key' => 'orders_cash',
                 'label' => 'Orders & Cash',
+                'color' => '#0284c7',
                 'items' => [
-                    ['key' => 'dining_history', 'label' => 'Dining & Sales History'],
-                    ['key' => 'cash_register', 'label' => 'Cash Register'],
+                    ['key' => 'dining_history', 'label' => 'Dining & Sales History', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales'],
+                    ['key' => 'cash_register', 'label' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register'],
                 ],
             ],
             [
                 'key' => 'financial_management',
                 'label' => 'Financial Management',
+                'color' => '#0f766e',
                 'items' => [
-                    ['key' => 'accounts_receivable', 'label' => 'Accounts Receivable'],
-                    ['key' => 'accounts_payable', 'label' => 'Accounts Payable'],
-                    ['key' => 'reports_analytics', 'label' => 'Reports & Analytics'],
+                    ['key' => 'due_receivables', 'label' => 'Accounts Receivable', 'icon' => 'notifications_active', 'component' => 'due_receivables', 'permission' => 'finance'],
+                    ['key' => 'payables', 'label' => 'Accounts Payable', 'icon' => 'request_quote', 'component' => 'payables', 'permission' => 'finance'],
+                    ['key' => 'reports', 'label' => 'Reports & Analytics', 'icon' => 'insights', 'component' => 'reports', 'permission' => 'reports'],
                 ],
             ],
             [
                 'key' => 'kitchen_menu_catalog',
                 'label' => 'Kitchen Menu & Catalog',
+                'color' => '#d97706',
                 'items' => [
-                    ['key' => 'menu_dishes', 'label' => 'Menu Dishes & Stock'],
-                    ['key' => 'categories', 'label' => 'Categories'],
-                    ['key' => 'brands', 'label' => 'Brands & Modifiers'],
-                    ['key' => 'units', 'label' => 'Units of Measure'],
-                    ['key' => 'suppliers', 'label' => 'Food Suppliers'],
-                    ['key' => 'catalog', 'label' => 'Online QR Menu'],
-                    ['key' => 'guest_directory', 'label' => 'Guest Directory'],
+                    ['key' => 'inventory', 'label' => 'Menu Dishes & Stock', 'icon' => 'restaurant_menu', 'component' => 'inventory', 'permission' => 'products'],
+                    ['key' => 'categories', 'label' => 'Categories', 'icon' => 'sell', 'component' => 'categories', 'permission' => 'categories'],
+                    ['key' => 'brands', 'label' => 'Brands & Modifiers', 'icon' => 'auto_awesome', 'component' => 'brands', 'permission' => 'categories'],
+                    ['key' => 'units', 'label' => 'Units of Measure', 'icon' => 'straighten', 'component' => 'units', 'permission' => 'units'],
+                    ['key' => 'suppliers', 'label' => 'Food Suppliers', 'icon' => 'local_shipping', 'component' => 'suppliers', 'permission' => 'suppliers'],
+                    ['key' => 'catalog', 'label' => 'Online QR Menu', 'icon' => 'qr_code', 'component' => 'catalog', 'permission' => 'catalog'],
+                ],
+            ],
+            self::administrationSection(),
+        ];
+    }
+
+    private static function pharmacySections(): array
+    {
+        return [
+            [
+                'key' => 'pharmacy_dispensary',
+                'label' => 'Dispensary & Counter',
+                'color' => '#059669',
+                'items' => [
+                    ['key' => 'pos', 'label' => 'Pharmacy Counter POS', 'icon' => 'local_pharmacy', 'component' => 'pos', 'permission' => 'pos'],
+                    ['key' => 'sales', 'label' => 'Dispensed Prescriptions', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales'],
+                    ['key' => 'customers', 'label' => 'Patients & Doctors', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers'],
+                ],
+            ],
+            [
+                'key' => 'pharmacy_inventory',
+                'label' => 'Medicines & Inventory',
+                'color' => '#2563eb',
+                'items' => [
+                    ['key' => 'inventory', 'label' => 'Drugs & Formulations', 'icon' => 'medication', 'component' => 'inventory', 'permission' => 'products'],
+                    ['key' => 'categories', 'label' => 'Therapeutic Categories', 'icon' => 'sell', 'component' => 'categories', 'permission' => 'categories'],
+                    ['key' => 'suppliers', 'label' => 'Pharma Distributors', 'icon' => 'local_shipping', 'component' => 'suppliers', 'permission' => 'suppliers'],
+                ],
+            ],
+            [
+                'key' => 'financial_management',
+                'label' => 'Financial Management',
+                'color' => '#0f766e',
+                'items' => [
+                    ['key' => 'cash_register', 'label' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register'],
+                    ['key' => 'due_receivables', 'label' => 'Patient Credit / Khata', 'icon' => 'notifications_active', 'component' => 'due_receivables', 'permission' => 'finance'],
+                    ['key' => 'payables', 'label' => 'Supplier Payables', 'icon' => 'request_quote', 'component' => 'payables', 'permission' => 'finance'],
+                    ['key' => 'reports', 'label' => 'Reports & Analytics', 'icon' => 'insights', 'component' => 'reports', 'permission' => 'reports'],
+                ],
+            ],
+            self::administrationSection(),
+        ];
+    }
+
+    private static function serviceBookingSections(): array
+    {
+        return [
+            [
+                'key' => 'service_operations',
+                'label' => 'Appointments & Service',
+                'color' => '#7c3aed',
+                'items' => [
+                    ['key' => 'service_orders', 'label' => 'Appointments & Bookings', 'icon' => 'event_available', 'component' => 'service_orders', 'permission' => 'service_orders'],
+                    ['key' => 'pos', 'label' => 'Service POS & Checkout', 'icon' => 'spa', 'component' => 'pos', 'permission' => 'pos'],
+                    ['key' => 'customers', 'label' => 'Clients & Memberships', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers'],
+                ],
+            ],
+            [
+                'key' => 'products_staff',
+                'label' => 'Supplies & Staff',
+                'color' => '#d97706',
+                'items' => [
+                    ['key' => 'inventory', 'label' => 'Products & Supplies', 'icon' => 'inventory_2', 'component' => 'inventory', 'permission' => 'products'],
+                    ['key' => 'staff', 'label' => 'Specialists & Stylists', 'icon' => 'badge', 'component' => 'staff', 'permission' => 'users'],
+                ],
+            ],
+            [
+                'key' => 'financial_management',
+                'label' => 'Financial Management',
+                'color' => '#0f766e',
+                'items' => [
+                    ['key' => 'cash_register', 'label' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register'],
+                    ['key' => 'due_receivables', 'label' => 'Client Due Receivables', 'icon' => 'notifications_active', 'component' => 'due_receivables', 'permission' => 'finance'],
+                    ['key' => 'reports', 'label' => 'Service Reports', 'icon' => 'insights', 'component' => 'reports', 'permission' => 'reports'],
                 ],
             ],
             self::administrationSection(),
@@ -127,34 +214,31 @@ class TenantNavRegistry
         return [
             'key' => 'administration',
             'label' => 'Administration & Settings',
+            'color' => '#475569',
             'items' => [
-                ['key' => 'subscription', 'label' => 'Subscription & Billing'],
-                ['key' => 'settings', 'label' => 'Store Settings'],
+                ['key' => 'subscription', 'label' => 'Subscription & Billing', 'icon' => 'workspace_premium', 'component' => 'subscription', 'permission' => null],
+                ['key' => 'settings', 'label' => 'Store Settings', 'icon' => 'settings', 'component' => 'settings', 'permission' => 'settings'],
                 ...self::settingsTabItems(),
-                ['key' => 'languages', 'label' => 'Languages & Translations'],
-                ['key' => 'staff', 'label' => 'Users & Permissions'],
-                ['key' => 'devices', 'label' => 'Terminals & Devices'],
+                ['key' => 'languages', 'label' => 'Languages & Translations', 'icon' => 'translate', 'component' => 'languages', 'permission' => 'settings'],
+                ['key' => 'staff', 'label' => 'Users & Permissions', 'icon' => 'badge', 'component' => 'staff', 'permission' => 'users'],
+                ['key' => 'devices', 'label' => 'Terminals & Devices', 'icon' => 'devices_other', 'component' => 'devices', 'permission' => null],
             ],
         ];
     }
 
     /**
-     * Store Settings' seven tenant-owned tabs (resources/views/livewire/tenant/settings/
-     * index.blade.php's `validTabs`/`#hash` routing), exposed as independent
-     * nav items nested under `settings` by default so an admin can pin a
-     * direct link to just one tab, reorder them, or un-nest one to the
-     * section root — without changing the Settings page itself.
+     * Store Settings' seven tenant-owned tabs.
      */
     private static function settingsTabItems(): array
     {
         return [
-            ['key' => 'settings_mode', 'label' => 'Store Operating Mode', 'parent' => 'settings'],
-            ['key' => 'settings_profile', 'label' => 'Store Profile & Branding', 'parent' => 'settings'],
-            ['key' => 'settings_receipts', 'label' => 'Receipt Prefixes & Bank Terms', 'parent' => 'settings'],
-            ['key' => 'settings_financial', 'label' => 'Financial & Currency', 'parent' => 'settings'],
-            ['key' => 'settings_taxes', 'label' => 'Taxes & Compliance', 'parent' => 'settings'],
-            ['key' => 'settings_api', 'label' => 'API & Integrations', 'parent' => 'settings'],
-            ['key' => 'settings_navigation', 'label' => 'Navigation Menu', 'parent' => 'settings'],
+            ['key' => 'settings_mode', 'label' => 'Store Operating Mode', 'icon' => 'tune', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
+            ['key' => 'settings_profile', 'label' => 'Store Profile & Branding', 'icon' => 'storefront', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
+            ['key' => 'settings_receipts', 'label' => 'Receipt Prefixes & Bank Terms', 'icon' => 'receipt', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
+            ['key' => 'settings_financial', 'label' => 'Financial & Currency', 'icon' => 'monetization_on', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
+            ['key' => 'settings_taxes', 'label' => 'Taxes & Compliance', 'icon' => 'percent', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
+            ['key' => 'settings_api', 'label' => 'API & Integrations', 'icon' => 'api', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
+            ['key' => 'settings_navigation', 'label' => 'Navigation Menu', 'icon' => 'menu_open', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
         ];
     }
 }
