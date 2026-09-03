@@ -909,7 +909,12 @@
                      touched simply keeps its compiled-in position (a stable
                      sort over an all-equal order is a no-op), so a tenant
                      with no saved config sees the drawer completely
-                     unchanged. Only one level of nesting is supported. --}}
+                     unchanged. childrenContainerFor() and the loops below
+                     work on whatever item key an item names as its parent
+                     with no depth limit of their own — Settings > Navigation
+                     Menu's builder is what actually caps nesting at three
+                     levels (Main Menu / Sub-Menu / Sub-Sub-Menu), by simply
+                     never saving a `parent` chain deeper than that. --}}
                 <script>
                     (function () {
                         const navConfig = @json($tenantNavConfig ?? ['sections' => [], 'items' => []]);

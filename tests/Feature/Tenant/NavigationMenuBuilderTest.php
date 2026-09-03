@@ -133,6 +133,82 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertContains('settings_navigation', collect($administration['items'])->pluck('key')->all());
     }
 
+    /**
+     * WordPress-style nesting: a Sub-Menu item can itself take a Sub-Sub-Menu
+     * child, giving three levels total (Main Menu / Sub-Menu / Sub-Sub-Menu).
+     * buildNavSections() must reconstruct that second nesting level on read,
+     * and reject anything deeper by falling it back to the section root
+     * rather than dropping it.
+     */
+    public function test_save_nav_config_persists_two_levels_of_nesting_and_caps_a_third(): void
+    {
+        [$company] = $this->actingAsTenantAdmin();
+
+        $payload = [
+            [
+                'key' => 'cashier_sales',
+                'label' => 'Cashier & Sales',
+                'items' => [
+                    [
+                        'key' => 'pos',
+                        'label' => 'Cashier POS Terminal',
+                        'visible' => true,
+                        'children' => [
+                            [
+                                'key' => 'sales',
+                                'label' => 'Sales & Invoices',
+                                'visible' => true,
+                                // A Sub-Sub-Menu item nested under a Sub-Menu item.
+                                'children' => [
+                                    ['key' => 'quotations', 'label' => 'Quotations & Proposals', 'visible' => true],
+                                ],
+                            ],
+                        ],
+                    ],
+                    ['key' => 'customers', 'label' => 'Customers & CRM', 'visible' => true, 'children' => []],
+                ],
+            ],
+        ];
+
+        Livewire::test(SettingsIndex::class)->call('saveNavConfig', $payload)->assertHasNoErrors();
+
+        $nav = $company->fresh()->normalizedNavConfig();
+        $itemsByKey = collect($nav['items'])->keyBy('key');
+
+        $this->assertSame('pos', $itemsByKey['sales']['parent']);
+        $this->assertSame('sales', $itemsByKey['quotations']['parent']);
+
+        auth('web')->user()->unsetRelation('company');
+        $sections = Livewire::test(SettingsIndex::class)->viewData('navSections');
+        $cashierSales = collect($sections)->firstWhere('key', 'cashier_sales');
+        $pos = collect($cashierSales['items'])->firstWhere('key', 'pos');
+        $sales = collect($pos['children'])->firstWhere('key', 'sales');
+
+        $this->assertSame(['quotations'], collect($sales['children'])->pluck('key')->all());
+
+        // Now attempt a fourth level (quotations parenting something) —
+        // buildNavSections() must cap it back to the section root, not
+        // drop it or nest it another level deeper.
+        $company->update(['nav_config' => [
+            'sections' => [['key' => 'cashier_sales', 'order' => 0]],
+            'items' => [
+                ['key' => 'pos', 'section' => 'cashier_sales', 'parent' => null, 'order' => 0, 'visible' => true],
+                ['key' => 'sales', 'section' => 'cashier_sales', 'parent' => 'pos', 'order' => 0, 'visible' => true],
+                ['key' => 'quotations', 'section' => 'cashier_sales', 'parent' => 'sales', 'order' => 0, 'visible' => true],
+                // Would be a 4th level (root -> pos -> sales -> quotations -> customers) — must be capped.
+                ['key' => 'customers', 'section' => 'cashier_sales', 'parent' => 'quotations', 'order' => 0, 'visible' => true],
+            ],
+        ]]);
+        auth('web')->user()->unsetRelation('company');
+        $cappedSections = Livewire::test(SettingsIndex::class)->viewData('navSections');
+        $cashierSalesCapped = collect($cappedSections)->firstWhere('key', 'cashier_sales');
+
+        $this->assertContains('customers', collect($cashierSalesCapped['items'])->pluck('key')->all());
+        $posCapped = collect($cashierSalesCapped['items'])->firstWhere('key', 'pos');
+        $salesCapped = collect($posCapped['children'])->firstWhere('key', 'sales');
+        $this->assertNotContains('customers', collect($salesCapped['children'])->pluck('key')->all());
+    }
+
     public function test_save_nav_config_persists_hidden_items_reordered_sections_and_moved_items(): void
     {
         [$company] = $this->actingAsTenantAdmin();
@@ -216,6 +292,12 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertStringContainsString('x-model="item.visible"', $html);
         $this->assertStringContainsString('class="nav-section-drag-handle', $html);
         $this->assertStringContainsString('class="nav-item-drag-handle', $html);
+
+        // Sub-Sub-Menu level (WordPress-style three-level nesting): a
+        // Sub-Menu row must render its own nested grandchildren list.
+        $this->assertStringContainsString('x-for="child in item.children"', $html);
+        $this->assertStringContainsString('x-for="grandchild in child.children"', $html);
+        $this->assertStringContainsString('nav-grandchildren-container', $html);
     }
 
     /**

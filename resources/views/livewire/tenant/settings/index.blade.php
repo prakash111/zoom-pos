@@ -1507,29 +1507,35 @@
                  // Shared `group` lets an item drag from one section's root
                  // list straight into another's (not just reorder within its
                  // own), and — since every item's nested `.nav-children-
-                 // container` shares the same group — drag it into or out of
-                 // another item to nest/un-nest it. Which of the two the
-                 // pointer counts as being inside is pure geometry (see
-                 // .nav-children-container's `ml-8` in the markup below: a real
-                 // margin, not just padding, narrows its own hoverable box
-                 // so it's a genuinely distinct drop target from the
-                 // full-width root list — dragging left past that margin
-                 // hands the pointer back to the root list on its own,
-                 // no custom pointer-tracking needed). onMove blocks
-                 // dropping an item that already has children into a
-                 // children container: only one level of nesting is
-                 // supported, so that combination would silently lose the
-                 // grandchildren once synced.
-                 document.querySelectorAll('.nav-items-container, .nav-children-container').forEach((el) => {
+                 // container` (Sub-Menu level) and `.nav-grandchildren-
+                 // container` (Sub-Sub-Menu level) share the same group —
+                 // drag it into or out of another item to nest/un-nest it,
+                 // one level at a time. Which zone the pointer counts as
+                 // being inside is pure geometry (see .nav-children-
+                 // container's `ml-8` / .nav-grandchildren-container's
+                 // `ml-16` in the markup below: real margins, not just
+                 // padding, narrow each zone's own hoverable box so they're
+                 // genuinely distinct drop targets from the full-width root
+                 // list — dragging left past a margin hands the pointer back
+                 // to the shallower zone on its own, no custom pointer-
+                 // tracking needed). A Sub-Sub-Menu row renders no nested
+                 // list of its own at all, so there's nothing to drop
+                 // further into — that's what caps nesting at three levels.
+                 // onMove additionally blocks dropping an item that already
+                 // has children into any nested zone: nesting something
+                 // that itself has children would push its own children one
+                 // level deeper than the cap allows, silently losing them
+                 // once synced.
+                 document.querySelectorAll('.nav-items-container, .nav-children-container, .nav-grandchildren-container').forEach((el) => {
                      this.sortableInstances.push(Sortable.create(el, {
                          ...commonSortableOptions,
                          group: 'tenant-nav-items',
                          handle: '.nav-item-drag-handle',
                          onMove: (evt) => {
-                             const childrenHolder = evt.dragged.querySelector('.nav-children-container');
+                             const childrenHolder = evt.dragged.querySelector(':scope > .nav-children-container, :scope > .nav-grandchildren-container');
                              const draggedHasChildren = childrenHolder && childrenHolder.children.length > 0;
-                             const droppingIntoChildren = evt.to.classList.contains('nav-children-container');
-                             return !(draggedHasChildren && droppingIntoChildren);
+                             const droppingIntoNestedZone = evt.to.classList.contains('nav-children-container') || evt.to.classList.contains('nav-grandchildren-container');
+                             return !(draggedHasChildren && droppingIntoNestedZone);
                          },
                          onEnd: () => this.syncFromDom(),
                      }));
@@ -1540,14 +1546,36 @@
                  if (!sectionContainer) return;
 
                  const findAnywhere = (key) => {
-                     for (const s of this.sections) {
-                         for (const it of s.items) {
+                     const inList = (items) => {
+                         for (const it of items) {
                              if (it.key === key) return it;
-                             const child = (it.children || []).find((c) => c.key === key);
-                             if (child) return child;
+                             const found = inList(it.children || []);
+                             if (found) return found;
                          }
+                         return null;
+                     };
+                     for (const s of this.sections) {
+                         const found = inList(s.items);
+                         if (found) return found;
                      }
                      return null;
+                 };
+
+                 // Reads one level of a nested list: `listEl` is the
+                 // container holding this level's rows, `nestedSelector` is
+                 // the class name of the NEXT level's container to recurse
+                 // into (null once there's no deeper level left, i.e. at
+                 // Sub-Sub-Menu rows).
+                 const readLevel = (listEl, nestedSelector) => {
+                     if (!listEl) return [];
+                     return Array.from(listEl.querySelectorAll(':scope > [data-item-key]')).flatMap((rowEl) => {
+                         const existing = findAnywhere(rowEl.getAttribute('data-item-key'));
+                         if (!existing) return [];
+                         const nestedRoot = nestedSelector ? rowEl.querySelector(':scope > ' + nestedSelector) : null;
+                         const nextSelector = nestedSelector === '.nav-children-container' ? '.nav-grandchildren-container' : null;
+                         const children = nestedRoot ? readLevel(nestedRoot, nextSelector) : [];
+                         return [{ key: existing.key, label: existing.label, visible: existing.visible, children }];
+                     });
                  };
 
                  const next = [];
@@ -1556,21 +1584,8 @@
                      const existingSection = this.sections.find((s) => s.key === key);
                      if (!existingSection) return;
 
-                     const items = [];
                      const itemsRoot = secEl.querySelector(':scope > .nav-items-container');
-                     (itemsRoot ? itemsRoot.querySelectorAll(':scope > [data-item-key]') : []).forEach((itemWrapEl) => {
-                         const existingItem = findAnywhere(itemWrapEl.getAttribute('data-item-key'));
-                         if (!existingItem) return;
-
-                         const children = [];
-                         const childrenRoot = itemWrapEl.querySelector(':scope > .nav-children-container');
-                         (childrenRoot ? childrenRoot.querySelectorAll(':scope > [data-item-key]') : []).forEach((childEl) => {
-                             const existingChild = findAnywhere(childEl.getAttribute('data-item-key'));
-                             if (existingChild) children.push({ key: existingChild.key, label: existingChild.label, visible: existingChild.visible });
-                         });
-
-                         items.push({ key: existingItem.key, label: existingItem.label, visible: existingItem.visible, children });
-                     });
+                     const items = readLevel(itemsRoot, '.nav-children-container');
 
                      next.push({ key: existingSection.key, label: existingSection.label, items });
                  });
@@ -1594,7 +1609,7 @@
         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
             <h3 class="text-sm font-black text-slate-800 dark:text-slate-100">{{ __('Navigation Menu') }}</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {{ __('Hide destinations your team doesn\'t use, drag to reorder sections, or drag a destination into a different section. Drag it right, into the indented zone under another destination, to nest it as a sub-item — drag it back left, past the indent, to un-nest it to the top level. Applies to every device signed in to this store — the mobile app included.') }}
+                {{ __('Hide destinations your team doesn\'t use, drag to reorder sections, or drag a destination into a different section. Drag it right, into the indented zone under another destination, to nest it as a Sub-Menu item — drag it right again to nest a Sub-Sub-Menu under that. Drag left, past an indent, to promote it back up one level at a time. Applies to every device signed in to this store — the mobile app included.') }}
             </p>
         </div>
 
@@ -1625,12 +1640,29 @@
                                      outdent (drag left, back into the root list). --}}
                                 <div class="nav-children-container ml-8 pl-2 border-l-2 border-dashed border-slate-200 dark:border-slate-700 space-y-0.5 min-h-[10px] mt-0.5" :data-parent-key="item.key">
                                     <template x-for="child in item.children" :key="child.key">
-                                        <div :data-item-key="child.key" class="flex items-center gap-2 px-2 py-1 rounded-xl border-l-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
-                                            <input type="checkbox" x-model="child.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
-                                            <span class="flex-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400" x-text="child.label"></span>
-                                            <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, or drag left past the indent to un-nest to the top level') }}">
-                                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
-                                            </span>
+                                        <div :data-item-key="child.key">
+                                            <div class="flex items-center gap-2 px-2 py-1 rounded-xl border-l-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                                                <input type="checkbox" x-model="child.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
+                                                <span class="flex-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400" x-text="child.label"></span>
+                                                <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, drag left past the indent to un-nest, or drag right again to nest a Sub-Sub-Menu under it') }}">
+                                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
+                                                </span>
+                                            </div>
+                                            {{-- Sub-Sub-Menu level — the deepest this builder supports.
+                                                 A Sub-Sub-Menu row (below) has no nested list of its own,
+                                                 which is what caps nesting at three levels: there's simply
+                                                 nowhere further to drop into. --}}
+                                            <div class="nav-grandchildren-container ml-8 pl-2 border-l-2 border-dashed border-slate-200 dark:border-slate-700 space-y-0.5 min-h-[10px] mt-0.5" :data-parent-key="child.key">
+                                                <template x-for="grandchild in child.children" :key="grandchild.key">
+                                                    <div :data-item-key="grandchild.key" class="flex items-center gap-2 px-2 py-1 rounded-xl border-l-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                                                        <input type="checkbox" x-model="grandchild.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
+                                                        <span class="flex-1 text-[10px] font-semibold text-slate-500 dark:text-slate-500" x-text="grandchild.label"></span>
+                                                        <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, or drag left past the indent to un-nest') }}">
+                                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
+                                                        </span>
+                                                    </div>
+                                                </template>
+                                            </div>
                                         </div>
                                     </template>
                                 </div>

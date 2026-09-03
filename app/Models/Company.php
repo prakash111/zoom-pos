@@ -245,9 +245,10 @@ class Company extends Model
      * back to whatever section/position/nesting that item's key defaults to
      * further up the stack — see DashboardScreen._sectionsFor and
      * ALL_DOCK_ITEMS on web). `parent` is another item's key in the same
-     * section — null means the item sits at that section's root level; only
-     * one level of nesting is supported (a parent may not itself have a
-     * parent — see TenantNavRegistry/buildNavSections()). Every reader
+     * section — null means the item sits at that section's root level; up
+     * to two levels of nesting are supported (Main Menu / Sub-Menu /
+     * Sub-Sub-Menu — see TenantNavRegistry/buildNavSections()'s depth cap).
+     * Every reader
      * (mobile bootstrap, mobile/web settings pages, the web sidebar) goes
      * through this so none of them need to understand a format the others
      * don't.

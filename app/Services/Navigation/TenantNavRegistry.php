@@ -23,8 +23,9 @@ namespace App\Services\Navigation;
  * section — it then renders nested under that item by default (Settings'
  * eight tabs are the only compiled-in example, nested under `settings`) and
  * an admin can drag it back out to the section root, or nest any other
- * item, from Settings > Navigation Menu. Only one level of nesting is
- * supported.
+ * item, from Settings > Navigation Menu. Up to two levels of nesting are
+ * supported (Main Menu / Sub-Menu / Sub-Sub-Menu) — see
+ * Index::buildNavSections()'s depth cap.
  */
 class TenantNavRegistry
 {

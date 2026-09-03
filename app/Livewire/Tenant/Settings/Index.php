@@ -1188,11 +1188,11 @@ class Index extends Component
      * exact same merge DashboardScreen._sectionsFor and layouts/tenant.
      * blade.php's client-side reordering script do, so this tab always
      * shows what the live sidebar (both web and mobile) currently renders.
-     * Only one level of nesting is supported — a parent may not itself have
-     * a parent; see the loop below that drops an invalid parent link back
-     * to root rather than silently hiding the item.
+     * Up to two levels of nesting are supported (Main Menu / Sub-Menu /
+     * Sub-Sub-Menu) — see the loop below that drops a parent link deeper
+     * than that back to root rather than silently hiding the item.
      *
-     * @return list<array{key: string, label: string, items: list<array{key: string, label: string, visible: bool, children: list<array{key: string, label: string, visible: bool}>}>}>
+     * @return list<array{key: string, label: string, items: list<array{key: string, label: string, visible: bool, children: list<array{key: string, label: string, visible: bool, children: list<array{key: string, label: string, visible: bool}>}>}>}>
      */
     private function buildNavSections(): array
     {
@@ -1228,17 +1228,43 @@ class Index extends Component
             }
         }
 
-        // A parent link only holds if the parent exists, resolved to the
-        // same section, and isn't itself nested — otherwise the item falls
-        // back to its section's root rather than disappearing.
+        // A parent link only holds if the parent exists, resolves to the
+        // same section, and its own depth doesn't already sit at the cap —
+        // otherwise the item falls back to its section's root rather than
+        // disappearing. Depth 0 = root (Main Menu), 1 = Sub-Menu, 2 =
+        // Sub-Sub-Menu — the deepest level this builder supports, matching
+        // the web/mobile UI's own nesting guards, so a parent already at
+        // depth 2 can't take on more children.
         foreach ($resolved as $key => &$row) {
-            $parentRow = $row['parent'] ? ($resolved[$row['parent']] ?? null) : null;
-            if ($row['parent'] && (! $parentRow || $parentRow['section'] !== $row['section'] || ! empty($parentRow['parent']))) {
+            if (! $row['parent']) {
+                continue;
+            }
+            $parentRow = $resolved[$row['parent']] ?? null;
+            if (! $parentRow || $parentRow['section'] !== $row['section']) {
+                $row['parent'] = null;
+
+                continue;
+            }
+            $parentDepth = 0;
+            if (! empty($parentRow['parent'])) {
+                $grandparentRow = $resolved[$parentRow['parent']] ?? null;
+                $parentDepth = ($grandparentRow && $grandparentRow['section'] === $parentRow['section'] && empty($grandparentRow['parent']))
+                    ? 1
+                    : 2;
+            }
+            if ($parentDepth >= 2) {
                 $row['parent'] = null;
             }
         }
         unset($row);
 
+        // Root items (depth 0) first, then attach depth-1 items under their
+        // (already-placed) root parent, then depth-2 items under their
+        // (already-placed) depth-1 parent. Every row's parent link is
+        // validated above to resolve to exactly one of these two passes —
+        // a parent with no parent of its own is a root item (pass 1), a
+        // parent that itself has a parent is a depth-1 item (pass 2) — so
+        // this is exhaustive, not just "the common case".
         $grouped = [];
         foreach ($resolved as $row) {
             if ($row['parent']) {
@@ -1247,10 +1273,31 @@ class Index extends Component
             $grouped[$row['section']][$row['key']] = $row + ['children' => []];
         }
         foreach ($resolved as $row) {
-            if (! $row['parent'] || ! isset($grouped[$row['section']][$row['parent']])) {
+            if (! $row['parent']) {
                 continue;
             }
-            $grouped[$row['section']][$row['parent']]['children'][] = $row;
+            $parentRow = $resolved[$row['parent']];
+            if ($parentRow['parent']) {
+                continue; // depth-2 — handled by the pass below instead.
+            }
+            if (! isset($grouped[$row['section']][$row['parent']])) {
+                continue;
+            }
+            $grouped[$row['section']][$row['parent']]['children'][$row['key']] = $row + ['children' => []];
+        }
+        foreach ($resolved as $row) {
+            if (! $row['parent']) {
+                continue;
+            }
+            $parentRow = $resolved[$row['parent']];
+            if (! $parentRow['parent']) {
+                continue; // depth-1 — already attached above.
+            }
+            $grandparentKey = $parentRow['parent'];
+            if (! isset($grouped[$row['section']][$grandparentKey]['children'][$row['parent']])) {
+                continue;
+            }
+            $grouped[$row['section']][$grandparentKey]['children'][$row['parent']]['children'][$row['key']] = $row + ['children' => []];
         }
 
         $sections = [];
@@ -1258,9 +1305,19 @@ class Index extends Component
             $items = array_values($items);
             usort($items, fn ($a, $b) => $a['order'] <=> $b['order']);
             foreach ($items as &$item) {
+                $item['children'] = array_values($item['children']);
                 usort($item['children'], fn ($a, $b) => $a['order'] <=> $b['order']);
+                foreach ($item['children'] as &$child) {
+                    $child['children'] = array_values($child['children']);
+                    usort($child['children'], fn ($a, $b) => $a['order'] <=> $b['order']);
+                    $child['children'] = array_map(
+                        fn ($gc) => ['key' => $gc['key'], 'label' => $gc['label'], 'visible' => $gc['visible']],
+                        $child['children']
+                    );
+                }
+                unset($child);
                 $item['children'] = array_map(
-                    fn ($c) => ['key' => $c['key'], 'label' => $c['label'], 'visible' => $c['visible']],
+                    fn ($c) => ['key' => $c['key'], 'label' => $c['label'], 'visible' => $c['visible'], 'children' => $c['children']],
                     $item['children']
                 );
             }
@@ -1291,13 +1348,16 @@ class Index extends Component
      * POST target for Settings > Navigation Menu's Save button — see
      * resources/views/livewire/tenant/settings/index.blade.php's Alpine nav
      * builder. Accepts the complete current section/item tree (order,
-     * section placement, visibility, and each root item's nested
-     * `children`) as one payload rather than incremental diffs, mirroring
-     * how the mobile app's NavMenuSettingsTab saves. Every item — root or
-     * child — becomes its own flat nav_config['items'] row; a child's row
-     * just carries its parent's key so buildNavSections() can re-nest it on
-     * read (only one level of nesting is supported, so children's own
-     * `children` arrays, if any slipped through, are ignored here).
+     * section placement, visibility, and each item's nested `children`,
+     * up to two levels deep — Main Menu, Sub-Menu, Sub-Sub-Menu) as one
+     * payload rather than incremental diffs, mirroring how the mobile app's
+     * NavMenuSettingsTab saves. Every item at any depth becomes its own
+     * flat nav_config['items'] row carrying its parent's key, so
+     * buildNavSections() can re-nest it on read; the flatten below itself
+     * doesn't enforce the two-level cap (a payload nested deeper than that
+     * shouldn't occur — the builder UI and its drag guards never construct
+     * one) since buildNavSections() is what actually enforces it, falling
+     * an over-deep item back to its section root rather than dropping it.
      */
     public function saveNavConfig(array $sections): void
     {
@@ -1308,14 +1368,8 @@ class Index extends Component
 
         $navSections = [];
         $navItems = [];
-        foreach (array_values($sections) as $sectionOrder => $section) {
-            $sectionKey = (string) ($section['key'] ?? '');
-            if ($sectionKey === '') {
-                continue;
-            }
-            $navSections[] = ['key' => $sectionKey, 'order' => $sectionOrder];
-
-            foreach (array_values($section['items'] ?? []) as $itemOrder => $item) {
+        $flatten = function (array $items, string $sectionKey, ?string $parentKey) use (&$flatten, &$navItems) {
+            foreach (array_values($items) as $order => $item) {
                 $itemKey = (string) ($item['key'] ?? '');
                 if ($itemKey === '') {
                     continue;
@@ -1323,25 +1377,21 @@ class Index extends Component
                 $navItems[] = [
                     'key' => $itemKey,
                     'section' => $sectionKey,
-                    'parent' => null,
-                    'order' => $itemOrder,
+                    'parent' => $parentKey,
+                    'order' => $order,
                     'visible' => (bool) ($item['visible'] ?? true),
                 ];
-
-                foreach (array_values($item['children'] ?? []) as $childOrder => $child) {
-                    $childKey = (string) ($child['key'] ?? '');
-                    if ($childKey === '') {
-                        continue;
-                    }
-                    $navItems[] = [
-                        'key' => $childKey,
-                        'section' => $sectionKey,
-                        'parent' => $itemKey,
-                        'order' => $childOrder,
-                        'visible' => (bool) ($child['visible'] ?? true),
-                    ];
-                }
+                $flatten($item['children'] ?? [], $sectionKey, $itemKey);
             }
+        };
+
+        foreach (array_values($sections) as $sectionOrder => $section) {
+            $sectionKey = (string) ($section['key'] ?? '');
+            if ($sectionKey === '') {
+                continue;
+            }
+            $navSections[] = ['key' => $sectionKey, 'order' => $sectionOrder];
+            $flatten($section['items'] ?? [], $sectionKey, null);
         }
 
         $this->company->update(['nav_config' => ['sections' => $navSections, 'items' => $navItems]]);
