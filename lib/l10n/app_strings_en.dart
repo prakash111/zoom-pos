@@ -136,7 +136,8 @@ const Map<String, String> kEnStrings = {
   'featureCategories': 'Categories',
   'featureBrands': 'Brands & Modifiers',
   'featureUnits': 'Units of Measure',
-  'featureSuppliers': 'Food Suppliers',
+  'featureSuppliers': 'Suppliers',
+  'featureFoodSuppliers': 'Food Suppliers',
   'featureGuestDirectory': 'Guest Directory',
 
   // Drawer section headers, shared by the retail and restaurant nav trees.

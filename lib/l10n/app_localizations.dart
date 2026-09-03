@@ -204,6 +204,7 @@ class AppLocalizations {
   String get featureBrands => _s('featureBrands');
   String get featureUnits => _s('featureUnits');
   String get featureSuppliers => _s('featureSuppliers');
+  String get featureFoodSuppliers => _s('featureFoodSuppliers');
   String get featureGuestDirectory => _s('featureGuestDirectory');
 
   String get navHeaderRestaurantOperations => _s('navHeaderRestaurantOperations');

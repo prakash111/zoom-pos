@@ -189,7 +189,7 @@ List<_NavSection> _restaurantSections() => [
           _FeatureTile('categories', (l10n) => l10n.featureCategories, Icons.sell_outlined, (_) => const CategoriesScreen(), 'categories'),
           _FeatureTile('brands', (l10n) => l10n.featureBrands, Icons.auto_awesome_outlined, (_) => const BrandsScreen(), 'categories'),
           _FeatureTile('units', (l10n) => l10n.featureUnits, Icons.straighten_outlined, (_) => const UnitsScreen(), 'units'),
-          _FeatureTile('suppliers', (l10n) => l10n.featureSuppliers, Icons.local_shipping_outlined, (_) => const SuppliersScreen(), 'suppliers'),
+          _FeatureTile('suppliers', (l10n) => l10n.featureFoodSuppliers, Icons.local_shipping_outlined, (_) => const SuppliersScreen(), 'suppliers'),
           _FeatureTile('catalog', (l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen(), 'catalog'),
           _FeatureTile('guest_directory', (l10n) => l10n.featureGuestDirectory, Icons.people_outline, (_) => const CustomersScreen(), 'customers'),
         ],
