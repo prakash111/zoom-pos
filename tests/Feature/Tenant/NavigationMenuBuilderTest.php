@@ -301,63 +301,34 @@ class NavigationMenuBuilderTest extends TestCase
     }
 
     /**
-     * Regression test for a reported bug: dragging an item within the
-     * builder rendered the SortableJS fallback drag-clone pinned near the
-     * page's left edge, escaping the card into the sidebar gap, instead of
-     * following the cursor — caused by a transformed ancestor elsewhere in
-     * the shared tenant layout hijacking the clone's `position: fixed`
-     * containing block. `fallbackOnBody: true` re-parents the clone onto
-     * <body>, sidestepping any such ancestor — see initSortables()'s
-     * `commonSortableOptions`. Also guards the indent/outdent drop-zone
-     * geometry: `.nav-children-container` must carry a real `ml-8` margin
-     * (which narrows its own hoverable box relative to the full-width root
-     * list, letting SortableJS's own collision detection tell "dragged
-     * right past the indent" from "dragged left past it" apart) rather than
-     * just inner padding, which wouldn't narrow the box at all.
+     * Regression test: forceFallback + fallbackOnBody were tried to fix a
+     * cosmetic bug (the drag preview rendered pinned near the page's edge
+     * instead of following the cursor), but forceFallback's preview is a
+     * raw cloneNode() of the dragged row — it still carries that row's
+     * Alpine directives (x-model, :data-item-key, etc.) even though it's
+     * no longer inside the x-for scope that gave `item`/`child`/
+     * `grandchild` meaning. Per SortableJS's own source, its internal
+     * _dragStarted() clones the row *before* dispatching any public event
+     * a plugin could hook to strip those directives first — so every
+     * attempt to clean up the clone (reactively via onClone/a
+     * MutationObserver, or preemptively via onStart) either lost the race
+     * against Livewire's own page-load-registered mutation observer or
+     * ran too late regardless, and Livewire kept throwing a reference
+     * error on every drag frame, expensive enough that dragging looked
+     * like it did nothing at all. Native drag-and-drop (SortableJS's
+     * default without forceFallback) renders its drag image as a browser
+     * snapshot, not a DOM clone, so it's categorically immune — this
+     * guards against forceFallback/fallbackOnBody being reintroduced.
      */
-    public function test_navigation_tab_configures_sortable_for_reliable_indent_outdent_dragging(): void
+    public function test_navigation_tab_does_not_use_sortables_force_fallback_mode(): void
     {
         $this->actingAsTenantAdmin();
 
         $html = Livewire::test(SettingsIndex::class)->html();
 
-        $this->assertStringContainsString('forceFallback: true', $html);
-        $this->assertStringContainsString('fallbackOnBody: true', $html);
+        $this->assertStringNotContainsString('forceFallback: true', $html);
+        $this->assertStringNotContainsString('fallbackOnBody: true', $html);
         $this->assertStringContainsString('class="nav-children-container ml-8', $html);
-    }
-
-    /**
-     * Regression test for a second bug the forceFallback/fallbackOnBody fix
-     * above introduced: SortableJS's fallback drag-clone is a raw
-     * cloneNode() of the dragged row, so it still carries that row's Alpine
-     * directives (x-model, :data-item-key, etc.) even though it's no longer
-     * inside the x-for scope that gave its loop variable (`item`/`child`/
-     * `grandchild`) meaning. Livewire's global mutation observer
-     * reprocesses any element whose attributes change — which SortableJS
-     * does immediately when creating the clone and continuously while
-     * dragging to update its position — throwing a reference error on
-     * every single frame, which is expensive enough that dragging looks
-     * like it does nothing at all.
-     *
-     * A first attempt stripped attributes from the clone reactively (via
-     * SortableJS's onClone hook / a MutationObserver) and still lost the
-     * race: Livewire's own mutation observer, registered at page load,
-     * always got to a mutation first. The actual fix strips them from the
-     * SOURCE row synchronously in onStart, before SortableJS's internal
-     * _dragStarted (fired from a setTimeout *after* onStart) ever clones
-     * it — the clone is then simply born without them, no race involved.
-     * onEnd restores them before syncFromDom() reads data-item-key.
-     */
-    public function test_navigation_tab_strips_alpine_attributes_from_the_drag_source_before_cloning(): void
-    {
-        $this->actingAsTenantAdmin();
-
-        $html = Livewire::test(SettingsIndex::class)->html();
-
-        $this->assertStringContainsString('function stripAlpineAttrs(el, removed)', $html);
-        $this->assertStringContainsString('onStart: onDragStart', $html);
-        $this->assertStringContainsString('onEnd: onDragEnd', $html);
-        $this->assertStringContainsString('el.setAttribute(name, value)', $html);
     }
 
     /**
