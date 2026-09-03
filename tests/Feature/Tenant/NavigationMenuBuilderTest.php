@@ -334,24 +334,30 @@ class NavigationMenuBuilderTest extends TestCase
      * inside the x-for scope that gave its loop variable (`item`/`child`/
      * `grandchild`) meaning. Livewire's global mutation observer
      * reprocesses any element whose attributes change — which SortableJS
-     * does continuously while dragging to update the clone's position —
-     * throwing a reference error on every single frame, which is expensive
-     * enough that dragging looks like it does nothing at all. The fix
-     * strips Alpine/Livewire attributes from the clone the instant it
-     * exists, via both SortableJS's onClone hook and a MutationObserver
-     * backstop in case a given SortableJS version doesn't route its
-     * forceFallback ghost through onClone.
+     * does immediately when creating the clone and continuously while
+     * dragging to update its position — throwing a reference error on
+     * every single frame, which is expensive enough that dragging looks
+     * like it does nothing at all.
+     *
+     * A first attempt stripped attributes from the clone reactively (via
+     * SortableJS's onClone hook / a MutationObserver) and still lost the
+     * race: Livewire's own mutation observer, registered at page load,
+     * always got to a mutation first. The actual fix strips them from the
+     * SOURCE row synchronously in onStart, before SortableJS's internal
+     * _dragStarted (fired from a setTimeout *after* onStart) ever clones
+     * it — the clone is then simply born without them, no race involved.
+     * onEnd restores them before syncFromDom() reads data-item-key.
      */
-    public function test_navigation_tab_strips_alpine_attributes_from_the_sortable_drag_clone(): void
+    public function test_navigation_tab_strips_alpine_attributes_from_the_drag_source_before_cloning(): void
     {
         $this->actingAsTenantAdmin();
 
         $html = Livewire::test(SettingsIndex::class)->html();
 
-        $this->assertStringContainsString('function stripAlpineAttrs(', $html);
-        $this->assertStringContainsString('onClone: (evt) => stripAlpineAttrs(evt.clone)', $html);
-        $this->assertStringContainsString('new MutationObserver(', $html);
-        $this->assertStringContainsString("sortable-drag, .sortable-fallback, .sortable-chosen", $html);
+        $this->assertStringContainsString('function stripAlpineAttrs(el, removed)', $html);
+        $this->assertStringContainsString('onStart: onDragStart', $html);
+        $this->assertStringContainsString('onEnd: onDragEnd', $html);
+        $this->assertStringContainsString('el.setAttribute(name, value)', $html);
     }
 
     /**

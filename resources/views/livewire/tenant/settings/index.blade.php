@@ -1473,50 +1473,63 @@
                  this.sortableInstances = [];
                  if (typeof Sortable === 'undefined') return;
 
-                 // Strips every Alpine/Livewire-looking attribute (x-*,
-                 // :attr, @event, wire:*) from an element and its
-                 // descendants — see commonSortableOptions.onClone below.
-                 function stripAlpineAttrs(el) {
+                 // SortableJS's forceFallback clone is a raw cloneNode() of
+                 // whatever row is being dragged, so it still carries that
+                 // row's Alpine directives (x-model, :data-item-key,
+                 // x-text, etc.) even though it's no longer inside the
+                 // x-for scope that gave `item`/`child`/`grandchild`
+                 // meaning. Livewire's own global mutation observer
+                 // reprocesses any element whose attributes change —
+                 // which SortableJS does immediately when creating the
+                 // clone and continuously while dragging — throwing a
+                 // reference error on every single frame, expensive enough
+                 // that dragging looks like it does nothing at all.
+                 // Stripping the attributes from the clone after the fact
+                 // (an earlier version of this fix used onClone) loses
+                 // that race every time, since Livewire's own observer was
+                 // registered at page load and always processes a
+                 // mutation first. Stripping them from the SOURCE row
+                 // instead — synchronously, in onStart, before Sortable's
+                 // internal _dragStarted (fired from a setTimeout *after*
+                 // onStart) ever clones it — means the clone is simply
+                 // born without them: no race at all. Alpine's own
+                 // reactivity for the source row is unaffected, since its
+                 // bindings are live JS effects set up once at initial
+                 // render, not something that re-reads these attributes
+                 // continuously — removing the attribute text doesn't stop
+                 // the checkbox/label from working. onEnd puts them back
+                 // before syncFromDom() reads data-item-key via
+                 // getAttribute().
+                 function stripAlpineAttrs(el, removed) {
                      Array.from(el.attributes || []).forEach((attr) => {
-                         if (/^(x-|:|@|wire:)/.test(attr.name)) el.removeAttribute(attr.name);
+                         if (/^(x-|:|@|wire:)/.test(attr.name)) {
+                             removed.push({ el, name: attr.name, value: attr.value });
+                             el.removeAttribute(attr.name);
+                         }
                      });
-                     Array.from(el.children || []).forEach(stripAlpineAttrs);
+                     Array.from(el.children || []).forEach((child) => stripAlpineAttrs(child, removed));
                  }
 
-                 // Backstop for the same fix, in case a given SortableJS
-                 // version doesn't route its forceFallback ghost through
-                 // the public onClone hook: watches for its ghost/fallback/
-                 // chosen classes appearing anywhere and strips them the
-                 // instant they're inserted, before Livewire's own mutation
-                 // observer gets a chance to react to a later attribute
-                 // change on them. Installed once per component instance.
-                 if (!this.__cloneGuardInstalled) {
-                     this.__cloneGuardInstalled = true;
-                     new MutationObserver((mutations) => {
-                         mutations.forEach((m) => {
-                             m.addedNodes.forEach((node) => {
-                                 if (!(node instanceof HTMLElement)) return;
-                                 if (node.matches?.('.sortable-drag, .sortable-fallback, .sortable-chosen')) {
-                                     stripAlpineAttrs(node);
-                                 }
-                             });
-                         });
-                     }).observe(document.body, { childList: true, subtree: true });
-                 }
+                 let removedAttrs = [];
+                 const onDragStart = (evt) => {
+                     removedAttrs = [];
+                     stripAlpineAttrs(evt.item, removedAttrs);
+                 };
+                 const onDragEnd = () => {
+                     removedAttrs.forEach(({ el, name, value }) => el.setAttribute(name, value));
+                     removedAttrs = [];
+                     this.syncFromDom();
+                 };
 
-                 // forceFallback + fallbackOnBody: the slide-out drawer this
-                 // page shares a layout with uses a CSS transform to animate
-                 // open/closed (see layouts/tenant.blade.php), and *any*
-                 // transformed ancestor between a `position: fixed` element
-                 // and <body> hijacks it into being fixed relative to that
-                 // ancestor instead of the viewport. Native HTML5 drag (what
-                 // Sortable uses without forceFallback) isn't affected — it's
-                 // its own JS-simulated fallback clone that was rendering
-                 // pinned near the transformed ancestor's edge instead of
-                 // tracking the cursor. fallbackOnBody re-parents the clone
-                 // onto <body> itself, sidestepping any transformed ancestor
-                 // in between (SortableJS's own documented fix for exactly
-                 // this class of bug).
+                 // fallbackOnBody: the slide-out drawer this page shares a
+                 // layout with uses a CSS transform to animate open/closed
+                 // (see layouts/tenant.blade.php), and *any* transformed
+                 // ancestor between a `position: fixed` element and <body>
+                 // hijacks it into being fixed relative to that ancestor
+                 // instead of the viewport. fallbackOnBody re-parents the
+                 // clone onto <body> itself, sidestepping any transformed
+                 // ancestor in between (SortableJS's own documented fix
+                 // for exactly this class of bug).
                  const commonSortableOptions = {
                      animation: 200,
                      ghostClass: 'opacity-30',
@@ -1524,23 +1537,7 @@
                      fallbackOnBody: true,
                      fallbackClass: 'z-50',
                      fallbackTolerance: 3,
-                     // The fallback clone is a raw cloneNode() of whatever
-                     // row is being dragged, so it still carries that row's
-                     // Alpine directives (x-model for child.visible, :data-
-                     // item-key for child.key, etc.) even though it's no
-                     // longer inside the x-for scope that gave `item`/
-                     // `child`/`grandchild` meaning. Livewire's own global
-                     // mutation observer reprocesses any element whose
-                     // attributes change — which SortableJS does
-                     // continuously to update the clone's position — and
-                     // without that scope, evaluating those directives
-                     // throws a reference error on every single drag
-                     // frame, which is expensive enough to make dragging
-                     // look like it does nothing at all. Stripping every
-                     // Alpine/Livewire attribute the instant the clone
-                     // exists keeps it a pure visual snapshot, which is all
-                     // it ever needs to be.
-                     onClone: (evt) => stripAlpineAttrs(evt.clone),
+                     onStart: onDragStart,
                  };
 
                  const sectionContainer = document.getElementById('nav-sections-container');
@@ -1548,7 +1545,7 @@
                      this.sortableInstances.push(Sortable.create(sectionContainer, {
                          ...commonSortableOptions,
                          handle: '.nav-section-drag-handle',
-                         onEnd: () => this.syncFromDom(),
+                         onEnd: onDragEnd,
                      }));
                  }
 
@@ -1585,7 +1582,7 @@
                              const droppingIntoNestedZone = evt.to.classList.contains('nav-children-container') || evt.to.classList.contains('nav-grandchildren-container');
                              return !(draggedHasChildren && droppingIntoNestedZone);
                          },
-                         onEnd: () => this.syncFromDom(),
+                         onEnd: onDragEnd,
                      }));
                  });
              },
