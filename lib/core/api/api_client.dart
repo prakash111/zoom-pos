@@ -43,9 +43,9 @@ class ApiClient {
   /// back to a safe default so the request still goes out (as unauthenticated
   /// / against the default server / in English) rather than never happening.
   Future<void> _prepare() async {
-    final baseUrl = await _preferences
-        .readBaseUrl()
-        .timeout(AppConfig.localReadTimeout, onTimeout: () => AppConfig.defaultBaseUrl);
+    final baseUrl = await _preferences.readBaseUrl().timeout(
+        AppConfig.localReadTimeout,
+        onTimeout: () => AppConfig.defaultBaseUrl);
     _dio.options.baseUrl = '$baseUrl${AppConfig.apiPrefix}';
 
     // On timeout, keep whatever Authorization header a previous successful
@@ -53,10 +53,15 @@ class ApiClient {
     // stored token itself changed) rather than downgrading to unauthenticated
     // and forcing a spurious logout on top of the slow/stuck read.
     final previousAuth = _dio.options.headers['Authorization'];
-    final token = await _secureStorage.readToken().timeout(AppConfig.localReadTimeout, onTimeout: () => null);
-    _dio.options.headers['Authorization'] = token != null ? 'Bearer $token' : previousAuth;
+    final token = await _secureStorage
+        .readToken()
+        .timeout(AppConfig.localReadTimeout, onTimeout: () => null);
+    _dio.options.headers['Authorization'] =
+        token != null ? 'Bearer $token' : previousAuth;
 
-    final locale = await _preferences.readLocale().timeout(AppConfig.localReadTimeout, onTimeout: () => 'en');
+    final locale = await _preferences
+        .readLocale()
+        .timeout(AppConfig.localReadTimeout, onTimeout: () => 'en');
     _dio.options.headers['Accept-Language'] = locale;
   }
 
@@ -70,7 +75,8 @@ class ApiClient {
   /// prefixed with the server's scheme, while [_prepare] still attaches the
   /// same bearer token, which [AuthenticateTenantApi] accepts on both route
   /// groups.
-  Future<Map<String, dynamic>> getAbsolute(String path, {Map<String, dynamic>? query}) {
+  Future<Map<String, dynamic>> getAbsolute(String path,
+      {Map<String, dynamic>? query}) {
     return _send(() async {
       final base = await currentBaseUrl();
       return _dio.get('$base$path', queryParameters: query);
@@ -115,7 +121,8 @@ class ApiClient {
 
   /// Like [post], but for endpoints outside the `/api/v1/pos` prefix — see
   /// [getAbsolute].
-  Future<Map<String, dynamic>> postAbsolute(String path, {Map<String, dynamic>? data}) {
+  Future<Map<String, dynamic>> postAbsolute(String path,
+      {Map<String, dynamic>? data}) {
     return _send(() async {
       final base = await currentBaseUrl();
       return _dio.post('$base$path', data: data);
@@ -144,11 +151,13 @@ class ApiClient {
     return _send(() => _dio.put(path, data: data));
   }
 
-  Future<Map<String, dynamic>> delete(String path) {
-    return _send(() => _dio.delete(path));
+  Future<Map<String, dynamic>> delete(String path,
+      {Map<String, dynamic>? data}) {
+    return _send(() => _dio.delete(path, data: data));
   }
 
-  Future<Map<String, dynamic>> _send(Future<Response> Function() request) async {
+  Future<Map<String, dynamic>> _send(
+      Future<Response> Function() request) async {
     await _prepare();
     try {
       final response = await request();
@@ -204,11 +213,14 @@ class ApiClient {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
-        return ApiException('The server took too long to respond. Check your connection and try again.');
+        return ApiException(
+            'The server took too long to respond. Check your connection and try again.');
       case DioExceptionType.connectionError:
-        return ApiException('Could not reach the server. Check the server address in Settings and your connection.');
+        return ApiException(
+            'Could not reach the server. Check the server address in Settings and your connection.');
       default:
-        return ApiException(e.message ?? 'Something went wrong.', statusCode: status);
+        return ApiException(e.message ?? 'Something went wrong.',
+            statusCode: status);
     }
   }
 

@@ -4,8 +4,7 @@ import '../../core/config/bootstrap_cache.dart';
 import '../../core/models/settings_models.dart';
 import '../../core/services/tenant_time_service.dart';
 
-/// Talks to SettingsApiController: GET /settings, PUT /settings/{section},
-/// POST /settings/notifications/test-email, and the payment-methods CRUD.
+/// Talks to SettingsApiController for tenant-owned settings and payment methods.
 class SettingsRepository {
   SettingsRepository(this._client);
 
@@ -14,15 +13,20 @@ class SettingsRepository {
   Future<TenantSettingsBundle> fetchAll() async {
     final response = await _client.get(ApiEndpoints.settings);
     return TenantSettingsBundle(
-      profile: ProfileSettings.fromJson(response['profile'] as Map<String, dynamic>),
-      receipts: ReceiptSettings.fromJson(response['receipts'] as Map<String, dynamic>),
-      financial: FinancialSettings.fromJson(response['financial'] as Map<String, dynamic>),
-      notifications: NotificationSettings.fromJson(response['notifications'] as Map<String, dynamic>),
+      profile:
+          ProfileSettings.fromJson(response['profile'] as Map<String, dynamic>),
+      receipts: ReceiptSettings.fromJson(
+          response['receipts'] as Map<String, dynamic>),
+      financial: FinancialSettings.fromJson(
+          response['financial'] as Map<String, dynamic>),
       paymentMethods: (response['payment_methods'] as List? ?? [])
           .map((e) => PaymentMethodModel.fromJson(e as Map<String, dynamic>))
           .toList(),
-      nav: NavConfig.fromJson(response['nav'] as Map<String, dynamic>? ?? const {}),
-      timezones: (response['timezones'] as List? ?? []).map((e) => e.toString()).toList(),
+      nav: NavConfig.fromJson(
+          response['nav'] as Map<String, dynamic>? ?? const {}),
+      timezones: (response['timezones'] as List? ?? [])
+          .map((e) => e.toString())
+          .toList(),
     );
   }
 
@@ -30,8 +34,10 @@ class SettingsRepository {
   /// refreshes [BootstrapCache] so the drawer/rail/bars pick it up without
   /// waiting for the next locale switch or app restart.
   Future<NavConfig> updateNavConfig(NavConfig nav) async {
-    final response = await _client.post(ApiEndpoints.settingsNavConfig, data: nav.toJson());
-    final updated = NavConfig.fromJson(response['nav'] as Map<String, dynamic>? ?? nav.toJson());
+    final response =
+        await _client.post(ApiEndpoints.settingsNavConfig, data: nav.toJson());
+    final updated = NavConfig.fromJson(
+        response['nav'] as Map<String, dynamic>? ?? nav.toJson());
     await BootstrapCache.instance.applyNav(updated);
     return updated;
   }
@@ -70,10 +76,13 @@ class SettingsRepository {
       if (country != null && country.isNotEmpty) 'country': country,
       if (timezone != null) 'timezone': timezone,
       if (primaryColor != null) 'primary_color': primaryColor,
-      if (defaultCommissionRate != null) 'default_commission_rate': defaultCommissionRate,
-      if (defaultCommissionType != null) 'default_commission_type': defaultCommissionType,
+      if (defaultCommissionRate != null)
+        'default_commission_rate': defaultCommissionRate,
+      if (defaultCommissionType != null)
+        'default_commission_type': defaultCommissionType,
     });
-    final profile = ProfileSettings.fromJson(response['profile'] as Map<String, dynamic>);
+    final profile =
+        ProfileSettings.fromJson(response['profile'] as Map<String, dynamic>);
 
     // Applied immediately (not just on next login/restart) so timestamps
     // update in the same session the store owner picks a new zone.
@@ -104,7 +113,8 @@ class SettingsRepository {
     return response['favicon_url'] as String?;
   }
 
-  Future<void> removeFavicon() => _client.delete(ApiEndpoints.settingsProfileFavicon);
+  Future<void> removeFavicon() =>
+      _client.delete(ApiEndpoints.settingsProfileFavicon);
 
   Future<String?> uploadDrawerCover(List<int> bytes, String filename) async {
     final response = await _client.postMultipart(
@@ -116,7 +126,8 @@ class SettingsRepository {
     return response['drawer_cover_url'] as String?;
   }
 
-  Future<void> removeDrawerCover() => _client.delete(ApiEndpoints.settingsProfileDrawerCover);
+  Future<void> removeDrawerCover() =>
+      _client.delete(ApiEndpoints.settingsProfileDrawerCover);
 
   Future<ReceiptSettings> updateReceipts({
     String? invoicePrefix,
@@ -132,7 +143,8 @@ class SettingsRepository {
       if (quoteTerms != null) 'quote_terms': quoteTerms,
       if (bankDetails != null) 'bank_details': bankDetails,
     });
-    return ReceiptSettings.fromJson(response['receipts'] as Map<String, dynamic>);
+    return ReceiptSettings.fromJson(
+        response['receipts'] as Map<String, dynamic>);
   }
 
   Future<FinancialSettings> updateFinancial({
@@ -146,43 +158,13 @@ class SettingsRepository {
       'currency': currency,
       if (currencySymbol != null) 'currency_symbol': currencySymbol,
       if (currencyDecimals != null) 'currency_decimals': currencyDecimals,
-      if (currencySymbolPosition != null) 'currency_symbol_position': currencySymbolPosition,
-      if (otherCurrencies != null) 'other_currencies': otherCurrencies.map((c) => c.toJson()).toList(),
+      if (currencySymbolPosition != null)
+        'currency_symbol_position': currencySymbolPosition,
+      if (otherCurrencies != null)
+        'other_currencies': otherCurrencies.map((c) => c.toJson()).toList(),
     });
-    return FinancialSettings.fromJson(response['financial'] as Map<String, dynamic>);
-  }
-
-  Future<NotificationSettings> updateNotifications({
-    String? smtpHost,
-    int? smtpPort,
-    String? smtpUsername,
-    String? smtpPassword,
-    String? smtpEncryption,
-    String? smtpFromAddress,
-    String? smtpFromName,
-    String? whatsappPhonePrefix,
-    String? whatsappCustomNote,
-    String? whatsappPhoneNumberId,
-    String? whatsappApiToken,
-  }) async {
-    final response = await _client.put(ApiEndpoints.settingsNotifications, data: {
-      if (smtpHost != null) 'smtp_host': smtpHost,
-      if (smtpPort != null) 'smtp_port': smtpPort,
-      if (smtpUsername != null) 'smtp_username': smtpUsername,
-      if (smtpPassword != null && smtpPassword.isNotEmpty) 'smtp_password': smtpPassword,
-      if (smtpEncryption != null) 'smtp_encryption': smtpEncryption,
-      if (smtpFromAddress != null) 'smtp_from_address': smtpFromAddress,
-      if (smtpFromName != null) 'smtp_from_name': smtpFromName,
-      if (whatsappPhonePrefix != null) 'whatsapp_phone_prefix': whatsappPhonePrefix,
-      if (whatsappCustomNote != null) 'whatsapp_custom_note': whatsappCustomNote,
-      if (whatsappPhoneNumberId != null) 'whatsapp_phone_number_id': whatsappPhoneNumberId,
-      if (whatsappApiToken != null && whatsappApiToken.isNotEmpty) 'whatsapp_api_token': whatsappApiToken,
-    });
-    return NotificationSettings.fromJson(response['notifications'] as Map<String, dynamic>);
-  }
-
-  Future<void> sendTestEmail(String recipient) {
-    return _client.post(ApiEndpoints.settingsTestEmail, data: {'recipient': recipient});
+    return FinancialSettings.fromJson(
+        response['financial'] as Map<String, dynamic>);
   }
 
   Future<List<PaymentMethodModel>> fetchPaymentMethods() async {
@@ -192,11 +174,13 @@ class SettingsRepository {
         .toList();
   }
 
-  Future<void> savePaymentMethod({String? id, required String name, String? code, String? description}) {
+  Future<void> savePaymentMethod(
+      {String? id, required String name, String? code, String? description}) {
     final data = {
       'name': name,
       if (code != null && code.isNotEmpty) 'code': code,
-      if (description != null && description.isNotEmpty) 'description': description,
+      if (description != null && description.isNotEmpty)
+        'description': description,
     };
     return id == null
         ? _client.post(ApiEndpoints.settingsPaymentMethods, data: data)
@@ -209,44 +193,5 @@ class SettingsRepository {
 
   Future<void> deletePaymentMethod(String id) {
     return _client.delete(ApiEndpoints.settingsPaymentMethod(id));
-  }
-
-  Future<List<CustomNotificationChannelModel>> fetchNotificationChannels() async {
-    final response = await _client.get(ApiEndpoints.settingsNotificationChannels);
-    return (response['channels'] as List? ?? [])
-        .map((e) => CustomNotificationChannelModel.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<void> saveNotificationChannel({
-    String? id,
-    required String name,
-    required String url,
-    required String method,
-    Map<String, dynamic>? headers,
-    required String authType,
-    String? authValue,
-    String? payloadTemplate,
-    required List<String> eventTypes,
-    required bool isActive,
-  }) {
-    final data = {
-      'name': name,
-      'url': url,
-      'method': method,
-      if (headers != null) 'headers': headers,
-      'auth_type': authType,
-      if (authValue != null && authValue.isNotEmpty) 'auth_value': authValue,
-      if (payloadTemplate != null) 'payload_template': payloadTemplate,
-      'event_types': eventTypes,
-      'is_active': isActive,
-    };
-    return id == null
-        ? _client.post(ApiEndpoints.settingsNotificationChannels, data: data)
-        : _client.put(ApiEndpoints.settingsNotificationChannel(id), data: data);
-  }
-
-  Future<void> deleteNotificationChannel(String id) {
-    return _client.delete(ApiEndpoints.settingsNotificationChannel(id));
   }
 }

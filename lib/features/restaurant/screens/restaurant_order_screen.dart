@@ -19,7 +19,11 @@ import '../../pos/screens/invoice_actions_sheet.dart';
 import '../../quotations/screens/product_picker_sheet.dart';
 import '../restaurant_repository.dart';
 
-const _kServiceTypeLabels = {'dine_in': 'Dine-In', 'takeaway': 'Takeaway', 'delivery': 'Delivery'};
+const _kServiceTypeLabels = {
+  'dine_in': 'Dine-In',
+  'takeaway': 'Takeaway',
+  'delivery': 'Delivery'
+};
 
 /// Order-taking screen for a single dining table (or a table-less takeaway/
 /// delivery order): build a cart, send it to the kitchen (creating/updating
@@ -62,6 +66,7 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
   List<RestaurantOrderItemModel> _draftItems = [];
   int _guestCount = 1;
   int _prepMinutes = 15;
+  int _intimationMinutes = 0;
   final _notesController = TextEditingController();
 
   /// Seat numbers for splitting a dine-in table's order (mirrors Pos.php's
@@ -95,8 +100,10 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
     try {
       final result = await widget.repository.fetchTable(table.id);
       if (!mounted) return;
-      final guestCount = result.openOrder?.guestCount ?? (table.guestCount > 0 ? table.guestCount : 1);
-      final seatCount = <int>[4, table.seatingCapacity, guestCount].reduce((a, b) => a > b ? a : b);
+      final guestCount = result.openOrder?.guestCount ??
+          (table.guestCount > 0 ? table.guestCount : 1);
+      final seatCount = <int>[4, table.seatingCapacity, guestCount]
+          .reduce((a, b) => a > b ? a : b);
       setState(() {
         _saleId = result.openOrder?.id;
         _committedItems = result.openOrder?.items ?? [];
@@ -112,8 +119,10 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
     }
   }
 
-  double get _committedTotal => _committedItems.fold(0.0, (sum, i) => sum + i.lineTotal);
-  double get _draftTotal => _draftItems.fold(0.0, (sum, i) => sum + i.lineTotal);
+  double get _committedTotal =>
+      _committedItems.fold(0.0, (sum, i) => sum + i.lineTotal);
+  double get _draftTotal =>
+      _draftItems.fold(0.0, (sum, i) => sum + i.lineTotal);
   double get _subtotal => _committedTotal + _draftTotal;
 
   void _addSeat() {
@@ -131,8 +140,10 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
     final product = await showModalBottomSheet<ProductModel>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => ProductPickerSheet(inventoryRepository: inventoryRepository),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) =>
+          ProductPickerSheet(inventoryRepository: inventoryRepository),
     );
     if (product == null || !mounted) return;
 
@@ -142,8 +153,10 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
       final result = await showModalBottomSheet<_CustomizationResult>(
         context: context,
         isScrollControlled: true,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-        builder: (_) => _ItemCustomizationSheet(product: product, formatter: formatter),
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        builder: (_) =>
+            _ItemCustomizationSheet(product: product, formatter: formatter),
       );
       if (result == null || !mounted) return;
 
@@ -176,11 +189,17 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
           i.spiceLevel == null);
       if (existingIndex != -1) {
         final existing = _draftItems[existingIndex];
-        _draftItems[existingIndex] = existing.copyWith(quantity: existing.quantity + 1);
+        _draftItems[existingIndex] =
+            existing.copyWith(quantity: existing.quantity + 1);
       } else {
         _draftItems = [
           ..._draftItems,
-          RestaurantOrderItemModel(productId: product.id, name: product.name, price: product.salePrice, quantity: 1, seat: _activeSeat),
+          RestaurantOrderItemModel(
+              productId: product.id,
+              name: product.name,
+              price: product.salePrice,
+              quantity: 1,
+              seat: _activeSeat),
         ];
       }
     });
@@ -210,7 +229,8 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
   /// audit logging (see RestaurantOrderItemModel.isOverridden).
   Future<void> _editPrice(int index) async {
     final item = _draftItems[index];
-    final controller = TextEditingController(text: item.price.toStringAsFixed(2));
+    final controller =
+        TextEditingController(text: item.price.toStringAsFixed(2));
     final newPrice = await showDialog<double>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -222,9 +242,12 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
           decoration: const InputDecoration(labelText: 'Unit Price'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel')),
           FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(double.tryParse(controller.text.trim())),
+            onPressed: () => Navigator.of(dialogContext)
+                .pop(double.tryParse(controller.text.trim())),
             child: const Text('Apply'),
           ),
         ],
@@ -233,7 +256,8 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
     controller.dispose();
     if (newPrice == null || newPrice < 0 || !mounted) return;
     setState(() {
-      _draftItems[index] = item.copyWith(price: double.parse(newPrice.toStringAsFixed(2)));
+      _draftItems[index] =
+          item.copyWith(price: double.parse(newPrice.toStringAsFixed(2)));
     });
   }
 
@@ -248,6 +272,7 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
         guestCount: _guestCount,
         notes: _notesController.text.trim(),
         prepMinutes: _prepMinutes,
+        intimationMinutes: _intimationMinutes,
         items: _draftItems,
       );
       _changed = true;
@@ -257,9 +282,12 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
         _committedItems = result.sale.items;
         _draftItems = [];
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${result.kot.kotNumber} sent to kitchen.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${result.kot.kotNumber} sent to kitchen.')));
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -273,9 +301,13 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
     final sale = await showModalBottomSheet<RestaurantSaleModel>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) =>
-          _SettleBillSheet(repository: widget.repository, saleId: _saleId!, total: _committedTotal, formatter: formatter),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => _SettleBillSheet(
+          repository: widget.repository,
+          saleId: _saleId!,
+          total: _committedTotal,
+          formatter: formatter),
     );
     if (sale == null) return;
 
@@ -295,8 +327,11 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
     // necessarily the route this method thinks it's closing). The user
     // leaves via the app bar's back button (already wired to `_changed`)
     // once they're done previewing/printing/sharing.
-    final subtotal = sale.items.fold(0.0, (sum, i) => sum + i.price * i.quantity);
-    final tax = (sale.total - subtotal + sale.discount).clamp(0, double.infinity).toDouble();
+    final subtotal =
+        sale.items.fold(0.0, (sum, i) => sum + i.price * i.quantity);
+    final tax = (sale.total - subtotal + sale.discount)
+        .clamp(0, double.infinity)
+        .toDouble();
     try {
       await showInvoiceActionsSheet(
         context,
@@ -319,14 +354,19 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
           paidAmount: sale.paidAmount,
           dueAmount: sale.dueAmount,
           lines: sale.items
-              .map((i) => ReceiptLine(name: i.name, quantity: i.quantity, unitPrice: i.price, lineTotal: i.price * i.quantity))
+              .map((i) => ReceiptLine(
+                  name: i.name,
+                  quantity: i.quantity,
+                  unitPrice: i.price,
+                  lineTotal: i.price * i.quantity))
               .toList(),
         ),
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Could not open the invoice actions for this bill.')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text('Could not open the invoice actions for this bill.')));
       }
     }
   }
@@ -335,7 +375,8 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
   Widget build(BuildContext context) {
     final company = context.watch<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
-    final canOverridePrice = context.watch<AuthProvider>().user?.can('pos.edit') ?? false;
+    final canOverridePrice =
+        context.watch<AuthProvider>().user?.can('pos.edit') ?? false;
     final title = widget.table != null
         ? 'Table ${widget.table!.tableNumber}'
         : (_kServiceTypeLabels[widget.serviceType] ?? 'Order');
@@ -382,26 +423,42 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
                         ),
                       Expanded(
                         child: (_committedItems.isEmpty && _draftItems.isEmpty)
-                            ? const Center(child: Text('No items yet. Tap "Add Item" to start the order.'))
+                          ? const Center(
+                              child: Text(
+                                  'No items yet. Tap "Add Item" to start the order.'))
                             : ListView(
                                 padding: const EdgeInsets.all(16),
                                 children: [
                                   if (_committedItems.isNotEmpty) ...[
-                                    Text('Sent to Kitchen', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade600, fontSize: 12)),
+                                  Text('Sent to Kitchen',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.grey.shade600,
+                                          fontSize: 12)),
                                     const SizedBox(height: 4),
-                                    for (final item in _committedItems) _OrderItemRow(item: item, formatter: formatter),
+                                  for (final item in _committedItems)
+                                    _OrderItemRow(
+                                        item: item, formatter: formatter),
                                     const Divider(height: 20),
                                   ],
                                   if (_draftItems.isNotEmpty) ...[
-                                    Text('New Items (not yet sent)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade600, fontSize: 12)),
+                                  Text('New Items (not yet sent)',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.grey.shade600,
+                                          fontSize: 12)),
                                     const SizedBox(height: 4),
-                                    for (var index = 0; index < _draftItems.length; index++)
+                                  for (var index = 0;
+                                      index < _draftItems.length;
+                                      index++)
                                       _OrderItemRow(
                                         item: _draftItems[index],
                                         formatter: formatter,
                                         onIncrement: () => _incrementItem(index),
                                         onDecrement: () => _decrementItem(index),
-                                        onEditPrice: canOverridePrice ? () => _editPrice(index) : null,
+                                      onEditPrice: canOverridePrice
+                                          ? () => _editPrice(index)
+                                          : null,
                                       ),
                                   ],
                                 ],
@@ -423,33 +480,89 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('Subtotal', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  Text(formatter.format(_subtotal), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                const Text('Subtotal',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                Text(formatter.format(_subtotal),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16)),
                                 ],
                               ),
                               if (_draftItems.isNotEmpty) ...[
                                 const SizedBox(height: 4),
                                 Text(
                                   'Send new items to kitchen before settling the bill.',
-                                  style: TextStyle(color: Colors.orange.shade800, fontSize: 11, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                    color: Colors.orange.shade800,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600),
                                 ),
                               ],
                               const SizedBox(height: 10),
                               if (_draftItems.isNotEmpty) ...[
                                 Row(
                                   children: [
-                                    Text('Prep time', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+                                  Text('Prep time',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey.shade700)),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Wrap(
                                         spacing: 6,
                                         children: [
-                                          for (final mins in const [5, 10, 15, 20, 30])
+                                        for (final mins in const [
+                                          5,
+                                          10,
+                                          15,
+                                          20,
+                                          30
+                                        ])
                                             ChoiceChip(
-                                              label: Text('${mins}m', style: const TextStyle(fontSize: 11)),
-                                              visualDensity: VisualDensity.compact,
+                                            label: Text('${mins}m',
+                                                style: const TextStyle(
+                                                    fontSize: 11)),
+                                            visualDensity:
+                                                VisualDensity.compact,
                                               selected: _prepMinutes == mins,
-                                              onSelected: (_) => setState(() => _prepMinutes = mins),
+                                            onSelected: (_) => setState(
+                                                () => _prepMinutes = mins),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Text('Alert',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey.shade700)),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Wrap(
+                                      spacing: 6,
+                                      children: [
+                                        for (final option in const [
+                                          (0, 'At expiry'),
+                                          (2, '2m before'),
+                                          (5, '5m before')
+                                        ])
+                                          ChoiceChip(
+                                            label: Text(option.$2,
+                                                style: const TextStyle(
+                                                    fontSize: 11)),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            selected:
+                                                _intimationMinutes == option.$1,
+                                            onSelected: (_) => setState(() =>
+                                                _intimationMinutes = option.$1),
                                             ),
                                         ],
                                       ),
@@ -462,16 +575,27 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
                                 children: [
                                   Expanded(
                                     child: OutlinedButton(
-                                      onPressed: (_draftItems.isEmpty || _isSending) ? null : _sendToKitchen,
+                                    onPressed:
+                                        (_draftItems.isEmpty || _isSending)
+                                            ? null
+                                            : _sendToKitchen,
                                       child: _isSending
-                                          ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                        ? const SizedBox(
+                                            height: 18,
+                                            width: 18,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2))
                                           : const Text('Send to Kitchen'),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: FilledButton(
-                                      onPressed: (_saleId == null || _committedItems.isEmpty || _draftItems.isNotEmpty) ? null : _settleBill,
+                                    onPressed: (_saleId == null ||
+                                            _committedItems.isEmpty ||
+                                            _draftItems.isNotEmpty)
+                                        ? null
+                                        : _settleBill,
                                       child: const Text('Settle Bill'),
                                     ),
                                   ),
@@ -510,7 +634,10 @@ class _OrderItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final modifierNames = item.modifiers.map((m) => m['name']?.toString() ?? '').where((n) => n.isNotEmpty).join(', ');
+    final modifierNames = item.modifiers
+        .map((m) => m['name']?.toString() ?? '')
+        .where((n) => n.isNotEmpty)
+        .join(', ');
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -523,35 +650,68 @@ class _OrderItemRow extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Flexible(child: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600))),
+                    Flexible(
+                        child: Text(item.name,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600))),
                     if (item.seat != 1) ...[
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
-                        child: Text('Seat ${item.seat}', style: TextStyle(fontSize: 10, color: Colors.grey.shade700, fontWeight: FontWeight.w700)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(4)),
+                        child: Text('Seat ${item.seat}',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ],
                 ),
                 if (item.variant != null)
-                  Text('• ${item.variant}', style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
+                  Text('• ${item.variant}',
+                      style:
+                          TextStyle(color: Colors.grey.shade600, fontSize: 11)),
                 if (modifierNames.isNotEmpty)
-                  Text('+ $modifierNames', style: TextStyle(color: Colors.blue.shade700, fontSize: 11, fontWeight: FontWeight.w600)),
+                  Text('+ $modifierNames',
+                      style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600)),
                 if (item.spiceLevel != null)
-                  Text('🌶 ${item.spiceLevel}', style: TextStyle(color: Colors.red.shade700, fontSize: 11, fontWeight: FontWeight.w700)),
+                  Text('🌶 ${item.spiceLevel}',
+                      style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700)),
                 if (item.note.isNotEmpty)
-                  Text('Note: ${item.note}', style: TextStyle(color: Colors.amber.shade800, fontSize: 11, fontWeight: FontWeight.w700)),
+                  Text('Note: ${item.note}',
+                      style: TextStyle(
+                          color: Colors.amber.shade800,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700)),
                 Row(
                   children: [
-                    Text(formatter.format(item.price), style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                    Text(formatter.format(item.price),
+                        style: TextStyle(
+                            color: Colors.grey.shade600, fontSize: 12)),
                     if (item.isOverridden) ...[
                       const SizedBox(width: 4),
-                      Text('(edited)', style: TextStyle(color: Colors.orange.shade700, fontSize: 10, fontStyle: FontStyle.italic)),
+                      Text('(edited)',
+                          style: TextStyle(
+                              color: Colors.orange.shade700,
+                              fontSize: 10,
+                              fontStyle: FontStyle.italic)),
                     ],
                     if (onEditPrice != null) ...[
                       const SizedBox(width: 4),
-                      InkWell(onTap: onEditPrice, child: Icon(Icons.edit, size: 13, color: Colors.grey.shade500)),
+                      InkWell(
+                          onTap: onEditPrice,
+                          child: Icon(Icons.edit,
+                              size: 13, color: Colors.grey.shade500)),
                     ],
                   ],
                 ),
@@ -559,13 +719,19 @@ class _OrderItemRow extends StatelessWidget {
             ),
           ),
           if (_isEditable) ...[
-            IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: onDecrement),
-            Text(item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 1)),
-            IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: onIncrement),
+            IconButton(
+                icon: const Icon(Icons.remove_circle_outline),
+                onPressed: onDecrement),
+            Text(item.quantity.toStringAsFixed(
+                item.quantity == item.quantity.roundToDouble() ? 0 : 1)),
+            IconButton(
+                icon: const Icon(Icons.add_circle_outline),
+                onPressed: onIncrement),
           ] else ...[
             Icon(Icons.check_circle, size: 16, color: Colors.green.shade600),
             const SizedBox(width: 6),
-            Text('× ${item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 1)}'),
+            Text(
+                '× ${item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 1)}'),
             const SizedBox(width: 12),
           ],
           SizedBox(
@@ -604,13 +770,15 @@ class _CustomizationResult {
 /// has any of those configured, mirroring Pos.php's openModifierModal() /
 /// addCustomizedItemToCart().
 class _ItemCustomizationSheet extends StatefulWidget {
-  const _ItemCustomizationSheet({required this.product, required this.formatter});
+  const _ItemCustomizationSheet(
+      {required this.product, required this.formatter});
 
   final ProductModel product;
   final CurrencyFormatter formatter;
 
   @override
-  State<_ItemCustomizationSheet> createState() => _ItemCustomizationSheetState();
+  State<_ItemCustomizationSheet> createState() =>
+      _ItemCustomizationSheetState();
 }
 
 class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
@@ -627,7 +795,8 @@ class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
     final variants = widget.product.variants;
     if (variants.isNotEmpty) {
       _variantName = variants.first['name'] as String?;
-      _variantPrice = (variants.first['price'] as num?)?.toDouble() ?? widget.product.salePrice;
+      _variantPrice = (variants.first['price'] as num?)?.toDouble() ??
+          widget.product.salePrice;
     } else {
       _variantPrice = widget.product.salePrice;
     }
@@ -644,12 +813,14 @@ class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
     super.dispose();
   }
 
-  double get _modifiersTotal => _selectedModifiers.fold(0.0, (sum, m) => sum + ((m['price'] as num?)?.toDouble() ?? 0));
+  double get _modifiersTotal => _selectedModifiers.fold(
+      0.0, (sum, m) => sum + ((m['price'] as num?)?.toDouble() ?? 0));
   double get _totalPrice => _variantPrice + _modifiersTotal + _spiceLevelPrice;
 
   void _toggleModifier(Map<String, dynamic> modifier) {
     setState(() {
-      final idx = _selectedModifiers.indexWhere((m) => m['name'] == modifier['name']);
+      final idx =
+          _selectedModifiers.indexWhere((m) => m['name'] == modifier['name']);
       if (idx != -1) {
         _selectedModifiers.removeAt(idx);
       } else {
@@ -674,7 +845,8 @@ class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
   Widget build(BuildContext context) {
     final product = widget.product;
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20),
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
@@ -684,10 +856,19 @@ class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(product.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Text(product.name,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 if (product.variants.isNotEmpty) ...[
-                  Text('PORTION / STYLE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade600, letterSpacing: 0.5)),
+                  Text('PORTION / STYLE',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -699,7 +880,8 @@ class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
                           selected: _variantName == v['name'],
                           onSelected: (_) => setState(() {
                             _variantName = v['name'] as String?;
-                            _variantPrice = (v['price'] as num?)?.toDouble() ?? product.salePrice;
+                            _variantPrice = (v['price'] as num?)?.toDouble() ??
+                                product.salePrice;
                           }),
                         ),
                     ],
@@ -707,7 +889,12 @@ class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
                   const SizedBox(height: 16),
                 ],
                 if (product.modifiers.isNotEmpty) ...[
-                  Text('ADD-ONS & EXTRAS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade600, letterSpacing: 0.5)),
+                  Text('ADD-ONS & EXTRAS',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -716,7 +903,8 @@ class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
                       for (final m in product.modifiers)
                         FilterChip(
                           label: Text(_addOnLabel(m)),
-                          selected: _selectedModifiers.any((sel) => sel['name'] == m['name']),
+                          selected: _selectedModifiers
+                              .any((sel) => sel['name'] == m['name']),
                           onSelected: (_) => _toggleModifier(m),
                         ),
                     ],
@@ -724,7 +912,12 @@ class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
                   const SizedBox(height: 16),
                 ],
                 if (product.spiceLevels.isNotEmpty) ...[
-                  Text('SPICE LEVEL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade600, letterSpacing: 0.5)),
+                  Text('SPICE LEVEL',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -736,7 +929,8 @@ class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
                           selected: _spiceLevelName == s['name'],
                           onSelected: (_) => setState(() {
                             _spiceLevelName = s['name'] as String?;
-                            _spiceLevelPrice = (s['price'] as num?)?.toDouble() ?? 0;
+                            _spiceLevelPrice =
+                                (s['price'] as num?)?.toDouble() ?? 0;
                           }),
                         ),
                     ],
@@ -745,15 +939,19 @@ class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
                 ],
                 TextField(
                   controller: _noteController,
-                  decoration: const InputDecoration(labelText: 'Kitchen Note (optional)'),
+                  decoration: const InputDecoration(
+                      labelText: 'Kitchen Note (optional)'),
                   maxLines: 2,
                 ),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text(widget.formatter.format(_totalPrice), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Total',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(widget.formatter.format(_totalPrice),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -779,7 +977,11 @@ class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
 }
 
 class _SettleBillSheet extends StatefulWidget {
-  const _SettleBillSheet({required this.repository, required this.saleId, required this.total, required this.formatter});
+  const _SettleBillSheet(
+      {required this.repository,
+      required this.saleId,
+      required this.total,
+      required this.formatter});
 
   final RestaurantRepository repository;
   final String saleId;
@@ -802,9 +1004,12 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
   DateTime? _dueDate;
   CustomerModel? _selectedCustomer;
 
-  double get _tenderedAmount => double.tryParse(_tenderedController.text.trim()) ?? 0.0;
-  double get _changeDue => (_tenderedAmount - widget.total).clamp(0, double.infinity).toDouble();
-  double get _remainingDue => (widget.total - _tenderedAmount).clamp(0, double.infinity).toDouble();
+  double get _tenderedAmount =>
+      double.tryParse(_tenderedController.text.trim()) ?? 0.0;
+  double get _changeDue =>
+      (_tenderedAmount - widget.total).clamp(0, double.infinity).toDouble();
+  double get _remainingDue =>
+      (widget.total - _tenderedAmount).clamp(0, double.infinity).toDouble();
 
   Future<void> _pickCustomer() async {
     final repository = CustomersRepository(context.read<ApiClient>());
@@ -812,7 +1017,8 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) => CustomerPickerSheet(customersRepository: repository),
     );
     if (customer != null) setState(() => _selectedCustomer = customer);
@@ -833,7 +1039,8 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
     super.dispose();
   }
 
-  double get _splitTotalPaid => _splitPayments.fold(0.0, (sum, p) => sum + p.amount);
+  double get _splitTotalPaid =>
+      _splitPayments.fold(0.0, (sum, p) => sum + p.amount);
   double get _remainingBalance => widget.total - _splitTotalPaid;
 
   void _toggleSplit() {
@@ -847,8 +1054,10 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
 
   void _addSplitRow({double initialAmount = 0}) {
     setState(() {
-      _splitAmountControllers.add(TextEditingController(text: initialAmount == 0 ? '' : initialAmount.toStringAsFixed(2)));
-      _splitPayments.add(PaymentEntry(methodCode: 'cash', amount: initialAmount));
+      _splitAmountControllers.add(TextEditingController(
+          text: initialAmount == 0 ? '' : initialAmount.toStringAsFixed(2)));
+      _splitPayments
+          .add(PaymentEntry(methodCode: 'cash', amount: initialAmount));
     });
   }
 
@@ -871,7 +1080,8 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
 
   Future<void> _settle() async {
     if (_isSplit && _remainingBalance > 0.001 && _dueDate == null) {
-      setState(() => _error = 'A due date is required when the split payment leaves a remaining balance.');
+      setState(() => _error =
+          'A due date is required when the split payment leaves a remaining balance.');
       return;
     }
 
@@ -886,10 +1096,15 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
       final sale = await widget.repository.settle(
         saleId: widget.saleId,
         paymentMethod: _isSplit ? null : _method,
-        cashTendered: (!_isSplit && _method == 'cash') ? double.tryParse(_tenderedController.text.trim()) : null,
+        cashTendered: (!_isSplit && _method == 'cash')
+            ? double.tryParse(_tenderedController.text.trim())
+            : null,
         isSplitPayment: _isSplit,
-        splitPayments: _isSplit ? _splitPayments.map((p) => p.toJson()).toList() : null,
-        dueDate: _dueDate != null ? _dueDate!.toIso8601String().split('T').first : null,
+        splitPayments:
+            _isSplit ? _splitPayments.map((p) => p.toJson()).toList() : null,
+        dueDate: _dueDate != null
+            ? _dueDate!.toIso8601String().split('T').first
+            : null,
         customerId: _selectedCustomer?.id,
       );
       if (!mounted) return;
@@ -911,7 +1126,8 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20),
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
@@ -924,39 +1140,60 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Settle Bill', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                    Text('Settle Bill',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.bold)),
                     TextButton.icon(
                       onPressed: _toggleSplit,
-                      icon: Icon(Icons.call_split, size: 16, color: _isSplit ? Theme.of(context).colorScheme.primary : Colors.grey.shade700),
+                      icon: Icon(Icons.call_split,
+                          size: 16,
+                          color: _isSplit
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.grey.shade700),
                       label: Text(_isSplit ? 'Cancel Split' : 'Split Payment'),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text('Total due: ${widget.formatter.format(widget.total)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text('Total due: ${widget.formatter.format(widget.total)}',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12)),
                   child: Row(
                     children: [
-                      Icon(Icons.person_outline, size: 18, color: Colors.grey.shade700),
+                      Icon(Icons.person_outline,
+                          size: 18, color: Colors.grey.shade700),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _selectedCustomer == null
-                            ? const Text('No customer assigned', style: TextStyle(fontSize: 13))
+                            ? const Text('No customer assigned',
+                                style: TextStyle(fontSize: 13))
                             : Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(_selectedCustomer!.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  Text(_selectedCustomer!.name,
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600)),
                                   if (_selectedCustomer!.phone.isNotEmpty)
-                                    Text(_selectedCustomer!.phone, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                    Text(_selectedCustomer!.phone,
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey.shade600)),
                                 ],
                               ),
                       ),
                       if (_selectedCustomer != null)
                         TextButton(
-                          onPressed: () => setState(() => _selectedCustomer = null),
+                          onPressed: () =>
+                              setState(() => _selectedCustomer = null),
                           child: const Text('Remove'),
                         )
                       else
@@ -990,33 +1227,49 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _tenderedController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Cash Tendered by Customer'),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                          labelText: 'Cash Tendered by Customer'),
                     ),
                     const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: _tenderedAmount >= widget.total ? Colors.green.shade50 : Colors.orange.shade50,
+                        color: _tenderedAmount >= widget.total
+                            ? Colors.green.shade50
+                            : Colors.orange.shade50,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _tenderedAmount >= widget.total ? Colors.green.shade200 : Colors.orange.shade200),
+                        border: Border.all(
+                            color: _tenderedAmount >= widget.total
+                                ? Colors.green.shade200
+                                : Colors.orange.shade200),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _tenderedAmount >= widget.total ? 'CHANGE DUE TO CUSTOMER' : 'REMAINING DUE BALANCE',
+                            _tenderedAmount >= widget.total
+                                ? 'CHANGE DUE TO CUSTOMER'
+                                : 'REMAINING DUE BALANCE',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: _tenderedAmount >= widget.total ? Colors.green.shade800 : Colors.orange.shade800,
+                              color: _tenderedAmount >= widget.total
+                                  ? Colors.green.shade800
+                                  : Colors.orange.shade800,
                               fontSize: 11,
                             ),
                           ),
                           Text(
-                            widget.formatter.format(_tenderedAmount >= widget.total ? _changeDue : _remainingDue),
+                            widget.formatter.format(
+                                _tenderedAmount >= widget.total
+                                    ? _changeDue
+                                    : _remainingDue),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: _tenderedAmount >= widget.total ? Colors.green.shade800 : Colors.orange.shade800,
+                              color: _tenderedAmount >= widget.total
+                                  ? Colors.green.shade800
+                                  : Colors.orange.shade800,
                               fontSize: 16,
                             ),
                           ),
@@ -1034,28 +1287,42 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                             flex: 2,
                             child: DropdownButtonFormField<String>(
                               initialValue: _splitPayments[i].methodCode,
-                              decoration: const InputDecoration(labelText: 'Method', isDense: true),
+                              decoration: const InputDecoration(
+                                  labelText: 'Method', isDense: true),
                               items: const [
-                                DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                                DropdownMenuItem(value: 'card', child: Text('Card')),
-                                DropdownMenuItem(value: 'upi', child: Text('UPI')),
-                                DropdownMenuItem(value: 'other', child: Text('Other')),
+                                DropdownMenuItem(
+                                    value: 'cash', child: Text('Cash')),
+                                DropdownMenuItem(
+                                    value: 'card', child: Text('Card')),
+                                DropdownMenuItem(
+                                    value: 'upi', child: Text('UPI')),
+                                DropdownMenuItem(
+                                    value: 'other', child: Text('Other')),
                               ],
-                              onChanged: (value) => setState(() => _splitPayments[i].methodCode = value ?? 'cash'),
+                              onChanged: (value) => setState(() =>
+                                  _splitPayments[i].methodCode =
+                                      value ?? 'cash'),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
                               controller: _splitAmountControllers[i],
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              decoration: const InputDecoration(labelText: 'Amount', isDense: true),
-                              onChanged: (value) => setState(() => _splitPayments[i].amount = double.tryParse(value.trim()) ?? 0),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              decoration: const InputDecoration(
+                                  labelText: 'Amount', isDense: true),
+                              onChanged: (value) => setState(() =>
+                                  _splitPayments[i].amount =
+                                      double.tryParse(value.trim()) ?? 0),
                             ),
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete_outline, size: 20),
-                            onPressed: _splitPayments.length > 1 ? () => _removeSplitRow(i) : null,
+                            onPressed: _splitPayments.length > 1
+                                ? () => _removeSplitRow(i)
+                                : null,
                           ),
                         ],
                       ),
@@ -1072,10 +1339,16 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Remaining Balance', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const Text('Remaining Balance',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
                       Text(
-                        widget.formatter.format(_remainingBalance > 0 ? _remainingBalance : 0),
-                        style: TextStyle(fontWeight: FontWeight.bold, color: _remainingBalance > 0.001 ? Colors.orange.shade800 : Colors.green.shade700),
+                        widget.formatter.format(
+                            _remainingBalance > 0 ? _remainingBalance : 0),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: _remainingBalance > 0.001
+                                ? Colors.orange.shade800
+                                : Colors.green.shade700),
                       ),
                     ],
                   ),
@@ -1084,7 +1357,9 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                     OutlinedButton.icon(
                       onPressed: _pickDueDate,
                       icon: const Icon(Icons.calendar_today, size: 16),
-                      label: Text(_dueDate == null ? 'Set Due Date (required)' : 'Due: ${_dueDate!.toIso8601String().split('T').first}'),
+                      label: Text(_dueDate == null
+                          ? 'Set Due Date (required)'
+                          : 'Due: ${_dueDate!.toIso8601String().split('T').first}'),
                     ),
                   ],
                 ],
@@ -1092,12 +1367,18 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                 FilledButton(
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 50),
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 14, horizontal: 20),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: _isSaving ? null : _settle,
                   child: _isSaving
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
                       : const Text('Settle Bill'),
                 ),
               ],

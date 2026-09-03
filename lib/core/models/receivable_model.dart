@@ -10,6 +10,8 @@ class ReceivableModel {
     this.email,
     this.date,
     this.dueDate,
+    this.dueReminderAt,
+    this.dueReminderSentAt,
     required this.total,
     required this.paidAmount,
     required this.dueAmount,
@@ -23,8 +25,18 @@ class ReceivableModel {
       customerName: json['customer_name'] as String? ?? 'Walk-in',
       phone: json['phone'] as String?,
       email: json['email'] as String?,
-      date: json['date'] != null ? DateTime.tryParse(json['date'] as String) : null,
-      dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'] as String) : null,
+      date: json['date'] != null
+          ? DateTime.tryParse(json['date'] as String)
+          : null,
+      dueDate: json['due_date'] != null
+          ? DateTime.tryParse(json['due_date'] as String)
+          : null,
+      dueReminderAt: json['due_reminder_at'] != null
+          ? DateTime.tryParse(json['due_reminder_at'] as String)
+          : null,
+      dueReminderSentAt: json['due_reminder_sent_at'] != null
+          ? DateTime.tryParse(json['due_reminder_sent_at'] as String)
+          : null,
       total: (json['total'] as num?)?.toDouble() ?? 0,
       paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? 0,
       dueAmount: (json['due_amount'] as num?)?.toDouble() ?? 0,
@@ -39,6 +51,8 @@ class ReceivableModel {
   final String? email;
   final DateTime? date;
   final DateTime? dueDate;
+  final DateTime? dueReminderAt;
+  final DateTime? dueReminderSentAt;
   final double total;
   final double paidAmount;
   final double dueAmount;

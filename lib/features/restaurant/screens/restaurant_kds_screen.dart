@@ -23,19 +23,26 @@ class RestaurantKdsScreen extends StatefulWidget {
 
 class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
   late final RestaurantRepository _repository;
-  Future<({List<KitchenTicketModel> tickets, List<KitchenTicketModel> completedTickets, Map<String, int> counts, KdsAlertSettings alertSettings})>?
-      _future;
+  Future<
+      ({
+        List<KitchenTicketModel> tickets,
+        List<KitchenTicketModel> completedTickets,
+        Map<String, int> counts,
+        KdsAlertSettings alertSettings
+      })>? _future;
   Timer? _pollTimer;
   Timer? _overdueChimeTimer;
   Set<String> _knownTicketIds = {};
-  KdsAlertSettings _alertSettings = const KdsAlertSettings(intervalMinutes: 3, soundPreset: 'chime', soundUrl: '');
+  KdsAlertSettings _alertSettings =
+      const KdsAlertSettings(repeatSeconds: 60, soundPreset: 'alarm');
 
   @override
   void initState() {
     super.initState();
     _repository = RestaurantRepository(context.read<ApiClient>());
     _reload();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _reload(showLoading: false));
+    _pollTimer = Timer.periodic(
+        const Duration(seconds: 5), (_) => _reload(showLoading: false));
   }
 
   @override
@@ -47,25 +54,34 @@ class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
 
   void _restartOverdueChimeTimer() {
     _overdueChimeTimer?.cancel();
-    _overdueChimeTimer = Timer.periodic(Duration(minutes: _alertSettings.intervalMinutes), (_) {
+    _overdueChimeTimer =
+        Timer.periodic(Duration(seconds: _alertSettings.repeatSeconds), (_) {
       final tickets = _future;
       if (tickets == null) return;
       tickets.then((result) {
-        if (result.tickets.any((t) => t.isOverdue)) {
-          SoundAlertService.instance.play(preset: _alertSettings.soundPreset, soundUrl: _alertSettings.soundUrl);
+        if (result.tickets.any((t) => t.isAlarmActive)) {
+          SoundAlertService.instance.play(preset: _alertSettings.soundPreset);
         }
       });
     });
   }
 
-  void _handleResult(({List<KitchenTicketModel> tickets, List<KitchenTicketModel> completedTickets, Map<String, int> counts, KdsAlertSettings alertSettings}) result) {
+  void _handleResult(
+      ({
+        List<KitchenTicketModel> tickets,
+        List<KitchenTicketModel> completedTickets,
+        Map<String, int> counts,
+        KdsAlertSettings alertSettings
+      }) result) {
     final currentIds = result.tickets.map((t) => t.id).toSet();
-    final hasNewTicket = _knownTicketIds.isNotEmpty && currentIds.difference(_knownTicketIds).isNotEmpty;
+    final hasNewTicket = _knownTicketIds.isNotEmpty &&
+        currentIds.difference(_knownTicketIds).isNotEmpty;
     if (hasNewTicket) {
-      SoundAlertService.instance.play(preset: result.alertSettings.soundPreset, soundUrl: result.alertSettings.soundUrl);
+      SoundAlertService.instance.play(preset: result.alertSettings.soundPreset);
     }
     _knownTicketIds = currentIds;
-    if (_alertSettings.intervalMinutes != result.alertSettings.intervalMinutes || _overdueChimeTimer == null) {
+    if (_alertSettings.repeatSeconds != result.alertSettings.repeatSeconds ||
+        _overdueChimeTimer == null) {
       _alertSettings = result.alertSettings;
       _restartOverdueChimeTimer();
     } else {
@@ -106,7 +122,9 @@ class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
       await _repository.updateKotStatus(ticket.id, next);
       _reload(showLoading: false);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -117,8 +135,12 @@ class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
         title: Text('Cancel ${ticket.kotNumber}?'),
         content: const Text('This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('No')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Yes, Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('No')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Yes, Cancel')),
         ],
       ),
     );
@@ -128,7 +150,20 @@ class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
       await _repository.updateKotStatus(ticket.id, 'cancelled');
       _reload(showLoading: false);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  Future<void> _dismissAlarm(KitchenTicketModel ticket) async {
+    try {
+      await _repository.dismissKotAlarm(ticket.id);
+      _reload(showLoading: false);
+    } on ApiException catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -139,14 +174,19 @@ class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
       body: FutureBuilder(
         future: _future,
         builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done || _future == null) return const LoadingIndicator();
-          if (snapshot.hasError) return ErrorView(message: 'Could not load kitchen tickets.', onRetry: _reload);
+          if (snapshot.connectionState != ConnectionState.done ||
+              _future == null) return const LoadingIndicator();
+          if (snapshot.hasError)
+            return ErrorView(
+                message: 'Could not load kitchen tickets.', onRetry: _reload);
 
           final data = snapshot.data;
           if (data == null) return const LoadingIndicator();
 
-          final pending = data.tickets.where((t) => t.status == 'pending').toList();
-          final preparing = data.tickets.where((t) => t.status == 'preparing').toList();
+          final pending =
+              data.tickets.where((t) => t.status == 'pending').toList();
+          final preparing =
+              data.tickets.where((t) => t.status == 'preparing').toList();
           final ready = data.tickets.where((t) => t.status == 'ready').toList();
 
           return RefreshIndicator(
@@ -154,11 +194,26 @@ class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
-                _KotSection(title: 'Pending (${pending.length})', tickets: pending, onAdvance: _advance, onCancel: _cancel),
+                _KotSection(
+                    title: 'Pending (${pending.length})',
+                    tickets: pending,
+                    onAdvance: _advance,
+                    onCancel: _cancel,
+                    onDismissAlarm: _dismissAlarm),
                 const SizedBox(height: 16),
-                _KotSection(title: 'Preparing (${preparing.length})', tickets: preparing, onAdvance: _advance, onCancel: _cancel),
+                _KotSection(
+                    title: 'Preparing (${preparing.length})',
+                    tickets: preparing,
+                    onAdvance: _advance,
+                    onCancel: _cancel,
+                    onDismissAlarm: _dismissAlarm),
                 const SizedBox(height: 16),
-                _KotSection(title: 'Ready (${ready.length})', tickets: ready, onAdvance: _advance, onCancel: _cancel),
+                _KotSection(
+                    title: 'Ready (${ready.length})',
+                    tickets: ready,
+                    onAdvance: _advance,
+                    onCancel: _cancel,
+                    onDismissAlarm: _dismissAlarm),
               ],
             ),
           );
@@ -169,12 +224,18 @@ class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
 }
 
 class _KotSection extends StatelessWidget {
-  const _KotSection({required this.title, required this.tickets, required this.onAdvance, required this.onCancel});
+  const _KotSection(
+      {required this.title,
+      required this.tickets,
+      required this.onAdvance,
+      required this.onCancel,
+      required this.onDismissAlarm});
 
   final String title;
   final List<KitchenTicketModel> tickets;
   final ValueChanged<KitchenTicketModel> onAdvance;
   final ValueChanged<KitchenTicketModel> onCancel;
+  final ValueChanged<KitchenTicketModel> onDismissAlarm;
 
   String _actionLabel(String status) => switch (status) {
         'pending' => 'Start Preparing',
@@ -188,31 +249,56 @@ class _KotSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        Text(title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
         const SizedBox(height: 8),
         if (tickets.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text('Nothing here.', style: TextStyle(color: Colors.grey.shade500)),
+            child: Text('Nothing here.',
+                style: TextStyle(color: Colors.grey.shade500)),
           )
         else
           for (final ticket in tickets)
             Card(
+              color: ticket.isAlarmActive ? Colors.red.shade50 : null,
+              shape: ticket.isAlarmActive
+                  ? RoundedRectangleBorder(
+                      side: const BorderSide(color: Colors.red, width: 2),
+                      borderRadius: BorderRadius.circular(12))
+                  : null,
               margin: const EdgeInsets.only(bottom: 8),
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (ticket.isAlarmActive) ...[
+                      Row(children: [
+                        const Expanded(
+                            child: Text('🚨 Preparation alarm',
+                                style: TextStyle(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold))),
+                        TextButton(
+                            onPressed: () => onDismissAlarm(ticket),
+                            child: const Text('Dismiss')),
+                      ]),
+                    ],
                     Row(
                       children: [
                         Expanded(
-                          child: Text(ticket.kotNumber, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          child: Text(ticket.kotNumber,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: ticket.elapsedMinutes >= 15 ? Colors.red.shade50 : Colors.grey.shade100,
+                            color: ticket.elapsedMinutes >= 15
+                                ? Colors.red.shade50
+                                : Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -220,7 +306,9 @@ class _KotSection extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: ticket.elapsedMinutes >= 15 ? Colors.red.shade700 : Colors.grey.shade700,
+                              color: ticket.elapsedMinutes >= 15
+                                  ? Colors.red.shade700
+                                  : Colors.grey.shade700,
                             ),
                           ),
                         ),
@@ -228,7 +316,8 @@ class _KotSection extends StatelessWidget {
                     ),
                     Text(
                       '${ticket.tableName ?? ticket.serviceType} · ${ticket.serviceType}',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                      style:
+                          TextStyle(color: Colors.grey.shade600, fontSize: 12),
                     ),
                     if (ticket.targetCompletionAt != null) ...[
                       const SizedBox(height: 4),
@@ -236,10 +325,13 @@ class _KotSection extends StatelessWidget {
                     ],
                     const SizedBox(height: 6),
                     for (final item in ticket.items)
-                      Text('${item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 1)} × ${item.name}'),
+                      Text(
+                          '${item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 1)} × ${item.name}'),
                     if ((ticket.kitchenNotes ?? '').isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text('Note: ${ticket.kitchenNotes}', style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 12)),
+                      Text('Note: ${ticket.kitchenNotes}',
+                          style: const TextStyle(
+                              fontStyle: FontStyle.italic, fontSize: 12)),
                     ],
                     const SizedBox(height: 10),
                     Row(
@@ -300,7 +392,9 @@ class _CountdownBadgeState extends State<_CountdownBadge> {
     final remaining = widget.target.difference(DateTime.now());
     final overdue = remaining.isNegative;
     final abs = remaining.abs();
-    final label = abs.inMinutes > 0 ? '${abs.inMinutes}m ${abs.inSeconds % 60}s' : '${abs.inSeconds}s';
+    final label = abs.inMinutes > 0
+        ? '${abs.inMinutes}m ${abs.inSeconds % 60}s'
+        : '${abs.inSeconds}s';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -310,7 +404,10 @@ class _CountdownBadgeState extends State<_CountdownBadge> {
       ),
       child: Text(
         overdue ? '⚠️ Overdue by $label' : '🎯 Due in $label',
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: overdue ? Colors.red.shade700 : Colors.blue.shade700),
+        style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: overdue ? Colors.red.shade700 : Colors.blue.shade700),
       ),
     );
   }

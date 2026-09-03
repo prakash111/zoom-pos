@@ -46,7 +46,8 @@ class ApiEndpoints {
 
   static const String inventory = '/inventory';
   static const String inventoryStoreProduct = '/inventory/product';
-  static String inventoryProductImage(String id) => '/inventory/product/$id/image';
+  static String inventoryProductImage(String id) =>
+      '/inventory/product/$id/image';
   static const String aiImageAvailability = '/ai-image/availability';
   static const String aiImageGenerate = '/ai-image/generate';
   static const String inventoryImport = '/inventory/import';
@@ -59,7 +60,13 @@ class ApiEndpoints {
   static const String analytics = '/analytics';
   static const String sendDelivery = '/send-delivery';
   static const String receivablesDue = '/receivables/due';
-  static String receivableRemind(String saleId) => '/receivables/$saleId/remind';
+  static String receivableRemind(String saleId) =>
+      '/receivables/$saleId/remind';
+  static String receivableReminder(String saleId) =>
+      '/receivables/$saleId/reminder';
+  static const String pushConfig = '/auth/push-config';
+  static const String pushDevices = '/push-devices';
+  static String sale(String id) => '/sales/$id';
   static String salePdf(String id) => '/sales/$id/pdf';
   static String quotationPdf(String id) => '/quotations/$id/pdf';
 
@@ -74,15 +81,21 @@ class ApiEndpoints {
   /// Outside the `/api/v1/pos` prefix — use with [ApiClient.postAbsolute].
   static const String passwordEmailAbsolute = '/api/tenant/password/email';
   static const String passwordResetAbsolute = '/api/tenant/password/reset';
-  static const String changePasswordAbsolute = '/api/tenant/profile/change-password';
+  static const String changePasswordAbsolute =
+      '/api/tenant/profile/change-password';
 
   static const String subscription = '/subscription';
   static const String subscriptionRedeem = '/subscription/redeem';
-  static String subscriptionActivateFree(String plan) => '/subscription/plans/$plan/activate-free';
-  static String subscriptionRazorpayOrder(String plan) => '/subscription/plans/$plan/razorpay/order';
-  static String subscriptionRazorpayVerify(String plan) => '/subscription/plans/$plan/razorpay/verify';
-  static String subscriptionMercadoPagoPreference(String plan) => '/subscription/plans/$plan/mercadopago/preference';
-  static String subscriptionMercadoPagoVerify(String plan) => '/subscription/plans/$plan/mercadopago/verify';
+  static String subscriptionActivateFree(String plan) =>
+      '/subscription/plans/$plan/activate-free';
+  static String subscriptionRazorpayOrder(String plan) =>
+      '/subscription/plans/$plan/razorpay/order';
+  static String subscriptionRazorpayVerify(String plan) =>
+      '/subscription/plans/$plan/razorpay/verify';
+  static String subscriptionMercadoPagoPreference(String plan) =>
+      '/subscription/plans/$plan/mercadopago/preference';
+  static String subscriptionMercadoPagoVerify(String plan) =>
+      '/subscription/plans/$plan/mercadopago/verify';
 
   static const String quotations = '/quotations';
   static String quotation(String id) => '/quotations/$id';
@@ -92,7 +105,8 @@ class ApiEndpoints {
   static const String cashRegisterOpen = '/cash-register/open';
   static const String cashRegisterHistory = '/cash-register/history';
   static String cashRegister(String id) => '/cash-register/$id';
-  static String cashRegisterTransaction(String id) => '/cash-register/$id/transaction';
+  static String cashRegisterTransaction(String id) =>
+      '/cash-register/$id/transaction';
   static String cashRegisterClose(String id) => '/cash-register/$id/close';
 
   static const String payables = '/payables';
@@ -123,22 +137,21 @@ class ApiEndpoints {
   static const String settingsProfile = '/settings/profile';
   static const String settingsProfileLogo = '/settings/profile/logo';
   static const String settingsProfileFavicon = '/settings/profile/favicon';
-  static const String settingsProfileDrawerCover = '/settings/profile/drawer-cover';
+  static const String settingsProfileDrawerCover =
+      '/settings/profile/drawer-cover';
   static const String settingsReceipts = '/settings/receipts';
   static const String settingsFinancial = '/settings/financial';
-  static const String settingsNotifications = '/settings/notifications';
-  static const String settingsTestEmail = '/settings/notifications/test-email';
   static const String settingsPaymentMethods = '/settings/payment-methods';
-  static String settingsPaymentMethod(String id) => '/settings/payment-methods/$id';
-  static String settingsPaymentMethodToggle(String id) => '/settings/payment-methods/$id/toggle';
-
-  static const String settingsNotificationChannels = '/settings/notification-channels';
-  static String settingsNotificationChannel(String id) => '/settings/notification-channels/$id';
+  static String settingsPaymentMethod(String id) =>
+      '/settings/payment-methods/$id';
+  static String settingsPaymentMethodToggle(String id) =>
+      '/settings/payment-methods/$id/toggle';
 
   static const String consignments = '/consignments';
   static String consignment(String id) => '/consignments/$id';
   static String consignmentDispatch(String id) => '/consignments/$id/dispatch';
-  static String consignmentReconcile(String id) => '/consignments/$id/reconcile';
+  static String consignmentReconcile(String id) =>
+      '/consignments/$id/reconcile';
   static String consignmentFinalize(String id) => '/consignments/$id/finalize';
 
   static const String serviceOrders = '/service-orders';
@@ -164,7 +177,8 @@ class ApiEndpoints {
 
   static const String languages = '/languages';
   static const String languagesDefault = '/languages/default';
-  static String languageTranslations(String locale) => '/languages/translations/$locale';
+  static String languageTranslations(String locale) =>
+      '/languages/translations/$locale';
 
   static const String appBootstrap = '/app/bootstrap';
   static const String settingsNavConfig = '/settings/nav-config';
@@ -173,9 +187,14 @@ class ApiEndpoints {
   static String restaurantFloor(String id) => '/restaurant/floors/$id';
   static const String restaurantTables = '/restaurant/tables';
   static String restaurantTable(String id) => '/restaurant/tables/$id';
-  static String restaurantTableStatus(String id) => '/restaurant/tables/$id/status';
-  static const String restaurantSendToKitchen = '/restaurant/orders/send-to-kitchen';
-  static String restaurantSettle(String saleId) => '/restaurant/orders/$saleId/settle';
+  static String restaurantTableStatus(String id) =>
+      '/restaurant/tables/$id/status';
+  static const String restaurantSendToKitchen =
+      '/restaurant/orders/send-to-kitchen';
+  static String restaurantSettle(String saleId) =>
+      '/restaurant/orders/$saleId/settle';
   static const String restaurantKot = '/restaurant/kot';
   static String restaurantKotStatus(String id) => '/restaurant/kot/$id/status';
+  static String restaurantKotDismissAlarm(String id) =>
+      '/restaurant/kot/$id/dismiss-alarm';
 }

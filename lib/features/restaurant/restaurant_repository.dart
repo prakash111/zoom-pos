@@ -16,7 +16,8 @@ class RestaurantRepository {
         .toList();
   }
 
-  Future<DiningFloorModel> saveFloor({String? id, required String name, int? orderIndex}) async {
+  Future<DiningFloorModel> saveFloor(
+      {String? id, required String name, int? orderIndex}) async {
     final data = {
       'name': name,
       if (orderIndex != null) 'order_index': orderIndex,
@@ -27,7 +28,8 @@ class RestaurantRepository {
     return DiningFloorModel.fromJson(response['floor'] as Map<String, dynamic>);
   }
 
-  Future<void> deleteFloor(String id) => _client.delete(ApiEndpoints.restaurantFloor(id));
+  Future<void> deleteFloor(String id) =>
+      _client.delete(ApiEndpoints.restaurantFloor(id));
 
   Future<DiningTableModel> saveTable({
     String? id,
@@ -49,18 +51,23 @@ class RestaurantRepository {
   }
 
   Future<DiningTableModel> setTableStatus(String id, String status) async {
-    final response = await _client.post(ApiEndpoints.restaurantTableStatus(id), data: {'status': status});
+    final response = await _client
+        .post(ApiEndpoints.restaurantTableStatus(id), data: {'status': status});
     return DiningTableModel.fromJson(response['table'] as Map<String, dynamic>);
   }
 
-  Future<void> deleteTable(String id) => _client.delete(ApiEndpoints.restaurantTable(id));
+  Future<void> deleteTable(String id) =>
+      _client.delete(ApiEndpoints.restaurantTable(id));
 
-  Future<({DiningTableModel table, RestaurantSaleModel? openOrder})> fetchTable(String id) async {
+  Future<({DiningTableModel table, RestaurantSaleModel? openOrder})> fetchTable(
+      String id) async {
     final response = await _client.get(ApiEndpoints.restaurantTable(id));
     return (
-      table: DiningTableModel.fromJson(response['table'] as Map<String, dynamic>),
+      table:
+          DiningTableModel.fromJson(response['table'] as Map<String, dynamic>),
       openOrder: response['open_order'] is Map
-          ? RestaurantSaleModel.fromJson(Map<String, dynamic>.from(response['open_order'] as Map))
+          ? RestaurantSaleModel.fromJson(
+              Map<String, dynamic>.from(response['open_order'] as Map))
           : null,
     );
   }
@@ -79,6 +86,7 @@ class RestaurantRepository {
     double? discount,
     String? notes,
     int? prepMinutes,
+    int? intimationMinutes,
     required List<RestaurantOrderItemModel> items,
   }) async {
     final data = {
@@ -86,21 +94,30 @@ class RestaurantRepository {
       if (tableId != null) 'table_id': tableId,
       if (saleId != null) 'sale_id': saleId,
       if (guestCount != null) 'guest_count': guestCount,
-      if (customerName != null && customerName.isNotEmpty) 'customer_name': customerName,
-      if (customerPhone != null && customerPhone.isNotEmpty) 'customer_phone': customerPhone,
-      if (pickupTime != null && pickupTime.isNotEmpty) 'pickup_time': pickupTime,
-      if (deliveryAddress != null && deliveryAddress.isNotEmpty) 'delivery_address': deliveryAddress,
-      if (driverName != null && driverName.isNotEmpty) 'driver_name': driverName,
-      if (driverPhone != null && driverPhone.isNotEmpty) 'driver_phone': driverPhone,
+      if (customerName != null && customerName.isNotEmpty)
+        'customer_name': customerName,
+      if (customerPhone != null && customerPhone.isNotEmpty)
+        'customer_phone': customerPhone,
+      if (pickupTime != null && pickupTime.isNotEmpty)
+        'pickup_time': pickupTime,
+      if (deliveryAddress != null && deliveryAddress.isNotEmpty)
+        'delivery_address': deliveryAddress,
+      if (driverName != null && driverName.isNotEmpty)
+        'driver_name': driverName,
+      if (driverPhone != null && driverPhone.isNotEmpty)
+        'driver_phone': driverPhone,
       if (discount != null) 'discount': discount,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
       if (prepMinutes != null) 'prep_minutes': prepMinutes,
+      if (intimationMinutes != null) 'intimation_minutes': intimationMinutes,
       'items': items.map((e) => e.toRequestJson()).toList(),
     };
 
-    final response = await _client.post(ApiEndpoints.restaurantSendToKitchen, data: data);
+    final response =
+        await _client.post(ApiEndpoints.restaurantSendToKitchen, data: data);
     return (
-      sale: RestaurantSaleModel.fromJson(response['sale'] as Map<String, dynamic>),
+      sale: RestaurantSaleModel.fromJson(
+          response['sale'] as Map<String, dynamic>),
       kot: KitchenTicketModel.fromJson(response['kot'] as Map<String, dynamic>),
     );
   }
@@ -126,30 +143,47 @@ class RestaurantRepository {
       if (dueDate != null) 'due_date': dueDate,
       if (customerId != null) 'customer_id': int.tryParse(customerId),
     };
-    final response = await _client.post(ApiEndpoints.restaurantSettle(saleId), data: data);
-    return RestaurantSaleModel.fromJson(response['sale'] as Map<String, dynamic>);
+    final response =
+        await _client.post(ApiEndpoints.restaurantSettle(saleId), data: data);
+    return RestaurantSaleModel.fromJson(
+        response['sale'] as Map<String, dynamic>);
   }
 
-  Future<({List<KitchenTicketModel> tickets, List<KitchenTicketModel> completedTickets, Map<String, int> counts, KdsAlertSettings alertSettings})>
-      fetchKot({
+  Future<
+      ({
+        List<KitchenTicketModel> tickets,
+        List<KitchenTicketModel> completedTickets,
+        Map<String, int> counts,
+        KdsAlertSettings alertSettings
+      })> fetchKot({
     String? status,
     String? serviceType,
   }) async {
     final response = await _client.get(ApiEndpoints.restaurantKot, query: {
       if (status != null && status.isNotEmpty) 'status': status,
-      if (serviceType != null && serviceType.isNotEmpty) 'service_type': serviceType,
+      if (serviceType != null && serviceType.isNotEmpty)
+        'service_type': serviceType,
     });
     return (
-      tickets: (response['tickets'] as List? ?? []).map((e) => KitchenTicketModel.fromJson(e as Map<String, dynamic>)).toList(),
-      completedTickets:
-          (response['completed_tickets'] as List? ?? []).map((e) => KitchenTicketModel.fromJson(e as Map<String, dynamic>)).toList(),
-      counts: (response['counts'] as Map<String, dynamic>? ?? {}).map((k, v) => MapEntry(k, (v as num).toInt())),
-      alertSettings: KdsAlertSettings.fromJson(response['alert_settings'] as Map<String, dynamic>?),
+      tickets: (response['tickets'] as List? ?? [])
+          .map((e) => KitchenTicketModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      completedTickets: (response['completed_tickets'] as List? ?? [])
+          .map((e) => KitchenTicketModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      counts: (response['counts'] as Map<String, dynamic>? ?? {})
+          .map((k, v) => MapEntry(k, (v as num).toInt())),
+      alertSettings: KdsAlertSettings.fromJson(
+          response['alert_settings'] as Map<String, dynamic>?),
     );
   }
 
   Future<KitchenTicketModel> updateKotStatus(String id, String status) async {
-    final response = await _client.post(ApiEndpoints.restaurantKotStatus(id), data: {'status': status});
+    final response = await _client
+        .post(ApiEndpoints.restaurantKotStatus(id), data: {'status': status});
     return KitchenTicketModel.fromJson(response['kot'] as Map<String, dynamic>);
   }
+
+  Future<void> dismissKotAlarm(String id) =>
+      _client.post(ApiEndpoints.restaurantKotDismissAlarm(id));
 }

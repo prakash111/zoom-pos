@@ -13,6 +13,7 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -25,6 +26,7 @@ android {
         applicationId = "com.zoomnearby.zoompos"
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
+        multiDexEnabled = true
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -59,4 +61,12 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // PushApplication initializes Firebase before the Flutter background
+    // isolate, so the app module needs FirebaseApp on its own compile path.
+    implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
+    implementation("com.google.firebase:firebase-messaging")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

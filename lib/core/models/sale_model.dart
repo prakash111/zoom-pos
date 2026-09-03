@@ -4,6 +4,7 @@
 class SaleModel {
   SaleModel({
     required this.id,
+    this.serverId,
     required this.saleNumber,
     required this.customerName,
     required this.items,
@@ -21,6 +22,7 @@ class SaleModel {
   factory SaleModel.fromJson(Map<String, dynamic> json) {
     return SaleModel(
       id: json['id'].toString(),
+      serverId: json['server_id']?.toString(),
       saleNumber: json['sale_number'] as String? ?? '',
       customerName: json['customer_name'] as String?,
       items: (json['items'] as List? ?? [])
@@ -40,6 +42,7 @@ class SaleModel {
   }
 
   final String id;
+  final String? serverId;
   final String saleNumber;
   final String? customerName;
   final List<Map<String, dynamic>> items;

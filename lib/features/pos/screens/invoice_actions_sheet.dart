@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
@@ -63,14 +64,18 @@ class InvoiceActionsData {
   final double? paidAmount;
   final double dueAmount;
 
-  String get _pdfPath =>
-      documentType == 'quotation' ? ApiEndpoints.quotationPdf(documentId) : ApiEndpoints.salePdf(documentId);
+  String get _pdfPath => documentType == 'quotation'
+      ? ApiEndpoints.quotationPdf(documentId)
+      : ApiEndpoints.salePdf(documentId);
 }
 
 bool get _supportsThermalPrint =>
-    !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS);
 
-Future<void> showInvoiceActionsSheet(BuildContext context, InvoiceActionsData data) {
+Future<void> showInvoiceActionsSheet(
+    BuildContext context, InvoiceActionsData data) {
   final apiClient = context.read<ApiClient>();
 
   return showAdaptiveSheet(
@@ -87,12 +92,16 @@ Future<void> showInvoiceActionsSheet(BuildContext context, InvoiceActionsData da
                 children: [
                   Text(
                     data.documentNumber,
-                    style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(sheetContext)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   if ((data.taxId ?? '').isNotEmpty)
                     Text(
                       '${data.isIndia ? 'GSTIN' : 'Tax ID'}: ${data.taxId}',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                      style:
+                          TextStyle(color: Colors.grey.shade600, fontSize: 11),
                     ),
                 ],
               ),
@@ -105,7 +114,9 @@ Future<void> showInvoiceActionsSheet(BuildContext context, InvoiceActionsData da
               onTap: () {
                 Navigator.of(sheetContext).pop();
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => _InvoicePreviewScreen(apiClient: apiClient, data: data)),
+                  MaterialPageRoute(
+                      builder: (_) => _InvoicePreviewScreen(
+                          apiClient: apiClient, data: data)),
                 );
               },
             ),
@@ -122,14 +133,17 @@ Future<void> showInvoiceActionsSheet(BuildContext context, InvoiceActionsData da
             ListTile(
               leading: const Icon(Icons.chat_outlined),
               title: const Text('Share via WhatsApp'),
-              subtitle: (data.customerPhone ?? '').isNotEmpty ? Text('to ${data.customerPhone}') : null,
+              subtitle: (data.customerPhone ?? '').isNotEmpty
+                  ? Text('to ${data.customerPhone}')
+                  : null,
               trailing: (data.customerPhone ?? '').isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       tooltip: 'Change recipient',
                       onPressed: () async {
                         Navigator.of(sheetContext).pop();
-                        await _sendDelivery(context, apiClient, data, type: 'whatsapp', forcePrompt: true);
+                        await _sendDelivery(context, apiClient, data,
+                            type: 'whatsapp', forcePrompt: true);
                       },
                     )
                   : null,
@@ -141,28 +155,23 @@ Future<void> showInvoiceActionsSheet(BuildContext context, InvoiceActionsData da
             ListTile(
               leading: const Icon(Icons.email_outlined),
               title: const Text('Send via Email'),
-              subtitle: (data.customerEmail ?? '').isNotEmpty ? Text('to ${data.customerEmail}') : null,
+              subtitle: (data.customerEmail ?? '').isNotEmpty
+                  ? Text('to ${data.customerEmail}')
+                  : null,
               trailing: (data.customerEmail ?? '').isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       tooltip: 'Change recipient',
                       onPressed: () async {
                         Navigator.of(sheetContext).pop();
-                        await _sendDelivery(context, apiClient, data, type: 'email', forcePrompt: true);
+                        await _sendDelivery(context, apiClient, data,
+                            type: 'email', forcePrompt: true);
                       },
                     )
                   : null,
               onTap: () async {
                 Navigator.of(sheetContext).pop();
                 await _sendDelivery(context, apiClient, data, type: 'email');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.hub_outlined),
-              title: const Text('Custom Notification Channel'),
-              onTap: () async {
-                Navigator.of(sheetContext).pop();
-                await _sendViaCustomChannel(context, apiClient, data);
               },
             ),
             const SizedBox(height: 8),
@@ -173,13 +182,15 @@ Future<void> showInvoiceActionsSheet(BuildContext context, InvoiceActionsData da
   );
 }
 
-Future<void> _printThermal(BuildContext context, InvoiceActionsData data) async {
+Future<void> _printThermal(
+    BuildContext context, InvoiceActionsData data) async {
   final service = ThermalPrinterService();
   final saved = await service.savedDeviceAddress();
   if (!context.mounted) return;
 
   if (saved == null) {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()));
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()));
     return;
   }
 
@@ -187,7 +198,8 @@ Future<void> _printThermal(BuildContext context, InvoiceActionsData data) async 
   messenger.showSnackBar(const SnackBar(content: Text('Printing…')));
   final ok = await service.printReceipt(
     companyName: data.companyName,
-    documentLabel: '${data.documentType == 'quotation' ? 'Quotation' : 'Sale'} #${data.documentNumber}',
+    documentLabel:
+        '${data.documentType == 'quotation' ? 'Quotation' : 'Sale'} #${data.documentNumber}',
     lines: data.lines,
     subtotal: data.subtotal,
     discount: data.discount,
@@ -202,7 +214,8 @@ Future<void> _printThermal(BuildContext context, InvoiceActionsData data) async 
     paidAmount: data.paidAmount,
     dueAmount: data.dueAmount,
   );
-  messenger.showSnackBar(SnackBar(content: Text(ok ? 'Sent to printer.' : 'Could not reach the printer.')));
+  messenger.showSnackBar(SnackBar(
+      content: Text(ok ? 'Sent to printer.' : 'Could not reach the printer.')));
 }
 
 Future<void> _sendDelivery(
@@ -212,13 +225,17 @@ Future<void> _sendDelivery(
   required String type,
   bool forcePrompt = false,
 }) async {
-  final knownRecipient = type == 'email' ? data.customerEmail : data.customerPhone;
-  String? recipient = (!forcePrompt && (knownRecipient ?? '').isNotEmpty) ? knownRecipient : null;
+  final knownRecipient =
+      type == 'email' ? data.customerEmail : data.customerPhone;
+  String? recipient = (!forcePrompt && (knownRecipient ?? '').isNotEmpty)
+      ? knownRecipient
+      : null;
 
   if (recipient == null) {
     recipient = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => _RecipientDialog(type: type, initialValue: knownRecipient),
+      builder: (dialogContext) =>
+          _RecipientDialog(type: type, initialValue: knownRecipient),
     );
   }
   if (recipient == null || recipient.trim().isEmpty) return;
@@ -248,66 +265,6 @@ Future<void> _sendDelivery(
   }
 }
 
-Future<void> _sendViaCustomChannel(BuildContext context, ApiClient apiClient, InvoiceActionsData data) async {
-  final messenger = ScaffoldMessenger.of(context);
-  List<dynamic> channels;
-  try {
-    final response = await apiClient.get(ApiEndpoints.settingsNotificationChannels);
-    channels = (response['channels'] as List? ?? [])
-        .where((c) => (c['is_active'] as bool? ?? true) && (c['event_types'] as List? ?? []).contains(data.documentType))
-        .toList();
-  } on ApiException catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    return;
-  }
-
-  if (channels.isEmpty) {
-    messenger.showSnackBar(const SnackBar(content: Text('No custom notification channels are configured for this document type.')));
-    return;
-  }
-
-  if (!context.mounted) return;
-  final selected = await showDialog<Map<String, dynamic>>(
-    context: context,
-    builder: (dialogContext) => SimpleDialog(
-      title: const Text('Send via'),
-      children: channels.map((c) {
-        final map = Map<String, dynamic>.from(c as Map);
-        final iconIsUrl = map['icon_is_url'] as bool? ?? false;
-        final iconDisplay = map['icon_display']?.toString() ?? '🔗';
-        return SimpleDialogOption(
-          onPressed: () => Navigator.of(dialogContext).pop(map),
-          child: Row(
-            children: [
-              iconIsUrl
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Image.network(iconDisplay, width: 18, height: 18, errorBuilder: (_, __, ___) => const Text('🔗')),
-                    )
-                  : Text(iconDisplay, style: const TextStyle(fontSize: 16)),
-              const SizedBox(width: 10),
-              Text(map['name']?.toString() ?? 'Channel'),
-            ],
-          ),
-        );
-      }).toList(),
-    ),
-  );
-  if (selected == null || !context.mounted) return;
-
-  try {
-    final response = await apiClient.post(ApiEndpoints.sendDelivery, data: {
-      'type': 'custom',
-      'document_type': data.documentType,
-      'channel_id': int.tryParse(selected['id'].toString()),
-      'document_id': data.documentId,
-    });
-    messenger.showSnackBar(SnackBar(content: Text(response['message']?.toString() ?? 'Dispatched.')));
-  } on ApiException catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text(e.message)));
-  }
-}
-
 class _RecipientDialog extends StatefulWidget {
   const _RecipientDialog({required this.type, this.initialValue});
 
@@ -319,7 +276,8 @@ class _RecipientDialog extends StatefulWidget {
 }
 
 class _RecipientDialogState extends State<_RecipientDialog> {
-  late final _controller = TextEditingController(text: widget.initialValue ?? '');
+  late final _controller =
+      TextEditingController(text: widget.initialValue ?? '');
 
   @override
   void dispose() {
@@ -335,11 +293,15 @@ class _RecipientDialogState extends State<_RecipientDialog> {
       content: TextField(
         controller: _controller,
         autofocus: true,
-        keyboardType: isEmail ? TextInputType.emailAddress : TextInputType.phone,
-        decoration: InputDecoration(labelText: isEmail ? 'Recipient email' : 'Recipient phone number'),
+        keyboardType:
+            isEmail ? TextInputType.emailAddress : TextInputType.phone,
+        decoration: InputDecoration(
+            labelText: isEmail ? 'Recipient email' : 'Recipient phone number'),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel')),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(_controller.text),
           child: const Text('Send'),
@@ -360,7 +322,8 @@ class _InvoicePreviewScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(data.documentNumber)),
       body: PdfPreview(
-        build: (format) async => Uint8List.fromList(await apiClient.getBytes(data._pdfPath)),
+        build: (format) async =>
+            Uint8List.fromList(await apiClient.getBytes(data._pdfPath)),
         allowPrinting: true,
         // The package's own share button hands off straight to the OS share
         // sheet with just the raw PDF bytes — no WhatsApp/email/thermal/

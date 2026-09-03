@@ -62,12 +62,10 @@ dependencies:
   # QR code generation (table "QR Stand" preview/share in Restaurant Mode)
   qr_flutter: ^4.1.0
 
-  # Restaurant order alert sound (custom hosted sound URL playback; preset
-  # alerts use the platform's built-in system sounds instead — see
-  # SoundAlertService). Already pulled in transitively by
-  # flutter_widget_from_html's fwfh_just_audio; declared directly here since
-  # it's now used as a first-class API, not just an HTML-embed dependency.
-  just_audio: ^0.9.46
+  # Platform-wide push delivery and Android max-importance alarm channels.
+  firebase_core: ^4.14.0
+  firebase_messaging: ^16.6.0
+  flutter_local_notifications: ^20.1.0
 
   # Thermal receipt printing (Android/iOS only — never imported from
   # web/desktop code paths, see lib/core/services/thermal/)

@@ -8,6 +8,7 @@ import 'core/config/nav_dock_provider.dart';
 import 'core/config/theme.dart';
 import 'core/config/theme_provider.dart';
 import 'core/services/desktop/window_close_guard.dart';
+import 'core/services/push_notification_service.dart';
 import 'core/services/sync/sync_engine.dart';
 import 'core/storage/app_database.dart';
 import 'core/storage/app_preferences.dart';
@@ -27,7 +28,8 @@ Future<void> main() async {
 
   final secureStorage = SecureStorageService();
   final preferences = AppPreferences();
-  final apiClient = ApiClient(secureStorage: secureStorage, preferences: preferences);
+  final apiClient =
+      ApiClient(secureStorage: secureStorage, preferences: preferences);
   final authRepository = AuthRepository(apiClient);
 
   final authProvider = AuthProvider(
@@ -38,13 +40,19 @@ Future<void> main() async {
 
   final heldCartsStore = HeldCartsStore()..load();
   final themeProvider = ThemeProvider()..load();
-  final localeProvider = LocaleProvider(preferences: preferences, apiClient: apiClient)..load();
+  final localeProvider =
+      LocaleProvider(preferences: preferences, apiClient: apiClient)..load();
   final navDockProvider = NavDockProvider(preferences: preferences)..load();
 
   // Restore session in background, then re-fetch translations now that
   // requests carry a token (LocaleProvider's own initial load may have run
   // before restoreSession finished).
   authProvider.restoreSession().then((_) => localeProvider.refreshFromServer());
+
+  // Central push config is fetched from SuperAdmin-owned settings. Android
+  // device registration follows automatically once the session is restored.
+  PushNotificationService.instance
+      .initialize(apiClient: apiClient, authProvider: authProvider);
 
   // Windows only: clear the session when the window is closed so the next
   // launch always starts at the login screen. No-op on Android.
@@ -109,6 +117,8 @@ class ZoomPosApp extends StatelessWidget {
         builder: (context, theme, _) {
           final locale = context.watch<LocaleProvider>().locale;
           return MaterialApp(
+            navigatorKey: appNavigatorKey,
+            scaffoldMessengerKey: appMessengerKey,
             title: 'Sales & Inventory',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light(seedColor: theme.seedColor),

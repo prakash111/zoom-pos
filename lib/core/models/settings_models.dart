@@ -1,6 +1,5 @@
-/// Model shapes returned by SettingsApiController — one class per section of
-/// the web tenant Settings page (Profile, Receipts, Financial, Notifications)
-/// plus the Payment Methods manager.
+/// Model shapes returned by SettingsApiController — tenant-owned Profile,
+/// Receipts and Financial sections plus the Payment Methods manager.
 class ProfileSettings {
   ProfileSettings({
     required this.name,
@@ -168,76 +167,6 @@ class FinancialSettings {
   final List<OtherCurrency> otherCurrencies;
 }
 
-class SmtpSettings {
-  SmtpSettings({
-    required this.host,
-    required this.port,
-    required this.username,
-    required this.encryption,
-    required this.fromAddress,
-    required this.fromName,
-    required this.hasPassword,
-  });
-
-  factory SmtpSettings.fromJson(Map<String, dynamic> json) {
-    return SmtpSettings(
-      host: json['host'] as String? ?? '',
-      port: (json['port'] as num?)?.toInt() ?? 587,
-      username: json['username'] as String? ?? '',
-      encryption: json['encryption'] as String? ?? 'tls',
-      fromAddress: json['from_address'] as String? ?? '',
-      fromName: json['from_name'] as String? ?? '',
-      hasPassword: json['has_password'] as bool? ?? false,
-    );
-  }
-
-  final String host;
-  final int port;
-  final String username;
-  final String encryption;
-  final String fromAddress;
-  final String fromName;
-  final bool hasPassword;
-}
-
-class WhatsappSettings {
-  WhatsappSettings({
-    required this.phonePrefix,
-    required this.customNote,
-    required this.phoneNumberId,
-    required this.hasApiToken,
-  });
-
-  factory WhatsappSettings.fromJson(Map<String, dynamic> json) {
-    return WhatsappSettings(
-      phonePrefix: json['phone_prefix'] as String? ?? '',
-      customNote: json['custom_note'] as String? ?? '',
-      phoneNumberId: json['phone_number_id'] as String? ?? '',
-      hasApiToken: json['has_api_token'] as bool? ?? false,
-    );
-  }
-
-  final String phonePrefix;
-  final String customNote;
-  final String phoneNumberId;
-  final bool hasApiToken;
-}
-
-class NotificationSettings {
-  NotificationSettings({required this.smtp, required this.whatsapp});
-
-  factory NotificationSettings.fromJson(Map<String, dynamic> json) {
-    return NotificationSettings(
-      smtp: SmtpSettings.fromJson(json['smtp'] as Map<String, dynamic>? ?? {}),
-      whatsapp: WhatsappSettings.fromJson(
-          json['whatsapp'] as Map<String, dynamic>? ?? {}),
-    );
-  }
-
-  final SmtpSettings smtp;
-  final WhatsappSettings whatsapp;
-}
-
 class PaymentMethodModel {
   PaymentMethodModel({
     required this.id,
@@ -287,83 +216,11 @@ class PaymentMethodModel {
   }
 }
 
-class CustomNotificationChannelModel {
-  CustomNotificationChannelModel({
-    required this.id,
-    required this.name,
-    required this.url,
-    required this.method,
-    required this.headers,
-    required this.authType,
-    required this.hasAuthValue,
-    required this.payloadTemplate,
-    required this.eventTypes,
-    required this.isActive,
-    this.authValue,
-  });
-
-  factory CustomNotificationChannelModel.fromJson(Map<String, dynamic> json) {
-    return CustomNotificationChannelModel(
-      id: json['id'].toString(),
-      name: json['name'] as String? ?? '',
-      url: json['url'] as String? ?? '',
-      method: json['method'] as String? ?? 'POST',
-      headers: (json['headers'] is Map)
-          ? Map<String, dynamic>.from(json['headers'] as Map)
-          : null,
-      authType: json['auth_type'] as String? ?? 'none',
-      hasAuthValue: json['has_auth_value'] as bool? ?? false,
-      payloadTemplate: json['payload_template'] as String? ?? '',
-      eventTypes: (json['event_types'] as List? ?? [])
-          .map((e) => e.toString())
-          .toList(),
-      isActive: json['is_active'] as bool? ?? true,
-    );
-  }
-
-  final String id;
-  final String name;
-  final String url;
-  final String method;
-  final Map<String, dynamic>? headers;
-  final String authType;
-
-  /// True if a secret is already stored server-side. The server never echoes
-  /// the plaintext secret back, so this is the only signal the form has for
-  /// showing "Secret is set" instead of a blank field.
-  final bool hasAuthValue;
-  final String payloadTemplate;
-  final List<String> eventTypes;
-  final bool isActive;
-
-  /// Write-only: only populated when the user is actively typing a new
-  /// secret in the form. Never set from [fromJson].
-  final String? authValue;
-
-  /// Request-body shape for POST/PUT. [authValue] is only included when the
-  /// caller passed a non-null value, so leaving a secret untouched during an
-  /// edit doesn't overwrite it with an empty string server-side.
-  Map<String, dynamic> toRequestBody() {
-    return {
-      'name': name,
-      'url': url,
-      'method': method,
-      if (headers != null) 'headers': headers,
-      'auth_type': authType,
-      if (authValue != null) 'auth_value': authValue,
-      'payload_template': payloadTemplate,
-      'event_types': eventTypes,
-      'is_active': isActive,
-    };
-  }
-}
-
 class TenantSettingsBundle {
   TenantSettingsBundle({
     required this.profile,
     required this.receipts,
     required this.financial,
-    required this.notifications,
     required this.paymentMethods,
     required this.nav,
     this.timezones = const [],
@@ -372,7 +229,6 @@ class TenantSettingsBundle {
   final ProfileSettings profile;
   final ReceiptSettings receipts;
   final FinancialSettings financial;
-  final NotificationSettings notifications;
   final List<PaymentMethodModel> paymentMethods;
   final NavConfig nav;
 

@@ -23,6 +23,11 @@ class SalesRepository {
         .toList();
   }
 
+  Future<SaleModel> fetchSale(String id) async {
+    final response = await _client.get(ApiEndpoints.sale(id));
+    return SaleModel.fromJson(response['sale'] as Map<String, dynamic>);
+  }
+
   Future<void> pushSale({
     required String id,
     required double total,
@@ -40,6 +45,7 @@ class SalesRepository {
     double? tendered,
     double changeReturned = 0,
     DateTime? dueDate,
+    DateTime? dueReminderAt,
   }) {
     return _client.post(ApiEndpoints.syncPush, data: {
       'sales': [
@@ -60,6 +66,7 @@ class SalesRepository {
           tendered: tendered,
           changeReturned: changeReturned,
           dueDate: dueDate,
+          dueReminderAt: dueReminderAt,
         ),
       ],
     });
@@ -73,10 +80,14 @@ class SalesRepository {
   /// never creates a duplicate sale. Returns the ids the server confirms it
   /// ingested (or already had), so the caller knows which outbox rows to
   /// mark synced.
-  Future<List<String>> pushSalesBatch(List<Map<String, dynamic>> payloads) async {
+  Future<List<String>> pushSalesBatch(
+      List<Map<String, dynamic>> payloads) async {
     if (payloads.isEmpty) return const [];
-    final response = await _client.post(ApiEndpoints.syncPush, data: {'sales': payloads});
-    return (response['synced_ids'] as List? ?? []).map((e) => e.toString()).toList();
+    final response =
+        await _client.post(ApiEndpoints.syncPush, data: {'sales': payloads});
+    return (response['synced_ids'] as List? ?? [])
+        .map((e) => e.toString())
+        .toList();
   }
 
   /// Builds the exact JSON shape [PosSyncApiController::syncPush] expects
@@ -99,6 +110,7 @@ class SalesRepository {
     double? tendered,
     double changeReturned = 0,
     DateTime? dueDate,
+    DateTime? dueReminderAt,
   }) {
     return {
       'id': id,
@@ -123,7 +135,10 @@ class SalesRepository {
       if (paidAmount != null) 'paid_amount': paidAmount,
       if (tendered != null) 'tendered': tendered,
       'change_returned': changeReturned,
-      if (dueDate != null) 'due_date': dueDate.toIso8601String().split('T').first,
+      if (dueDate != null)
+        'due_date': dueDate.toIso8601String().split('T').first,
+      if (dueReminderAt != null)
+        'due_reminder_at': dueReminderAt.toUtc().toIso8601String(),
     };
   }
 
@@ -148,6 +163,7 @@ class SalesRepository {
     double? tendered,
     double changeReturned = 0,
     DateTime? dueDate,
+    DateTime? dueReminderAt,
   }) {
     return _salePayload(
       id: id,
@@ -166,6 +182,7 @@ class SalesRepository {
       tendered: tendered,
       changeReturned: changeReturned,
       dueDate: dueDate,
+      dueReminderAt: dueReminderAt,
     );
   }
 }

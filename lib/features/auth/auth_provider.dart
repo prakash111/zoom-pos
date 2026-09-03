@@ -31,6 +31,8 @@ class AuthProvider extends ChangeNotifier {
   CompanyModel? _company;
   String? _errorMessage;
 
+  Future<void> Function()? onBeforeLogout;
+
   AuthStatus get status => _status;
   UserModel? get user => _user;
   CompanyModel? get company => _company;
@@ -151,6 +153,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await onBeforeLogout?.call();
     await _secureStorage.clearToken();
     _user = null;
     _applyCompany(null);

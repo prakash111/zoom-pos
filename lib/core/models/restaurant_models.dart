@@ -74,7 +74,11 @@ class DiningTableModel {
 /// A dining floor/area with its nested tables, as returned by
 /// RestaurantApiController::presentFloor().
 class DiningFloorModel {
-  DiningFloorModel({required this.id, required this.name, required this.orderIndex, required this.tables});
+  DiningFloorModel(
+      {required this.id,
+      required this.name,
+      required this.orderIndex,
+      required this.tables});
 
   factory DiningFloorModel.fromJson(Map<String, dynamic> json) {
     return DiningFloorModel(
@@ -119,7 +123,8 @@ class RestaurantOrderItemModel {
       basePrice: (json['base_price'] as num?)?.toDouble(),
       quantity: (json['quantity'] as num?)?.toDouble() ?? 1,
       variant: json['variant'] as String?,
-      modifiers: (json['modifiers'] as List? ?? []).cast<Map<String, dynamic>>(),
+      modifiers:
+          (json['modifiers'] as List? ?? []).cast<Map<String, dynamic>>(),
       spiceLevel: json['spice_level'] as String?,
       note: json['note'] as String? ?? '',
       seat: (json['seat'] as num?)?.toInt() ?? 1,
@@ -220,7 +225,8 @@ class RestaurantSaleModel {
       tableName: json['table_name'] as String?,
       guestCount: (json['guest_count'] as num?)?.toInt() ?? 0,
       items: (json['items'] as List? ?? [])
-          .map((e) => RestaurantOrderItemModel.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map((e) => RestaurantOrderItemModel.fromJson(
+              Map<String, dynamic>.from(e as Map)))
           .toList(),
       discount: (json['discount'] as num?)?.toDouble() ?? 0,
       total: (json['total'] as num?)?.toDouble() ?? 0,
@@ -300,6 +306,9 @@ class KitchenTicketModel {
     this.createdAt,
     this.prepMinutes,
     this.targetCompletionAt,
+    this.intimationMinutes = 0,
+    this.alarmAt,
+    this.isAlarmActive = false,
     this.isOverdue = false,
   });
 
@@ -314,16 +323,32 @@ class KitchenTicketModel {
       status: json['status'] as String? ?? 'pending',
       serverName: json['server_name'] as String?,
       items: (json['items'] as List? ?? [])
-          .map((e) => RestaurantOrderItemModel.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map((e) => RestaurantOrderItemModel.fromJson(
+              Map<String, dynamic>.from(e as Map)))
           .toList(),
       kitchenNotes: json['kitchen_notes'] as String?,
       elapsedMinutes: (json['elapsed_minutes'] as num?)?.toInt() ?? 0,
-      preparedAt: json['prepared_at'] != null ? DateTime.tryParse(json['prepared_at'] as String) : null,
-      readyAt: json['ready_at'] != null ? DateTime.tryParse(json['ready_at'] as String) : null,
-      servedAt: json['served_at'] != null ? DateTime.tryParse(json['served_at'] as String) : null,
-      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
+      preparedAt: json['prepared_at'] != null
+          ? DateTime.tryParse(json['prepared_at'] as String)
+          : null,
+      readyAt: json['ready_at'] != null
+          ? DateTime.tryParse(json['ready_at'] as String)
+          : null,
+      servedAt: json['served_at'] != null
+          ? DateTime.tryParse(json['served_at'] as String)
+          : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'] as String)
+          : null,
       prepMinutes: (json['prep_minutes'] as num?)?.toInt(),
-      targetCompletionAt: json['target_completion_at'] != null ? DateTime.tryParse(json['target_completion_at'] as String) : null,
+      targetCompletionAt: json['target_completion_at'] != null
+          ? DateTime.tryParse(json['target_completion_at'] as String)
+          : null,
+      intimationMinutes: (json['intimation_minutes'] as num?)?.toInt() ?? 0,
+      alarmAt: json['alarm_at'] != null
+          ? DateTime.tryParse(json['alarm_at'] as String)
+          : null,
+      isAlarmActive: json['is_alarm_active'] as bool? ?? false,
       isOverdue: json['is_overdue'] as bool? ?? false,
     );
   }
@@ -345,26 +370,27 @@ class KitchenTicketModel {
   final DateTime? createdAt;
   final int? prepMinutes;
   final DateTime? targetCompletionAt;
+  final int intimationMinutes;
+  final DateTime? alarmAt;
+  final bool isAlarmActive;
   final bool isOverdue;
 
   String get statusLabel => kKotStatusLabels[status] ?? status;
 }
 
-/// Tenant-configured KDS/dashboard order alert preferences (Settings >
-/// Notifications > Restaurant Order Alerts), returned alongside the KOT list
-/// so the KDS screen doesn't need a second round-trip to fetch them.
+/// Platform-wide KDS alert preferences managed by SuperAdmin.
 class KdsAlertSettings {
-  const KdsAlertSettings({required this.intervalMinutes, required this.soundPreset, required this.soundUrl});
+  const KdsAlertSettings(
+      {required this.repeatSeconds, required this.soundPreset});
 
   factory KdsAlertSettings.fromJson(Map<String, dynamic>? json) {
     return KdsAlertSettings(
-      intervalMinutes: (json?['interval_minutes'] as num?)?.toInt() ?? 3,
-      soundPreset: json?['sound_preset'] as String? ?? 'chime',
-      soundUrl: json?['sound_url'] as String? ?? '',
+      repeatSeconds: (json?['alarm_repeat_seconds'] as num?)?.toInt() ?? 60,
+      soundPreset:
+          (json?['order_channel'] as Map?)?['sound'] as String? ?? 'alarm',
     );
   }
 
-  final int intervalMinutes;
+  final int repeatSeconds;
   final String soundPreset;
-  final String soundUrl;
 }

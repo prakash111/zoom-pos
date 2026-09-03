@@ -39,20 +39,26 @@ class HeldCart {
   final bool isPercentDiscount;
   final DateTime heldAt;
 
-  int get itemCount => cart.values.fold<int>(0, (sum, item) => sum + item.quantity.ceil());
-  double get total => cart.values.fold<double>(0, (sum, item) => sum + item.lineTotal);
+  int get itemCount =>
+      cart.values.fold<int>(0, (sum, item) => sum + item.quantity.ceil());
+  double get total =>
+      cart.values.fold<double>(0, (sum, item) => sum + item.lineTotal);
 
   factory HeldCart.fromJson(Map<String, dynamic> json) {
     final cartJson = json['cart'] as Map<String, dynamic>? ?? const {};
     return HeldCart(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
-      cart: cartJson.map((key, value) => MapEntry(key, CartItem.fromJson(value as Map<String, dynamic>))),
-      customer: json['customer'] != null ? CustomerModel.fromJson(json['customer'] as Map<String, dynamic>) : null,
+      cart: cartJson.map((key, value) =>
+          MapEntry(key, CartItem.fromJson(value as Map<String, dynamic>))),
+      customer: json['customer'] != null
+          ? CustomerModel.fromJson(json['customer'] as Map<String, dynamic>)
+          : null,
       notes: json['notes'] as String? ?? '',
       discount: (json['discount'] as num?)?.toDouble() ?? 0,
       isPercentDiscount: json['is_percent_discount'] as bool? ?? false,
-      heldAt: DateTime.tryParse(json['held_at'] as String? ?? '') ?? DateTime.now(),
+      heldAt:
+          DateTime.tryParse(json['held_at'] as String? ?? '') ?? DateTime.now(),
     );
   }
 
@@ -169,6 +175,29 @@ class PosProvider extends ChangeNotifier {
   List<PaymentEntry> payments = [];
   double? _manualAmountPaid;
   double cashTendered = 0;
+  DateTime? dueDate;
+  DateTime? dueReminderAt;
+
+  DateTime get effectiveDueDate =>
+      dueDate ?? DateTime.now().add(const Duration(days: 15));
+  DateTime get effectiveDueReminderAt {
+    if (dueReminderAt != null) return dueReminderAt!;
+    final date = effectiveDueDate;
+    return DateTime(date.year, date.month, date.day, 9);
+  }
+
+  void setDueDate(DateTime value) {
+    dueDate = DateTime(value.year, value.month, value.day);
+    if (dueReminderAt == null)
+      dueReminderAt = DateTime(value.year, value.month, value.day, 9);
+    notifyListeners();
+  }
+
+  void setDueReminderAt(DateTime value) {
+    dueReminderAt = value;
+    notifyListeners();
+  }
+
   bool _cashTenderedManuallySet = false;
 
   /// How much of [grandTotal] is being paid right now. Defaults to the full
@@ -192,9 +221,11 @@ class PosProvider extends ChangeNotifier {
     return 'pending';
   }
 
-  bool get requiresCustomerForDue => dueAmount > 0.001 && selectedCustomer == null;
+  bool get requiresCustomerForDue =>
+      dueAmount > 0.001 && selectedCustomer == null;
 
-  double get remainingSplitBalance => (grandTotal - amountPaid).clamp(0, double.infinity);
+  double get remainingSplitBalance =>
+      (grandTotal - amountPaid).clamp(0, double.infinity);
 
   void setAmountPaid(double amount) {
     _manualAmountPaid = amount.clamp(0, grandTotal);
@@ -208,9 +239,11 @@ class PosProvider extends ChangeNotifier {
 
   /// Cash tendered by the customer, defaulting to the payable amount until
   /// the cashier types a different figure.
-  double get effectiveCashTendered => _cashTenderedManuallySet ? cashTendered : amountPaid;
+  double get effectiveCashTendered =>
+      _cashTenderedManuallySet ? cashTendered : amountPaid;
 
-  double get changeDue => (effectiveCashTendered - amountPaid).clamp(0, double.infinity);
+  double get changeDue =>
+      (effectiveCashTendered - amountPaid).clamp(0, double.infinity);
 
   void setCashTendered(double amount) {
     cashTendered = amount;
@@ -221,6 +254,8 @@ class PosProvider extends ChangeNotifier {
   void resetCashTendered() {
     _cashTenderedManuallySet = false;
     cashTendered = 0;
+    dueDate = null;
+    dueReminderAt = null;
     notifyListeners();
   }
 
@@ -233,11 +268,16 @@ class PosProvider extends ChangeNotifier {
   }
 
   void addSplitRow() {
-    payments.add(PaymentEntry(methodCode: paymentMethod, amount: remainingSplitBalance));
+    payments.add(
+        PaymentEntry(methodCode: paymentMethod, amount: remainingSplitBalance));
     notifyListeners();
   }
 
-  void updateSplitRow(int index, {String? methodCode, double? amount, double? tendered, String? referenceNo}) {
+  void updateSplitRow(int index,
+      {String? methodCode,
+      double? amount,
+      double? tendered,
+      String? referenceNo}) {
     if (index < 0 || index >= payments.length) return;
     final row = payments[index];
     if (methodCode != null) row.methodCode = methodCode;
@@ -260,7 +300,8 @@ class PosProvider extends ChangeNotifier {
     final query = searchQuery.trim().toLowerCase();
     return _products.where((p) {
       if (!p.active) return false;
-      if (selectedCategoryId != null && p.categoryId != selectedCategoryId) return false;
+      if (selectedCategoryId != null && p.categoryId != selectedCategoryId)
+        return false;
       if (query.isEmpty) return true;
       return p.name.toLowerCase().contains(query) ||
           p.sku.toLowerCase().contains(query) ||
@@ -269,9 +310,12 @@ class PosProvider extends ChangeNotifier {
   }
 
   List<CartItem> get cartItems => _cart.values.toList();
-  int get cartCount => _cart.values.fold<int>(0, (sum, item) => sum + item.quantity.ceil());
-  double get subtotal => _cart.values.fold<double>(0, (sum, item) => sum + item.lineTotal);
-  double get taxTotal => _cart.values.fold<double>(0, (sum, item) => sum + item.taxAmount);
+  int get cartCount =>
+      _cart.values.fold<int>(0, (sum, item) => sum + item.quantity.ceil());
+  double get subtotal =>
+      _cart.values.fold<double>(0, (sum, item) => sum + item.lineTotal);
+  double get taxTotal =>
+      _cart.values.fold<double>(0, (sum, item) => sum + item.taxAmount);
 
   double get discount {
     if (customDiscount <= 0) return 0;
@@ -281,7 +325,8 @@ class PosProvider extends ChangeNotifier {
     return customDiscount.clamp(0, subtotal);
   }
 
-  double get grandTotal => (subtotal - discount + taxTotal).clamp(0, double.infinity);
+  double get grandTotal =>
+      (subtotal - discount + taxTotal).clamp(0, double.infinity);
   bool get cartIsEmpty => _cart.isEmpty;
 
   Future<void> loadCatalog() async {
@@ -293,8 +338,12 @@ class PosProvider extends ChangeNotifier {
       _products = catalog.products;
       categories = catalog.categories;
       paymentMethods = catalog.paymentMethods;
-      if (paymentMethods.isNotEmpty && !paymentMethods.any((p) => p.code == paymentMethod || p.id == paymentMethod)) {
-        paymentMethod = paymentMethods.first.code.isNotEmpty ? paymentMethods.first.code : paymentMethods.first.id;
+      if (paymentMethods.isNotEmpty &&
+          !paymentMethods
+              .any((p) => p.code == paymentMethod || p.id == paymentMethod)) {
+        paymentMethod = paymentMethods.first.code.isNotEmpty
+            ? paymentMethods.first.code
+            : paymentMethods.first.id;
       }
       catalogStatus = CatalogStatus.loaded;
     } on ApiException catch (e) {
@@ -386,13 +435,16 @@ class PosProvider extends ChangeNotifier {
     final heldId = _uuid.v4().substring(0, 6).toUpperCase();
     final name = label != null && label.isNotEmpty
         ? label
-        : (selectedCustomer?.name != null ? 'Cart (${selectedCustomer!.name})' : 'Held #$heldId');
+        : (selectedCustomer?.name != null
+            ? 'Cart (${selectedCustomer!.name})'
+            : 'Held #$heldId');
 
     _heldCartsStore.add(
       HeldCart(
         id: heldId,
         name: name,
-        cart: Map<String, CartItem>.from(_cart.map((k, v) => MapEntry(k, CartItem(product: v.product, quantity: v.quantity)))),
+        cart: Map<String, CartItem>.from(_cart.map((k, v) =>
+            MapEntry(k, CartItem(product: v.product, quantity: v.quantity)))),
         customer: selectedCustomer,
         notes: orderNotes,
         discount: customDiscount,
@@ -406,7 +458,8 @@ class PosProvider extends ChangeNotifier {
   void resumeHeldCart(HeldCart held) {
     _cart.clear();
     for (final entry in held.cart.entries) {
-      _cart[entry.key] = CartItem(product: entry.value.product, quantity: entry.value.quantity);
+      _cart[entry.key] = CartItem(
+          product: entry.value.product, quantity: entry.value.quantity);
     }
     selectedCustomer = held.customer;
     orderNotes = held.notes;
@@ -432,8 +485,12 @@ class PosProvider extends ChangeNotifier {
     _manualAmountPaid = null;
     _cashTenderedManuallySet = false;
     cashTendered = 0;
+    dueDate = null;
+    dueReminderAt = null;
     if (paymentMethods.isNotEmpty) {
-      paymentMethod = paymentMethods.first.code.isNotEmpty ? paymentMethods.first.code : paymentMethods.first.id;
+      paymentMethod = paymentMethods.first.code.isNotEmpty
+          ? paymentMethods.first.code
+          : paymentMethods.first.id;
     } else {
       paymentMethod = 'cash';
     }
@@ -477,7 +534,8 @@ class PosProvider extends ChangeNotifier {
     final soldNotes = orderNotes;
     final soldPaidAmount = amountPaid;
     final soldDueAmount = dueAmount;
-    final soldChangeDue = paymentMethod == 'cash' && !isSplitPayment ? changeDue : 0.0;
+    final soldChangeDue =
+        paymentMethod == 'cash' && !isSplitPayment ? changeDue : 0.0;
     final taxName = soldTax > 0 ? (taxLabel ?? 'Tax') : null;
     final itemsPayload = soldItems
         .map((item) => {
@@ -493,9 +551,12 @@ class PosProvider extends ChangeNotifier {
     // Only sent when it changes what the backend would otherwise assume
     // (full payment, non-cash): a split breakdown, an explicit partial/zero
     // amount, or the cash tendered/change for a simple cash sale.
-    final paymentsPayload = isSplitPayment ? payments.map((p) => p.toJson()).toList() : null;
-    final needsPaidAmountOverride = !isSplitPayment && soldPaidAmount < soldTotal - 0.001;
-    final dueDate = soldDueAmount > 0 ? soldAt.add(const Duration(days: 15)) : null;
+    final paymentsPayload =
+        isSplitPayment ? payments.map((p) => p.toJson()).toList() : null;
+    final needsPaidAmountOverride =
+        !isSplitPayment && soldPaidAmount < soldTotal - 0.001;
+    final soldDueDate = soldDueAmount > 0 ? effectiveDueDate : null;
+    final soldDueReminderAt = soldDueAmount > 0 ? effectiveDueReminderAt : null;
 
     Future<void> queueOffline() {
       final payload = SalesRepository.buildOfflineSalePayload(
@@ -511,11 +572,15 @@ class PosProvider extends ChangeNotifier {
         createdAt: soldAt,
         payments: paymentsPayload,
         paidAmount: needsPaidAmountOverride ? soldPaidAmount : null,
-        tendered: paymentMethod == 'cash' && !isSplitPayment ? effectiveCashTendered : null,
+        tendered: paymentMethod == 'cash' && !isSplitPayment
+            ? effectiveCashTendered
+            : null,
         changeReturned: soldChangeDue,
-        dueDate: dueDate,
+        dueDate: soldDueDate,
+        dueReminderAt: soldDueReminderAt,
       );
-      return _syncEngine.queueOfflineSale(id: saleId, payload: payload, createdAt: soldAt);
+      return _syncEngine.queueOfflineSale(
+          id: saleId, payload: payload, createdAt: soldAt);
     }
 
     PosCheckoutResult buildResult({required bool isPendingSync}) {
@@ -562,9 +627,12 @@ class PosProvider extends ChangeNotifier {
         items: itemsPayload,
         payments: paymentsPayload,
         paidAmount: needsPaidAmountOverride ? soldPaidAmount : null,
-        tendered: paymentMethod == 'cash' && !isSplitPayment ? effectiveCashTendered : null,
+        tendered: paymentMethod == 'cash' && !isSplitPayment
+            ? effectiveCashTendered
+            : null,
         changeReturned: soldChangeDue,
-        dueDate: dueDate,
+        dueDate: soldDueDate,
+        dueReminderAt: soldDueReminderAt,
       );
       clearCart();
       isCheckingOut = false;

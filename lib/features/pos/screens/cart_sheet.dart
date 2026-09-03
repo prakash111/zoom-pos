@@ -18,14 +18,44 @@ class CartSheet extends StatelessWidget {
 
   final CustomersRepository customersRepository;
 
+  Future<void> _pickDueDate(BuildContext context) async {
+    final pos = context.read<PosProvider>();
+    final value = await showDatePicker(
+      context: context,
+      initialDate: pos.effectiveDueDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+    );
+    if (value != null) pos.setDueDate(value);
+  }
+
+  Future<void> _pickDueReminder(BuildContext context) async {
+    final pos = context.read<PosProvider>();
+    final current = pos.effectiveDueReminderAt;
+    final date = await showDatePicker(
+      context: context,
+      initialDate: current.isBefore(DateTime.now()) ? DateTime.now() : current,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+    );
+    if (date == null || !context.mounted) return;
+    final time = await showTimePicker(
+        context: context, initialTime: TimeOfDay.fromDateTime(current));
+    if (time != null)
+      pos.setDueReminderAt(
+          DateTime(date.year, date.month, date.day, time.hour, time.minute));
+  }
+
   Future<void> _pickCustomer(BuildContext context) async {
     final pos = context.read<PosProvider>();
     final customer = await showModalBottomSheet<CustomerModel>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => CustomerPickerSheet(customersRepository: customersRepository),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) =>
+          CustomerPickerSheet(customersRepository: customersRepository),
     );
     if (customer != null) {
       pos.setCustomer(customer);
@@ -46,7 +76,8 @@ class CartSheet extends StatelessWidget {
             Text('Order Notes & Remarks'),
           ],
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         content: TextField(
           controller: controller,
           maxLines: 3,
@@ -56,7 +87,8 @@ class CartSheet extends StatelessWidget {
             border: OutlineInputBorder(),
           ),
         ),
-        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actionsPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         actions: [
           OverflowBar(
             spacing: 8,
@@ -98,7 +130,8 @@ class CartSheet extends StatelessWidget {
               Text('Apply Discount'),
             ],
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -108,7 +141,8 @@ class CartSheet extends StatelessWidget {
                     child: ChoiceChip(
                       label: const Text('Fixed Amount'),
                       selected: !isPercent,
-                      onSelected: (_) => setDialogState(() => isPercent = false),
+                      onSelected: (_) =>
+                          setDialogState(() => isPercent = false),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -124,17 +158,20 @@ class CartSheet extends StatelessWidget {
               const SizedBox(height: 16),
               TextField(
                 controller: controller,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 autofocus: true,
                 decoration: InputDecoration(
-                  labelText: isPercent ? 'Discount Percentage' : 'Discount Amount',
+                  labelText:
+                      isPercent ? 'Discount Percentage' : 'Discount Amount',
                   suffixText: isPercent ? '%' : '',
                   prefixIcon: const Icon(Icons.percent),
                 ),
               ),
             ],
           ),
-          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          actionsPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           actions: [
             OverflowBar(
               spacing: 8,
@@ -146,7 +183,8 @@ class CartSheet extends StatelessWidget {
                       pos.setDiscount(0);
                       Navigator.of(dialogCtx).pop();
                     },
-                    child: const Text('Remove Discount', style: TextStyle(color: Colors.red)),
+                    child: const Text('Remove Discount',
+                        style: TextStyle(color: Colors.red)),
                   ),
                 TextButton(
                   onPressed: () => Navigator.of(dialogCtx).pop(),
@@ -176,7 +214,8 @@ class CartSheet extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (sheetCtx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -189,7 +228,8 @@ class CartSheet extends StatelessWidget {
                 children: [
                   Text(
                     l10n.heldOrdersTitle(pos.heldCarts.length),
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   if (!pos.cartIsEmpty)
                     TextButton.icon(
@@ -223,13 +263,17 @@ class CartSheet extends StatelessWidget {
                         leading: const CircleAvatar(
                           child: Icon(Icons.shopping_cart_outlined),
                         ),
-                        title: Text(held.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: Text(l10n.heldCartSubtitle(held.itemCount, formatter.format(held.total))),
+                        title: Text(held.name,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text(l10n.heldCartSubtitle(
+                            held.itemCount, formatter.format(held.total))),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              icon: const Icon(Icons.delete_outline,
+                                  color: Colors.red),
                               onPressed: () => pos.deleteHeldCart(held.id),
                             ),
                             ElevatedButton(
@@ -299,10 +343,16 @@ class CartSheet extends StatelessWidget {
   IconData _iconForMethod(String code) {
     final c = code.toLowerCase();
     if (c.contains('cash')) return Icons.payments_outlined;
-    if (c.contains('card') || c.contains('debit') || c.contains('credit_card')) return Icons.credit_card_outlined;
-    if (c.contains('upi') || c.contains('qr') || c.contains('gpay') || c.contains('phonepe')) return Icons.qr_code_2_outlined;
-    if (c.contains('credit') || c.contains('due') || c.contains('khata')) return Icons.schedule_outlined;
-    if (c.contains('bank') || c.contains('transfer')) return Icons.account_balance_outlined;
+    if (c.contains('card') || c.contains('debit') || c.contains('credit_card'))
+      return Icons.credit_card_outlined;
+    if (c.contains('upi') ||
+        c.contains('qr') ||
+        c.contains('gpay') ||
+        c.contains('phonepe')) return Icons.qr_code_2_outlined;
+    if (c.contains('credit') || c.contains('due') || c.contains('khata'))
+      return Icons.schedule_outlined;
+    if (c.contains('bank') || c.contains('transfer'))
+      return Icons.account_balance_outlined;
     return Icons.account_balance_wallet_outlined;
   }
 
@@ -319,14 +369,22 @@ class CartSheet extends StatelessWidget {
   /// Bank/UPI metadata (bank_name, account_no, ifsc_code, upi_id,
   /// holder_name) configured for the currently-selected payment method, if
   /// it looks like a bank transfer or UPI method and has any details set.
-  Map<String, dynamic>? _bankMetadataFor(List<PaymentMethodModel> methods, String selectedCode) {
-    final match = methods.where((m) => (m.code.isNotEmpty ? m.code : m.id) == selectedCode || m.id == selectedCode);
+  Map<String, dynamic>? _bankMetadataFor(
+      List<PaymentMethodModel> methods, String selectedCode) {
+    final match = methods.where((m) =>
+        (m.code.isNotEmpty ? m.code : m.id) == selectedCode ||
+        m.id == selectedCode);
     if (match.isEmpty) return null;
     final method = match.first;
-    final code = (method.code.isNotEmpty ? method.code : method.id).toLowerCase();
-    if (!code.contains('bank') && !code.contains('transfer') && !code.contains('upi')) return null;
+    final code =
+        (method.code.isNotEmpty ? method.code : method.id).toLowerCase();
+    if (!code.contains('bank') &&
+        !code.contains('transfer') &&
+        !code.contains('upi')) return null;
     final metadata = method.metadata;
-    if (metadata == null || metadata.values.every((v) => v == null || v.toString().isEmpty)) return null;
+    if (metadata == null ||
+        metadata.values.every((v) => v == null || v.toString().isEmpty))
+      return null;
     return metadata;
   }
 
@@ -334,7 +392,8 @@ class CartSheet extends StatelessWidget {
     final pos = context.read<PosProvider>();
     final company = context.read<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
-    final controller = TextEditingController(text: pos.amountPaid.toStringAsFixed(2));
+    final controller =
+        TextEditingController(text: pos.amountPaid.toStringAsFixed(2));
 
     await showDialog(
       context: context,
@@ -346,16 +405,19 @@ class CartSheet extends StatelessWidget {
             Text('Amount Paid'),
           ],
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Grand Total: ${formatter.format(pos.grandTotal)}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            Text('Grand Total: ${formatter.format(pos.grandTotal)}',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               autofocus: true,
               decoration: InputDecoration(
                 labelText: 'Amount Paid Now',
@@ -369,7 +431,8 @@ class CartSheet extends StatelessWidget {
               children: [
                 ActionChip(
                   label: const Text('Full Amount'),
-                  onPressed: () => controller.text = pos.grandTotal.toStringAsFixed(2),
+                  onPressed: () =>
+                      controller.text = pos.grandTotal.toStringAsFixed(2),
                 ),
                 ActionChip(
                   label: const Text('Zero Payment (Full Due)'),
@@ -379,12 +442,16 @@ class CartSheet extends StatelessWidget {
             ),
           ],
         ),
-        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actionsPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogCtx).pop(), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
-              final val = double.tryParse(controller.text.trim()) ?? pos.grandTotal;
+              final val =
+                  double.tryParse(controller.text.trim()) ?? pos.grandTotal;
               pos.setAmountPaid(val);
               Navigator.of(dialogCtx).pop();
             },
@@ -395,7 +462,8 @@ class CartSheet extends StatelessWidget {
     );
   }
 
-  Future<void> _openSplitPaymentEditor(BuildContext context, List<PaymentMethodModel> activeMethods) async {
+  Future<void> _openSplitPaymentEditor(
+      BuildContext context, List<PaymentMethodModel> activeMethods) async {
     final pos = context.read<PosProvider>();
     final company = context.read<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
@@ -408,7 +476,8 @@ class CartSheet extends StatelessWidget {
     }
 
     final controllers = <TextEditingController>[
-      for (final p in pos.payments) TextEditingController(text: p.amount.toStringAsFixed(2)),
+      for (final p in pos.payments)
+        TextEditingController(text: p.amount.toStringAsFixed(2)),
     ];
 
     await showDialog(
@@ -416,19 +485,28 @@ class CartSheet extends StatelessWidget {
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) {
           while (controllers.length < pos.payments.length) {
-            controllers.add(TextEditingController(text: pos.payments[controllers.length].amount.toStringAsFixed(2)));
+            controllers.add(TextEditingController(
+                text: pos.payments[controllers.length].amount
+                    .toStringAsFixed(2)));
           }
           while (controllers.length > pos.payments.length) {
             controllers.removeLast().dispose();
           }
 
-          String codeFor(int i) => activeMethods.any((m) => (m.code.isNotEmpty ? m.code : m.id) == pos.payments[i].methodCode)
+          String codeFor(int i) => activeMethods.any((m) =>
+                  (m.code.isNotEmpty ? m.code : m.id) ==
+                  pos.payments[i].methodCode)
               ? pos.payments[i].methodCode
-              : (activeMethods.isNotEmpty ? (activeMethods.first.code.isNotEmpty ? activeMethods.first.code : activeMethods.first.id) : 'cash');
+              : (activeMethods.isNotEmpty
+                  ? (activeMethods.first.code.isNotEmpty
+                      ? activeMethods.first.code
+                      : activeMethods.first.id)
+                  : 'cash');
 
           return AlertDialog(
             title: const Text('Split Payment'),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             content: SizedBox(
               width: double.maxFinite,
               child: SingleChildScrollView(
@@ -449,7 +527,8 @@ class CartSheet extends StatelessWidget {
                                   for (final m in activeMethods)
                                     DropdownMenuItem(
                                       value: m.code.isNotEmpty ? m.code : m.id,
-                                      child: Text(m.name, overflow: TextOverflow.ellipsis),
+                                      child: Text(m.name,
+                                          overflow: TextOverflow.ellipsis),
                                     ),
                                 ],
                                 onChanged: (val) {
@@ -457,7 +536,10 @@ class CartSheet extends StatelessWidget {
                                   pos.updateSplitRow(i, methodCode: val);
                                   setDialogState(() {});
                                 },
-                                decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+                                decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 8)),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -465,16 +547,23 @@ class CartSheet extends StatelessWidget {
                               flex: 2,
                               child: TextField(
                                 controller: controllers[i],
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                decoration: InputDecoration(isDense: true, prefixText: company?.currencySymbol ?? '\$', border: const OutlineInputBorder()),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                decoration: InputDecoration(
+                                    isDense: true,
+                                    prefixText: company?.currencySymbol ?? '\$',
+                                    border: const OutlineInputBorder()),
                                 onChanged: (val) {
-                                  pos.updateSplitRow(i, amount: double.tryParse(val) ?? 0);
+                                  pos.updateSplitRow(i,
+                                      amount: double.tryParse(val) ?? 0);
                                   setDialogState(() {});
                                 },
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                              icon: const Icon(Icons.remove_circle_outline,
+                                  color: Colors.red),
                               onPressed: pos.payments.length <= 1
                                   ? null
                                   : () {
@@ -500,24 +589,31 @@ class CartSheet extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Remaining Due', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(formatter.format(pos.remainingSplitBalance), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        const Text('Remaining Due',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(formatter.format(pos.remainingSplitBalance),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ],
                 ),
               ),
             ),
-            actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            actionsPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             actions: [
               TextButton(
                 onPressed: () {
                   pos.toggleSplitPayment();
                   Navigator.of(dialogCtx).pop();
                 },
-                child: const Text('Cancel Split', style: TextStyle(color: Colors.red)),
+                child: const Text('Cancel Split',
+                    style: TextStyle(color: Colors.red)),
               ),
-              ElevatedButton(onPressed: () => Navigator.of(dialogCtx).pop(), child: const Text('Done')),
+              ElevatedButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Done')),
             ],
           );
         },
@@ -542,11 +638,41 @@ class CartSheet extends StatelessWidget {
     final activeMethods = pos.paymentMethods.isNotEmpty
         ? pos.paymentMethods.where((p) => p.isActive).toList()
         : [
-            PaymentMethodModel(id: 'cash', name: 'Cash', code: 'cash', description: '', isActive: true, orderIndex: 0),
-            PaymentMethodModel(id: 'card', name: 'Card', code: 'card', description: '', isActive: true, orderIndex: 1),
-            PaymentMethodModel(id: 'upi', name: 'UPI', code: 'upi', description: '', isActive: true, orderIndex: 2),
-            PaymentMethodModel(id: 'credit', name: 'Credit', code: 'credit', description: '', isActive: true, orderIndex: 3),
-            PaymentMethodModel(id: 'other', name: 'Other', code: 'other', description: '', isActive: true, orderIndex: 4),
+            PaymentMethodModel(
+                id: 'cash',
+                name: 'Cash',
+                code: 'cash',
+                description: '',
+                isActive: true,
+                orderIndex: 0),
+            PaymentMethodModel(
+                id: 'card',
+                name: 'Card',
+                code: 'card',
+                description: '',
+                isActive: true,
+                orderIndex: 1),
+            PaymentMethodModel(
+                id: 'upi',
+                name: 'UPI',
+                code: 'upi',
+                description: '',
+                isActive: true,
+                orderIndex: 2),
+            PaymentMethodModel(
+                id: 'credit',
+                name: 'Credit',
+                code: 'credit',
+                description: '',
+                isActive: true,
+                orderIndex: 3),
+            PaymentMethodModel(
+                id: 'other',
+                name: 'Other',
+                code: 'other',
+                description: '',
+                isActive: true,
+                orderIndex: 4),
           ];
 
     return DraggableScrollableSheet(
@@ -556,7 +682,8 @@ class CartSheet extends StatelessWidget {
       expand: false,
       builder: (context, scrollController) {
         return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20),
           child: SafeArea(
             top: false,
             child: Column(
@@ -565,26 +692,37 @@ class CartSheet extends StatelessWidget {
               Container(
                 width: 44,
                 height: 5,
-                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(3)),
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(3)),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
-                        Text(l10n.orderCart, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(l10n.orderCart,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: primaryColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             l10n.itemsCountBadge(pos.cartCount),
-                            style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                  color: primaryColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
@@ -594,7 +732,8 @@ class CartSheet extends StatelessWidget {
                         onPressed: pos.clearCart,
                         icon: const Icon(Icons.delete_outline, size: 18),
                         label: Text(l10n.clearCart),
-                        style: TextButton.styleFrom(foregroundColor: Colors.red.shade600),
+                          style: TextButton.styleFrom(
+                              foregroundColor: Colors.red.shade600),
                       ),
                   ],
                 ),
@@ -619,11 +758,19 @@ class CartSheet extends StatelessWidget {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.shopping_cart_outlined, size: 56, color: Colors.grey.shade300),
+                                      Icon(Icons.shopping_cart_outlined,
+                                          size: 56,
+                                          color: Colors.grey.shade300),
                                     const SizedBox(height: 12),
-                                    Text(l10n.cartEmptyTitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
+                                      Text(l10n.cartEmptyTitle,
+                                          style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 16)),
                                     const SizedBox(height: 4),
-                                    Text(l10n.cartEmptySubtitle, style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                                      Text(l10n.cartEmptySubtitle,
+                                          style: TextStyle(
+                                              color: Colors.grey.shade400,
+                                              fontSize: 12)),
                                   ],
                                 ),
                               ),
@@ -631,35 +778,46 @@ class CartSheet extends StatelessWidget {
                           : ListView.separated(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
                               itemCount: pos.cartItems.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1),
+                                separatorBuilder: (_, __) =>
+                                    const Divider(height: 1),
                               itemBuilder: (context, index) {
                                 final item = pos.cartItems[index];
                                 return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 6),
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 6),
                                   child: Row(
                                     children: [
                                       Expanded(
                                         flex: 3,
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               item.product.name,
-                                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 14),
                                               maxLines: 2,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
                                               '${formatter.format(item.product.salePrice)} / ${item.product.unit}',
-                                              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                                style: TextStyle(
+                                                    color: Colors.grey.shade600,
+                                                    fontSize: 12),
                                             ),
                                             if (item.product.taxRate > 0)
                                               Text(
                                                 '${isIndia ? 'GST' : 'Tax'} (${item.product.taxRate.toStringAsFixed(0)}%): +${formatter.format(item.taxAmount)}',
-                                                style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                                                  style: TextStyle(
+                                                      color:
+                                                          Colors.grey.shade500,
+                                                      fontSize: 11),
                                               ),
                                           ],
                                         ),
@@ -667,29 +825,54 @@ class CartSheet extends StatelessWidget {
                                       Container(
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(20),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             IconButton(
-                                              icon: const Icon(Icons.remove, size: 16),
-                                              padding: const EdgeInsets.all(4),
-                                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                              onPressed: () => pos.decrementQuantity(item.product.id),
+                                                icon: const Icon(Icons.remove,
+                                                    size: 16),
+                                                padding:
+                                                    const EdgeInsets.all(4),
+                                                constraints:
+                                                    const BoxConstraints(
+                                                        minWidth: 32,
+                                                        minHeight: 32),
+                                                onPressed: () =>
+                                                    pos.decrementQuantity(
+                                                        item.product.id),
                                             ),
                                             Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 6),
                                               child: Text(
-                                                item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 2),
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                                  item.quantity.toStringAsFixed(
+                                                      item.quantity ==
+                                                              item.quantity
+                                                                  .roundToDouble()
+                                                          ? 0
+                                                          : 2),
+                                                  style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 14),
                                               ),
                                             ),
                                             IconButton(
-                                              icon: const Icon(Icons.add, size: 16),
-                                              padding: const EdgeInsets.all(4),
-                                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                              onPressed: () => pos.incrementQuantity(item.product.id),
+                                                icon: const Icon(Icons.add,
+                                                    size: 16),
+                                                padding:
+                                                    const EdgeInsets.all(4),
+                                                constraints:
+                                                    const BoxConstraints(
+                                                        minWidth: 32,
+                                                        minHeight: 32),
+                                                onPressed: () =>
+                                                    pos.incrementQuantity(
+                                                        item.product.id),
                                             ),
                                           ],
                                         ),
@@ -700,7 +883,9 @@ class CartSheet extends StatelessWidget {
                                         child: Text(
                                           formatter.format(item.lineTotal),
                                           textAlign: TextAlign.right,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14),
                                         ),
                                       ),
                                     ],
@@ -731,51 +916,103 @@ class CartSheet extends StatelessWidget {
                       children: [
                         // Customer Pill
                         ActionChip(
-                          avatar: Icon(Icons.person_outline, size: 16, color: pos.selectedCustomer != null ? primaryColor : Colors.grey.shade700),
-                          label: Text(pos.selectedCustomer?.name ?? l10n.addCustomer),
-                          backgroundColor: pos.selectedCustomer != null ? primaryColor.withValues(alpha: 0.12) : null,
+                                    avatar: Icon(Icons.person_outline,
+                                        size: 16,
+                                        color: pos.selectedCustomer != null
+                                            ? primaryColor
+                                            : Colors.grey.shade700),
+                                    label: Text(pos.selectedCustomer?.name ??
+                                        l10n.addCustomer),
+                                    backgroundColor: pos.selectedCustomer !=
+                                            null
+                                        ? primaryColor.withValues(alpha: 0.12)
+                                        : null,
                           onPressed: () => _pickCustomer(context),
                         ),
 
                         // Hold Cart Pill
                         ActionChip(
-                          avatar: Icon(Icons.pause_circle_outline, size: 16, color: pos.heldCarts.isNotEmpty ? Colors.orange.shade800 : Colors.grey.shade700),
-                          label: Text(pos.heldCarts.isNotEmpty ? l10n.heldChip(pos.heldCarts.length) : l10n.hold),
-                          backgroundColor: pos.heldCarts.isNotEmpty ? Colors.orange.shade50 : null,
-                          onPressed: () => _showHoldCartsSheet(context),
+                                    avatar: Icon(Icons.pause_circle_outline,
+                                        size: 16,
+                                        color: pos.heldCarts.isNotEmpty
+                                            ? Colors.orange.shade800
+                                            : Colors.grey.shade700),
+                                    label: Text(pos.heldCarts.isNotEmpty
+                                        ? l10n.heldChip(pos.heldCarts.length)
+                                        : l10n.hold),
+                                    backgroundColor: pos.heldCarts.isNotEmpty
+                                        ? Colors.orange.shade50
+                                        : null,
+                                    onPressed: () =>
+                                        _showHoldCartsSheet(context),
                         ),
 
                         // Note Pill
                         ActionChip(
-                          avatar: Icon(Icons.edit_note, size: 16, color: pos.orderNotes.isNotEmpty ? primaryColor : Colors.grey.shade700),
-                          label: Text(pos.orderNotes.isNotEmpty ? l10n.noteChecked : l10n.note),
-                          backgroundColor: pos.orderNotes.isNotEmpty ? primaryColor.withValues(alpha: 0.12) : null,
+                                    avatar: Icon(Icons.edit_note,
+                                        size: 16,
+                                        color: pos.orderNotes.isNotEmpty
+                                            ? primaryColor
+                                            : Colors.grey.shade700),
+                                    label: Text(pos.orderNotes.isNotEmpty
+                                        ? l10n.noteChecked
+                                        : l10n.note),
+                                    backgroundColor: pos.orderNotes.isNotEmpty
+                                        ? primaryColor.withValues(alpha: 0.12)
+                                        : null,
                           onPressed: () => _showNotesDialog(context),
                         ),
 
                         // Discount Pill
                         ActionChip(
-                          avatar: Icon(Icons.local_offer_outlined, size: 16, color: pos.customDiscount > 0 ? Colors.green.shade800 : Colors.grey.shade700),
-                          label: Text(pos.customDiscount > 0 ? l10n.discountChecked : l10n.discount),
-                          backgroundColor: pos.customDiscount > 0 ? Colors.green.shade50 : null,
-                          onPressed: () => _showDiscountDialog(context),
+                                    avatar: Icon(Icons.local_offer_outlined,
+                                        size: 16,
+                                        color: pos.customDiscount > 0
+                                            ? Colors.green.shade800
+                                            : Colors.grey.shade700),
+                                    label: Text(pos.customDiscount > 0
+                                        ? l10n.discountChecked
+                                        : l10n.discount),
+                                    backgroundColor: pos.customDiscount > 0
+                                        ? Colors.green.shade50
+                                        : null,
+                                    onPressed: () =>
+                                        _showDiscountDialog(context),
                         ),
 
                         // Split Payment Pill
                         ActionChip(
-                          avatar: Icon(Icons.call_split, size: 16, color: pos.isSplitPayment ? primaryColor : Colors.grey.shade700),
-                          label: Text(pos.isSplitPayment ? 'Split (${pos.payments.length})' : 'Split Payment'),
-                          backgroundColor: pos.isSplitPayment ? primaryColor.withValues(alpha: 0.12) : null,
-                          onPressed: () => _openSplitPaymentEditor(context, activeMethods),
+                                    avatar: Icon(Icons.call_split,
+                                        size: 16,
+                                        color: pos.isSplitPayment
+                                            ? primaryColor
+                                            : Colors.grey.shade700),
+                                    label: Text(pos.isSplitPayment
+                                        ? 'Split (${pos.payments.length})'
+                                        : 'Split Payment'),
+                                    backgroundColor: pos.isSplitPayment
+                                        ? primaryColor.withValues(alpha: 0.12)
+                                        : null,
+                                    onPressed: () => _openSplitPaymentEditor(
+                                        context, activeMethods),
                         ),
 
                         // Amount Paid Pill (only meaningful outside split mode)
                         if (!pos.isSplitPayment)
                           ActionChip(
-                            avatar: Icon(Icons.price_check, size: 16, color: pos.dueAmount > 0.001 ? Colors.amber.shade800 : Colors.grey.shade700),
-                            label: Text(pos.dueAmount > 0.001 ? 'Paid: ${formatter.format(pos.amountPaid)}' : 'Amount Paid'),
-                            backgroundColor: pos.dueAmount > 0.001 ? Colors.amber.shade50 : null,
-                            onPressed: () => _showAmountPaidDialog(context),
+                                      avatar: Icon(Icons.price_check,
+                                          size: 16,
+                                          color: pos.dueAmount > 0.001
+                                              ? Colors.amber.shade800
+                                              : Colors.grey.shade700),
+                                      label: Text(pos.dueAmount > 0.001
+                                          ? 'Paid: ${formatter.format(pos.amountPaid)}'
+                                          : 'Amount Paid'),
+                                      backgroundColor: pos.dueAmount > 0.001
+                                          ? Colors.amber.shade50
+                                          : null,
+                                      onPressed: () =>
+                                          _showAmountPaidDialog(context),
                           ),
                       ],
                     ),
@@ -785,7 +1022,54 @@ class CartSheet extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           'Attach a customer for due, partial, or credit sales.',
-                          style: TextStyle(color: Colors.red.shade600, fontSize: 11, fontWeight: FontWeight.w600),
+                                    style: TextStyle(
+                                        color: Colors.red.shade600,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+
+                              if (pos.dueAmount > 0.001)
+                                Container(
+                                  margin: const EdgeInsets.only(top: 10),
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.shade50,
+                                    border: Border.all(
+                                        color: Colors.amber.shade200),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Due date & push reminder',
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 6),
+                                      Wrap(
+                                          spacing: 8,
+                                          runSpacing: 6,
+                                          children: [
+                                            OutlinedButton.icon(
+                                              onPressed: () =>
+                                                  _pickDueDate(context),
+                                              icon: const Icon(Icons.event,
+                                                  size: 16),
+                                              label: Text(
+                                                  'Due ${pos.effectiveDueDate.year}-${pos.effectiveDueDate.month.toString().padLeft(2, '0')}-${pos.effectiveDueDate.day.toString().padLeft(2, '0')}'),
+                                            ),
+                                            OutlinedButton.icon(
+                                              onPressed: () =>
+                                                  _pickDueReminder(context),
+                                              icon: const Icon(Icons.alarm,
+                                                  size: 16),
+                                              label: Text(
+                                                  'Alert ${pos.effectiveDueReminderAt.month}/${pos.effectiveDueReminderAt.day} ${TimeOfDay.fromDateTime(pos.effectiveDueReminderAt).format(context)}'),
+                                            ),
+                                          ]),
+                                    ],
                         ),
                       ),
 
@@ -799,20 +1083,32 @@ class CartSheet extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: primaryColor.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: primaryColor.withValues(alpha: 0.25)),
+                                    border: Border.all(
+                                        color: primaryColor.withValues(
+                                            alpha: 0.25)),
                         ),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                           children: [
-                            Text('Split Payment (${pos.payments.length} methods)',
-                                style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor, fontSize: 13)),
+                                      Text(
+                                          'Split Payment (${pos.payments.length} methods)',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: primaryColor,
+                                              fontSize: 13)),
                             const SizedBox(height: 4),
                             for (final p in pos.payments)
-                              Text('• ${p.methodCode} — ${formatter.format(p.amount)}', style: const TextStyle(fontSize: 12)),
+                                        Text(
+                                            '• ${p.methodCode} — ${formatter.format(p.amount)}',
+                                            style:
+                                                const TextStyle(fontSize: 12)),
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
-                                onPressed: () => _openSplitPaymentEditor(context, activeMethods),
+                                          onPressed: () =>
+                                              _openSplitPaymentEditor(
+                                                  context, activeMethods),
                                 child: const Text('Edit Split'),
                               ),
                             ),
@@ -822,7 +1118,10 @@ class CartSheet extends StatelessWidget {
                     else ...[
                       Text(
                         l10n.paymentMethod,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade600),
                       ),
                       const SizedBox(height: 6),
                       // A Wrap instead of a fixed-height horizontal scroller —
@@ -839,23 +1138,43 @@ class CartSheet extends StatelessWidget {
                           for (final method in activeMethods)
                             _PaymentMethodChip(
                               method: method,
-                              isSelected: pos.paymentMethod == (method.code.isNotEmpty ? method.code : method.id) ||
+                                        isSelected: pos.paymentMethod ==
+                                                (method.code.isNotEmpty
+                                                    ? method.code
+                                                    : method.id) ||
                                   pos.paymentMethod == method.id,
-                              color: _colorForMethod(method.code.isNotEmpty ? method.code : method.id, primaryColor),
-                              icon: _iconForMethod(method.code.isNotEmpty ? method.code : method.id),
-                              onTap: () => pos.setPaymentMethod(method.code.isNotEmpty ? method.code : method.id),
+                                        color: _colorForMethod(
+                                            method.code.isNotEmpty
+                                                ? method.code
+                                                : method.id,
+                                            primaryColor),
+                                        icon: _iconForMethod(
+                                            method.code.isNotEmpty
+                                                ? method.code
+                                                : method.id),
+                                        onTap: () => pos.setPaymentMethod(
+                                            method.code.isNotEmpty
+                                                ? method.code
+                                                : method.id),
                             ),
                         ],
                       ),
 
-                      if (_bankMetadataFor(activeMethods, pos.paymentMethod) != null) ...[
+                                if (_bankMetadataFor(
+                                        activeMethods, pos.paymentMethod) !=
+                                    null) ...[
                         const SizedBox(height: 10),
-                        _BankDetailsBox(metadata: _bankMetadataFor(activeMethods, pos.paymentMethod)!),
+                                  _BankDetailsBox(
+                                      metadata: _bankMetadataFor(
+                                          activeMethods, pos.paymentMethod)!),
                       ],
 
                       if (pos.paymentMethod == 'cash') ...[
                         const SizedBox(height: 12),
-                        _CashTenderSection(payableAmount: pos.amountPaid, currencySymbol: company?.currencySymbol ?? '\$'),
+                                  _CashTenderSection(
+                                      payableAmount: pos.amountPaid,
+                                      currencySymbol:
+                                          company?.currencySymbol ?? '\$'),
                       ],
                     ],
 
@@ -867,47 +1186,62 @@ class CartSheet extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
+                                  border:
+                                      Border.all(color: Colors.grey.shade200),
                       ),
                       child: Column(
                         children: [
-                          _TotalsRow(label: l10n.subtotal, value: formatter.format(pos.subtotal)),
+                                    _TotalsRow(
+                                        label: l10n.subtotal,
+                                        value: formatter.format(pos.subtotal)),
                           if (pos.discount > 0)
                             _TotalsRow(
                               label: l10n.discount,
-                              value: '-${formatter.format(pos.discount)}',
+                                        value:
+                                            '-${formatter.format(pos.discount)}',
                               valueColor: Colors.red.shade600,
                             ),
                           if (pos.taxTotal > 0) ...[
                             if (isIndia) ...[
                               _TotalsRow(
                                 label: l10n.cgst,
-                                value: '+${formatter.format(pos.taxTotal / 2)}',
+                                          value:
+                                              '+${formatter.format(pos.taxTotal / 2)}',
                                 isSub: true,
                               ),
                               _TotalsRow(
                                 label: l10n.sgst,
-                                value: '+${formatter.format(pos.taxTotal / 2)}',
+                                          value:
+                                              '+${formatter.format(pos.taxTotal / 2)}',
                                 isSub: true,
                               ),
                             ] else
                               _TotalsRow(
                                 label: company?.taxLabel ?? 'Tax',
-                                value: '+${formatter.format(pos.taxTotal)}',
+                                          value:
+                                              '+${formatter.format(pos.taxTotal)}',
                               ),
                           ],
                           const Divider(height: 12),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                             children: [
                               Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                 children: [
-                                  Text(l10n.grandTotal, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                  if ((company?.taxId ?? '').isNotEmpty)
+                                            Text(l10n.grandTotal,
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14)),
+                                            if ((company?.taxId ?? '')
+                                                .isNotEmpty)
                                     Text(
                                       '${isIndia ? l10n.gstin : l10n.taxId}: ${company!.taxId}',
-                                      style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+                                                style: TextStyle(
+                                                    color: Colors.grey.shade500,
+                                                    fontSize: 10),
                                     ),
                                 ],
                               ),
@@ -923,7 +1257,10 @@ class CartSheet extends StatelessWidget {
                           ),
                           if (pos.dueAmount > 0.001) ...[
                             const Divider(height: 12),
-                            _TotalsRow(label: 'Amount Paid', value: formatter.format(pos.amountPaid)),
+                                      _TotalsRow(
+                                          label: 'Amount Paid',
+                                          value:
+                                              formatter.format(pos.amountPaid)),
                             _TotalsRow(
                               label: 'Due Balance',
                               value: formatter.format(pos.dueAmount),
@@ -940,26 +1277,37 @@ class CartSheet extends StatelessWidget {
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 50),
-                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: pos.cartIsEmpty || pos.isCheckingOut || pos.requiresCustomerForDue
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 14, horizontal: 20),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                ),
+                                onPressed: pos.cartIsEmpty ||
+                                        pos.isCheckingOut ||
+                                        pos.requiresCustomerForDue
                           ? null
                           : () => _previewThenCheckout(context),
                       child: pos.isCheckingOut
                           ? const SizedBox(
                               height: 22,
                               width: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: Colors.white),
                             )
                           : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.check_circle_outline, size: 20),
+                                          const Icon(Icons.check_circle_outline,
+                                              size: 20),
                                 const SizedBox(width: 8),
                                 Text(
-                                  l10n.completeSaleButton(formatter.format(pos.grandTotal)),
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                            l10n.completeSaleButton(formatter
+                                                .format(pos.grandTotal)),
+                                            style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
@@ -1004,7 +1352,8 @@ class _PaymentMethodChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.15) : Colors.grey.shade100,
+          color:
+              isSelected ? color.withValues(alpha: 0.15) : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? color : Colors.grey.shade300,
@@ -1014,7 +1363,8 @@ class _PaymentMethodChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: isSelected ? color : Colors.grey.shade700),
+            Icon(icon,
+                size: 18, color: isSelected ? color : Colors.grey.shade700),
             const SizedBox(width: 6),
             Text(
               method.name,
@@ -1061,7 +1411,8 @@ class _TotalsRow extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              color: valueColor ?? (isSub ? Colors.grey.shade600 : Colors.grey.shade900),
+              color: valueColor ??
+                  (isSub ? Colors.grey.shade600 : Colors.grey.shade900),
               fontWeight: isSub ? FontWeight.normal : FontWeight.w600,
               fontSize: isSub ? 11 : 13,
             ),
@@ -1083,11 +1434,16 @@ class _BankDetailsBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = <String, String>{
-      if ((metadata['bank_name'] ?? '').toString().isNotEmpty) 'Bank': metadata['bank_name'].toString(),
-      if ((metadata['holder_name'] ?? '').toString().isNotEmpty) 'Account Holder': metadata['holder_name'].toString(),
-      if ((metadata['account_no'] ?? '').toString().isNotEmpty) 'Account No.': metadata['account_no'].toString(),
-      if ((metadata['ifsc_code'] ?? '').toString().isNotEmpty) 'IFSC': metadata['ifsc_code'].toString(),
-      if ((metadata['upi_id'] ?? '').toString().isNotEmpty) 'UPI ID': metadata['upi_id'].toString(),
+      if ((metadata['bank_name'] ?? '').toString().isNotEmpty)
+        'Bank': metadata['bank_name'].toString(),
+      if ((metadata['holder_name'] ?? '').toString().isNotEmpty)
+        'Account Holder': metadata['holder_name'].toString(),
+      if ((metadata['account_no'] ?? '').toString().isNotEmpty)
+        'Account No.': metadata['account_no'].toString(),
+      if ((metadata['ifsc_code'] ?? '').toString().isNotEmpty)
+        'IFSC': metadata['ifsc_code'].toString(),
+      if ((metadata['upi_id'] ?? '').toString().isNotEmpty)
+        'UPI ID': metadata['upi_id'].toString(),
     };
     if (rows.isEmpty) return const SizedBox.shrink();
 
@@ -1102,7 +1458,11 @@ class _BankDetailsBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Account Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.teal.shade800)),
+          Text('Account Details',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: Colors.teal.shade800)),
           const SizedBox(height: 6),
           for (final entry in rows.entries)
             Padding(
@@ -1110,8 +1470,12 @@ class _BankDetailsBox extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(entry.key, style: TextStyle(fontSize: 12, color: Colors.teal.shade700)),
-                  Text(entry.value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  Text(entry.key,
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.teal.shade700)),
+                  Text(entry.value,
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -1127,7 +1491,8 @@ class _BankDetailsBox extends StatelessWidget {
 /// cursor/focus across the ancestor [CartSheet]'s frequent rebuilds
 /// (it watches [PosProvider], which notifies on every cart change).
 class _CashTenderSection extends StatefulWidget {
-  const _CashTenderSection({required this.payableAmount, required this.currencySymbol});
+  const _CashTenderSection(
+      {required this.payableAmount, required this.currencySymbol});
 
   final double payableAmount;
   final String currencySymbol;
@@ -1143,7 +1508,8 @@ class _CashTenderSectionState extends State<_CashTenderSection> {
   void initState() {
     super.initState();
     final pos = context.read<PosProvider>();
-    _controller = TextEditingController(text: pos.effectiveCashTendered.toStringAsFixed(2));
+    _controller = TextEditingController(
+        text: pos.effectiveCashTendered.toStringAsFixed(2));
   }
 
   @override
@@ -1177,7 +1543,10 @@ class _CashTenderSectionState extends State<_CashTenderSection> {
       children: [
         Text(
           'Cash Tendered by Customer',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600),
         ),
         const SizedBox(height: 6),
         TextField(
@@ -1187,7 +1556,8 @@ class _CashTenderSectionState extends State<_CashTenderSection> {
             prefixText: widget.currencySymbol,
             border: const OutlineInputBorder(),
             isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           ),
           onChanged: (val) => pos.setCashTendered(double.tryParse(val) ?? 0),
         ),
@@ -1203,9 +1573,15 @@ class _CashTenderSectionState extends State<_CashTenderSection> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('CHANGE DUE TO CUSTOMER',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade800, fontSize: 11)),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade800,
+                      fontSize: 11)),
               Text(formatter.format(pos.changeDue),
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade800, fontSize: 16)),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade800,
+                      fontSize: 16)),
             ],
           ),
         ),
@@ -1216,7 +1592,9 @@ class _CashTenderSectionState extends State<_CashTenderSection> {
           children: [
             for (final preset in presets)
               ActionChip(
-                label: Text(preset == presets.first ? 'Exact' : formatter.format(preset)),
+                label: Text(preset == presets.first
+                    ? 'Exact'
+                    : formatter.format(preset)),
                 onPressed: () {
                   _controller.text = preset.toStringAsFixed(2);
                   pos.setCashTendered(preset);

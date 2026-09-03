@@ -16,7 +16,6 @@ import '../../../core/widgets/loading_indicator.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../taxes/screens/taxes_screen.dart';
 import '../settings_repository.dart';
-import 'custom_notification_channel_settings_screen.dart';
 import 'nav_menu_settings_tab.dart';
 import 'payment_methods_screen.dart';
 import 'printer_settings_screen.dart';
@@ -36,9 +35,15 @@ const List<Color> _brandColorSwatches = [
   Color(0xFF334155), // slate
 ];
 
-const _tabs = ['Profile', 'Receipts', 'Financial', 'Notifications', 'Navigation Menu', 'Appearance'];
+const _tabs = [
+  'Profile',
+  'Receipts',
+  'Financial',
+  'Navigation Menu',
+  'Appearance'
+];
 
-/// Tenant Settings: Profile / Receipts / Financial / Notifications, mirroring
+/// Tenant Settings: Profile / Receipts / Financial, mirroring
 /// those tabs on the web Settings page (Mode and API/AI-config tabs are out
 /// of scope for mobile), plus a mobile-only Appearance tab for local
 /// workspace preferences (the nav dock layout). Each tab saves its own
@@ -50,7 +55,8 @@ class TenantSettingsScreen extends StatefulWidget {
   State<TenantSettingsScreen> createState() => _TenantSettingsScreenState();
 }
 
-class _TenantSettingsScreenState extends State<TenantSettingsScreen> with SingleTickerProviderStateMixin {
+class _TenantSettingsScreenState extends State<TenantSettingsScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final SettingsRepository _repository;
   late Future<TenantSettingsBundle> _future;
@@ -79,9 +85,12 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen> with Single
     return FutureBuilder<TenantSettingsBundle>(
       future: _future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) return const LoadingIndicator();
+        if (snapshot.connectionState != ConnectionState.done)
+          return const LoadingIndicator();
         if (snapshot.hasError) {
-          final message = snapshot.error is ApiException ? (snapshot.error as ApiException).message : 'Could not load settings.';
+          final message = snapshot.error is ApiException
+              ? (snapshot.error as ApiException).message
+              : 'Could not load settings.';
           return ErrorView(message: message, onRetry: _reload);
         }
         return builder(snapshot.data!);
@@ -96,7 +105,6 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen> with Single
       l10n.tabProfile,
       l10n.tabReceipts,
       l10n.tabFinancial,
-      l10n.tabNotifications,
       l10n.tabNavigationMenu,
       l10n.tabAppearance,
     ];
@@ -104,16 +112,24 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen> with Single
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.settingsTitle),
-        bottom: TabBar(controller: _tabController, isScrollable: true, tabs: [for (final t in tabLabels) Tab(text: t)]),
+        bottom: TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabs: [for (final t in tabLabels) Tab(text: t)]),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _serverTab((bundle) => _ProfileTab(repository: _repository, initial: bundle.profile, timezones: bundle.timezones)),
-          _serverTab((bundle) => _ReceiptsTab(repository: _repository, initial: bundle.receipts)),
-          _serverTab((bundle) => _FinancialTab(repository: _repository, initial: bundle.financial)),
-          _serverTab((bundle) => _NotificationsTab(repository: _repository, initial: bundle.notifications)),
-          _serverTab((bundle) => NavMenuSettingsTab(repository: _repository, initial: bundle.nav)),
+          _serverTab((bundle) => _ProfileTab(
+              repository: _repository,
+              initial: bundle.profile,
+              timezones: bundle.timezones)),
+          _serverTab((bundle) =>
+              _ReceiptsTab(repository: _repository, initial: bundle.receipts)),
+          _serverTab((bundle) => _FinancialTab(
+              repository: _repository, initial: bundle.financial)),
+          _serverTab((bundle) =>
+              NavMenuSettingsTab(repository: _repository, initial: bundle.nav)),
           // A per-device workspace preference, not a tenant setting — never
           // gated behind the server fetch above, so it's reachable offline.
           const _AppearanceTab(),
@@ -146,7 +162,8 @@ class _AppearanceTab extends StatelessWidget {
       children: [
         Text(l10n.navDockTitle, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),
-        Text(l10n.navDockDescription, style: TextStyle(color: Colors.grey.shade600)),
+        Text(l10n.navDockDescription,
+            style: TextStyle(color: Colors.grey.shade600)),
         const SizedBox(height: 12),
         RadioGroup<NavDockPosition>(
           groupValue: navDock.position,
@@ -173,7 +190,10 @@ class _AppearanceTab extends StatelessWidget {
 }
 
 class _ProfileTab extends StatefulWidget {
-  const _ProfileTab({required this.repository, required this.initial, required this.timezones});
+  const _ProfileTab(
+      {required this.repository,
+      required this.initial,
+      required this.timezones});
 
   final SettingsRepository repository;
   final ProfileSettings initial;
@@ -202,6 +222,7 @@ class _ProfileTabState extends State<_ProfileTab> {
   late String _commissionType;
   late String _countryCode;
   late Color _primaryColor;
+
   /// Null means "no manual override — follow the country default".
   String? _timezoneOverride;
   late String _defaultTimezoneForCountry;
@@ -217,7 +238,9 @@ class _ProfileTabState extends State<_ProfileTab> {
   /// selection (or the "Other" fallback field) rather than the saved
   /// company, so the Tax ID label updates before the form is saved.
   bool get _isIndiaSelected {
-    final code = _countryCode == kOtherCountrySentinel ? _country.text.trim().toUpperCase() : _countryCode;
+    final code = _countryCode == kOtherCountrySentinel
+        ? _country.text.trim().toUpperCase()
+        : _countryCode;
     return code == 'IN';
   }
 
@@ -236,11 +259,14 @@ class _ProfileTabState extends State<_ProfileTab> {
     _state = TextEditingController(text: p.state);
     _postalCode = TextEditingController(text: p.postalCode);
     _country = TextEditingController(text: p.country);
-    _commissionRate = TextEditingController(text: p.defaultCommissionRate.toStringAsFixed(2));
+    _commissionRate =
+        TextEditingController(text: p.defaultCommissionRate.toStringAsFixed(2));
     _commissionType = p.defaultCommissionType;
 
     final upperCountry = p.country.trim().toUpperCase();
-    _countryCode = kTaxJurisdictions.containsKey(upperCountry) ? upperCountry : kOtherCountrySentinel;
+    _countryCode = kTaxJurisdictions.containsKey(upperCountry)
+        ? upperCountry
+        : kOtherCountrySentinel;
 
     _timezoneOverride = p.timezone.isEmpty ? null : p.timezone;
     _defaultTimezoneForCountry = p.defaultTimezoneForCountry;
@@ -291,7 +317,8 @@ class _ProfileTabState extends State<_ProfileTab> {
   }
 
   Future<void> _pickLogo(ImageSource source) async {
-    final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    final picked =
+        await ImagePicker().pickImage(source: source, imageQuality: 85);
     if (picked == null) return;
 
     setState(() => _uploadingLogo = true);
@@ -300,7 +327,9 @@ class _ProfileTabState extends State<_ProfileTab> {
       final url = await widget.repository.uploadLogo(bytes, picked.name);
       if (mounted) setState(() => _logoUrl = url);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _uploadingLogo = false);
     }
@@ -312,14 +341,17 @@ class _ProfileTabState extends State<_ProfileTab> {
       await widget.repository.removeLogo();
       if (mounted) setState(() => _logoUrl = null);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _uploadingLogo = false);
     }
   }
 
   Future<void> _pickFavicon(ImageSource source) async {
-    final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    final picked =
+        await ImagePicker().pickImage(source: source, imageQuality: 85);
     if (picked == null) return;
 
     setState(() => _uploadingFavicon = true);
@@ -328,7 +360,9 @@ class _ProfileTabState extends State<_ProfileTab> {
       final url = await widget.repository.uploadFavicon(bytes, picked.name);
       if (mounted) setState(() => _faviconUrl = url);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _uploadingFavicon = false);
     }
@@ -340,14 +374,17 @@ class _ProfileTabState extends State<_ProfileTab> {
       await widget.repository.removeFavicon();
       if (mounted) setState(() => _faviconUrl = null);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _uploadingFavicon = false);
     }
   }
 
   Future<void> _pickDrawerCover(ImageSource source) async {
-    final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    final picked =
+        await ImagePicker().pickImage(source: source, imageQuality: 85);
     if (picked == null) return;
 
     setState(() => _uploadingDrawerCover = true);
@@ -356,7 +393,9 @@ class _ProfileTabState extends State<_ProfileTab> {
       final url = await widget.repository.uploadDrawerCover(bytes, picked.name);
       if (mounted) setState(() => _drawerCoverUrl = url);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _uploadingDrawerCover = false);
     }
@@ -368,7 +407,9 @@ class _ProfileTabState extends State<_ProfileTab> {
       await widget.repository.removeDrawerCover();
       if (mounted) setState(() => _drawerCoverUrl = null);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _uploadingDrawerCover = false);
     }
@@ -376,7 +417,8 @@ class _ProfileTabState extends State<_ProfileTab> {
 
   Future<void> _save() async {
     if (_name.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).storeNameRequired)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppLocalizations.of(context).storeNameRequired)));
       return;
     }
 
@@ -393,17 +435,22 @@ class _ProfileTabState extends State<_ProfileTab> {
         city: _city.text.trim(),
         state: _state.text.trim(),
         postalCode: _postalCode.text.trim(),
-        country: _countryCode == kOtherCountrySentinel ? _country.text.trim() : _countryCode,
+        country: _countryCode == kOtherCountrySentinel
+            ? _country.text.trim()
+            : _countryCode,
         timezone: _timezoneOverride ?? '',
         primaryColor: toHexColor(_primaryColor),
         defaultCommissionRate: double.tryParse(_commissionRate.text) ?? 0,
         defaultCommissionType: _commissionType,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).profileSaved)));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(AppLocalizations.of(context).profileSaved)));
       }
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -416,42 +463,67 @@ class _ProfileTabState extends State<_ProfileTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        TextField(controller: _name, decoration: InputDecoration(labelText: l10n.storeName)),
+        TextField(
+            controller: _name,
+            decoration: InputDecoration(labelText: l10n.storeName)),
         const SizedBox(height: 12),
-        TextField(controller: _tradeName, decoration: InputDecoration(labelText: l10n.tradeName)),
+        TextField(
+            controller: _tradeName,
+            decoration: InputDecoration(labelText: l10n.tradeName)),
         const SizedBox(height: 12),
         TextField(
           controller: _taxId,
-          decoration: InputDecoration(labelText: _isIndiaSelected ? l10n.gstin : l10n.taxId),
+          decoration: InputDecoration(
+              labelText: _isIndiaSelected ? l10n.gstin : l10n.taxId),
         ),
         const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TaxesScreen())),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const TaxesScreen())),
             icon: const Icon(Icons.percent, size: 16),
             label: Text(l10n.manageTaxRules),
           ),
         ),
         const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: TextField(controller: _email, decoration: InputDecoration(labelText: l10n.email))),
+          Expanded(
+              child: TextField(
+                  controller: _email,
+                  decoration: InputDecoration(labelText: l10n.email))),
           const SizedBox(width: 12),
-          Expanded(child: TextField(controller: _phone, decoration: InputDecoration(labelText: l10n.phone))),
+          Expanded(
+              child: TextField(
+                  controller: _phone,
+                  decoration: InputDecoration(labelText: l10n.phone))),
         ]),
         const SizedBox(height: 12),
-        TextField(controller: _website, decoration: InputDecoration(labelText: l10n.website)),
+        TextField(
+            controller: _website,
+            decoration: InputDecoration(labelText: l10n.website)),
         const SizedBox(height: 12),
-        TextField(controller: _address, decoration: InputDecoration(labelText: l10n.address)),
+        TextField(
+            controller: _address,
+            decoration: InputDecoration(labelText: l10n.address)),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: TextField(controller: _city, decoration: InputDecoration(labelText: l10n.city))),
+          Expanded(
+              child: TextField(
+                  controller: _city,
+                  decoration: InputDecoration(labelText: l10n.city))),
           const SizedBox(width: 12),
-          Expanded(child: TextField(controller: _state, decoration: InputDecoration(labelText: l10n.state))),
+          Expanded(
+              child: TextField(
+                  controller: _state,
+                  decoration: InputDecoration(labelText: l10n.state))),
         ]),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: TextField(controller: _postalCode, decoration: InputDecoration(labelText: l10n.postalCode))),
+          Expanded(
+              child: TextField(
+                  controller: _postalCode,
+                  decoration: InputDecoration(labelText: l10n.postalCode))),
           const SizedBox(width: 12),
           Expanded(
             child: DropdownButtonFormField<String>(
@@ -459,10 +531,16 @@ class _ProfileTabState extends State<_ProfileTab> {
               decoration: InputDecoration(labelText: l10n.country),
               items: [
                 for (final entry in kTaxJurisdictions.entries)
-                  DropdownMenuItem(value: entry.key, child: Text('${entry.value} (${entry.key})', overflow: TextOverflow.ellipsis)),
-                DropdownMenuItem(value: kOtherCountrySentinel, child: Text(l10n.countryOther)),
+                  DropdownMenuItem(
+                      value: entry.key,
+                      child: Text('${entry.value} (${entry.key})',
+                          overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(
+                    value: kOtherCountrySentinel,
+                    child: Text(l10n.countryOther)),
               ],
-              onChanged: (value) => setState(() => _countryCode = value ?? _countryCode),
+              onChanged: (value) =>
+                  setState(() => _countryCode = value ?? _countryCode),
             ),
           ),
         ]),
@@ -471,16 +549,19 @@ class _ProfileTabState extends State<_ProfileTab> {
           TextField(
             controller: _country,
             maxLength: 2,
-            decoration: InputDecoration(labelText: l10n.countryCodeIso2, counterText: ''),
+            decoration: InputDecoration(
+                labelText: l10n.countryCodeIso2, counterText: ''),
             onChanged: (_) => setState(() {}),
           ),
         ],
         const SizedBox(height: 20),
         const Divider(),
         const SizedBox(height: 12),
-        Text(l10n.timezoneSectionTitle, style: Theme.of(context).textTheme.titleMedium),
+        Text(l10n.timezoneSectionTitle,
+            style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),
-        Text(l10n.timezoneSectionDescription, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+        Text(l10n.timezoneSectionDescription,
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
         const SizedBox(height: 10),
         DropdownButtonFormField<String?>(
           initialValue: _timezoneOverride,
@@ -489,10 +570,13 @@ class _ProfileTabState extends State<_ProfileTab> {
           items: [
             DropdownMenuItem<String?>(
               value: null,
-              child: Text(l10n.timezoneUseCountryDefault(_defaultTimezoneForCountry), overflow: TextOverflow.ellipsis),
+              child: Text(
+                  l10n.timezoneUseCountryDefault(_defaultTimezoneForCountry),
+                  overflow: TextOverflow.ellipsis),
             ),
             for (final tz in widget.timezones)
-              DropdownMenuItem<String?>(value: tz, child: Text(tz, overflow: TextOverflow.ellipsis)),
+              DropdownMenuItem<String?>(
+                  value: tz, child: Text(tz, overflow: TextOverflow.ellipsis)),
           ],
           onChanged: (value) => setState(() => _timezoneOverride = value),
         ),
@@ -501,8 +585,10 @@ class _ProfileTabState extends State<_ProfileTab> {
           Expanded(
             child: TextField(
               controller: _commissionRate,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(labelText: l10n.defaultCommissionRate),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration:
+                  InputDecoration(labelText: l10n.defaultCommissionRate),
             ),
           ),
           const SizedBox(width: 12),
@@ -511,17 +597,26 @@ class _ProfileTabState extends State<_ProfileTab> {
               initialValue: _commissionType,
               decoration: InputDecoration(labelText: l10n.type),
               items: [
-                DropdownMenuItem(value: 'percentage', child: Text(l10n.commissionPercentage)),
-                DropdownMenuItem(value: 'fixed', child: Text(l10n.commissionFixed)),
+                DropdownMenuItem(
+                    value: 'percentage',
+                    child: Text(l10n.commissionPercentage)),
+                DropdownMenuItem(
+                    value: 'fixed', child: Text(l10n.commissionFixed)),
               ],
-              onChanged: (value) => setState(() => _commissionType = value ?? _commissionType),
+              onChanged: (value) =>
+                  setState(() => _commissionType = value ?? _commissionType),
             ),
           ),
         ]),
         const SizedBox(height: 20),
-        Text(l10n.brandColor, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+        Text(l10n.brandColor,
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text(l10n.brandColorDescription, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+        Text(l10n.brandColorDescription,
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
         const SizedBox(height: 10),
         Wrap(
           spacing: 10,
@@ -572,9 +667,14 @@ class _ProfileTabState extends State<_ProfileTab> {
           ],
         ),
         const SizedBox(height: 24),
-        Text(l10n.branding, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+        Text(l10n.branding,
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text(l10n.brandingDescription, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+        Text(l10n.brandingDescription,
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
         const SizedBox(height: 10),
         Row(
           children: [
@@ -611,7 +711,11 @@ class _ProfileTabState extends State<_ProfileTab> {
         ElevatedButton(
           onPressed: _saving ? null : _save,
           child: _saving
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
               : Text(l10n.saveProfile),
         ),
       ],
@@ -642,7 +746,8 @@ class _BrandImagePicker extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(label,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         ClipRRect(
           borderRadius: BorderRadius.circular(10),
@@ -652,10 +757,18 @@ class _BrandImagePicker extends StatelessWidget {
             color: Colors.grey.shade100,
             alignment: Alignment.center,
             child: busy
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))
                 : (imageUrl ?? '').isNotEmpty
-                    ? CachedNetworkImage(imageUrl: imageUrl!, fit: BoxFit.cover, width: 72, height: 72)
-                    : Icon(Icons.image_outlined, size: 28, color: Colors.grey.shade400),
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl!,
+                        fit: BoxFit.cover,
+                        width: 72,
+                        height: 72)
+                    : Icon(Icons.image_outlined,
+                        size: 28, color: Colors.grey.shade400),
           ),
         ),
         const SizedBox(height: 4),
@@ -725,7 +838,13 @@ class _ReceiptsTabState extends State<_ReceiptsTab> {
 
   @override
   void dispose() {
-    for (final c in [_invoicePrefix, _quotationPrefix, _invoiceTerms, _quoteTerms, _bankDetails]) {
+    for (final c in [
+      _invoicePrefix,
+      _quotationPrefix,
+      _invoiceTerms,
+      _quoteTerms,
+      _bankDetails
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -741,9 +860,13 @@ class _ReceiptsTabState extends State<_ReceiptsTab> {
         quoteTerms: _quoteTerms.text.trim(),
         bankDetails: _bankDetails.text.trim(),
       );
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Receipt settings saved.')));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Receipt settings saved.')));
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -755,21 +878,43 @@ class _ReceiptsTabState extends State<_ReceiptsTab> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
         Row(children: [
-          Expanded(child: TextField(controller: _invoicePrefix, decoration: const InputDecoration(labelText: 'Invoice prefix'))),
+          Expanded(
+              child: TextField(
+                  controller: _invoicePrefix,
+                  decoration:
+                      const InputDecoration(labelText: 'Invoice prefix'))),
           const SizedBox(width: 12),
-          Expanded(child: TextField(controller: _quotationPrefix, decoration: const InputDecoration(labelText: 'Quotation prefix'))),
+          Expanded(
+              child: TextField(
+                  controller: _quotationPrefix,
+                  decoration:
+                      const InputDecoration(labelText: 'Quotation prefix'))),
         ]),
         const SizedBox(height: 12),
-        TextField(controller: _invoiceTerms, decoration: const InputDecoration(labelText: 'Invoice terms'), maxLines: 3),
+        TextField(
+            controller: _invoiceTerms,
+            decoration: const InputDecoration(labelText: 'Invoice terms'),
+            maxLines: 3),
         const SizedBox(height: 12),
-        TextField(controller: _quoteTerms, decoration: const InputDecoration(labelText: 'Quote terms'), maxLines: 3),
+        TextField(
+            controller: _quoteTerms,
+            decoration: const InputDecoration(labelText: 'Quote terms'),
+            maxLines: 3),
         const SizedBox(height: 12),
-        TextField(controller: _bankDetails, decoration: const InputDecoration(labelText: 'Bank & payment details'), maxLines: 4),
+        TextField(
+            controller: _bankDetails,
+            decoration:
+                const InputDecoration(labelText: 'Bank & payment details'),
+            maxLines: 4),
         const SizedBox(height: 20),
         ElevatedButton(
           onPressed: _saving ? null : _save,
           child: _saving
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
               : const Text('Save receipt settings'),
         ),
         const SizedBox(height: 24),
@@ -779,7 +924,8 @@ class _ReceiptsTabState extends State<_ReceiptsTab> {
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.print_outlined),
           title: const Text('Bluetooth thermal printer'),
-          subtitle: const Text('Pair ESC/POS receipt printer for direct POS printing'),
+          subtitle: const Text(
+              'Pair ESC/POS receipt printer for direct POS printing'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()),
@@ -827,7 +973,8 @@ class _FinancialTabState extends State<_FinancialTab> {
 
   Future<void> _save() async {
     if (_currency.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Currency code is required.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Currency code is required.')));
       return;
     }
 
@@ -839,9 +986,13 @@ class _FinancialTabState extends State<_FinancialTab> {
         currencyDecimals: int.tryParse(_decimals.text) ?? 2,
         currencySymbolPosition: _symbolPosition,
       );
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Financial settings saved.')));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Financial settings saved.')));
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -857,11 +1008,15 @@ class _FinancialTabState extends State<_FinancialTab> {
             child: TextField(
               controller: _currency,
               maxLength: 3,
-              decoration: const InputDecoration(labelText: 'Currency code (e.g. USD)', counterText: ''),
+              decoration: const InputDecoration(
+                  labelText: 'Currency code (e.g. USD)', counterText: ''),
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(child: TextField(controller: _symbol, decoration: const InputDecoration(labelText: 'Symbol'))),
+          Expanded(
+              child: TextField(
+                  controller: _symbol,
+                  decoration: const InputDecoration(labelText: 'Symbol'))),
         ]),
         const SizedBox(height: 12),
         Row(children: [
@@ -881,7 +1036,8 @@ class _FinancialTabState extends State<_FinancialTab> {
                 DropdownMenuItem(value: 'prefix', child: Text('Prefix (\$10)')),
                 DropdownMenuItem(value: 'suffix', child: Text('Suffix (10\$)')),
               ],
-              onChanged: (value) => setState(() => _symbolPosition = value ?? _symbolPosition),
+              onChanged: (value) =>
+                  setState(() => _symbolPosition = value ?? _symbolPosition),
             ),
           ),
         ]),
@@ -889,7 +1045,11 @@ class _FinancialTabState extends State<_FinancialTab> {
         ElevatedButton(
           onPressed: _saving ? null : _save,
           child: _saving
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
               : const Text('Save financial settings'),
         ),
         const SizedBox(height: 24),
@@ -898,223 +1058,13 @@ class _FinancialTabState extends State<_FinancialTab> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Payment methods'),
-          subtitle: const Text('Manage which payment methods appear at checkout'),
+          subtitle:
+              const Text('Manage which payment methods appear at checkout'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => PaymentMethodsScreen(repository: widget.repository)),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _NotificationsTab extends StatefulWidget {
-  const _NotificationsTab({required this.repository, required this.initial});
-
-  final SettingsRepository repository;
-  final NotificationSettings initial;
-
-  @override
-  State<_NotificationsTab> createState() => _NotificationsTabState();
-}
-
-class _NotificationsTabState extends State<_NotificationsTab> {
-  late final TextEditingController _smtpHost;
-  late final TextEditingController _smtpPort;
-  late final TextEditingController _smtpUsername;
-  late final TextEditingController _smtpPassword;
-  late final TextEditingController _smtpFromAddress;
-  late final TextEditingController _smtpFromName;
-  late final TextEditingController _testEmailTo;
-  late final TextEditingController _whatsappPhonePrefix;
-  late final TextEditingController _whatsappCustomNote;
-  late final TextEditingController _whatsappPhoneNumberId;
-  late final TextEditingController _whatsappApiToken;
-  late String _smtpEncryption;
-  late bool _hasSmtpPassword;
-  late bool _hasWhatsappToken;
-  bool _saving = false;
-  bool _testingEmail = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final n = widget.initial;
-    _smtpHost = TextEditingController(text: n.smtp.host);
-    _smtpPort = TextEditingController(text: n.smtp.port.toString());
-    _smtpUsername = TextEditingController(text: n.smtp.username);
-    _smtpPassword = TextEditingController();
-    _smtpFromAddress = TextEditingController(text: n.smtp.fromAddress);
-    _smtpFromName = TextEditingController(text: n.smtp.fromName);
-    _testEmailTo = TextEditingController();
-    _whatsappPhonePrefix = TextEditingController(text: n.whatsapp.phonePrefix);
-    _whatsappCustomNote = TextEditingController(text: n.whatsapp.customNote);
-    _whatsappPhoneNumberId = TextEditingController(text: n.whatsapp.phoneNumberId);
-    _whatsappApiToken = TextEditingController();
-    _smtpEncryption = n.smtp.encryption;
-    _hasSmtpPassword = n.smtp.hasPassword;
-    _hasWhatsappToken = n.whatsapp.hasApiToken;
-  }
-
-  @override
-  void dispose() {
-    for (final c in [
-      _smtpHost, _smtpPort, _smtpUsername, _smtpPassword, _smtpFromAddress, _smtpFromName,
-      _testEmailTo, _whatsappPhonePrefix, _whatsappCustomNote, _whatsappPhoneNumberId, _whatsappApiToken,
-    ]) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    try {
-      final result = await widget.repository.updateNotifications(
-        smtpHost: _smtpHost.text.trim(),
-        smtpPort: int.tryParse(_smtpPort.text) ?? 587,
-        smtpUsername: _smtpUsername.text.trim(),
-        smtpPassword: _smtpPassword.text,
-        smtpEncryption: _smtpEncryption,
-        smtpFromAddress: _smtpFromAddress.text.trim(),
-        smtpFromName: _smtpFromName.text.trim(),
-        whatsappPhonePrefix: _whatsappPhonePrefix.text.trim(),
-        whatsappCustomNote: _whatsappCustomNote.text.trim(),
-        whatsappPhoneNumberId: _whatsappPhoneNumberId.text.trim(),
-        whatsappApiToken: _whatsappApiToken.text.trim(),
-      );
-      if (mounted) {
-        setState(() {
-          _hasSmtpPassword = result.smtp.hasPassword;
-          _hasWhatsappToken = result.whatsapp.hasApiToken;
-          _smtpPassword.clear();
-          _whatsappApiToken.clear();
-        });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notification settings saved.')));
-      }
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Future<void> _sendTestEmail() async {
-    if (_testEmailTo.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a recipient email.')));
-      return;
-    }
-
-    setState(() => _testingEmail = true);
-    try {
-      await widget.repository.sendTestEmail(_testEmailTo.text.trim());
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Test email sent.')));
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _testingEmail = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      children: [
-        Text('Email (SMTP)', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        TextField(controller: _smtpHost, decoration: const InputDecoration(labelText: 'SMTP host')),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(
-            child: TextField(
-              controller: _smtpPort,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Port'),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: DropdownButtonFormField<String>(
-              initialValue: _smtpEncryption,
-              decoration: const InputDecoration(labelText: 'Encryption'),
-              items: const [
-                DropdownMenuItem(value: 'tls', child: Text('TLS')),
-                DropdownMenuItem(value: 'ssl', child: Text('SSL')),
-                DropdownMenuItem(value: 'none', child: Text('None')),
-              ],
-              onChanged: (value) => setState(() => _smtpEncryption = value ?? _smtpEncryption),
-            ),
-          ),
-        ]),
-        const SizedBox(height: 12),
-        TextField(controller: _smtpUsername, decoration: const InputDecoration(labelText: 'Username')),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _smtpPassword,
-          obscureText: true,
-          decoration: InputDecoration(
-            labelText: 'Password',
-            hintText: _hasSmtpPassword ? 'Stored — leave blank to keep' : 'Not set',
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: TextField(controller: _smtpFromAddress, decoration: const InputDecoration(labelText: 'From address'))),
-          const SizedBox(width: 12),
-          Expanded(child: TextField(controller: _smtpFromName, decoration: const InputDecoration(labelText: 'From name'))),
-        ]),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: TextField(controller: _testEmailTo, decoration: const InputDecoration(labelText: 'Send test email to'))),
-          const SizedBox(width: 12),
-          OutlinedButton(
-            onPressed: _testingEmail ? null : _sendTestEmail,
-            child: _testingEmail
-                ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Test'),
-          ),
-        ]),
-        const SizedBox(height: 24),
-        const Divider(),
-        const SizedBox(height: 8),
-        Text('WhatsApp', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(child: TextField(controller: _whatsappPhonePrefix, decoration: const InputDecoration(labelText: 'Default country code'))),
-          const SizedBox(width: 12),
-          Expanded(child: TextField(controller: _whatsappPhoneNumberId, decoration: const InputDecoration(labelText: 'Business Phone Number ID'))),
-        ]),
-        const SizedBox(height: 12),
-        TextField(controller: _whatsappCustomNote, decoration: const InputDecoration(labelText: 'Message footer note')),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _whatsappApiToken,
-          obscureText: true,
-          decoration: InputDecoration(
-            labelText: 'Access token',
-            hintText: _hasWhatsappToken ? 'Stored — leave blank to keep' : 'Not set',
-          ),
-        ),
-        const SizedBox(height: 20),
-        ElevatedButton(
-          onPressed: _saving ? null : _save,
-          child: _saving
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Save notification settings'),
-        ),
-        const SizedBox(height: 24),
-        const Divider(),
-        const SizedBox(height: 8),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.webhook_outlined),
-          title: const Text('Custom Notification Channels'),
-          subtitle: const Text('Dispatch invoices, quotations, or due reminders to your own webhook endpoint'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => CustomNotificationChannelSettingsScreen(repository: widget.repository)),
+            MaterialPageRoute(
+                builder: (_) =>
+                    PaymentMethodsScreen(repository: widget.repository)),
           ),
         ),
       ],
