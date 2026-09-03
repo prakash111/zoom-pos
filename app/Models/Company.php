@@ -27,7 +27,7 @@ class Company extends Model
     protected $fillable = [
         'unique_account_id', 'name', 'slug', 'custom_domain', 'trade_name', 'legal_name', 'tax_id', 'tax_id_label',
         'email', 'phone', 'website', 'address', 'city', 'state', 'postal_code', 'country', 'currency',
-        'language', 'default_locale', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'nav_config', 'receipt_format', 'status', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
+        'language', 'default_locale', 'timezone', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'nav_config', 'receipt_format', 'status', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
         'max_users', 'max_devices', 'pricing_mode', 'tax_api_mode', 'tax_api_key', 'tax_api_endpoint',
         'invoice_prefix', 'quotation_prefix', 'tax_settings', 'invoice_terms', 'quote_terms', 'bank_details',
         'currency_symbol', 'currency_decimals', 'currency_symbol_position', 'other_currencies',
@@ -233,6 +233,68 @@ class Company extends Model
     public function isRestaurantMode(): bool
     {
         return ! $this->restaurant_mode_locked && in_array($this->pos_mode, ['restaurant', 'food_restaurant'], true);
+    }
+
+    /**
+     * The IANA timezone identifier order timestamps, prep timers, and KOT
+     * logs should be shown in: the manual override from Settings > Profile
+     * if one is set, else a default derived from `country` — see
+     * defaultTimezoneForCountry(). Always returns a valid identifier
+     * (falls back to UTC), so callers never need a null check.
+     */
+    public function resolveTimezone(): string
+    {
+        if (! empty($this->timezone) && in_array($this->timezone, \DateTimeZone::listIdentifiers(), true)) {
+            return $this->timezone;
+        }
+
+        return self::defaultTimezoneForCountry($this->country);
+    }
+
+    /**
+     * One representative IANA zone per ISO-3166 country code, via PHP's
+     * built-in per-country tzdata grouping. Countries spanning several
+     * zones (US, CA, AU, BR, RU, MX) get a curated pick — PHP's own
+     * ordering for those is alphabetical by city, not by population/
+     * business relevance (e.g. `US` alone returns `America/Adak` first),
+     * so this is not just a plain pass-through of listIdentifiers(). This
+     * is always just a *default*: Settings > Profile's manual override
+     * exists precisely for the stores it guesses wrong for.
+     */
+    public static function defaultTimezoneForCountry(?string $country): string
+    {
+        $code = strtoupper(trim((string) $country));
+        if ($code === '') {
+            return 'UTC';
+        }
+
+        $curated = [
+            'US' => 'America/New_York',
+            'CA' => 'America/Toronto',
+            'AU' => 'Australia/Sydney',
+            'BR' => 'America/Sao_Paulo',
+            'RU' => 'Europe/Moscow',
+            'MX' => 'America/Mexico_City',
+            'ID' => 'Asia/Jakarta',
+            'CD' => 'Africa/Kinshasa',
+            'KZ' => 'Asia/Almaty',
+            'MN' => 'Asia/Ulaanbaatar',
+            'ES' => 'Europe/Madrid',
+            'PT' => 'Europe/Lisbon',
+            'MY' => 'Asia/Kuala_Lumpur',
+            'PF' => 'Pacific/Tahiti',
+            'EC' => 'America/Guayaquil',
+            'CL' => 'America/Santiago',
+            'UA' => 'Europe/Kyiv',
+            'GL' => 'America/Nuuk',
+        ];
+        if (isset($curated[$code])) {
+            return $curated[$code];
+        }
+
+        $identifiers = @\DateTimeZone::listIdentifiers(\DateTimeZone::PER_COUNTRY, $code);
+
+        return $identifiers[0] ?? 'UTC';
     }
 
     public function isGeneralMode(): bool

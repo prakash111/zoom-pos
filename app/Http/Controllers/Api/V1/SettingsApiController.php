@@ -55,6 +55,12 @@ class SettingsApiController extends Controller
                 'hidden_tiles' => array_values($navConfig['hidden_tiles'] ?? []),
                 'section_order' => array_values($navConfig['section_order'] ?? []),
             ],
+            // Full IANA identifier list for the Timezone & Regional Settings
+            // manual-override dropdown — served from the backend so the app
+            // doesn't bundle/maintain its own copy of the tzdata identifier
+            // list (only the identifiers themselves; DST/offset math is
+            // still done on-device by the `timezone` package).
+            'timezones' => \DateTimeZone::listIdentifiers(),
         ]);
     }
 
@@ -62,6 +68,12 @@ class SettingsApiController extends Controller
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
+
+        // An empty string means "clear the manual override, go back to the
+        // country default" — not "invalid timezone".
+        if ($request->input('timezone') === '') {
+            $request->merge(['timezone' => null]);
+        }
 
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:150'],
@@ -75,6 +87,7 @@ class SettingsApiController extends Controller
             'state' => ['nullable', 'string', 'max:100'],
             'postal_code' => ['nullable', 'string', 'max:20'],
             'country' => ['nullable', 'string', 'max:2'],
+            'timezone' => ['nullable', 'string', 'max:64', 'timezone'],
             'primary_color' => ['nullable', 'string', 'max:16'],
             'default_commission_rate' => ['nullable', 'numeric', 'min:0'],
             'default_commission_type' => ['nullable', 'string', 'in:percentage,fixed'],
@@ -511,6 +524,14 @@ class SettingsApiController extends Controller
             'state' => $company->state ?? '',
             'postal_code' => $company->postal_code ?? '',
             'country' => $company->country ?? 'US',
+            // 'timezone' is the raw manual override (empty = none set, i.e.
+            // following the country default); 'resolved_timezone' is what
+            // order times/prep timers/KOT logs should actually be shown in
+            // — always a valid IANA id, never empty. See
+            // Company::resolveTimezone().
+            'timezone' => $company->timezone ?? '',
+            'resolved_timezone' => $company->resolveTimezone(),
+            'default_timezone_for_country' => \App\Models\Company::defaultTimezoneForCountry($company->country),
             'primary_color' => $company->primary_color ?: '#2563eb',
             'logo_url' => $company->getLogoUrl(),
             'favicon_url' => $company->getFaviconUrl(),
