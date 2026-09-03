@@ -334,6 +334,61 @@ class TenantTranslationIsolationAndReceiptPdfTest extends TestCase
     }
 
     /**
+     * Regression test for tofu ("▯") boxes on Hindi-locale receipts/invoices:
+     * DejaVu Sans (dompdf's default PDF font) has no Devanagari glyphs at
+     * all, so translated UI labels (Customer:/Status:/Subtotal:/etc., which
+     * do have Hindi translations in lang/hi.json) rendered as empty boxes
+     * while untranslated labels fell back to plain English and looked fine —
+     * exactly the mixed pattern the bug report described. Asserts the
+     * bundled Noto Sans Devanagari font actually gets embedded in the
+     * generated PDF (i.e. the Hindi label text was actually rendered with a
+     * font that has those glyphs, not silently dropped as tofu).
+     */
+    public function test_hindi_locale_labels_use_the_bundled_devanagari_font_not_tofu(): void
+    {
+        [$company, $admin] = $this->createTenant('Bharat Kirana Store', 'hi', 'hi');
+
+        $sale = Sale::create([
+            'company_id' => $company->id,
+            'user_id' => $admin->id,
+            'sale_number' => 'POS-'.strtoupper(bin2hex(random_bytes(4))),
+            'customer_name' => 'Srivastava sane',
+            'total' => 25.00,
+            'paid_amount' => 25.00,
+            'due_amount' => 0.00,
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'status' => 'completed',
+            'items' => [
+                ['name' => 'Item A', 'quantity' => 1, 'price' => 25.00],
+            ],
+        ]);
+
+        $deliveryService = app(InvoiceDeliveryService::class);
+
+        $thermalPdf = $deliveryService->generateInvoicePdf($sale, '80mm');
+        preg_match_all('/\/BaseFont\s*\/([^\s\/\]>]+)/', $thermalPdf, $thermalFonts);
+        $this->assertTrue(
+            str_contains(implode(',', $thermalFonts[1]), 'NotoSansDevanagari'),
+            'Expected the thermal receipt PDF to embed the Devanagari font for its Hindi-translated labels.'
+        );
+
+        $a4Pdf = $deliveryService->generateInvoicePdf($sale, 'standard');
+        preg_match_all('/\/BaseFont\s*\/([^\s\/\]>]+)/', $a4Pdf, $a4Fonts);
+        $this->assertTrue(
+            str_contains(implode(',', $a4Fonts[1]), 'NotoSansDevanagari'),
+            'Expected the A4 invoice PDF to embed the Devanagari font for its Hindi-translated labels.'
+        );
+
+        // Untranslated labels (no lang/hi.json entry) fall back to their
+        // literal English key and must stay exactly as-is, not blank/garbled.
+        app()->instance('tenant.company_id', $company->id);
+        app()->setLocale('hi');
+        $this->assertSame('Payment:', __('Payment:'));
+        $this->assertSame('ग्राहक:', __('Customer:'));
+    }
+
+    /**
      * 6. Test Print Media CSS (@media print) and Unescaped HTML Terms Rendering.
      */
     public function test_print_media_css_and_unescaped_html_terms_rendering(): void

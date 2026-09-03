@@ -21,6 +21,40 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 class InvoiceDeliveryService
 {
     /**
+     * Bundled Devanagari-script font (resources/fonts/), base64-encoded once
+     * per process for @font-face embedding in pdf.receipt/pdf.invoice — see
+     * devanagariFontData(). DejaVu Sans (dompdf's default PDF font) has no
+     * Devanagari glyphs at all, so a Hindi-locale document's translated
+     * labels rendered under it come out as tofu boxes; dompdf also doesn't
+     * do per-glyph font fallback across a CSS font-family list (confirmed
+     * empirically — it picks one font per styled element regardless of
+     * glyph coverage), so the fix is to wrap just the translated-label text
+     * in a class backed by this font, rather than swapping the document's
+     * base font.
+     */
+    private static ?string $devanagariRegularBase64 = null;
+
+    private static ?string $devanagariBoldBase64 = null;
+
+    /**
+     * @return array{notoDevanagariRegularBase64: string, notoDevanagariBoldBase64: string}
+     */
+    private function devanagariFontData(): array
+    {
+        self::$devanagariRegularBase64 ??= base64_encode(
+            file_get_contents(resource_path('fonts/NotoSansDevanagari-Regular.ttf'))
+        );
+        self::$devanagariBoldBase64 ??= base64_encode(
+            file_get_contents(resource_path('fonts/NotoSansDevanagari-Bold.ttf'))
+        );
+
+        return [
+            'notoDevanagariRegularBase64' => self::$devanagariRegularBase64,
+            'notoDevanagariBoldBase64' => self::$devanagariBoldBase64,
+        ];
+    }
+
+    /**
      * Resolves SMTP configuration for a tenant with fallback to platform settings.
      */
     public function getSmtpConfig(?Company $company = null): array
@@ -205,6 +239,7 @@ class InvoiceDeliveryService
                     'sale' => $sale,
                     'company' => $company,
                     'logoBase64' => $logoBase64,
+                    ...$this->devanagariFontData(),
                 ])->setPaper('a4', 'portrait')
                   ->setOptions([
                       'isHtml5ParserEnabled' => true,
@@ -280,6 +315,7 @@ class InvoiceDeliveryService
                 'qrCodeDataUri' => $qrCodeData['data_uri'],
                 'qrCodeSvg' => $qrCodeData['svg'],
                 'verificationUrl' => $qrCodeData['url'],
+                ...$this->devanagariFontData(),
             ])->setPaper($customPaper, 'portrait')
                 ->setOption(['isRemoteEnabled' => true, 'isHtml5ParserEnabled' => true, 'defaultFont' => 'sans-serif']);
 

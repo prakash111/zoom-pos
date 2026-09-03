@@ -22,9 +22,42 @@
         $bg = (int) ($g * 0.25 + 255 * 0.75);
         $bb = (int) ($b * 0.25 + 255 * 0.75);
         $borderTint = sprintf('#%02x%02x%02x', $br, $bg, $bb);
+
+        // dompdf resolves one font per styled element and does not fall
+        // through a CSS font-family list by glyph coverage (confirmed
+        // empirically) — DejaVu Sans (this document's base font) has no
+        // Devanagari glyphs at all, so a Hindi-locale tenant's translated
+        // labels rendered under it show as tofu boxes while labels with no
+        // Hindi translation (falling back to their literal English key)
+        // render fine. $L() wraps a translated label in the .i18n-label
+        // class (backed by the bundled Devanagari font) only when the
+        // active locale actually needs it and the label was actually
+        // translated, leaving plain English/data text on the base font.
+        $needsScriptFont = in_array(app()->getLocale(), ['hi'], true);
+        $L = function (string $key) use ($needsScriptFont) {
+            $text = __($key);
+            return ($needsScriptFont && $text !== $key)
+                ? '<span class="i18n-label">'.e($text).'</span>'
+                : e($text);
+        };
     @endphp
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        @font-face {
+            font-family: 'Noto Sans Devanagari';
+            src: url(data:font/ttf;base64,{{ $notoDevanagariRegularBase64 ?? '' }}) format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Noto Sans Devanagari';
+            src: url(data:font/ttf;base64,{{ $notoDevanagariBoldBase64 ?? '' }}) format('truetype');
+            font-weight: bold;
+            font-style: normal;
+        }
+        .i18n-label {
+            font-family: 'Noto Sans Devanagari', sans-serif;
+        }
         @page {
             margin: 12mm 14mm;
             size: A4 portrait;
@@ -320,10 +353,10 @@
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 50%;">{{ __("Item & Description") }}</th>
-                    <th class="text-center" style="width: 12%;">{{ __("Qty") }}</th>
-                    <th class="text-right" style="width: 18%;">{{ __("Unit Price") }}</th>
-                    <th class="text-right" style="width: 20%;">{{ __("Total") }}</th>
+                    <th style="width: 50%;">{!! $L("Item & Description") !!}</th>
+                    <th class="text-center" style="width: 12%;">{!! $L("Qty") !!}</th>
+                    <th class="text-right" style="width: 18%;">{!! $L("Unit Price") !!}</th>
+                    <th class="text-right" style="width: 20%;">{!! $L("Total") !!}</th>
                 </tr>
             </thead>
             <tbody>
@@ -363,10 +396,10 @@
             <table class="items-table" style="margin-top: 14px; page-break-inside: avoid;">
                 <thead>
                     <tr>
-                        <th style="font-size: 8.5px;">{{ __("Tax Category / Rule") }}</th>
-                        <th class="text-right" style="font-size: 8.5px;">{{ __("Rate (%)") }}</th>
-                        <th class="text-right" style="font-size: 8.5px;">{{ __("Taxable Amount") }}</th>
-                        <th class="text-right" style="font-size: 8.5px;">{{ __("Tax Amount") }}</th>
+                        <th style="font-size: 8.5px;">{!! $L("Tax Category / Rule") !!}</th>
+                        <th class="text-right" style="font-size: 8.5px;">{!! $L("Rate (%)") !!}</th>
+                        <th class="text-right" style="font-size: 8.5px;">{!! $L("Taxable Amount") !!}</th>
+                        <th class="text-right" style="font-size: 8.5px;">{!! $L("Tax Amount") !!}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -393,12 +426,12 @@
         <!-- Summary Totals -->
         <table class="summary-table">
             <tr>
-                <td style="color: #64748b; font-weight: bold;">{{ __("Subtotal:") }}</td>
+                <td style="color: #64748b; font-weight: bold;">{!! $L("Subtotal:") !!}</td>
                 <td style="text-align: right; font-weight: bold;">{{ $company->formatMoney($subtotal) }}</td>
             </tr>
             @if ($sale->discount > 0)
                 <tr>
-                    <td style="color: #dc2626; font-weight: bold;">{{ __("Discount:") }}</td>
+                    <td style="color: #dc2626; font-weight: bold;">{!! $L("Discount:") !!}</td>
                     <td style="text-align: right; color: #dc2626; font-weight: bold;">-{{ $company->formatMoney($sale->discount) }}</td>
                 </tr>
             @endif
@@ -419,22 +452,22 @@
                     @endforeach
                 @else
                     <tr>
-                        <td style="color: #475569; font-weight: 500;">{{ $sale->tax_name ?: __('Tax / GST') }} ({{ (float)($sale->tax_rate ?? 0) }}%):</td>
+                        <td style="color: #475569; font-weight: 500;">{!! $sale->tax_name ? e($sale->tax_name) : $L('Tax / GST') !!} ({{ (float)($sale->tax_rate ?? 0) }}%):</td>
                         <td style="text-align: right; font-weight: 600;">+{{ $company->formatMoney($taxAmount) }}</td>
                     </tr>
                 @endif
             @endif
             <tr class="total-row">
-                <td>{{ __("Grand Total:") }}</td>
+                <td>{!! $L("Grand Total:") !!}</td>
                 <td style="text-align: right;">{{ $company->formatMoney($sale->total) }}</td>
             </tr>
             <tr>
-                <td style="color: #16a34a; font-weight: bold; padding-top: 4px;">{{ __("Paid Amount:") }}</td>
+                <td style="color: #16a34a; font-weight: bold; padding-top: 4px;">{!! $L("Paid Amount:") !!}</td>
                 <td style="text-align: right; color: #16a34a; font-weight: bold; padding-top: 4px;">{{ $company->formatMoney($sale->paid_amount ?: $sale->total) }}</td>
             </tr>
             @if ($sale->due_amount > 0)
                 <tr>
-                    <td style="color: #dc2626; font-weight: bold;">{{ __("Balance Due:") }}</td>
+                    <td style="color: #dc2626; font-weight: bold;">{!! $L("Balance Due:") !!}</td>
                     <td style="text-align: right; color: #dc2626; font-weight: bold;">{{ $company->formatMoney($sale->due_amount) }}</td>
                 </tr>
             @endif
@@ -443,7 +476,7 @@
         <!-- Document Notes & Remarks -->
         @if (!empty($sale->notes))
             <div class="notes-section">
-                <div class="card-heading">{{ __("Notes & Remarks") }}</div>
+                <div class="card-heading">{!! $L("Notes & Remarks") !!}</div>
                 <div class="card-content">{!! clean_html($sale->notes) !!}</div>
             </div>
         @endif
@@ -452,22 +485,22 @@
         <table class="cards-table">
             <tr>
                 <td>
-                    <div class="card-heading">{{ __("Payment Information") }}</div>
+                    <div class="card-heading">{!! $L("Payment Information") !!}</div>
                     <div class="card-content">
-                        <strong>{{ __("Method:") }}</strong> {{ ucfirst($sale->payment_method ?: 'Cash') }}<br>
-                        <strong>{{ __("Status:") }}</strong> {{ ucfirst($sale->payment_status ?: 'Paid') }}<br>
+                        <strong>{!! $L("Method:") !!}</strong> {{ ucfirst($sale->payment_method ?: 'Cash') }}<br>
+                        <strong>{!! $L("Status:") !!}</strong> {{ ucfirst($sale->payment_status ?: 'Paid') }}<br>
                         @if (!empty($company->bank_details))
                             <div style="margin-top: 4px;">{!! clean_html($company->bank_details) !!}</div>
                         @endif
                     </div>
                 </td>
                 <td>
-                    <div class="card-heading">{{ __("Invoice Terms & Policy") }}</div>
+                    <div class="card-heading">{!! $L("Invoice Terms & Policy") !!}</div>
                     <div class="card-content">
                         @if (!empty($company->invoice_terms))
                             {!! clean_html($company->invoice_terms) !!}
                         @else
-                            <p>{{ __("Thank you for your business! All sales are final unless otherwise specified in your service contract.") }}</p>
+                            <p>{!! $L("Thank you for your business! All sales are final unless otherwise specified in your service contract.") !!}</p>
                         @endif
                     </div>
                 </td>

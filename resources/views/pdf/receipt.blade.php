@@ -12,12 +12,45 @@
         $itemSize = $is58mm ? '8.5px' : '10.5px';
         $totalSize = $is58mm ? '12px' : '14px';
         $qrDimension = $is58mm ? '68px' : '88px';
+
+        // dompdf resolves one font per styled element and does not fall
+        // through a CSS font-family list by glyph coverage (confirmed
+        // empirically) — DejaVu Sans (this document's base font) has no
+        // Devanagari glyphs at all, so a Hindi-locale tenant's translated
+        // labels rendered under it show as tofu boxes while labels with no
+        // Hindi translation (falling back to their literal English key)
+        // render fine. $L() wraps a translated label in the .i18n-label
+        // class (backed by the bundled Devanagari font) only when the
+        // active locale actually needs it and the label was actually
+        // translated, leaving plain English/data text on the base font.
+        $needsScriptFont = in_array(app()->getLocale(), ['hi'], true);
+        $L = function (string $key) use ($needsScriptFont) {
+            $text = __($key);
+            return ($needsScriptFont && $text !== $key)
+                ? '<span class="i18n-label">'.e($text).'</span>'
+                : e($text);
+        };
     @endphp
     <style>
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+        }
+        @font-face {
+            font-family: 'Noto Sans Devanagari';
+            src: url(data:font/ttf;base64,{{ $notoDevanagariRegularBase64 ?? '' }}) format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Noto Sans Devanagari';
+            src: url(data:font/ttf;base64,{{ $notoDevanagariBoldBase64 ?? '' }}) format('truetype');
+            font-weight: bold;
+            font-style: normal;
+        }
+        .i18n-label {
+            font-family: 'Noto Sans Devanagari', sans-serif;
         }
         @page {
             size: {{ $paperWidth ?? ($is58mm ? '58mm' : '80mm') }} auto;
@@ -230,7 +263,7 @@
                 <div>{{ \App\Services\TaxEngineService::getTaxIdentifierLabel($company->country, $appliedTaxRuleName) }}: {{ $company->tax_id }}</div>
             @endif
         </div>
-        <div class="receipt-type">*** {{ __("TAX INVOICE / RECEIPT") }} ***</div>
+        <div class="receipt-type">*** {!! $L("TAX INVOICE / RECEIPT") !!} ***</div>
     </div>
 
     <div class="dashed"></div>
@@ -238,20 +271,20 @@
     <!-- Metadata Block (2-Column Key-Value Layout) -->
     <table class="meta-table">
         <tr>
-            <td class="col-left"><strong>{{ __("Receipt #:") }}</strong> {{ $sale->sale_number }}</td>
+            <td class="col-left"><strong>{!! $L("Receipt #:") !!}</strong> {{ $sale->sale_number }}</td>
             <td class="col-right">{{ $sale->created_at ? $sale->created_at->format('d/m/Y H:i') : now()->format('d/m/Y H:i') }}</td>
         </tr>
         <tr>
-            <td class="col-left"><strong>{{ __("Customer:") }}</strong> {{ Str::limit($sale->customer_name ?: __('Walk-in'), $is58mm ? 14 : 20) }}</td>
-            <td class="col-right"><strong>{{ __("Staff:") }}</strong> {{ Str::limit($sale->user?->name ?: __('Admin'), $is58mm ? 10 : 15) }}</td>
+            <td class="col-left"><strong>{!! $L("Customer:") !!}</strong> {!! $sale->customer_name ? e(Str::limit($sale->customer_name, $is58mm ? 14 : 20)) : $L('Walk-in') !!}</td>
+            <td class="col-right"><strong>{!! $L("Staff:") !!}</strong> {!! $sale->user?->name ? e(Str::limit($sale->user->name, $is58mm ? 10 : 15)) : $L('Admin') !!}</td>
         </tr>
         <tr>
-            <td class="col-left"><strong>{{ __("Payment:") }}</strong> {{ ucfirst($sale->payment_method ?: 'Cash') }}</td>
-            <td class="col-right"><strong>{{ __("Status:") }}</strong> <span class="bold">{{ strtoupper($sale->payment_status ?: ($sale->status === 'completed' ? 'PAID' : $sale->status)) }}</span></td>
+            <td class="col-left"><strong>{!! $L("Payment:") !!}</strong> {{ ucfirst($sale->payment_method ?: 'Cash') }}</td>
+            <td class="col-right"><strong>{!! $L("Status:") !!}</strong> <span class="bold">{{ strtoupper($sale->payment_status ?: ($sale->status === 'completed' ? 'PAID' : $sale->status)) }}</span></td>
         </tr>
         @if ($sale->table_name)
             <tr>
-                <td class="col-left"><strong>{{ __("Table:") }}</strong> {{ $sale->table_name }}</td>
+                <td class="col-left"><strong>{!! $L("Table:") !!}</strong> {{ $sale->table_name }}</td>
                 <td class="col-right"></td>
             </tr>
         @endif
@@ -263,9 +296,9 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th class="col-item">{{ __("ITEM") }}</th>
-                <th class="col-qty">{{ __("QTY") }}</th>
-                <th class="col-total">{{ __("TOTAL") }}</th>
+                <th class="col-item">{!! $L("ITEM") !!}</th>
+                <th class="col-qty">{!! $L("QTY") !!}</th>
+                <th class="col-total">{!! $L("TOTAL") !!}</th>
             </tr>
         </thead>
         <tbody>
@@ -308,12 +341,12 @@
             }
         @endphp
         <tr>
-            <td class="col-label">{{ __("Subtotal:") }}</td>
+            <td class="col-label">{!! $L("Subtotal:") !!}</td>
             <td class="col-val">{{ $company->formatMoney($subtotal > 0 ? $subtotal : $sale->total) }}</td>
         </tr>
         @if ((float) $sale->discount > 0)
             <tr>
-                <td class="col-label" style="color: #dc2626;">{{ __("Discount:") }}</td>
+                <td class="col-label" style="color: #dc2626;">{!! $L("Discount:") !!}</td>
                 <td class="col-val" style="color: #dc2626;">-{{ $company->formatMoney($sale->discount) }}</td>
             </tr>
         @endif
@@ -335,30 +368,30 @@
                 @endforeach
             @else
                 <tr>
-                    <td class="col-label" style="color: #4b5563;">{{ $sale->tax_name ?: __('Tax') }} ({{ (float)($sale->tax_rate ?? 0) }}%):</td>
+                    <td class="col-label" style="color: #4b5563;">{!! $sale->tax_name ? e($sale->tax_name) : $L('Tax') !!} ({{ (float)($sale->tax_rate ?? 0) }}%):</td>
                     <td class="col-val" style="color: #111827;">+{{ $company->formatMoney($saleTax) }}</td>
                 </tr>
             @endif
         @endif
         <tr class="grand-total">
-            <td class="col-label bold">{{ __("TOTAL AMOUNT:") }}</td>
+            <td class="col-label bold">{!! $L("TOTAL AMOUNT:") !!}</td>
             <td class="col-val bold">{{ $company->formatMoney($sale->total) }}</td>
         </tr>
         @if ($paidAmt > 0)
             <tr>
-                <td class="col-label">{{ __("Amount Paid:") }}</td>
+                <td class="col-label">{!! $L("Amount Paid:") !!}</td>
                 <td class="col-val">{{ $company->formatMoney($paidAmt) }}</td>
             </tr>
         @endif
         @if ($changeDue > 0)
             <tr>
-                <td class="col-label">{{ __("Change Due:") }}</td>
+                <td class="col-label">{!! $L("Change Due:") !!}</td>
                 <td class="col-val">{{ $company->formatMoney($changeDue) }}</td>
             </tr>
         @endif
         @if ((float) $sale->due_amount > 0)
             <tr>
-                <td class="col-label bold" style="color: #990000;">{{ __("Remaining Balance:") }}</td>
+                <td class="col-label bold" style="color: #990000;">{!! $L("Remaining Balance:") !!}</td>
                 <td class="col-val bold" style="color: #990000;">{{ $company->formatMoney($sale->due_amount) }}</td>
             </tr>
         @endif
@@ -374,7 +407,7 @@
                 </tr>
                 @if ((float) $pmt->change_returned > 0)
                     <tr>
-                        <td class="col-left" style="font-size: {{ $subSize }}; color: #555;">{{ __("Change Returned:") }}</td>
+                        <td class="col-left" style="font-size: {{ $subSize }}; color: #555;">{!! $L("Change Returned:") !!}</td>
                         <td class="col-right" style="font-size: {{ $subSize }};">{{ $company->formatMoney($pmt->change_returned) }}</td>
                     </tr>
                 @endif
@@ -389,7 +422,7 @@
         <div class="dashed"></div>
         <!-- Thermal Receipt PIX Block -->
         <div class="text-center" style="text-align: center; margin: 4px 0;">
-            <div class="bold" style="font-size: {{ $subSize }}; text-transform: uppercase;">{{ __('Payment via PIX') }}</div>
+            <div class="bold" style="font-size: {{ $subSize }}; text-transform: uppercase;">{!! $L('Payment via PIX') !!}</div>
             <div style="font-size: {{ $fontSize }}; font-weight: bold;">{{ tenant_setting('pix_holder_name', $company->trade_name ?: $company->name) }}</div>
             <div style="font-size: {{ $subSize }}; color: #666666;">{{ tenant_setting('pix_city', $company->city ?: 'Springfield') }}</div>
         </div>
@@ -398,7 +431,7 @@
     @if (!empty($sale->notes))
         <div class="dashed"></div>
         <div style="font-size: {{ $subSize }}; text-align: left; padding: 2px 0; word-break: break-word;">
-            <strong>{{ __("Note:") }}</strong> {!! nl2br(e(strip_tags($sale->notes))) !== $sale->notes ? $sale->notes : nl2br(e($sale->notes)) !!}
+            <strong>{!! $L("Note:") !!}</strong> {!! nl2br(e(strip_tags($sale->notes))) !== $sale->notes ? $sale->notes : nl2br(e($sale->notes)) !!}
         </div>
     @endif
 
@@ -408,7 +441,7 @@
     @if (!empty($termsText))
         <div class="dashed"></div>
         <div style="font-size: {{ $subSize }}; text-align: left; padding: 2px 0; word-break: break-word;">
-            <strong>{{ __("Terms:") }}</strong>
+            <strong>{!! $L("Terms:") !!}</strong>
             <div style="margin-top: 1px;">
                 {!! clean_html($termsText) !!}
             </div>
@@ -422,21 +455,21 @@
         @if (!empty($qrCodeDataUri))
             <div class="qr-wrapper">
                 <img src="{{ $qrCodeDataUri }}" class="qr-image" alt="QR Code">
-                <div class="qr-caption">{{ __("Scan for digital e-receipt & verify") }}</div>
+                <div class="qr-caption">{!! $L("Scan for digital e-receipt & verify") !!}</div>
             </div>
         @elseif (!empty($qrCodeSvg))
             <div class="qr-wrapper">
                 <div style="width: {{ $qrDimension }}; height: {{ $qrDimension }}; margin: 0 auto;">
                     {!! $qrCodeSvg !!}
                 </div>
-                <div class="qr-caption">{{ __("Scan for digital e-receipt & verify") }}</div>
+                <div class="qr-caption">{!! $L("Scan for digital e-receipt & verify") !!}</div>
             </div>
         @endif
 
         <div class="ref-code">#{{ $sale->sale_number }}</div>
 
         <div class="footer-text">
-            <div>{{ __("Thank you for your visit & business!") }}</div>
+            <div>{!! $L("Thank you for your visit & business!") !!}</div>
             <div>{{ $company->website ?: (config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'saas.zoomnearby.com') }}</div>
             @php
                 $platformBranding = \App\Models\PlatformBranding::current();
@@ -445,7 +478,7 @@
             @endphp
             @if (setting('show_powered_by', true))
             <div style="font-size: {{ $subSize }}; color: #555555; margin-top: 3px; border-top: 1px dashed #dddddd; padding-top: 2px;">
-                {{ __("Powered by") }} {{ $platformName }} &bull; {{ __("Issued via") }} {{ $platformDomain }}
+                {!! $L("Powered by") !!} {{ $platformName }} &bull; {!! $L("Issued via") !!} {{ $platformDomain }}
             </div>
             @endif
         </div>
