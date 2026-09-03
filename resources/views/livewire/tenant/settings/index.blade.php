@@ -1473,12 +1473,33 @@
                  this.sortableInstances = [];
                  if (typeof Sortable === 'undefined') return;
 
+                 // forceFallback + fallbackOnBody: the slide-out drawer this
+                 // page shares a layout with uses a CSS transform to animate
+                 // open/closed (see layouts/tenant.blade.php), and *any*
+                 // transformed ancestor between a `position: fixed` element
+                 // and <body> hijacks it into being fixed relative to that
+                 // ancestor instead of the viewport. Native HTML5 drag (what
+                 // Sortable uses without forceFallback) isn't affected — it's
+                 // its own JS-simulated fallback clone that was rendering
+                 // pinned near the transformed ancestor's edge instead of
+                 // tracking the cursor. fallbackOnBody re-parents the clone
+                 // onto <body> itself, sidestepping any transformed ancestor
+                 // in between (SortableJS's own documented fix for exactly
+                 // this class of bug).
+                 const commonSortableOptions = {
+                     animation: 200,
+                     ghostClass: 'opacity-30',
+                     forceFallback: true,
+                     fallbackOnBody: true,
+                     fallbackClass: 'z-50',
+                     fallbackTolerance: 3,
+                 };
+
                  const sectionContainer = document.getElementById('nav-sections-container');
                  if (sectionContainer) {
                      this.sortableInstances.push(Sortable.create(sectionContainer, {
-                         animation: 200,
+                         ...commonSortableOptions,
                          handle: '.nav-section-drag-handle',
-                         ghostClass: 'opacity-30',
                          onEnd: () => this.syncFromDom(),
                      }));
                  }
@@ -1487,16 +1508,23 @@
                  // list straight into another's (not just reorder within its
                  // own), and — since every item's nested `.nav-children-
                  // container` shares the same group — drag it into or out of
-                 // another item to nest/un-nest it. onMove blocks dropping an
-                 // item that already has children into a children container:
-                 // only one level of nesting is supported, so that combination
-                 // would silently lose the grandchildren once synced.
+                 // another item to nest/un-nest it. Which of the two the
+                 // pointer counts as "in" is pure geometry (see .nav-
+                 // children-container's `ml-8` in the markup below: a real
+                 // margin, not just padding, narrows its own hoverable box
+                 // so it's a genuinely distinct drop target from the
+                 // full-width root list — dragging left past that margin
+                 // hands the pointer back to the root list on its own,
+                 // no custom pointer-tracking needed). onMove blocks
+                 // dropping an item that already has children into a
+                 // children container: only one level of nesting is
+                 // supported, so that combination would silently lose the
+                 // grandchildren once synced.
                  document.querySelectorAll('.nav-items-container, .nav-children-container').forEach((el) => {
                      this.sortableInstances.push(Sortable.create(el, {
+                         ...commonSortableOptions,
                          group: 'tenant-nav-items',
-                         animation: 200,
                          handle: '.nav-item-drag-handle',
-                         ghostClass: 'opacity-30',
                          onMove: (evt) => {
                              const childrenHolder = evt.dragged.querySelector('.nav-children-container');
                              const draggedHasChildren = childrenHolder && childrenHolder.children.length > 0;
@@ -1566,7 +1594,7 @@
         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
             <h3 class="text-sm font-black text-slate-800 dark:text-slate-100">{{ __('Navigation Menu') }}</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {{ __('Hide destinations your team doesn\'t use, drag to reorder sections, reorder destinations within a section, drag a destination into a different section, or drag one destination onto another to nest it as a sub-item (drag it back out to un-nest). Applies to every device signed in to this store — the mobile app included.') }}
+                {{ __('Hide destinations your team doesn\'t use, drag to reorder sections, or drag a destination into a different section. Drag it right, into the indented zone under another destination, to nest it as a sub-item — drag it back left, past the indent, to un-nest it to the top level. Applies to every device signed in to this store — the mobile app included.') }}
             </p>
         </div>
 
@@ -1585,16 +1613,22 @@
                                 <div class="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">
                                     <input type="checkbox" x-model="item.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
                                     <span class="flex-1 text-xs font-semibold text-slate-700 dark:text-slate-300" x-text="item.label"></span>
-                                    <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, drag into another section, or drop onto another destination to nest it') }}">
+                                    <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder or move to another section, or drag right into the indented zone below to nest it') }}">
                                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
                                     </span>
                                 </div>
-                                <div class="nav-children-container pl-6 space-y-0.5 min-h-[6px] mt-0.5" :data-parent-key="item.key">
+                                {{-- A real left margin (not just padding) narrows this
+                                     list's own hoverable box relative to the full-width
+                                     root list above, so SortableJS's ordinary cross-list
+                                     collision detection — not custom pointer-math — is
+                                     what decides indent (drag right, into this box) vs.
+                                     outdent (drag left, back into the root list). --}}
+                                <div class="nav-children-container ml-8 pl-2 border-l-2 border-dashed border-slate-200 dark:border-slate-700 space-y-0.5 min-h-[10px] mt-0.5" :data-parent-key="item.key">
                                     <template x-for="child in item.children" :key="child.key">
                                         <div :data-item-key="child.key" class="flex items-center gap-2 px-2 py-1 rounded-xl border-l-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
                                             <input type="checkbox" x-model="child.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
                                             <span class="flex-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400" x-text="child.label"></span>
-                                            <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, or drag out to un-nest') }}">
+                                            <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, or drag left past the indent to un-nest to the top level') }}">
                                                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
                                             </span>
                                         </div>

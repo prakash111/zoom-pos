@@ -218,6 +218,32 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertStringContainsString('class="nav-item-drag-handle', $html);
     }
 
+    /**
+     * Regression test for a reported bug: dragging an item within the
+     * builder rendered the SortableJS fallback drag-clone pinned near the
+     * page's left edge, escaping the card into the sidebar gap, instead of
+     * following the cursor — caused by a transformed ancestor elsewhere in
+     * the shared tenant layout hijacking the clone's `position: fixed`
+     * containing block. `fallbackOnBody: true` re-parents the clone onto
+     * <body>, sidestepping any such ancestor — see initSortables()'s
+     * `commonSortableOptions`. Also guards the indent/outdent drop-zone
+     * geometry: `.nav-children-container` must carry a real `ml-8` margin
+     * (which narrows its own hoverable box relative to the full-width root
+     * list, letting SortableJS's own collision detection tell "dragged
+     * right past the indent" from "dragged left past it" apart) rather than
+     * just inner padding, which wouldn't narrow the box at all.
+     */
+    public function test_navigation_tab_configures_sortable_for_reliable_indent_outdent_dragging(): void
+    {
+        $this->actingAsTenantAdmin();
+
+        $html = Livewire::test(SettingsIndex::class)->html();
+
+        $this->assertStringContainsString('forceFallback: true', $html);
+        $this->assertStringContainsString('fallbackOnBody: true', $html);
+        $this->assertStringContainsString('class="nav-children-container ml-8', $html);
+    }
+
     public function test_save_nav_config_requires_settings_permission(): void
     {
         [$company, $staff] = $this->actingAsTenantStaff();
