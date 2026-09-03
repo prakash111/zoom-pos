@@ -1,17 +1,15 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
-import '../../../core/models/product_model.dart';
+import '../../../core/config/bootstrap_cache.dart';
 import '../../../core/services/sync/sync_engine.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../core/utils/image_url.dart';
-import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/barcode_scanner_screen.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
+import '../../../core/widgets/sdui/sdui_catalog_layouts.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/auth_provider.dart';
 import '../../cash_register/cash_register_provider.dart';
@@ -25,15 +23,13 @@ import '../sales_repository.dart';
 import 'cart_sheet.dart';
 import 'invoice_actions_sheet.dart';
 
-/// Entry point for the POS module. Owns a [PosProvider] scoped to this route
-/// so the cart resets whenever a fresh sale is started from the dashboard.
+/// Entry point for the POS module. Agnostic layout driven by [BootstrapCache.instance.activeModule].
 class PosScreen extends StatelessWidget {
   const PosScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final apiClient = context.read<ApiClient>();
-
     final heldCartsStore = context.read<HeldCartsStore>();
     final syncEngine = context.read<SyncEngine>();
 
@@ -123,10 +119,6 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     if (result == null || !context.mounted) return;
 
     if (result.isPendingSync) {
-      // No server-side sale exists yet to preview/print/share — it's only
-      // created once the outbox pushes successfully — so skip straight past
-      // the invoice actions sheet instead of pointing it at a document id
-      // the server doesn't have.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).saleQueuedOffline)),
       );
@@ -172,8 +164,9 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     final pos = context.watch<PosProvider>();
     final company = context.watch<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
-    final isDesktopOrTabletWide = isWide(context);
+    final isDesktopOrTabletWide = MediaQuery.of(context).size.width >= 768;
     final l10n = AppLocalizations.of(context);
+    final activeModule = BootstrapCache.instance.activeModule;
 
     final catalogWidget = Column(
       children: [
@@ -205,11 +198,12 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
               suffixIcon: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.qr_code_scanner),
-                    tooltip: l10n.scanBarcode,
-                    onPressed: () => _scanBarcode(context),
-                  ),
+                  if (activeModule.features['has_barcode_scanner'] != false)
+                    IconButton(
+                      icon: const Icon(Icons.qr_code_scanner),
+                      tooltip: l10n.scanBarcode,
+                      onPressed: () => _scanBarcode(context),
+                    ),
                   if (pos.searchQuery.isNotEmpty)
                     IconButton(
                       icon: const Icon(Icons.clear),
@@ -233,7 +227,7 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: const Text('All'),
+                    label: Text(l10n.text('all', fallback: 'All')),
                     selected: pos.selectedCategoryId == null,
                     onSelected: (_) => pos.setCategory(null),
                   ),
@@ -251,13 +245,13 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
             ),
           ),
         const SizedBox(height: 8),
-        Expanded(child: _buildBody(pos, formatter, _baseUrl)),
+        Expanded(child: _buildBody(pos, formatter, _baseUrl, l10n)),
       ],
     );
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Point of Sale'),
+        title: Text(activeModule.title),
         actions: [
           if (pos.heldCarts.isNotEmpty)
             IconButton(
@@ -265,7 +259,7 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
                 label: Text('${pos.heldCarts.length}'),
                 child: const Icon(Icons.pause_circle_outline),
               ),
-              tooltip: 'Held orders',
+              tooltip: l10n.text('heldOrders', fallback: 'Held orders'),
               onPressed: () => _openCart(context),
             ),
         ],
@@ -295,7 +289,7 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
                   onPressed: () => _openCart(context),
                   icon: const Icon(Icons.shopping_cart_checkout),
                   label: Text(
-                    'View Cart · ${pos.cartCount} item${pos.cartCount == 1 ? '' : 's'} · ${formatter.format(pos.grandTotal)}',
+                    '${l10n.text('viewCart', fallback: 'View Cart')} · ${pos.cartCount} ${pos.cartCount == 1 ? l10n.text('item', fallback: 'item') : l10n.text('items', fallback: 'items')} · ${formatter.format(pos.grandTotal)}',
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -304,123 +298,24 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     );
   }
 
-  Widget _buildBody(PosProvider pos, CurrencyFormatter formatter, String? baseUrl) {
+  Widget _buildBody(PosProvider pos, CurrencyFormatter formatter, String? baseUrl, AppLocalizations l10n) {
     switch (pos.catalogStatus) {
       case CatalogStatus.loading:
         return const LoadingIndicator();
       case CatalogStatus.error:
-        return ErrorView(message: pos.catalogError ?? 'Could not load products.', onRetry: pos.loadCatalog);
+        return ErrorView(
+          message: pos.catalogError ?? l10n.text('couldNotLoadProducts', fallback: 'Could not load products.'),
+          onRetry: pos.loadCatalog,
+        );
       case CatalogStatus.loaded:
-        final products = pos.filteredProducts;
-        if (products.isEmpty) {
-          return const Center(child: Text('No products found.'));
-        }
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            return GridView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: gridColumnsFor(constraints.maxWidth),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.85,
-              ),
-              itemCount: products.length,
-              itemBuilder: (context, index) {
-                final product = products[index];
-                return _ProductCard(
-                  product: product,
-                  formatter: formatter,
-                  baseUrl: baseUrl,
-                  onTap: product.isOutOfStock ? null : () => pos.addToCart(product),
-                );
-              },
-            );
-          },
+        return SduiCatalogLayout(
+          layoutType: BootstrapCache.instance.activeModule.layoutType,
+          products: pos.filteredProducts,
+          formatter: formatter,
+          baseUrl: baseUrl,
+          onProductSelected: pos.addToCart,
+          emptyMessage: l10n.text('noProductsFound', fallback: 'No products found.'),
         );
     }
-  }
-}
-
-class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product, required this.formatter, required this.onTap, this.baseUrl});
-
-  final ProductModel product;
-  final CurrencyFormatter formatter;
-  final VoidCallback? onTap;
-  final String? baseUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final resolvedImageUrl = resolveImageUrl(product.imageUrl, baseUrl: baseUrl);
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox.expand(
-                    child: resolvedImageUrl == null
-                        ? _ProductImagePlaceholder()
-                        : CachedNetworkImage(
-                            imageUrl: resolvedImageUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => const Center(
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => _ProductImagePlaceholder(),
-                          ),
-                  ),
-                ),
-              ),
-              Text(
-                product.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    formatter.format(product.salePrice),
-                    style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
-                  ),
-                  if (product.isOutOfStock)
-                    Text('Out of stock', style: TextStyle(color: Colors.red.shade400, fontSize: 11))
-                  else if (product.isLowStock)
-                    Text('Low stock', style: TextStyle(color: Colors.orange.shade700, fontSize: 11)),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProductImagePlaceholder extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.grey.shade100,
-      child: Center(
-        child: Icon(Icons.inventory_2_outlined, size: 36, color: Colors.grey.shade400),
-      ),
-    );
   }
 }

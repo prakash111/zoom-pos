@@ -1,0 +1,122 @@
+import 'package:flutter/material.dart';
+
+/// Centralized registry resolving server icon names to Flutter [IconData].
+class SduiIconRegistry {
+  SduiIconRegistry._();
+
+  static const Map<String, IconData> _icons = {
+    // Sales & POS
+    'point_of_sale': Icons.point_of_sale_outlined,
+    'receipt_long': Icons.receipt_long_outlined,
+    'description': Icons.description_outlined,
+    'local_shipping': Icons.local_shipping_outlined,
+    'handyman': Icons.handyman_outlined,
+    'people': Icons.people_outline,
+    'person': Icons.person_outline,
+    'person_add': Icons.person_add_outlined,
+    'person_add_outlined': Icons.person_add_outlined,
+    'qr_code_scanner': Icons.qr_code_scanner,
+
+    // Restaurant & Kitchen
+    'restaurant': Icons.restaurant_outlined,
+    'table_restaurant': Icons.table_restaurant_outlined,
+    'soup_kitchen': Icons.soup_kitchen_outlined,
+    'restaurant_menu': Icons.restaurant_menu_outlined,
+
+    // Pharmacy & Health
+    'local_pharmacy': Icons.local_pharmacy_outlined,
+    'medication': Icons.medication_outlined,
+    'medical_services': Icons.medical_services_outlined,
+    'personal_injury': Icons.personal_injury_outlined,
+
+    // Service & Salon
+    'spa': Icons.spa_outlined,
+    'event_available': Icons.event_available_outlined,
+    'schedule': Icons.schedule_outlined,
+
+    // Financial
+    'savings': Icons.savings_outlined,
+    'notifications_active': Icons.notifications_active_outlined,
+    'request_quote': Icons.request_quote_outlined,
+    'flag': Icons.flag_outlined,
+    'insights': Icons.insights_outlined,
+    'bar_chart': Icons.bar_chart_outlined,
+    'payments': Icons.payments_outlined,
+    'credit_card': Icons.credit_card_outlined,
+    'qr_code_2': Icons.qr_code_2_outlined,
+    'account_balance': Icons.account_balance_outlined,
+    'account_balance_wallet': Icons.account_balance_wallet_outlined,
+
+    // Products & Inventory
+    'inventory': Icons.inventory_2_outlined,
+    'inventory_2': Icons.inventory_2_outlined,
+    'sell': Icons.sell_outlined,
+    'auto_awesome': Icons.auto_awesome_outlined,
+    'straighten': Icons.straighten_outlined,
+    'percent': Icons.percent_outlined,
+    'qr_code': Icons.qr_code_outlined,
+
+    // Admin & Settings
+    'workspace_premium': Icons.workspace_premium_outlined,
+    'settings': Icons.settings_outlined,
+    'translate': Icons.translate_outlined,
+    'badge': Icons.badge_outlined,
+    'devices_other': Icons.devices_other_outlined,
+    'tune': Icons.tune_outlined,
+    'storefront': Icons.storefront_outlined,
+    'receipt': Icons.receipt_outlined,
+    'monetization_on': Icons.monetization_on_outlined,
+    'api': Icons.api_outlined,
+    'menu_open': Icons.menu_open_outlined,
+
+    // Action pills & dialogs
+    'pause_circle': Icons.pause_circle_outline,
+    'pause_circle_outline': Icons.pause_circle_outline,
+    'edit_note': Icons.edit_note,
+    'local_offer': Icons.local_offer_outlined,
+    'local_offer_outlined': Icons.local_offer_outlined,
+    'event': Icons.event_outlined,
+    'notification_add': Icons.notification_add_outlined,
+    'notification_add_outlined': Icons.notification_add_outlined,
+
+    // Status badges
+    'check_circle': Icons.check_circle_outline,
+    'timelapse': Icons.timelapse_outlined,
+    'pending_actions': Icons.pending_actions_outlined,
+    'cancel': Icons.cancel_outlined,
+    'drafts': Icons.drafts_outlined,
+    'assignment_return': Icons.assignment_return_outlined,
+    'commute': Icons.commute_outlined,
+    'verified': Icons.verified_outlined,
+    'task_alt': Icons.task_alt,
+    'block': Icons.block_outlined,
+    'send': Icons.send_outlined,
+    'thumb_up': Icons.thumb_up_outlined,
+    'thumb_down': Icons.thumb_down_outlined,
+    'engineering': Icons.engineering_outlined,
+    'done_all': Icons.done_all,
+    'widgets': Icons.widgets_outlined,
+    'category': Icons.category_outlined,
+  };
+
+  /// Resolves an icon name from server payload to an [IconData].
+  static IconData resolve(String? iconName, {IconData fallback = Icons.widgets_outlined}) {
+    if (iconName == null || iconName.isEmpty) return fallback;
+    final normalized = iconName.toLowerCase().trim().replaceAll('-', '_');
+    return _icons[normalized] ?? fallback;
+  }
+
+  /// Parses a hex color string (e.g. '#15803d', '15803d') into a Flutter [Color].
+  static Color parseColor(String? hexString, {Color fallback = const Color(0xFF2563EB)}) {
+    if (hexString == null || hexString.isEmpty) return fallback;
+    try {
+      final buffer = StringBuffer();
+      final cleaned = hexString.replaceAll('#', '').trim();
+      if (cleaned.length == 6) buffer.write('ff');
+      buffer.write(cleaned);
+      return Color(int.parse(buffer.toString(), radix: 16));
+    } catch (_) {
+      return fallback;
+    }
+  }
+}

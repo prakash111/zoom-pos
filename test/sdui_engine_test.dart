@@ -1,0 +1,247 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:zoom_pos_mobile/core/config/bootstrap_cache.dart';
+import 'package:zoom_pos_mobile/core/sdui/models/sdui_models.dart';
+import 'package:zoom_pos_mobile/core/sdui/sdui_component_registry.dart';
+import 'package:zoom_pos_mobile/core/sdui/sdui_icon_registry.dart';
+import 'package:zoom_pos_mobile/core/widgets/sdui/sdui_controls.dart';
+
+void main() {
+  group('SDUI Models & Serialization', () {
+    test('TenantSchema and ModuleSchema decode correctly from JSON payload', () {
+      final json = {
+        'tenant': {
+          'id': 'tenant_123',
+          'business_name': 'Zoom Fresh',
+          'active_mode': 'pharmacy',
+          'available_modes': ['retail', 'pharmacy', 'service_booking']
+        },
+        'modules': {
+          'pharmacy': {
+            'id': 'pharmacy',
+            'title': 'Pharmacy & Chemist',
+            'layout_type': 'standard_grid',
+            'features': {
+              'has_batch_tracking': true,
+              'has_expiry_alerts': true,
+              'has_prescription_upload': true,
+              'has_barcode_scanner': true,
+            },
+            'cart_configuration': {
+              'show_customer_selector': true,
+              'allow_split_payment': true,
+              'tax_display': 'itemized',
+            }
+          }
+        },
+        'menu_structure': [
+          {
+            'key': 'pharmacy_dispensary',
+            'title': 'Pharmacy & Dispensary',
+            'color': '#0d9488',
+            'items': [
+              {
+                'key': 'dispensary_pos',
+                'title': 'Dispensary POS',
+                'icon': 'medication',
+                'component': 'pos',
+                'permission': 'pos',
+              },
+              {
+                'key': 'prescriptions',
+                'title': 'Doctor Prescriptions',
+                'icon': 'receipt_long',
+                'component': 'prescriptions',
+                'permission': 'sales',
+              }
+            ]
+          }
+        ],
+        'ui_schema': {
+          'payment_methods': [
+            {
+              'id': 'cash',
+              'code': 'cash',
+              'title': 'Cash Payment',
+              'icon': 'payments',
+              'color': '#15803d',
+              'requires_reference': false,
+            },
+            {
+              'id': 'upi_qr',
+              'code': 'upi_qr',
+              'title': 'UPI & QR Code',
+              'icon': 'qr_code_2',
+              'color': '#7e22ce',
+              'requires_reference': true,
+            }
+          ],
+          'status_labels': {
+            'sale': {
+              'paid': {'label': 'Fully Paid', 'color': '#16a34a', 'badge_style': 'solid'},
+              'partial': {'label': 'Partially Settled', 'color': '#ca8a04', 'badge_style': 'subtle'},
+            }
+          },
+          'tax': {
+            'country': 'IN',
+            'tax_label': 'GST',
+            'has_sub_components': true,
+            'sub_components': [
+              {'code': 'CGST', 'label': 'Central GST', 'rate': 9.0},
+              {'code': 'SGST', 'label': 'State GST', 'rate': 9.0},
+            ]
+          }
+        }
+      };
+
+      final tenant = TenantSchema.fromJson(json['tenant'] as Map<String, dynamic>);
+      expect(tenant.id, 'tenant_123');
+      expect(tenant.businessName, 'Zoom Fresh');
+      expect(tenant.activeMode, 'pharmacy');
+      expect(tenant.availableModes, contains('pharmacy'));
+
+      final modules = (json['modules'] as Map<String, dynamic>).map(
+        (k, v) => MapEntry(k, ModuleSchema.fromJson(v as Map<String, dynamic>)),
+      );
+      expect(modules['pharmacy']?.title, 'Pharmacy & Chemist');
+      expect(modules['pharmacy']?.features['has_batch_tracking'], isTrue);
+      expect(modules['pharmacy']?.cartConfiguration.allowSplitPayment, isTrue);
+
+      final menu = (json['menu_structure'] as List)
+          .map((m) => SduiNavSectionSchema.fromJson(m as Map<String, dynamic>))
+          .toList();
+      expect(menu.length, 1);
+      expect(menu.first.items.length, 2);
+      expect(menu.first.items.first.title, 'Dispensary POS');
+
+      final uiSchema = SduiUiSchema.fromJson(json['ui_schema'] as Map<String, dynamic>);
+      expect(uiSchema.paymentMethods.length, 2);
+      expect(uiSchema.paymentMethods.first.code, 'cash');
+      expect(uiSchema.statusFor('sale', 'paid')?.label, 'Fully Paid');
+      expect(uiSchema.tax.subComponents.length, 2);
+      expect(uiSchema.tax.subComponents.first.code, 'CGST');
+    });
+  });
+
+  group('SDUI Icon and Color Registry', () {
+    test('resolves server icon names to Material Icons', () {
+      expect(SduiIconRegistry.resolve('point_of_sale'), Icons.point_of_sale_outlined);
+      expect(SduiIconRegistry.resolve('restaurant'), Icons.restaurant_outlined);
+      expect(SduiIconRegistry.resolve('medication'), Icons.medication_outlined);
+      expect(SduiIconRegistry.resolve('soup_kitchen'), Icons.soup_kitchen_outlined);
+      expect(SduiIconRegistry.resolve('qr_code'), Icons.qr_code_outlined);
+      expect(SduiIconRegistry.resolve('unrecognized_xyz'), Icons.widgets_outlined);
+    });
+
+    test('parses hex colors correctly with or without hash', () {
+      final c1 = SduiIconRegistry.parseColor('#16a34a');
+      expect(c1.value, const Color(0xFF16A34A).value);
+
+      final c2 = SduiIconRegistry.parseColor('0284c7');
+      expect(c2.value, const Color(0xFF0284C7).value);
+
+      final c3 = SduiIconRegistry.parseColor(null, fallback: Colors.red);
+      expect(c3, Colors.red);
+    });
+  });
+
+  group('SDUI Component Registry', () {
+    test('resolves registered components and custom registered handlers', () {
+      final registry = SduiComponentRegistry.instance;
+      expect(registry.has('pos'), isTrue);
+      expect(registry.has('restaurant_pos'), isTrue);
+      expect(registry.has('cash_register'), isTrue);
+
+      // Register new custom component for future hotel module
+      registry.register('hotel_rooms', (_) => const Scaffold(body: Text('Hotel Rooms')));
+      expect(registry.has('hotel_rooms'), isTrue);
+
+      final builder = registry.resolve('hotel_rooms');
+      expect(builder, isNotNull);
+    });
+  });
+
+  group('SDUI Dynamic Widgets', () {
+    testWidgets('SduiActionPill renders badge and responds to taps', (tester) async {
+      var tapped = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SduiActionPill(
+              label: 'Hold Carts',
+              icon: Icons.pause_circle_outline,
+              badgeCount: 3,
+              isActive: true,
+              onTap: () => tapped = true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Hold Carts'), findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
+
+      await tester.tap(find.byType(SduiActionPill));
+      expect(tapped, isTrue);
+    });
+
+    testWidgets('SduiStatusBadge renders solid and subtle styles', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                SduiStatusBadge(label: 'COMPLETED', color: Colors.green, isSolid: true),
+                SduiStatusBadge(label: 'PENDING', color: Colors.amber, isSolid: false),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('COMPLETED'), findsOneWidget);
+      expect(find.text('PENDING'), findsOneWidget);
+    });
+
+    testWidgets('SduiStepCounter increments and decrements quantity', (tester) async {
+      var currentVal = 1;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                return SduiStepCounter(
+                  value: currentVal,
+                  onChanged: (newVal) => setState(() => currentVal = newVal),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('1'), findsOneWidget);
+
+      // Tap + button
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pump();
+      expect(currentVal, 2);
+      expect(find.text('2'), findsOneWidget);
+
+      // Tap - button
+      await tester.tap(find.byIcon(Icons.remove));
+      await tester.pump();
+      expect(currentVal, 1);
+      expect(find.text('1'), findsOneWidget);
+    });
+  });
+
+  group('BootstrapCache SDUI Integration', () {
+    test('effectiveSections provides clean fallback when cache is empty', () {
+      final cache = BootstrapCache.instance;
+      expect(cache.effectiveSections, isNotEmpty);
+      final firstSection = cache.effectiveSections.first;
+      expect(firstSection.items, isNotEmpty);
+    });
+  });
+}

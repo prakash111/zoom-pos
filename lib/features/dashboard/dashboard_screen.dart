@@ -11,6 +11,8 @@ import '../../core/config/theme_provider.dart';
 import '../../core/models/analytics_model.dart';
 import '../../core/models/company_model.dart';
 import '../../core/models/user_model.dart';
+import '../../core/sdui/sdui_component_registry.dart';
+import '../../core/sdui/sdui_icon_registry.dart';
 import '../../core/services/sync/sync_status_badge.dart';
 import '../../core/storage/app_preferences.dart';
 import '../../core/utils/currency_formatter.dart';
@@ -18,35 +20,11 @@ import '../../core/utils/responsive.dart';
 import '../../core/widgets/coming_soon_screen.dart';
 import '../../l10n/app_localizations.dart';
 import '../analytics/analytics_repository.dart';
-import '../analytics/screens/analytics_screen.dart';
 import '../analytics/widgets/analytics_widgets.dart';
 import '../auth/auth_provider.dart';
-import '../cash_register/screens/cash_register_screen.dart';
-import '../catalog/screens/catalog_screen.dart';
-import '../catalog_admin/screens/catalog_admin_screen.dart';
-import '../consignments/screens/consignments_screen.dart';
-import '../customers/screens/customers_screen.dart';
-import '../devices/screens/devices_screen.dart';
-import '../inventory/screens/inventory_management_screen.dart';
-import '../languages/screens/languages_screen.dart';
-import '../payables/screens/payables_screen.dart';
-import '../pos/screens/pos_screen.dart';
-import '../quotations/screens/quotations_screen.dart';
-import '../receivables/screens/due_receivables_screen.dart';
-import '../reports/screens/reports_screen.dart';
-import '../restaurant/screens/restaurant_kds_screen.dart';
-import '../restaurant/screens/restaurant_pos_screen.dart';
-import '../restaurant/screens/restaurant_tables_screen.dart';
-import '../sales/screens/sales_screen.dart';
-import '../sales_targets/screens/sales_targets_screen.dart';
-import '../service_orders/screens/service_orders_screen.dart';
 import '../settings/screens/change_password_screen.dart';
-import '../settings/screens/tenant_settings_screen.dart';
 import '../settings/server_settings_screen.dart';
 import '../settings/settings_repository.dart';
-import '../staff/screens/staff_screen.dart';
-import '../subscription/screens/subscription_screen.dart';
-import '../taxes/screens/taxes_screen.dart';
 
 const int _maximumNavigationDepth = 2;
 
@@ -108,312 +86,40 @@ class _NavSection {
   final Map<String, String> parentByKey;
 }
 
-/// Retail (general) mode's nav tree — the drawer/rail/top bar/bottom bar all
-/// render this same structure, just flattened differently. Mirrors the web
-/// tenant sidebar's general-mode sections (see layouts/tenant.blade.php's
-/// "GENERAL RETAIL DRAWER ITEMS" branch): Cashier & Sales, Financial
-/// Management, Products & Inventory, Administration & Settings.
-List<_NavSection> _retailSections() => [
+/// Dynamically hydrates navigation sections from the Server-Driven UI bootstrap payload,
+/// resolving icons via [SduiIconRegistry] and screen builders via [SduiComponentRegistry].
+List<_NavSection> _serverDrivenSections() {
+  final sduiSections = BootstrapCache.instance.effectiveSections;
+  return [
+    for (final s in sduiSections)
       _NavSection(
-        'cashier_sales',
-        (l10n) => l10n.navHeaderCashierSales,
+        s.key,
+        (l10n) => l10n.text(s.title, fallback: s.title),
         [
-          _FeatureTile('pos', (l10n) => l10n.featurePos,
-              Icons.point_of_sale_outlined, (_) => const PosScreen(), 'pos'),
-          _FeatureTile('sales', (l10n) => l10n.featureSales,
-              Icons.receipt_long_outlined, (_) => const SalesScreen(), 'sales'),
-          _FeatureTile(
-              'quotations',
-              (l10n) => l10n.featureQuotations,
-              Icons.description_outlined,
-              (_) => const QuotationsScreen(),
-              'quotes'),
-          _FeatureTile(
-              'consignments',
-              (l10n) => l10n.featureConsignments,
-              Icons.local_shipping_outlined,
-              (_) => const ConsignmentsScreen(),
-              'consignments'),
-          _FeatureTile(
-              'service_orders',
-              (l10n) => l10n.featureServiceOrders,
-              Icons.handyman_outlined,
-              (_) => const ServiceOrdersScreen(),
-              'service_orders'),
-          _FeatureTile(
-              'customers',
-              (l10n) => l10n.featureCustomers,
-              Icons.people_outline,
-              (_) => const CustomersScreen(),
-              'customers'),
+          for (final item in s.items)
+            _FeatureTile(
+              item.key,
+              (l10n) => l10n.text(item.title, fallback: item.title),
+              SduiIconRegistry.resolve(item.icon),
+              SduiComponentRegistry.instance.resolve(item.component ?? item.key),
+              item.permission,
+            ),
         ],
-        headerColor: Colors.blue.shade700,
+        headerColor: s.color != null ? SduiIconRegistry.parseColor(s.color) : null,
+        parentByKey: {
+          for (final item in s.items)
+            if (item.parent != null && item.parent!.isNotEmpty)
+              item.key: item.parent!,
+        },
       ),
-      _NavSection(
-        'financial_management',
-        (l10n) => l10n.navHeaderFinancialManagement,
-        [
-          _FeatureTile(
-              'cash_register',
-              (l10n) => l10n.featureCashRegister,
-              Icons.savings_outlined,
-              (_) => const CashRegisterScreen(),
-              'cash_register'),
-          _FeatureTile(
-              'due_receivables',
-              (l10n) => l10n.featureDueReceivables,
-              Icons.notifications_active_outlined,
-              (_) => const DueReceivablesScreen(),
-              'finance'),
-          _FeatureTile(
-              'payables',
-              (l10n) => l10n.featurePayables,
-              Icons.request_quote_outlined,
-              (_) => const PayablesScreen(),
-              'finance'),
-          _FeatureTile(
-              'sales_targets',
-              (l10n) => l10n.featureSalesTargets,
-              Icons.flag_outlined,
-              (_) => const SalesTargetsScreen(),
-              'targets'),
-          _FeatureTile('reports', (l10n) => l10n.featureReports,
-              Icons.insights_outlined, (_) => const ReportsScreen(), 'reports'),
-          _FeatureTile(
-              'analytics',
-              (l10n) => l10n.featureAnalytics,
-              Icons.bar_chart_outlined,
-              (_) => const AnalyticsScreen(),
-              'reports'),
-        ],
-      ),
-      _NavSection(
-        'products_inventory',
-        (l10n) => l10n.navHeaderProductsInventory,
-        [
-          _FeatureTile(
-              'inventory',
-              (l10n) => l10n.featureInventory,
-              Icons.inventory_2_outlined,
-              (_) => const InventoryManagementScreen(),
-              'products'),
-          _FeatureTile(
-              'categories',
-              (l10n) => l10n.featureCategories,
-              Icons.sell_outlined,
-              (_) => const CategoriesScreen(),
-              'categories'),
-          _FeatureTile(
-              'brands',
-              (l10n) => l10n.featureBrands,
-              Icons.auto_awesome_outlined,
-              (_) => const BrandsScreen(),
-              'categories'),
-          _FeatureTile('units', (l10n) => l10n.featureUnits,
-              Icons.straighten_outlined, (_) => const UnitsScreen(), 'units'),
-          _FeatureTile(
-              'suppliers',
-              (l10n) => l10n.featureSuppliers,
-              Icons.local_shipping_outlined,
-              (_) => const SuppliersScreen(),
-              'suppliers'),
-          _FeatureTile('taxes', (l10n) => l10n.featureTaxes,
-              Icons.percent_outlined, (_) => const TaxesScreen(), 'settings'),
-          _FeatureTile('catalog', (l10n) => l10n.featureOnlineCatalog,
-              Icons.qr_code_outlined, (_) => const CatalogScreen(), 'catalog'),
-        ],
-      ),
-      _NavSection(
-        'administration',
-        (l10n) => l10n.navHeaderAdministration,
-        [
-          _FeatureTile(
-              'subscription',
-              (l10n) => l10n.featureSubscription,
-              Icons.workspace_premium_outlined,
-              (_) => const SubscriptionScreen()),
-          _FeatureTile(
-              'settings',
-              (l10n) => l10n.featureSettings,
-              Icons.settings_outlined,
-              (_) => const TenantSettingsScreen(),
-              'settings'),
-          _FeatureTile(
-              'languages',
-              (l10n) => l10n.featureLanguages,
-              Icons.translate_outlined,
-              (_) => const LanguagesScreen(),
-              'settings'),
-          _FeatureTile('staff', (l10n) => l10n.featureStaff,
-              Icons.badge_outlined, (_) => const StaffScreen(), 'users'),
-          _FeatureTile('devices', (l10n) => l10n.featureDevices,
-              Icons.devices_other_outlined, (_) => const DevicesScreen()),
-        ],
-      ),
-    ];
+  ];
+}
 
-/// Cafe & Restaurant mode's nav tree — a 1:1 mirror of the web tenant
-/// sidebar's restaurant-mode sections (see layouts/tenant.blade.php's
-/// `$isRestaurant` branch): RESTAURANT OPERATIONS, ORDERS & CASH, FINANCIAL
-/// MANAGEMENT, KITCHEN MENU & CATALOG, ADMINISTRATION & SETTINGS. Service
-/// Orders and Consignments are retail-only and never appear here.
-List<_NavSection> _restaurantSections() => [
-      _NavSection(
-        'restaurant_operations',
-        (l10n) => l10n.navHeaderRestaurantOperations,
-        [
-          _FeatureTile(
-              'restaurant_pos',
-              (l10n) => l10n.featureRestaurantPos,
-              Icons.restaurant_outlined,
-              (_) => const RestaurantPosScreen(),
-              'pos'),
-          _FeatureTile(
-              'floor_plan',
-              (l10n) => l10n.featureFloorPlan,
-              Icons.table_restaurant_outlined,
-              (_) => const RestaurantTablesScreen(),
-              'pos'),
-          _FeatureTile(
-              'kitchen_display',
-              (l10n) => l10n.featureKitchenDisplay,
-              Icons.soup_kitchen_outlined,
-              (_) => const RestaurantKdsScreen(),
-              'pos'),
-        ],
-        headerColor: Colors.lime.shade800,
-      ),
-      _NavSection(
-        'orders_cash',
-        (l10n) => l10n.navHeaderOrdersCash,
-        [
-          _FeatureTile('dining_history', (l10n) => l10n.featureDiningHistory,
-              Icons.receipt_long_outlined, (_) => const SalesScreen(), 'sales'),
-          _FeatureTile(
-              'cash_register',
-              (l10n) => l10n.featureCashRegister,
-              Icons.savings_outlined,
-              (_) => const CashRegisterScreen(),
-              'cash_register'),
-        ],
-      ),
-      _NavSection(
-        'financial_management',
-        (l10n) => l10n.navHeaderFinancialManagement,
-        [
-          _FeatureTile(
-              'accounts_receivable',
-              (l10n) => l10n.featureAccountsReceivable,
-              Icons.notifications_active_outlined,
-              (_) => const DueReceivablesScreen(),
-              'finance'),
-          _FeatureTile(
-              'accounts_payable',
-              (l10n) => l10n.featureAccountsPayable,
-              Icons.request_quote_outlined,
-              (_) => const PayablesScreen(),
-              'finance'),
-          _FeatureTile(
-              'reports_analytics',
-              (l10n) => l10n.featureReportsAnalytics,
-              Icons.insights_outlined,
-              (_) => const ReportsScreen(),
-              'reports'),
-        ],
-      ),
-      _NavSection(
-        'kitchen_menu_catalog',
-        (l10n) => l10n.navHeaderKitchenMenuCatalog,
-        [
-          _FeatureTile(
-              'menu_dishes',
-              (l10n) => l10n.featureMenuDishes,
-              Icons.inventory_2_outlined,
-              (_) => const InventoryManagementScreen(),
-              'products'),
-          _FeatureTile(
-              'categories',
-              (l10n) => l10n.featureCategories,
-              Icons.sell_outlined,
-              (_) => const CategoriesScreen(),
-              'categories'),
-          _FeatureTile(
-              'brands',
-              (l10n) => l10n.featureBrands,
-              Icons.auto_awesome_outlined,
-              (_) => const BrandsScreen(),
-              'categories'),
-          _FeatureTile('units', (l10n) => l10n.featureUnits,
-              Icons.straighten_outlined, (_) => const UnitsScreen(), 'units'),
-          _FeatureTile(
-              'suppliers',
-              (l10n) => l10n.featureFoodSuppliers,
-              Icons.local_shipping_outlined,
-              (_) => const SuppliersScreen(),
-              'suppliers'),
-          _FeatureTile('catalog', (l10n) => l10n.featureOnlineCatalog,
-              Icons.qr_code_outlined, (_) => const CatalogScreen(), 'catalog'),
-          _FeatureTile(
-              'guest_directory',
-              (l10n) => l10n.featureGuestDirectory,
-              Icons.people_outline,
-              (_) => const CustomersScreen(),
-              'customers'),
-        ],
-      ),
-      _NavSection(
-        'administration',
-        (l10n) => l10n.navHeaderAdministration,
-        [
-          _FeatureTile(
-              'subscription',
-              (l10n) => l10n.featureSubscription,
-              Icons.workspace_premium_outlined,
-              (_) => const SubscriptionScreen()),
-          _FeatureTile(
-              'settings',
-              (l10n) => l10n.featureSettings,
-              Icons.settings_outlined,
-              (_) => const TenantSettingsScreen(),
-              'settings'),
-          _FeatureTile(
-              'languages',
-              (l10n) => l10n.featureLanguages,
-              Icons.translate_outlined,
-              (_) => const LanguagesScreen(),
-              'settings'),
-          _FeatureTile('staff', (l10n) => l10n.featureStaff,
-              Icons.badge_outlined, (_) => const StaffScreen(), 'users'),
-          _FeatureTile('devices', (l10n) => l10n.featureDevices,
-              Icons.devices_other_outlined, (_) => const DevicesScreen()),
-        ],
-      ),
-    ];
-
-/// The active nav tree for this tenant — retail (general) or Cafe &
-/// Restaurant, chosen by [CompanyModel.isRestaurantMode] exactly as the web
-/// picks between its two sidebar branches, with this tenant's
-/// Settings > Navigation Menu customization applied on top: a tile the
-/// signed-in [user] isn't authorized for (see [_FeatureTile.visibleTo]) is
-/// always dropped first, then for the tiles that remain —
-///  - a tile the tenant hid stays dropped,
-///  - a tile the tenant moved to a different section renders there instead
-///    of its compiled-in default section (an unrecognized target section
-///    is ignored, keeping the tile in its default section, since sections
-///    are fixed per mode and a moved-to section might belong to the other
-///    mode or no longer exist),
-///  - within each section, tiles sort by the tenant's per-item order where
-///    set, falling back to compiled-in relative order for the rest,
-///  - a section left with no visible tiles is dropped entirely, and the
-///    surviving sections sort by the tenant's per-section order, falling
-///    back to compiled-in relative order for any section it didn't set.
-/// This is the single point all four dock renderings (drawer/rail/top
-/// bar/bottom bar) go through, so their tile-to-index mapping stays
-/// consistent with each other.
+/// The active nav tree for this tenant — loaded dynamically from the backend SDUI
+/// module schema and menu structure, with this tenant's Settings > Navigation Menu
+/// customization applied on top.
 List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
-  final compiled = (company?.isRestaurantMode ?? false)
-      ? _restaurantSections()
-      : _retailSections();
+  final compiled = _serverDrivenSections();
   final nav = BootstrapCache.instance.navConfig;
   final itemOverrides = {for (final item in nav.items) item.key: item};
   final sectionOrderOverrides = {
@@ -564,9 +270,7 @@ class NavSectionDescriptor {
 /// can see which module.
 List<NavSectionDescriptor> navSectionsForSettings(
     AppLocalizations l10n, CompanyModel? company) {
-  final sections = (company?.isRestaurantMode ?? false)
-      ? _restaurantSections()
-      : _retailSections();
+  final sections = _serverDrivenSections();
   return [
     for (final section in sections)
       NavSectionDescriptor(
@@ -683,7 +387,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildDrawer(
       BuildContext context, CompanyModel? company, UserModel? user) {
     final l10n = AppLocalizations.of(context);
-    final isRestaurant = company?.isRestaurantMode ?? false;
 
     final coverUrl = company?.drawerCoverUrl;
     final hasCover = coverUrl != null && coverUrl.isNotEmpty;
@@ -723,16 +426,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   fontSize: 18,
                   fontWeight: FontWeight.bold),
             ),
-            if (company != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                isRestaurant
-                    ? 'CAFE & RESTAURANT'
-                    : company.planName.toUpperCase(),
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
-              ),
-            ],
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    BootstrapCache.instance.activeModule.title.toUpperCase(),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.95),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (BootstrapCache.instance.availableModes.length > 1) ...[
+                  const SizedBox(width: 4),
+                  PopupMenuButton<String>(
+                    tooltip: 'Switch Operating Mode',
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.swap_horiz, size: 18, color: Colors.white),
+                    onSelected: (mode) async {
+                      final client = context.read<ApiClient>();
+                      final ok = await BootstrapCache.instance.switchOperatingMode(mode, client);
+                      if (ok && mounted) {
+                        setState(() {});
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      for (final m in BootstrapCache.instance.availableModes)
+                        PopupMenuItem(
+                          value: m,
+                          child: Text(
+                            (BootstrapCache.instance.modules[m]?.title ?? m).toUpperCase(),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
       ),
@@ -1186,7 +923,7 @@ class _DashboardAnalytics extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                    builder: (_) => const InventoryManagementScreen()),
+                    builder: SduiComponentRegistry.instance.resolve('inventory')),
               ),
             ),
           ),
@@ -1203,7 +940,8 @@ class _DashboardAnalytics extends StatelessWidget {
                   '${formatter.format(analytics.totalReceivables)} outstanding'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DueReceivablesScreen()),
+                MaterialPageRoute(
+                    builder: SduiComponentRegistry.instance.resolve('due_receivables')),
               ),
             ),
           ),

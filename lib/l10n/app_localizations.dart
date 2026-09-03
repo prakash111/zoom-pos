@@ -57,6 +57,13 @@ class AppLocalizations {
   String _s(String key) =>
       TranslationsCache.instance.forLocale(localeName)[key] ?? _strings[key] ?? kEnStrings[key] ?? key;
 
+  /// Resolves any dynamic key delivered from the server payload,
+  /// checking server translation cache, bundled locale dictionary, and English fallback.
+  String text(String key, {String? fallback}) =>
+      TranslationsCache.instance.forLocale(localeName)[key] ?? _strings[key] ?? kEnStrings[key] ?? fallback ?? key;
+
+  String s(String key, {String? fallback}) => text(key, fallback: fallback);
+
   /// Substitutes `{name}` placeholders in a template string, e.g.
   /// `_format('{n} items', {'n': '3'})` → `'3 items'`.
   String _format(String key, Map<String, String> args) {

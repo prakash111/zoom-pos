@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/config/bootstrap_cache.dart';
 import '../../../core/models/customer_model.dart';
 import '../../../core/models/settings_models.dart';
+import '../../../core/sdui/sdui_icon_registry.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/sdui/sdui_controls.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/auth_provider.dart';
 import '../../customers/customers_repository.dart';
@@ -66,14 +69,15 @@ class CartSheet extends StatelessWidget {
     final pos = context.read<PosProvider>();
     final controller = TextEditingController(text: pos.orderNotes);
 
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.edit_note, size: 22),
-            SizedBox(width: 8),
-            Text('Order Notes & Remarks'),
+            const Icon(Icons.edit_note, size: 22),
+            const SizedBox(width: 8),
+            Text(l10n.text('orderNotes', fallback: 'Order Notes & Remarks')),
           ],
         ),
         contentPadding:
@@ -82,9 +86,9 @@ class CartSheet extends StatelessWidget {
           controller: controller,
           maxLines: 3,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'e.g. Special packaging, delivery note, invoice memo',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: l10n.text('orderNotesHint', fallback: 'e.g. Special packaging, delivery note, invoice memo'),
+            border: const OutlineInputBorder(),
           ),
         ),
         actionsPadding:
@@ -96,14 +100,14 @@ class CartSheet extends StatelessWidget {
             children: [
               TextButton(
                 onPressed: () => Navigator.of(dialogCtx).pop(),
-                child: const Text('Cancel'),
+                child: Text(l10n.cancel),
               ),
               ElevatedButton(
                 onPressed: () {
                   pos.setOrderNotes(controller.text.trim());
                   Navigator.of(dialogCtx).pop();
                 },
-                child: const Text('Save Note'),
+                child: Text(l10n.text('saveNote', fallback: 'Save Note')),
               ),
             ],
           ),
@@ -114,6 +118,7 @@ class CartSheet extends StatelessWidget {
 
   void _showDiscountDialog(BuildContext context) {
     final pos = context.read<PosProvider>();
+    final l10n = AppLocalizations.of(context);
     final controller = TextEditingController(
       text: pos.customDiscount > 0 ? pos.customDiscount.toStringAsFixed(0) : '',
     );
@@ -123,11 +128,11 @@ class CartSheet extends StatelessWidget {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.local_offer_outlined, size: 22),
-              SizedBox(width: 8),
-              Text('Apply Discount'),
+              const Icon(Icons.local_offer_outlined, size: 22),
+              const SizedBox(width: 8),
+              Text(l10n.text('applyDiscount', fallback: 'Apply Discount')),
             ],
           ),
           contentPadding:
@@ -139,7 +144,7 @@ class CartSheet extends StatelessWidget {
                 children: [
                   Expanded(
                     child: ChoiceChip(
-                      label: const Text('Fixed Amount'),
+                      label: Text(l10n.text('fixedAmount', fallback: 'Fixed Amount')),
                       selected: !isPercent,
                       onSelected: (_) =>
                           setDialogState(() => isPercent = false),
@@ -148,7 +153,7 @@ class CartSheet extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: ChoiceChip(
-                      label: const Text('Percentage (%)'),
+                      label: Text(l10n.text('percentage', fallback: 'Percentage (%)')),
                       selected: isPercent,
                       onSelected: (_) => setDialogState(() => isPercent = true),
                     ),
@@ -341,28 +346,18 @@ class CartSheet extends StatelessWidget {
   }
 
   IconData _iconForMethod(String code) {
-    final c = code.toLowerCase();
-    if (c.contains('cash')) return Icons.payments_outlined;
-    if (c.contains('card') || c.contains('debit') || c.contains('credit_card'))
-      return Icons.credit_card_outlined;
-    if (c.contains('upi') ||
-        c.contains('qr') ||
-        c.contains('gpay') ||
-        c.contains('phonepe')) return Icons.qr_code_2_outlined;
-    if (c.contains('credit') || c.contains('due') || c.contains('khata'))
-      return Icons.schedule_outlined;
-    if (c.contains('bank') || c.contains('transfer'))
-      return Icons.account_balance_outlined;
-    return Icons.account_balance_wallet_outlined;
+    final sduiMethod = BootstrapCache.instance.paymentMethodFor(code);
+    if (sduiMethod != null) {
+      return SduiIconRegistry.resolve(sduiMethod.icon);
+    }
+    return SduiIconRegistry.resolve(code, fallback: Icons.account_balance_wallet_outlined);
   }
 
   Color _colorForMethod(String code, Color defaultPrimary) {
-    final c = code.toLowerCase();
-    if (c.contains('cash')) return Colors.green.shade700;
-    if (c.contains('card')) return Colors.blue.shade700;
-    if (c.contains('upi') || c.contains('qr')) return Colors.purple.shade700;
-    if (c.contains('credit') || c.contains('due')) return Colors.amber.shade800;
-    if (c.contains('bank')) return Colors.teal.shade700;
+    final sduiMethod = BootstrapCache.instance.paymentMethodFor(code);
+    if (sduiMethod != null) {
+      return SduiIconRegistry.parseColor(sduiMethod.color, fallback: defaultPrimary);
+    }
     return defaultPrimary;
   }
 
@@ -392,17 +387,18 @@ class CartSheet extends StatelessWidget {
     final pos = context.read<PosProvider>();
     final company = context.read<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
+    final l10n = AppLocalizations.of(context);
     final controller =
         TextEditingController(text: pos.amountPaid.toStringAsFixed(2));
 
     await showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.price_check, size: 22),
-            SizedBox(width: 8),
-            Text('Amount Paid'),
+            const Icon(Icons.price_check, size: 22),
+            const SizedBox(width: 8),
+            Text(l10n.text('amountPaid', fallback: 'Amount Paid')),
           ],
         ),
         contentPadding:
@@ -411,7 +407,7 @@ class CartSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Grand Total: ${formatter.format(pos.grandTotal)}',
+            Text('${l10n.text('grandTotal', fallback: 'Grand Total')}: ${formatter.format(pos.grandTotal)}',
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
             const SizedBox(height: 12),
             TextField(
@@ -420,7 +416,7 @@ class CartSheet extends StatelessWidget {
                   const TextInputType.numberWithOptions(decimal: true),
               autofocus: true,
               decoration: InputDecoration(
-                labelText: 'Amount Paid Now',
+                labelText: l10n.text('amountPaidNow', fallback: 'Amount Paid Now'),
                 prefixText: company?.currencySymbol ?? '\$',
                 border: const OutlineInputBorder(),
               ),
@@ -430,12 +426,12 @@ class CartSheet extends StatelessWidget {
               spacing: 8,
               children: [
                 ActionChip(
-                  label: const Text('Full Amount'),
+                  label: Text(l10n.text('fullAmount', fallback: 'Full Amount')),
                   onPressed: () =>
                       controller.text = pos.grandTotal.toStringAsFixed(2),
                 ),
                 ActionChip(
-                  label: const Text('Zero Payment (Full Due)'),
+                  label: Text(l10n.text('zeroPayment', fallback: 'Zero Payment (Full Due)')),
                   onPressed: () => controller.text = '0',
                 ),
               ],
@@ -447,7 +443,7 @@ class CartSheet extends StatelessWidget {
         actions: [
           TextButton(
               onPressed: () => Navigator.of(dialogCtx).pop(),
-              child: const Text('Cancel')),
+              child: Text(l10n.cancel)),
           ElevatedButton(
             onPressed: () {
               final val =
@@ -455,7 +451,7 @@ class CartSheet extends StatelessWidget {
               pos.setAmountPaid(val);
               Navigator.of(dialogCtx).pop();
             },
-            child: const Text('Apply'),
+            child: Text(l10n.text('apply', fallback: 'Apply')),
           ),
         ],
       ),
@@ -915,104 +911,70 @@ class CartSheet extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         // Customer Pill
-                        ActionChip(
-                                    avatar: Icon(Icons.person_outline,
-                                        size: 16,
-                                        color: pos.selectedCustomer != null
-                                            ? primaryColor
-                                            : Colors.grey.shade700),
-                                    label: Text(pos.selectedCustomer?.name ??
-                                        l10n.addCustomer),
-                                    backgroundColor: pos.selectedCustomer !=
-                                            null
-                                        ? primaryColor.withValues(alpha: 0.12)
-                                        : null,
-                          onPressed: () => _pickCustomer(context),
+                        SduiActionPill(
+                          label: pos.selectedCustomer?.name ?? l10n.addCustomer,
+                          icon: Icons.person_outline,
+                          isActive: pos.selectedCustomer != null,
+                          activeColor: primaryColor,
+                          onTap: () => _pickCustomer(context),
                         ),
 
                         // Hold Cart Pill
-                        ActionChip(
-                                    avatar: Icon(Icons.pause_circle_outline,
-                                        size: 16,
-                                        color: pos.heldCarts.isNotEmpty
-                                            ? Colors.orange.shade800
-                                            : Colors.grey.shade700),
-                                    label: Text(pos.heldCarts.isNotEmpty
-                                        ? l10n.heldChip(pos.heldCarts.length)
-                                        : l10n.hold),
-                                    backgroundColor: pos.heldCarts.isNotEmpty
-                                        ? Colors.orange.shade50
-                                        : null,
-                                    onPressed: () =>
-                                        _showHoldCartsSheet(context),
+                        SduiActionPill(
+                          label: pos.heldCarts.isNotEmpty
+                              ? l10n.heldChip(pos.heldCarts.length)
+                              : l10n.hold,
+                          icon: Icons.pause_circle_outline,
+                          isActive: pos.heldCarts.isNotEmpty,
+                          badgeCount: pos.heldCarts.isNotEmpty ? pos.heldCarts.length : null,
+                          activeColor: Colors.orange.shade800,
+                          onTap: () => _showHoldCartsSheet(context),
                         ),
 
                         // Note Pill
-                        ActionChip(
-                                    avatar: Icon(Icons.edit_note,
-                                        size: 16,
-                                        color: pos.orderNotes.isNotEmpty
-                                            ? primaryColor
-                                            : Colors.grey.shade700),
-                                    label: Text(pos.orderNotes.isNotEmpty
-                                        ? l10n.noteChecked
-                                        : l10n.note),
-                                    backgroundColor: pos.orderNotes.isNotEmpty
-                                        ? primaryColor.withValues(alpha: 0.12)
-                                        : null,
-                          onPressed: () => _showNotesDialog(context),
+                        SduiActionPill(
+                          label: pos.orderNotes.isNotEmpty
+                              ? l10n.noteChecked
+                              : l10n.note,
+                          icon: Icons.edit_note,
+                          isActive: pos.orderNotes.isNotEmpty,
+                          activeColor: primaryColor,
+                          onTap: () => _showNotesDialog(context),
                         ),
 
                         // Discount Pill
-                        ActionChip(
-                                    avatar: Icon(Icons.local_offer_outlined,
-                                        size: 16,
-                                        color: pos.customDiscount > 0
-                                            ? Colors.green.shade800
-                                            : Colors.grey.shade700),
-                                    label: Text(pos.customDiscount > 0
-                                        ? l10n.discountChecked
-                                        : l10n.discount),
-                                    backgroundColor: pos.customDiscount > 0
-                                        ? Colors.green.shade50
-                                        : null,
-                                    onPressed: () =>
-                                        _showDiscountDialog(context),
+                        SduiActionPill(
+                          label: pos.customDiscount > 0
+                              ? l10n.discountChecked
+                              : l10n.discount,
+                          icon: Icons.local_offer_outlined,
+                          isActive: pos.customDiscount > 0,
+                          activeColor: Colors.green.shade800,
+                          onTap: () => _showDiscountDialog(context),
                         ),
 
                         // Split Payment Pill
-                        ActionChip(
-                                    avatar: Icon(Icons.call_split,
-                                        size: 16,
-                                        color: pos.isSplitPayment
-                                            ? primaryColor
-                                            : Colors.grey.shade700),
-                                    label: Text(pos.isSplitPayment
-                                        ? 'Split (${pos.payments.length})'
-                                        : 'Split Payment'),
-                                    backgroundColor: pos.isSplitPayment
-                                        ? primaryColor.withValues(alpha: 0.12)
-                                        : null,
-                                    onPressed: () => _openSplitPaymentEditor(
-                                        context, activeMethods),
-                        ),
+                        if (BootstrapCache.instance.activeModule.cartConfiguration.allowSplitPayment)
+                          SduiActionPill(
+                            label: pos.isSplitPayment
+                                ? 'Split (${pos.payments.length})'
+                                : l10n.text('splitPayment', fallback: 'Split Payment'),
+                            icon: Icons.call_split,
+                            isActive: pos.isSplitPayment,
+                            activeColor: primaryColor,
+                            onTap: () => _openSplitPaymentEditor(context, activeMethods),
+                          ),
 
                         // Amount Paid Pill (only meaningful outside split mode)
                         if (!pos.isSplitPayment)
-                          ActionChip(
-                                      avatar: Icon(Icons.price_check,
-                                          size: 16,
-                                          color: pos.dueAmount > 0.001
-                                              ? Colors.amber.shade800
-                                              : Colors.grey.shade700),
-                                      label: Text(pos.dueAmount > 0.001
-                                          ? 'Paid: ${formatter.format(pos.amountPaid)}'
-                                          : 'Amount Paid'),
-                                      backgroundColor: pos.dueAmount > 0.001
-                                          ? Colors.amber.shade50
-                                          : null,
-                                      onPressed: () =>
-                                          _showAmountPaidDialog(context),
+                          SduiActionPill(
+                            label: pos.dueAmount > 0.001
+                                ? 'Paid: ${formatter.format(pos.amountPaid)}'
+                                : l10n.text('amountPaid', fallback: 'Amount Paid'),
+                            icon: Icons.price_check,
+                            isActive: pos.dueAmount > 0.001,
+                            activeColor: Colors.amber.shade800,
+                            onTap: () => _showAmountPaidDialog(context),
                           ),
                       ],
                     ),
