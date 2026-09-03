@@ -13,6 +13,21 @@ class AppConfig {
 
   static const Duration connectTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 30);
+
+  /// Ceiling for each local, non-network read [ApiClient] does before every
+  /// request (token from the OS keystore, base URL/locale from
+  /// SharedPreferences). These are plugin platform-channel calls, not HTTP —
+  /// Dio's [connectTimeout]/[receiveTimeout] above don't cover them, and a
+  /// stuck native call (a known real-world flutter_secure_storage failure
+  /// mode on some Android/Keystore states) would otherwise hang every single
+  /// request in the app forever with no exception ever thrown to catch.
+  static const Duration localReadTimeout = Duration(seconds: 5);
+
+  /// Ceiling for the POS catalog fetch specifically (products/categories/
+  /// payment methods) — shorter than the general request timeouts above so
+  /// Retail POS and the "+ Add Item" picker fall back to cache/an error
+  /// state well before a user would call it "hanging".
+  static const Duration catalogFetchTimeout = Duration(seconds: 8);
 }
 
 class ApiEndpoints {

@@ -35,14 +35,28 @@ class ApiClient {
   /// asset URLs (product images) or opening public web pages from the app.
   Future<String> currentBaseUrl() => _preferences.readBaseUrl();
 
+  /// Runs once before every request. Each read is bounded by
+  /// [AppConfig.localReadTimeout]: these are platform-channel calls (OS
+  /// keystore, SharedPreferences), not HTTP, so Dio's own timeouts don't
+  /// apply — a stuck native call here would otherwise hang every request in
+  /// the app with no exception ever thrown to catch. A timed-out read falls
+  /// back to a safe default so the request still goes out (as unauthenticated
+  /// / against the default server / in English) rather than never happening.
   Future<void> _prepare() async {
-    final baseUrl = await _preferences.readBaseUrl();
+    final baseUrl = await _preferences
+        .readBaseUrl()
+        .timeout(AppConfig.localReadTimeout, onTimeout: () => AppConfig.defaultBaseUrl);
     _dio.options.baseUrl = '$baseUrl${AppConfig.apiPrefix}';
 
-    final token = await _secureStorage.readToken();
-    _dio.options.headers['Authorization'] = token != null ? 'Bearer $token' : null;
+    // On timeout, keep whatever Authorization header a previous successful
+    // _prepare() already set (a token read taking >5s doesn't mean the
+    // stored token itself changed) rather than downgrading to unauthenticated
+    // and forcing a spurious logout on top of the slow/stuck read.
+    final previousAuth = _dio.options.headers['Authorization'];
+    final token = await _secureStorage.readToken().timeout(AppConfig.localReadTimeout, onTimeout: () => null);
+    _dio.options.headers['Authorization'] = token != null ? 'Bearer $token' : previousAuth;
 
-    final locale = await _preferences.readLocale();
+    final locale = await _preferences.readLocale().timeout(AppConfig.localReadTimeout, onTimeout: () => 'en');
     _dio.options.headers['Accept-Language'] = locale;
   }
 

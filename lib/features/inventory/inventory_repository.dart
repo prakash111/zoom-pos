@@ -32,7 +32,10 @@ class InventoryRepository {
   /// screen keeps working offline instead of showing an error.
   Future<InventoryCatalog> fetchCatalog() async {
     try {
-      final response = await _client.get(ApiEndpoints.inventory);
+      final response = await _client.get(ApiEndpoints.inventory).timeout(
+            AppConfig.catalogFetchTimeout,
+            onTimeout: () => throw ApiException('Loading products timed out. Check your connection and try again.'),
+          );
 
       final products = (response['products'] as List? ?? [])
           .whereType<Map>()
