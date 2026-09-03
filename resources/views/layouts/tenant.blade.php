@@ -28,6 +28,16 @@
          of a route-gated raw <script> tag. --}}
     @livewireStyles
     <script>window.platformAppearanceDefaults = @json(appearance_defaults());</script>
+    {{-- Loaded here (not pushed from the page that uses it, e.g. Settings >
+         Navigation Menu) because a @push('scripts')'d <script> only resolves
+         at @stack('scripts') near the end of body — by the time an Alpine
+         x-init runs (as soon as this element is processed, typically well
+         before the rest of the page has finished loading), Sortable would
+         still be undefined and drag-and-drop would silently no-op forever,
+         with no retry once the library does finish loading. Same
+         early-in-<head> placement the superadmin layout already uses for
+         its own (working) SortableJS menu builder. --}}
+    <script src="{{ asset('assets/libs/sortable.min.js') }}"></script>
 
     {{-- Cloak/nprogress/font-family/dockable-nav/theme-utility CSS used to be
          duplicated here as an inline <style> block, re-sent and re-parsed on
@@ -865,6 +875,16 @@
 
                             @if ($canSettings)
                                 <x-nav.drawer-link item-key="settings" :route="route('tenant.settings.index')" :title="__('Store Settings')" />
+                                <div class="pl-4 space-y-1 nav-children-container" data-parent-key="settings">
+                                    <x-nav.drawer-link item-key="settings_mode" :route="route('tenant.settings.index').'#mode'" :title="__('Store Operating Mode')" />
+                                    <x-nav.drawer-link item-key="settings_profile" :route="route('tenant.settings.index').'#profile'" :title="__('Store Profile & Branding')" />
+                                    <x-nav.drawer-link item-key="settings_receipts" :route="route('tenant.settings.index').'#receipts'" :title="__('Receipt Prefixes & Bank Terms')" />
+                                    <x-nav.drawer-link item-key="settings_financial" :route="route('tenant.settings.index').'#financial'" :title="__('Financial & Currency')" />
+                                    <x-nav.drawer-link item-key="settings_taxes" :route="route('tenant.settings.index').'#taxes'" :title="__('Taxes & Compliance')" />
+                                    <x-nav.drawer-link item-key="settings_api" :route="route('tenant.settings.index').'#api'" :title="__('API & Integrations')" />
+                                    <x-nav.drawer-link item-key="settings_notifications" :route="route('tenant.settings.index').'#notifications'" :title="__('Notification & Dispatch')" />
+                                    <x-nav.drawer-link item-key="settings_navigation" :route="route('tenant.settings.index').'#navigation'" :title="__('Navigation Menu')" />
+                                </div>
                             @endif
 
                             <x-nav.drawer-link item-key="languages" :route="route('tenant.languages.index')" dot="emerald" :title="__('Languages & Translations')" :badge="__('Multi-Lang')" badge-color="emerald" />
@@ -879,19 +899,34 @@
 
                 </nav>
 
-                {{-- Applies Settings > Navigation Menu's section/item order
-                     and any item moved to a different section, directly to
-                     the already-rendered (permission-gated) drawer markup —
-                     see AppBootstrapController::updateNav() and
+                {{-- Applies Settings > Navigation Menu's section/item order,
+                     any item moved to a different section, and any item
+                     nested under (or un-nested from) another item, directly
+                     to the already-rendered (permission-gated) drawer
+                     markup — see AppBootstrapController::updateNav() and
                      Company::normalizedNavConfig(). Pure DOM reordering, no
                      Blade restructuring: an item/section this tenant never
                      touched simply keeps its compiled-in position (a stable
                      sort over an all-equal order is a no-op), so a tenant
                      with no saved config sees the drawer completely
-                     unchanged. --}}
+                     unchanged. Only one level of nesting is supported. --}}
                 <script>
                     (function () {
                         const navConfig = @json($tenantNavConfig ?? ['sections' => [], 'items' => []]);
+
+                        function childrenContainerFor(navEl, parentEl) {
+                            const parentKey = parentEl.getAttribute('data-item-key');
+                            let container = navEl.querySelector(
+                                '.nav-children-container[data-parent-key="' + CSS.escape(parentKey) + '"]'
+                            );
+                            if (!container) {
+                                container = document.createElement('div');
+                                container.className = 'pl-4 space-y-1 nav-children-container';
+                                container.setAttribute('data-parent-key', parentKey);
+                                parentEl.after(container);
+                            }
+                            return container;
+                        }
 
                         function applyTenantNavOrder() {
                             const navEl = document.getElementById('tenant-drawer-nav');
@@ -907,25 +942,35 @@
                                 sectionsByKey[sec.getAttribute('data-section-key')] = sec;
                             });
 
-                            // Move an item into a different section than it
-                            // rendered in by default, if this tenant dragged
-                            // it there.
+                            // Move an item into a different section, or nest
+                            // it under / un-nest it from another item, if
+                            // this tenant saved that change. An item with no
+                            // saved override at all is left exactly where it
+                            // was compiled/rendered.
                             navEl.querySelectorAll('[data-item-key]').forEach((itemEl) => {
-                                const meta = itemMeta[itemEl.getAttribute('data-item-key')];
-                                const targetSection = meta && meta.section ? sectionsByKey[meta.section] : null;
-                                const targetList = targetSection ? targetSection.querySelector('.space-y-1') : null;
+                                const key = itemEl.getAttribute('data-item-key');
+                                const meta = itemMeta[key];
+                                if (!meta) return;
+
+                                if (meta.parent) {
+                                    const parentEl = navEl.querySelector('[data-item-key="' + CSS.escape(meta.parent) + '"]');
+                                    if (parentEl && parentEl !== itemEl) {
+                                        const container = childrenContainerFor(navEl, parentEl);
+                                        if (itemEl.parentElement !== container) container.appendChild(itemEl);
+                                        return;
+                                    }
+                                }
+
+                                const currentSectionEl = itemEl.closest('[data-section-key]');
+                                const targetSectionKey = meta.section || (currentSectionEl ? currentSectionEl.getAttribute('data-section-key') : null);
+                                const targetSection = targetSectionKey ? sectionsByKey[targetSectionKey] : null;
+                                const targetList = targetSection ? targetSection.querySelector(':scope > .space-y-1') : null;
                                 if (targetList && targetList !== itemEl.parentElement) {
                                     targetList.appendChild(itemEl);
                                 }
                             });
 
-                            // Sort each section's items, then the sections
-                            // themselves, by configured order (a stable sort,
-                            // so anything without an explicit order keeps its
-                            // current relative position).
-                            Object.values(sectionsByKey).forEach((sec) => {
-                                const list = sec.querySelector('.space-y-1');
-                                if (!list) return;
+                            function sortByOrder(list) {
                                 Array.from(list.children)
                                     .sort((a, b) => {
                                         const ao = itemMeta[a.getAttribute('data-item-key')]?.order ?? Number.MAX_SAFE_INTEGER;
@@ -933,6 +978,25 @@
                                         return ao - bo;
                                     })
                                     .forEach((el) => list.appendChild(el));
+                            }
+
+                            // Sort each section's root items, then every
+                            // nested children container, then the sections
+                            // themselves — all stable sorts, so anything
+                            // without an explicit order keeps its current
+                            // relative position.
+                            Object.values(sectionsByKey).forEach((sec) => {
+                                const list = sec.querySelector(':scope > .space-y-1');
+                                if (list) sortByOrder(list);
+                            });
+                            navEl.querySelectorAll('.nav-children-container').forEach(sortByOrder);
+
+                            // Keep each children container immediately after
+                            // its own parent item, wherever that item ended
+                            // up after the moves/sorts above.
+                            navEl.querySelectorAll('.nav-children-container').forEach((container) => {
+                                const parentEl = navEl.querySelector('[data-item-key="' + CSS.escape(container.getAttribute('data-parent-key')) + '"]');
+                                if (parentEl) parentEl.after(container);
                             });
 
                             Array.from(navEl.querySelectorAll(':scope > [data-section-key]'))

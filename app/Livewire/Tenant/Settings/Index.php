@@ -1184,12 +1184,15 @@ class Index extends Component
      * The Navigation Menu tab's editable working state: TenantNavRegistry's
      * compiled-in tree for this store's mode, with this store's saved
      * nav_config (section/item order, item visibility, an item moved to a
-     * different section) applied on top — the exact same merge
-     * DashboardScreen._sectionsFor and layouts/tenant.blade.php's client-side
-     * reordering script do, so this tab always shows what the live sidebar
-     * (both web and mobile) currently renders.
+     * different section, an item nested under another) applied on top — the
+     * exact same merge DashboardScreen._sectionsFor and layouts/tenant.
+     * blade.php's client-side reordering script do, so this tab always
+     * shows what the live sidebar (both web and mobile) currently renders.
+     * Only one level of nesting is supported — a parent may not itself have
+     * a parent; see the loop below that drops an invalid parent link back
+     * to root rather than silently hiding the item.
      *
-     * @return list<array{key: string, label: string, items: list<array{key: string, label: string, visible: bool}>}>
+     * @return list<array{key: string, label: string, items: list<array{key: string, label: string, visible: bool, children: list<array{key: string, label: string, visible: bool}>}>}>
      */
     private function buildNavSections(): array
     {
@@ -1200,8 +1203,10 @@ class Index extends Component
         $itemOverrides = collect($navConfig['items'])->keyBy('key');
         $sectionOrderOverrides = collect($navConfig['sections'])->pluck('order', 'key');
 
-        $grouped = [];
-        foreach ($compiled as $sectionIndex => $section) {
+        // Resolve every compiled item's effective section/parent/order/
+        // visibility, keyed by item key so parent lookups below are O(1).
+        $resolved = [];
+        foreach ($compiled as $section) {
             foreach ($section['items'] as $itemIndex => $item) {
                 $override = $itemOverrides->get($item['key']);
                 if ($override && $override['visible'] === false) {
@@ -1211,20 +1216,63 @@ class Index extends Component
                 $targetSectionKey = ($override && $override['section'] && $compiledByKey->has($override['section']))
                     ? $override['section']
                     : $section['key'];
-                $order = $override['order'] ?? $itemIndex;
-                $visible = $override['visible'] ?? true;
 
-                $grouped[$targetSectionKey][] = ['order' => $order, 'key' => $item['key'], 'label' => $item['label'], 'visible' => $visible];
+                $resolved[$item['key']] = [
+                    'key' => $item['key'],
+                    'label' => $item['label'],
+                    'visible' => $override['visible'] ?? true,
+                    'section' => $targetSectionKey,
+                    'parent' => $override ? ($override['parent'] ?? null) : ($item['parent'] ?? null),
+                    'order' => $override['order'] ?? $itemIndex,
+                ];
             }
+        }
+
+        // A parent link only holds if the parent exists, resolved to the
+        // same section, and isn't itself nested — otherwise the item falls
+        // back to its section's root rather than disappearing.
+        foreach ($resolved as $key => &$row) {
+            $parentRow = $row['parent'] ? ($resolved[$row['parent']] ?? null) : null;
+            if ($row['parent'] && (! $parentRow || $parentRow['section'] !== $row['section'] || ! empty($parentRow['parent']))) {
+                $row['parent'] = null;
+            }
+        }
+        unset($row);
+
+        $grouped = [];
+        foreach ($resolved as $row) {
+            if ($row['parent']) {
+                continue;
+            }
+            $grouped[$row['section']][$row['key']] = $row + ['children' => []];
+        }
+        foreach ($resolved as $row) {
+            if (! $row['parent'] || ! isset($grouped[$row['section']][$row['parent']])) {
+                continue;
+            }
+            $grouped[$row['section']][$row['parent']]['children'][] = $row;
         }
 
         $sections = [];
         foreach ($grouped as $sectionKey => $items) {
+            $items = array_values($items);
             usort($items, fn ($a, $b) => $a['order'] <=> $b['order']);
+            foreach ($items as &$item) {
+                usort($item['children'], fn ($a, $b) => $a['order'] <=> $b['order']);
+                $item['children'] = array_map(
+                    fn ($c) => ['key' => $c['key'], 'label' => $c['label'], 'visible' => $c['visible']],
+                    $item['children']
+                );
+            }
+            unset($item);
+
             $sections[] = [
                 'key' => $sectionKey,
                 'label' => $compiledByKey[$sectionKey]['label'],
-                'items' => array_map(fn ($i) => ['key' => $i['key'], 'label' => $i['label'], 'visible' => $i['visible']], $items),
+                'items' => array_map(
+                    fn ($i) => ['key' => $i['key'], 'label' => $i['label'], 'visible' => $i['visible'], 'children' => $i['children']],
+                    $items
+                ),
             ];
         }
 
@@ -1243,8 +1291,13 @@ class Index extends Component
      * POST target for Settings > Navigation Menu's Save button — see
      * resources/views/livewire/tenant/settings/index.blade.php's Alpine nav
      * builder. Accepts the complete current section/item tree (order,
-     * section placement, visibility) as one payload rather than incremental
-     * diffs, mirroring how the mobile app's NavMenuSettingsTab saves.
+     * section placement, visibility, and each root item's nested
+     * `children`) as one payload rather than incremental diffs, mirroring
+     * how the mobile app's NavMenuSettingsTab saves. Every item — root or
+     * child — becomes its own flat nav_config['items'] row; a child's row
+     * just carries its parent's key so buildNavSections() can re-nest it on
+     * read (only one level of nesting is supported, so children's own
+     * `children` arrays, if any slipped through, are ignored here).
      */
     public function saveNavConfig(array $sections): void
     {
@@ -1270,9 +1323,24 @@ class Index extends Component
                 $navItems[] = [
                     'key' => $itemKey,
                     'section' => $sectionKey,
+                    'parent' => null,
                     'order' => $itemOrder,
                     'visible' => (bool) ($item['visible'] ?? true),
                 ];
+
+                foreach (array_values($item['children'] ?? []) as $childOrder => $child) {
+                    $childKey = (string) ($child['key'] ?? '');
+                    if ($childKey === '') {
+                        continue;
+                    }
+                    $navItems[] = [
+                        'key' => $childKey,
+                        'section' => $sectionKey,
+                        'parent' => $itemKey,
+                        'order' => $childOrder,
+                        'visible' => (bool) ($child['visible'] ?? true),
+                    ];
+                }
             }
         }
 

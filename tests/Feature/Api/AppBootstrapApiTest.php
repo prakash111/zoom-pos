@@ -107,6 +107,32 @@ class AppBootstrapApiTest extends TestCase
             ->assertJsonPath('nav.items', $payload['items']);
     }
 
+    public function test_nested_item_parent_round_trips_through_update_and_bootstrap(): void
+    {
+        $token = $this->token();
+
+        $payload = [
+            'sections' => [
+                ['key' => 'administration', 'order' => 0],
+            ],
+            'items' => [
+                ['key' => 'settings', 'section' => 'administration', 'parent' => null, 'order' => 0, 'visible' => true],
+                // Un-nested from "settings" back to the section root.
+                ['key' => 'settings_navigation', 'section' => 'administration', 'parent' => null, 'order' => 1, 'visible' => true],
+                // Nested under "settings" (only one of the eight tabs kept).
+                ['key' => 'settings_profile', 'section' => 'administration', 'parent' => 'settings', 'order' => 0, 'visible' => true],
+            ],
+        ];
+
+        $this->withToken($token)->postJson('/api/v1/pos/settings/nav-config', $payload)
+            ->assertOk()
+            ->assertJsonPath('nav.items', $payload['items']);
+
+        $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap?locale=en')
+            ->assertOk()
+            ->assertJsonPath('nav.items', $payload['items']);
+    }
+
     public function test_legacy_hidden_tiles_and_section_order_shape_upgrades_on_read(): void
     {
         $this->company->update([
@@ -126,7 +152,7 @@ class AppBootstrapApiTest extends TestCase
             $nav['sections']
         );
         $this->assertSame(
-            [['key' => 'quotations', 'section' => null, 'order' => null, 'visible' => false]],
+            [['key' => 'quotations', 'section' => null, 'parent' => null, 'order' => null, 'visible' => false]],
             $nav['items']
         );
     }

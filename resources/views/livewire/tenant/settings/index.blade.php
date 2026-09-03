@@ -1,7 +1,3 @@
-@push('scripts')
-    <script src="{{ asset('assets/libs/sortable.min.js') }}"></script>
-@endpush
-
 <div class="w-full space-y-6"
      x-data="{
          activeTab: (window.location.hash ? window.location.hash.substring(1) : 'mode') || 'mode'
@@ -1469,7 +1465,7 @@
          ========================================================================= -->
     <div x-show="activeTab === 'navigation'" x-cloak class="space-y-4"
          x-data="{
-             sections: @json($navSections),
+             sections: @js($navSections),
              saving: false,
              sortableInstances: [],
              initSortables() {
@@ -1487,14 +1483,26 @@
                      }));
                  }
 
-                 // Shared `group` lets an item drag from one section's list
-                 // straight into another's, not just reorder within its own.
-                 document.querySelectorAll('.nav-items-container').forEach((el) => {
+                 // Shared `group` lets an item drag from one section's root
+                 // list straight into another's (not just reorder within its
+                 // own), and — since every item's nested `.nav-children-
+                 // container` shares the same group — drag it into or out of
+                 // another item to nest/un-nest it. onMove blocks dropping an
+                 // item that already has children into a children container:
+                 // only one level of nesting is supported, so that combination
+                 // would silently lose the grandchildren once synced.
+                 document.querySelectorAll('.nav-items-container, .nav-children-container').forEach((el) => {
                      this.sortableInstances.push(Sortable.create(el, {
                          group: 'tenant-nav-items',
                          animation: 200,
                          handle: '.nav-item-drag-handle',
                          ghostClass: 'opacity-30',
+                         onMove: (evt) => {
+                             const childrenHolder = evt.dragged.querySelector('.nav-children-container');
+                             const draggedHasChildren = childrenHolder && childrenHolder.children.length > 0;
+                             const droppingIntoChildren = evt.to.classList.contains('nav-children-container');
+                             return !(draggedHasChildren && droppingIntoChildren);
+                         },
                          onEnd: () => this.syncFromDom(),
                      }));
                  });
@@ -1502,17 +1510,40 @@
              syncFromDom() {
                  const sectionContainer = document.getElementById('nav-sections-container');
                  if (!sectionContainer) return;
-                 const allItems = this.sections.flatMap((s) => s.items);
+
+                 const findAnywhere = (key) => {
+                     for (const s of this.sections) {
+                         for (const it of s.items) {
+                             if (it.key === key) return it;
+                             const child = (it.children || []).find((c) => c.key === key);
+                             if (child) return child;
+                         }
+                     }
+                     return null;
+                 };
+
                  const next = [];
                  sectionContainer.querySelectorAll(':scope > [data-section-key]').forEach((secEl) => {
                      const key = secEl.getAttribute('data-section-key');
                      const existingSection = this.sections.find((s) => s.key === key);
                      if (!existingSection) return;
+
                      const items = [];
-                     secEl.querySelectorAll('[data-item-key]').forEach((itemEl) => {
-                         const item = allItems.find((i) => i.key === itemEl.getAttribute('data-item-key'));
-                         if (item) items.push(item);
+                     const itemsRoot = secEl.querySelector(':scope > .nav-items-container');
+                     (itemsRoot ? itemsRoot.querySelectorAll(':scope > [data-item-key]') : []).forEach((itemWrapEl) => {
+                         const existingItem = findAnywhere(itemWrapEl.getAttribute('data-item-key'));
+                         if (!existingItem) return;
+
+                         const children = [];
+                         const childrenRoot = itemWrapEl.querySelector(':scope > .nav-children-container');
+                         (childrenRoot ? childrenRoot.querySelectorAll(':scope > [data-item-key]') : []).forEach((childEl) => {
+                             const existingChild = findAnywhere(childEl.getAttribute('data-item-key'));
+                             if (existingChild) children.push({ key: existingChild.key, label: existingChild.label, visible: existingChild.visible });
+                         });
+
+                         items.push({ key: existingItem.key, label: existingItem.label, visible: existingItem.visible, children });
                      });
+
                      next.push({ key: existingSection.key, label: existingSection.label, items });
                  });
                  this.sections = next;
@@ -1535,7 +1566,7 @@
         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
             <h3 class="text-sm font-black text-slate-800 dark:text-slate-100">{{ __('Navigation Menu') }}</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {{ __('Hide destinations your team doesn\'t use, drag to reorder sections, reorder destinations within a section, or drag a destination into a different section. Applies to every device signed in to this store — the mobile app included.') }}
+                {{ __('Hide destinations your team doesn\'t use, drag to reorder sections, reorder destinations within a section, drag a destination into a different section, or drag one destination onto another to nest it as a sub-item (drag it back out to un-nest). Applies to every device signed in to this store — the mobile app included.') }}
             </p>
         </div>
 
@@ -1550,12 +1581,25 @@
                     </div>
                     <div class="nav-items-container space-y-0.5 min-h-[10px]">
                         <template x-for="item in section.items" :key="item.key">
-                            <div :data-item-key="item.key" class="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">
-                                <input type="checkbox" x-model="item.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
-                                <span class="flex-1 text-xs font-semibold text-slate-700 dark:text-slate-300" x-text="item.label"></span>
-                                <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, or drag into another section') }}">
-                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
-                                </span>
+                            <div :data-item-key="item.key">
+                                <div class="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">
+                                    <input type="checkbox" x-model="item.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
+                                    <span class="flex-1 text-xs font-semibold text-slate-700 dark:text-slate-300" x-text="item.label"></span>
+                                    <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, drag into another section, or drop onto another destination to nest it') }}">
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
+                                    </span>
+                                </div>
+                                <div class="nav-children-container pl-6 space-y-0.5 min-h-[6px] mt-0.5" :data-parent-key="item.key">
+                                    <template x-for="child in item.children" :key="child.key">
+                                        <div :data-item-key="child.key" class="flex items-center gap-2 px-2 py-1 rounded-xl border-l-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                                            <input type="checkbox" x-model="child.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
+                                            <span class="flex-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400" x-text="child.label"></span>
+                                            <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, or drag out to un-nest') }}">
+                                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
+                                            </span>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
                         </template>
                     </div>

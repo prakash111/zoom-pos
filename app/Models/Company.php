@@ -238,15 +238,19 @@ class Company extends Model
     /**
      * This tenant's nav customization (Settings > Navigation Menu, mobile
      * and web), normalized to the current `{sections: [{key, order}],
-     * items: [{key, section, order, visible}]}` shape regardless of which
-     * shape `nav_config` actually holds — including this app's older
-     * `{hidden_tiles, section_order}` shape (no per-item order or explicit
-     * section existed yet, so those come back null: callers fall back to
-     * whatever section/position that item's key defaults to further up the
-     * stack — see DashboardScreen._sectionsFor and ALL_DOCK_ITEMS on web).
-     * Every reader (mobile bootstrap, mobile/web settings pages, the web
-     * sidebar) goes through this so none of them need to understand a
-     * format the others don't.
+     * items: [{key, section, parent, order, visible}]}` shape regardless of
+     * which shape `nav_config` actually holds — including this app's older
+     * `{hidden_tiles, section_order}` shape (no per-item order, explicit
+     * section, or parent existed yet, so those come back null: callers fall
+     * back to whatever section/position/nesting that item's key defaults to
+     * further up the stack — see DashboardScreen._sectionsFor and
+     * ALL_DOCK_ITEMS on web). `parent` is another item's key in the same
+     * section — null means the item sits at that section's root level; only
+     * one level of nesting is supported (a parent may not itself have a
+     * parent — see TenantNavRegistry/buildNavSections()). Every reader
+     * (mobile bootstrap, mobile/web settings pages, the web sidebar) goes
+     * through this so none of them need to understand a format the others
+     * don't.
      */
     public function normalizedNavConfig(): array
     {
@@ -269,7 +273,7 @@ class Company extends Model
                 array_keys($sectionOrder)
             ),
             'items' => array_map(
-                fn ($key) => ['key' => $key, 'section' => null, 'order' => null, 'visible' => false],
+                fn ($key) => ['key' => $key, 'section' => null, 'parent' => null, 'order' => null, 'visible' => false],
                 $hiddenTiles
             ),
         ];

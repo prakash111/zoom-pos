@@ -85,6 +85,7 @@ class AppBootstrapController extends Controller
             'items' => ['nullable', 'array'],
             'items.*.key' => ['required', 'string', 'max:60'],
             'items.*.section' => ['nullable', 'string', 'max:60'],
+            'items.*.parent' => ['nullable', 'string', 'max:60'],
             'items.*.order' => ['nullable', 'integer', 'min:0'],
             'items.*.visible' => ['required', 'boolean'],
         ]);
