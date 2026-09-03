@@ -3,6 +3,8 @@
 namespace App\Livewire\Tenant\Restaurant;
 
 use App\Models\KitchenTicket;
+use App\Models\PushNotificationSetting;
+use App\Services\Push\FirebasePushService;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -45,18 +47,39 @@ class Kds extends Component
         $kot->update([
             'status' => KitchenTicket::STATUS_SERVED,
             'served_at' => now(),
+            'alarm_dismissed_at' => now(),
         ]);
         if ($kot->sale) {
             $kot->sale->update(['kot_status' => 'served']);
         }
+        $this->clearDeviceAlarm($kot);
         session()->flash('status', "Ticket {$kot->kot_number} marked as Served. ✅");
     }
 
     public function cancelKot(string $id): void
     {
         $kot = KitchenTicket::findOrFail($id);
-        $kot->update(['status' => KitchenTicket::STATUS_CANCELLED]);
+        $kot->update(['status' => KitchenTicket::STATUS_CANCELLED, 'alarm_dismissed_at' => now()]);
+        $this->clearDeviceAlarm($kot);
         session()->flash('status', "Ticket {$kot->kot_number} cancelled.");
+    }
+
+    public function dismissAlarm(string $id): void
+    {
+        $kot = KitchenTicket::findOrFail($id);
+        $kot->update(['alarm_dismissed_at' => now()]);
+        $this->clearDeviceAlarm($kot);
+        session()->flash('status', "Alarm for {$kot->kot_number} dismissed.");
+    }
+
+    private function clearDeviceAlarm(KitchenTicket $kot): void
+    {
+        rescue(fn () => app(FirebasePushService::class)->sendToCompany($kot->company_id, [
+            'type' => 'delayed_order_alarm',
+            'action' => 'clear',
+            'notification_id' => 'order_'.$kot->id,
+            'kitchen_ticket_id' => $kot->id,
+        ]), report: true);
     }
 
     public function render()
@@ -75,15 +98,16 @@ class Kds extends Component
             ->limit(10)
             ->get();
 
+        $push = PushNotificationSetting::current();
+
         return view('livewire.tenant.restaurant.kds', [
             'tickets' => $activeTickets,
             'completedTickets' => $completedTickets,
             'pendingCount' => KitchenTicket::where('status', KitchenTicket::STATUS_PENDING)->count(),
             'preparingCount' => KitchenTicket::where('status', KitchenTicket::STATUS_PREPARING)->count(),
             'readyCount' => KitchenTicket::where('status', KitchenTicket::STATUS_READY)->count(),
-            'alertIntervalMinutes' => (int) tenant_setting('restaurant_alert_interval_minutes', 3),
-            'alertSoundPreset' => (string) tenant_setting('restaurant_alert_sound_preset', 'chime'),
-            'alertSoundUrl' => (string) tenant_setting('restaurant_alert_sound_url', ''),
+            'alertRepeatSeconds' => (int) $push->alarm_repeat_seconds,
+            'alertSoundPreset' => (string) $push->order_sound,
         ]);
     }
 }

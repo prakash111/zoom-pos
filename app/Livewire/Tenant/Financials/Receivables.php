@@ -48,6 +48,14 @@ class Receivables extends Component
 
     public string $paymentNotes = '';
 
+    public bool $showReminderModal = false;
+
+    public ?int $reminderSaleId = null;
+
+    public string $reminderDueDate = '';
+
+    public string $reminderAt = '';
+
     public function mount(): void
     {
         $this->paymentDate = now()->format('Y-m-d');
@@ -139,6 +147,7 @@ class Receivables extends Component
                 'paid_amount' => $newPaid,
                 'due_amount' => $newDue,
                 'payment_status' => $newStatus,
+                'due_reminder_dismissed_at' => $newDue <= 0.001 ? now() : $sale->due_reminder_dismissed_at,
             ]);
 
             app(CustomerLedgerService::class)->recordPayment($sale, $orderPayment);
@@ -154,6 +163,44 @@ class Receivables extends Component
 
         session()->flash('status', 'Payment of $'.number_format($this->paymentAmount, 2)." logged successfully for Sale #{$this->selectedSale->sale_number}.");
         $this->closePaymentModal();
+    }
+
+    public function openReminderModal(int $saleId): void
+    {
+        $sale = Sale::where('due_amount', '>', 0)->findOrFail($saleId);
+        $timezone = auth('web')->user()?->company?->resolveTimezone() ?? 'UTC';
+        $this->reminderSaleId = $sale->id;
+        $this->reminderDueDate = $sale->due_date?->toDateString() ?? now($timezone)->addDays(7)->toDateString();
+        $this->reminderAt = $sale->due_reminder_at
+            ? $sale->due_reminder_at->copy()->timezone($timezone)->format('Y-m-d\TH:i')
+            : Carbon::parse($this->reminderDueDate, $timezone)->setTime(9, 0)->format('Y-m-d\TH:i');
+        $this->showReminderModal = true;
+    }
+
+    public function scheduleReminder(): void
+    {
+        $this->validate([
+            'reminderDueDate' => ['required', 'date'],
+            'reminderAt' => ['required', 'date'],
+        ]);
+
+        $sale = Sale::where('due_amount', '>', 0)->findOrFail($this->reminderSaleId);
+        $timezone = auth('web')->user()?->company?->resolveTimezone() ?? 'UTC';
+        $sale->update([
+            'due_date' => $this->reminderDueDate,
+            'due_reminder_at' => Carbon::parse($this->reminderAt, $timezone)->utc(),
+            'due_reminder_sent_at' => null,
+            'due_reminder_dismissed_at' => null,
+        ]);
+
+        AuditLog::record('receivable.reminder_scheduled', $sale->company_id, auth('web')->id(), [
+            'sale_id' => $sale->id,
+            'reminder_at' => $sale->due_reminder_at?->toIso8601String(),
+        ]);
+
+        $this->showReminderModal = false;
+        $this->reminderSaleId = null;
+        session()->flash('status', "Push reminder scheduled for {$sale->sale_number}.");
     }
 
     /**

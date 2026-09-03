@@ -13,7 +13,7 @@
                         {{ __('Platform & System Settings') }}
                     </h1>
                     <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                        {{ __('Centralized management for platform general info, SMTP mail servers, white-label branding, custom pages, and visual theme appearances.') }}
+                        {{ __('Centralized management for platform settings, push gateways, email, branding, pages, and appearance.') }}
                     </p>
                 </div>
             </div>
@@ -84,6 +84,13 @@
                 <span>✉️</span> {{ __('SMTP & Email') }}
             </button>
 
+            <button type="button"
+                    @click="switchTab('push')"
+                    :class="activeTab === 'push' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
+                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
+                <span>🔔</span> {{ __('Push Notifications') }}
+            </button>
+
             <button type="button" 
                     @click="switchTab('whitelabel')"
                     :class="(activeTab === 'whitelabel' || activeTab === 'branding') ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
@@ -116,6 +123,7 @@
         <!-- Tab Panes -->
         <div x-show="activeTab === 'general'" x-cloak> @include('superadmin.settings.partials.general') </div>
         <div x-show="activeTab === 'smtp'" x-cloak> @include('superadmin.settings.partials.smtp') </div>
+        <div x-show="activeTab === 'push'" x-cloak> @include('superadmin.settings.partials.push-notifications') </div>
         <div x-show="activeTab === 'whitelabel' || activeTab === 'branding'" x-cloak> @include('superadmin.settings.partials.whitelabel') </div>
         <div x-show="activeTab === 'pages'" x-cloak> @include('superadmin.settings.partials.pages') </div>
         <div x-show="activeTab === 'social'" x-cloak> @include('superadmin.settings.partials.social-login') </div>

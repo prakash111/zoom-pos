@@ -12,7 +12,9 @@ use App\Models\DiningFloor;
 use App\Models\DiningTable;
 use App\Models\KitchenTicket;
 use App\Models\OrderPayment;
+use App\Models\PushNotificationSetting;
 use App\Models\Sale;
+use App\Services\Push\FirebasePushService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -291,6 +293,7 @@ class RestaurantApiController extends Controller
             'discount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'prep_minutes' => ['nullable', 'integer', 'min:1', 'max:240'],
+            'intimation_minutes' => ['nullable', 'integer', 'in:0,2,5'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable'],
             'items.*.name' => ['required', 'string', 'max:255'],
@@ -392,6 +395,9 @@ class RestaurantApiController extends Controller
             }
 
             $prepMinutes = (int) ($data['prep_minutes'] ?? 15);
+            $intimationMinutes = min($prepMinutes, (int) ($data['intimation_minutes'] ?? 0));
+            $sentAt = now();
+            $targetAt = $sentAt->copy()->addMinutes($prepMinutes);
             $kotCount = KitchenTicket::withoutGlobalScope('company')->where('company_id', $company->id)->count();
             $kot = KitchenTicket::create([
                 'company_id' => $company->id,
@@ -403,8 +409,11 @@ class RestaurantApiController extends Controller
                 'status' => KitchenTicket::STATUS_PENDING,
                 'server_name' => $user?->name ?? 'POS Staff',
                 'items' => $items,
+                'sent_to_kitchen_at' => $sentAt,
                 'prep_minutes' => $prepMinutes,
-                'target_completion_at' => now()->addMinutes($prepMinutes),
+                'intimation_minutes' => $intimationMinutes,
+                'target_completion_at' => $targetAt,
+                'alarm_at' => $targetAt->copy()->subMinutes($intimationMinutes),
             ]);
 
             if ($table) {
@@ -609,11 +618,7 @@ class RestaurantApiController extends Controller
                 'preparing' => KitchenTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', KitchenTicket::STATUS_PREPARING)->count(),
                 'ready' => KitchenTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', KitchenTicket::STATUS_READY)->count(),
             ],
-            'alert_settings' => [
-                'interval_minutes' => (int) \App\Models\Configuration::withoutGlobalScopes()->where('company_id', $company->id)->where('key', 'restaurant_alert_interval_minutes')->value('value') ?: 3,
-                'sound_preset' => \App\Models\Configuration::withoutGlobalScopes()->where('company_id', $company->id)->where('key', 'restaurant_alert_sound_preset')->value('value') ?: 'chime',
-                'sound_url' => \App\Models\Configuration::withoutGlobalScopes()->where('company_id', $company->id)->where('key', 'restaurant_alert_sound_url')->value('value') ?: '',
-            ],
+            'alert_settings' => PushNotificationSetting::current()->publicConfig(),
         ]);
     }
 
@@ -659,7 +664,39 @@ class RestaurantApiController extends Controller
             $kot->sale->update(['kot_status' => $saleKotStatus]);
         }
 
+        if (in_array($status, [KitchenTicket::STATUS_SERVED, KitchenTicket::STATUS_CANCELLED], true)) {
+            $kot->update(['alarm_dismissed_at' => now()]);
+            rescue(fn () => app(FirebasePushService::class)->sendToCompany($company->id, [
+                'type' => 'delayed_order_alarm',
+                'action' => 'clear',
+                'notification_id' => 'order_'.$kot->id,
+                'kitchen_ticket_id' => $kot->id,
+            ]), report: true);
+        }
+
         return response()->json(['success' => true, 'message' => "Ticket {$kot->kot_number} updated.", 'kot' => $this->presentKot($kot->fresh('table'))]);
+    }
+
+    public function kotDismissAlarm(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $kot = KitchenTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->find($id);
+
+        if (! $kot) {
+            return response()->json(['success' => false, 'error' => 'Kitchen ticket not found.'], 404);
+        }
+
+        $kot->update(['alarm_dismissed_at' => now()]);
+        rescue(fn () => app(FirebasePushService::class)->sendToCompany($company->id, [
+            'type' => 'delayed_order_alarm',
+            'action' => 'clear',
+            'notification_id' => 'order_'.$kot->id,
+            'kitchen_ticket_id' => $kot->id,
+        ]), report: true);
+
+        return response()->json(['success' => true, 'message' => 'Order alarm dismissed.']);
     }
 
     // ---------------------------------------------------------------
@@ -758,8 +795,14 @@ class RestaurantApiController extends Controller
             'ready_at' => $kot->ready_at?->toIso8601String(),
             'served_at' => $kot->served_at?->toIso8601String(),
             'created_at' => $kot->created_at?->toIso8601String(),
+            'sent_to_kitchen_at' => $kot->sent_to_kitchen_at?->toIso8601String(),
             'prep_minutes' => $kot->prep_minutes,
+            'intimation_minutes' => $kot->intimation_minutes,
             'target_completion_at' => $kot->target_completion_at?->toIso8601String(),
+            'alarm_at' => $kot->alarm_at?->toIso8601String(),
+            'alarm_sent_at' => $kot->alarm_sent_at?->toIso8601String(),
+            'alarm_dismissed_at' => $kot->alarm_dismissed_at?->toIso8601String(),
+            'is_alarm_active' => $kot->isAlarmActive(),
             'is_overdue' => $kot->isOverdue(),
         ];
     }

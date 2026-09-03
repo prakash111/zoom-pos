@@ -125,6 +125,8 @@ class Create extends Component
 
     public ?string $dueDate = null;
 
+    public ?string $dueReminderAt = null;
+
     public ?string $salespersonId = null;
 
     // Card Machine Merchant Fee & Installments
@@ -904,6 +906,7 @@ class Create extends Component
         $this->splitPayments = [];
         $this->salespersonId = $this->salespersonId ?: (string) auth('web')->id();
         $this->dueDate = $this->dueDate ?: now()->addDays(30)->format('Y-m-d');
+        $this->dueReminderAt = $this->dueReminderAt ?: now()->addDays(30)->setTime(9, 0)->format('Y-m-d\TH:i');
         $this->showCheckoutModal = true;
     }
 
@@ -1094,6 +1097,7 @@ class Create extends Component
         $companyId = app()->bound('tenant.company_id')
             ? app('tenant.company_id')
             : (auth('web')->user()?->company_id ?? auth('tenant_api')->user()?->company_id);
+        $company = auth('web')->user()?->company ?? Company::find($companyId);
 
         if ($companyId && ! app()->bound('tenant.company_id')) {
             app()->instance('tenant.company_id', $companyId);
@@ -1160,6 +1164,14 @@ class Create extends Component
             $paymentStatus = $dueAmount <= 0.001 ? 'paid' : ($paidAmount > 0 ? 'partially_paid' : 'pending');
         }
 
+        if ($dueAmount > 0 && empty($this->dueReminderAt)) {
+            $timezone = $company->resolveTimezone();
+            $reminderDate = $this->dueDate
+                ? Carbon::parse($this->dueDate, $timezone)
+                : now($timezone)->addDays(30);
+            $this->dueReminderAt = $reminderDate->setTime(9, 0)->format('Y-m-d\TH:i');
+        }
+
         $overriddenItems = collect($this->items)
             ->filter(fn ($item) => ! empty($item['is_overridden']))
             ->map(fn ($item) => ['name' => $item['name'], 'base_price' => (float) $item['base_price'], 'price' => (float) $item['price']])
@@ -1169,7 +1181,6 @@ class Create extends Component
         // Calculate commission via CommissionService
         $assignedUserId = $this->salespersonId ?: (string) auth('web')->id();
         $salesperson = User::find($assignedUserId);
-        $company = auth('web')->user()?->company;
 
         $commRate = 0.0;
         $commType = 'percentage';
@@ -1233,6 +1244,9 @@ class Create extends Component
                 'paid_amount' => $paidAmount,
                 'due_amount' => $dueAmount,
                 'due_date' => $dueAmount > 0 ? $this->dueDate : null,
+                'due_reminder_at' => $dueAmount > 0 && $this->dueReminderAt
+                    ? Carbon::parse($this->dueReminderAt, $company->resolveTimezone())->utc()
+                    : null,
                 'payment_status' => $paymentStatus,
             ]);
 
@@ -1487,6 +1501,7 @@ class Create extends Component
         $this->isSplitPayment = false;
         $this->splitPayments = [];
         $this->dueDate = null;
+        $this->dueReminderAt = null;
         $saleCount = Sale::count();
         $this->orderNumber = sprintf('%03d', ($saleCount + 1) % 1000 ?: 1);
         $this->addItem();

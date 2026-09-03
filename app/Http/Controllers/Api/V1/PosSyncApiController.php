@@ -1004,6 +1004,9 @@ class PosSyncApiController extends Controller
                     'paid_amount' => $paidAmount,
                     'due_amount' => $dueAmount,
                     'due_date' => $dueAmount > 0 ? ($saleData['due_date'] ?? null) : null,
+                    'due_reminder_at' => $dueAmount > 0 && ! empty($saleData['due_reminder_at'])
+                        ? Carbon::parse($saleData['due_reminder_at'])->utc()
+                        : null,
                     'items' => $normalizedItems,
                     'created_at' => $createdAt,
                     'updated_at' => now(),
@@ -2743,6 +2746,45 @@ class PosSyncApiController extends Controller
     }
 
     /**
+     * Exact sale payload used by notification deep links. Unlike sync-pull,
+     * this is not limited to the latest 200 records.
+     */
+    public function saleDetails(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $sale = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(fn ($query) => $query->where('id', $id)
+                ->orWhere('external_id', $id)
+                ->orWhere('sale_number', $id))
+            ->first();
+
+        if (! $sale) {
+            return response()->json(['success' => false, 'error' => 'Sale not found.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'sale' => [
+                'id' => (string) ($sale->external_id ?: $sale->id),
+                'server_id' => (string) $sale->id,
+                'sale_number' => $sale->sale_number,
+                'customer_name' => $sale->customer_name,
+                'items' => is_array($sale->items) ? $sale->items : (json_decode($sale->items ?? '', true) ?: []),
+                'total' => (float) $sale->total,
+                'discount' => (float) $sale->discount,
+                'tax' => (float) $sale->tax_amount,
+                'payment_method' => $sale->payment_method,
+                'payment_status' => $sale->payment_status,
+                'paid_amount' => (float) $sale->paid_amount,
+                'due_amount' => (float) $sale->due_amount,
+                'status' => $sale->status,
+                'createdAt' => $sale->created_at?->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
      * 18b. Sale/Invoice PDF (same document InvoiceDeliveryService already
      * produces for the web app and for email/WhatsApp delivery).
      * GET /api/v1/pos/sales/{id}/pdf?format=a4|80mm|58mm
@@ -2990,6 +3032,8 @@ class PosSyncApiController extends Controller
                 'email' => $sale->customer?->email,
                 'date' => $sale->created_at?->toIso8601String(),
                 'due_date' => $sale->due_date?->toIso8601String(),
+                'due_reminder_at' => $sale->due_reminder_at?->toIso8601String(),
+                'due_reminder_sent_at' => $sale->due_reminder_sent_at?->toIso8601String(),
                 'total' => (float) $sale->total,
                 'paid_amount' => (float) $sale->paid_amount,
                 'due_amount' => (float) $sale->due_amount,
@@ -3078,5 +3122,48 @@ class PosSyncApiController extends Controller
         ]);
 
         return response()->json(['success' => true, 'message' => 'Reminder dispatched to custom notification channels.']);
+    }
+
+    public function scheduleReceivableReminder(Request $request, string $sale): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+        $validator = Validator::make($request->all(), [
+            'due_date' => ['required', 'date'],
+            'reminder_at' => ['required', 'date'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
+        }
+
+        $saleModel = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(fn ($query) => $query->where('id', $sale)->orWhere('external_id', $sale))
+            ->where('due_amount', '>', 0)
+            ->first();
+
+        if (! $saleModel) {
+            return response()->json(['success' => false, 'error' => 'Due invoice not found.'], 404);
+        }
+
+        $saleModel->update([
+            'due_date' => Carbon::parse($request->input('due_date'))->toDateString(),
+            'due_reminder_at' => Carbon::parse($request->input('reminder_at'))->utc(),
+            'due_reminder_sent_at' => null,
+            'due_reminder_dismissed_at' => null,
+        ]);
+
+        AuditLog::record('receivable.reminder_scheduled', $company->id, $user?->id, [
+            'sale_id' => $saleModel->id,
+            'reminder_at' => $saleModel->due_reminder_at?->toIso8601String(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Invoice reminder scheduled.',
+            'due_date' => $saleModel->due_date?->toDateString(),
+            'due_reminder_at' => $saleModel->due_reminder_at?->toIso8601String(),
+        ]);
     }
 }

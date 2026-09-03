@@ -41,6 +41,7 @@ Route::prefix('superadmin')->name('superadmin.')->group(function () {
         Route::get('/activation-codes', ActivationCodes\Index::class)->name('activation-codes.index');
         Route::get('/payment-gateways', PaymentGateways\Index::class)->name('payment-gateways.index');
         Route::get('/settings', Settings\Index::class)->name('settings.index');
+        Route::get('/settings/notifications', Settings\Index::class)->name('settings.notifications');
         Route::get('/branding', Branding\Index::class)->name('branding.index');
         Route::get('/menus', MenuBuilderComponent::class)->name('menus.index');
         Route::get('/pages', Pages\Index::class)->name('pages.index');

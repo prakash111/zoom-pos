@@ -197,7 +197,7 @@ class ProductsAndSalesTest extends TestCase
         $this->assertSame($customer->id, $pos->get('customerId'));
     }
 
-    public function test_tenant_smtp_configuration_and_whatsapp_invoice_generation(): void
+    public function test_tenant_cannot_persist_gateway_credentials_and_can_generate_whatsapp_invoice_link(): void
     {
         [$company] = $this->actingAsTenantAdmin();
 
@@ -210,10 +210,13 @@ class ProductsAndSalesTest extends TestCase
             ->set('smtpFromName', 'Store Billing')
             ->call('save');
 
-        $this->assertDatabaseHas('configurations', [
+        $this->assertDatabaseMissing('configurations', [
             'company_id' => $company->id,
             'key' => 'smtp_host',
-            'value' => 'smtp.mailtrap.io',
+        ]);
+        $this->assertDatabaseMissing('configurations', [
+            'company_id' => $company->id,
+            'key' => 'smtp_password',
         ]);
 
         // Create a sale and verify WhatsApp generation

@@ -197,6 +197,9 @@
                                                 <span class="text-[9px] block text-rose-500 font-sans uppercase">OVERDUE</span>
                                             @endif
                                         </span>
+                                        @if ($inv->due_reminder_at)
+                                            <span class="mt-0.5 block text-[9px] font-sans text-indigo-500">🔔 {{ $inv->due_reminder_at->timezone(auth('web')->user()?->company?->resolveTimezone() ?? 'UTC')->format('M j, H:i') }}</span>
+                                        @endif
                                     @else
                                         <span class="text-slate-400 font-normal">{{ __("Immediate") }}</span>
                                     @endif
@@ -250,6 +253,7 @@
                                                 class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition shadow-2xs active:scale-95 cursor-pointer">
                                             + {{ __("Collect Pay") }}
                                         </button>
+                                        <button type="button" wire:click="openReminderModal({{ $inv->id }})" class="px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] transition" title="{{ __('Schedule push reminder') }}">⏰</button>
 
                                         <div x-data="{ open: false }" class="relative inline-block">
                                             <button type="button" x-on:click="open = !open"
@@ -452,6 +456,31 @@
                     </button>
                 </div>
 
+            </div>
+        </div>
+    @endif
+
+    @if ($showReminderModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" x-data x-on:keydown.escape.window="$wire.set('showReminderModal', false)">
+            <div class="w-full max-w-md space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+                <div>
+                    <h3 class="text-base font-black text-slate-900 dark:text-white">{{ __('Schedule due-invoice reminder') }}</h3>
+                    <p class="mt-1 text-xs text-slate-500">{{ __('Registered tenant devices receive a high-priority alert at this time.') }}</p>
+                </div>
+                <label class="block space-y-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <span>{{ __('Invoice due date') }}</span>
+                    <input type="date" wire:model="reminderDueDate" class="w-full rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-800">
+                    @error('reminderDueDate') <span class="text-rose-500">{{ $message }}</span> @enderror
+                </label>
+                <label class="block space-y-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <span>{{ __('Reminder date & time') }}</span>
+                    <input type="datetime-local" wire:model="reminderAt" class="w-full rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-800">
+                    @error('reminderAt') <span class="text-rose-500">{{ $message }}</span> @enderror
+                </label>
+                <div class="flex justify-end gap-2">
+                    <button type="button" wire:click="$set('showReminderModal', false)" class="rounded-xl px-4 py-2 text-xs font-bold text-slate-500">{{ __('Cancel') }}</button>
+                    <button type="button" wire:click="scheduleReminder" class="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-black text-white">{{ __('Schedule reminder') }}</button>
+                </div>
             </div>
         </div>
     @endif

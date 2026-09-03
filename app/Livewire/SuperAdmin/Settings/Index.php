@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Page;
 use App\Models\PlatformBranding;
 use App\Models\PlatformSystem;
+use App\Models\PushNotificationSetting;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Layout;
@@ -83,6 +84,41 @@ class Index extends Component
 
     public string $testEmailTo = '';
 
+    // --- GLOBAL PUSH NOTIFICATION SETTINGS ---
+    public bool $pushEnabled = false;
+
+    public string $fcmProjectId = '';
+
+    public string $fcmServiceAccountJson = '';
+
+    public string $fcmServerKey = '';
+
+    public bool $hasFcmServiceAccount = false;
+
+    public bool $hasFcmServerKey = false;
+
+    public string $androidApiKey = '';
+
+    public string $androidAppId = '';
+
+    public string $messagingSenderId = '';
+
+    public bool $hasAndroidApiKey = false;
+
+    public string $orderChannelId = 'delayed_orders_alarm';
+
+    public string $orderChannelName = 'Delayed order alarms';
+
+    public string $orderSound = 'alarm';
+
+    public string $invoiceChannelId = 'due_invoice_reminders';
+
+    public string $invoiceChannelName = 'Due invoice reminders';
+
+    public string $invoiceSound = 'alarm';
+
+    public int $alarmRepeatSeconds = 60;
+
     // --- TAB 3: WHITE-LABEL & BRANDING ---
     public string $platformName = '';
 
@@ -149,7 +185,11 @@ class Index extends Component
     {
         abort_unless(auth('platform_web')->user()?->hasRole('super_admin'), 403);
 
-        $allowedTabs = ['general', 'smtp', 'branding', 'whitelabel', 'social', 'pages', 'appearance'];
+        if (request()->routeIs('superadmin.settings.notifications')) {
+            $this->activeTab = 'push';
+        }
+
+        $allowedTabs = ['general', 'smtp', 'push', 'branding', 'whitelabel', 'social', 'pages', 'appearance'];
         if (! in_array($this->activeTab, $allowedTabs, true)) {
             $this->activeTab = 'general';
         }
@@ -224,14 +264,109 @@ class Index extends Component
         $this->smtpFromName = (string) ($branding->smtp_from_name ?? $branding->platform_name ?? '');
         $this->hasStoredPassword = filled($branding->smtp_password);
         $this->testEmailTo = (string) (auth('platform_web')->user()?->email ?? '');
+
+        $push = PushNotificationSetting::current();
+        $this->pushEnabled = $push->enabled;
+        $this->fcmProjectId = (string) $push->fcm_project_id;
+        $this->hasFcmServiceAccount = filled($push->fcm_service_account_json);
+        $this->hasFcmServerKey = filled($push->fcm_server_key);
+        $this->hasAndroidApiKey = filled($push->android_api_key);
+        $this->androidAppId = (string) $push->android_app_id;
+        $this->messagingSenderId = (string) $push->messaging_sender_id;
+        $this->orderChannelId = (string) $push->order_channel_id;
+        $this->orderChannelName = (string) $push->order_channel_name;
+        $this->orderSound = (string) $push->order_sound;
+        $this->invoiceChannelId = (string) $push->invoice_channel_id;
+        $this->invoiceChannelName = (string) $push->invoice_channel_name;
+        $this->invoiceSound = (string) $push->invoice_sound;
+        $this->alarmRepeatSeconds = (int) $push->alarm_repeat_seconds;
     }
 
     public function setTab(string $tab): void
     {
-        $allowedTabs = ['general', 'smtp', 'branding', 'whitelabel', 'social', 'pages', 'appearance'];
+        $allowedTabs = ['general', 'smtp', 'push', 'branding', 'whitelabel', 'social', 'pages', 'appearance'];
         if (in_array($tab, $allowedTabs, true)) {
             $this->activeTab = $tab;
         }
+    }
+
+    public function savePushNotifications(): void
+    {
+        $data = $this->validate([
+            'pushEnabled' => ['boolean'],
+            'fcmProjectId' => ['nullable', 'string', 'max:255'],
+            'fcmServiceAccountJson' => ['nullable', 'json'],
+            'fcmServerKey' => ['nullable', 'string', 'max:4096'],
+            'androidApiKey' => ['nullable', 'string', 'max:1000'],
+            'androidAppId' => ['nullable', 'string', 'max:255'],
+            'messagingSenderId' => ['nullable', 'string', 'max:255'],
+            'orderChannelId' => ['required', 'regex:/^[a-z0-9_.-]+$/', 'max:100'],
+            'orderChannelName' => ['required', 'string', 'max:100'],
+            'orderSound' => ['required', 'in:alarm,notification,ringtone'],
+            'invoiceChannelId' => ['required', 'regex:/^[a-z0-9_.-]+$/', 'max:100'],
+            'invoiceChannelName' => ['required', 'string', 'max:100'],
+            'invoiceSound' => ['required', 'in:alarm,notification,ringtone'],
+            'alarmRepeatSeconds' => ['required', 'integer', 'min:15', 'max:600'],
+        ]);
+
+        $push = PushNotificationSetting::current();
+        if ($this->pushEnabled
+            && blank($this->fcmServiceAccountJson)
+            && blank($this->fcmServerKey)
+            && blank($push->fcm_service_account_json)
+            && blank($push->fcm_server_key)) {
+            $this->addError('fcmServiceAccountJson', 'Add a service account JSON or legacy server key before enabling push.');
+
+            return;
+        }
+
+        $update = [
+            'enabled' => $data['pushEnabled'],
+            'fcm_project_id' => $data['fcmProjectId'] ?: null,
+            'android_app_id' => $data['androidAppId'] ?: null,
+            'messaging_sender_id' => $data['messagingSenderId'] ?: null,
+            'order_channel_id' => $data['orderChannelId'],
+            'order_channel_name' => $data['orderChannelName'],
+            'order_sound' => $data['orderSound'],
+            'invoice_channel_id' => $data['invoiceChannelId'],
+            'invoice_channel_name' => $data['invoiceChannelName'],
+            'invoice_sound' => $data['invoiceSound'],
+            'alarm_repeat_seconds' => $data['alarmRepeatSeconds'],
+        ];
+
+        if (filled($this->fcmServiceAccountJson)) {
+            $credentials = json_decode($this->fcmServiceAccountJson, true);
+            if (empty($credentials['client_email']) || empty($credentials['private_key'])) {
+                $this->addError('fcmServiceAccountJson', 'The service account must contain client_email and private_key.');
+
+                return;
+            }
+            $update['fcm_service_account_json'] = $this->fcmServiceAccountJson;
+            $update['fcm_project_id'] = $update['fcm_project_id'] ?: ($credentials['project_id'] ?? null);
+        }
+        if (filled($this->fcmServerKey)) {
+            $update['fcm_server_key'] = trim($this->fcmServerKey);
+        }
+        if (filled($this->androidApiKey)) {
+            $update['android_api_key'] = trim($this->androidApiKey);
+        }
+
+        $push->update($update);
+        $this->fcmProjectId = (string) $push->fresh()->fcm_project_id;
+        $this->hasFcmServiceAccount = filled($push->fcm_service_account_json);
+        $this->hasFcmServerKey = filled($push->fcm_server_key);
+        $this->hasAndroidApiKey = filled($push->android_api_key);
+        $this->reset('fcmServiceAccountJson', 'fcmServerKey', 'androidApiKey');
+
+        AuditLog::record('push.settings_updated', null, auth('platform_web')->id(), [
+            'enabled' => $this->pushEnabled,
+            'project_id' => $this->fcmProjectId,
+            'order_channel_id' => $this->orderChannelId,
+            'invoice_channel_id' => $this->invoiceChannelId,
+        ]);
+
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Global push notification settings saved.']);
+        session()->flash('status', 'Global push notification settings saved.');
     }
 
     public function setLandingTheme(string $themeKey): void

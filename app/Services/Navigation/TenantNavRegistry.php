@@ -139,7 +139,7 @@ class TenantNavRegistry
     }
 
     /**
-     * Store Settings' eight tabs (resources/views/livewire/tenant/settings/
+     * Store Settings' seven tenant-owned tabs (resources/views/livewire/tenant/settings/
      * index.blade.php's `validTabs`/`#hash` routing), exposed as independent
      * nav items nested under `settings` by default so an admin can pin a
      * direct link to just one tab, reorder them, or un-nest one to the
@@ -154,7 +154,6 @@ class TenantNavRegistry
             ['key' => 'settings_financial', 'label' => 'Financial & Currency', 'parent' => 'settings'],
             ['key' => 'settings_taxes', 'label' => 'Taxes & Compliance', 'parent' => 'settings'],
             ['key' => 'settings_api', 'label' => 'API & Integrations', 'parent' => 'settings'],
-            ['key' => 'settings_notifications', 'label' => 'Notification & Dispatch', 'parent' => 'settings'],
             ['key' => 'settings_navigation', 'label' => 'Navigation Menu', 'parent' => 'settings'],
         ];
     }

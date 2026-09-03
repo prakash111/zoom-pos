@@ -54,6 +54,9 @@ class Pos extends Component
     // Estimated Preparation Time (set when sending an order to the kitchen)
     public int $prepMinutes = 15;
 
+    // Advance warning before the selected preparation time expires.
+    public int $intimationMinutes = 0;
+
     // Menu Browser State
     public ?int $selectedCategoryId = null;
 
@@ -665,6 +668,9 @@ class Pos extends Component
         $kotCount = KitchenTicket::where('company_id', $companyId)->count();
         $kotNumber = 'KOT-'.sprintf('%03d', $kotCount + 1);
 
+        $sentAt = now();
+        $intimationMinutes = min($this->prepMinutes, $this->intimationMinutes);
+        $targetAt = $sentAt->copy()->addMinutes($this->prepMinutes);
         $kot = KitchenTicket::create([
             'company_id' => $companyId,
             'sale_id' => $sale->id,
@@ -675,8 +681,11 @@ class Pos extends Component
             'status' => 'pending',
             'server_name' => auth('web')->user()?->name ?? 'POS Staff',
             'items' => $this->items,
+            'sent_to_kitchen_at' => $sentAt,
             'prep_minutes' => $this->prepMinutes,
-            'target_completion_at' => now()->addMinutes($this->prepMinutes),
+            'intimation_minutes' => $intimationMinutes,
+            'target_completion_at' => $targetAt,
+            'alarm_at' => $targetAt->copy()->subMinutes($intimationMinutes),
         ]);
 
         // 3. Mark Table Occupied

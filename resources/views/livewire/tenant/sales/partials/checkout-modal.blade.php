@@ -527,6 +527,11 @@
                                 @error('dueDate') <span class="text-rose-400 text-[10px] font-bold">{{ $message }}</span> @enderror
                                 @error('customerId') <span class="text-rose-400 text-[10px] font-bold">{{ $message }}</span> @enderror
                             </div>
+                            <div>
+                                <label class="block font-bold text-slate-600 dark:text-slate-300 mb-1.5 text-xs">{{ __('Reminder date & time *') }}</label>
+                                <input type="datetime-local" wire:model="dueReminderAt" class="w-full py-2.5 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500">
+                                @error('dueReminderAt') <span class="text-rose-400 text-[10px] font-bold">{{ $message }}</span> @enderror
+                            </div>
                         </div>
                     @endif
                 </div>
@@ -615,15 +620,18 @@
 
                     <!-- Credit Sale Due Date (If Partial / Unpaid Balance Remains) -->
                     @if ($this->remainingBalance > 0)
-                        <div class="p-2.5 rounded-xl bg-amber-950/40 border border-amber-800 flex items-center justify-between gap-2">
+                        <div class="p-2.5 rounded-xl bg-amber-950/40 border border-amber-800 flex flex-wrap items-center justify-between gap-2">
                             <div class="text-amber-300 font-semibold text-[11px]">
                                 ⚠️ <strong>{{ __("Credit / Receivable Sale:") }}</strong> {{ $company->formatMoney($this->remainingBalance) }} {{ __("will be logged to Accounts Receivable.") }}
                             </div>
                             <div class="flex items-center gap-1.5 shrink-0">
                                 <label class="text-[10px] font-bold text-amber-200">{{ __("Due Date:") }}</label>
                                 <input type="date" wire:model="dueDate" class="text-xs py-1 px-2 rounded-lg border-amber-700 bg-slate-800 text-white">
+                                <label class="text-[10px] font-bold text-amber-200">{{ __('Reminder:') }}</label>
+                                <input type="datetime-local" wire:model="dueReminderAt" class="text-xs py-1 px-2 rounded-lg border-amber-700 bg-slate-800 text-white">
                             </div>
                         </div>
+                        @error('dueReminderAt') <span class="text-rose-400 text-[10px] font-bold">{{ $message }}</span> @enderror
                     @endif
 
                 </div>

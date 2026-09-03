@@ -407,14 +407,6 @@ class Index extends Component
             'logoFile' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp,svg', 'max:2048'],
             'faviconFile' => ['nullable', 'file', 'mimes:png,ico,svg,jpg,jpeg,webp', 'max:1024'],
             'drawerCoverFile' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:4096'],
-            'smtpHost' => ['nullable', 'string', 'max:255'],
-            'smtpPort' => ['nullable', 'integer', 'min:1', 'max:65535'],
-            'smtpUsername' => ['nullable', 'string', 'max:255'],
-            'smtpEncryption' => ['nullable', 'in:tls,ssl,'],
-            'smtpFromAddress' => ['nullable', 'email'],
-            'smtpFromName' => ['nullable', 'string', 'max:255'],
-            'whatsappPhoneNumberId' => ['nullable', 'string', 'max:100'],
-            'whatsappApiToken' => ['nullable', 'string', 'max:1000'],
             'defaultAiProvider' => ['required', 'in:openai,gemini,claude'],
             'openaiModel' => ['required', Rule::in(array_column($this->modelPresets['openai'], 'id'))],
             'geminiModel' => ['required', Rule::in(array_column($this->modelPresets['gemini'], 'id'))],
@@ -422,9 +414,6 @@ class Index extends Component
             'openaiApiKey' => ['nullable', 'string', 'max:500'],
             'geminiApiKey' => ['nullable', 'string', 'max:500'],
             'claudeApiKey' => ['nullable', 'string', 'max:500'],
-            'restaurantAlertIntervalMinutes' => ['required', 'integer', 'in:2,3,5'],
-            'restaurantAlertSoundPreset' => ['required', 'in:chime,bell,alert'],
-            'restaurantAlertSoundUrl' => ['nullable', 'string', 'max:2000', 'url'],
         ];
     }
 
@@ -678,24 +667,13 @@ class Index extends Component
 
         $this->dispatch('set-ui-accent-color', color: $this->primaryColor ?: '#2563eb');
 
-        // Save SMTP & Custom configurations
+        // Save tenant-owned feature configurations. Delivery and push
+        // gateway credentials are intentionally SuperAdmin-only.
         $configsToSave = [
-            'smtp_host' => $this->smtpHost,
-            'smtp_port' => (string) $this->smtpPort,
-            'smtp_username' => $this->smtpUsername,
-            'smtp_encryption' => $this->smtpEncryption,
-            'smtp_from_address' => $this->smtpFromAddress,
-            'smtp_from_name' => $this->smtpFromName,
-            'whatsapp_phone_prefix' => $this->whatsappPhonePrefix,
-            'whatsapp_custom_note' => $this->whatsappCustomNote,
-            'whatsapp_phone_number_id' => $this->whatsappPhoneNumberId,
             'default_ai_provider' => $this->defaultAiProvider,
             'openai_model' => $this->openaiModel,
             'gemini_model' => $this->geminiModel,
             'claude_model' => $this->claudeModel,
-            'restaurant_alert_interval_minutes' => (string) $this->restaurantAlertIntervalMinutes,
-            'restaurant_alert_sound_preset' => $this->restaurantAlertSoundPreset,
-            'restaurant_alert_sound_url' => $this->restaurantAlertSoundUrl,
         ];
 
         foreach (['openai_api_key' => 'openaiApiKey', 'gemini_api_key' => 'geminiApiKey', 'claude_api_key' => 'claudeApiKey'] as $key => $property) {
@@ -705,18 +683,6 @@ class Index extends Component
                 $this->{$flag} = true;
                 $this->{$property} = '';
             }
-        }
-
-        if (filled($this->smtpPassword)) {
-            $configsToSave['smtp_password'] = $this->smtpPassword;
-            $this->hasStoredSmtpPassword = true;
-            $this->smtpPassword = '';
-        }
-
-        if (filled($this->whatsappApiToken)) {
-            $configsToSave['whatsapp_api_token'] = trim($this->whatsappApiToken);
-            $this->hasWhatsappApiToken = true;
-            $this->whatsappApiToken = '';
         }
 
         foreach ($configsToSave as $key => $val) {

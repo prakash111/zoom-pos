@@ -74,15 +74,22 @@
             @php
                 $mins = $kot->getElapsedMinutes();
             @endphp
-            <div data-kot-id="{{ $kot->id }}" @class([
+            <div data-kot-id="{{ $kot->id }}" data-alarm-active="{{ $kot->isAlarmActive() ? 'true' : 'false' }}" @class([
                 'rounded-3xl p-5 border-2 transition-all flex flex-col justify-between shadow-md relative',
-                'bg-white dark:bg-slate-900 border-amber-500/60 shadow-amber-500/10' => $kot->status === 'pending',
-                'bg-white dark:bg-slate-900 border-blue-500/60 shadow-blue-500/10' => $kot->status === 'preparing',
-                'bg-white dark:bg-slate-900 border-emerald-500/80 shadow-emerald-500/15 ring-2 ring-emerald-500/30' => $kot->status === 'ready',
+                'bg-rose-50 dark:bg-rose-950/40 border-rose-600 shadow-rose-500/30 ring-4 ring-rose-500/20' => $kot->isAlarmActive(),
+                'bg-white dark:bg-slate-900 border-amber-500/60 shadow-amber-500/10' => !$kot->isAlarmActive() && $kot->status === 'pending',
+                'bg-white dark:bg-slate-900 border-blue-500/60 shadow-blue-500/10' => !$kot->isAlarmActive() && $kot->status === 'preparing',
+                'bg-white dark:bg-slate-900 border-emerald-500/80 shadow-emerald-500/15 ring-2 ring-emerald-500/30' => !$kot->isAlarmActive() && $kot->status === 'ready',
             ])>
                 
                 <!-- Ticket Top Header -->
                 <div>
+                    @if ($kot->isAlarmActive())
+                        <div class="mb-3 flex items-center justify-between gap-2 rounded-2xl bg-rose-600 px-3 py-2 text-white animate-pulse">
+                            <span class="text-xs font-black">🚨 {{ __('Preparation alarm') }}</span>
+                            <button type="button" wire:click="dismissAlarm('{{ $kot->id }}')" class="rounded-lg bg-white/20 px-2 py-1 text-[10px] font-black hover:bg-white/30">{{ __('Dismiss') }}</button>
+                        </div>
+                    @endif
                     <div class="flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
                         <div>
                             <div class="flex items-center gap-1.5">
@@ -218,9 +225,8 @@
 
 <script>
 (function () {
-    const alertIntervalMs = {{ (int) $alertIntervalMinutes }} * 60000;
+    const alertIntervalMs = {{ (int) $alertRepeatSeconds }} * 1000;
     const soundPreset = @js($alertSoundPreset);
-    const soundUrl = @js($alertSoundUrl);
 
     function playPresetTone(pattern) {
         try {
@@ -242,15 +248,11 @@
     }
 
     function playAlert() {
-        if (soundUrl) {
-            const audio = new Audio(soundUrl);
-            audio.play().catch(() => {});
-            return;
-        }
         const patterns = {
             chime: [[880, 0.15], [1175, 0.2]],
             bell: [[1046, 0.35]],
             alert: [[660, 0.12], [660, 0.12], [660, 0.12]],
+            alarm: [[880, 0.18], [660, 0.18], [880, 0.18], [660, 0.25]],
         };
         playPresetTone(patterns[soundPreset] || patterns.chime);
     }
@@ -291,7 +293,7 @@
     }
 
     function checkForOverdueChime() {
-        const anyOverdue = document.querySelector('[data-kot-id] .kds-countdown-badge.bg-rose-100');
+        const anyOverdue = document.querySelector('[data-kot-id][data-alarm-active="true"]');
         if (anyOverdue) playAlert();
     }
 

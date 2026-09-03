@@ -15,14 +15,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * Mobile REST surface for the "Profile", "Receipts", "Financial",
- * "Notifications" and Payment Methods sections of the web tenant Settings
- * page (app/Livewire/Tenant/Settings/Index.php). Split into one endpoint
- * per section (unlike the web page's single monolithic save()) so a mobile
- * tab only ever touches its own fields. Secrets (SMTP password, WhatsApp API
- * token) are stored in the same `configurations` key/value table the web
- * page uses, and are never echoed back — only a `has_*` boolean, matching
- * the web page's own masking convention.
+ * Mobile REST surface for the tenant-owned Profile, Receipts, Financial and
+ * Payment Methods sections. Push and delivery gateway credentials are
+ * deliberately excluded: they are managed only by SuperAdmin.
  */
 class SettingsApiController extends Controller
 {
@@ -31,11 +26,6 @@ class SettingsApiController extends Controller
     public function index(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
-        $configs = Configuration::withoutGlobalScopes()
-            ->where('company_id', $company->id)
-            ->pluck('value', 'key')
-            ->all();
-
         return response()->json([
             'success' => true,
             'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
@@ -43,7 +33,6 @@ class SettingsApiController extends Controller
             'profile' => $this->presentProfile($company),
             'receipts' => $this->presentReceipts($company),
             'financial' => $this->presentFinancial($company),
-            'notifications' => $this->presentNotifications($company, $configs),
             'payment_methods' => $this->paymentMethods($company),
             // Read-only mirror of AppBootstrapController::bootstrap()'s `nav`
             // block, for Settings > Navigation Menu to render its current

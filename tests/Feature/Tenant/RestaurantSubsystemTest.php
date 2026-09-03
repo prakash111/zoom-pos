@@ -110,6 +110,8 @@ class RestaurantSubsystemTest extends TestCase
         // 1. Select Table & Customize Item
         $component
             ->call('selectTable', $table->id)
+            ->set('prepMinutes', 10)
+            ->set('intimationMinutes', 2)
             ->call('openModifierModal', $burger->id)
             ->call('selectVariant', 'Double', 15.00)
             ->call('toggleModifier', 'Extra Cheese', 1.50)
@@ -131,6 +133,11 @@ class RestaurantSubsystemTest extends TestCase
             'dining_table_id' => $table->id,
             'status' => 'pending',
         ]);
+        $ticket = KitchenTicket::where('company_id', $company->id)->latest('created_at')->firstOrFail();
+        $this->assertSame(10, $ticket->prep_minutes);
+        $this->assertSame(2, $ticket->intimation_minutes);
+        $this->assertSame(600, (int) $ticket->sent_to_kitchen_at->diffInSeconds($ticket->target_completion_at, true));
+        $this->assertSame(120, (int) $ticket->alarm_at->diffInSeconds($ticket->target_completion_at, true));
 
         // 3. Settle Bill (Clears table to Available, shows the post-settlement dispatch modal)
         $component

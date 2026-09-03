@@ -1297,6 +1297,7 @@
             </header>
 
             <!-- Main Dynamic View Container with Smooth Transition -->
+            <livewire:tenant.system-alarm-banner />
             <main class="flex-1 w-full max-w-none transition-all duration-200 {{ $isPosScreen ? 'p-1.5 sm:p-2.5 overflow-hidden flex flex-col min-h-0 h-full' : 'p-3 sm:p-5 md:p-6 overflow-y-auto' }}" id="main-app-content">
                 <div class="w-full max-w-none {{ $isPosScreen ? 'flex-1 min-h-0 flex flex-col overflow-hidden h-full' : '' }}">
                     {{ $slot ?? '' }}

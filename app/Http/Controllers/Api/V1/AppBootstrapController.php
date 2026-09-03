@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\PushNotificationSetting;
 use App\Services\Localization\LocalizationService;
 use App\Services\Navigation\TenantNavigationConfigService;
 use Illuminate\Http\JsonResponse;
@@ -41,6 +42,7 @@ class AppBootstrapController extends Controller
             'locale' => $locale,
             'translations' => $localization->getMergedTranslations($locale, $company->id),
             'nav' => $company->normalizedNavConfig(),
+            'push' => PushNotificationSetting::current()->publicConfig(),
             'config' => [
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,

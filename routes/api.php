@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\DeviceApiController;
 use App\Http\Controllers\Api\V1\LanguageApiController;
 use App\Http\Controllers\Api\V1\PayablesApiController;
 use App\Http\Controllers\Api\V1\PermissionApiController;
+use App\Http\Controllers\Api\V1\PushDeviceApiController;
 use App\Http\Controllers\Api\V1\PosDesktopSyncController;
 use App\Http\Controllers\Api\V1\PosSyncApiController;
 use App\Http\Controllers\Api\V1\QuotationApiController;
@@ -65,12 +66,15 @@ Route::prefix('v1/pos')->group(function () {
     Route::post('/auth/register', [PosSyncApiController::class, 'register']);
     Route::get('/auth/registration-config', [PosSyncApiController::class, 'registrationConfig']);
     Route::get('/auth/branding', [PosSyncApiController::class, 'branding']);
+    Route::get('/auth/push-config', [PushDeviceApiController::class, 'config']);
 
     // Protected POS Endpoints (Require API Key or Bearer Token)
     Route::middleware([AuthenticateTenantApi::class])->group(function () {
         Route::get('/auth/session', [PosSyncApiController::class, 'session']);
         Route::post('/auth/desktop-session', [PosSyncApiController::class, 'desktopWebSession']);
         Route::get('/status', [PosSyncApiController::class, 'status']);
+        Route::post('/push-devices', [PushDeviceApiController::class, 'store']);
+        Route::delete('/push-devices', [PushDeviceApiController::class, 'destroy']);
         Route::get('/sync-catalog', [PosSyncApiController::class, 'syncPull'])->middleware('tenant.api.permission:products,view');
         Route::get('/sync-pull', [PosSyncApiController::class, 'syncPull'])->middleware('tenant.api.permission:products,view');
         Route::post('/sync-sales', [PosSyncApiController::class, 'syncPush'])->middleware('tenant.api.permission:pos,create');
@@ -102,6 +106,7 @@ Route::prefix('v1/pos')->group(function () {
         // Due Payments / Receivables dashboard panel
         Route::get('/receivables/due', [PosSyncApiController::class, 'dueReceivables'])->middleware('tenant.api.permission:customers,view');
         Route::post('/receivables/{sale}/remind', [PosSyncApiController::class, 'remindReceivable'])->middleware('tenant.api.permission:finance,edit');
+        Route::put('/receivables/{sale}/reminder', [PosSyncApiController::class, 'scheduleReceivableReminder'])->middleware('tenant.api.permission:finance,edit');
 
         // Analytics & Reports
         Route::get('/analytics', [PosSyncApiController::class, 'analytics'])->middleware('tenant.api.permission:reports,view');
@@ -110,6 +115,7 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/send-delivery', [PosSyncApiController::class, 'sendDelivery'])->middleware('tenant.api.permission:pos,create');
 
         // Invoice PDF (Preview / Print / Share)
+        Route::get('/sales/{id}', [PosSyncApiController::class, 'saleDetails'])->middleware('tenant.api.permission:sales,view');
         Route::get('/sales/{id}/pdf', [PosSyncApiController::class, 'salePdf'])->middleware('tenant.api.permission:sales,view');
 
         // Taxes & Tax Rules Management
@@ -182,7 +188,7 @@ Route::prefix('v1/pos')->group(function () {
         Route::put('/suppliers/{id}', [CatalogAdminApiController::class, 'suppliersUpdate'])->middleware('tenant.api.permission:suppliers,edit');
         Route::delete('/suppliers/{id}', [CatalogAdminApiController::class, 'suppliersDestroy'])->middleware('tenant.api.permission:suppliers,edit');
 
-        // Settings: Profile / Receipts / Financial / Notifications / Payment Methods
+        // Settings: Profile / Receipts / Financial / Payment Methods
         Route::get('/settings', [SettingsApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
         Route::put('/settings/profile', [SettingsApiController::class, 'updateProfile'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/profile/logo', [SettingsApiController::class, 'uploadLogo'])->middleware('tenant.api.permission:settings,edit');
@@ -193,9 +199,6 @@ Route::prefix('v1/pos')->group(function () {
         Route::delete('/settings/profile/drawer-cover', [SettingsApiController::class, 'removeDrawerCover'])->middleware('tenant.api.permission:settings,edit');
         Route::put('/settings/receipts', [SettingsApiController::class, 'updateReceipts'])->middleware('tenant.api.permission:settings,edit');
         Route::put('/settings/financial', [SettingsApiController::class, 'updateFinancial'])->middleware('tenant.api.permission:settings,edit');
-        Route::put('/settings/notifications', [SettingsApiController::class, 'updateNotifications'])->middleware('tenant.api.permission:settings,edit');
-        Route::post('/settings/notifications/test-email', [SettingsApiController::class, 'testEmail'])->middleware('tenant.api.permission:settings,edit');
-
         Route::get('/settings/payment-methods', [SettingsApiController::class, 'paymentMethodsIndex'])->middleware('tenant.api.permission:settings,view');
         Route::post('/settings/payment-methods', [SettingsApiController::class, 'paymentMethodsStore'])->middleware('tenant.api.permission:settings,edit');
         Route::put('/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsUpdate'])->middleware('tenant.api.permission:settings,edit');
@@ -203,11 +206,6 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/settings/payment-methods/{id}/toggle', [SettingsApiController::class, 'paymentMethodsToggle'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/settings/payment-methods/{id}/transactions', [SettingsApiController::class, 'paymentMethodTransactions'])->middleware('tenant.api.permission:settings,view');
         Route::get('/settings/payment-methods/{id}/transactions/export', [SettingsApiController::class, 'paymentMethodTransactionsExport'])->middleware('tenant.api.permission:settings,view');
-
-        Route::get('/settings/notification-channels', [SettingsApiController::class, 'notificationChannelsIndex'])->middleware('tenant.api.permission:settings,view');
-        Route::post('/settings/notification-channels', [SettingsApiController::class, 'notificationChannelsStore'])->middleware('tenant.api.permission:settings,edit');
-        Route::put('/settings/notification-channels/{id}', [SettingsApiController::class, 'notificationChannelsUpdate'])->middleware('tenant.api.permission:settings,edit');
-        Route::delete('/settings/notification-channels/{id}', [SettingsApiController::class, 'notificationChannelsDestroy'])->middleware('tenant.api.permission:settings,edit');
 
         // Consignments (draft -> dispatched -> reconciled -> finalized)
         Route::get('/consignments', [ConsignmentApiController::class, 'index'])->middleware('tenant.api.permission:consignments,view');
@@ -243,6 +241,7 @@ Route::prefix('v1/pos')->group(function () {
 
         Route::get('/restaurant/kot', [RestaurantApiController::class, 'kotIndex'])->middleware('tenant.api.permission:pos,view');
         Route::post('/restaurant/kot/{id}/status', [RestaurantApiController::class, 'kotUpdateStatus'])->middleware('tenant.api.permission:pos,edit');
+        Route::post('/restaurant/kot/{id}/dismiss-alarm', [RestaurantApiController::class, 'kotDismissAlarm'])->middleware('tenant.api.permission:pos,edit');
 
         // Sales Targets & Goals
         Route::get('/sales-targets', [SalesTargetApiController::class, 'index'])->middleware('tenant.api.permission:targets,view');

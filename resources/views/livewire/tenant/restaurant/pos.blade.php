@@ -409,6 +409,18 @@
                     @endforeach
                 </div>
             </div>
+            <div class="flex items-center gap-1.5 pb-1">
+                <span class="text-[10px] font-bold text-slate-400 uppercase shrink-0">{{ __('Alert') }}</span>
+                <div class="flex items-center gap-1 flex-wrap">
+                    @foreach ([0 => __('At expiry'), 2 => __('2m before'), 5 => __('5m before')] as $mins => $label)
+                        <button type="button" wire:click="$set('intimationMinutes', {{ $mins }})" @class([
+                            'px-2.5 py-1 rounded-lg text-[10px] font-bold transition',
+                            'bg-amber-400 text-slate-950' => $intimationMinutes === $mins,
+                            'bg-slate-800 text-slate-300 hover:bg-slate-700' => $intimationMinutes !== $mins,
+                        ])>{{ $label }}</button>
+                    @endforeach
+                </div>
+            </div>
 
             <!-- Action Buttons matching food-idea-pos.png -->
             <div class="flex items-center gap-2">

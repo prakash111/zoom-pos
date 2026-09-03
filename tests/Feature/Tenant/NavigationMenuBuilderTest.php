@@ -47,7 +47,7 @@ class NavigationMenuBuilderTest extends TestCase
      * "settings" row, not as flat administration-section items, with no
      * nav_config saved yet.
      */
-    public function test_navigation_tab_nests_the_eight_settings_tabs_under_store_settings_by_default(): void
+    public function test_navigation_tab_nests_the_tenant_owned_settings_tabs_under_store_settings_by_default(): void
     {
         $this->actingAsTenantAdmin();
 
@@ -58,13 +58,13 @@ class NavigationMenuBuilderTest extends TestCase
 
                 $childKeys = collect($settings['children'] ?? [])->pluck('key')->all();
 
-                // The eight tabs must be nested under "settings", not also
+                // Tenant-owned tabs must be nested under "settings", not also
                 // duplicated as separate root-level administration items.
                 $rootKeys = collect($administration['items'])->pluck('key')->all();
 
                 return $childKeys === [
                     'settings_mode', 'settings_profile', 'settings_receipts', 'settings_financial',
-                    'settings_taxes', 'settings_api', 'settings_notifications', 'settings_navigation',
+                    'settings_taxes', 'settings_api', 'settings_navigation',
                 ] && ! in_array('settings_mode', $rootKeys, true);
             });
     }
@@ -95,7 +95,6 @@ class NavigationMenuBuilderTest extends TestCase
                             ['key' => 'settings_financial', 'label' => 'Financial & Currency', 'visible' => true],
                             ['key' => 'settings_taxes', 'label' => 'Taxes & Compliance', 'visible' => true],
                             ['key' => 'settings_api', 'label' => 'API & Integrations', 'visible' => true],
-                            ['key' => 'settings_notifications', 'label' => 'Notification & Dispatch', 'visible' => true],
                             // "settings_navigation" dragged out below, not listed here.
                         ],
                     ],
