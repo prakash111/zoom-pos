@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/quotation_model.dart';
+import '../../../core/services/tenant_time_service.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../auth/auth_provider.dart';
@@ -141,7 +142,10 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
           if (quote.validUntil != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text('Valid until ${_dateFormat.format(quote.validUntil!)}', style: TextStyle(color: Colors.grey.shade600)),
+              child: Text(
+                'Valid until ${_dateFormat.format(TenantTimeService.instance.toTenantTime(quote.validUntil!))}',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
             ),
           const SizedBox(height: 16),
           Card(

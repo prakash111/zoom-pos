@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/models/customer_model.dart';
 import '../../../core/models/ledger_entry_model.dart';
+import '../../../core/services/tenant_time_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
@@ -175,7 +176,7 @@ class _LedgerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final date = entry.date == null ? '' : _dateFormat.format(entry.date!);
+    final date = entry.date == null ? '' : _dateFormat.format(TenantTimeService.instance.toTenantTime(entry.date!));
 
     if (entry.isInvoice) {
       return Card(

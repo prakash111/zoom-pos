@@ -4,6 +4,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/models/company_model.dart';
 import '../../core/models/user_model.dart';
+import '../../core/services/tenant_time_service.dart';
 import '../../core/storage/secure_storage_service.dart';
 import 'auth_repository.dart';
 
@@ -36,6 +37,15 @@ class AuthProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isBusy => _status == AuthStatus.authenticating;
 
+  /// Sets [_company] and keeps [TenantTimeService] (order timestamps, prep
+  /// timers, KOT logs) in sync with it — every call site that assigns
+  /// `_company` goes through here rather than the field directly, so none
+  /// of them can forget this.
+  void _applyCompany(CompanyModel? company) {
+    _company = company;
+    TenantTimeService.instance.setTimezone(company?.timezone);
+  }
+
   Future<void> restoreSession() async {
     try {
       final token = await _secureStorage.readToken().timeout(
@@ -53,7 +63,7 @@ class AuthProvider extends ChangeNotifier {
             onTimeout: () => throw ApiException('Session restore timed out'),
           );
       _user = result.user;
-      _company = result.company;
+      _applyCompany(result.company);
       _status = AuthStatus.authenticated;
     } on ApiException {
       await _secureStorage.clearToken();
@@ -107,7 +117,7 @@ class AuthProvider extends ChangeNotifier {
       final result = await action();
       await _secureStorage.saveToken(result.token);
       _user = result.user;
-      _company = result.company;
+      _applyCompany(result.company);
 
       // The login/register responses omit a few company fields (notably
       // pos_mode/restaurant_mode_locked) that only GET /auth/session
@@ -116,7 +126,7 @@ class AuthProvider extends ChangeNotifier {
       // immediately after signing in, not just after an app restart.
       try {
         final refreshed = await _authRepository.session();
-        _company = refreshed.company;
+        _applyCompany(refreshed.company);
         if (refreshed.user != null) _user = refreshed.user;
       } catch (_) {
         // Keep the company from the login/register response if this fails.
@@ -143,7 +153,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await _secureStorage.clearToken();
     _user = null;
-    _company = null;
+    _applyCompany(null);
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }
@@ -152,7 +162,7 @@ class AuthProvider extends ChangeNotifier {
     if (_status != AuthStatus.authenticated) return;
     _secureStorage.clearToken();
     _user = null;
-    _company = null;
+    _applyCompany(null);
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }

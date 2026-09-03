@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/services/tenant_time_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
@@ -67,7 +68,7 @@ class _RegisterHistoryScreenState extends State<RegisterHistoryScreen> {
                 return Card(
                   child: ListTile(
                     title: Text(r.terminalId),
-                    subtitle: Text(r.openedAt != null ? _dateFormat.format(r.openedAt!) : ''),
+                    subtitle: Text(r.openedAt != null ? _dateFormat.format(TenantTimeService.instance.toTenantTime(r.openedAt!)) : ''),
                     trailing: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,

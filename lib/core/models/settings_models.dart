@@ -20,6 +20,9 @@ class ProfileSettings {
     this.drawerCoverUrl,
     required this.defaultCommissionRate,
     required this.defaultCommissionType,
+    this.timezone = '',
+    this.resolvedTimezone = 'UTC',
+    this.defaultTimezoneForCountry = 'UTC',
   });
 
   factory ProfileSettings.fromJson(Map<String, dynamic> json) {
@@ -41,6 +44,9 @@ class ProfileSettings {
       drawerCoverUrl: json['drawer_cover_url'] as String?,
       defaultCommissionRate: (json['default_commission_rate'] as num?)?.toDouble() ?? 0,
       defaultCommissionType: json['default_commission_type'] as String? ?? 'percentage',
+      timezone: json['timezone'] as String? ?? '',
+      resolvedTimezone: json['resolved_timezone'] as String? ?? 'UTC',
+      defaultTimezoneForCountry: json['default_timezone_for_country'] as String? ?? 'UTC',
     );
   }
 
@@ -61,6 +67,18 @@ class ProfileSettings {
   final String? drawerCoverUrl;
   final double defaultCommissionRate;
   final String defaultCommissionType;
+
+  /// Raw manual override — empty means "none set, following the country
+  /// default".
+  final String timezone;
+
+  /// What order times/prep timers/KOT logs are actually shown in — always
+  /// a valid IANA identifier, never empty. See Company::resolveTimezone().
+  final String resolvedTimezone;
+
+  /// What [timezone] would default to if cleared, for the "Use country
+  /// default (Xxx/Yyy)" hint next to the manual-override picker.
+  final String defaultTimezoneForCountry;
 }
 
 class ReceiptSettings {
@@ -328,6 +346,7 @@ class TenantSettingsBundle {
     required this.notifications,
     required this.paymentMethods,
     required this.nav,
+    this.timezones = const [],
   });
 
   final ProfileSettings profile;
@@ -336,6 +355,10 @@ class TenantSettingsBundle {
   final NotificationSettings notifications;
   final List<PaymentMethodModel> paymentMethods;
   final NavConfig nav;
+
+  /// Full IANA identifier list for the manual-timezone-override picker —
+  /// see SettingsApiController::index().
+  final List<String> timezones;
 }
 
 /// This tenant's drawer/rail/bar customization — see AppBootstrapController

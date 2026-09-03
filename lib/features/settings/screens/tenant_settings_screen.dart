@@ -109,7 +109,7 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen> with Single
       body: TabBarView(
         controller: _tabController,
         children: [
-          _serverTab((bundle) => _ProfileTab(repository: _repository, initial: bundle.profile)),
+          _serverTab((bundle) => _ProfileTab(repository: _repository, initial: bundle.profile, timezones: bundle.timezones)),
           _serverTab((bundle) => _ReceiptsTab(repository: _repository, initial: bundle.receipts)),
           _serverTab((bundle) => _FinancialTab(repository: _repository, initial: bundle.financial)),
           _serverTab((bundle) => _NotificationsTab(repository: _repository, initial: bundle.notifications)),
@@ -173,10 +173,13 @@ class _AppearanceTab extends StatelessWidget {
 }
 
 class _ProfileTab extends StatefulWidget {
-  const _ProfileTab({required this.repository, required this.initial});
+  const _ProfileTab({required this.repository, required this.initial, required this.timezones});
 
   final SettingsRepository repository;
   final ProfileSettings initial;
+
+  /// Full IANA identifier list for the manual-override picker below.
+  final List<String> timezones;
 
   @override
   State<_ProfileTab> createState() => _ProfileTabState();
@@ -199,6 +202,9 @@ class _ProfileTabState extends State<_ProfileTab> {
   late String _commissionType;
   late String _countryCode;
   late Color _primaryColor;
+  /// Null means "no manual override — follow the country default".
+  String? _timezoneOverride;
+  late String _defaultTimezoneForCountry;
   String? _logoUrl;
   String? _faviconUrl;
   String? _drawerCoverUrl;
@@ -235,6 +241,9 @@ class _ProfileTabState extends State<_ProfileTab> {
 
     final upperCountry = p.country.trim().toUpperCase();
     _countryCode = kTaxJurisdictions.containsKey(upperCountry) ? upperCountry : kOtherCountrySentinel;
+
+    _timezoneOverride = p.timezone.isEmpty ? null : p.timezone;
+    _defaultTimezoneForCountry = p.defaultTimezoneForCountry;
 
     _primaryColor = parseHexColor(p.primaryColor) ?? AppTheme.primary;
     _colorHex = TextEditingController(text: toHexColor(_primaryColor));
@@ -385,6 +394,7 @@ class _ProfileTabState extends State<_ProfileTab> {
         state: _state.text.trim(),
         postalCode: _postalCode.text.trim(),
         country: _countryCode == kOtherCountrySentinel ? _country.text.trim() : _countryCode,
+        timezone: _timezoneOverride ?? '',
         primaryColor: toHexColor(_primaryColor),
         defaultCommissionRate: double.tryParse(_commissionRate.text) ?? 0,
         defaultCommissionType: _commissionType,
@@ -465,6 +475,27 @@ class _ProfileTabState extends State<_ProfileTab> {
             onChanged: (_) => setState(() {}),
           ),
         ],
+        const SizedBox(height: 20),
+        const Divider(),
+        const SizedBox(height: 12),
+        Text(l10n.timezoneSectionTitle, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(l10n.timezoneSectionDescription, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String?>(
+          initialValue: _timezoneOverride,
+          isExpanded: true,
+          decoration: InputDecoration(labelText: l10n.timezoneManualOverride),
+          items: [
+            DropdownMenuItem<String?>(
+              value: null,
+              child: Text(l10n.timezoneUseCountryDefault(_defaultTimezoneForCountry), overflow: TextOverflow.ellipsis),
+            ),
+            for (final tz in widget.timezones)
+              DropdownMenuItem<String?>(value: tz, child: Text(tz, overflow: TextOverflow.ellipsis)),
+          ],
+          onChanged: (value) => setState(() => _timezoneOverride = value),
+        ),
         const SizedBox(height: 12),
         Row(children: [
           Expanded(

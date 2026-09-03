@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/sale_model.dart';
+import '../../../core/services/tenant_time_service.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../auth/auth_provider.dart';
@@ -75,7 +76,8 @@ class SaleDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (sale.createdAt != null) Text(_dateFormat.format(sale.createdAt!)),
+                  if (sale.createdAt != null)
+                    Text(_dateFormat.format(TenantTimeService.instance.toTenantTime(sale.createdAt!))),
                   if ((sale.customerName ?? '').isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text('Customer: ${sale.customerName}'),

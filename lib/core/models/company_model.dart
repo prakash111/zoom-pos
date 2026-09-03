@@ -17,6 +17,7 @@ class CompanyModel {
     this.posMode = 'general',
     this.restaurantModeLocked = false,
     this.drawerCoverUrl,
+    this.timezone = 'UTC',
   });
 
   factory CompanyModel.fromJson(Map<String, dynamic> json) {
@@ -38,6 +39,10 @@ class CompanyModel {
       posMode: json['pos_mode']?.toString() ?? 'general',
       restaurantModeLocked: json['restaurant_mode_locked'] as bool? ?? false,
       drawerCoverUrl: json['drawer_cover_url']?.toString(),
+      // Always the *resolved* zone (Company::resolveTimezone() server-side)
+      // — a manual override if the store set one, else a default derived
+      // from `country`. Never empty.
+      timezone: json['timezone']?.toString().isNotEmpty == true ? json['timezone'].toString() : 'UTC',
     );
   }
 
@@ -58,6 +63,7 @@ class CompanyModel {
   final String posMode;
   final bool restaurantModeLocked;
   final String? drawerCoverUrl;
+  final String timezone;
 
   /// True when this tenant should see the restaurant POS (table
   /// management + KOT) instead of the standard retail POS. Mirrors

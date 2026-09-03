@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/sale_model.dart';
+import '../../../core/services/tenant_time_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
@@ -155,7 +156,8 @@ class _SaleTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       [
-                        if (sale.createdAt != null) _dateFormat.format(sale.createdAt!),
+                        if (sale.createdAt != null)
+                          _dateFormat.format(TenantTimeService.instance.toTenantTime(sale.createdAt!)),
                         if ((sale.customerName ?? '').isNotEmpty) sale.customerName!,
                       ].join(' · '),
                       style: TextStyle(color: Colors.grey.shade600, fontSize: 12),

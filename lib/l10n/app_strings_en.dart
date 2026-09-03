@@ -14,6 +14,11 @@ const Map<String, String> kEnStrings = {
   'navMenuDescription': 'Hide destinations your team doesn\'t use and reorder the drawer\'s section groups. Applies to every device signed in to this store.',
   'navMenuSectionOrderHint': 'Drag to reorder sections',
   'navMenuSaved': 'Navigation menu updated.',
+  'timezoneSectionTitle': 'Timezone & Regional Settings',
+  'timezoneSectionDescription':
+      'Order times, prep timers, and KOT logs are shown in this timezone. Defaults to one based on your Country above — override it only if this store operates in a different zone.',
+  'timezoneManualOverride': 'Specific Timezone (Manual Override)',
+  'timezoneUseCountryDefault': 'Use country default ({zone})',
 
   // Login
   'signIn': 'Sign in',

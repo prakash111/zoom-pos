@@ -154,6 +154,10 @@ class AppLocalizations {
 
   // Appearance / Workspace
   String get tabAppearance => _s('tabAppearance');
+  String get timezoneSectionTitle => _s('timezoneSectionTitle');
+  String get timezoneSectionDescription => _s('timezoneSectionDescription');
+  String get timezoneManualOverride => _s('timezoneManualOverride');
+  String timezoneUseCountryDefault(String zone) => _format('timezoneUseCountryDefault', {'zone': zone});
   String get tabNavigationMenu => _s('tabNavigationMenu');
   String get navMenuDescription => _s('navMenuDescription');
   String get navMenuSectionOrderHint => _s('navMenuSectionOrderHint');

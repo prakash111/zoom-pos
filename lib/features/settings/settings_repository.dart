@@ -2,6 +2,7 @@ import '../../core/api/api_client.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/bootstrap_cache.dart';
 import '../../core/models/settings_models.dart';
+import '../../core/services/tenant_time_service.dart';
 
 /// Talks to SettingsApiController: GET /settings, PUT /settings/{section},
 /// POST /settings/notifications/test-email, and the payment-methods CRUD.
@@ -21,6 +22,7 @@ class SettingsRepository {
           .map((e) => PaymentMethodModel.fromJson(e as Map<String, dynamic>))
           .toList(),
       nav: NavConfig.fromJson(response['nav'] as Map<String, dynamic>? ?? const {}),
+      timezones: (response['timezones'] as List? ?? []).map((e) => e.toString()).toList(),
     );
   }
 
@@ -46,6 +48,10 @@ class SettingsRepository {
     String? state,
     String? postalCode,
     String? country,
+    // Null means "don't touch it"; '' means "clear the manual override and
+    // follow the country default" — distinct from country/primaryColor/etc,
+    // which have no meaningful "clear" state of their own.
+    String? timezone,
     String? primaryColor,
     double? defaultCommissionRate,
     String? defaultCommissionType,
@@ -62,11 +68,18 @@ class SettingsRepository {
       if (state != null) 'state': state,
       if (postalCode != null) 'postal_code': postalCode,
       if (country != null && country.isNotEmpty) 'country': country,
+      if (timezone != null) 'timezone': timezone,
       if (primaryColor != null) 'primary_color': primaryColor,
       if (defaultCommissionRate != null) 'default_commission_rate': defaultCommissionRate,
       if (defaultCommissionType != null) 'default_commission_type': defaultCommissionType,
     });
-    return ProfileSettings.fromJson(response['profile'] as Map<String, dynamic>);
+    final profile = ProfileSettings.fromJson(response['profile'] as Map<String, dynamic>);
+
+    // Applied immediately (not just on next login/restart) so timestamps
+    // update in the same session the store owner picks a new zone.
+    TenantTimeService.instance.setTimezone(profile.resolvedTimezone);
+
+    return profile;
   }
 
   Future<String?> uploadLogo(List<int> bytes, String filename) async {
