@@ -81,7 +81,7 @@ class _FeatureTile {
 /// "RESTAURANT OPERATIONS" or "FINANCIAL MANAGEMENT" headers. [header] is
 /// `null` for a group that renders with no heading of its own.
 class _NavSection {
-  const _NavSection(this.key, this.header, this.tiles, {this.headerColor});
+  const _NavSection(this.key, this.header, this.tiles, {this.headerColor, this.parentByKey = const {}});
 
   /// Stable identifier a tenant's `nav_config.section_order` reorders by
   /// (see [_FeatureTile.key]).
@@ -89,6 +89,15 @@ class _NavSection {
   final String Function(AppLocalizations l10n)? header;
   final Color? headerColor;
   final List<_FeatureTile> tiles;
+
+  /// Tile key -> the parent tile key it's nested under (Settings >
+  /// Navigation Menu's "Nest under..." action), for tiles the tenant has
+  /// explicitly nested — absent for every root-level tile. Purely a display
+  /// hint: [_DashboardScreenState._buildDrawer] indents a nested tile under
+  /// its parent, but tap order/routing (see [_featuresFor]) is completely
+  /// unaffected — [tiles] stays whatever flat, index-stable order it always
+  /// was, exactly like the un-nested compiled-in tree.
+  final Map<String, String> parentByKey;
 }
 
 /// Retail (general) mode's nav tree — the drawer/rail/top bar/bottom bar all
@@ -252,12 +261,30 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
 
   final result = [
     for (final entry in tilesBySection.entries)
-      _NavSection(
-        entry.key,
-        sectionMetaByKey[entry.key]!.header,
-        (entry.value..sort((a, b) => a.$1.compareTo(b.$1))).map((e) => e.$2).toList(),
-        headerColor: sectionMetaByKey[entry.key]!.headerColor,
-      ),
+      () {
+        final tiles = (entry.value..sort((a, b) => a.$1.compareTo(b.$1))).map((e) => e.$2).toList();
+        final keysInSection = {for (final t in tiles) t.key};
+
+        // A parent link only holds if it names another tile that landed in
+        // this same section and isn't itself nested — same single-level
+        // rule the web builder and NavMenuSettingsTab enforce.
+        final parentByKey = <String, String>{};
+        for (final tile in tiles) {
+          final parent = itemOverrides[tile.key]?.parent;
+          if (parent == null || parent.isEmpty || !keysInSection.contains(parent) || parent == tile.key) continue;
+          final parentOverride = itemOverrides[parent];
+          if (parentOverride?.parent != null && parentOverride!.parent!.isNotEmpty) continue;
+          parentByKey[tile.key] = parent;
+        }
+
+        return _NavSection(
+          entry.key,
+          sectionMetaByKey[entry.key]!.header,
+          tiles,
+          headerColor: sectionMetaByKey[entry.key]!.headerColor,
+          parentByKey: parentByKey,
+        );
+      }(),
   ];
 
   final compiledSectionIndex = {for (var i = 0; i < compiled.length; i++) compiled[i].key: i};
@@ -468,8 +495,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
       for (final tile in section.tiles) {
         final i = index++;
+        final isNested = section.parentByKey.containsKey(tile.key);
         children.add(ListTile(
-          leading: Icon(tile.icon),
+          contentPadding: isNested ? const EdgeInsets.only(left: 32, right: 16) : null,
+          leading: Icon(tile.icon, size: isNested ? 20 : 24),
           title: Text(tile.titleOf(l10n)),
           selected: _dockIndex == i,
           onTap: () {

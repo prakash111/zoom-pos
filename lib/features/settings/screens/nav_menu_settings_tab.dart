@@ -9,10 +9,18 @@ import '../../dashboard/dashboard_screen.dart' show navSectionsForSettings, NavT
 import '../settings_repository.dart';
 
 class _WorkingItem {
-  _WorkingItem({required this.key, required this.label, required this.visible});
+  _WorkingItem({required this.key, required this.label, required this.visible, this.parentKey});
   final String key;
   final String label;
   bool visible;
+
+  /// Another item's key in the same section this item is nested under, or
+  /// null for a root-level item — set only via the explicit "Nest under..."
+  /// action (see [_NavMenuSettingsTabState._nestItem]), never implied by
+  /// drag-reordering. Only one level of nesting is supported: an item that
+  /// is itself nested can't become a parent (enforced when building the
+  /// "Nest under..." picker's choices).
+  String? parentKey;
 }
 
 class _WorkingSection {
@@ -77,10 +85,24 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                     key: e.$2.key,
                     label: e.$2.label,
                     visible: itemOverrides[e.$2.key]?.visible ?? true,
+                    parentKey: itemOverrides[e.$2.key]?.parent,
                   ))
               .toList(),
         ),
     ];
+
+    // A parent link only holds if it names another tile in the same section
+    // that isn't itself nested — otherwise this item falls back to the
+    // section root instead of silently vanishing behind a dangling parent.
+    for (final section in sections) {
+      final keysInSection = {for (final t in section.tiles) t.key: t};
+      for (final tile in section.tiles) {
+        final parent = tile.parentKey == null ? null : keysInSection[tile.parentKey];
+        if (tile.parentKey != null && (parent == null || parent.parentKey != null)) {
+          tile.parentKey = null;
+        }
+      }
+    }
 
     final compiledIndex = {for (var i = 0; i < compiled.length; i++) compiled[i].key: i};
     sections.sort((a, b) {
@@ -117,8 +139,64 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
 
     setState(() {
       fromSection.tiles.remove(item);
+      // Nesting only makes sense within one section — an item's parent
+      // lives in the section it's leaving, and any child of this item
+      // (it can't have one — only root items can be parents — but the
+      // un-nest below is what keeps that invariant true) would be left
+      // dangling too, so both are cleared on a cross-section move.
+      item.parentKey = null;
+      for (final other in fromSection.tiles) {
+        if (other.parentKey == item.key) other.parentKey = null;
+      }
       target.tiles.add(item);
     });
+  }
+
+  /// "Nest under..." / "Un-nest": lets a tenant group one destination as a
+  /// sub-item of another within the same section, or pull it back out to
+  /// the root — the settings-tab equivalent of web's drag-onto-another-item
+  /// gesture, without needing a full tree-drag widget on mobile. Only root
+  /// items (no parent of their own) are offered as nesting targets, since
+  /// only one level of nesting is supported.
+  Future<void> _nestItem(_WorkingSection section, _WorkingItem item) async {
+    final isNested = item.parentKey != null;
+    final hasChildren = section.tiles.any((t) => t.parentKey == item.key);
+    if (hasChildren) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Un-nest this item\'s own sub-items first.')),
+      );
+      return;
+    }
+    final candidates = section.tiles.where((t) => t.key != item.key && t.parentKey == null).toList();
+
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Nest under', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            if (isNested)
+              ListTile(
+                leading: const Icon(Icons.first_page),
+                title: const Text('Un-nest (move to top level)'),
+                onTap: () => Navigator.of(sheetContext).pop(''),
+              ),
+            for (final candidate in candidates)
+              ListTile(
+                title: Text(candidate.label),
+                onTap: () => Navigator.of(sheetContext).pop(candidate.key),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null) return;
+
+    setState(() => item.parentKey = choice.isEmpty ? null : choice);
   }
 
   Future<void> _save() async {
@@ -131,7 +209,13 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         items: [
           for (final section in _sections)
             for (var i = 0; i < section.tiles.length; i++)
-              NavItemConfig(key: section.tiles[i].key, section: section.key, order: i, visible: section.tiles[i].visible),
+              NavItemConfig(
+                key: section.tiles[i].key,
+                section: section.key,
+                parent: section.tiles[i].parentKey,
+                order: i,
+                visible: section.tiles[i].visible,
+              ),
         ],
       ));
       if (!mounted) return;
@@ -218,15 +302,35 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                           for (var itemIndex = 0; itemIndex < _sections[sectionIndex].tiles.length; itemIndex++)
                             Padding(
                               key: ValueKey(_sections[sectionIndex].tiles[itemIndex].key),
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: EdgeInsets.only(
+                                left: _sections[sectionIndex].tiles[itemIndex].parentKey != null ? 32 : 8,
+                                right: 8,
+                              ),
                               child: Row(
                                 children: [
+                                  if (_sections[sectionIndex].tiles[itemIndex].parentKey != null)
+                                    Icon(Icons.subdirectory_arrow_right, size: 16, color: Colors.grey.shade400),
                                   Checkbox(
                                     value: _sections[sectionIndex].tiles[itemIndex].visible,
                                     onChanged: (checked) =>
                                         setState(() => _sections[sectionIndex].tiles[itemIndex].visible = checked ?? true),
                                   ),
                                   Expanded(child: Text(_sections[sectionIndex].tiles[itemIndex].label)),
+                                  IconButton(
+                                    icon: Icon(
+                                      _sections[sectionIndex].tiles[itemIndex].parentKey != null
+                                          ? Icons.subdirectory_arrow_right_outlined
+                                          : Icons.turn_slight_right,
+                                      size: 20,
+                                    ),
+                                    tooltip: 'Nest under',
+                                    onPressed: _sections[sectionIndex].tiles.length < 2
+                                        ? null
+                                        : () => _nestItem(
+                                              _sections[sectionIndex],
+                                              _sections[sectionIndex].tiles[itemIndex],
+                                            ),
+                                  ),
                                   IconButton(
                                     icon: const Icon(Icons.drive_file_move_outline, size: 20),
                                     tooltip: 'Move to section',

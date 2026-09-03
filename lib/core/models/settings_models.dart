@@ -379,14 +379,18 @@ class NavSectionOrder {
 /// [order] are null when a tenant has hidden/shown an item without ever
 /// dragging it, meaning "use whatever this tile's compiled-in default
 /// section/position is" (see DashboardScreen's `_sectionsFor`) — distinct
-/// from an explicit override that happens to match the default.
+/// from an explicit override that happens to match the default. [parent] is
+/// another item's key in the same section — null means this item sits at
+/// its section's root level; only one level of nesting is supported (a
+/// parent may not itself have a parent).
 class NavItemConfig {
-  const NavItemConfig({required this.key, this.section, this.order, required this.visible});
+  const NavItemConfig({required this.key, this.section, this.parent, this.order, required this.visible});
 
   factory NavItemConfig.fromJson(Map<String, dynamic> json) {
     return NavItemConfig(
       key: json['key'] as String? ?? '',
       section: json['section'] as String?,
+      parent: json['parent'] as String?,
       order: (json['order'] as num?)?.toInt(),
       visible: json['visible'] as bool? ?? true,
     );
@@ -394,19 +398,24 @@ class NavItemConfig {
 
   final String key;
   final String? section;
+  final String? parent;
   final int? order;
   final bool visible;
 
-  NavItemConfig copyWith({String? section, int? order, bool? visible}) {
+  /// [clearParent] un-nests this item back to its section root — plain
+  /// `parent: null` in [copyWith] can't be distinguished from "leave
+  /// unchanged" since null is also copyWith's own "keep current" sentinel.
+  NavItemConfig copyWith({String? section, String? parent, bool clearParent = false, int? order, bool? visible}) {
     return NavItemConfig(
       key: key,
       section: section ?? this.section,
+      parent: clearParent ? null : (parent ?? this.parent),
       order: order ?? this.order,
       visible: visible ?? this.visible,
     );
   }
 
-  Map<String, dynamic> toJson() => {'key': key, 'section': section, 'order': order, 'visible': visible};
+  Map<String, dynamic> toJson() => {'key': key, 'section': section, 'parent': parent, 'order': order, 'visible': visible};
 }
 
 /// This tenant's drawer/rail/bar customization — see AppBootstrapController
