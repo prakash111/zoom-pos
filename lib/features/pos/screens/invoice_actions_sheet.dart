@@ -362,7 +362,20 @@ class _InvoicePreviewScreen extends StatelessWidget {
       body: PdfPreview(
         build: (format) async => Uint8List.fromList(await apiClient.getBytes(data._pdfPath)),
         allowPrinting: true,
-        allowSharing: true,
+        // The package's own share button hands off straight to the OS share
+        // sheet with just the raw PDF bytes — no WhatsApp/email/thermal/
+        // custom-channel choices, and no pre-filled customer contact info.
+        // Replace it with the same actions sheet the post-settlement flow
+        // uses, so every entry point into "share this document" behaves
+        // identically.
+        allowSharing: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: 'Share',
+            onPressed: () => showInvoiceActionsSheet(context, data),
+          ),
+        ],
         canChangeOrientation: false,
         canChangePageFormat: false,
       ),
