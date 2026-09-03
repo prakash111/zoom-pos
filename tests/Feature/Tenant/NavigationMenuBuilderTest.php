@@ -244,6 +244,46 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertStringContainsString('class="nav-children-container ml-8', $html);
     }
 
+    /**
+     * Regression test: a stray literal `"` anywhere inside the Navigation
+     * Menu tab's `x-data="{ ... }"` — even inside a `//` JS comment, not
+     * just templated data — prematurely closes the double-quoted HTML
+     * attribute, spilling the rest of initSortables()/syncFromDom()/save()
+     * onto the page as visible text (this bug has now recurred twice: once
+     * from unescaped @json() data, once from a comment literally containing
+     * the word "in" in quotes). @js() only protects templated data, not
+     * hand-written JS/comments in the template itself, so this asserts the
+     * invariant directly: nothing between the tab's `x-data="{` and its
+     * matching `x-init="` may contain a raw double-quote character.
+     */
+    public function test_navigation_tab_x_data_contains_no_stray_double_quotes(): void
+    {
+        $this->actingAsTenantAdmin();
+
+        $html = Livewire::test(SettingsIndex::class)->html();
+
+        $start = strpos($html, "x-show=\"activeTab === 'navigation'\"");
+        $this->assertNotFalse($start, 'Navigation Menu tab wrapper not found.');
+        $dataStart = strpos($html, 'x-data="{', $start);
+        $this->assertNotFalse($dataStart);
+        $initStart = strpos($html, 'x-init="', $dataStart);
+        $this->assertNotFalse($initStart);
+
+        // Everything from just after x-data=" up to (not including) x-init="
+        // — trimmed of trailing whitespace, that must end in the attribute's
+        // own closing quote, which is excluded below since it isn't part of
+        // the JS body itself.
+        $beforeInit = rtrim(substr($html, $dataStart + strlen('x-data="'), $initStart - ($dataStart + strlen('x-data="'))));
+        $this->assertStringEndsWith('"', $beforeInit, 'x-data attribute does not close properly right before x-init.');
+        $xDataBody = substr($beforeInit, 0, -1);
+
+        $this->assertStringNotContainsString(
+            '"',
+            $xDataBody,
+            'A raw double-quote inside x-data breaks out of the HTML attribute, leaking the rest of the JS onto the page as visible text.'
+        );
+    }
+
     public function test_save_nav_config_requires_settings_permission(): void
     {
         [$company, $staff] = $this->actingAsTenantStaff();

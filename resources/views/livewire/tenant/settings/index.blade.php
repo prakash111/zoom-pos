@@ -1509,8 +1509,8 @@
                  // own), and — since every item's nested `.nav-children-
                  // container` shares the same group — drag it into or out of
                  // another item to nest/un-nest it. Which of the two the
-                 // pointer counts as "in" is pure geometry (see .nav-
-                 // children-container's `ml-8` in the markup below: a real
+                 // pointer counts as being inside is pure geometry (see
+                 // .nav-children-container's `ml-8` in the markup below: a real
                  // margin, not just padding, narrows its own hoverable box
                  // so it's a genuinely distinct drop target from the
                  // full-width root list — dragging left past that margin
