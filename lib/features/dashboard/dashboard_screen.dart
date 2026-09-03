@@ -209,39 +209,65 @@ List<_NavSection> _restaurantSections() => [
 
 /// The active nav tree for this tenant — retail (general) or Cafe &
 /// Restaurant, chosen by [CompanyModel.isRestaurantMode] exactly as the web
-/// picks between its two sidebar branches.
-/// Mode-appropriate sections with every tile the signed-in [user] isn't
-/// authorized for (see [_FeatureTile.visibleTo]) or this tenant has hidden
-/// (see [BootstrapCache.hiddenTiles]) filtered out, and any section left with
-/// no visible tiles dropped entirely; the surviving sections are then
-/// reordered by [BootstrapCache.sectionOrder] where the tenant has set one,
-/// with any section it doesn't mention kept in its compiled-in relative
-/// order at the end — this is the single point all four dock renderings
-/// (drawer/rail/top bar/bottom bar) go through, so their tile-to-index
-/// mapping stays consistent with each other.
+/// picks between its two sidebar branches, with this tenant's
+/// Settings > Navigation Menu customization applied on top: a tile the
+/// signed-in [user] isn't authorized for (see [_FeatureTile.visibleTo]) is
+/// always dropped first, then for the tiles that remain —
+///  - a tile the tenant hid stays dropped,
+///  - a tile the tenant moved to a different section renders there instead
+///    of its compiled-in default section (an unrecognized target section
+///    is ignored, keeping the tile in its default section, since sections
+///    are fixed per mode and a moved-to section might belong to the other
+///    mode or no longer exist),
+///  - within each section, tiles sort by the tenant's per-item order where
+///    set, falling back to compiled-in relative order for the rest,
+///  - a section left with no visible tiles is dropped entirely, and the
+///    surviving sections sort by the tenant's per-section order, falling
+///    back to compiled-in relative order for any section it didn't set.
+/// This is the single point all four dock renderings (drawer/rail/top
+/// bar/bottom bar) go through, so their tile-to-index mapping stays
+/// consistent with each other.
 List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
-  final sections = (company?.isRestaurantMode ?? false) ? _restaurantSections() : _retailSections();
-  final hiddenTiles = BootstrapCache.instance.hiddenTiles;
-  final visible = [
-    for (final section in sections)
-      if (section.tiles.any((t) => t.visibleTo(user) && !hiddenTiles.contains(t.key)))
-        _NavSection(
-          section.key,
-          section.header,
-          section.tiles.where((t) => t.visibleTo(user) && !hiddenTiles.contains(t.key)).toList(),
-          headerColor: section.headerColor,
-        ),
+  final compiled = (company?.isRestaurantMode ?? false) ? _restaurantSections() : _retailSections();
+  final nav = BootstrapCache.instance.navConfig;
+  final itemOverrides = {for (final i in nav.items) i.key: i};
+  final sectionOrderOverrides = {for (final s in nav.sections) s.key: s.order};
+  final sectionMetaByKey = {for (final s in compiled) s.key: s};
+
+  final tilesBySection = <String, List<(int, _FeatureTile)>>{};
+  for (final section in compiled) {
+    for (var i = 0; i < section.tiles.length; i++) {
+      final tile = section.tiles[i];
+      if (!tile.visibleTo(user)) continue;
+
+      final override = itemOverrides[tile.key];
+      if (override != null && !override.visible) continue;
+
+      final targetSectionKey =
+          (override?.section != null && sectionMetaByKey.containsKey(override!.section)) ? override.section! : section.key;
+      final order = override?.order ?? i;
+      (tilesBySection[targetSectionKey] ??= []).add((order, tile));
+    }
+  }
+
+  final result = [
+    for (final entry in tilesBySection.entries)
+      _NavSection(
+        entry.key,
+        sectionMetaByKey[entry.key]!.header,
+        (entry.value..sort((a, b) => a.$1.compareTo(b.$1))).map((e) => e.$2).toList(),
+        headerColor: sectionMetaByKey[entry.key]!.headerColor,
+      ),
   ];
 
-  final order = BootstrapCache.instance.sectionOrder;
-  if (order.isEmpty) return visible;
+  final compiledSectionIndex = {for (var i = 0; i < compiled.length; i++) compiled[i].key: i};
+  result.sort((a, b) {
+    final orderA = sectionOrderOverrides[a.key] ?? compiledSectionIndex[a.key] ?? 0;
+    final orderB = sectionOrderOverrides[b.key] ?? compiledSectionIndex[b.key] ?? 0;
+    return orderA.compareTo(orderB);
+  });
 
-  final byKey = {for (final s in visible) s.key: s};
-  return [
-    for (final key in order)
-      if (byKey.containsKey(key)) byKey.remove(key)!,
-    ...byKey.values,
-  ];
+  return result;
 }
 
 /// Settings > Navigation Menu's read-only view of one [_FeatureTile] — just

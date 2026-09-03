@@ -24,8 +24,7 @@ class BootstrapCache {
   static const _navCacheKey = 'zoom_pos.bootstrap.nav';
   static const _configCacheKey = 'zoom_pos.bootstrap.config';
 
-  List<String> hiddenTiles = [];
-  List<String> sectionOrder = [];
+  NavConfig navConfig = const NavConfig();
   Map<String, dynamic> config = {};
 
   Future<void> loadFromDisk() async {
@@ -33,9 +32,7 @@ class BootstrapCache {
       final prefs = await SharedPreferences.getInstance();
       final navRaw = prefs.getString(_navCacheKey);
       if (navRaw != null) {
-        final decoded = jsonDecode(navRaw) as Map<String, dynamic>;
-        hiddenTiles = List<String>.from(decoded['hidden_tiles'] as List? ?? const []);
-        sectionOrder = List<String>.from(decoded['section_order'] as List? ?? const []);
+        navConfig = NavConfig.fromJson(jsonDecode(navRaw) as Map<String, dynamic>);
       }
       final configRaw = prefs.getString(_configCacheKey);
       if (configRaw != null) {
@@ -52,8 +49,7 @@ class BootstrapCache {
   /// SettingsRepository.updateNavConfig — so the drawer picks it up
   /// immediately instead of waiting for the next locale switch/app start.
   Future<void> applyNav(NavConfig nav) async {
-    hiddenTiles = nav.hiddenTiles;
-    sectionOrder = nav.sectionOrder;
+    navConfig = nav;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_navCacheKey, jsonEncode(nav.toJson()));
   }

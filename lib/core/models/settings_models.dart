@@ -361,22 +361,77 @@ class TenantSettingsBundle {
   final List<String> timezones;
 }
 
-/// This tenant's drawer/rail/bar customization — see AppBootstrapController
-/// and DashboardScreen's `_sectionsFor`. Both lists hold the opaque
-/// `_FeatureTile.key`/`_NavSection.key` values the client itself defines;
-/// the server only stores and echoes them back.
-class NavConfig {
-  const NavConfig({required this.hiddenTiles, required this.sectionOrder});
+/// One section's position override — see [NavConfig].
+class NavSectionOrder {
+  const NavSectionOrder({required this.key, required this.order});
 
-  factory NavConfig.fromJson(Map<String, dynamic> json) {
-    return NavConfig(
-      hiddenTiles: List<String>.from(json['hidden_tiles'] as List? ?? const []),
-      sectionOrder: List<String>.from(json['section_order'] as List? ?? const []),
+  factory NavSectionOrder.fromJson(Map<String, dynamic> json) {
+    return NavSectionOrder(key: json['key'] as String? ?? '', order: (json['order'] as num?)?.toInt() ?? 0);
+  }
+
+  final String key;
+  final int order;
+
+  Map<String, dynamic> toJson() => {'key': key, 'order': order};
+}
+
+/// One nav destination's placement override — see [NavConfig]. [section] and
+/// [order] are null when a tenant has hidden/shown an item without ever
+/// dragging it, meaning "use whatever this tile's compiled-in default
+/// section/position is" (see DashboardScreen's `_sectionsFor`) — distinct
+/// from an explicit override that happens to match the default.
+class NavItemConfig {
+  const NavItemConfig({required this.key, this.section, this.order, required this.visible});
+
+  factory NavItemConfig.fromJson(Map<String, dynamic> json) {
+    return NavItemConfig(
+      key: json['key'] as String? ?? '',
+      section: json['section'] as String?,
+      order: (json['order'] as num?)?.toInt(),
+      visible: json['visible'] as bool? ?? true,
     );
   }
 
-  final List<String> hiddenTiles;
-  final List<String> sectionOrder;
+  final String key;
+  final String? section;
+  final int? order;
+  final bool visible;
 
-  Map<String, dynamic> toJson() => {'hidden_tiles': hiddenTiles, 'section_order': sectionOrder};
+  NavItemConfig copyWith({String? section, int? order, bool? visible}) {
+    return NavItemConfig(
+      key: key,
+      section: section ?? this.section,
+      order: order ?? this.order,
+      visible: visible ?? this.visible,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'key': key, 'section': section, 'order': order, 'visible': visible};
+}
+
+/// This tenant's drawer/rail/bar customization — see AppBootstrapController
+/// and DashboardScreen's `_sectionsFor`. Section/item keys are opaque
+/// `_FeatureTile.key`/`_NavSection.key` values the client itself defines;
+/// the server only stores and echoes them back.
+class NavConfig {
+  const NavConfig({this.sections = const [], this.items = const []});
+
+  factory NavConfig.fromJson(Map<String, dynamic> json) {
+    return NavConfig(
+      sections: (json['sections'] as List? ?? const [])
+          .map((e) => NavSectionOrder.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+      items: (json['items'] as List? ?? const [])
+          .map((e) => NavItemConfig.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+    );
+  }
+
+  final List<NavSectionOrder> sections;
+  final List<NavItemConfig> items;
+
+  Map<String, dynamic> toJson() => {
+        'sections': sections.map((s) => s.toJson()).toList(),
+        'items': items.map((i) => i.toJson()).toList(),
+      };
 }

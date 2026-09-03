@@ -5,14 +5,29 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/models/settings_models.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/auth_provider.dart';
-import '../../dashboard/dashboard_screen.dart' show navSectionsForSettings, NavSectionDescriptor;
+import '../../dashboard/dashboard_screen.dart' show navSectionsForSettings, NavTileDescriptor;
 import '../settings_repository.dart';
 
+class _WorkingItem {
+  _WorkingItem({required this.key, required this.label, required this.visible});
+  final String key;
+  final String label;
+  bool visible;
+}
+
+class _WorkingSection {
+  _WorkingSection({required this.key, required this.label, required this.tiles});
+  final String key;
+  final String label;
+  List<_WorkingItem> tiles;
+}
+
 /// Settings > Navigation Menu — lets a tenant hide drawer/rail/bar
-/// destinations it doesn't use and reorder the drawer's section groups
-/// (DashboardScreen._sectionsFor applies both). A store-wide setting, unlike
-/// Appearance's per-device dock position, so it's saved through
-/// [SettingsRepository] rather than local preferences.
+/// destinations it doesn't use, reorder the drawer's section groups, reorder
+/// destinations within a section, and move a destination to a different
+/// section (DashboardScreen._sectionsFor applies all of it). A store-wide
+/// setting, unlike Appearance's per-device dock position, so it's saved
+/// through [SettingsRepository] rather than local preferences.
 class NavMenuSettingsTab extends StatefulWidget {
   const NavMenuSettingsTab({required this.repository, required this.initial});
 
@@ -24,32 +39,86 @@ class NavMenuSettingsTab extends StatefulWidget {
 }
 
 class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
-  late List<NavSectionDescriptor> _sections;
-  late Set<String> _hiddenTiles;
+  List<_WorkingSection> _sections = [];
   bool _saving = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _hiddenTiles = widget.initial.hiddenTiles.toSet();
-    _sections = [];
-  }
-
+  /// Builds the editable working copy by layering this tenant's saved
+  /// overrides (which section an item lives in, its order, its visibility)
+  /// on top of the compiled-in defaults — an item with no override keeps
+  /// its default section/position, exactly like DashboardScreen._sectionsFor.
   void _ensureSectionsLoaded(AppLocalizations l10n) {
     if (_sections.isNotEmpty) return;
     final company = context.read<AuthProvider>().company;
     final compiled = navSectionsForSettings(l10n, company);
-    final order = widget.initial.sectionOrder;
-    if (order.isEmpty) {
-      _sections = compiled;
-      return;
+    final compiledByKey = {for (final s in compiled) s.key: s};
+
+    final itemOverrides = {for (final i in widget.initial.items) i.key: i};
+    final sectionOrderOverrides = {for (final s in widget.initial.sections) s.key: s.order};
+
+    final grouped = <String, List<(int, NavTileDescriptor)>>{};
+    for (final section in compiled) {
+      for (var i = 0; i < section.tiles.length; i++) {
+        final tile = section.tiles[i];
+        final override = itemOverrides[tile.key];
+        final targetSectionKey =
+            (override?.section != null && compiledByKey.containsKey(override!.section)) ? override.section! : section.key;
+        final order = override?.order ?? i;
+        (grouped[targetSectionKey] ??= []).add((order, tile));
+      }
     }
-    final byKey = {for (final s in compiled) s.key: s};
-    _sections = [
-      for (final key in order)
-        if (byKey.containsKey(key)) byKey.remove(key)!,
-      ...byKey.values,
+
+    final sections = [
+      for (final entry in grouped.entries)
+        _WorkingSection(
+          key: entry.key,
+          label: compiledByKey[entry.key]!.label,
+          tiles: (entry.value..sort((a, b) => a.$1.compareTo(b.$1)))
+              .map((e) => _WorkingItem(
+                    key: e.$2.key,
+                    label: e.$2.label,
+                    visible: itemOverrides[e.$2.key]?.visible ?? true,
+                  ))
+              .toList(),
+        ),
     ];
+
+    final compiledIndex = {for (var i = 0; i < compiled.length; i++) compiled[i].key: i};
+    sections.sort((a, b) {
+      final orderA = sectionOrderOverrides[a.key] ?? compiledIndex[a.key] ?? 0;
+      final orderB = sectionOrderOverrides[b.key] ?? compiledIndex[b.key] ?? 0;
+      return orderA.compareTo(orderB);
+    });
+
+    _sections = sections;
+  }
+
+  Future<void> _moveItemToSection(_WorkingSection fromSection, _WorkingItem item) async {
+    final target = await showModalBottomSheet<_WorkingSection>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Move to section', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            for (final section in _sections)
+              if (section.key != fromSection.key)
+                ListTile(
+                  title: Text(section.label),
+                  onTap: () => Navigator.of(sheetContext).pop(section),
+                ),
+          ],
+        ),
+      ),
+    );
+    if (target == null) return;
+
+    setState(() {
+      fromSection.tiles.remove(item);
+      target.tiles.add(item);
+    });
   }
 
   Future<void> _save() async {
@@ -57,12 +126,15 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     final messenger = ScaffoldMessenger.of(context);
     final l10n = AppLocalizations.of(context);
     try {
-      final saved = await widget.repository.updateNavConfig(NavConfig(
-        hiddenTiles: _hiddenTiles.toList(),
-        sectionOrder: [for (final s in _sections) s.key],
+      await widget.repository.updateNavConfig(NavConfig(
+        sections: [for (var i = 0; i < _sections.length; i++) NavSectionOrder(key: _sections[i].key, order: i)],
+        items: [
+          for (final section in _sections)
+            for (var i = 0; i < section.tiles.length; i++)
+              NavItemConfig(key: section.tiles[i].key, section: section.key, order: i, visible: section.tiles[i].visible),
+        ],
       ));
       if (!mounted) return;
-      setState(() => _hiddenTiles = saved.hiddenTiles.toSet());
       messenger.showSnackBar(SnackBar(content: Text(l10n.navMenuSaved)));
     } on ApiException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
@@ -88,13 +160,16 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             children: [
               Icon(Icons.drag_handle, size: 18, color: Colors.grey.shade600),
               const SizedBox(width: 6),
-              Text(l10n.navMenuSectionOrderHint, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+              Expanded(
+                child: Text(l10n.navMenuSectionOrderHint, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+              ),
             ],
           ),
         ),
         Expanded(
           child: ReorderableListView(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            buildDefaultDragHandles: false,
             onReorderItem: (oldIndex, newIndex) {
               setState(() {
                 final section = _sections.removeAt(oldIndex);
@@ -102,9 +177,9 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
               });
             },
             children: [
-              for (final section in _sections)
+              for (var sectionIndex = 0; sectionIndex < _sections.length; sectionIndex++)
                 Card(
-                  key: ValueKey(section.key),
+                  key: ValueKey(_sections[sectionIndex].key),
                   margin: const EdgeInsets.symmetric(vertical: 6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,28 +189,63 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                         child: Row(
                           children: [
                             Expanded(
-                              child: Text(section.label, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              child: Text(_sections[sectionIndex].label, style: const TextStyle(fontWeight: FontWeight.bold)),
                             ),
-                            Icon(Icons.drag_handle, color: Colors.grey.shade400),
+                            // Only this handle starts an outer (section)
+                            // drag — the rest of the card, including the
+                            // inner reorderable list below, is untouched by
+                            // it, so inner item drags never get hijacked by
+                            // the outer list.
+                            ReorderableDragStartListener(
+                              index: sectionIndex,
+                              child: Icon(Icons.drag_handle, color: Colors.grey.shade400),
+                            ),
                           ],
                         ),
                       ),
-                      for (final tile in section.tiles)
-                        CheckboxListTile(
-                          value: !_hiddenTiles.contains(tile.key),
-                          dense: true,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          title: Text(tile.label),
-                          onChanged: (checked) {
-                            setState(() {
-                              if (checked ?? true) {
-                                _hiddenTiles.remove(tile.key);
-                              } else {
-                                _hiddenTiles.add(tile.key);
-                              }
-                            });
-                          },
-                        ),
+                      ReorderableListView(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        buildDefaultDragHandles: false,
+                        onReorderItem: (oldIndex, newIndex) {
+                          setState(() {
+                            final tiles = _sections[sectionIndex].tiles;
+                            final item = tiles.removeAt(oldIndex);
+                            tiles.insert(newIndex, item);
+                          });
+                        },
+                        children: [
+                          for (var itemIndex = 0; itemIndex < _sections[sectionIndex].tiles.length; itemIndex++)
+                            Padding(
+                              key: ValueKey(_sections[sectionIndex].tiles[itemIndex].key),
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Row(
+                                children: [
+                                  Checkbox(
+                                    value: _sections[sectionIndex].tiles[itemIndex].visible,
+                                    onChanged: (checked) =>
+                                        setState(() => _sections[sectionIndex].tiles[itemIndex].visible = checked ?? true),
+                                  ),
+                                  Expanded(child: Text(_sections[sectionIndex].tiles[itemIndex].label)),
+                                  IconButton(
+                                    icon: const Icon(Icons.drive_file_move_outline, size: 20),
+                                    tooltip: 'Move to section',
+                                    onPressed: _sections.length < 2
+                                        ? null
+                                        : () => _moveItemToSection(
+                                              _sections[sectionIndex],
+                                              _sections[sectionIndex].tiles[itemIndex],
+                                            ),
+                                  ),
+                                  ReorderableDragStartListener(
+                                    index: itemIndex,
+                                    child: Icon(Icons.drag_handle, color: Colors.grey.shade400),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                       const SizedBox(height: 4),
                     ],
                   ),
