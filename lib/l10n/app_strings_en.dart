@@ -11,7 +11,8 @@ const Map<String, String> kEnStrings = {
   'signOutConfirmBody': "You'll need your password to sign back in.",
   'changePassword': 'Change Password',
   'tabNavigationMenu': 'Navigation Menu',
-  'navMenuDescription': 'Hide destinations your team doesn\'t use and reorder the drawer\'s section groups. Applies to every device signed in to this store.',
+  'navMenuDescription':
+      'Hide destinations, drag vertically to reorder, and move a row left or right to snap it between Main Menu, Sub-Menu, and Sub-Sub-Menu. Applies to every device signed in to this store.',
   'navMenuSectionOrderHint': 'Drag to reorder sections',
   'navMenuSaved': 'Navigation menu updated.',
   'timezoneSectionTitle': 'Timezone & Regional Settings',
@@ -80,10 +81,12 @@ const Map<String, String> kEnStrings = {
   // POS
   'searchProductsHint': 'Search products, SKU, or barcode',
   'scanBarcode': 'Scan barcode',
-  'registerClosedBanner': 'No cash register is open. Sales are blocked until one is opened.',
+  'registerClosedBanner':
+      'No cash register is open. Sales are blocked until one is opened.',
   'open': 'Open',
   'saleCompleted': 'Sale completed.',
-  'saleQueuedOffline': "Sale saved offline. It'll sync automatically once you're back online.",
+  'saleQueuedOffline':
+      "Sale saved offline. It'll sync automatically once you're back online.",
 
   // Offline sync
   'syncNow': 'Sync Now',

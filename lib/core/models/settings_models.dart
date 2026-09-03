@@ -42,11 +42,14 @@ class ProfileSettings {
       logoUrl: json['logo_url'] as String?,
       faviconUrl: json['favicon_url'] as String?,
       drawerCoverUrl: json['drawer_cover_url'] as String?,
-      defaultCommissionRate: (json['default_commission_rate'] as num?)?.toDouble() ?? 0,
-      defaultCommissionType: json['default_commission_type'] as String? ?? 'percentage',
+      defaultCommissionRate:
+          (json['default_commission_rate'] as num?)?.toDouble() ?? 0,
+      defaultCommissionType:
+          json['default_commission_type'] as String? ?? 'percentage',
       timezone: json['timezone'] as String? ?? '',
       resolvedTimezone: json['resolved_timezone'] as String? ?? 'UTC',
-      defaultTimezoneForCountry: json['default_timezone_for_country'] as String? ?? 'UTC',
+      defaultTimezoneForCountry:
+          json['default_timezone_for_country'] as String? ?? 'UTC',
     );
   }
 
@@ -108,7 +111,11 @@ class ReceiptSettings {
 }
 
 class OtherCurrency {
-  OtherCurrency({required this.code, required this.name, required this.symbol, required this.exchangeRate});
+  OtherCurrency(
+      {required this.code,
+      required this.name,
+      required this.symbol,
+      required this.exchangeRate});
 
   factory OtherCurrency.fromJson(Map<String, dynamic> json) {
     return OtherCurrency(
@@ -124,7 +131,12 @@ class OtherCurrency {
   final String symbol;
   final double exchangeRate;
 
-  Map<String, dynamic> toJson() => {'code': code, 'name': name, 'symbol': symbol, 'exchange_rate': exchangeRate};
+  Map<String, dynamic> toJson() => {
+        'code': code,
+        'name': name,
+        'symbol': symbol,
+        'exchange_rate': exchangeRate
+      };
 }
 
 class FinancialSettings {
@@ -141,7 +153,8 @@ class FinancialSettings {
       currency: json['currency'] as String? ?? 'USD',
       currencySymbol: json['currency_symbol'] as String? ?? '\$',
       currencyDecimals: (json['currency_decimals'] as num?)?.toInt() ?? 2,
-      currencySymbolPosition: json['currency_symbol_position'] as String? ?? 'prefix',
+      currencySymbolPosition:
+          json['currency_symbol_position'] as String? ?? 'prefix',
       otherCurrencies: (json['other_currencies'] as List? ?? [])
           .map((e) => OtherCurrency.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -216,7 +229,8 @@ class NotificationSettings {
   factory NotificationSettings.fromJson(Map<String, dynamic> json) {
     return NotificationSettings(
       smtp: SmtpSettings.fromJson(json['smtp'] as Map<String, dynamic>? ?? {}),
-      whatsapp: WhatsappSettings.fromJson(json['whatsapp'] as Map<String, dynamic>? ?? {}),
+      whatsapp: WhatsappSettings.fromJson(
+          json['whatsapp'] as Map<String, dynamic>? ?? {}),
     );
   }
 
@@ -243,7 +257,9 @@ class PaymentMethodModel {
       description: json['description'] as String? ?? '',
       isActive: json['is_active'] as bool? ?? true,
       orderIndex: (json['order_index'] as num?)?.toInt() ?? 0,
-      metadata: (json['metadata'] is Map) ? Map<String, dynamic>.from(json['metadata'] as Map) : null,
+      metadata: (json['metadata'] is Map)
+          ? Map<String, dynamic>.from(json['metadata'] as Map)
+          : null,
     );
   }
 
@@ -292,11 +308,15 @@ class CustomNotificationChannelModel {
       name: json['name'] as String? ?? '',
       url: json['url'] as String? ?? '',
       method: json['method'] as String? ?? 'POST',
-      headers: (json['headers'] is Map) ? Map<String, dynamic>.from(json['headers'] as Map) : null,
+      headers: (json['headers'] is Map)
+          ? Map<String, dynamic>.from(json['headers'] as Map)
+          : null,
       authType: json['auth_type'] as String? ?? 'none',
       hasAuthValue: json['has_auth_value'] as bool? ?? false,
       payloadTemplate: json['payload_template'] as String? ?? '',
-      eventTypes: (json['event_types'] as List? ?? []).map((e) => e.toString()).toList(),
+      eventTypes: (json['event_types'] as List? ?? [])
+          .map((e) => e.toString())
+          .toList(),
       isActive: json['is_active'] as bool? ?? true,
     );
   }
@@ -366,7 +386,9 @@ class NavSectionOrder {
   const NavSectionOrder({required this.key, required this.order});
 
   factory NavSectionOrder.fromJson(Map<String, dynamic> json) {
-    return NavSectionOrder(key: json['key'] as String? ?? '', order: (json['order'] as num?)?.toInt() ?? 0);
+    return NavSectionOrder(
+        key: json['key'] as String? ?? '',
+        order: (json['order'] as num?)?.toInt() ?? 0);
   }
 
   final String key;
@@ -375,72 +397,228 @@ class NavSectionOrder {
   Map<String, dynamic> toJson() => {'key': key, 'order': order};
 }
 
-/// One nav destination's placement override — see [NavConfig]. [section] and
-/// [order] are null when a tenant has hidden/shown an item without ever
-/// dragging it, meaning "use whatever this tile's compiled-in default
-/// section/position is" (see DashboardScreen's `_sectionsFor`) — distinct
-/// from an explicit override that happens to match the default. [parent] is
-/// another item's key in the same section — null means this item sits at
-/// its section's root level; up to two levels of nesting are supported
-/// (Main Menu / Sub-Menu / Sub-Sub-Menu).
+/// One nav destination's canonical placement. [parent] / [parentId] names
+/// the nearest ancestor one level above it; [level] is 0 (Main Menu), 1
+/// (Sub-Menu), or 2 (Sub-Sub-Menu). [children] is populated when reading a
+/// recursive tree and is emitted when this object is serialized as a node.
 class NavItemConfig {
-  const NavItemConfig({required this.key, this.section, this.parent, this.order, required this.visible});
+  const NavItemConfig({
+    required this.key,
+    this.section,
+    this.parent,
+    this.level = 0,
+    this.order,
+    required this.visible,
+    this.children = const [],
+  });
 
   factory NavItemConfig.fromJson(Map<String, dynamic> json) {
     return NavItemConfig(
       key: json['key'] as String? ?? '',
       section: json['section'] as String?,
-      parent: json['parent'] as String?,
+      parent: (json['parent_id'] ?? json['parent']) as String?,
+      level: ((json['level'] as num?)?.toInt() ?? 0).clamp(0, 2),
       order: (json['order'] as num?)?.toInt(),
       visible: json['visible'] as bool? ?? true,
+      children: (json['children'] as List? ?? const [])
+          .map((item) =>
+              NavItemConfig.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList(),
     );
   }
 
   final String key;
   final String? section;
   final String? parent;
+  String? get parentId => parent;
+  final int level;
   final int? order;
   final bool visible;
+  final List<NavItemConfig> children;
 
   /// [clearParent] un-nests this item back to its section root — plain
   /// `parent: null` in [copyWith] can't be distinguished from "leave
   /// unchanged" since null is also copyWith's own "keep current" sentinel.
-  NavItemConfig copyWith({String? section, String? parent, bool clearParent = false, int? order, bool? visible}) {
+  NavItemConfig copyWith({
+    String? section,
+    String? parent,
+    bool clearParent = false,
+    int? level,
+    int? order,
+    bool? visible,
+    List<NavItemConfig>? children,
+  }) {
     return NavItemConfig(
       key: key,
       section: section ?? this.section,
       parent: clearParent ? null : (parent ?? this.parent),
+      level: level ?? this.level,
       order: order ?? this.order,
       visible: visible ?? this.visible,
+      children: children ?? this.children,
     );
   }
 
-  Map<String, dynamic> toJson() => {'key': key, 'section': section, 'parent': parent, 'order': order, 'visible': visible};
+  Map<String, dynamic> toJson() => {
+        'key': key,
+        'section': section,
+        'parent': parent,
+        'parent_id': parent,
+        'level': level.clamp(0, 2),
+        'order': order,
+        'visible': visible,
+        'children': children.map((item) => item.toJson()).toList(),
+      };
 }
 
-/// This tenant's drawer/rail/bar customization — see AppBootstrapController
-/// and DashboardScreen's `_sectionsFor`. Section/item keys are opaque
-/// `_FeatureTile.key`/`_NavSection.key` values the client itself defines;
-/// the server only stores and echoes them back.
+/// This tenant's drawer/rail/bar customization. The flat [items] index keeps
+/// older clients compatible; [toJson] also builds the lossless recursive
+/// `tree` consumed by the web editor and Laravel normalizer.
 class NavConfig {
   const NavConfig({this.sections = const [], this.items = const []});
 
   factory NavConfig.fromJson(Map<String, dynamic> json) {
+    final flatItems = (json['items'] as List? ?? const [])
+        .map((item) =>
+            NavItemConfig.fromJson(Map<String, dynamic>.from(item as Map)))
+        .toList();
+
     return NavConfig(
       sections: (json['sections'] as List? ?? const [])
-          .map((e) => NavSectionOrder.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map((section) => NavSectionOrder.fromJson(
+              Map<String, dynamic>.from(section as Map)))
           .toList(),
-      items: (json['items'] as List? ?? const [])
-          .map((e) => NavItemConfig.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
+      items: flatItems.isNotEmpty ? flatItems : _flattenTree(json['tree']),
     );
   }
 
   final List<NavSectionOrder> sections;
   final List<NavItemConfig> items;
 
-  Map<String, dynamic> toJson() => {
-        'sections': sections.map((s) => s.toJson()).toList(),
-        'items': items.map((i) => i.toJson()).toList(),
-      };
+  static List<NavItemConfig> _flattenTree(dynamic source) {
+    final flattened = <NavItemConfig>[];
+
+    void visit(dynamic rawNodes, String section, String? parent, int level) {
+      for (final raw in rawNodes as List? ?? const []) {
+        final json = Map<String, dynamic>.from(raw as Map);
+        final node = NavItemConfig.fromJson({
+          ...json,
+          'section': section,
+          'parent_id': parent,
+          'level': level.clamp(0, 2),
+          'children': const [],
+        });
+        flattened.add(node);
+        visit(json['children'], section, node.key, level + 1);
+      }
+    }
+
+    for (final rawSection in source as List? ?? const []) {
+      final section = Map<String, dynamic>.from(rawSection as Map);
+      final key = section['key'] as String? ?? '';
+      if (key.isNotEmpty) visit(section['items'], key, null, 0);
+    }
+
+    return flattened;
+  }
+
+  List<Map<String, dynamic>> _treeJson() {
+    if (items.any((item) => item.section == null || item.section!.isEmpty))
+      return const [];
+
+    final itemByKey = {for (final item in items) item.key: item};
+    final sourceIndex = {
+      for (var index = 0; index < items.length; index++) items[index].key: index
+    };
+    final safeParent = <String, String?>{};
+
+    for (final item in items) {
+      final rawParent = item.parent;
+      final candidate =
+          rawParent == null || rawParent.isEmpty ? null : rawParent;
+      final seen = <String>{item.key};
+      var depth = 0;
+      var valid = true;
+      var cursor = candidate;
+
+      while (cursor != null) {
+        final ancestor = itemByKey[cursor];
+        if (ancestor == null ||
+            ancestor.section != item.section ||
+            !seen.add(cursor) ||
+            ++depth > 2) {
+          valid = false;
+          break;
+        }
+        cursor = ancestor.parent;
+      }
+      safeParent[item.key] = valid ? candidate : null;
+    }
+
+    final childrenByBucket = <String, List<NavItemConfig>>{};
+    for (final item in items) {
+      final bucket = '${item.section}|${safeParent[item.key] ?? ''}';
+      (childrenByBucket[bucket] ??= []).add(item);
+    }
+
+    int compareItems(NavItemConfig first, NavItemConfig second) {
+      final byOrder =
+          (first.order ?? 1 << 30).compareTo(second.order ?? 1 << 30);
+      return byOrder != 0
+          ? byOrder
+          : (sourceIndex[first.key] ?? 0)
+              .compareTo(sourceIndex[second.key] ?? 0);
+    }
+
+    List<Map<String, dynamic>> buildNodes(
+        String section, String? parent, int level) {
+      final rows = [...?childrenByBucket['$section|${parent ?? ''}']]
+        ..sort(compareItems);
+      return [
+        for (var order = 0; order < rows.length; order++)
+          {
+            'key': rows[order].key,
+            'section': section,
+            'parent': parent,
+            'parent_id': parent,
+            'level': level.clamp(0, 2),
+            'order': order,
+            'visible': rows[order].visible,
+            'children': buildNodes(section, rows[order].key, level + 1),
+          },
+      ];
+    }
+
+    final orderedSections = [...sections]
+      ..sort((a, b) => a.order.compareTo(b.order));
+    final knownSections = {for (final section in orderedSections) section.key};
+    for (final item in items) {
+      if (knownSections.add(item.section!)) {
+        orderedSections.add(
+            NavSectionOrder(key: item.section!, order: orderedSections.length));
+      }
+    }
+
+    return [
+      for (var order = 0; order < orderedSections.length; order++)
+        {
+          'key': orderedSections[order].key,
+          'order': order,
+          'items': buildNodes(orderedSections[order].key, null, 0),
+        },
+    ];
+  }
+
+  Map<String, dynamic> toJson() {
+    final tree = _treeJson();
+    return {
+      'sections': sections.map((section) => section.toJson()).toList(),
+      'items': items.map((item) {
+        final json = item.toJson();
+        json.remove('children');
+        return json;
+      }).toList(),
+      if (tree.isNotEmpty) 'tree': tree,
+    };
+  }
 }

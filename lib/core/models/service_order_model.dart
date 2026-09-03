@@ -60,7 +60,11 @@ class ServiceOrderModel {
       serialNumber: json['serial_number'] as String? ?? '',
       reportedDefect: json['reported_defect'] as String? ?? '',
       technicalDiagnosis: json['technical_diagnosis'] as String? ?? '',
-      partsUsed: (json['parts_used'] as List? ?? []).cast<Map<String, dynamic>>(),
+      partsUsed: (json['parts_used'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map)
+            ..['quantity'] = ((e['quantity'] as num?) ?? 1).toDouble()
+            ..['unit_price'] = ((e['unit_price'] as num?) ?? 0).toDouble())
+          .toList(),
       partsTotal: (json['parts_total'] as num?)?.toDouble() ?? 0,
       laborCost: (json['labor_cost'] as num?)?.toDouble() ?? 0,
       discount: (json['discount'] as num?)?.toDouble() ?? 0,

@@ -214,12 +214,12 @@ class _ServiceOrderFormSheetState extends State<ServiceOrderFormSheet> {
                   ..._parts.asMap().entries.map((entry) {
                     final index = entry.key;
                     final part = entry.value;
-                    final qty = part['quantity'] as double;
+                    final qty = ((part['quantity'] as num?) ?? 1).toDouble();
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
                         children: [
-                          Expanded(child: Text(part['name'] as String, overflow: TextOverflow.ellipsis)),
+                          Expanded(child: Text(part['name'] as String? ?? '', overflow: TextOverflow.ellipsis)),
                           IconButton(
                             icon: const Icon(Icons.remove_circle_outline, size: 20),
                             onPressed: () => setState(() {

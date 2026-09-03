@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -46,8 +48,11 @@ import '../staff/screens/staff_screen.dart';
 import '../subscription/screens/subscription_screen.dart';
 import '../taxes/screens/taxes_screen.dart';
 
+const int _maximumNavigationDepth = 2;
+
 class _FeatureTile {
-  _FeatureTile(this.key, this.titleOf, this.icon, [this.builder, this.permissionModule]);
+  _FeatureTile(this.key, this.titleOf, this.icon,
+      [this.builder, this.permissionModule]);
 
   /// Stable identifier for this destination, independent of locale/label and
   /// of [permissionModule] (several tiles share one backend module, e.g.
@@ -74,14 +79,17 @@ class _FeatureTile {
   final String? permissionModule;
 
   bool visibleTo(UserModel? user) =>
-      permissionModule == null || user == null || user.can('$permissionModule.view');
+      permissionModule == null ||
+      user == null ||
+      user.can('$permissionModule.view');
 }
 
 /// One labeled group of [_FeatureTile]s in the drawer — e.g. web's
 /// "RESTAURANT OPERATIONS" or "FINANCIAL MANAGEMENT" headers. [header] is
 /// `null` for a group that renders with no heading of its own.
 class _NavSection {
-  const _NavSection(this.key, this.header, this.tiles, {this.headerColor, this.parentByKey = const {}});
+  const _NavSection(this.key, this.header, this.tiles,
+      {this.headerColor, this.parentByKey = const {}});
 
   /// Stable identifier a tenant's `nav_config.section_order` reorders by
   /// (see [_FeatureTile.key]).
@@ -110,12 +118,34 @@ List<_NavSection> _retailSections() => [
         'cashier_sales',
         (l10n) => l10n.navHeaderCashierSales,
         [
-          _FeatureTile('pos', (l10n) => l10n.featurePos, Icons.point_of_sale_outlined, (_) => const PosScreen(), 'pos'),
-          _FeatureTile('sales', (l10n) => l10n.featureSales, Icons.receipt_long_outlined, (_) => const SalesScreen(), 'sales'),
-          _FeatureTile('quotations', (l10n) => l10n.featureQuotations, Icons.description_outlined, (_) => const QuotationsScreen(), 'quotes'),
-          _FeatureTile('consignments', (l10n) => l10n.featureConsignments, Icons.local_shipping_outlined, (_) => const ConsignmentsScreen(), 'consignments'),
-          _FeatureTile('service_orders', (l10n) => l10n.featureServiceOrders, Icons.handyman_outlined, (_) => const ServiceOrdersScreen(), 'service_orders'),
-          _FeatureTile('customers', (l10n) => l10n.featureCustomers, Icons.people_outline, (_) => const CustomersScreen(), 'customers'),
+          _FeatureTile('pos', (l10n) => l10n.featurePos,
+              Icons.point_of_sale_outlined, (_) => const PosScreen(), 'pos'),
+          _FeatureTile('sales', (l10n) => l10n.featureSales,
+              Icons.receipt_long_outlined, (_) => const SalesScreen(), 'sales'),
+          _FeatureTile(
+              'quotations',
+              (l10n) => l10n.featureQuotations,
+              Icons.description_outlined,
+              (_) => const QuotationsScreen(),
+              'quotes'),
+          _FeatureTile(
+              'consignments',
+              (l10n) => l10n.featureConsignments,
+              Icons.local_shipping_outlined,
+              (_) => const ConsignmentsScreen(),
+              'consignments'),
+          _FeatureTile(
+              'service_orders',
+              (l10n) => l10n.featureServiceOrders,
+              Icons.handyman_outlined,
+              (_) => const ServiceOrdersScreen(),
+              'service_orders'),
+          _FeatureTile(
+              'customers',
+              (l10n) => l10n.featureCustomers,
+              Icons.people_outline,
+              (_) => const CustomersScreen(),
+              'customers'),
         ],
         headerColor: Colors.blue.shade700,
       ),
@@ -123,36 +153,101 @@ List<_NavSection> _retailSections() => [
         'financial_management',
         (l10n) => l10n.navHeaderFinancialManagement,
         [
-          _FeatureTile('cash_register', (l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen(), 'cash_register'),
-          _FeatureTile('due_receivables', (l10n) => l10n.featureDueReceivables, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen(), 'finance'),
-          _FeatureTile('payables', (l10n) => l10n.featurePayables, Icons.request_quote_outlined, (_) => const PayablesScreen(), 'finance'),
-          _FeatureTile('sales_targets', (l10n) => l10n.featureSalesTargets, Icons.flag_outlined, (_) => const SalesTargetsScreen(), 'targets'),
-          _FeatureTile('reports', (l10n) => l10n.featureReports, Icons.insights_outlined, (_) => const ReportsScreen(), 'reports'),
-          _FeatureTile('analytics', (l10n) => l10n.featureAnalytics, Icons.bar_chart_outlined, (_) => const AnalyticsScreen(), 'reports'),
+          _FeatureTile(
+              'cash_register',
+              (l10n) => l10n.featureCashRegister,
+              Icons.savings_outlined,
+              (_) => const CashRegisterScreen(),
+              'cash_register'),
+          _FeatureTile(
+              'due_receivables',
+              (l10n) => l10n.featureDueReceivables,
+              Icons.notifications_active_outlined,
+              (_) => const DueReceivablesScreen(),
+              'finance'),
+          _FeatureTile(
+              'payables',
+              (l10n) => l10n.featurePayables,
+              Icons.request_quote_outlined,
+              (_) => const PayablesScreen(),
+              'finance'),
+          _FeatureTile(
+              'sales_targets',
+              (l10n) => l10n.featureSalesTargets,
+              Icons.flag_outlined,
+              (_) => const SalesTargetsScreen(),
+              'targets'),
+          _FeatureTile('reports', (l10n) => l10n.featureReports,
+              Icons.insights_outlined, (_) => const ReportsScreen(), 'reports'),
+          _FeatureTile(
+              'analytics',
+              (l10n) => l10n.featureAnalytics,
+              Icons.bar_chart_outlined,
+              (_) => const AnalyticsScreen(),
+              'reports'),
         ],
       ),
       _NavSection(
         'products_inventory',
         (l10n) => l10n.navHeaderProductsInventory,
         [
-          _FeatureTile('inventory', (l10n) => l10n.featureInventory, Icons.inventory_2_outlined, (_) => const InventoryManagementScreen(), 'products'),
-          _FeatureTile('categories', (l10n) => l10n.featureCategories, Icons.sell_outlined, (_) => const CategoriesScreen(), 'categories'),
-          _FeatureTile('brands', (l10n) => l10n.featureBrands, Icons.auto_awesome_outlined, (_) => const BrandsScreen(), 'categories'),
-          _FeatureTile('units', (l10n) => l10n.featureUnits, Icons.straighten_outlined, (_) => const UnitsScreen(), 'units'),
-          _FeatureTile('suppliers', (l10n) => l10n.featureSuppliers, Icons.local_shipping_outlined, (_) => const SuppliersScreen(), 'suppliers'),
-          _FeatureTile('taxes', (l10n) => l10n.featureTaxes, Icons.percent_outlined, (_) => const TaxesScreen(), 'settings'),
-          _FeatureTile('catalog', (l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen(), 'catalog'),
+          _FeatureTile(
+              'inventory',
+              (l10n) => l10n.featureInventory,
+              Icons.inventory_2_outlined,
+              (_) => const InventoryManagementScreen(),
+              'products'),
+          _FeatureTile(
+              'categories',
+              (l10n) => l10n.featureCategories,
+              Icons.sell_outlined,
+              (_) => const CategoriesScreen(),
+              'categories'),
+          _FeatureTile(
+              'brands',
+              (l10n) => l10n.featureBrands,
+              Icons.auto_awesome_outlined,
+              (_) => const BrandsScreen(),
+              'categories'),
+          _FeatureTile('units', (l10n) => l10n.featureUnits,
+              Icons.straighten_outlined, (_) => const UnitsScreen(), 'units'),
+          _FeatureTile(
+              'suppliers',
+              (l10n) => l10n.featureSuppliers,
+              Icons.local_shipping_outlined,
+              (_) => const SuppliersScreen(),
+              'suppliers'),
+          _FeatureTile('taxes', (l10n) => l10n.featureTaxes,
+              Icons.percent_outlined, (_) => const TaxesScreen(), 'settings'),
+          _FeatureTile('catalog', (l10n) => l10n.featureOnlineCatalog,
+              Icons.qr_code_outlined, (_) => const CatalogScreen(), 'catalog'),
         ],
       ),
       _NavSection(
         'administration',
         (l10n) => l10n.navHeaderAdministration,
         [
-          _FeatureTile('subscription', (l10n) => l10n.featureSubscription, Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),
-          _FeatureTile('settings', (l10n) => l10n.featureSettings, Icons.settings_outlined, (_) => const TenantSettingsScreen(), 'settings'),
-          _FeatureTile('languages', (l10n) => l10n.featureLanguages, Icons.translate_outlined, (_) => const LanguagesScreen(), 'settings'),
-          _FeatureTile('staff', (l10n) => l10n.featureStaff, Icons.badge_outlined, (_) => const StaffScreen(), 'users'),
-          _FeatureTile('devices', (l10n) => l10n.featureDevices, Icons.devices_other_outlined, (_) => const DevicesScreen()),
+          _FeatureTile(
+              'subscription',
+              (l10n) => l10n.featureSubscription,
+              Icons.workspace_premium_outlined,
+              (_) => const SubscriptionScreen()),
+          _FeatureTile(
+              'settings',
+              (l10n) => l10n.featureSettings,
+              Icons.settings_outlined,
+              (_) => const TenantSettingsScreen(),
+              'settings'),
+          _FeatureTile(
+              'languages',
+              (l10n) => l10n.featureLanguages,
+              Icons.translate_outlined,
+              (_) => const LanguagesScreen(),
+              'settings'),
+          _FeatureTile('staff', (l10n) => l10n.featureStaff,
+              Icons.badge_outlined, (_) => const StaffScreen(), 'users'),
+          _FeatureTile('devices', (l10n) => l10n.featureDevices,
+              Icons.devices_other_outlined, (_) => const DevicesScreen()),
         ],
       ),
     ];
@@ -167,9 +262,24 @@ List<_NavSection> _restaurantSections() => [
         'restaurant_operations',
         (l10n) => l10n.navHeaderRestaurantOperations,
         [
-          _FeatureTile('restaurant_pos', (l10n) => l10n.featureRestaurantPos, Icons.restaurant_outlined, (_) => const RestaurantPosScreen(), 'pos'),
-          _FeatureTile('floor_plan', (l10n) => l10n.featureFloorPlan, Icons.table_restaurant_outlined, (_) => const RestaurantTablesScreen(), 'pos'),
-          _FeatureTile('kitchen_display', (l10n) => l10n.featureKitchenDisplay, Icons.soup_kitchen_outlined, (_) => const RestaurantKdsScreen(), 'pos'),
+          _FeatureTile(
+              'restaurant_pos',
+              (l10n) => l10n.featureRestaurantPos,
+              Icons.restaurant_outlined,
+              (_) => const RestaurantPosScreen(),
+              'pos'),
+          _FeatureTile(
+              'floor_plan',
+              (l10n) => l10n.featureFloorPlan,
+              Icons.table_restaurant_outlined,
+              (_) => const RestaurantTablesScreen(),
+              'pos'),
+          _FeatureTile(
+              'kitchen_display',
+              (l10n) => l10n.featureKitchenDisplay,
+              Icons.soup_kitchen_outlined,
+              (_) => const RestaurantKdsScreen(),
+              'pos'),
         ],
         headerColor: Colors.lime.shade800,
       ),
@@ -177,41 +287,105 @@ List<_NavSection> _restaurantSections() => [
         'orders_cash',
         (l10n) => l10n.navHeaderOrdersCash,
         [
-          _FeatureTile('dining_history', (l10n) => l10n.featureDiningHistory, Icons.receipt_long_outlined, (_) => const SalesScreen(), 'sales'),
-          _FeatureTile('cash_register', (l10n) => l10n.featureCashRegister, Icons.savings_outlined, (_) => const CashRegisterScreen(), 'cash_register'),
+          _FeatureTile('dining_history', (l10n) => l10n.featureDiningHistory,
+              Icons.receipt_long_outlined, (_) => const SalesScreen(), 'sales'),
+          _FeatureTile(
+              'cash_register',
+              (l10n) => l10n.featureCashRegister,
+              Icons.savings_outlined,
+              (_) => const CashRegisterScreen(),
+              'cash_register'),
         ],
       ),
       _NavSection(
         'financial_management',
         (l10n) => l10n.navHeaderFinancialManagement,
         [
-          _FeatureTile('accounts_receivable', (l10n) => l10n.featureAccountsReceivable, Icons.notifications_active_outlined, (_) => const DueReceivablesScreen(), 'finance'),
-          _FeatureTile('accounts_payable', (l10n) => l10n.featureAccountsPayable, Icons.request_quote_outlined, (_) => const PayablesScreen(), 'finance'),
-          _FeatureTile('reports_analytics', (l10n) => l10n.featureReportsAnalytics, Icons.insights_outlined, (_) => const ReportsScreen(), 'reports'),
+          _FeatureTile(
+              'accounts_receivable',
+              (l10n) => l10n.featureAccountsReceivable,
+              Icons.notifications_active_outlined,
+              (_) => const DueReceivablesScreen(),
+              'finance'),
+          _FeatureTile(
+              'accounts_payable',
+              (l10n) => l10n.featureAccountsPayable,
+              Icons.request_quote_outlined,
+              (_) => const PayablesScreen(),
+              'finance'),
+          _FeatureTile(
+              'reports_analytics',
+              (l10n) => l10n.featureReportsAnalytics,
+              Icons.insights_outlined,
+              (_) => const ReportsScreen(),
+              'reports'),
         ],
       ),
       _NavSection(
         'kitchen_menu_catalog',
         (l10n) => l10n.navHeaderKitchenMenuCatalog,
         [
-          _FeatureTile('menu_dishes', (l10n) => l10n.featureMenuDishes, Icons.inventory_2_outlined, (_) => const InventoryManagementScreen(), 'products'),
-          _FeatureTile('categories', (l10n) => l10n.featureCategories, Icons.sell_outlined, (_) => const CategoriesScreen(), 'categories'),
-          _FeatureTile('brands', (l10n) => l10n.featureBrands, Icons.auto_awesome_outlined, (_) => const BrandsScreen(), 'categories'),
-          _FeatureTile('units', (l10n) => l10n.featureUnits, Icons.straighten_outlined, (_) => const UnitsScreen(), 'units'),
-          _FeatureTile('suppliers', (l10n) => l10n.featureFoodSuppliers, Icons.local_shipping_outlined, (_) => const SuppliersScreen(), 'suppliers'),
-          _FeatureTile('catalog', (l10n) => l10n.featureOnlineCatalog, Icons.qr_code_outlined, (_) => const CatalogScreen(), 'catalog'),
-          _FeatureTile('guest_directory', (l10n) => l10n.featureGuestDirectory, Icons.people_outline, (_) => const CustomersScreen(), 'customers'),
+          _FeatureTile(
+              'menu_dishes',
+              (l10n) => l10n.featureMenuDishes,
+              Icons.inventory_2_outlined,
+              (_) => const InventoryManagementScreen(),
+              'products'),
+          _FeatureTile(
+              'categories',
+              (l10n) => l10n.featureCategories,
+              Icons.sell_outlined,
+              (_) => const CategoriesScreen(),
+              'categories'),
+          _FeatureTile(
+              'brands',
+              (l10n) => l10n.featureBrands,
+              Icons.auto_awesome_outlined,
+              (_) => const BrandsScreen(),
+              'categories'),
+          _FeatureTile('units', (l10n) => l10n.featureUnits,
+              Icons.straighten_outlined, (_) => const UnitsScreen(), 'units'),
+          _FeatureTile(
+              'suppliers',
+              (l10n) => l10n.featureFoodSuppliers,
+              Icons.local_shipping_outlined,
+              (_) => const SuppliersScreen(),
+              'suppliers'),
+          _FeatureTile('catalog', (l10n) => l10n.featureOnlineCatalog,
+              Icons.qr_code_outlined, (_) => const CatalogScreen(), 'catalog'),
+          _FeatureTile(
+              'guest_directory',
+              (l10n) => l10n.featureGuestDirectory,
+              Icons.people_outline,
+              (_) => const CustomersScreen(),
+              'customers'),
         ],
       ),
       _NavSection(
         'administration',
         (l10n) => l10n.navHeaderAdministration,
         [
-          _FeatureTile('subscription', (l10n) => l10n.featureSubscription, Icons.workspace_premium_outlined, (_) => const SubscriptionScreen()),
-          _FeatureTile('settings', (l10n) => l10n.featureSettings, Icons.settings_outlined, (_) => const TenantSettingsScreen(), 'settings'),
-          _FeatureTile('languages', (l10n) => l10n.featureLanguages, Icons.translate_outlined, (_) => const LanguagesScreen(), 'settings'),
-          _FeatureTile('staff', (l10n) => l10n.featureStaff, Icons.badge_outlined, (_) => const StaffScreen(), 'users'),
-          _FeatureTile('devices', (l10n) => l10n.featureDevices, Icons.devices_other_outlined, (_) => const DevicesScreen()),
+          _FeatureTile(
+              'subscription',
+              (l10n) => l10n.featureSubscription,
+              Icons.workspace_premium_outlined,
+              (_) => const SubscriptionScreen()),
+          _FeatureTile(
+              'settings',
+              (l10n) => l10n.featureSettings,
+              Icons.settings_outlined,
+              (_) => const TenantSettingsScreen(),
+              'settings'),
+          _FeatureTile(
+              'languages',
+              (l10n) => l10n.featureLanguages,
+              Icons.translate_outlined,
+              (_) => const LanguagesScreen(),
+              'settings'),
+          _FeatureTile('staff', (l10n) => l10n.featureStaff,
+              Icons.badge_outlined, (_) => const StaffScreen(), 'users'),
+          _FeatureTile('devices', (l10n) => l10n.featureDevices,
+              Icons.devices_other_outlined, (_) => const DevicesScreen()),
         ],
       ),
     ];
@@ -237,70 +411,129 @@ List<_NavSection> _restaurantSections() => [
 /// bar/bottom bar) go through, so their tile-to-index mapping stays
 /// consistent with each other.
 List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
-  final compiled = (company?.isRestaurantMode ?? false) ? _restaurantSections() : _retailSections();
+  final compiled = (company?.isRestaurantMode ?? false)
+      ? _restaurantSections()
+      : _retailSections();
   final nav = BootstrapCache.instance.navConfig;
-  final itemOverrides = {for (final i in nav.items) i.key: i};
-  final sectionOrderOverrides = {for (final s in nav.sections) s.key: s.order};
-  final sectionMetaByKey = {for (final s in compiled) s.key: s};
+  final itemOverrides = {for (final item in nav.items) item.key: item};
+  final sectionOrderOverrides = {
+    for (final section in nav.sections) section.key: section.order,
+  };
+  final sectionMetaByKey = {
+    for (final section in compiled) section.key: section
+  };
+  final tilesBySection =
+      <String, List<({int order, int fallback, _FeatureTile tile})>>{};
 
-  final tilesBySection = <String, List<(int, _FeatureTile)>>{};
+  var fallback = 0;
   for (final section in compiled) {
-    for (var i = 0; i < section.tiles.length; i++) {
-      final tile = section.tiles[i];
+    for (var index = 0; index < section.tiles.length; index++) {
+      final tile = section.tiles[index];
       if (!tile.visibleTo(user)) continue;
 
       final override = itemOverrides[tile.key];
       if (override != null && !override.visible) continue;
 
-      final targetSectionKey =
-          (override?.section != null && sectionMetaByKey.containsKey(override!.section)) ? override.section! : section.key;
-      final order = override?.order ?? i;
-      (tilesBySection[targetSectionKey] ??= []).add((order, tile));
+      final targetSection = override?.section != null &&
+              sectionMetaByKey.containsKey(override!.section)
+          ? override.section!
+          : section.key;
+      (tilesBySection[targetSection] ??= []).add((
+        order: override?.order ?? index,
+        fallback: fallback++,
+        tile: tile,
+      ));
     }
   }
 
-  final result = [
-    for (final entry in tilesBySection.entries)
-      () {
-        final tiles = (entry.value..sort((a, b) => a.$1.compareTo(b.$1))).map((e) => e.$2).toList();
-        final keysInSection = {for (final t in tiles) t.key};
+  final result = <_NavSection>[];
+  for (final entry in tilesBySection.entries) {
+    final rows = entry.value;
+    final rowByKey = {for (final row in rows) row.tile.key: row};
+    final safeParent = <String, String?>{};
 
-        // A parent link only holds if it names another tile that landed in
-        // this same section and whose own depth doesn't already sit at the
-        // cap — same three-level (Main Menu / Sub-Menu / Sub-Sub-Menu) rule
-        // the web builder and NavMenuSettingsTab enforce: depth 0 (root),
-        // 1 (parent has no parent of its own), or 2 (parent's parent is
-        // itself a root item) are fine; a parent already at depth 2 can't
-        // take on more children.
-        final parentByKey = <String, String>{};
-        for (final tile in tiles) {
-          final parent = itemOverrides[tile.key]?.parent;
-          if (parent == null || parent.isEmpty || !keysInSection.contains(parent) || parent == tile.key) continue;
-          final grandparent = itemOverrides[parent]?.parent;
-          var parentDepth = 0;
-          if (grandparent != null && grandparent.isNotEmpty) {
-            final greatGrandparent = itemOverrides[grandparent]?.parent;
-            parentDepth = (keysInSection.contains(grandparent) && (greatGrandparent == null || greatGrandparent.isEmpty)) ? 1 : 2;
-          }
-          if (parentDepth >= 2) continue;
-          parentByKey[tile.key] = parent;
+    for (final row in rows) {
+      final item = itemOverrides[row.tile.key];
+      final rawParent = item?.parentId;
+      final candidate =
+          rawParent == null || rawParent.isEmpty ? null : rawParent;
+      var cursor = candidate;
+      var valid = true;
+      var depth = 0;
+      final seen = <String>{row.tile.key};
+
+      while (cursor != null && cursor.isNotEmpty) {
+        if (!rowByKey.containsKey(cursor) ||
+            !seen.add(cursor) ||
+            ++depth > _maximumNavigationDepth) {
+          valid = false;
+          break;
         }
+        cursor = itemOverrides[cursor]?.parentId;
+      }
+      safeParent[row.tile.key] = valid ? candidate : null;
+    }
 
-        return _NavSection(
-          entry.key,
-          sectionMetaByKey[entry.key]!.header,
-          tiles,
-          headerColor: sectionMetaByKey[entry.key]!.headerColor,
-          parentByKey: parentByKey,
-        );
-      }(),
-  ];
+    int compareRows(
+      ({int order, int fallback, _FeatureTile tile}) first,
+      ({int order, int fallback, _FeatureTile tile}) second,
+    ) {
+      final byOrder = first.order.compareTo(second.order);
+      return byOrder != 0 ? byOrder : first.fallback.compareTo(second.fallback);
+    }
 
-  final compiledSectionIndex = {for (var i = 0; i < compiled.length; i++) compiled[i].key: i};
-  result.sort((a, b) {
-    final orderA = sectionOrderOverrides[a.key] ?? compiledSectionIndex[a.key] ?? 0;
-    final orderB = sectionOrderOverrides[b.key] ?? compiledSectionIndex[b.key] ?? 0;
-    return orderA.compareTo(orderB);
+    final childrenByParent =
+        <String?, List<({int order, int fallback, _FeatureTile tile})>>{};
+    for (final row in rows) {
+      (childrenByParent[safeParent[row.tile.key]] ??= []).add(row);
+    }
+    for (final children in childrenByParent.values) {
+      children.sort(compareRows);
+    }
+
+    final orderedTiles = <_FeatureTile>[];
+    final parentByKey = <String, String>{};
+    final visited = <String>{};
+
+    void appendBranch(({int order, int fallback, _FeatureTile tile}) row) {
+      if (!visited.add(row.tile.key)) return;
+      orderedTiles.add(row.tile);
+      for (final child in childrenByParent[row.tile.key] ??
+          const <({int order, int fallback, _FeatureTile tile})>[]) {
+        parentByKey[child.tile.key] = row.tile.key;
+        appendBranch(child);
+      }
+    }
+
+    for (final root in childrenByParent[null] ??
+        const <({int order, int fallback, _FeatureTile tile})>[]) {
+      appendBranch(root);
+    }
+    for (final row in rows..sort(compareRows)) {
+      appendBranch(row);
+    }
+
+    result.add(_NavSection(
+      entry.key,
+      sectionMetaByKey[entry.key]!.header,
+      orderedTiles,
+      headerColor: sectionMetaByKey[entry.key]!.headerColor,
+      parentByKey: parentByKey,
+    ));
+  }
+
+  final compiledSectionIndex = {
+    for (var index = 0; index < compiled.length; index++)
+      compiled[index].key: index,
+  };
+  result.sort((first, second) {
+    final firstOrder = sectionOrderOverrides[first.key] ??
+        compiledSectionIndex[first.key] ??
+        0;
+    final secondOrder = sectionOrderOverrides[second.key] ??
+        compiledSectionIndex[second.key] ??
+        0;
+    return firstOrder.compareTo(secondOrder);
   });
 
   return result;
@@ -329,14 +562,20 @@ class NavSectionDescriptor {
 /// by [_sectionsFor]). Deliberately not permission-filtered: this is the
 /// tenant-wide tree an owner/admin configures, independent of which roles
 /// can see which module.
-List<NavSectionDescriptor> navSectionsForSettings(AppLocalizations l10n, CompanyModel? company) {
-  final sections = (company?.isRestaurantMode ?? false) ? _restaurantSections() : _retailSections();
+List<NavSectionDescriptor> navSectionsForSettings(
+    AppLocalizations l10n, CompanyModel? company) {
+  final sections = (company?.isRestaurantMode ?? false)
+      ? _restaurantSections()
+      : _retailSections();
   return [
     for (final section in sections)
       NavSectionDescriptor(
         section.key,
         section.header?.call(l10n) ?? section.key,
-        [for (final tile in section.tiles) NavTileDescriptor(tile.key, tile.titleOf(l10n))],
+        [
+          for (final tile in section.tiles)
+            NavTileDescriptor(tile.key, tile.titleOf(l10n))
+        ],
       ),
   ];
 }
@@ -373,7 +612,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _analyticsRepository = AnalyticsRepository(context.read<ApiClient>());
     _analyticsFuture = _analyticsRepository.fetchAnalytics();
-    context.read<ThemeProvider>().refreshFromServer(SettingsRepository(context.read<ApiClient>()));
+    context
+        .read<ThemeProvider>()
+        .refreshFromServer(SettingsRepository(context.read<ApiClient>()));
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
@@ -384,8 +625,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: Text(l10n.signOutConfirmTitle),
         content: Text(l10n.signOutConfirmBody),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.cancel)),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.signOut)),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(l10n.cancel)),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(l10n.signOut)),
         ],
       ),
     );
@@ -410,7 +655,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final feature = _featuresFor(auth.company, auth.user)[index - 1];
     final title = feature.titleOf(AppLocalizations.of(context));
     Navigator.of(context)
-        .push(MaterialPageRoute(builder: feature.builder ?? (_) => ComingSoonScreen(title: title, icon: feature.icon)))
+        .push(MaterialPageRoute(
+            builder: feature.builder ??
+                (_) => ComingSoonScreen(title: title, icon: feature.icon)))
         .then((_) {
       if (mounted) setState(() => _dockIndex = 0);
     });
@@ -420,9 +667,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// [_FeatureTile], with titles resolved from the active locale — shared by
   /// every dock rendering below so none of them can drift out of sync (or
   /// out of language) with each other.
-  List<(IconData, String)> _dockDestinationsFor(AppLocalizations l10n, CompanyModel? company, UserModel? user) => [
+  List<(IconData, String)> _dockDestinationsFor(
+          AppLocalizations l10n, CompanyModel? company, UserModel? user) =>
+      [
         (Icons.home_outlined, l10n.navHome),
-        for (final feature in _featuresFor(company, user)) (feature.icon, feature.titleOf(l10n)),
+        for (final feature in _featuresFor(company, user))
+          (feature.icon, feature.titleOf(l10n)),
       ];
 
   /// Structured, mode-isolated drawer: a Home tile followed by every
@@ -430,7 +680,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// tenant sidebar's slide-out drawer (see layouts/tenant.blade.php).
   /// Section headers are omitted from the rail/top bar/bottom bar (see
   /// [_dockDestinationsFor]), which just render the same tiles flat.
-  Widget _buildDrawer(BuildContext context, CompanyModel? company, UserModel? user) {
+  Widget _buildDrawer(
+      BuildContext context, CompanyModel? company, UserModel? user) {
     final l10n = AppLocalizations.of(context);
     final isRestaurant = company?.isRestaurantMode ?? false;
 
@@ -440,7 +691,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final children = <Widget>[
       Container(
         width: double.infinity,
-        padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 12, 16, 14),
+        padding: EdgeInsets.fromLTRB(
+            16, MediaQuery.of(context).padding.top + 12, 16, 14),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.primary,
           image: hasCover
@@ -453,7 +705,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ? LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.black.withValues(alpha: 0.15), Colors.black.withValues(alpha: 0.55)],
+                  colors: [
+                    Colors.black.withValues(alpha: 0.15),
+                    Colors.black.withValues(alpha: 0.55)
+                  ],
                 )
               : null,
         ),
@@ -463,13 +718,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Text(
               company?.tradeName ?? company?.name ?? 'Sales & Inventory',
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold),
             ),
             if (company != null) ...[
               const SizedBox(height: 4),
               Text(
-                isRestaurant ? 'CAFE & RESTAURANT' : company.planName.toUpperCase(),
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
+                isRestaurant
+                    ? 'CAFE & RESTAURANT'
+                    : company.planName.toUpperCase(),
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
               ),
             ],
           ],
@@ -485,9 +746,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
         },
       ),
     ];
+    final navSections = _sectionsFor(company, user);
+    final indexByKey = <String, int>{};
+    var nextIndex = 1;
+    for (final section in navSections) {
+      for (final tile in section.tiles) {
+        indexByKey[tile.key] = nextIndex++;
+      }
+    }
 
-    var index = 1;
-    for (final section in _sectionsFor(company, user)) {
+    void openTile(_FeatureTile tile) {
+      final index = indexByKey[tile.key];
+      if (index == null) return;
+      Navigator.of(context).pop();
+      _onDockItemSelected(context, index);
+    }
+
+    for (final section in navSections) {
       if (section.header != null) {
         children.add(Padding(
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
@@ -497,31 +772,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
               fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.6,
-              color: section.headerColor ?? Theme.of(context).colorScheme.onSurfaceVariant,
+              color: section.headerColor ??
+                  Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ));
       }
+
+      final childrenByParent = <String?, List<_FeatureTile>>{};
       for (final tile in section.tiles) {
-        final i = index++;
-        // 0 = Main Menu, 1 = Sub-Menu, 2 = Sub-Sub-Menu — walking
-        // parentByKey at most twice since that's exactly where the cap is.
-        var depth = 0;
-        var walkKey = tile.key;
-        while (section.parentByKey.containsKey(walkKey) && depth < 2) {
-          depth++;
-          walkKey = section.parentByKey[walkKey]!;
+        (childrenByParent[section.parentByKey[tile.key]] ??= []).add(tile);
+      }
+
+      bool branchContainsSelection(_FeatureTile tile) {
+        if (indexByKey[tile.key] == _dockIndex) return true;
+        return (childrenByParent[tile.key] ?? const <_FeatureTile>[])
+            .any(branchContainsSelection);
+      }
+
+      Widget buildBranch(_FeatureTile tile, int depth) {
+        final nested = childrenByParent[tile.key] ?? const <_FeatureTile>[];
+        final index = indexByKey[tile.key]!;
+        final padding = EdgeInsets.only(
+          left: 16 + depth * 30,
+          right: 12,
+        );
+
+        if (nested.isEmpty) {
+          return ListTile(
+            key: ValueKey('drawer-item-${tile.key}'),
+            contentPadding: padding,
+            leading: Icon(tile.icon, size: depth == 0 ? 24 : 20),
+            title: Text(tile.titleOf(l10n)),
+            selected: _dockIndex == index,
+            onTap: () => openTile(tile),
+          );
         }
-        children.add(ListTile(
-          contentPadding: depth > 0 ? EdgeInsets.only(left: 16.0 + depth * 16, right: 16) : null,
-          leading: Icon(tile.icon, size: depth > 0 ? 20 : 24),
-          title: Text(tile.titleOf(l10n)),
-          selected: _dockIndex == i,
-          onTap: () {
-            Navigator.of(context).pop();
-            _onDockItemSelected(context, i);
-          },
-        ));
+
+        return ExpansionTile(
+          key: PageStorageKey<String>(
+            'drawer-branch-${section.key}-${tile.key}',
+          ),
+          tilePadding: padding,
+          childrenPadding: EdgeInsets.zero,
+          leading: Icon(tile.icon, size: depth == 0 ? 24 : 20),
+          initiallyExpanded: branchContainsSelection(tile),
+          maintainState: true,
+          shape: const Border(),
+          collapsedShape: const Border(),
+          title: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => openTile(tile),
+            child: Text(
+              tile.titleOf(l10n),
+              style: TextStyle(
+                fontWeight:
+                    _dockIndex == index ? FontWeight.w700 : FontWeight.normal,
+                color: _dockIndex == index
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
+              ),
+            ),
+          ),
+          children: [
+            for (final child in nested)
+              buildBranch(
+                child,
+                math.min(depth + 1, _maximumNavigationDepth),
+              ),
+          ],
+        );
+      }
+
+      for (final root in childrenByParent[null] ?? const <_FeatureTile>[]) {
+        children.add(buildBranch(root, 0));
       }
     }
 
@@ -531,7 +855,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       title: Text(l10n.changePassword),
       onTap: () {
         Navigator.of(context).pop();
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+        Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
       },
     ));
 
@@ -560,17 +885,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
         extended: extended,
         selectedIndex: _dockIndex,
         onDestinationSelected: (index) => _onDockItemSelected(context, index),
-        labelType: extended ? NavigationRailLabelType.none : NavigationRailLabelType.all,
+        labelType: extended
+            ? NavigationRailLabelType.none
+            : NavigationRailLabelType.all,
         destinations: [
-          for (final destination in _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company, context.read<AuthProvider>().user))
-            NavigationRailDestination(icon: Icon(destination.$1), label: Text(destination.$2)),
+          for (final destination in _dockDestinationsFor(
+              AppLocalizations.of(context),
+              context.read<AuthProvider>().company,
+              context.read<AuthProvider>().user))
+            NavigationRailDestination(
+                icon: Icon(destination.$1), label: Text(destination.$2)),
         ],
       ),
     );
   }
 
   PreferredSizeWidget _buildTopDock(BuildContext context) {
-    final destinations = _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company, context.read<AuthProvider>().user);
+    final destinations = _dockDestinationsFor(
+        AppLocalizations.of(context),
+        context.read<AuthProvider>().company,
+        context.read<AuthProvider>().user);
     return PreferredSize(
       preferredSize: const Size.fromHeight(52),
       child: SizedBox(
@@ -593,7 +927,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildBottomDock(BuildContext context) {
-    final destinations = _dockDestinationsFor(AppLocalizations.of(context), context.read<AuthProvider>().company, context.read<AuthProvider>().user);
+    final destinations = _dockDestinationsFor(
+        AppLocalizations.of(context),
+        context.read<AuthProvider>().company,
+        context.read<AuthProvider>().user);
     return Material(
       elevation: 8,
       child: SafeArea(
@@ -678,7 +1015,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: const Icon(Icons.dns_outlined),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => ServerSettingsScreen(preferences: context.read<AppPreferences>()),
+                builder: (_) => ServerSettingsScreen(
+                    preferences: context.read<AppPreferences>()),
               ),
             ),
           ),
@@ -722,12 +1060,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       FutureBuilder<AnalyticsModel>(
                         future: _analyticsFuture,
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState != ConnectionState.done || !snapshot.hasData) {
+                          if (snapshot.connectionState !=
+                                  ConnectionState.done ||
+                              !snapshot.hasData) {
                             return const SizedBox.shrink();
                           }
                           return _DashboardAnalytics(
                             analytics: snapshot.data!,
-                            formatter: CurrencyFormatter(company?.currencySymbol ?? '\$'),
+                            formatter: CurrencyFormatter(
+                                company?.currencySymbol ?? '\$'),
                           );
                         },
                       ),
@@ -738,7 +1079,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ),
-          if (rightRail != null) ...[const VerticalDivider(width: 1), rightRail],
+          if (rightRail != null) ...[
+            const VerticalDivider(width: 1),
+            rightRail
+          ],
         ],
       ),
     );
@@ -749,7 +1093,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 /// column, since neither [TabBar] nor [BottomNavigationBar] scroll well
 /// past a handful of items and this app has ~20 destinations.
 class _DockChip extends StatelessWidget {
-  const _DockChip({required this.icon, required this.label, required this.selected, required this.onTap});
+  const _DockChip(
+      {required this.icon,
+      required this.label,
+      required this.selected,
+      required this.onTap});
 
   final IconData icon;
   final String label;
@@ -758,7 +1106,9 @@ class _DockChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant;
+    final color = selected
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.onSurfaceVariant;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -773,7 +1123,10 @@ class _DockChip extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 10, color: color, fontWeight: selected ? FontWeight.bold : FontWeight.normal),
+              style: TextStyle(
+                  fontSize: 10,
+                  color: color,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal),
             ),
           ],
         ),
@@ -809,9 +1162,15 @@ class _DashboardAnalytics extends StatelessWidget {
               crossAxisSpacing: 10,
               childAspectRatio: isSmall ? 3.2 : 1.15,
               children: [
-                KpiCard(label: l10n.todaysSales, value: formatter.format(analytics.todayRevenue)),
-                KpiCard(label: l10n.ordersToday, value: analytics.todayOrders.toString()),
-                KpiCard(label: l10n.avgOrder, value: formatter.format(analytics.averageOrderValue)),
+                KpiCard(
+                    label: l10n.todaysSales,
+                    value: formatter.format(analytics.todayRevenue)),
+                KpiCard(
+                    label: l10n.ordersToday,
+                    value: analytics.todayOrders.toString()),
+                KpiCard(
+                    label: l10n.avgOrder,
+                    value: formatter.format(analytics.averageOrderValue)),
               ],
             );
           },
@@ -821,11 +1180,13 @@ class _DashboardAnalytics extends StatelessWidget {
           Card(
             color: Colors.orange.shade50,
             child: ListTile(
-              leading: Icon(Icons.warning_amber_outlined, color: Colors.orange.shade800),
+              leading: Icon(Icons.warning_amber_outlined,
+                  color: Colors.orange.shade800),
               title: Text(l10n.lowStockWarning(analytics.lowStockCount)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const InventoryManagementScreen()),
+                MaterialPageRoute(
+                    builder: (_) => const InventoryManagementScreen()),
               ),
             ),
           ),
@@ -835,9 +1196,11 @@ class _DashboardAnalytics extends StatelessWidget {
           Card(
             color: Colors.amber.shade50,
             child: ListTile(
-              leading: Icon(Icons.request_page_outlined, color: Colors.amber.shade800),
+              leading: Icon(Icons.request_page_outlined,
+                  color: Colors.amber.shade800),
               title: Text(l10n.featureDueReceivables),
-              subtitle: Text('${formatter.format(analytics.totalReceivables)} outstanding'),
+              subtitle: Text(
+                  '${formatter.format(analytics.totalReceivables)} outstanding'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const DueReceivablesScreen()),
@@ -847,9 +1210,12 @@ class _DashboardAnalytics extends StatelessWidget {
         ],
         if (analytics.revenueTrend.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text(l10n.revenueTrend, style: Theme.of(context).textTheme.titleMedium),
+          Text(l10n.revenueTrend,
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          SizedBox(height: 140, child: RevenueTrendChart(points: analytics.revenueTrend)),
+          SizedBox(
+              height: 140,
+              child: RevenueTrendChart(points: analytics.revenueTrend)),
         ],
         if (analytics.topProducts.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -862,8 +1228,10 @@ class _DashboardAnalytics extends StatelessWidget {
                   ListTile(
                     dense: true,
                     title: Text(product.name),
-                    subtitle: Text('${product.unitsSold.toStringAsFixed(0)} sold'),
-                    trailing: Text(formatter.format(product.revenue), style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle:
+                        Text('${product.unitsSold.toStringAsFixed(0)} sold'),
+                    trailing: Text(formatter.format(product.revenue),
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
                   ),
               ],
             ),
