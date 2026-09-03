@@ -381,8 +381,8 @@ class NavSectionOrder {
 /// section/position is" (see DashboardScreen's `_sectionsFor`) — distinct
 /// from an explicit override that happens to match the default. [parent] is
 /// another item's key in the same section — null means this item sits at
-/// its section's root level; only one level of nesting is supported (a
-/// parent may not itself have a parent).
+/// its section's root level; up to two levels of nesting are supported
+/// (Main Menu / Sub-Menu / Sub-Sub-Menu).
 class NavItemConfig {
   const NavItemConfig({required this.key, this.section, this.parent, this.order, required this.visible});
 

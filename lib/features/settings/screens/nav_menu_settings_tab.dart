@@ -15,11 +15,12 @@ class _WorkingItem {
   bool visible;
 
   /// Another item's key in the same section this item is nested under, or
-  /// null for a root-level item — set only via the explicit "Nest under..."
-  /// action (see [_NavMenuSettingsTabState._nestItem]), never implied by
-  /// drag-reordering. Only one level of nesting is supported: an item that
-  /// is itself nested can't become a parent (enforced when building the
-  /// "Nest under..." picker's choices).
+  /// null for a root-level (Main Menu) item — set only via the explicit
+  /// "Nest under..." action (see [_NavMenuSettingsTabState._nestItem]),
+  /// never implied by drag-reordering. Up to two levels of nesting are
+  /// supported (Main Menu / Sub-Menu / Sub-Sub-Menu): an item already at
+  /// the deepest level can't become a parent itself (enforced when
+  /// building the "Nest under..." picker's choices).
   String? parentKey;
 }
 
@@ -92,13 +93,15 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     ];
 
     // A parent link only holds if it names another tile in the same section
-    // that isn't itself nested — otherwise this item falls back to the
-    // section root instead of silently vanishing behind a dangling parent.
+    // whose own depth doesn't already sit at the cap — otherwise this item
+    // falls back to the section root instead of silently vanishing behind
+    // a dangling or over-deep parent.
     for (final section in sections) {
       final keysInSection = {for (final t in section.tiles) t.key: t};
       for (final tile in section.tiles) {
-        final parent = tile.parentKey == null ? null : keysInSection[tile.parentKey];
-        if (tile.parentKey != null && (parent == null || parent.parentKey != null)) {
+        if (tile.parentKey == null) continue;
+        final parent = keysInSection[tile.parentKey];
+        if (parent == null || _depthOf(section, parent.key) >= 2) {
           tile.parentKey = null;
         }
       }
@@ -112,6 +115,24 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     });
 
     _sections = sections;
+  }
+
+  /// How many parent hops `key` sits from its section's root (0 = Main
+  /// Menu). Bounded well past the two-level cap this builder enforces
+  /// elsewhere, purely as a cycle guard — a real chain from a trusted
+  /// server response never runs that deep.
+  int _depthOf(_WorkingSection section, String key) {
+    final byKey = {for (final t in section.tiles) t.key: t};
+    final seen = <String>{};
+    var depth = 0;
+    var current = byKey[key];
+    while (current?.parentKey != null && depth < 10 && seen.add(current!.key)) {
+      final parent = byKey[current.parentKey];
+      if (parent == null) break;
+      depth++;
+      current = parent;
+    }
+    return depth;
   }
 
   Future<void> _moveItemToSection(_WorkingSection fromSection, _WorkingItem item) async {
@@ -153,11 +174,12 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   }
 
   /// "Nest under..." / "Un-nest": lets a tenant group one destination as a
-  /// sub-item of another within the same section, or pull it back out to
-  /// the root — the settings-tab equivalent of web's drag-onto-another-item
-  /// gesture, without needing a full tree-drag widget on mobile. Only root
-  /// items (no parent of their own) are offered as nesting targets, since
-  /// only one level of nesting is supported.
+  /// Sub-Menu (or Sub-Sub-Menu) item under another within the same section,
+  /// or pull it back out one level — the settings-tab equivalent of web's
+  /// drag-onto-another-item gesture, without needing a full tree-drag
+  /// widget on mobile. Only items not already at the deepest supported
+  /// level (Sub-Sub-Menu) are offered as nesting targets, since this
+  /// builder caps nesting at three levels total.
   Future<void> _nestItem(_WorkingSection section, _WorkingItem item) async {
     final isNested = item.parentKey != null;
     final hasChildren = section.tiles.any((t) => t.parentKey == item.key);
@@ -167,7 +189,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       );
       return;
     }
-    final candidates = section.tiles.where((t) => t.key != item.key && t.parentKey == null).toList();
+    final candidates = section.tiles.where((t) => t.key != item.key && _depthOf(section, t.key) < 2).toList();
 
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -300,54 +322,42 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                         },
                         children: [
                           for (var itemIndex = 0; itemIndex < _sections[sectionIndex].tiles.length; itemIndex++)
-                            Padding(
-                              key: ValueKey(_sections[sectionIndex].tiles[itemIndex].key),
-                              padding: EdgeInsets.only(
-                                left: _sections[sectionIndex].tiles[itemIndex].parentKey != null ? 32 : 8,
-                                right: 8,
-                              ),
-                              child: Row(
-                                children: [
-                                  if (_sections[sectionIndex].tiles[itemIndex].parentKey != null)
-                                    Icon(Icons.subdirectory_arrow_right, size: 16, color: Colors.grey.shade400),
-                                  Checkbox(
-                                    value: _sections[sectionIndex].tiles[itemIndex].visible,
-                                    onChanged: (checked) =>
-                                        setState(() => _sections[sectionIndex].tiles[itemIndex].visible = checked ?? true),
-                                  ),
-                                  Expanded(child: Text(_sections[sectionIndex].tiles[itemIndex].label)),
-                                  IconButton(
-                                    icon: Icon(
-                                      _sections[sectionIndex].tiles[itemIndex].parentKey != null
-                                          ? Icons.subdirectory_arrow_right_outlined
-                                          : Icons.turn_slight_right,
-                                      size: 20,
+                            () {
+                              final tile = _sections[sectionIndex].tiles[itemIndex];
+                              final depth = _depthOf(_sections[sectionIndex], tile.key);
+                              return Padding(
+                                key: ValueKey(tile.key),
+                                padding: EdgeInsets.only(left: 8.0 + depth * 24, right: 8),
+                                child: Row(
+                                  children: [
+                                    if (depth > 0)
+                                      Icon(Icons.subdirectory_arrow_right, size: 16, color: Colors.grey.shade400),
+                                    Checkbox(
+                                      value: tile.visible,
+                                      onChanged: (checked) => setState(() => tile.visible = checked ?? true),
                                     ),
-                                    tooltip: 'Nest under',
-                                    onPressed: _sections[sectionIndex].tiles.length < 2
-                                        ? null
-                                        : () => _nestItem(
-                                              _sections[sectionIndex],
-                                              _sections[sectionIndex].tiles[itemIndex],
-                                            ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.drive_file_move_outline, size: 20),
-                                    tooltip: 'Move to section',
-                                    onPressed: _sections.length < 2
-                                        ? null
-                                        : () => _moveItemToSection(
-                                              _sections[sectionIndex],
-                                              _sections[sectionIndex].tiles[itemIndex],
-                                            ),
-                                  ),
-                                  ReorderableDragStartListener(
-                                    index: itemIndex,
-                                    child: Icon(Icons.drag_handle, color: Colors.grey.shade400),
-                                  ),
-                                ],
-                              ),
-                            ),
+                                    Expanded(child: Text(tile.label)),
+                                    IconButton(
+                                      icon: Icon(
+                                        depth > 0 ? Icons.subdirectory_arrow_right_outlined : Icons.turn_slight_right,
+                                        size: 20,
+                                      ),
+                                      tooltip: 'Nest under',
+                                      onPressed: _sections[sectionIndex].tiles.length < 2 ? null : () => _nestItem(_sections[sectionIndex], tile),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.drive_file_move_outline, size: 20),
+                                      tooltip: 'Move to section',
+                                      onPressed: _sections.length < 2 ? null : () => _moveItemToSection(_sections[sectionIndex], tile),
+                                    ),
+                                    ReorderableDragStartListener(
+                                      index: itemIndex,
+                                      child: Icon(Icons.drag_handle, color: Colors.grey.shade400),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }(),
                         ],
                       ),
                       const SizedBox(height: 4),

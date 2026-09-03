@@ -266,14 +266,23 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
         final keysInSection = {for (final t in tiles) t.key};
 
         // A parent link only holds if it names another tile that landed in
-        // this same section and isn't itself nested — same single-level
-        // rule the web builder and NavMenuSettingsTab enforce.
+        // this same section and whose own depth doesn't already sit at the
+        // cap — same three-level (Main Menu / Sub-Menu / Sub-Sub-Menu) rule
+        // the web builder and NavMenuSettingsTab enforce: depth 0 (root),
+        // 1 (parent has no parent of its own), or 2 (parent's parent is
+        // itself a root item) are fine; a parent already at depth 2 can't
+        // take on more children.
         final parentByKey = <String, String>{};
         for (final tile in tiles) {
           final parent = itemOverrides[tile.key]?.parent;
           if (parent == null || parent.isEmpty || !keysInSection.contains(parent) || parent == tile.key) continue;
-          final parentOverride = itemOverrides[parent];
-          if (parentOverride?.parent != null && parentOverride!.parent!.isNotEmpty) continue;
+          final grandparent = itemOverrides[parent]?.parent;
+          var parentDepth = 0;
+          if (grandparent != null && grandparent.isNotEmpty) {
+            final greatGrandparent = itemOverrides[grandparent]?.parent;
+            parentDepth = (keysInSection.contains(grandparent) && (greatGrandparent == null || greatGrandparent.isEmpty)) ? 1 : 2;
+          }
+          if (parentDepth >= 2) continue;
           parentByKey[tile.key] = parent;
         }
 
@@ -495,10 +504,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
       for (final tile in section.tiles) {
         final i = index++;
-        final isNested = section.parentByKey.containsKey(tile.key);
+        // 0 = Main Menu, 1 = Sub-Menu, 2 = Sub-Sub-Menu — walking
+        // parentByKey at most twice since that's exactly where the cap is.
+        var depth = 0;
+        var walkKey = tile.key;
+        while (section.parentByKey.containsKey(walkKey) && depth < 2) {
+          depth++;
+          walkKey = section.parentByKey[walkKey]!;
+        }
         children.add(ListTile(
-          contentPadding: isNested ? const EdgeInsets.only(left: 32, right: 16) : null,
-          leading: Icon(tile.icon, size: isNested ? 20 : 24),
+          contentPadding: depth > 0 ? EdgeInsets.only(left: 16.0 + depth * 16, right: 16) : null,
+          leading: Icon(tile.icon, size: depth > 0 ? 20 : 24),
           title: Text(tile.titleOf(l10n)),
           selected: _dockIndex == i,
           onTap: () {
