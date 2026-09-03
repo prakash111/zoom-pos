@@ -327,6 +327,34 @@ class NavigationMenuBuilderTest extends TestCase
     }
 
     /**
+     * Regression test for a second bug the forceFallback/fallbackOnBody fix
+     * above introduced: SortableJS's fallback drag-clone is a raw
+     * cloneNode() of the dragged row, so it still carries that row's Alpine
+     * directives (x-model, :data-item-key, etc.) even though it's no longer
+     * inside the x-for scope that gave its loop variable (`item`/`child`/
+     * `grandchild`) meaning. Livewire's global mutation observer
+     * reprocesses any element whose attributes change — which SortableJS
+     * does continuously while dragging to update the clone's position —
+     * throwing a reference error on every single frame, which is expensive
+     * enough that dragging looks like it does nothing at all. The fix
+     * strips Alpine/Livewire attributes from the clone the instant it
+     * exists, via both SortableJS's onClone hook and a MutationObserver
+     * backstop in case a given SortableJS version doesn't route its
+     * forceFallback ghost through onClone.
+     */
+    public function test_navigation_tab_strips_alpine_attributes_from_the_sortable_drag_clone(): void
+    {
+        $this->actingAsTenantAdmin();
+
+        $html = Livewire::test(SettingsIndex::class)->html();
+
+        $this->assertStringContainsString('function stripAlpineAttrs(', $html);
+        $this->assertStringContainsString('onClone: (evt) => stripAlpineAttrs(evt.clone)', $html);
+        $this->assertStringContainsString('new MutationObserver(', $html);
+        $this->assertStringContainsString("sortable-drag, .sortable-fallback, .sortable-chosen", $html);
+    }
+
+    /**
      * Regression test: a stray literal `"` anywhere inside the Navigation
      * Menu tab's `x-data="{ ... }"` — even inside a `//` JS comment, not
      * just templated data — prematurely closes the double-quoted HTML

@@ -1473,6 +1473,37 @@
                  this.sortableInstances = [];
                  if (typeof Sortable === 'undefined') return;
 
+                 // Strips every Alpine/Livewire-looking attribute (x-*,
+                 // :attr, @event, wire:*) from an element and its
+                 // descendants — see commonSortableOptions.onClone below.
+                 function stripAlpineAttrs(el) {
+                     Array.from(el.attributes || []).forEach((attr) => {
+                         if (/^(x-|:|@|wire:)/.test(attr.name)) el.removeAttribute(attr.name);
+                     });
+                     Array.from(el.children || []).forEach(stripAlpineAttrs);
+                 }
+
+                 // Backstop for the same fix, in case a given SortableJS
+                 // version doesn't route its forceFallback ghost through
+                 // the public onClone hook: watches for its ghost/fallback/
+                 // chosen classes appearing anywhere and strips them the
+                 // instant they're inserted, before Livewire's own mutation
+                 // observer gets a chance to react to a later attribute
+                 // change on them. Installed once per component instance.
+                 if (!this.__cloneGuardInstalled) {
+                     this.__cloneGuardInstalled = true;
+                     new MutationObserver((mutations) => {
+                         mutations.forEach((m) => {
+                             m.addedNodes.forEach((node) => {
+                                 if (!(node instanceof HTMLElement)) return;
+                                 if (node.matches?.('.sortable-drag, .sortable-fallback, .sortable-chosen')) {
+                                     stripAlpineAttrs(node);
+                                 }
+                             });
+                         });
+                     }).observe(document.body, { childList: true, subtree: true });
+                 }
+
                  // forceFallback + fallbackOnBody: the slide-out drawer this
                  // page shares a layout with uses a CSS transform to animate
                  // open/closed (see layouts/tenant.blade.php), and *any*
@@ -1493,6 +1524,23 @@
                      fallbackOnBody: true,
                      fallbackClass: 'z-50',
                      fallbackTolerance: 3,
+                     // The fallback clone is a raw cloneNode() of whatever
+                     // row is being dragged, so it still carries that row's
+                     // Alpine directives (x-model for child.visible, :data-
+                     // item-key for child.key, etc.) even though it's no
+                     // longer inside the x-for scope that gave `item`/
+                     // `child`/`grandchild` meaning. Livewire's own global
+                     // mutation observer reprocesses any element whose
+                     // attributes change — which SortableJS does
+                     // continuously to update the clone's position — and
+                     // without that scope, evaluating those directives
+                     // throws a reference error on every single drag
+                     // frame, which is expensive enough to make dragging
+                     // look like it does nothing at all. Stripping every
+                     // Alpine/Livewire attribute the instant the clone
+                     // exists keeps it a pure visual snapshot, which is all
+                     // it ever needs to be.
+                     onClone: (evt) => stripAlpineAttrs(evt.clone),
                  };
 
                  const sectionContainer = document.getElementById('nav-sections-container');
