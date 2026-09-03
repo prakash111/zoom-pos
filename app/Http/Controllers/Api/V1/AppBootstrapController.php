@@ -35,16 +35,11 @@ class AppBootstrapController extends Controller
             $locale = $company->default_locale ?: ($company->language ?: 'en');
         }
 
-        $navConfig = $company->nav_config ?? [];
-
         return response()->json([
             'success' => true,
             'locale' => $locale,
             'translations' => $localization->getMergedTranslations($locale, $company->id),
-            'nav' => [
-                'hidden_tiles' => array_values($navConfig['hidden_tiles'] ?? []),
-                'section_order' => array_values($navConfig['section_order'] ?? []),
-            ],
+            'nav' => $company->normalizedNavConfig(),
             'config' => [
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
@@ -67,12 +62,16 @@ class AppBootstrapController extends Controller
     /**
      * POST /api/v1/pos/settings/nav-config
      *
-     * Persists which nav destinations this tenant hides from the mobile
-     * drawer/rail/bars and what order its section groups render in. Both
-     * arrays are opaque tile/section keys owned by the mobile client (see
-     * _FeatureTile.key / _NavSection.key in dashboard_screen.dart) — this
-     * endpoint doesn't validate them against a fixed list so new client
-     * versions can introduce keys without a server round-trip first.
+     * Persists this tenant's nav customization: which section groups exist
+     * and in what order, and — for every item — which section it's placed
+     * in (letting an item move to a different section than it defaults
+     * to), its order within that section, and whether it's hidden. `key`/
+     * `section` are opaque tile/section keys owned by the client (see
+     * _FeatureTile.key / _NavSection.key in dashboard_screen.dart and
+     * ALL_DOCK_ITEMS on web) — this endpoint doesn't validate them against
+     * a fixed list so new client versions can introduce keys without a
+     * server round-trip first. Shared by both the mobile app and the web
+     * tenant Settings > Navigation Menu tab.
      */
     public function updateNav(Request $request): JsonResponse
     {
@@ -80,19 +79,27 @@ class AppBootstrapController extends Controller
         $user = $this->resolveUser($request, $company);
 
         $validator = Validator::make($request->all(), [
-            'hidden_tiles' => ['nullable', 'array'],
-            'hidden_tiles.*' => ['string', 'max:60'],
-            'section_order' => ['nullable', 'array'],
-            'section_order.*' => ['string', 'max:60'],
+            'sections' => ['nullable', 'array'],
+            'sections.*.key' => ['required', 'string', 'max:60'],
+            'sections.*.order' => ['required', 'integer', 'min:0'],
+            'items' => ['nullable', 'array'],
+            'items.*.key' => ['required', 'string', 'max:60'],
+            'items.*.section' => ['nullable', 'string', 'max:60'],
+            'items.*.order' => ['nullable', 'integer', 'min:0'],
+            'items.*.visible' => ['required', 'boolean'],
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
         }
 
+        $dedupeByKey = fn (array $rows) => array_values(
+            collect($rows)->unique('key')->all()
+        );
+
         $navConfig = [
-            'hidden_tiles' => array_values(array_unique($request->input('hidden_tiles', []))),
-            'section_order' => array_values(array_unique($request->input('section_order', []))),
+            'sections' => $dedupeByKey($request->input('sections', [])),
+            'items' => $dedupeByKey($request->input('items', [])),
         ];
         $company->update(['nav_config' => $navConfig]);
 

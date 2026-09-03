@@ -10,6 +10,10 @@
     'bold' => false,
     'badge' => null,
     'badgeColor' => 'blue', // 'blue' | 'emerald'
+    // Opaque nav-customization key (Settings > Navigation Menu) — matches
+    // the mobile app's _FeatureTile.key so both platforms' nav_config stay
+    // in sync. Null for items not offered as customizable (rare).
+    'itemKey' => null,
 ])
 @php
     $dotColors = ['blue' => 'bg-blue-500', 'slate' => 'bg-slate-400', 'emerald' => 'bg-emerald-500'];
@@ -18,7 +22,8 @@
         'emerald' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300',
     ];
 @endphp
-<a wire:navigate.hover href="{{ $route }}" class="flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition">
+@if (!$itemKey || !in_array($itemKey, $hiddenNavKeys ?? [], true))
+<a wire:navigate.hover href="{{ $route }}" @if($itemKey) data-item-key="{{ $itemKey }}" @endif class="flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition">
     <div class="flex items-center gap-2.5">
         <span class="w-2 h-2 rounded-full {{ $dotColors[$dot] ?? $dotColors['slate'] }}"></span>
         <span @class(['font-bold' => $bold])>{{ $title }}</span>
@@ -27,3 +32,4 @@
         <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded {{ $badgeColors[$badgeColor] ?? $badgeColors['blue'] }}">{{ $badge }}</span>
     @endif
 </a>
+@endif

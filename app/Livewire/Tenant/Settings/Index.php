@@ -10,6 +10,7 @@ use App\Models\TaxRule;
 use App\Models\TenantApiKey;
 use App\Services\Auth\PermissionChecker;
 use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\Navigation\TenantNavRegistry;
 use App\Services\TaxCalculationService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -1175,6 +1176,109 @@ class Index extends Component
             'apiKeys' => TenantApiKey::where('company_id', $this->company->id)->orderByDesc('created_at')->get(),
             'jurisdictionPresets' => $taxService->getJurisdictionPresets($this->company->country),
             'notificationChannels' => \App\Models\CustomNotificationChannel::where('company_id', $this->company->id)->orderBy('name')->get(),
+            'navSections' => $this->buildNavSections(),
         ]);
+    }
+
+    /**
+     * The Navigation Menu tab's editable working state: TenantNavRegistry's
+     * compiled-in tree for this store's mode, with this store's saved
+     * nav_config (section/item order, item visibility, an item moved to a
+     * different section) applied on top — the exact same merge
+     * DashboardScreen._sectionsFor and layouts/tenant.blade.php's client-side
+     * reordering script do, so this tab always shows what the live sidebar
+     * (both web and mobile) currently renders.
+     *
+     * @return list<array{key: string, label: string, items: list<array{key: string, label: string, visible: bool}>}>
+     */
+    private function buildNavSections(): array
+    {
+        $compiled = TenantNavRegistry::sectionsFor($this->company->isRestaurantMode());
+        $compiledByKey = collect($compiled)->keyBy('key');
+
+        $navConfig = $this->company->normalizedNavConfig();
+        $itemOverrides = collect($navConfig['items'])->keyBy('key');
+        $sectionOrderOverrides = collect($navConfig['sections'])->pluck('order', 'key');
+
+        $grouped = [];
+        foreach ($compiled as $sectionIndex => $section) {
+            foreach ($section['items'] as $itemIndex => $item) {
+                $override = $itemOverrides->get($item['key']);
+                if ($override && $override['visible'] === false) {
+                    continue;
+                }
+
+                $targetSectionKey = ($override && $override['section'] && $compiledByKey->has($override['section']))
+                    ? $override['section']
+                    : $section['key'];
+                $order = $override['order'] ?? $itemIndex;
+                $visible = $override['visible'] ?? true;
+
+                $grouped[$targetSectionKey][] = ['order' => $order, 'key' => $item['key'], 'label' => $item['label'], 'visible' => $visible];
+            }
+        }
+
+        $sections = [];
+        foreach ($grouped as $sectionKey => $items) {
+            usort($items, fn ($a, $b) => $a['order'] <=> $b['order']);
+            $sections[] = [
+                'key' => $sectionKey,
+                'label' => $compiledByKey[$sectionKey]['label'],
+                'items' => array_map(fn ($i) => ['key' => $i['key'], 'label' => $i['label'], 'visible' => $i['visible']], $items),
+            ];
+        }
+
+        $compiledIndex = collect($compiled)->keys()->flip();
+        usort($sections, function ($a, $b) use ($sectionOrderOverrides, $compiledIndex) {
+            $orderA = $sectionOrderOverrides->get($a['key'], $compiledIndex->get($a['key'], 0));
+            $orderB = $sectionOrderOverrides->get($b['key'], $compiledIndex->get($b['key'], 0));
+
+            return $orderA <=> $orderB;
+        });
+
+        return $sections;
+    }
+
+    /**
+     * POST target for Settings > Navigation Menu's Save button — see
+     * resources/views/livewire/tenant/settings/index.blade.php's Alpine nav
+     * builder. Accepts the complete current section/item tree (order,
+     * section placement, visibility) as one payload rather than incremental
+     * diffs, mirroring how the mobile app's NavMenuSettingsTab saves.
+     */
+    public function saveNavConfig(array $sections): void
+    {
+        $user = auth('web')->user();
+        if ($user && ! PermissionChecker::can($user, 'settings')) {
+            abort(403, 'Unauthorized.');
+        }
+
+        $navSections = [];
+        $navItems = [];
+        foreach (array_values($sections) as $sectionOrder => $section) {
+            $sectionKey = (string) ($section['key'] ?? '');
+            if ($sectionKey === '') {
+                continue;
+            }
+            $navSections[] = ['key' => $sectionKey, 'order' => $sectionOrder];
+
+            foreach (array_values($section['items'] ?? []) as $itemOrder => $item) {
+                $itemKey = (string) ($item['key'] ?? '');
+                if ($itemKey === '') {
+                    continue;
+                }
+                $navItems[] = [
+                    'key' => $itemKey,
+                    'section' => $sectionKey,
+                    'order' => $itemOrder,
+                    'visible' => (bool) ($item['visible'] ?? true),
+                ];
+            }
+        }
+
+        $this->company->update(['nav_config' => ['sections' => $navSections, 'items' => $navItems]]);
+        AuditLog::record('company.settings_updated', $this->company->id, $user?->id, ['section' => 'nav_config']);
+
+        session()->flash('status', 'Navigation menu updated.');
     }
 }

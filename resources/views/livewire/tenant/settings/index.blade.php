@@ -1,9 +1,13 @@
+@push('scripts')
+    <script src="{{ asset('assets/libs/sortable.min.js') }}"></script>
+@endpush
+
 <div class="w-full space-y-6"
-     x-data="{ 
+     x-data="{
          activeTab: (window.location.hash ? window.location.hash.substring(1) : 'mode') || 'mode'
      }"
      x-init="
-         const validTabs = ['mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'notifications'];
+         const validTabs = ['mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'notifications', 'navigation'];
          if (!validTabs.includes(activeTab)) activeTab = 'mode';
          window.addEventListener('hashchange', () => {
              const h = window.location.hash ? window.location.hash.substring(1) : 'mode';
@@ -97,6 +101,16 @@
                 class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
             <span class="text-sm">🔔</span>
             <span>{{ __('Notification & Dispatch') }}</span>
+        </button>
+
+        <!-- Tab 8: Navigation Menu -->
+        <button type="button"
+                @click="activeTab = 'navigation'; window.location.hash = 'navigation'"
+                :aria-selected="activeTab === 'navigation' ? 'true' : 'false'"
+                :class="activeTab === 'navigation' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+                class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+            <span class="text-sm">🧭</span>
+            <span>{{ __('Navigation Menu') }}</span>
         </button>
     </div>
 
@@ -1447,6 +1461,113 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 8: NAVIGATION MENU (item-level drag-and-drop customization)
+         ========================================================================= -->
+    <div x-show="activeTab === 'navigation'" x-cloak class="space-y-4"
+         x-data="{
+             sections: @json($navSections),
+             saving: false,
+             sortableInstances: [],
+             initSortables() {
+                 this.sortableInstances.forEach((s) => { try { s.destroy(); } catch (e) {} });
+                 this.sortableInstances = [];
+                 if (typeof Sortable === 'undefined') return;
+
+                 const sectionContainer = document.getElementById('nav-sections-container');
+                 if (sectionContainer) {
+                     this.sortableInstances.push(Sortable.create(sectionContainer, {
+                         animation: 200,
+                         handle: '.nav-section-drag-handle',
+                         ghostClass: 'opacity-30',
+                         onEnd: () => this.syncFromDom(),
+                     }));
+                 }
+
+                 // Shared `group` lets an item drag from one section's list
+                 // straight into another's, not just reorder within its own.
+                 document.querySelectorAll('.nav-items-container').forEach((el) => {
+                     this.sortableInstances.push(Sortable.create(el, {
+                         group: 'tenant-nav-items',
+                         animation: 200,
+                         handle: '.nav-item-drag-handle',
+                         ghostClass: 'opacity-30',
+                         onEnd: () => this.syncFromDom(),
+                     }));
+                 });
+             },
+             syncFromDom() {
+                 const sectionContainer = document.getElementById('nav-sections-container');
+                 if (!sectionContainer) return;
+                 const allItems = this.sections.flatMap((s) => s.items);
+                 const next = [];
+                 sectionContainer.querySelectorAll(':scope > [data-section-key]').forEach((secEl) => {
+                     const key = secEl.getAttribute('data-section-key');
+                     const existingSection = this.sections.find((s) => s.key === key);
+                     if (!existingSection) return;
+                     const items = [];
+                     secEl.querySelectorAll('[data-item-key]').forEach((itemEl) => {
+                         const item = allItems.find((i) => i.key === itemEl.getAttribute('data-item-key'));
+                         if (item) items.push(item);
+                     });
+                     next.push({ key: existingSection.key, label: existingSection.label, items });
+                 });
+                 this.sections = next;
+                 this.$nextTick(() => this.initSortables());
+             },
+             async save() {
+                 this.saving = true;
+                 try {
+                     await this.$wire.saveNavConfig(this.sections);
+                 } finally {
+                     this.saving = false;
+                 }
+             },
+         }"
+         x-init="
+             $nextTick(() => initSortables());
+             if (window.Livewire) { Livewire.hook('morph.updated', () => $nextTick(() => initSortables())); }
+         ">
+
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
+            <h3 class="text-sm font-black text-slate-800 dark:text-slate-100">{{ __('Navigation Menu') }}</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {{ __('Hide destinations your team doesn\'t use, drag to reorder sections, reorder destinations within a section, or drag a destination into a different section. Applies to every device signed in to this store — the mobile app included.') }}
+            </p>
+        </div>
+
+        <div id="nav-sections-container" class="space-y-3">
+            <template x-for="section in sections" :key="section.key">
+                <div :data-section-key="section.key" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="section.label"></span>
+                        <span class="nav-section-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder this section') }}">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
+                        </span>
+                    </div>
+                    <div class="nav-items-container space-y-0.5 min-h-[10px]">
+                        <template x-for="item in section.items" :key="item.key">
+                            <div :data-item-key="item.key" class="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">
+                                <input type="checkbox" x-model="item.visible" class="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500">
+                                <span class="flex-1 text-xs font-semibold text-slate-700 dark:text-slate-300" x-text="item.label"></span>
+                                <span class="nav-item-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1" title="{{ __('Drag to reorder, or drag into another section') }}">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
+                                </span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <div class="flex justify-end pt-2">
+            <button type="button" @click="save()" :disabled="saving" class="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow-sm cursor-pointer disabled:opacity-50">
+                <span x-show="!saving">{{ __('Save Navigation Menu') }}</span>
+                <span x-show="saving">{{ __('Saving...') }}</span>
+            </button>
         </div>
     </div>
 

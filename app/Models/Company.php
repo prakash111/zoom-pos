@@ -236,6 +236,46 @@ class Company extends Model
     }
 
     /**
+     * This tenant's nav customization (Settings > Navigation Menu, mobile
+     * and web), normalized to the current `{sections: [{key, order}],
+     * items: [{key, section, order, visible}]}` shape regardless of which
+     * shape `nav_config` actually holds — including this app's older
+     * `{hidden_tiles, section_order}` shape (no per-item order or explicit
+     * section existed yet, so those come back null: callers fall back to
+     * whatever section/position that item's key defaults to further up the
+     * stack — see DashboardScreen._sectionsFor and ALL_DOCK_ITEMS on web).
+     * Every reader (mobile bootstrap, mobile/web settings pages, the web
+     * sidebar) goes through this so none of them need to understand a
+     * format the others don't.
+     */
+    public function normalizedNavConfig(): array
+    {
+        $raw = $this->nav_config ?? [];
+
+        if (isset($raw['items']) || isset($raw['sections'])) {
+            return [
+                'sections' => array_values($raw['sections'] ?? []),
+                'items' => array_values($raw['items'] ?? []),
+            ];
+        }
+
+        $sectionOrder = array_values($raw['section_order'] ?? []);
+        $hiddenTiles = array_values($raw['hidden_tiles'] ?? []);
+
+        return [
+            'sections' => array_map(
+                fn ($key, $order) => ['key' => $key, 'order' => $order],
+                $sectionOrder,
+                array_keys($sectionOrder)
+            ),
+            'items' => array_map(
+                fn ($key) => ['key' => $key, 'section' => null, 'order' => null, 'visible' => false],
+                $hiddenTiles
+            ),
+        ];
+    }
+
+    /**
      * The IANA timezone identifier order timestamps, prep timers, and KOT
      * logs should be shown in: the manual override from Settings > Profile
      * if one is set, else a default derived from `country` — see

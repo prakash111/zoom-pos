@@ -716,168 +716,238 @@
                 </div>
 
                 <!-- Structured Toggle Menu List Items (Strictly Mode Isolated) -->
-                <nav class="space-y-5 text-xs font-semibold">
+                <nav id="tenant-drawer-nav" class="space-y-5 text-xs font-semibold">
                     
                     @if ($isRestaurant)
                         <!-- RESTAURANT MODE DRAWER ITEMS -->
                         @if ($canPos)
-                            <div>
+                            <div data-section-key="restaurant_operations">
                                 <div class="text-[10px] font-extrabold uppercase tracking-wider text-lime-600 dark:text-lime-400 mb-2 px-3">{{ __('Restaurant Operations') }}</div>
                                 <div class="space-y-1">
-                                    <x-nav.drawer-item :route="route('tenant.restaurant.pos')" hover="lime" highlighted title="{{ __('Restaurant POS Terminal') }}" subtitle="{{ __('Dine-In, Takeaway & Delivery') }}">🍽️</x-nav.drawer-item>
-                                    <x-nav.drawer-item :route="route('tenant.restaurant.tables')" hover="lime" title="{{ __('Floor Plan & Tables') }}" subtitle="{{ __('Live Table Status & QR Menus') }}">🪑</x-nav.drawer-item>
-                                    <x-nav.drawer-item :route="route('tenant.restaurant.kds')" hover="lime" title="{{ __('Kitchen Display (KDS)') }}" subtitle="{{ __('Live KOT preparation queue') }}">🍳</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="restaurant_pos" :route="route('tenant.restaurant.pos')" hover="lime" highlighted title="{{ __('Restaurant POS Terminal') }}" subtitle="{{ __('Dine-In, Takeaway & Delivery') }}">🍽️</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="floor_plan" :route="route('tenant.restaurant.tables')" hover="lime" title="{{ __('Floor Plan & Tables') }}" subtitle="{{ __('Live Table Status & QR Menus') }}">🪑</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="kitchen_display" :route="route('tenant.restaurant.kds')" hover="lime" title="{{ __('Kitchen Display (KDS)') }}" subtitle="{{ __('Live KOT preparation queue') }}">🍳</x-nav.drawer-item>
                                 </div>
                             </div>
                         @endif
 
-                        <div>
+                        <div data-section-key="orders_cash">
                             <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Orders & Cash') }}</div>
                             <div class="space-y-1">
                                 @if ($canSales)
-                                    <x-nav.drawer-item :route="route('tenant.sales.index')" title="{{ __('Dining & Sales History') }}" subtitle="{{ __('Thermal receipts & order history') }}">
+                                    <x-nav.drawer-item item-key="dining_history" :route="route('tenant.sales.index')" title="{{ __('Dining & Sales History') }}" subtitle="{{ __('Thermal receipts & order history') }}">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
                                     </x-nav.drawer-item>
                                 @endif
 
                                 @if ($canFinance)
-                                    <x-nav.drawer-item :route="route('tenant.financials.cash_register')" hover="lime" title="{{ __('Cash Register') }}" subtitle="{{ __('Opening, closing, cash withdrawals') }}">🗄️</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="cash_register" :route="route('tenant.financials.cash_register')" hover="lime" title="{{ __('Cash Register') }}" subtitle="{{ __('Opening, closing, cash withdrawals') }}">🗄️</x-nav.drawer-item>
                                 @endif
                             </div>
                         </div>
 
                         @if ($canFinance)
-                            <div>
+                            <div data-section-key="financial_management">
                                 <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Financial Management') }}</div>
                                 <div class="space-y-1">
-                                    <x-nav.drawer-item :route="route('tenant.financials.receivables')" title="{{ __('Accounts Receivable') }}" subtitle="{{ __('Customer credit & unpaid bills') }}">📈</x-nav.drawer-item>
-                                    <x-nav.drawer-item :route="route('tenant.financials.payables')" title="{{ __('Accounts Payable') }}" subtitle="{{ __('Supplier bills & food purchases') }}">📉</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="accounts_receivable" :route="route('tenant.financials.receivables')" title="{{ __('Accounts Receivable') }}" subtitle="{{ __('Customer credit & unpaid bills') }}">📈</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="accounts_payable" :route="route('tenant.financials.payables')" title="{{ __('Accounts Payable') }}" subtitle="{{ __('Supplier bills & food purchases') }}">📉</x-nav.drawer-item>
 
                                     @if ($canReports)
-                                        <x-nav.drawer-item :route="route('tenant.reports.index')" title="{{ __('Reports & Analytics') }}" subtitle="{{ __('Sales, commissions & aging') }}">📊</x-nav.drawer-item>
+                                        <x-nav.drawer-item item-key="reports_analytics" :route="route('tenant.reports.index')" title="{{ __('Reports & Analytics') }}" subtitle="{{ __('Sales, commissions & aging') }}">📊</x-nav.drawer-item>
                                     @endif
                                 </div>
                             </div>
                         @endif
 
-                        <div>
+                        <div data-section-key="kitchen_menu_catalog">
                             <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Kitchen Menu & Catalog') }}</div>
                             <div class="space-y-1">
                                 @if ($canProducts)
-                                    <x-nav.drawer-item :route="route('tenant.products.index')" title="{{ __('Menu Dishes & Stock') }}" subtitle="{{ __('Dishes, ingredients & pricing') }}">📦</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="menu_dishes" :route="route('tenant.products.index')" title="{{ __('Menu Dishes & Stock') }}" subtitle="{{ __('Dishes, ingredients & pricing') }}">📦</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCategories)
-                                    <x-nav.drawer-item :route="route('tenant.categories.index')" title="{{ __('Categories') }}" subtitle="{{ __('Menu sections & tax rates') }}">🏷️</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="categories" :route="route('tenant.categories.index')" title="{{ __('Categories') }}" subtitle="{{ __('Menu sections & tax rates') }}">🏷️</x-nav.drawer-item>
                                 @endif
 
-                                <x-nav.drawer-item :route="route('tenant.brands.index')" title="{{ __('Brands & Modifiers') }}" subtitle="{{ __('Product brands & food options') }}">✨</x-nav.drawer-item>
+                                <x-nav.drawer-item item-key="brands" :route="route('tenant.brands.index')" title="{{ __('Brands & Modifiers') }}" subtitle="{{ __('Product brands & food options') }}">✨</x-nav.drawer-item>
 
                                 @if ($canUnits)
-                                    <x-nav.drawer-item :route="route('tenant.units.index')" title="{{ __('Units of Measure') }}" subtitle="{{ __('Portions, kg, litres & grams') }}">⚖️</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="units" :route="route('tenant.units.index')" title="{{ __('Units of Measure') }}" subtitle="{{ __('Portions, kg, litres & grams') }}">⚖️</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canSuppliers)
-                                    <x-nav.drawer-item :route="route('tenant.suppliers.index')" title="{{ __('Food Suppliers') }}" subtitle="{{ __('Vendor contacts & purchasing') }}">🚚</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="suppliers" :route="route('tenant.suppliers.index')" title="{{ __('Food Suppliers') }}" subtitle="{{ __('Vendor contacts & purchasing') }}">🚚</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCatalog)
-                                    <x-nav.drawer-item :route="route('tenant.catalog.index')" title="{{ __('Online QR Menu') }}" subtitle="{{ __('Digital QR menu & WhatsApp store') }}">🌐</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="catalog" :route="route('tenant.catalog.index')" title="{{ __('Online QR Menu') }}" subtitle="{{ __('Digital QR menu & WhatsApp store') }}">🌐</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCustomers)
-                                    <x-nav.drawer-item :route="route('tenant.customers.index')" title="{{ __('Guest Directory') }}" subtitle="{{ __('Customer history & contact list') }}">👥</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="guest_directory" :route="route('tenant.customers.index')" title="{{ __('Guest Directory') }}" subtitle="{{ __('Customer history & contact list') }}">👥</x-nav.drawer-item>
                                 @endif
                             </div>
                         </div>
 
                     @else
                         <!-- GENERAL RETAIL DRAWER ITEMS -->
-                        <div>
+                        <div data-section-key="cashier_sales">
                             <div class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 px-3">{{ __('Cashier & Sales') }}</div>
                             <div class="space-y-1">
                                 @if ($canPos)
-                                    <x-nav.drawer-item :route="route('tenant.sales.create')" highlighted title="{{ __('Cashier POS Terminal') }}" subtitle="{{ __('Fast barcode scan & cash checkout') }}">🛒</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="pos" :route="route('tenant.sales.create')" highlighted title="{{ __('Cashier POS Terminal') }}" subtitle="{{ __('Fast barcode scan & cash checkout') }}">🛒</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canSales)
-                                    <x-nav.drawer-item :route="route('tenant.sales.index')" title="{{ __('Sales & Invoices') }}" subtitle="{{ __('History, print receipts & refunds') }}">🧾</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="sales" :route="route('tenant.sales.index')" title="{{ __('Sales & Invoices') }}" subtitle="{{ __('History, print receipts & refunds') }}">🧾</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canQuotes)
-                                    <x-nav.drawer-item :route="route('tenant.quotes.index')" title="{{ __('Quotations & Proposals') }}" subtitle="{{ __('Quotes, estimates & 1-click sales conversion') }}">📑</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="quotations" :route="route('tenant.quotes.index')" title="{{ __('Quotations & Proposals') }}" subtitle="{{ __('Quotes, estimates & 1-click sales conversion') }}">📑</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCustomers)
-                                    <x-nav.drawer-item :route="route('tenant.customers.index')" title="{{ __('Customers & CRM') }}" subtitle="{{ __('Customer directory & loyalty points') }}">👥</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="customers" :route="route('tenant.customers.index')" title="{{ __('Customers & CRM') }}" subtitle="{{ __('Customer directory & loyalty points') }}">👥</x-nav.drawer-item>
                                 @endif
                             </div>
                         </div>
 
                         @if ($canFinance)
-                            <div>
+                            <div data-section-key="financial_management">
                                 <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Financial Management') }}</div>
                                 <div class="space-y-1">
-                                    <x-nav.drawer-item :route="route('tenant.financials.cash_register')" title="{{ __('Cash Register') }}" subtitle="{{ __('Opening, closing, cash withdrawals') }}">🗄️</x-nav.drawer-item>
-                                    <x-nav.drawer-item :route="route('tenant.financials.receivables')" title="{{ __('Accounts Receivable') }}" subtitle="{{ __('Customer credit & pending payments') }}">📈</x-nav.drawer-item>
-                                    <x-nav.drawer-item :route="route('tenant.financials.payables')" title="{{ __('Accounts Payable') }}" subtitle="{{ __('Supplier bills & purchase dues') }}">📉</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="cash_register" :route="route('tenant.financials.cash_register')" title="{{ __('Cash Register') }}" subtitle="{{ __('Opening, closing, cash withdrawals') }}">🗄️</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="due_receivables" :route="route('tenant.financials.receivables')" title="{{ __('Accounts Receivable') }}" subtitle="{{ __('Customer credit & pending payments') }}">📈</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="payables" :route="route('tenant.financials.payables')" title="{{ __('Accounts Payable') }}" subtitle="{{ __('Supplier bills & purchase dues') }}">📉</x-nav.drawer-item>
 
                                     @if ($canReports)
-                                        <x-nav.drawer-item :route="route('tenant.reports.index')" title="{{ __('Reports & Analytics') }}" subtitle="{{ __('Sales, commissions & aging') }}">📊</x-nav.drawer-item>
+                                        <x-nav.drawer-item item-key="reports" :route="route('tenant.reports.index')" title="{{ __('Reports & Analytics') }}" subtitle="{{ __('Sales, commissions & aging') }}">📊</x-nav.drawer-item>
                                     @endif
                                 </div>
                             </div>
                         @endif
 
-                        <div>
+                        <div data-section-key="products_inventory">
                             <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Products & Inventory') }}</div>
                             <div class="space-y-1">
                                 @if ($canProducts)
-                                    <x-nav.drawer-item :route="route('tenant.products.index')" title="{{ __('All Products') }}" subtitle="{{ __('SKUs, pricing & inventory levels') }}">📦</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="inventory" :route="route('tenant.products.index')" title="{{ __('All Products') }}" subtitle="{{ __('SKUs, pricing & inventory levels') }}">📦</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCategories)
-                                    <x-nav.drawer-item :route="route('tenant.categories.index')" title="{{ __('Categories') }}" subtitle="{{ __('Tax rates & category hierarchy') }}">🏷️</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="categories" :route="route('tenant.categories.index')" title="{{ __('Categories') }}" subtitle="{{ __('Tax rates & category hierarchy') }}">🏷️</x-nav.drawer-item>
                                 @endif
 
-                                <x-nav.drawer-item :route="route('tenant.brands.index')" title="{{ __('Brands & Manufacturers') }}" subtitle="{{ __('Brand names & supplier labels') }}">✨</x-nav.drawer-item>
+                                <x-nav.drawer-item item-key="brands" :route="route('tenant.brands.index')" title="{{ __('Brands & Manufacturers') }}" subtitle="{{ __('Brand names & supplier labels') }}">✨</x-nav.drawer-item>
 
                                 @if ($canUnits)
-                                    <x-nav.drawer-item :route="route('tenant.units.index')" title="{{ __('Units of Measure') }}" subtitle="{{ __('Pieces, kg, box, packs & liters') }}">⚖️</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="units" :route="route('tenant.units.index')" title="{{ __('Units of Measure') }}" subtitle="{{ __('Pieces, kg, box, packs & liters') }}">⚖️</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canSuppliers)
-                                    <x-nav.drawer-item :route="route('tenant.suppliers.index')" title="{{ __('Suppliers & Vendors') }}" subtitle="{{ __('Vendor directory & purchasing') }}">🚚</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="suppliers" :route="route('tenant.suppliers.index')" title="{{ __('Suppliers & Vendors') }}" subtitle="{{ __('Vendor directory & purchasing') }}">🚚</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCatalog)
-                                    <x-nav.drawer-item :route="route('tenant.catalog.index')" title="{{ __('Online Digital Catalog') }}" subtitle="{{ __('Shareable web catalog & WhatsApp store') }}">🌐</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="catalog" :route="route('tenant.catalog.index')" title="{{ __('Online Digital Catalog') }}" subtitle="{{ __('Shareable web catalog & WhatsApp store') }}">🌐</x-nav.drawer-item>
                                 @endif
                             </div>
                         </div>
                     @endif
 
                     <!-- Administration & Settings -->
-                    <div>
+                    <div data-section-key="administration">
                         <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Administration & Settings') }}</div>
                         <div class="space-y-1">
-                            <x-nav.drawer-link :route="route('tenant.billing.index')" dot="blue" bold :title="__('Subscription & Billing')" :badge="__('Invoices')" badge-color="blue" />
+                            <x-nav.drawer-link item-key="subscription" :route="route('tenant.billing.index')" dot="blue" bold :title="__('Subscription & Billing')" :badge="__('Invoices')" badge-color="blue" />
 
                             @if ($canSettings)
-                                <x-nav.drawer-link :route="route('tenant.settings.index')" :title="__('Store Settings')" />
+                                <x-nav.drawer-link item-key="settings" :route="route('tenant.settings.index')" :title="__('Store Settings')" />
                             @endif
 
-                            <x-nav.drawer-link :route="route('tenant.languages.index')" dot="emerald" :title="__('Languages & Translations')" :badge="__('Multi-Lang')" badge-color="emerald" />
+                            <x-nav.drawer-link item-key="languages" :route="route('tenant.languages.index')" dot="emerald" :title="__('Languages & Translations')" :badge="__('Multi-Lang')" badge-color="emerald" />
 
                             @if ($canUsers)
-                                <x-nav.drawer-link :route="route('tenant.users.index')" :title="__('Users & Permissions')" />
+                                <x-nav.drawer-link item-key="staff" :route="route('tenant.users.index')" :title="__('Users & Permissions')" />
                             @endif
 
-                            <x-nav.drawer-link :route="route('tenant.devices.index')" :title="__('Terminals & Devices')" />
+                            <x-nav.drawer-link item-key="devices" :route="route('tenant.devices.index')" :title="__('Terminals & Devices')" />
                         </div>
                     </div>
 
                 </nav>
+
+                {{-- Applies Settings > Navigation Menu's section/item order
+                     and any item moved to a different section, directly to
+                     the already-rendered (permission-gated) drawer markup —
+                     see AppBootstrapController::updateNav() and
+                     Company::normalizedNavConfig(). Pure DOM reordering, no
+                     Blade restructuring: an item/section this tenant never
+                     touched simply keeps its compiled-in position (a stable
+                     sort over an all-equal order is a no-op), so a tenant
+                     with no saved config sees the drawer completely
+                     unchanged. --}}
+                <script>
+                    (function () {
+                        const navConfig = @json($tenantNavConfig ?? ['sections' => [], 'items' => []]);
+
+                        function applyTenantNavOrder() {
+                            const navEl = document.getElementById('tenant-drawer-nav');
+                            if (!navEl) return;
+
+                            const sectionOrder = {};
+                            (navConfig.sections || []).forEach((s) => { sectionOrder[s.key] = s.order; });
+                            const itemMeta = {};
+                            (navConfig.items || []).forEach((i) => { itemMeta[i.key] = i; });
+
+                            const sectionsByKey = {};
+                            navEl.querySelectorAll(':scope > [data-section-key]').forEach((sec) => {
+                                sectionsByKey[sec.getAttribute('data-section-key')] = sec;
+                            });
+
+                            // Move an item into a different section than it
+                            // rendered in by default, if this tenant dragged
+                            // it there.
+                            navEl.querySelectorAll('[data-item-key]').forEach((itemEl) => {
+                                const meta = itemMeta[itemEl.getAttribute('data-item-key')];
+                                const targetSection = meta && meta.section ? sectionsByKey[meta.section] : null;
+                                const targetList = targetSection ? targetSection.querySelector('.space-y-1') : null;
+                                if (targetList && targetList !== itemEl.parentElement) {
+                                    targetList.appendChild(itemEl);
+                                }
+                            });
+
+                            // Sort each section's items, then the sections
+                            // themselves, by configured order (a stable sort,
+                            // so anything without an explicit order keeps its
+                            // current relative position).
+                            Object.values(sectionsByKey).forEach((sec) => {
+                                const list = sec.querySelector('.space-y-1');
+                                if (!list) return;
+                                Array.from(list.children)
+                                    .sort((a, b) => {
+                                        const ao = itemMeta[a.getAttribute('data-item-key')]?.order ?? Number.MAX_SAFE_INTEGER;
+                                        const bo = itemMeta[b.getAttribute('data-item-key')]?.order ?? Number.MAX_SAFE_INTEGER;
+                                        return ao - bo;
+                                    })
+                                    .forEach((el) => list.appendChild(el));
+                            });
+
+                            Array.from(navEl.querySelectorAll(':scope > [data-section-key]'))
+                                .sort((a, b) => {
+                                    const ao = sectionOrder[a.getAttribute('data-section-key')] ?? Number.MAX_SAFE_INTEGER;
+                                    const bo = sectionOrder[b.getAttribute('data-section-key')] ?? Number.MAX_SAFE_INTEGER;
+                                    return ao - bo;
+                                })
+                                .forEach((el) => navEl.appendChild(el));
+                        }
+
+                        document.addEventListener('DOMContentLoaded', applyTenantNavOrder);
+                        document.addEventListener('livewire:navigated', applyTenantNavOrder);
+                    })();
+                </script>
             </div>
 
             <!-- Drawer Bottom Bar -->

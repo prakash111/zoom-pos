@@ -67,8 +67,8 @@ class AppBootstrapApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('locale', 'en')
-            ->assertJsonPath('nav.hidden_tiles', [])
-            ->assertJsonPath('nav.section_order', [])
+            ->assertJsonPath('nav.sections', [])
+            ->assertJsonPath('nav.items', [])
             ->assertJsonPath('config.pos_mode', 'general')
             ->assertJsonPath('config.currency_symbol', '$')
             ->assertJsonStructure(['translations', 'messages']);
@@ -78,22 +78,57 @@ class AppBootstrapApiTest extends TestCase
     {
         $token = $this->token();
 
-        $this->withToken($token)->postJson('/api/v1/pos/settings/nav-config', [
-            'hidden_tiles' => ['quotations', 'consignments'],
-            'section_order' => ['financial_management', 'cashier_sales'],
-        ])->assertOk()
-            ->assertJsonPath('nav.hidden_tiles', ['quotations', 'consignments'])
-            ->assertJsonPath('nav.section_order', ['financial_management', 'cashier_sales']);
+        $payload = [
+            'sections' => [
+                ['key' => 'financial_management', 'order' => 0],
+                ['key' => 'cashier_sales', 'order' => 1],
+            ],
+            'items' => [
+                ['key' => 'quotations', 'section' => 'cashier_sales', 'order' => 0, 'visible' => false],
+                ['key' => 'consignments', 'section' => 'cashier_sales', 'order' => 1, 'visible' => false],
+                // Moved out of its default section, into financial_management.
+                ['key' => 'pos', 'section' => 'financial_management', 'order' => 0, 'visible' => true],
+            ],
+        ];
+
+        $this->withToken($token)->postJson('/api/v1/pos/settings/nav-config', $payload)
+            ->assertOk()
+            ->assertJsonPath('nav.sections', $payload['sections'])
+            ->assertJsonPath('nav.items', $payload['items']);
 
         $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap?locale=en')
             ->assertOk()
-            ->assertJsonPath('nav.hidden_tiles', ['quotations', 'consignments'])
-            ->assertJsonPath('nav.section_order', ['financial_management', 'cashier_sales']);
+            ->assertJsonPath('nav.sections', $payload['sections'])
+            ->assertJsonPath('nav.items', $payload['items']);
 
         $this->withToken($token)->getJson('/api/v1/pos/settings')
             ->assertOk()
-            ->assertJsonPath('nav.hidden_tiles', ['quotations', 'consignments'])
-            ->assertJsonPath('nav.section_order', ['financial_management', 'cashier_sales']);
+            ->assertJsonPath('nav.sections', $payload['sections'])
+            ->assertJsonPath('nav.items', $payload['items']);
+    }
+
+    public function test_legacy_hidden_tiles_and_section_order_shape_upgrades_on_read(): void
+    {
+        $this->company->update([
+            'nav_config' => [
+                'hidden_tiles' => ['quotations'],
+                'section_order' => ['financial_management', 'cashier_sales'],
+            ],
+        ]);
+
+        $nav = $this->company->fresh()->normalizedNavConfig();
+
+        $this->assertSame(
+            [
+                ['key' => 'financial_management', 'order' => 0],
+                ['key' => 'cashier_sales', 'order' => 1],
+            ],
+            $nav['sections']
+        );
+        $this->assertSame(
+            [['key' => 'quotations', 'section' => null, 'order' => null, 'visible' => false]],
+            $nav['items']
+        );
     }
 
     public function test_nav_config_update_is_permission_gated(): void
@@ -111,7 +146,7 @@ class AppBootstrapApiTest extends TestCase
         ])->assertOk()->json('token');
 
         $this->withToken($token)->postJson('/api/v1/pos/settings/nav-config', [
-            'hidden_tiles' => ['pos'],
+            'items' => [['key' => 'pos', 'visible' => false]],
         ])->assertForbidden();
     }
 }

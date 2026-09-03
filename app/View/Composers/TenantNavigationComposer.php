@@ -5,6 +5,7 @@ namespace App\View\Composers;
 use App\Models\Company;
 use App\Services\Auth\PermissionChecker;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\View as ViewFacade;
 use Illuminate\View\View;
 
 /**
@@ -33,6 +34,14 @@ class TenantNavigationComposer
         $isCashRegister = $this->request->routeIs('tenant.financials.cash_register');
         $isReceivables = $this->request->routeIs('tenant.financials.receivables');
         $isPayables = $this->request->routeIs('tenant.financials.payables');
+
+        // Settings > Navigation Menu customization — see Company::
+        // normalizedNavConfig(). Shared (not just $view->with(), which is
+        // scoped to this one view) because x-nav.drawer-item/drawer-link
+        // are separate anonymous-component view instances that need it too.
+        $navConfig = $company->normalizedNavConfig();
+        $hiddenNavKeys = collect($navConfig['items'] ?? [])->where('visible', false)->pluck('key')->all();
+        ViewFacade::share(['hiddenNavKeys' => $hiddenNavKeys, 'tenantNavConfig' => $navConfig]);
 
         $view->with([
             'tenantCompany' => $company,
