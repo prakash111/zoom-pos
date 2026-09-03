@@ -332,6 +332,30 @@ class NavigationMenuBuilderTest extends TestCase
     }
 
     /**
+     * Regression test: this page also polls for desktop-sync-status
+     * (livewire:tenant.desktop-sync-status), and Livewire's morph.updated
+     * hook fires for *any* Livewire request completing anywhere on the
+     * page, not just one scoped to this tab. Without a guard,
+     * initSortables() destroying and recreating every Sortable instance
+     * whenever that hook fires — including mid-drag, if a poll happens to
+     * land while the user is dragging — leaves a native `dragover` event
+     * still firing against an instance that was just destroy()'d, whose
+     * own `el` reference is now null: SortableJS's internal _onDragOver
+     * throws trying to read a property off it, repeatedly, until the drag
+     * ends. initSortables() must skip re-running while a drag is active.
+     */
+    public function test_navigation_tab_does_not_reinit_sortable_instances_mid_drag(): void
+    {
+        $this->actingAsTenantAdmin();
+
+        $html = Livewire::test(SettingsIndex::class)->html();
+
+        $this->assertStringContainsString('if (this.dragging) return;', $html);
+        $this->assertStringContainsString('onStart: () => { this.dragging = true; }', $html);
+        $this->assertStringContainsString('this.dragging = false;', $html);
+    }
+
+    /**
      * Regression test: a stray literal `"` anywhere inside the Navigation
      * Menu tab's `x-data="{ ... }"` — even inside a `//` JS comment, not
      * just templated data — prematurely closes the double-quoted HTML

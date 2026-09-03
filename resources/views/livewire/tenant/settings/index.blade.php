@@ -1468,7 +1468,23 @@
              sections: @js($navSections),
              saving: false,
              sortableInstances: [],
+             dragging: false,
              initSortables() {
+                 // Livewire's morph.updated hook fires for *any* Livewire
+                 // request completing anywhere on the page (this settings
+                 // page also polls for desktop-sync-status), not just one
+                 // scoped to this tab — so without this guard, destroying
+                 // and recreating every Sortable instance mid-drag (a
+                 // native `dragover` event keeps firing against an
+                 // instance that was just destroy()'d, whose own `el`
+                 // reference is now null) throws a null-property-access
+                 // error inside SortableJS's own _onDragOver repeatedly
+                 // (reading lastElementChild off it) until the drag
+                 // ends. onEnd (below) already calls this again once the
+                 // drag actually finishes, so skipping a re-init while one
+                 // is in progress loses nothing.
+                 if (this.dragging) return;
+
                  this.sortableInstances.forEach((s) => { try { s.destroy(); } catch (e) {} });
                  this.sortableInstances = [];
                  if (typeof Sortable === 'undefined') return;
@@ -1502,6 +1518,11 @@
                  const commonSortableOptions = {
                      animation: 200,
                      ghostClass: 'opacity-30',
+                     onStart: () => { this.dragging = true; },
+                 };
+                 const onDragEnd = () => {
+                     this.dragging = false;
+                     this.syncFromDom();
                  };
 
                  const sectionContainer = document.getElementById('nav-sections-container');
@@ -1509,7 +1530,7 @@
                      this.sortableInstances.push(Sortable.create(sectionContainer, {
                          ...commonSortableOptions,
                          handle: '.nav-section-drag-handle',
-                         onEnd: () => this.syncFromDom(),
+                         onEnd: onDragEnd,
                      }));
                  }
 
@@ -1546,7 +1567,7 @@
                              const droppingIntoNestedZone = evt.to.classList.contains('nav-children-container') || evt.to.classList.contains('nav-grandchildren-container');
                              return !(draggedHasChildren && droppingIntoNestedZone);
                          },
-                         onEnd: () => this.syncFromDom(),
+                         onEnd: onDragEnd,
                      }));
                  });
              },
