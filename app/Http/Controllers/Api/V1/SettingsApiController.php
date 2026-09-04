@@ -75,6 +75,10 @@ class SettingsApiController extends Controller
             'primary_color' => ['nullable', 'string', 'max:16'],
             'accent_color' => ['nullable', 'string', 'max:16'],
             'drawer_bg' => ['nullable', 'string', 'max:16'],
+            'drawer_gradient_enabled' => ['nullable', 'boolean'],
+            'drawer_gradient_start' => ['nullable', 'string', 'max:16'],
+            'drawer_gradient_end' => ['nullable', 'string', 'max:16'],
+            'drawer_gradient_direction' => ['nullable', 'string', 'in:top_to_bottom,diagonal,radial'],
             'default_commission_rate' => ['nullable', 'numeric', 'min:0'],
             'default_commission_type' => ['nullable', 'string', 'in:percentage,fixed'],
         ]);

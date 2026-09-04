@@ -29,7 +29,8 @@ class SchemaResponse
         'badge', 'icon', 'divider', 'text_input', 'dropdown_select',
         'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker',
         'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
-        'button_outlined', 'fab', 'action_sheet_trigger', 'navigation_builder',
+        'button_outlined', 'fab', 'action_sheet_trigger', 'navigation_builder', 'tree_builder',
+        'wrap',
     ];
 
     public const INPUT_TYPES = [
@@ -104,6 +105,16 @@ class SchemaResponse
         return array_merge([
             'type' => 'row',
             'components' => $components,
+        ], $props);
+    }
+
+    public static function wrap(array $components, array $props = []): array
+    {
+        return array_merge([
+            'type' => 'wrap',
+            'components' => $components,
+            'spacing' => 8,
+            'run_spacing' => 8,
         ], $props);
     }
 
@@ -462,22 +473,13 @@ class SchemaResponse
                 ], ['spacing' => 12]),
                 self::divider(),
                 self::text('Active Capabilities', 'title_small', ['bold' => true]),
-                self::row($featureChips, ['spacing' => 6]),
+                self::wrap($featureChips, ['spacing' => 8, 'run_spacing' => 8]),
             ]),
             self::card([
                 self::text('Licensed Modules for Tenant', 'title_small', ['bold' => true]),
                 self::text('Modules granted to this tenant account:', 'body_small', ['color' => '#6b7280']),
-                self::row($licensedBadges, ['spacing' => 6]),
+                self::wrap($licensedBadges, ['spacing' => 8, 'run_spacing' => 8]),
             ]),
-            self::card([
-                self::row([
-                    self::icon('lock', ['color' => '#d97706', 'size' => 24]),
-                    self::column([
-                        self::text('Strict Store Mode Lock', 'title_small', ['bold' => true, 'color' => '#b45309']),
-                        self::text('Store operating mode is locked by SuperAdmin. Self-service mode switching is disabled to prevent database and fiscal corruption.', 'body_small', ['color' => '#78350f']),
-                    ], ['spacing' => 4]),
-                ], ['spacing' => 12]),
-            ], ['color' => '#fef3c7', 'border_color' => '#fde68a']),
         ]);
     }
 
@@ -513,7 +515,20 @@ class SchemaResponse
                 ], $company->country ?? 'US'),
                 self::colorPicker('primary_color', 'Primary Accent Color', $company->primary_color ?? '#4F46E5'),
                 self::colorPicker('accent_color', 'Secondary Accent Color', $company->accent_color ?? '#D97706'),
-                self::colorPicker('drawer_bg', 'Sidebar / Drawer Background', $company->drawer_bg ?? '#FFF7ED'),
+                self::card([
+                    self::text('Sidebar & Navigation Styling', 'title_medium', ['bold' => true]),
+                    self::text('Configure solid background or multi-color gradients for the navigation drawer.', 'body_small', ['color' => '#6b7280']),
+                    self::divider(),
+                    self::colorPicker('drawer_bg', 'Solid Background Color', $company->drawer_bg ?? '#1e293b'),
+                    self::toggleSwitch('drawer_gradient_enabled', 'Enable Gradient Background', (bool) ($company->drawer_gradient_enabled ?? false)),
+                    self::colorPicker('drawer_gradient_start', 'Gradient Start Color', $company->drawer_gradient_start ?? ($company->drawer_bg ?? '#1e293b')),
+                    self::colorPicker('drawer_gradient_end', 'Gradient End Color', $company->drawer_gradient_end ?? '#0f172a'),
+                    self::dropdownSelect('drawer_gradient_direction', 'Gradient Direction / Style', [
+                        ['label' => 'Linear Top-to-Bottom', 'value' => 'top_to_bottom'],
+                        ['label' => 'Linear Diagonal', 'value' => 'diagonal'],
+                        ['label' => 'Radial', 'value' => 'radial'],
+                    ], $company->drawer_gradient_direction ?? 'top_to_bottom'),
+                ], ['color' => '#f8fafc', 'border_color' => '#e2e8f0']),
             ]),
             self::buttonPrimary('Save Store Profile', self::formSubmitAction(
                 '/api/tenant/settings/profile',
@@ -658,6 +673,7 @@ class SchemaResponse
                 'webhook_url', 'ai_catalog_enrichment', 'ai_receipt_ocr',
                 'webhook_platform', 'webhook_hmac_secret',
                 'outbound_webhook_url', 'outbound_webhook_secret', 'outbound_events',
+                'integration_default_locale', 'integration_multilingual_payloads',
             ])
             ->pluck('value', 'key');
 
@@ -671,6 +687,22 @@ class SchemaResponse
                 self::text('Connect external ERPs, Shopify, WooCommerce, and mobile apps securely.', 'body_small', ['color' => '#6b7280']),
                 self::divider(),
                 self::text('Active Token Status: ENABLED', 'label_medium', ['bold' => true, 'color' => '#16a34a']),
+            ]),
+            self::card([
+                self::text('Integration Language & Localization', 'title_medium', ['bold' => true]),
+                self::text('Configure language defaults and multilingual serialization for external webhooks, SMS/WhatsApp receipts, and API payloads.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::dropdownSelect('integration_default_locale', 'Default Communication Language', [
+                    ['label' => 'English (en)', 'value' => 'en'],
+                    ['label' => 'Hindi (hi)', 'value' => 'hi'],
+                    ['label' => 'Spanish (es)', 'value' => 'es'],
+                    ['label' => 'Arabic (ar)', 'value' => 'ar'],
+                    ['label' => 'French (fr)', 'value' => 'fr'],
+                    ['label' => 'German (de)', 'value' => 'de'],
+                    ['label' => 'Portuguese (pt)', 'value' => 'pt'],
+                    ['label' => 'Chinese (zh)', 'value' => 'zh'],
+                ], $configuration->get('integration_default_locale', 'en')),
+                self::toggleSwitch('integration_multilingual_payloads', 'Multi-Language Webhook Payloads', filter_var($configuration->get('integration_multilingual_payloads', false), FILTER_VALIDATE_BOOL)),
             ]),
             self::card([
                 self::text('E-Commerce Inbound Webhooks (Shopify / WooCommerce)', 'title_medium', ['bold' => true]),
@@ -725,14 +757,37 @@ class SchemaResponse
         $menuStructure = TenantNavRegistry::menuStructureForMode($activeMode);
         $navConfig = $company->normalizedNavConfig();
 
+        // Ensure default items exist if tenant customizations are missing
+        if (empty($navConfig['items'])) {
+            $defaultItems = [];
+            $order = 0;
+            foreach ($menuStructure as $section) {
+                foreach ($section['items'] ?? [] as $item) {
+                    $defaultItems[] = [
+                        'key' => $item['key'],
+                        'section' => $section['key'],
+                        'label' => $item['label'] ?? $item['title'] ?? $item['key'],
+                        'parent' => $item['parent'] ?? null,
+                        'parent_id' => $item['parent'] ?? null,
+                        'level' => ! empty($item['parent']) ? 1 : 0,
+                        'order' => $order++,
+                        'visible' => true,
+                    ];
+                }
+            }
+            $navConfig['items'] = $defaultItems;
+        }
+
         return self::screen('Navigation Menu Customization', [
             [
-                'type' => 'navigation_builder',
+                'type' => 'tree_builder',
                 'title' => 'Menu Hierarchy & Arrangement',
                 'description' => 'Drag and drop items to re-order, indent right (+30px) to nest under previous item, drag left to outdent.',
                 'active_mode' => $activeMode,
                 'menu_structure' => $menuStructure,
+                'sections' => $menuStructure,
                 'nav_config' => $navConfig,
+                'items' => $navConfig['items'] ?? [],
             ],
             self::card([
                 self::text('Server-Driven Navigation Structure', 'title_medium', ['bold' => true]),

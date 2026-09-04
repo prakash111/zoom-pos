@@ -110,6 +110,8 @@ class SduiViewController extends Controller
                     'event_stock_low_alert' => ['nullable', 'boolean'],
                     'ai_catalog_enrichment' => ['nullable', 'boolean'],
                     'ai_receipt_ocr' => ['nullable', 'boolean'],
+                    'integration_default_locale' => ['nullable', 'string', 'max:10'],
+                    'integration_multilingual_payloads' => ['nullable', 'boolean'],
                 ]);
                 if ($validator->fails()) {
                     return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
