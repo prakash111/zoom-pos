@@ -155,6 +155,9 @@ class BootstrapCache extends ChangeNotifier {
     if (menuStructure.isNotEmpty) {
       return menuStructure;
     }
+    if (isNavigationLoading) {
+      return const [];
+    }
     return _defaultFallbackSections();
   }
 
@@ -331,6 +334,8 @@ class BootstrapCache extends ChangeNotifier {
       final menuPayload = response.containsKey('menu_structure')
           ? response['menu_structure']
           : response['navigation'] ?? response['sections'];
+      debugPrint(
+          'Bootstrap raw menu payload: ${menuPayload != null ? (menuPayload is List ? "${(menuPayload as List).length} sections" : menuPayload.runtimeType) : "null"}');
       final parsedMenu = _parseMenuStructure(
         menuPayload,
         source: 'server bootstrap',
@@ -343,8 +348,16 @@ class BootstrapCache extends ChangeNotifier {
           jsonEncode(menuStructure.map((s) => s.toJson()).toList()),
         );
       } else if (menuStructure.isEmpty) {
-        _navigationError =
-            'The server returned no valid navigation sections. Please retry.';
+        final fallback = _defaultFallbackSections();
+        if (fallback.isNotEmpty) {
+          menuStructure = fallback;
+          _navigationError = null;
+          debugPrint(
+              'Bootstrap: server returned empty menu; populated baseline fallback sections.');
+        } else {
+          _navigationError =
+              'The server returned no valid navigation sections. Please retry.';
+        }
       }
 
       if (response['ui_schema'] is Map) {
@@ -544,5 +557,55 @@ class BootstrapCache extends ChangeNotifier {
     debugPrintStack(stackTrace: stackTrace);
   }
 
-  List<SduiNavSectionSchema> _defaultFallbackSections() => const [];
+  List<SduiNavSectionSchema> _defaultFallbackSections() => const [
+        SduiNavSectionSchema(
+          key: 'cashier_sales',
+          title: 'Cashier & Sales',
+          color: '#1d4ed8',
+          items: [
+            SduiNavItemSchema(
+              key: 'pos',
+              title: 'Point of Sale',
+              icon: 'point_of_sale',
+              component: 'pos',
+              permission: 'pos',
+            ),
+            SduiNavItemSchema(
+              key: 'sales',
+              title: 'Sales & Invoices',
+              icon: 'receipt_long',
+              component: 'sales',
+              permission: 'sales',
+            ),
+          ],
+        ),
+        SduiNavSectionSchema(
+          key: 'products_inventory',
+          title: 'Products & Inventory',
+          color: '#b45309',
+          items: [
+            SduiNavItemSchema(
+              key: 'inventory',
+              title: 'All Products',
+              icon: 'inventory_2',
+              component: 'inventory',
+              permission: 'products',
+            ),
+          ],
+        ),
+        SduiNavSectionSchema(
+          key: 'administration',
+          title: 'Administration & Settings',
+          color: '#475569',
+          items: [
+            SduiNavItemSchema(
+              key: 'settings',
+              title: 'Store Settings',
+              icon: 'settings',
+              component: 'settings',
+              permission: 'settings',
+            ),
+          ],
+        ),
+      ];
 }

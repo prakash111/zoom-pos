@@ -436,5 +436,40 @@ void main() {
       expect(cache.effectiveSections.single.key, 'operations');
       expect(cache.effectiveSections.single.items.single.key, 'pos');
     });
+
+    test('accepts id and title interoperably for key and label', () {
+      final section = SduiNavSectionSchema.fromJson({
+        'id': 'cashier_pos',
+        'title': 'Cashier & POS',
+        'color': '#1d4ed8',
+        'items': [
+          {
+            'id': 'pos_terminal',
+            'title': 'Point of Sale',
+            'icon': 'point_of_sale',
+          },
+        ],
+      });
+
+      expect(section.key, 'cashier_pos');
+      expect(section.title, 'Cashier & POS');
+      expect(section.items.first.key, 'pos_terminal');
+      expect(section.items.first.title, 'Point of Sale');
+    });
+
+    test('effectiveSections falls back to baseline sections when hydrated cache is empty', () async {
+      SharedPreferences.setMockInitialValues({
+        'zoom_pos.bootstrap.menu': jsonEncode([]),
+      });
+
+      final cache = BootstrapCache.instance;
+      cache.menuStructure = [];
+      await cache.loadFromDisk();
+
+      expect(cache.isNavigationLoading, isFalse);
+      expect(cache.effectiveSections, isNotEmpty);
+      expect(cache.effectiveSections.first.key, 'cashier_sales');
+      expect(cache.effectiveSections.first.items.first.key, 'pos');
+    });
   });
 }

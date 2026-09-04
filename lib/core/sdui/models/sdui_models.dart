@@ -179,11 +179,18 @@ class SduiNavItemSchema {
           'Bootstrap navigation: expected children to be a list for ${json['key'] ?? '(unknown)'}, got ${rawChildren.runtimeType}.');
     }
 
+    final rawKey = json['key']?.toString() ?? json['id']?.toString() ?? '';
+    final rawTitle = json['label']?.toString() ?? json['title']?.toString() ?? '';
+    final key = rawKey.isNotEmpty
+        ? rawKey
+        : (json['component']?.toString() ??
+            rawTitle.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]+'), '_'));
+
     return SduiNavItemSchema(
-      key: json['key']?.toString() ?? '',
-      title: json['label']?.toString() ?? json['title']?.toString() ?? '',
+      key: key,
+      title: rawTitle.isNotEmpty ? rawTitle : key,
       icon: json['icon']?.toString() ?? 'widgets',
-      component: json['component']?.toString() ?? json['key']?.toString(),
+      component: json['component']?.toString() ?? (key.isNotEmpty ? key : null),
       permission: json['permission']?.toString(),
       parent: rawParent,
       parentId: rawParent,
@@ -197,7 +204,9 @@ class SduiNavItemSchema {
 
   Map<String, dynamic> toJson() => {
         'key': key,
+        'id': key,
         'title': title,
+        'label': title,
         'icon': icon,
         if (component != null) 'component': component,
         if (permission != null) 'permission': permission,
@@ -250,9 +259,15 @@ class SduiNavSectionSchema {
           'Bootstrap navigation: expected items to be a list for section ${json['key'] ?? '(unknown)'}, got ${rawItems.runtimeType}.');
     }
 
+    final rawKey = json['key']?.toString() ?? json['id']?.toString() ?? '';
+    final rawTitle = json['label']?.toString() ?? json['title']?.toString() ?? '';
+    final key = rawKey.isNotEmpty
+        ? rawKey
+        : rawTitle.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]+'), '_');
+
     return SduiNavSectionSchema(
-      key: json['key']?.toString() ?? '',
-      title: json['label']?.toString() ?? json['title']?.toString() ?? '',
+      key: key,
+      title: rawTitle.isNotEmpty ? rawTitle : key,
       color: json['color']?.toString() ?? json['header_color']?.toString(),
       items: parsedItems,
     );
@@ -260,7 +275,9 @@ class SduiNavSectionSchema {
 
   Map<String, dynamic> toJson() => {
         'key': key,
+        'id': key,
         'title': title,
+        'label': title,
         if (color != null) 'color': color,
         'items': items.map((i) => i.toJson()).toList(),
       };
