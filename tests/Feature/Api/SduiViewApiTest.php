@@ -398,4 +398,28 @@ class SduiViewApiTest extends TestCase
         $this->assertArrayHasKey('target_endpoint', $firstTab);
         $this->assertSame('/api/tenant/views/settings-mode', $firstTab['target_endpoint']);
     }
+
+    public function test_licensed_module_views_render_valid_sdui_screens(): void
+    {
+        $token = $this->token();
+        $endpoints = [
+            'restaurant-tables' => 'Floor Plan & Tables',
+            'restaurant-kds' => 'Kitchen Display (KDS)',
+            'pharmacy-batches' => 'Batch & Expiry Manager',
+            'pharmacy-prescriptions' => 'Prescriptions Queue',
+            'service-calendar' => 'Service Booking Calendar',
+            'service-stylists' => 'Stylists & Staff Assignments',
+        ];
+
+        foreach ($endpoints as $viewKey => $expectedTitle) {
+            $response = $this->withHeader('Authorization', 'Bearer '.$token)
+                ->getJson("/api/tenant/views/{$viewKey}");
+
+            $response->assertOk()
+                ->assertJsonPath('success', true)
+                ->assertJsonPath('schema.title', $expectedTitle)
+                ->assertJsonPath('schema.layout', 'scroll_view');
+        }
+    }
 }
+

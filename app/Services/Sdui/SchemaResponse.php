@@ -649,6 +649,108 @@ class SchemaResponse
         ]);
     }
 
+    public static function restaurantTablesView(Company $company): array
+    {
+        return self::screen('Floor Plan & Tables', [
+            self::card([
+                self::row([
+                    self::icon('table_restaurant', ['color' => '#4d7c0f', 'size' => 28]),
+                    self::column([
+                        self::text('Floor Plan & Table Management', 'title_medium', ['bold' => true]),
+                        self::text('Live dining tables, occupancy status, and active order tickets.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::badge('Restaurant Operations Active', '#4d7c0f', 'subtle'),
+            ]),
+        ]);
+    }
+
+    public static function restaurantKdsView(Company $company): array
+    {
+        return self::screen('Kitchen Display (KDS)', [
+            self::card([
+                self::row([
+                    self::icon('soup_kitchen', ['color' => '#0284c7', 'size' => 28]),
+                    self::column([
+                        self::text('Kitchen Display System (KDS)', 'title_medium', ['bold' => true]),
+                        self::text('Live preparation queue and kitchen order ticket dispatching.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::badge('KDS Queue Connected', '#0284c7', 'subtle'),
+            ]),
+        ]);
+    }
+
+    public static function pharmacyBatchesView(Company $company): array
+    {
+        return self::screen('Batch & Expiry Manager', [
+            self::card([
+                self::row([
+                    self::icon('medication', ['color' => '#059669', 'size' => 28]),
+                    self::column([
+                        self::text('Medicine Batches & Expiry Tracking', 'title_medium', ['bold' => true]),
+                        self::text('Track batch numbers, manufacturing dates, and upcoming expirations.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::badge('Pharmacy Management Active', '#059669', 'subtle'),
+            ]),
+        ]);
+    }
+
+    public static function pharmacyPrescriptionsView(Company $company): array
+    {
+        return self::screen('Prescriptions Queue', [
+            self::card([
+                self::row([
+                    self::icon('receipt_long', ['color' => '#059669', 'size' => 28]),
+                    self::column([
+                        self::text('Prescriptions & Patient Queue', 'title_medium', ['bold' => true]),
+                        self::text('Dispensed prescriptions, doctor referrals, and patient records.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::badge('Prescriptions Live', '#059669', 'subtle'),
+            ]),
+        ]);
+    }
+
+    public static function serviceCalendarView(Company $company): array
+    {
+        return self::screen('Service Booking Calendar', [
+            self::card([
+                self::row([
+                    self::icon('event_available', ['color' => '#7c3aed', 'size' => 28]),
+                    self::column([
+                        self::text('Service Appointments Calendar', 'title_medium', ['bold' => true]),
+                        self::text('Schedule appointments, view booking slots, and manage reservations.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::badge('Bookings Active', '#7c3aed', 'subtle'),
+            ]),
+        ]);
+    }
+
+    public static function serviceStylistsView(Company $company): array
+    {
+        return self::screen('Stylists & Staff Assignments', [
+            self::card([
+                self::row([
+                    self::icon('badge', ['color' => '#7c3aed', 'size' => 28]),
+                    self::column([
+                        self::text('Specialists, Stylists & Staff Roster', 'title_medium', ['bold' => true]),
+                        self::text('Assign service providers, track availability, and manage commission tiers.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::badge('Staff Roster Connected', '#7c3aed', 'subtle'),
+            ]),
+        ]);
+    }
+
     public static function receiptsView(Company $company): array
     {
         return self::screen('Receipt Prefixes & Bank Terms', [
@@ -906,7 +1008,7 @@ class SchemaResponse
      */
     private static function effectiveNavigationBuilderData(Company $company, string $activeMode): array
     {
-        $catalog = TenantNavRegistry::menuStructureForMode($activeMode);
+        $catalog = TenantNavRegistry::getEffectiveNavForTenant($company);
         if ($catalog === []) {
             $catalog = TenantNavRegistry::menuStructureForMode('retail');
         }
@@ -1257,6 +1359,26 @@ class SchemaResponse
             return 'settings.view';
         }
 
+        if (in_array($normalized, ['restaurant-tables', 'restaurant-kds', 'restaurant-pos'], true)) {
+            return 'pos.view';
+        }
+
+        if (in_array($normalized, ['pharmacy-batches'], true)) {
+            return 'products.view';
+        }
+
+        if (in_array($normalized, ['pharmacy-prescriptions'], true)) {
+            return 'sales.view';
+        }
+
+        if (in_array($normalized, ['service-calendar'], true)) {
+            return 'service_orders.view';
+        }
+
+        if (in_array($normalized, ['service-stylists'], true)) {
+            return 'users.view';
+        }
+
         return 'pos.view';
     }
 
@@ -1318,6 +1440,12 @@ class SchemaResponse
             'settings-navigation', 'navigation', 'navigation-menu' => self::navigationView($company),
             'settings-notifications', 'notifications', 'custom-notifications' => self::notificationsView($company),
             'settings-advanced', 'advanced', 'danger-zone' => self::advancedView($company),
+            'restaurant-tables', 'tables', 'floor-plan' => self::restaurantTablesView($company),
+            'restaurant-kds', 'kds', 'kitchen-display' => self::restaurantKdsView($company),
+            'pharmacy-batches', 'batches' => self::pharmacyBatchesView($company),
+            'pharmacy-prescriptions', 'prescriptions' => self::pharmacyPrescriptionsView($company),
+            'service-calendar', 'calendar' => self::serviceCalendarView($company),
+            'service-stylists', 'stylists' => self::serviceStylistsView($company),
             default => null,
         };
 

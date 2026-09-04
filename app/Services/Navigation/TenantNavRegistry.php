@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\Log;
 class TenantNavRegistry
 {
     /**
-     * Return guaranteed non-empty navigation sections for a tenant or mode.
+     * Return guaranteed non-empty navigation sections for a tenant or mode,
+     * including injected sections for all licensed business modules.
      *
      * @param  \App\Models\Company|string|null  $companyOrMode
      * @return list<array<string, mixed>>
@@ -23,25 +24,269 @@ class TenantNavRegistry
     {
         if ($companyOrMode instanceof Company) {
             $mode = ModuleRegistry::resolveActiveMode($companyOrMode);
+            $licensedRaw = $companyOrMode->licensed_modules;
+            if (empty($licensedRaw)) {
+                $licensedRaw = ModuleRegistry::availableModes($companyOrMode);
+            }
         } elseif (is_string($companyOrMode) && trim($companyOrMode) !== '') {
             $mode = trim($companyOrMode);
+            $licensedRaw = [$mode];
         } else {
             $mode = 'retail';
+            $licensedRaw = ['retail'];
         }
 
-        $mode = strtolower(trim($mode));
-        $mode = match ($mode) {
+        $primaryMode = strtolower(trim($mode));
+        $primaryMode = match ($primaryMode) {
             'general', 'general_retail' => 'retail',
             'food_restaurant' => 'restaurant',
-            default => $mode,
+            default => $primaryMode,
         };
 
-        $sections = self::sectionsFor($mode);
-        if (empty($sections)) {
-            $sections = array_values(array_map([self::class, 'normalizeSection'], self::retailSections()));
+        // 1. Core modules / Primary Mode
+        $primarySections = self::sectionsFor($primaryMode);
+        if (empty($primarySections)) {
+            $primarySections = array_values(array_map([self::class, 'normalizeSection'], self::retailSections()));
         }
 
-        return $sections;
+        // Separate out administration section so it always docks at the bottom
+        $sections = [];
+        foreach ($primarySections as $sec) {
+            $secKey = trim((string) ($sec['key'] ?? $sec['id'] ?? ''));
+            if ($secKey !== 'administration') {
+                $sections[] = self::normalizeSection($sec);
+            }
+        }
+
+        // 2. Normalize licensed modules list
+        $licensedModules = [];
+        foreach ((array) $licensedRaw as $item) {
+            if (is_string($item)) {
+                $norm = strtolower(trim($item));
+                $norm = match ($norm) {
+                    'general', 'general_retail' => 'retail',
+                    'food_restaurant' => 'restaurant',
+                    default => $norm,
+                };
+                if ($norm !== '') {
+                    $licensedModules[] = $norm;
+                }
+            }
+        }
+        if ($companyOrMode instanceof Company && $companyOrMode->restaurant_mode_locked) {
+            $licensedModules = array_values(array_diff($licensedModules, ['restaurant']));
+        }
+        $licensedModules = array_values(array_unique($licensedModules));
+
+        // 3. Inject Additional Licensed Module Sections
+        $existingKeys = array_column($sections, 'key');
+        foreach ($licensedModules as $module) {
+            if (strtolower($module) === $primaryMode) {
+                continue; // already added in primary mode
+            }
+
+            $moduleSection = self::menuStructureForModule(strtolower($module));
+            if (! empty($moduleSection)) {
+                if (isset($moduleSection['key'])) {
+                    if (! in_array($moduleSection['key'], $existingKeys, true)) {
+                        $sections[] = self::normalizeSection($moduleSection);
+                        $existingKeys[] = $moduleSection['key'];
+                    }
+                } else {
+                    foreach ($moduleSection as $subSec) {
+                        if (is_array($subSec)) {
+                            $subKey = trim((string) ($subSec['key'] ?? $subSec['id'] ?? ''));
+                            if ($subKey !== '' && $subKey !== 'administration' && ! in_array($subKey, $existingKeys, true)) {
+                                $sections[] = self::normalizeSection($subSec);
+                                $existingKeys[] = $subKey;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Append Common Settings & Administration at the bottom
+        $sections[] = self::getAdministrationSection();
+
+        return array_values($sections);
+    }
+
+    /**
+     * Return enriched navigation section for an individual licensed module.
+     *
+     * @param  string  $module
+     * @return array<string, mixed>|null
+     */
+    public static function menuStructureForModule(string $module): ?array
+    {
+        $mod = strtolower(trim($module));
+        $mod = match ($mod) {
+            'general', 'general_retail' => 'retail',
+            'food_restaurant' => 'restaurant',
+            default => $mod,
+        };
+
+        // Check if database SDUI module defines custom navigation
+        $dbModule = ModuleRegistry::find($mod);
+        $navigation = $dbModule['navigation'] ?? null;
+        if (is_array($navigation) && $navigation !== []) {
+            $validated = self::validatedCustomNavigation($navigation);
+            if (! empty($validated)) {
+                foreach ($validated as $sec) {
+                    $secKey = trim((string) ($sec['key'] ?? $sec['id'] ?? ''));
+                    if ($secKey !== 'administration') {
+                        return self::normalizeSection($sec);
+                    }
+                }
+            }
+        }
+
+        $section = match ($mod) {
+            'restaurant' => [
+                'key' => 'restaurant_operations',
+                'id' => 'restaurant_operations',
+                'label' => 'Restaurant Operations',
+                'title' => 'Restaurant Operations',
+                'color' => '#4d7c0f',
+                'items' => [
+                    [
+                        'key' => 'floor_plan',
+                        'label' => 'Floor Plan & Tables',
+                        'title' => 'Floor Plan & Tables',
+                        'icon' => 'table_restaurant',
+                        'component' => 'floor_plan',
+                        'permission' => 'pos',
+                        'target_endpoint' => '/api/tenant/views/restaurant-tables',
+                    ],
+                    [
+                        'key' => 'kitchen_display',
+                        'label' => 'Kitchen Display (KDS)',
+                        'title' => 'Kitchen Display (KDS)',
+                        'icon' => 'soup_kitchen',
+                        'component' => 'kitchen_display',
+                        'permission' => 'pos',
+                        'target_endpoint' => '/api/tenant/views/restaurant-kds',
+                    ],
+                    [
+                        'key' => 'dining_history',
+                        'label' => 'KOT History',
+                        'title' => 'KOT History',
+                        'icon' => 'receipt_long',
+                        'component' => 'sales',
+                        'permission' => 'sales',
+                        'target_endpoint' => '/api/tenant/views/dining-history',
+                    ],
+                    [
+                        'key' => 'restaurant_pos',
+                        'label' => 'Restaurant POS Terminal',
+                        'title' => 'Restaurant POS Terminal',
+                        'icon' => 'restaurant',
+                        'component' => 'restaurant_pos',
+                        'permission' => 'pos',
+                        'target_endpoint' => '/api/tenant/views/restaurant-pos',
+                    ],
+                ],
+            ],
+            'pharmacy' => [
+                'key' => 'pharmacy_management',
+                'id' => 'pharmacy_management',
+                'label' => 'Pharmacy Management',
+                'title' => 'Pharmacy Management',
+                'color' => '#059669',
+                'items' => [
+                    [
+                        'key' => 'pharmacy_batches',
+                        'label' => 'Batch & Expiry Manager',
+                        'title' => 'Batch & Expiry Manager',
+                        'icon' => 'medication',
+                        'component' => 'pharmacy_batches',
+                        'permission' => 'products',
+                        'target_endpoint' => '/api/tenant/views/pharmacy-batches',
+                    ],
+                    [
+                        'key' => 'pharmacy_prescriptions',
+                        'label' => 'Prescriptions Queue',
+                        'title' => 'Prescriptions Queue',
+                        'icon' => 'receipt_long',
+                        'component' => 'pharmacy_prescriptions',
+                        'permission' => 'sales',
+                        'target_endpoint' => '/api/tenant/views/pharmacy-prescriptions',
+                    ],
+                    [
+                        'key' => 'pharmacy_pos',
+                        'label' => 'Pharmacy Counter POS',
+                        'title' => 'Pharmacy Counter POS',
+                        'icon' => 'local_pharmacy',
+                        'component' => 'pos',
+                        'permission' => 'pos',
+                        'target_endpoint' => '/api/tenant/views/pos',
+                    ],
+                ],
+            ],
+            'service_booking' => [
+                'key' => 'salon_bookings',
+                'id' => 'salon_bookings',
+                'label' => 'Salon & Bookings',
+                'title' => 'Salon & Bookings',
+                'color' => '#7c3aed',
+                'items' => [
+                    [
+                        'key' => 'service_calendar',
+                        'label' => 'Service Booking Calendar',
+                        'title' => 'Service Booking Calendar',
+                        'icon' => 'event_available',
+                        'component' => 'service_calendar',
+                        'permission' => 'service_orders',
+                        'target_endpoint' => '/api/tenant/views/service-calendar',
+                    ],
+                    [
+                        'key' => 'service_stylists',
+                        'label' => 'Stylists & Staff Assignments',
+                        'title' => 'Stylists & Staff Assignments',
+                        'icon' => 'badge',
+                        'component' => 'staff',
+                        'permission' => 'users',
+                        'target_endpoint' => '/api/tenant/views/service-stylists',
+                    ],
+                    [
+                        'key' => 'service_orders',
+                        'label' => 'Appointments & Bookings',
+                        'title' => 'Appointments & Bookings',
+                        'icon' => 'spa',
+                        'component' => 'service_orders',
+                        'permission' => 'service_orders',
+                        'target_endpoint' => '/api/tenant/views/service-orders',
+                    ],
+                ],
+            ],
+            'retail' => [
+                'key' => 'cashier_sales',
+                'id' => 'cashier_sales',
+                'label' => 'Cashier & Sales',
+                'title' => 'Cashier & Sales',
+                'color' => '#1d4ed8',
+                'items' => [
+                    ['key' => 'pos', 'label' => 'Point of Sale', 'title' => 'Point of Sale', 'icon' => 'point_of_sale', 'component' => 'pos', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/pos'],
+                    ['key' => 'sales', 'label' => 'Sales & Invoices', 'title' => 'Sales & Invoices', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales', 'target_endpoint' => '/api/tenant/views/sales'],
+                    ['key' => 'quotations', 'label' => 'Quotations & Proposals', 'title' => 'Quotations & Proposals', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes', 'target_endpoint' => '/api/tenant/views/quotations'],
+                    ['key' => 'customers', 'label' => 'Customers & CRM', 'title' => 'Customers & CRM', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'target_endpoint' => '/api/tenant/views/customers'],
+                ],
+            ],
+            default => null,
+        };
+
+        return $section !== null ? self::normalizeSection($section) : null;
+    }
+
+    /**
+     * Return normalized common administration section.
+     *
+     * @return array<string, mixed>
+     */
+    public static function getAdministrationSection(): array
+    {
+        return self::normalizeSection(self::administrationSection());
     }
 
     /**
