@@ -18,6 +18,7 @@ class SduiModule extends Model
         'features',
         'routes',
         'navigation',
+        'translation_keys',
         'is_active',
         'registration_allowed',
         'sort_order',
@@ -29,6 +30,7 @@ class SduiModule extends Model
             'features' => 'array',
             'routes' => 'array',
             'navigation' => 'array',
+            'translation_keys' => 'array',
             'is_active' => 'boolean',
             'registration_allowed' => 'boolean',
             'sort_order' => 'integer',
@@ -54,6 +56,17 @@ class SduiModule extends Model
 
                 self::validateNavigationItems($section['items'], "navigation.{$sectionIndex}.items");
             }
+        });
+
+        static::saved(function (SduiModule $module): void {
+            $strings = $module->translation_keys ?? [];
+            $strings[$module->name] ??= $module->name;
+            if (filled($module->description)) {
+                $strings[$module->description] ??= $module->description;
+            }
+
+            app(\App\Services\Localization\LocalizationService::class)
+                ->registerModuleTranslations($module->slug, $strings);
         });
     }
 

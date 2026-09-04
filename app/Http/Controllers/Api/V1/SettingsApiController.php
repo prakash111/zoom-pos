@@ -31,6 +31,7 @@ class SettingsApiController extends Controller
             'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
             'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
             'profile' => $this->presentProfile($company),
+            'branding' => $company->getThemeTokens(),
             'receipts' => $this->presentReceipts($company),
             'financial' => $this->presentFinancial($company),
             'payment_methods' => $this->paymentMethods($company),
@@ -74,13 +75,6 @@ class SettingsApiController extends Controller
             'timezone' => ['nullable', 'string', 'max:64', 'timezone'],
             'language' => ['nullable', 'string', 'max:10'],
             'default_locale' => ['nullable', 'string', 'max:10'],
-            'primary_color' => ['nullable', 'string', 'max:16'],
-            'accent_color' => ['nullable', 'string', 'max:16'],
-            'drawer_bg' => ['nullable', 'string', 'max:16'],
-            'drawer_gradient_enabled' => ['nullable', 'boolean'],
-            'drawer_gradient_start' => ['nullable', 'string', 'max:16'],
-            'drawer_gradient_end' => ['nullable', 'string', 'max:16'],
-            'drawer_gradient_direction' => ['nullable', 'string', 'in:top_to_bottom,diagonal,radial'],
             'default_commission_rate' => ['nullable', 'numeric', 'min:0'],
             'default_commission_type' => ['nullable', 'string', 'in:percentage,fixed'],
         ]);
@@ -115,6 +109,39 @@ class SettingsApiController extends Controller
         AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'profile']);
 
         return response()->json(['success' => true, 'message' => 'Profile saved.', 'profile' => $this->presentProfile($company->fresh())]);
+    }
+
+    public function updateBranding(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+        $validator = Validator::make($request->all(), [
+            'primary_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'accent_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'drawer_bg' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'drawer_gradient_enabled' => ['required', 'boolean'],
+            'drawer_gradient_start' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'drawer_gradient_end' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'drawer_gradient_direction' => ['required', 'string', 'in:top_to_bottom,diagonal,radial'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $company->update($validator->validated());
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'branding']);
+        $theme = $company->fresh()->getThemeTokens();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Branding and colors updated successfully.',
+            'theme' => $theme,
+        ]);
     }
 
     /**
@@ -549,9 +576,6 @@ class SettingsApiController extends Controller
             'timezone' => $company->timezone ?? '',
             'resolved_timezone' => $company->resolveTimezone(),
             'default_timezone_for_country' => \App\Models\Company::defaultTimezoneForCountry($company->country),
-            'primary_color' => $company->primary_color ?: '#4F46E5',
-            'accent_color' => $company->accent_color ?: '#D97706',
-            'drawer_bg' => $company->drawer_bg ?: '#FFF7ED',
             'logo_url' => $company->getLogoUrl(),
             'favicon_url' => $company->getFaviconUrl(),
             'drawer_cover_url' => $company->getDrawerCoverUrl(),

@@ -49,6 +49,8 @@ class AppBootstrapController extends Controller
         $activeModule = ModuleRegistry::getModule($activeMode);
         $menuStructure = TenantNavRegistry::getEffectiveNavForTenant($company);
 
+        $translationVersion = $localization->translationVersion($locale, $company->id);
+
         return response()->json([
             'success' => true,
             'locale' => $locale,
@@ -80,6 +82,7 @@ class AppBootstrapController extends Controller
                 'action_pills' => ModuleRegistry::actionPillsSchema($company),
             ],
             'translations' => $localization->getMergedTranslations($locale, $company->id),
+            'translations_version' => $translationVersion,
             'nav' => $company->normalizedNavConfig(),
             'push' => PushNotificationSetting::current()->publicConfig(),
             'config' => [
@@ -103,7 +106,7 @@ class AppBootstrapController extends Controller
             ],
             // Reserved for tenant-wide status/announcement banners.
             'messages' => [],
-        ]);
+        ])->header('ETag', '"'.$translationVersion.'"');
     }
 
     /**

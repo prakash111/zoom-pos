@@ -63,7 +63,7 @@ class NavigationMenuBuilderTest extends TestCase
                 $rootKeys = collect($administration['items'])->pluck('key')->all();
 
                 return $childKeys === [
-                    'settings_mode', 'settings_profile', 'settings_receipts', 'settings_financial',
+                    'settings_mode', 'settings_profile', 'settings_branding', 'settings_receipts', 'settings_financial',
                     'settings_taxes', 'settings_api', 'settings_navigation',
                 ] && ! in_array('settings_mode', $rootKeys, true);
             });

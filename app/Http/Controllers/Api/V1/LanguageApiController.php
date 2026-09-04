@@ -54,11 +54,45 @@ class LanguageApiController extends Controller
             return response()->json(['success' => false, 'error' => 'Unsupported locale.'], 404);
         }
 
+        $version = $localization->translationVersion($clean, $company->id);
+
         return response()->json([
             'success' => true,
             'locale' => $clean,
+            'version' => $version,
             'translations' => $localization->getMergedTranslations($clean, $company->id),
-        ]);
+        ])->header('ETag', '"'.$version.'"');
+    }
+
+    /**
+     * Version-aware language pack endpoint used by architecture-agnostic
+     * clients. GET /api/app/translations?lang=xx&version=sha256
+     */
+    public function appTranslations(Request $request, LocalizationService $localization): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $clean = strtolower(trim((string) $request->query('lang', $request->query('locale', ''))));
+        if ($clean === '') {
+            $clean = $company->default_locale ?: ($company->language ?: 'en');
+        }
+        if (! $localization->isValidLocale($clean)) {
+            return response()->json(['success' => false, 'error' => 'Unsupported locale.'], 404);
+        }
+
+        $version = $localization->translationVersion($clean, $company->id);
+        $clientVersion = trim((string) $request->query('version', ''));
+        $response = [
+            'success' => true,
+            'locale' => $clean,
+            'version' => $version,
+            'etag' => $version,
+            'not_modified' => $clientVersion !== '' && hash_equals($version, $clientVersion),
+        ];
+        if (! $response['not_modified']) {
+            $response['translations'] = $localization->getMergedTranslations($clean, $company->id);
+        }
+
+        return response()->json($response)->header('ETag', '"'.$version.'"');
     }
 
     public function setDefault(Request $request, LocalizationService $localization): JsonResponse

@@ -27,7 +27,7 @@ class SchemaResponse
         'container', 'card', 'scroll_view', 'grid_view', 'accordion_group',
         'accordion', 'column', 'row', 'tabs', 'text', 'image_network',
         'badge', 'icon', 'divider', 'text_input', 'dropdown_select',
-        'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker',
+        'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker', 'file_upload',
         'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
         'button_outlined', 'button_danger', 'fab', 'action_sheet_trigger', 'navigation_builder', 'tree_builder',
         'wrap',
@@ -35,7 +35,7 @@ class SchemaResponse
 
     public const INPUT_TYPES = [
         'text_input', 'dropdown_select', 'checkbox', 'toggle_switch',
-        'date_time_picker', 'color_picker', 'step_counter',
+        'date_time_picker', 'color_picker', 'file_upload', 'step_counter',
     ];
 
     public const ACTION_COMPONENT_TYPES = [
@@ -251,6 +251,26 @@ class SchemaResponse
             'label' => $label,
             'initial_value' => $initialValue,
             'presets' => ['#1d4ed8', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#8b5cf6', '#0284c7', '#0f766e'],
+            'custom_label' => 'Choose Custom Hex Color',
+            'hue_label' => 'Hue',
+            'saturation_label' => 'Saturation',
+            'brightness_label' => 'Brightness',
+            'cancel_label' => 'Cancel',
+            'apply_label' => 'Apply Color',
+        ], $props);
+    }
+
+    public static function fileUpload(string $name, string $label, ?string $currentUrl, string $uploadEndpoint, array $props = []): array
+    {
+        return array_merge([
+            'type' => 'file_upload',
+            'name' => $name,
+            'label' => $label,
+            'current_url' => $currentUrl,
+            'upload_endpoint' => $uploadEndpoint,
+            'field_name' => $name,
+            'select_label' => 'Choose File',
+            'remove_label' => 'Remove',
         ], $props);
     }
 
@@ -495,9 +515,35 @@ class SchemaResponse
         ]);
     }
 
+    public static function dashboardView(Company $company): array
+    {
+        $items = [];
+        foreach (TenantNavRegistry::getEffectiveNavForTenant($company) as $section) {
+            foreach ($section['items'] ?? [] as $item) {
+                if (! is_array($item) || ! empty($item['children'])) {
+                    continue;
+                }
+                $endpoint = (string) ($item['target_endpoint'] ?? '');
+                if ($endpoint === '') {
+                    continue;
+                }
+                $items[] = self::lineItemTile(
+                    (string) ($item['title'] ?? $item['label'] ?? $item['key'] ?? ''),
+                    '',
+                    (string) ($item['icon'] ?? 'widgets'),
+                    self::navigateAction($endpoint, 'dynamic_page', (string) ($item['title'] ?? $item['label'] ?? '')),
+                );
+            }
+        }
+
+        return self::screen($company->trade_name ?: $company->name, [
+            self::gridView($items, 2),
+        ]);
+    }
+
     public static function profileView(Company $company): array
     {
-        return self::screen('Store Profile & Branding', [
+        return self::screen('Store Profile', [
             self::card([
                 self::text('Store Identity', 'title_medium', ['bold' => true]),
                 self::text('Configure your business trade name, tax registration number, and address.', 'body_small', ['color' => '#6b7280']),
@@ -505,6 +551,11 @@ class SchemaResponse
                 self::textInput('name', 'Business Name', $company->name, ['required' => true]),
                 self::textInput('trade_name', 'Trading Name (DBA)', $company->trade_name),
                 self::textInput('tax_id', 'Tax ID / GSTIN / VAT', $company->tax_id),
+                self::fileUpload('logo', 'Store Logo', $company->getLogoUrl(), '/api/v1/pos/settings/profile/logo', [
+                    'delete_endpoint' => '/api/v1/pos/settings/profile/logo',
+                    'accept' => ['image/png', 'image/jpeg', 'image/webp'],
+                    'response_url_path' => 'logo_url',
+                ]),
                 self::textInput('email', 'Store Email', $company->email, ['keyboard_type' => 'email']),
                 self::textInput('phone', 'Store Phone', $company->phone, ['keyboard_type' => 'phone']),
                 self::textInput('website', 'Store Website', $company->website),
@@ -527,41 +578,55 @@ class SchemaResponse
                 ], $company->country ?? 'US'),
                 self::dropdownSelect('default_locale', 'Store Primary Language', \App\Services\Localization\PlatformRegionalService::languageOptions(), $company->default_locale ?: ($company->language ?: 'en')),
                 self::dropdownSelect('timezone', 'Store Timezone', \App\Services\Localization\PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone()),
-                self::colorPicker('primary_color', 'Primary Accent Color', $company->primary_color ?? '#4F46E5'),
-                self::colorPicker('accent_color', 'Secondary Accent Color', $company->accent_color ?? '#D97706'),
-                self::card([
-                    self::text('Sidebar & Navigation Styling', 'title_medium', ['bold' => true]),
-                    self::text('Configure solid background or multi-color gradients for the navigation drawer.', 'body_small', ['color' => '#6b7280']),
-                    self::divider(),
-                    self::colorPicker('drawer_bg', 'Sidebar / Drawer Background', $company->drawer_bg ?? '#1e293b'),
-                    self::toggleSwitch('drawer_gradient_enabled', 'Enable Gradient Background', (bool) ($company->drawer_gradient_enabled ?? false)),
-                    self::colorPicker('drawer_gradient_start', 'Gradient Start Color', $company->drawer_gradient_start ?? ($company->drawer_bg ?? '#1e293b')),
-                    self::colorPicker('drawer_gradient_end', 'Gradient End Color', $company->drawer_gradient_end ?? '#0f172a'),
-                    self::dropdownSelect('drawer_gradient_direction', 'Gradient Direction / Style', [
-                        ['label' => 'Linear Top-to-Bottom', 'value' => 'top_to_bottom'],
-                        ['label' => 'Linear Diagonal', 'value' => 'diagonal'],
-                        ['label' => 'Radial', 'value' => 'radial'],
-                    ], $company->drawer_gradient_direction ?? 'top_to_bottom'),
-                ], ['color' => '#f8fafc', 'border_color' => '#e2e8f0']),
-                self::card([
-                    self::text('Danger Zone & Demo Data', 'title_medium', ['bold' => true, 'color' => '#dc2626']),
-                    self::text('Purge auto-seeded demo products, categories, tables, and test invoices without altering your store branding or custom settings.', 'body_small', ['color' => '#6b7280']),
-                    self::divider(),
-                    self::buttonDanger('Clear Sample Demo Data', [
-                        'type' => 'form_submit',
-                        'endpoint' => '/api/tenant/demo-data',
-                        'method' => 'DELETE',
-                        'success_toast' => 'Sample demo data cleared successfully.',
-                        'confirm_message' => 'Are you sure you want to delete all sample demo items? Real products and settings will not be affected.',
-                        'reload' => true,
-                    ], 'delete_forever'),
-                ], ['color' => '#fef2f2', 'border_color' => '#fecaca']),
             ]),
             self::buttonPrimary('Save Store Profile', self::formSubmitAction(
                 '/api/tenant/settings/profile',
                 'POST',
                 'Store profile updated successfully'
             ), 'save'),
+            self::card([
+                self::text('Demo Data Reset', 'title_medium', ['bold' => true, 'color' => '#dc2626']),
+                self::text('Clear all auto-seeded sample products, categories, floor plans, and sample transactions. Your store profile and configuration will remain untouched.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::buttonDanger('Clear Sample Demo Data', [
+                    'type' => 'form_submit',
+                    'endpoint' => '/api/tenant/demo-data',
+                    'method' => 'DELETE',
+                    'success_toast' => 'Sample demo data cleared successfully.',
+                    'confirm_message' => 'Are you sure you want to delete all sample demo items? Real products and settings will not be affected.',
+                    'reload' => true,
+                ], 'delete_forever'),
+            ], ['color' => '#fef2f2', 'border_color' => '#fecaca']),
+        ]);
+    }
+
+    public static function brandingView(Company $company): array
+    {
+        return self::screen('Store Branding & Colors', [
+            self::card([
+                self::text('Accent Colors', 'title_medium', ['bold' => true]),
+                self::divider(),
+                self::colorPicker('primary_color', 'Primary Accent Color', $company->primary_color ?? '#4F46E5'),
+                self::colorPicker('accent_color', 'Secondary Accent Color', $company->accent_color ?? '#D97706'),
+            ]),
+            self::card([
+                self::text('Sidebar & Drawer Background', 'title_medium', ['bold' => true]),
+                self::divider(),
+                self::colorPicker('drawer_bg', 'Sidebar / Drawer Background', $company->drawer_bg ?? '#1e293b'),
+                self::toggleSwitch('drawer_gradient_enabled', 'Enable Gradient Background', (bool) ($company->drawer_gradient_enabled ?? false)),
+                self::colorPicker('drawer_gradient_start', 'Gradient Start Color', $company->drawer_gradient_start ?? ($company->drawer_bg ?? '#1e293b')),
+                self::colorPicker('drawer_gradient_end', 'Gradient End Color', $company->drawer_gradient_end ?? '#0f172a'),
+                self::dropdownSelect('drawer_gradient_direction', 'Gradient Direction', [
+                    ['label' => 'Linear Top-to-Bottom', 'value' => 'top_to_bottom'],
+                    ['label' => 'Linear Diagonal', 'value' => 'diagonal'],
+                    ['label' => 'Radial', 'value' => 'radial'],
+                ], $company->drawer_gradient_direction ?? 'top_to_bottom'),
+            ]),
+            self::buttonPrimary('Save Branding & Colors', self::formSubmitAction(
+                '/api/tenant/settings/branding',
+                'POST',
+                'Branding and colors updated successfully'
+            ), 'palette'),
         ]);
     }
 
@@ -815,8 +880,6 @@ class SchemaResponse
         return self::screen('Navigation Menu Customization', [
             [
                 'type' => 'tree_builder',
-                'title' => 'Menu Hierarchy & Arrangement',
-                'description' => 'Drag and drop items to re-order, indent right (+30px) to nest under previous item, drag left to outdent.',
                 'active_mode' => $activeMode,
                 'menu_structure' => $menuStructure,
                 'sections' => $menuStructure,
@@ -826,16 +889,6 @@ class SchemaResponse
                 'nav_config' => $navConfig,
                 'items' => $navConfig['items'] ?? [],
             ],
-            self::card([
-                self::text('Server-Driven Navigation Structure', 'title_medium', ['bold' => true]),
-                self::text('The mobile app updates its menu hierarchy dynamically based on this server schema.', 'body_small', ['color' => '#6b7280']),
-                self::divider(),
-                self::lineItemTile('Cashier & Sales', 'Point of Sale, Sales History, Quotes', 'point_of_sale'),
-                self::lineItemTile('Financial Management', 'Cash Register, Receivables, Payables, Reports', 'monetization_on'),
-                self::lineItemTile('Products & Inventory', 'All Products, Categories, Brands, Suppliers', 'inventory_2'),
-                self::lineItemTile('Administration & Settings', 'Store Settings (Expandable Accordion)', 'settings'),
-            ]),
-            self::text('Use the server navigation configuration to reorder or hide entries. Changes are reflected by the next bootstrap response.', 'body_small', ['color' => '#6b7280']),
         ]);
     }
 
@@ -1133,7 +1186,9 @@ class SchemaResponse
     {
         $screens = [
             ['key' => 'settings-mode', 'title' => 'Store Operating Mode', 'endpoint' => '/api/tenant/views/settings-mode', 'permission' => 'settings.view'],
-            ['key' => 'settings-profile', 'title' => 'Store Profile & Branding', 'endpoint' => '/api/tenant/views/settings-profile', 'permission' => 'settings.view'],
+            ['key' => 'dashboard', 'title' => 'Dashboard', 'endpoint' => '/api/tenant/views/dashboard', 'permission' => 'pos.view'],
+            ['key' => 'settings-profile', 'title' => 'Store Profile', 'endpoint' => '/api/tenant/views/settings-profile', 'permission' => 'settings.view'],
+            ['key' => 'settings-branding', 'title' => 'Store Branding & Colors', 'endpoint' => '/api/tenant/views/settings-branding', 'permission' => 'settings.view'],
             ['key' => 'settings-receipts', 'title' => 'Receipt Prefixes & Bank Terms', 'endpoint' => '/api/tenant/views/settings-receipts', 'permission' => 'settings.view'],
             ['key' => 'settings-financial', 'title' => 'Financial & Currency', 'endpoint' => '/api/tenant/views/settings-financial', 'permission' => 'settings.view'],
             ['key' => 'settings-localization', 'title' => 'Localization & Region', 'endpoint' => '/api/tenant/views/settings-localization', 'permission' => 'settings.view'],
@@ -1243,8 +1298,8 @@ class SchemaResponse
             // render its headings but has no rows to give the Flutter builder.
             if (in_array($normalized, ['settings-navigation', 'navigation', 'navigation-menu'], true)) {
                 $schema = self::hydrateStoredNavigationSchema($schema, $company);
-            } elseif (in_array($normalized, ['settings-profile', 'profile', 'branding'], true)) {
-                $schema = self::hydrateStoredProfileColorPickers($schema, $company);
+            } elseif (in_array($normalized, ['settings-branding', 'branding', 'settings-profile', 'profile'], true)) {
+                $schema = self::hydrateStoredBrandingColorPickers($schema, $company);
             }
 
             return self::schemaResponse($normalized, $schema);
@@ -1252,7 +1307,9 @@ class SchemaResponse
 
         $schema = match ($normalized) {
             'settings-mode', 'mode' => self::modeView($company),
-            'settings-profile', 'profile', 'branding' => self::profileView($company),
+            'dashboard' => self::dashboardView($company),
+            'settings-profile', 'profile' => self::profileView($company),
+            'settings-branding', 'branding' => self::brandingView($company),
             'settings-receipts', 'receipts' => self::receiptsView($company),
             'settings-financial', 'financial' => self::financialView($company),
             'settings-localization', 'localization' => self::localizationView($company),
@@ -1266,17 +1323,62 @@ class SchemaResponse
 
         if ($schema === null) {
             $module = ModuleRegistry::find($normalized);
-            if ($module === null || ! in_array($normalized, ModuleRegistry::availableModes($company), true)) {
+            if ($module !== null && in_array($normalized, ModuleRegistry::availableModes($company), true)) {
+                $schema = self::moduleView($normalized, $company);
+            } else {
+                $navItem = self::findNavigationItem($normalized, $company);
+                if ($navItem !== null) {
+                    // Existing destinations can be progressively replaced by
+                    // database-authored SduiScreen records. Until then, the
+                    // endpoint still returns a valid server-owned shell and
+                    // never asks Flutter to instantiate a vertical class.
+                    $schema = self::screen(
+                        (string) ($navItem['title'] ?? $navItem['label'] ?? $normalized),
+                        [],
+                    );
+                }
+            }
+
+            if ($schema === null) {
                 return response()->json([
                     'success' => false,
                     'error' => 'SDUI view not found.',
                 ], 404);
             }
-
-            $schema = self::moduleView($normalized, $company);
         }
 
         return self::schemaResponse($normalized, $schema);
+    }
+
+    private static function findNavigationItem(string $viewKey, Company $company): ?array
+    {
+        $needle = str_replace('-', '_', $viewKey);
+        $search = function (array $items) use (&$search, $needle): ?array {
+            foreach ($items as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                $key = str_replace('-', '_', (string) ($item['key'] ?? $item['id'] ?? ''));
+                if ($key === $needle) {
+                    return $item;
+                }
+                $found = $search(is_array($item['children'] ?? null) ? $item['children'] : []);
+                if ($found !== null) {
+                    return $found;
+                }
+            }
+
+            return null;
+        };
+
+        foreach (TenantNavRegistry::getEffectiveNavForTenant($company) as $section) {
+            $found = $search(is_array($section['items'] ?? null) ? $section['items'] : []);
+            if ($found !== null) {
+                return $found;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -1340,7 +1442,7 @@ class SchemaResponse
     /**
      * Upgrade legacy database-authored branding inputs to visual pickers.
      */
-    private static function hydrateStoredProfileColorPickers(array $schema, Company $company): array
+    private static function hydrateStoredBrandingColorPickers(array $schema, Company $company): array
     {
         $colors = [
             'primary_color' => ['Primary Accent Color', $company->primary_color ?? '#4F46E5'],

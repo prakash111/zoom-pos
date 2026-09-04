@@ -4,6 +4,7 @@ namespace App\Services\Localization;
 
 use App\Models\Company;
 use App\Models\Language;
+use App\Models\SystemTranslation;
 use App\Models\TenantTranslation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\App;
@@ -265,6 +266,18 @@ class LocalizationService
      */
     public function getLanguageFileContent(string $locale): array
     {
+        $clean = strtolower(trim($locale));
+        if (Schema::hasTable('system_translations')) {
+            $this->importLegacyCatalog($clean);
+
+            return SystemTranslation::query()
+                ->where('locale', $clean)
+                ->orderBy('key')
+                ->pluck('value', 'key')
+                ->map(fn ($value) => (string) $value)
+                ->all();
+        }
+
         $path = $this->getLanguageFilePath($locale);
 
         if (! File::exists($path)) {
@@ -291,6 +304,14 @@ class LocalizationService
      */
     public function saveLanguageFileContent(string $locale, array $translations): bool
     {
+        $clean = strtolower(trim($locale));
+        if (Schema::hasTable('system_translations')) {
+            $this->replaceSystemTranslations($clean, $translations);
+            $this->flushTranslator();
+
+            return true;
+        }
+
         $path = $this->getLanguageFilePath($locale);
         $dir = dirname($path);
 
@@ -320,6 +341,21 @@ class LocalizationService
 
         $locales = $locale ? [$locale] : Language::pluck('code')->toArray();
 
+        if (Schema::hasTable('system_translations')) {
+            foreach ($locales as $loc) {
+                $this->upsertSystemTranslation(
+                    strtolower(trim((string) $loc)),
+                    'core',
+                    $cleanKey,
+                    $value ?? $cleanKey,
+                    false,
+                );
+            }
+            $this->flushTranslator();
+
+            return;
+        }
+
         foreach ($locales as $loc) {
             $content = $this->getLanguageFileContent($loc);
             if (! array_key_exists($cleanKey, $content)) {
@@ -334,6 +370,13 @@ class LocalizationService
      */
     public function updateTranslationKey(string $locale, string $key, string $value): void
     {
+        if (Schema::hasTable('system_translations')) {
+            $this->upsertSystemTranslation(strtolower(trim($locale)), 'core', $key, $value, true);
+            $this->flushTranslator();
+
+            return;
+        }
+
         $content = $this->getLanguageFileContent($locale);
         $content[$key] = $value;
         $this->saveLanguageFileContent($locale, $content);
@@ -344,6 +387,16 @@ class LocalizationService
      */
     public function deleteTranslationKey(string $locale, string $key): void
     {
+        if (Schema::hasTable('system_translations')) {
+            SystemTranslation::query()
+                ->where('locale', strtolower(trim($locale)))
+                ->where('key', $key)
+                ->delete();
+            $this->flushTranslator();
+
+            return;
+        }
+
         $content = $this->getLanguageFileContent($locale);
         unset($content[$key]);
         $this->saveLanguageFileContent($locale, $content);
@@ -490,5 +543,134 @@ class LocalizationService
         $overrides = $this->getTenantTranslations($tenantId, $locale, $group);
 
         return array_merge($base, $overrides);
+    }
+
+    /**
+     * Stable cache version for a locale plus its tenant overlay.
+     */
+    public function translationVersion(string $locale, ?string $tenantId = null): string
+    {
+        $clean = strtolower(trim($locale));
+        $base = $this->getLanguageFileContent($clean);
+        $tenant = $tenantId ? $this->getTenantTranslations($tenantId, $clean) : [];
+
+        return hash('sha256', json_encode([$base, $tenant], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
+     * A module registers its UI keys once and they immediately become part of
+     * every language pack. Translators can replace the copied source value in
+     * the database without requiring a mobile release.
+     *
+     * @param  array<string, string>  $translations
+     */
+    public function registerModuleTranslations(string $module, array $translations): void
+    {
+        if (! Schema::hasTable('system_translations') || $translations === []) {
+            return;
+        }
+
+        $this->ensureDefaultLanguages();
+        $locales = Language::query()->where('is_active', true)->pluck('code')->all();
+        foreach ($locales as $locale) {
+            foreach ($translations as $key => $value) {
+                $cleanKey = trim((string) $key);
+                if ($cleanKey === '') {
+                    continue;
+                }
+                $this->upsertSystemTranslation(
+                    (string) $locale,
+                    $module,
+                    $cleanKey,
+                    (string) ($value ?: $cleanKey),
+                    false,
+                );
+            }
+        }
+        $this->flushTranslator();
+    }
+
+    private function importLegacyCatalog(string $locale): void
+    {
+        if (SystemTranslation::query()->where('locale', $locale)->exists()) {
+            return;
+        }
+
+        $path = $this->getLanguageFilePath($locale);
+        if (! File::exists($path)) {
+            return;
+        }
+
+        $decoded = json_decode(File::get($path), true);
+        if (! is_array($decoded) || $decoded === []) {
+            return;
+        }
+
+        $now = now();
+        foreach (array_chunk($decoded, 400, true) as $chunk) {
+            $rows = [];
+            foreach ($chunk as $key => $value) {
+                $rows[] = [
+                    'locale' => $locale,
+                    'module' => 'core',
+                    'key' => (string) $key,
+                    'value' => (string) $value,
+                    'version' => 1,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+            SystemTranslation::query()->insertOrIgnore($rows);
+        }
+    }
+
+    /** @param array<string, mixed> $translations */
+    private function replaceSystemTranslations(string $locale, array $translations): void
+    {
+        DB::transaction(function () use ($locale, $translations): void {
+            $keys = array_map('strval', array_keys($translations));
+            SystemTranslation::query()
+                ->where('locale', $locale)
+                ->when($keys !== [], fn ($query) => $query->whereNotIn('key', $keys))
+                ->when($keys === [], fn ($query) => $query)
+                ->delete();
+
+            foreach ($translations as $key => $value) {
+                $this->upsertSystemTranslation($locale, 'core', (string) $key, (string) $value, true);
+            }
+        });
+    }
+
+    private function upsertSystemTranslation(
+        string $locale,
+        string $module,
+        string $key,
+        string $value,
+        bool $overwrite,
+    ): void {
+        $existing = SystemTranslation::query()
+            ->where('locale', $locale)
+            ->where('key', $key)
+            ->first();
+
+        if ($existing === null) {
+            SystemTranslation::query()->create([
+                'locale' => $locale,
+                'module' => $module,
+                'key' => $key,
+                'value' => $value,
+                'version' => 1,
+            ]);
+
+            return;
+        }
+
+        if ($overwrite && ($existing->value !== $value || $existing->module !== $module)) {
+            $existing->update([
+                'module' => $module,
+                'value' => $value,
+                'version' => $existing->version + 1,
+            ]);
+        }
     }
 }

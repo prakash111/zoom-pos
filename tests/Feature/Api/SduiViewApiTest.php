@@ -145,7 +145,7 @@ class SduiViewApiTest extends TestCase
     public function test_profile_brand_colors_are_visual_color_picker_components(): void
     {
         $schema = $this->withHeader('Authorization', 'Bearer '.$this->token())
-            ->getJson('/api/tenant/views/settings-profile')
+            ->getJson('/api/tenant/views/settings-branding')
             ->assertOk()
             ->json('schema');
 
@@ -201,7 +201,7 @@ class SduiViewApiTest extends TestCase
     {
         $token = $this->token();
 
-        foreach (['mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'navigation'] as $panel) {
+        foreach (['mode', 'profile', 'branding', 'receipts', 'financial', 'taxes', 'api', 'navigation'] as $panel) {
             $this->withHeader('Authorization', 'Bearer '.$token)
                 ->getJson('/api/tenant/views/settings-'.$panel)
                 ->assertOk()

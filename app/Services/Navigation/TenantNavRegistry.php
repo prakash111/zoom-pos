@@ -164,6 +164,12 @@ class TenantNavRegistry
             $normalized['children'] = $children;
         }
 
+        $hasChildren = ! empty($normalized['children']);
+        if (! $hasChildren && empty($normalized['target_endpoint'])) {
+            $routeKey = str_replace('_', '-', $key);
+            $normalized['target_endpoint'] = '/api/tenant/views/'.$routeKey;
+        }
+
         return $normalized;
     }
 
@@ -480,12 +486,24 @@ class TenantNavRegistry
             ],
             [
                 'key' => 'settings_profile',
-                'label' => 'Store Profile & Branding',
-                'title' => 'Store Profile & Branding',
+                'label' => 'Store Profile',
+                'title' => 'Store Profile',
                 'icon' => 'storefront',
                 'component' => 'settings_profile',
                 'type' => 'link',
                 'target_endpoint' => '/api/tenant/views/settings-profile',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => 'settings',
+            ],
+            [
+                'key' => 'settings_branding',
+                'label' => 'Branding & Colors',
+                'title' => 'Store Branding & Colors',
+                'icon' => 'palette',
+                'component' => 'settings_branding',
+                'type' => 'link',
+                'target_endpoint' => '/api/tenant/views/settings-branding',
                 'parent' => 'settings',
                 'parent_id' => 'settings',
                 'permission' => 'settings',

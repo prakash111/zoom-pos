@@ -65,6 +65,7 @@ Route::post('/integrations/webhooks/{tenant_uuid}/orders', [EcommerceWebhookCont
 // Server-Driven UI Bootstrap, View Schemas, and Form Action Routes
 Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
+    Route::get('/app/translations', [LanguageApiController::class, 'appTranslations']);
     Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
 
     // Server-Driven UI Dynamic Schema Views
@@ -238,6 +239,7 @@ Route::prefix('v1/pos')->group(function () {
         // Settings: Profile / Receipts / Financial / Payment Methods
         Route::get('/settings', [SettingsApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
         Route::put('/settings/profile', [SettingsApiController::class, 'updateProfile'])->middleware('tenant.api.permission:settings,edit');
+        Route::put('/settings/branding', [SettingsApiController::class, 'updateBranding'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/profile/logo', [SettingsApiController::class, 'uploadLogo'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/settings/profile/logo', [SettingsApiController::class, 'removeLogo'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/profile/favicon', [SettingsApiController::class, 'uploadFavicon'])->middleware('tenant.api.permission:settings,edit');
