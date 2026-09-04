@@ -251,6 +251,49 @@ void main() {
       expect(registry.has('settings_navigation'), isTrue);
       expect(registry.has('navigation'), isTrue);
     });
+
+    test('resolves core navigation views to working screen builders', () {
+      final registry = SduiComponentRegistry.instance;
+      final coreViews = [
+        'pos',
+        'restaurant_pos',
+        'floor_plan',
+        'kitchen_display',
+        'sales',
+        'cash_register',
+        'quotations',
+        'consignments',
+        'service_orders',
+        'customers',
+        'due_receivables',
+        'payables',
+        'sales_targets',
+        'reports',
+        'analytics',
+        'inventory',
+        'categories',
+        'brands',
+        'units',
+        'suppliers',
+        'taxes',
+        'catalog',
+        'subscription',
+        'settings',
+        'navigation',
+        'languages',
+        'staff',
+        'devices',
+      ];
+
+      for (final viewKey in coreViews) {
+        expect(registry.has(viewKey), isTrue,
+            reason: 'View key $viewKey should be registered');
+        final builder = registry.resolve(viewKey,
+            targetEndpoint: '/api/tenant/views/$viewKey');
+        expect(builder, isNotNull,
+            reason: 'Builder for $viewKey should not be null');
+      }
+    });
   });
 
   group('SDUI Dynamic Widgets', () {

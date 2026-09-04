@@ -199,8 +199,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           : Text(l10n.signIn),
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(l10n.noStoreYetPrompt),
                         TextButton(

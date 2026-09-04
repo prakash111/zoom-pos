@@ -1,32 +1,67 @@
 import 'package:flutter/material.dart';
 
-import '../core/services/dynamic_string_service.dart';
+import 'app_strings_ar.dart';
+import 'app_strings_de.dart';
+import 'app_strings_en.dart';
+import 'app_strings_es.dart';
+import 'app_strings_fr.dart';
+import 'app_strings_hi.dart';
+import 'app_strings_id.dart';
+import 'app_strings_it.dart';
+import 'app_strings_ja.dart';
+import 'app_strings_pt.dart';
+import 'app_strings_ru.dart';
+import 'app_strings_tr.dart';
+import 'app_strings_zh.dart';
+import 'translations_cache.dart';
 
-/// Compatibility facade for legacy widgets while they are phased out.
-/// Every value is resolved by [DynamicStringService]; this file contains no
-/// locale dictionary and is not registered by the production app.
+/// Small hand-written dictionaries (not Flutter's `.arb`/codegen pipeline —
+/// see the Phase 5 plan for why) for the highest-traffic screens:
+/// login/splash, dashboard chrome, POS, and Settings' Profile tab — kept
+/// intentionally minimal so the APK doesn't bundle every locale's full
+/// catalog. The full phrase catalog (including any tenant-specific
+/// overrides) is fetched on demand from the backend and cached to disk by
+/// [TranslationsCache]; a key found there always wins over the bundled
+/// dictionary. A key missing everywhere in the active locale falls back to
+/// English rather than crashing or showing a blank string.
 class AppLocalizations {
-  AppLocalizations(this.localeName);
+  AppLocalizations(this.localeName) : _strings = _stringsFor(localeName);
 
   final String localeName;
+  final Map<String, String> _strings;
+
+  static const _byLocale = <String, Map<String, String>>{
+    'en': kEnStrings,
+    'es': kEsStrings,
+    'fr': kFrStrings,
+    'de': kDeStrings,
+    'ar': kArStrings,
+    'hi': kHiStrings,
+    'pt': kPtStrings,
+    'it': kItStrings,
+    'zh': kZhStrings,
+    'ja': kJaStrings,
+    'ru': kRuStrings,
+    'id': kIdStrings,
+    'tr': kTrStrings,
+  };
+
+  static Map<String, String> _stringsFor(String localeName) => _byLocale[localeName] ?? kEnStrings;
 
   static AppLocalizations of(BuildContext context) {
     return Localizations.of<AppLocalizations>(context, AppLocalizations) ??
-        AppLocalizations(DynamicStringService.instance.locale);
+        AppLocalizations('en');
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate =
-      _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
-  String _s(String key) => DynamicStringService.instance.translate(key);
+  String _s(String key) =>
+      TranslationsCache.instance.forLocale(localeName)[key] ?? _strings[key] ?? kEnStrings[key] ?? key;
 
   /// Resolves any dynamic key delivered from the server payload,
-  /// checking only the runtime server dictionary. The optional fallback is
-  /// retained for source compatibility with deprecated screens.
-  String text(String key, {String? fallback}) {
-    final value = _s(key);
-    return value == key && fallback != null ? fallback : value;
-  }
+  /// checking server translation cache, bundled locale dictionary, and English fallback.
+  String text(String key, {String? fallback}) =>
+      TranslationsCache.instance.forLocale(localeName)[key] ?? _strings[key] ?? kEnStrings[key] ?? fallback ?? key;
 
   String s(String key, {String? fallback}) => text(key, fallback: fallback);
 
@@ -65,8 +100,7 @@ class AppLocalizations {
   String get avgOrder => _s('avgOrder');
   String get revenueTrend => _s('revenueTrend');
   String get topSelling => _s('topSelling');
-  String lowStockWarning(int count) =>
-      _format('lowStockWarning', {'n': '$count'});
+  String lowStockWarning(int count) => _format('lowStockWarning', {'n': '$count'});
 
   // Settings
   String get settingsTitle => _s('settingsTitle');
@@ -121,8 +155,7 @@ class AppLocalizations {
   String get syncing => _s('syncing');
   String get syncStatusTitle => _s('syncStatusTitle');
   String get syncNeverRun => _s('syncNeverRun');
-  String unsyncedSalesCount(int count) =>
-      _format('unsyncedSalesCount', {'n': '$count'});
+  String unsyncedSalesCount(int count) => _format('unsyncedSalesCount', {'n': '$count'});
   String lastSyncedAt(String when) => _format('lastSyncedAt', {'when': when});
   String get syncCompleted => _s('syncCompleted');
   String get menu => _s('menu');
@@ -132,8 +165,7 @@ class AppLocalizations {
   String get timezoneSectionTitle => _s('timezoneSectionTitle');
   String get timezoneSectionDescription => _s('timezoneSectionDescription');
   String get timezoneManualOverride => _s('timezoneManualOverride');
-  String timezoneUseCountryDefault(String zone) =>
-      _format('timezoneUseCountryDefault', {'zone': zone});
+  String timezoneUseCountryDefault(String zone) => _format('timezoneUseCountryDefault', {'zone': zone});
   String get tabNavigationMenu => _s('tabNavigationMenu');
   String get navMenuDescription => _s('navMenuDescription');
   String get navMenuSectionOrderHint => _s('navMenuSectionOrderHint');
@@ -187,8 +219,7 @@ class AppLocalizations {
   String get featureFoodSuppliers => _s('featureFoodSuppliers');
   String get featureGuestDirectory => _s('featureGuestDirectory');
 
-  String get navHeaderRestaurantOperations =>
-      _s('navHeaderRestaurantOperations');
+  String get navHeaderRestaurantOperations => _s('navHeaderRestaurantOperations');
   String get navHeaderOrdersCash => _s('navHeaderOrdersCash');
   String get navHeaderFinancialManagement => _s('navHeaderFinancialManagement');
   String get navHeaderKitchenMenuCatalog => _s('navHeaderKitchenMenuCatalog');
@@ -201,11 +232,9 @@ class AppLocalizations {
   String get restaurantPosDineIn => _s('restaurantPosDineIn');
   String get restaurantPosDineInSubtitle => _s('restaurantPosDineInSubtitle');
   String get restaurantPosTakeaway => _s('restaurantPosTakeaway');
-  String get restaurantPosTakeawaySubtitle =>
-      _s('restaurantPosTakeawaySubtitle');
+  String get restaurantPosTakeawaySubtitle => _s('restaurantPosTakeawaySubtitle');
   String get restaurantPosDelivery => _s('restaurantPosDelivery');
-  String get restaurantPosDeliverySubtitle =>
-      _s('restaurantPosDeliverySubtitle');
+  String get restaurantPosDeliverySubtitle => _s('restaurantPosDeliverySubtitle');
 
   String get orderCart => _s('orderCart');
   String get clearCart => _s('clearCart');
@@ -227,27 +256,21 @@ class AppLocalizations {
   String get cgst => _s('cgst');
   String get sgst => _s('sgst');
 
-  String itemsCountBadge(int count) =>
-      _format('itemsCountBadge', {'n': '$count'});
-  String heldOrdersTitle(int count) =>
-      _format('heldOrdersTitle', {'n': '$count'});
+  String itemsCountBadge(int count) => _format('itemsCountBadge', {'n': '$count'});
+  String heldOrdersTitle(int count) => _format('heldOrdersTitle', {'n': '$count'});
   String heldChip(int count) => _format('heldChip', {'n': '$count'});
-  String heldCartSubtitle(int count, String total) =>
-      _format('heldCartSubtitle', {'n': '$count', 'total': total});
-  String completeSaleButton(String amount) =>
-      _format('completeSaleButton', {'amount': amount});
+  String heldCartSubtitle(int count, String total) => _format('heldCartSubtitle', {'n': '$count', 'total': total});
+  String completeSaleButton(String amount) => _format('completeSaleButton', {'amount': amount});
 }
 
-class _AppLocalizationsDelegate
-    extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
-  bool isSupported(Locale locale) => locale.languageCode.isNotEmpty;
+  bool isSupported(Locale locale) => AppLocalizations._byLocale.containsKey(locale.languageCode);
 
   @override
-  Future<AppLocalizations> load(Locale locale) async =>
-      AppLocalizations(locale.languageCode);
+  Future<AppLocalizations> load(Locale locale) async => AppLocalizations(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
