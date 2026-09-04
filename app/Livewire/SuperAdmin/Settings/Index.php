@@ -7,6 +7,7 @@ use App\Models\Page;
 use App\Models\PlatformBranding;
 use App\Models\PlatformSystem;
 use App\Models\PushNotificationSetting;
+use App\Services\Localization\PlatformRegionalService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Layout;
@@ -35,6 +36,12 @@ class Index extends Component
     public string $appCurrency = 'USD';
 
     public string $appTimezone = 'UTC';
+
+    public string $platformDefaultCurrency = 'USD';
+
+    public string $platformDefaultLanguage = 'en';
+
+    public string $platformDefaultTimezone = 'UTC';
 
     public bool $maintenanceMode = false;
 
@@ -192,6 +199,10 @@ class Index extends Component
             $this->activeTab = 'push';
         }
 
+        if (request()->routeIs('superadmin.settings.regional')) {
+            $this->activeTab = 'general';
+        }
+
         $allowedTabs = ['general', 'smtp', 'push', 'branding', 'whitelabel', 'social', 'pages', 'appearance'];
         if (! in_array($this->activeTab, $allowedTabs, true)) {
             $this->activeTab = 'general';
@@ -199,8 +210,11 @@ class Index extends Component
 
         // Load Platform System Settings
         $this->appName = (string) PlatformSystem::get('app_name', config('app.name', 'Smart Inventory & Sales'));
-        $this->appCurrency = (string) PlatformSystem::get('app_currency', 'USD');
-        $this->appTimezone = (string) PlatformSystem::get('app_timezone', config('app.timezone', 'UTC'));
+        $this->platformDefaultCurrency = PlatformRegionalService::defaultCurrency();
+        $this->platformDefaultLanguage = PlatformRegionalService::defaultLanguage();
+        $this->platformDefaultTimezone = PlatformRegionalService::defaultTimezone();
+        $this->appCurrency = $this->platformDefaultCurrency;
+        $this->appTimezone = $this->platformDefaultTimezone;
         $this->maintenanceMode = filter_var(PlatformSystem::get('maintenance_mode', false), FILTER_VALIDATE_BOOLEAN);
         $this->maintenanceMessage = (string) PlatformSystem::get('maintenance_message', '');
         $this->minClientBuildVersion = (string) PlatformSystem::get('min_client_build_version', '0');
@@ -292,6 +306,26 @@ class Index extends Component
         if (in_array($tab, $allowedTabs, true)) {
             $this->activeTab = $tab;
         }
+    }
+
+    public function updatedPlatformDefaultCurrency(string $value): void
+    {
+        $this->appCurrency = $value;
+    }
+
+    public function updatedAppCurrency(string $value): void
+    {
+        $this->platformDefaultCurrency = $value;
+    }
+
+    public function updatedPlatformDefaultTimezone(string $value): void
+    {
+        $this->appTimezone = $value;
+    }
+
+    public function updatedAppTimezone(string $value): void
+    {
+        $this->platformDefaultTimezone = $value;
     }
 
     public function savePushNotifications(): void
@@ -453,8 +487,11 @@ class Index extends Component
     {
         $this->validate([
             'appName' => ['required', 'string', 'max:255'],
-            'appCurrency' => ['required', 'string', 'max:10'],
-            'appTimezone' => ['required', 'string', 'max:100'],
+            'platformDefaultCurrency' => ['required', 'string', 'max:10'],
+            'platformDefaultLanguage' => ['required', 'string', 'max:10'],
+            'platformDefaultTimezone' => ['required', 'string', 'max:100'],
+            'appCurrency' => ['nullable', 'string', 'max:10'],
+            'appTimezone' => ['nullable', 'string', 'max:100'],
             'maintenanceMessage' => ['nullable', 'string', 'max:500'],
             'minClientBuildVersion' => ['required', 'string', 'max:50'],
             'appVersion' => ['required', 'string', 'max:50'],
@@ -474,9 +511,28 @@ class Index extends Component
 
         $this->allowedRegistrationModes = in_array('restaurant', $this->enabledRegistrationModules, true) && in_array('retail', $this->enabledRegistrationModules, true) ? 'both' : (in_array('restaurant', $this->enabledRegistrationModules, true) ? 'restaurant_only' : 'retail_only');
 
+        if ($this->appCurrency !== $this->platformDefaultCurrency) {
+            if ($this->platformDefaultCurrency === 'USD' && $this->appCurrency !== 'USD') {
+                $this->platformDefaultCurrency = $this->appCurrency;
+            } else {
+                $this->appCurrency = $this->platformDefaultCurrency;
+            }
+        }
+
+        if ($this->appTimezone !== $this->platformDefaultTimezone) {
+            if ($this->platformDefaultTimezone === 'UTC' && $this->appTimezone !== 'UTC') {
+                $this->platformDefaultTimezone = $this->appTimezone;
+            } else {
+                $this->appTimezone = $this->platformDefaultTimezone;
+            }
+        }
+
         PlatformSystem::set('app_name', $this->appName);
-        PlatformSystem::set('app_currency', $this->appCurrency);
-        PlatformSystem::set('app_timezone', $this->appTimezone);
+        PlatformRegionalService::setPlatformDefaults(
+            $this->platformDefaultCurrency,
+            $this->platformDefaultLanguage,
+            $this->platformDefaultTimezone
+        );
         PlatformSystem::set('maintenance_mode', $this->maintenanceMode ? '1' : '0');
         PlatformSystem::set('maintenance_message', $this->maintenanceMessage);
         PlatformSystem::set('min_client_build_version', $this->minClientBuildVersion);
@@ -726,6 +782,9 @@ class Index extends Component
             'pages' => $pages,
             'availablePages' => Page::orderBy('title')->get(),
             'landingPageId' => PlatformBranding::current()->landing_page_id,
+            'currencyOptions' => PlatformRegionalService::currencyOptions(),
+            'languageOptions' => PlatformRegionalService::languageOptions(),
+            'timezoneOptions' => PlatformRegionalService::timezoneOptions(),
         ]);
     }
 }

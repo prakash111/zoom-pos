@@ -525,6 +525,8 @@ class SchemaResponse
                     'AE' => 'United Arab Emirates',
                     'SA' => 'Saudi Arabia',
                 ], $company->country ?? 'US'),
+                self::dropdownSelect('default_locale', 'Store Primary Language', \App\Services\Localization\PlatformRegionalService::languageOptions(), $company->default_locale ?: ($company->language ?: 'en')),
+                self::dropdownSelect('timezone', 'Store Timezone', \App\Services\Localization\PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone()),
                 self::colorPicker('primary_color', 'Primary Accent Color', $company->primary_color ?? '#4F46E5'),
                 self::colorPicker('accent_color', 'Secondary Accent Color', $company->accent_color ?? '#D97706'),
                 self::card([
@@ -633,15 +635,7 @@ class SchemaResponse
                 self::text('Base Operating Currency', 'title_medium', ['bold' => true]),
                 self::text('Select default currency code and decimal display parameters.', 'body_small', ['color' => '#6b7280']),
                 self::divider(),
-                self::dropdownSelect('currency', 'Base Currency Code', [
-                    'USD' => 'USD - US Dollar',
-                    'INR' => 'INR - Indian Rupee',
-                    'EUR' => 'EUR - Euro',
-                    'GBP' => 'GBP - British Pound',
-                    'AED' => 'AED - UAE Dirham',
-                    'SAR' => 'SAR - Saudi Riyal',
-                    'CAD' => 'CAD - Canadian Dollar',
-                ], $company->currency ?? 'USD'),
+                self::dropdownSelect('currency', 'Base Currency Code', \App\Services\Localization\PlatformRegionalService::currencyOptions(), $company->currency ?? 'USD'),
                 self::textInput('currency_symbol', 'Currency Symbol', $company->currency_symbol ?? '$'),
                 self::dropdownSelect('currency_decimals', 'Decimal Precision', [
                     '0' => '0 (e.g. 100)',
@@ -670,6 +664,24 @@ class SchemaResponse
         ), 'save');
 
         return self::screen('Financial & Currency', $components);
+    }
+
+    public static function localizationView(Company $company): array
+    {
+        return self::screen('Localization & Region', [
+            self::card([
+                self::text('Regional Localization & Store Defaults', 'title_medium', ['bold' => true]),
+                self::text('Configure primary store language and operating timezone inherited or overridden from platform baseline.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::dropdownSelect('default_locale', 'Store Primary Language', \App\Services\Localization\PlatformRegionalService::languageOptions(), $company->default_locale ?: ($company->language ?: 'en')),
+                self::dropdownSelect('timezone', 'Store Operating Timezone', \App\Services\Localization\PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone()),
+            ]),
+            self::buttonPrimary('Save Localization Settings', self::formSubmitAction(
+                '/api/tenant/settings/profile',
+                'POST',
+                'Localization settings updated successfully'
+            ), 'save'),
+        ]);
     }
 
     public static function taxesView(Company $company): array
@@ -971,6 +983,7 @@ class SchemaResponse
             ['key' => 'settings-profile', 'title' => 'Store Profile & Branding', 'endpoint' => '/api/tenant/views/settings-profile', 'permission' => 'settings.view'],
             ['key' => 'settings-receipts', 'title' => 'Receipt Prefixes & Bank Terms', 'endpoint' => '/api/tenant/views/settings-receipts', 'permission' => 'settings.view'],
             ['key' => 'settings-financial', 'title' => 'Financial & Currency', 'endpoint' => '/api/tenant/views/settings-financial', 'permission' => 'settings.view'],
+            ['key' => 'settings-localization', 'title' => 'Localization & Region', 'endpoint' => '/api/tenant/views/settings-localization', 'permission' => 'settings.view'],
             ['key' => 'settings-taxes', 'title' => 'Taxes & Compliance', 'endpoint' => '/api/tenant/views/settings-taxes', 'permission' => 'settings.view'],
             ['key' => 'settings-api', 'title' => 'API & Integrations', 'endpoint' => '/api/tenant/views/settings-api', 'permission' => 'settings.view'],
             ['key' => 'settings-navigation', 'title' => 'Navigation Menu', 'endpoint' => '/api/tenant/views/settings-navigation', 'permission' => 'settings.view'],
@@ -1032,7 +1045,7 @@ class SchemaResponse
 
         $normalized = self::normalizeViewKey($viewKey);
         if (str_starts_with($normalized, 'settings-')
-            || in_array($normalized, ['mode', 'profile', 'branding', 'receipts', 'financial', 'taxes', 'api', 'api-integrations', 'navigation', 'navigation-menu', 'notifications', 'custom-notifications'], true)) {
+            || in_array($normalized, ['mode', 'profile', 'branding', 'receipts', 'financial', 'localization', 'taxes', 'api', 'api-integrations', 'navigation', 'navigation-menu', 'notifications', 'custom-notifications'], true)) {
             return 'settings.view';
         }
 
@@ -1079,6 +1092,7 @@ class SchemaResponse
             'settings-profile', 'profile', 'branding' => self::profileView($company),
             'settings-receipts', 'receipts' => self::receiptsView($company),
             'settings-financial', 'financial' => self::financialView($company),
+            'settings-localization', 'localization' => self::localizationView($company),
             'settings-taxes', 'taxes' => self::taxesView($company),
             'settings-api', 'api', 'api-integrations' => self::apiView($company),
             'settings-navigation', 'navigation', 'navigation-menu' => self::navigationView($company),

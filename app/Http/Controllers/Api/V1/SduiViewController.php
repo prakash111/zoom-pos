@@ -60,6 +60,7 @@ class SduiViewController extends Controller
         switch ($normSection) {
             case 'profile':
             case 'branding':
+            case 'localization':
                 return $settingsController->updateProfile($request);
 
             case 'receipts':

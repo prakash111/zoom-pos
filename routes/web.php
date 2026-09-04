@@ -46,3 +46,6 @@ Route::get('/desktop/session/{token}', function (string $token) {
 
     return redirect($payload['destination'] ?? route('tenant.dashboard'));
 })->middleware(EnsureAppIsInstalled::class)->name('desktop.session');
+
+Route::redirect('/admin/settings/general', '/superadmin/settings?tab=general');
+Route::redirect('/admin/settings/regional', '/superadmin/settings?tab=general');

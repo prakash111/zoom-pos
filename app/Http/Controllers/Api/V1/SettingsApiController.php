@@ -60,7 +60,7 @@ class SettingsApiController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'name' => ['required', 'string', 'max:150'],
+            'name' => ['sometimes', 'required', 'string', 'max:150'],
             'trade_name' => ['nullable', 'string', 'max:150'],
             'tax_id' => ['nullable', 'string', 'max:60'],
             'email' => ['nullable', 'email'],
@@ -72,6 +72,8 @@ class SettingsApiController extends Controller
             'postal_code' => ['nullable', 'string', 'max:20'],
             'country' => ['nullable', 'string', 'max:2'],
             'timezone' => ['nullable', 'string', 'max:64', 'timezone'],
+            'language' => ['nullable', 'string', 'max:10'],
+            'default_locale' => ['nullable', 'string', 'max:10'],
             'primary_color' => ['nullable', 'string', 'max:16'],
             'accent_color' => ['nullable', 'string', 'max:16'],
             'drawer_bg' => ['nullable', 'string', 'max:16'],
@@ -94,6 +96,19 @@ class SettingsApiController extends Controller
         $data = $validator->validated();
         if (isset($data['country'])) {
             $data['country'] = strtoupper($data['country']);
+        }
+        if (isset($data['default_locale'])) {
+            $data['default_locale'] = strtolower(trim($data['default_locale']));
+            if (! isset($data['language'])) {
+                $data['language'] = $data['default_locale'];
+            }
+        } elseif (isset($data['language'])) {
+            $data['language'] = strtolower(trim($data['language']));
+            $data['default_locale'] = $data['language'];
+        }
+
+        if ($user && (! empty($data['default_locale']) || ! empty($data['language']))) {
+            $user->update(['locale' => $data['default_locale'] ?? $data['language']]);
         }
 
         $company->update($data);
@@ -282,6 +297,16 @@ class SettingsApiController extends Controller
 
         $data = $validator->validated();
         $data['currency'] = strtoupper($data['currency']);
+        if (empty($data['currency_symbol'])) {
+            $currDetails = \App\Services\Localization\PlatformRegionalService::getCurrencyDetails($data['currency']);
+            $data['currency_symbol'] = $currDetails['symbol'];
+            if (! isset($data['currency_decimals'])) {
+                $data['currency_decimals'] = $currDetails['decimals'];
+            }
+            if (! isset($data['currency_symbol_position'])) {
+                $data['currency_symbol_position'] = $currDetails['position'];
+            }
+        }
         if (isset($data['other_currencies'])) {
             $data['other_currencies'] = collect($data['other_currencies'])
                 ->map(fn ($c) => [
@@ -514,6 +539,8 @@ class SettingsApiController extends Controller
             'state' => $company->state ?? '',
             'postal_code' => $company->postal_code ?? '',
             'country' => $company->country ?? 'US',
+            'language' => $company->language ?? 'en',
+            'default_locale' => $company->default_locale ?: ($company->language ?: 'en'),
             // 'timezone' is the raw manual override (empty = none set, i.e.
             // following the country default); 'resolved_timezone' is what
             // order times/prep timers/KOT logs should actually be shown in

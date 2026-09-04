@@ -108,6 +108,7 @@ Route::prefix('v1/pos')->group(function () {
     // Public Tenant Auth & Registration Endpoints for Standalone / Dual-Mode Desktop Client
     Route::post('/auth/login', [PosSyncApiController::class, 'login']);
     Route::post('/auth/register', [PosSyncApiController::class, 'register']);
+    Route::post('/register', [PosSyncApiController::class, 'register']);
     Route::get('/auth/registration-config', [PosSyncApiController::class, 'registrationConfig']);
     Route::get('/auth/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
     Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);

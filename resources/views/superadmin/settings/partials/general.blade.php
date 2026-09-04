@@ -23,30 +23,6 @@
                     @error('appName') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
                 </div>
 
-                <!-- App Currency -->
-                <div class="space-y-2">
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                        {{ __('Platform Default Currency') }} <span class="text-rose-500">*</span>
-                    </label>
-                    <input type="text"
-                           wire:model="appCurrency"
-                           placeholder="USD, EUR, INR, GBP, BRL..."
-                           class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-                    @error('appCurrency') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
-                </div>
-
-                <!-- App Timezone -->
-                <div class="space-y-2">
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                        {{ __('System Timezone') }} <span class="text-rose-500">*</span>
-                    </label>
-                    <input type="text"
-                           wire:model="appTimezone"
-                           placeholder="UTC, America/New_York, Asia/Kolkata..."
-                           class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-                    @error('appTimezone') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
-                </div>
-
                 <!-- Min Client Build Version -->
                 <div class="space-y-2">
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
@@ -67,6 +43,80 @@
                            wire:model="appVersion"
                            class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
                     @error('appVersion') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Default Localization & Region -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/80 dark:border-slate-800 space-y-6">
+            <div class="border-b border-slate-100 dark:border-slate-800 pb-4">
+                <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>🌐</span> {{ __('Global Default Localization & Region') }}
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    {{ __('Configure platform-wide baseline currency, primary language, and timezone inherited automatically by newly registered tenant stores.') }}
+                </p>
+            </div>
+
+            <!-- Behavior / Clarification Note -->
+            <div class="rounded-2xl p-4 bg-sky-50 dark:bg-sky-950/40 border border-sky-200/80 dark:border-sky-800/60 flex items-start gap-3">
+                <span class="text-base sm:text-lg shrink-0">ℹ️</span>
+                <div class="text-xs text-sky-800 dark:text-sky-300 font-medium leading-relaxed">
+                    <strong>{{ __('Inheritance & Isolation Notice:') }}</strong>
+                    {{ __('These defaults will automatically apply to all newly registered stores. Existing active tenants retain their current configuration and can override their currency, language, and timezone individually in their Store Settings.') }}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Default Platform Currency -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {{ __('Default Platform Currency') }} <span class="text-rose-500">*</span>
+                    </label>
+                    <select wire:model="platformDefaultCurrency"
+                            class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                        @foreach ($currencyOptions as $code => $label)
+                            <option value="{{ $code }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    @error('platformDefaultCurrency') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">
+                        {{ __('Auto-sets currency symbol, decimal precision, and formatting for new stores.') }}
+                    </p>
+                </div>
+
+                <!-- Default Platform Language -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {{ __('Default Platform Language') }} <span class="text-rose-500">*</span>
+                    </label>
+                    <select wire:model="platformDefaultLanguage"
+                            class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                        @foreach ($languageOptions as $code => $label)
+                            <option value="{{ $code }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    @error('platformDefaultLanguage') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">
+                        {{ __('Initial UI locale for new tenant administrators and storefront default.') }}
+                    </p>
+                </div>
+
+                <!-- Default Platform Timezone -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {{ __('Default Platform Timezone') }} <span class="text-rose-500">*</span>
+                    </label>
+                    <select wire:model="platformDefaultTimezone"
+                            class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                        @foreach ($timezoneOptions as $tz => $tzLabel)
+                            <option value="{{ $tz }}">{{ $tzLabel }}</option>
+                        @endforeach
+                    </select>
+                    @error('platformDefaultTimezone') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">
+                        {{ __('Standard IANA timezone for order timestamps, daily shifts, and sales analytics.') }}
+                    </p>
                 </div>
             </div>
         </div>

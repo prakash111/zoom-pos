@@ -11,6 +11,7 @@ use App\Models\PlatformBranding;
 use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
 use App\Models\User;
+use App\Services\Localization\PlatformRegionalService;
 use Carbon\Carbon;
 use Database\Seeders\RestaurantDemoSeeder;
 use Database\Seeders\TenantDemoSeeder;
@@ -64,6 +65,12 @@ class TenantProvisioningService
                 $customDomain = null;
             }
 
+            // Regional defaults from SuperAdmin or registration overrides
+            $currency = ! empty($data['currency']) ? strtoupper(trim($data['currency'])) : PlatformRegionalService::defaultCurrency();
+            $currencyInfo = PlatformRegionalService::getCurrencyDetails($currency);
+            $language = ! empty($data['language']) ? strtolower(trim($data['language'])) : PlatformRegionalService::defaultLanguage();
+            $timezone = ! empty($data['timezone']) ? trim($data['timezone']) : PlatformRegionalService::defaultTimezone();
+
             // 1. Create Company
             $company = Company::create([
                 'name' => $storeName,
@@ -78,8 +85,13 @@ class TenantProvisioningService
                 'state' => $data['state'] ?? null,
                 'postal_code' => $data['postal_code'] ?? null,
                 'country' => $data['country'] ?? 'US',
-                'currency' => $data['currency'] ?? 'USD',
-                'language' => $data['language'] ?? 'en',
+                'currency' => $currency,
+                'currency_symbol' => $data['currency_symbol'] ?? ($currencyInfo['symbol'] ?? '$'),
+                'currency_decimals' => isset($data['currency_decimals']) ? (int) $data['currency_decimals'] : ($currencyInfo['decimals'] ?? 2),
+                'currency_symbol_position' => $data['currency_symbol_position'] ?? ($currencyInfo['position'] ?? 'prefix'),
+                'language' => $language,
+                'default_locale' => $data['default_locale'] ?? $language,
+                'timezone' => $timezone,
                 'pos_mode' => $posMode,
                 'licensed_modules' => [$posMode === 'general' ? 'retail' : $posMode],
                 'plan_name' => $planName,
@@ -122,6 +134,7 @@ class TenantProvisioningService
                 'password' => Hash::make($adminPassword),
                 'role' => User::ROLE_ADMINISTRATOR,
                 'status' => 'approved',
+                'locale' => $language,
                 'email_verified_at' => now(),
             ]);
 
