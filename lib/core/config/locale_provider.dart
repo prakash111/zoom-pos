@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../l10n/translations_cache.dart';
 import '../api/api_client.dart';
+import '../services/dynamic_string_service.dart';
 import '../storage/app_preferences.dart';
 import 'bootstrap_cache.dart';
 
@@ -18,25 +18,19 @@ import 'bootstrap_cache.dart';
 /// a background refresh against the backend keeps it current and
 /// notifies listeners again once it lands.
 class LocaleProvider extends ChangeNotifier {
-  LocaleProvider({required AppPreferences preferences, required ApiClient apiClient})
+  LocaleProvider(
+      {required AppPreferences preferences, required ApiClient apiClient})
       : _preferences = preferences,
         _apiClient = apiClient;
 
   final AppPreferences _preferences;
   final ApiClient _apiClient;
 
-  /// Every locale the Laravel backend's language catalog supports
-  /// (LocalizationService::$defaultLanguages) — kept in sync with that list
-  /// so a store's chosen default language is never silently unsupported.
-  static const supportedCodes = ['en', 'es', 'fr', 'de', 'ar', 'hi', 'pt', 'it', 'zh', 'ja', 'ru', 'id', 'tr'];
-
   Locale locale = const Locale('en');
 
   Future<void> load() async {
     final code = await _preferences.readLocale();
-    if (supportedCodes.contains(code)) {
-      locale = Locale(code);
-    }
+    if (_isLocaleCode(code)) locale = Locale(code);
     await BootstrapCache.instance.loadFromDisk();
     await _applyTranslations(locale.languageCode);
   }
@@ -44,12 +38,15 @@ class LocaleProvider extends ChangeNotifier {
   /// Re-fetches the current locale's translations (plus nav/config) — call
   /// once an unauthenticated startup's session restore completes, since the
   /// first [load] may have run before the API client had a token to send.
-  Future<void> refreshFromServer() => BootstrapCache.instance.refresh(locale.languageCode, _apiClient).then((_) {
+  Future<void> refreshFromServer() => BootstrapCache.instance
+          .refresh(locale.languageCode, _apiClient)
+          .then((_) {
         notifyListeners();
       });
 
   Future<void> setLocale(Locale newLocale) async {
-    locale = newLocale;
+    if (!_isLocaleCode(newLocale.languageCode)) return;
+    locale = Locale(newLocale.languageCode.toLowerCase());
     notifyListeners();
     await _preferences.saveLocale(newLocale.languageCode);
     await _applyTranslations(newLocale.languageCode);
@@ -60,10 +57,13 @@ class LocaleProvider extends ChangeNotifier {
   /// GET per switch (translations + nav + config bundled together by
   /// [BootstrapCache]), no polling loop or persistent connection.
   Future<void> _applyTranslations(String code) async {
-    await TranslationsCache.instance.loadFromDisk(code);
+    await DynamicStringService.instance.activate(code);
     notifyListeners();
 
     await BootstrapCache.instance.refresh(code, _apiClient);
     notifyListeners();
   }
+
+  static bool _isLocaleCode(String code) =>
+      RegExp(r'^[A-Za-z]{2,3}$').hasMatch(code.trim());
 }

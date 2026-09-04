@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zoom_pos_mobile/core/models/settings_models.dart';
-import 'package:zoom_pos_mobile/features/settings/screens/nav_menu_settings_tab.dart';
+import 'package:zoom_pos_mobile/core/sdui/components/navigation_tree_builder.dart';
 
 void main() {
   group('navigation indentation', () {

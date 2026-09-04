@@ -202,6 +202,23 @@ class ApiClient {
         ));
   }
 
+  Future<Map<String, dynamic>> postMultipartAbsolute(
+    String path, {
+    required String fieldName,
+    required List<int> bytes,
+    required String filename,
+  }) {
+    return _send(() async {
+      final base = await currentBaseUrl();
+      return _dio.post(
+        '$base$path',
+        data: FormData.fromMap({
+          fieldName: MultipartFile.fromBytes(bytes, filename: filename),
+        }),
+      );
+    });
+  }
+
   Future<Map<String, dynamic>> put(String path, {Map<String, dynamic>? data}) {
     return _send(() => _dio.put(path, data: data));
   }

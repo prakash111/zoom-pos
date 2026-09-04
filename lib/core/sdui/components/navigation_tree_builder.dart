@@ -4,16 +4,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/api/api_client.dart';
-import '../../../core/api/api_exception.dart';
-import '../../../core/config/bootstrap_cache.dart';
-import '../../../core/models/settings_models.dart';
-import '../../../core/sdui/models/sdui_models.dart';
-import '../../../l10n/app_localizations.dart';
-import '../../auth/auth_provider.dart';
-import '../../dashboard/dashboard_screen.dart'
-    show navSectionsForSettings, NavSectionDescriptor, NavTileDescriptor;
-import '../settings_repository.dart';
+import '../../api/api_client.dart';
+import '../../api/api_exception.dart';
+import '../../config/bootstrap_cache.dart';
+import '../../models/settings_models.dart';
+import '../../services/dynamic_string_service.dart';
+import '../../../features/settings/settings_repository.dart';
+import '../models/sdui_models.dart';
 
 const double navigationIndentStep = 30;
 const double _levelOneThreshold = 20;
@@ -34,6 +31,19 @@ String navigationLevelLabel(int level) {
     2 => 'Sub-Sub-Menu',
     _ => 'Main Menu',
   };
+}
+
+class NavTileDescriptor {
+  const NavTileDescriptor(this.key, this.label);
+  final String key;
+  final String label;
+}
+
+class NavSectionDescriptor {
+  const NavSectionDescriptor(this.key, this.label, this.tiles);
+  final String key;
+  final String label;
+  final List<NavTileDescriptor> tiles;
 }
 
 class _WorkingItem {
@@ -111,7 +121,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   /// Layers saved placement over the compiled catalog and converts each
   /// section to tree preorder. Sibling `order` values may repeat at separate
   /// levels, so a plain global sort would not be sufficient here.
-  void _ensureSectionsLoaded(AppLocalizations l10n) {
+  void _ensureSectionsLoaded() {
     if (_sections.isNotEmpty) return;
 
     // An SDUI navigation screen is self-contained. Prefer its active
@@ -120,39 +130,8 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     // when no AuthProvider is above it (for example in schema previews).
     var compiled = _sectionsFromSchema();
     if (compiled.isEmpty) {
-      try {
-        final company = context.read<AuthProvider>().company;
-        compiled = navSectionsForSettings(l10n, company);
-      } catch (_) {
-        // Continue to bootstrap and built-in fallbacks below.
-      }
-    }
-
-    if (compiled.isEmpty) {
       compiled =
           _parseSectionCollection(BootstrapCache.instance.effectiveSections);
-    }
-
-    if (compiled.isEmpty) {
-      compiled = [
-        NavSectionDescriptor('cashier_sales', 'Cashier & Sales', [
-          NavTileDescriptor('pos_terminal', 'Point of Sale'),
-          NavTileDescriptor('sales_history', 'Sales History'),
-          NavTileDescriptor('quotations', 'Quotations'),
-        ]),
-        NavSectionDescriptor('financial_mgmt', 'Financial Management', [
-          NavTileDescriptor('cash_register', 'Cash Register'),
-          NavTileDescriptor('receivables', 'Customer Ledger'),
-          NavTileDescriptor('reports', 'Analytics & Reports'),
-        ]),
-        NavSectionDescriptor('products_inventory', 'Products & Inventory', [
-          NavTileDescriptor('products', 'Products'),
-          NavTileDescriptor('categories', 'Categories'),
-        ]),
-        NavSectionDescriptor('settings', 'Administration & Settings', [
-          NavTileDescriptor('settings', 'Settings'),
-        ]),
-      ];
     }
 
     final compiledByKey = {
@@ -605,7 +584,6 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   Future<void> _save() async {
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
-    final l10n = AppLocalizations.of(context);
 
     try {
       final items = <NavItemConfig>[];
@@ -634,7 +612,8 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         items: items,
       ));
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(l10n.navMenuSaved)));
+      messenger.showSnackBar(
+          SnackBar(content: Text(context.tr('Navigation menu updated.'))));
     } on ApiException catch (error) {
       messenger.showSnackBar(SnackBar(content: Text(error.message)));
     } finally {
@@ -792,8 +771,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    _ensureSectionsLoaded(l10n);
+    _ensureSectionsLoaded();
     final embeddedInSduiScrollView = widget.schema != null;
 
     final sectionList = ReorderableListView(
@@ -869,45 +847,6 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       mainAxisSize:
           embeddedInSduiScrollView ? MainAxisSize.min : MainAxisSize.max,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            l10n.navMenuDescription,
-            style: TextStyle(color: Colors.grey.shade600),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.drag_handle,
-                      size: 18, color: Colors.grey.shade600),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '${l10n.navMenuSectionOrderHint}. Drag menu rows left/right to snap their level.',
-                      style:
-                          TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              const Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  _IndentLegend(label: 'Main Menu', offset: '0 px'),
-                  _IndentLegend(label: 'Sub-Menu', offset: '30 px'),
-                  _IndentLegend(label: 'Sub-Sub-Menu', offset: '60 px'),
-                ],
-              ),
-            ],
-          ),
-        ),
         if (embeddedInSduiScrollView)
           sectionList
         else
@@ -929,28 +868,6 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _IndentLegend extends StatelessWidget {
-  const _IndentLegend({required this.label, required this.offset});
-
-  final String label;
-  final String offset;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        child: Text('$label · $offset',
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
-      ),
     );
   }
 }

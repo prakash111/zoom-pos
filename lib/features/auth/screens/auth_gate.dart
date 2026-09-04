@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../dashboard/dashboard_screen.dart';
+import '../../../core/services/dynamic_string_service.dart';
 import '../auth_provider.dart';
 import 'login_screen.dart';
 
@@ -24,7 +25,8 @@ class _AuthGateState extends State<AuthGate> {
     super.initState();
     // Safety fallback: if status stays unknown for > 4s, force display login screen
     _safetyTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && context.read<AuthProvider>().status == AuthStatus.unknown) {
+      if (mounted &&
+          context.read<AuthProvider>().status == AuthStatus.unknown) {
         setState(() {
           _timedOut = true;
         });
@@ -60,7 +62,7 @@ class _AuthGateState extends State<AuthGate> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Sales & Inventory',
+                  t('Sales & Inventory'),
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),

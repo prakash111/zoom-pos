@@ -6,11 +6,15 @@ class AppTheme {
   static const Color primary = Color(0xFF2563EB);
   static const Color surface = Color(0xFFF8FAFC);
 
-  static ThemeData light({Color? seedColor, Color? drawerBg}) {
-    final colorScheme = ColorScheme.fromSeed(
+  static ThemeData light(
+      {Color? seedColor, Color? accentColor, Color? drawerBg}) {
+    var colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor ?? primary,
       brightness: Brightness.light,
     );
+    if (accentColor != null) {
+      colorScheme = colorScheme.copyWith(secondary: accentColor);
+    }
 
     return ThemeData(
       useMaterial3: true,
@@ -38,7 +42,8 @@ class AppTheme {
           backgroundColor: colorScheme.primary,
           foregroundColor: colorScheme.onPrimary,
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
       cardTheme: CardThemeData(

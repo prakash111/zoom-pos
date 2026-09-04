@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../l10n/translations_cache.dart';
 import '../api/api_client.dart';
 import '../models/settings_models.dart';
 import '../sdui/models/sdui_models.dart';
 import '../utils/color_utils.dart';
+import '../services/dynamic_string_service.dart';
 import 'app_config.dart';
 import 'theme_provider.dart';
 
@@ -74,7 +74,8 @@ class BootstrapTheme {
       drawerGradientEnabled: json['drawer_gradient_enabled'] == true,
       drawerGradientStart: json['drawer_gradient_start']?.toString(),
       drawerGradientEnd: json['drawer_gradient_end']?.toString(),
-      drawerGradientDirection: json['drawer_gradient_direction']?.toString() ?? 'top_to_bottom',
+      drawerGradientDirection:
+          json['drawer_gradient_direction']?.toString() ?? 'top_to_bottom',
     );
   }
 
@@ -83,7 +84,8 @@ class BootstrapTheme {
         if (accentColor != null) 'accent_color': accentColor,
         if (drawerBg != null) 'drawer_bg': drawerBg,
         'drawer_gradient_enabled': drawerGradientEnabled,
-        if (drawerGradientStart != null) 'drawer_gradient_start': drawerGradientStart,
+        if (drawerGradientStart != null)
+          'drawer_gradient_start': drawerGradientStart,
         if (drawerGradientEnd != null) 'drawer_gradient_end': drawerGradientEnd,
         'drawer_gradient_direction': drawerGradientDirection,
       };
@@ -150,7 +152,7 @@ class BootstrapCache extends ChangeNotifier {
   }
 
   /// Server-driven navigation sections. Disk cache supplies offline startup;
-  /// an empty cache intentionally renders no business-specific fallback tree.
+  /// falls back to baseline sections when hydrated cache is empty.
   List<SduiNavSectionSchema> get effectiveSections {
     if (menuStructure.isNotEmpty) {
       return menuStructure;
@@ -335,7 +337,7 @@ class BootstrapCache extends ChangeNotifier {
           ? response['menu_structure']
           : response['navigation'] ?? response['sections'];
       debugPrint(
-          'Bootstrap raw menu payload: ${menuPayload != null ? (menuPayload is List ? "${(menuPayload as List).length} sections" : menuPayload.runtimeType) : "null"}');
+          'Bootstrap raw menu payload: ${menuPayload != null ? (menuPayload is List ? "${menuPayload.length} sections" : menuPayload.runtimeType) : "null"}');
       final parsedMenu = _parseMenuStructure(
         menuPayload,
         source: 'server bootstrap',
@@ -348,16 +350,8 @@ class BootstrapCache extends ChangeNotifier {
           jsonEncode(menuStructure.map((s) => s.toJson()).toList()),
         );
       } else if (menuStructure.isEmpty) {
-        final fallback = _defaultFallbackSections();
-        if (fallback.isNotEmpty) {
-          menuStructure = fallback;
-          _navigationError = null;
-          debugPrint(
-              'Bootstrap: server returned empty menu; populated baseline fallback sections.');
-        } else {
-          _navigationError =
-              'The server returned no valid navigation sections. Please retry.';
-        }
+        _navigationError =
+            'The server returned no valid navigation sections. Please retry.';
       }
 
       if (response['ui_schema'] is Map) {
@@ -373,10 +367,11 @@ class BootstrapCache extends ChangeNotifier {
 
       final translations = response['translations'];
       if (translations is Map && translations.isNotEmpty) {
-        await TranslationsCache.instance.applyFetched(
+        await DynamicStringService.instance.applyFetched(
           locale,
           translations
               .map((key, value) => MapEntry(key.toString(), value.toString())),
+          version: response['translations_version']?.toString(),
         );
       }
 
@@ -398,11 +393,10 @@ class BootstrapCache extends ChangeNotifier {
 
       if (response['theme'] is Map) {
         try {
-          theme = BootstrapTheme.fromJson(
+          await applyThemeJson(
             Map<String, dynamic>.from(response['theme'] as Map),
+            preferences: prefs,
           );
-          await prefs.setString(_themeCacheKey, jsonEncode(theme.toJson()));
-          globalThemeProvider?.syncFromBootstrap(theme);
         } catch (error, stackTrace) {
           _logParseFailure('server theme', error, stackTrace);
         }
@@ -418,6 +412,19 @@ class BootstrapCache extends ChangeNotifier {
       _activeRefreshes--;
       notifyListeners();
     }
+  }
+
+  /// Applies a just-saved server theme to the singleton immediately and
+  /// repaints both Material colors and the navigation background.
+  Future<void> applyThemeJson(
+    Map<String, dynamic> json, {
+    SharedPreferences? preferences,
+  }) async {
+    theme = BootstrapTheme.fromJson(json);
+    final prefs = preferences ?? await SharedPreferences.getInstance();
+    await prefs.setString(_themeCacheKey, jsonEncode(theme.toJson()));
+    await globalThemeProvider?.syncFromBootstrap(theme);
+    notifyListeners();
   }
 
   /// Hydrates bootstrap state. If [forceRefresh] is true or menu is empty,

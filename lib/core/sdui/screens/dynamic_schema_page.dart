@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../api/api_client.dart';
 import '../../api/api_exception.dart';
+import '../../config/bootstrap_cache.dart';
+import '../../services/dynamic_string_service.dart';
 import '../dynamic_schema_context.dart';
 import '../dynamic_schema_parser.dart';
 import '../sdui_icon_registry.dart';
@@ -26,6 +28,7 @@ class DynamicSchemaPage extends StatefulWidget {
     this.initialTitle,
     this.apiClient,
     this.requestExecutor,
+    this.embedded = false,
   });
 
   final String? endpoint;
@@ -33,6 +36,7 @@ class DynamicSchemaPage extends StatefulWidget {
   final String? initialTitle;
   final ApiClient? apiClient;
   final DynamicSchemaRequest? requestExecutor;
+  final bool embedded;
 
   @override
   State<DynamicSchemaPage> createState() => _DynamicSchemaPageState();
@@ -225,6 +229,11 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
             data: _formValues,
           );
           final message = res['message']?.toString() ?? successToast;
+          final rawTheme = res['theme'];
+          if (rawTheme is Map) {
+            await BootstrapCache.instance
+                .applyThemeJson(Map<String, dynamic>.from(rawTheme));
+          }
           _showToast(message);
           if (navigateBack && mounted) {
             Navigator.of(context).pop();
@@ -339,8 +348,18 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
   @override
   Widget build(BuildContext context) {
     final client = _resolveApiClient();
+    if (widget.embedded) {
+      return DynamicSchemaContext(
+        formValues: _formValues,
+        setFormValue: _setFormValue,
+        dispatchAction: _dispatchAction,
+        apiClient: client,
+        child: Builder(builder: _buildBody),
+      );
+    }
+
     final title =
-        _schema?['title']?.toString() ?? widget.initialTitle ?? 'Screen';
+        _schema?['title']?.toString() ?? widget.initialTitle ?? 'screen';
     final appBarConfig = _schema?['app_bar'] as Map<String, dynamic>?;
     final showBackButton = appBarConfig?['show_back_button'] != false;
     final fabConfig = _schema?['fab'] as Map<String, dynamic>?;
@@ -352,7 +371,7 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
       apiClient: client,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(appBarConfig?['title']?.toString() ?? title),
+          title: Text(context.tr(appBarConfig?['title']?.toString() ?? title)),
           automaticallyImplyLeading: showBackButton,
           actions: [
             if (appBarConfig?['actions'] is List)
@@ -361,7 +380,9 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
                   IconButton(
                     icon:
                         Icon(SduiIconRegistry.resolve(act['icon']?.toString())),
-                    tooltip: act['label']?.toString(),
+                    tooltip: act['label'] == null
+                        ? null
+                        : context.tr(act['label'].toString()),
                     onPressed: () {
                       final a = act['action'] as Map<String, dynamic>?;
                       if (a != null) _dispatchAction(a);
@@ -405,7 +426,7 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
               ElevatedButton.icon(
                 onPressed: _fetchSchema,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                label: Text(context.tr('Retry')),
               ),
             ],
           ),

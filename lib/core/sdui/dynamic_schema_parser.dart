@@ -1,9 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../../features/settings/screens/nav_menu_settings_tab.dart';
+import '../api/api_exception.dart';
 import '../models/settings_models.dart';
+import '../services/dynamic_string_service.dart';
 import '../widgets/sdui/sdui_controls.dart';
+import 'components/navigation_tree_builder.dart';
 import 'dynamic_schema_context.dart';
 import 'sdui_icon_registry.dart';
 
@@ -69,6 +72,8 @@ class DynamicSchemaParser {
         return _buildDateTimePicker(context, schema);
       case 'color_picker':
         return _buildColorPicker(context, schema);
+      case 'file_upload':
+        return _buildFileUpload(context, schema);
 
       // Lists & Tables
       case 'line_item_tile':
@@ -272,8 +277,10 @@ class DynamicSchemaParser {
 
   static Widget _buildAccordion(
       BuildContext context, Map<String, dynamic> schema) {
-    final title = schema['title']?.toString() ?? '';
-    final subtitle = schema['subtitle']?.toString();
+    final title = context.tr(schema['title']?.toString() ?? '');
+    final subtitle = schema['subtitle'] == null
+        ? null
+        : context.tr(schema['subtitle'].toString());
     final iconName = schema['icon']?.toString();
     final initiallyExpanded = schema['initially_expanded'] == true;
     final children = _extractChildren(schema);
@@ -404,7 +411,7 @@ class DynamicSchemaParser {
             tabs: [
               for (final t in tabItems)
                 Tab(
-                  text: t['title']?.toString() ?? '',
+                  text: context.tr(t['title']?.toString() ?? ''),
                   icon: t['icon'] != null
                       ? Icon(SduiIconRegistry.resolve(t['icon'].toString()),
                           size: 18)
@@ -435,7 +442,7 @@ class DynamicSchemaParser {
 
   static Widget _buildText(BuildContext context, Map<String, dynamic> schema) {
     final theme = Theme.of(context);
-    final text = schema['text']?.toString() ?? '';
+    final text = context.tr(schema['text']?.toString() ?? '');
     final styleKey = schema['style']?.toString().toLowerCase();
     final isBold = schema['bold'] == true;
     final isItalic = schema['italic'] == true;
@@ -542,8 +549,8 @@ class DynamicSchemaParser {
   }
 
   static Widget _buildBadge(BuildContext context, Map<String, dynamic> schema) {
-    final label =
-        schema['label']?.toString() ?? schema['text']?.toString() ?? '';
+    final label = context
+        .tr(schema['label']?.toString() ?? schema['text']?.toString() ?? '');
     final color = schema['color'] != null
         ? SduiIconRegistry.parseColor(schema['color'].toString())
         : Colors.blue;
@@ -589,9 +596,9 @@ class DynamicSchemaParser {
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
     final name = schema['name']?.toString() ?? '';
-    final label = schema['label']?.toString() ?? '';
-    final placeholder =
-        schema['placeholder']?.toString() ?? schema['hint']?.toString() ?? '';
+    final label = context.tr(schema['label']?.toString() ?? '');
+    final placeholder = context.tr(
+        schema['placeholder']?.toString() ?? schema['hint']?.toString() ?? '');
     final initialValue = sduiContext?.formValues[name]?.toString() ??
         schema['initial_value']?.toString() ??
         '';
@@ -637,7 +644,7 @@ class DynamicSchemaParser {
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
     final name = schema['name']?.toString() ?? '';
-    final label = schema['label']?.toString() ?? '';
+    final label = context.tr(schema['label']?.toString() ?? '');
     final rawOptions = schema['options'] as List<dynamic>? ?? const [];
     final currentVal = sduiContext?.formValues[name]?.toString() ??
         schema['initial_value']?.toString();
@@ -649,10 +656,11 @@ class DynamicSchemaParser {
             opt['label']?.toString() ?? opt['name']?.toString() ?? '';
         final optVal =
             opt['value']?.toString() ?? opt['code']?.toString() ?? optLabel;
-        options.add(DropdownMenuItem(value: optVal, child: Text(optLabel)));
+        options.add(
+            DropdownMenuItem(value: optVal, child: Text(context.tr(optLabel))));
       } else {
         final str = opt.toString();
-        options.add(DropdownMenuItem(value: str, child: Text(str)));
+        options.add(DropdownMenuItem(value: str, child: Text(context.tr(str))));
       }
     }
 
@@ -693,8 +701,10 @@ class DynamicSchemaParser {
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
     final name = schema['name']?.toString() ?? '';
-    final label = schema['label']?.toString() ?? '';
-    final subtitle = schema['subtitle']?.toString();
+    final label = context.tr(schema['label']?.toString() ?? '');
+    final subtitle = schema['subtitle'] == null
+        ? null
+        : context.tr(schema['subtitle'].toString());
     final isChecked = sduiContext?.formValues[name] == true ||
         (sduiContext?.formValues[name] == null &&
             schema['initial_value'] == true);
@@ -739,8 +749,10 @@ class DynamicSchemaParser {
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
     final name = schema['name']?.toString() ?? '';
-    final label = schema['label']?.toString() ?? '';
-    final subtitle = schema['subtitle']?.toString();
+    final label = context.tr(schema['label']?.toString() ?? '');
+    final subtitle = schema['subtitle'] == null
+        ? null
+        : context.tr(schema['subtitle'].toString());
     final isToggled = sduiContext?.formValues[name] == true ||
         (sduiContext?.formValues[name] == null &&
             schema['initial_value'] == true);
@@ -770,7 +782,7 @@ class DynamicSchemaParser {
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
     final name = schema['name']?.toString() ?? '';
-    final label = schema['label']?.toString() ?? 'Select Date';
+    final label = context.tr(schema['label']?.toString() ?? 'Select Date');
     final initial = sduiContext?.formValues[name]?.toString() ??
         schema['initial_value']?.toString() ??
         '';
@@ -805,7 +817,10 @@ class DynamicSchemaParser {
                   ),
                   title: Text(label,
                       style: const TextStyle(fontSize: 13, color: Colors.grey)),
-                  subtitle: Text(current.isNotEmpty ? current : 'Tap to select',
+                  subtitle: Text(
+                      current.isNotEmpty
+                          ? current
+                          : context.tr('Tap to select'),
                       style: const TextStyle(fontSize: 15)),
                   trailing: Icon(mode == 'time'
                       ? Icons.schedule
@@ -884,7 +899,7 @@ class DynamicSchemaParser {
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
     final name = schema['name']?.toString() ?? '';
-    final label = schema['label']?.toString() ?? 'Color';
+    final label = context.tr(schema['label']?.toString() ?? 'Color');
     final rawPresets = (schema['presets'] as List<dynamic>? ??
             [
               '#1d4ed8',
@@ -907,7 +922,22 @@ class DynamicSchemaParser {
       presets: rawPresets,
       initialColor: currentColor,
       sduiContext: sduiContext,
+      customLabel: context
+          .tr(schema['custom_label']?.toString() ?? 'Choose custom color'),
+      hueLabel: context.tr(schema['hue_label']?.toString() ?? 'Hue'),
+      saturationLabel:
+          context.tr(schema['saturation_label']?.toString() ?? 'Saturation'),
+      brightnessLabel:
+          context.tr(schema['brightness_label']?.toString() ?? 'Brightness'),
+      cancelLabel: context.tr(schema['cancel_label']?.toString() ?? 'Cancel'),
+      applyLabel:
+          context.tr(schema['apply_label']?.toString() ?? 'Apply color'),
     );
+  }
+
+  static Widget _buildFileUpload(
+      BuildContext context, Map<String, dynamic> schema) {
+    return _SduiFileUploadField(schema: schema);
   }
 
   // ===========================================================================
@@ -917,8 +947,10 @@ class DynamicSchemaParser {
   static Widget _buildLineItemTile(
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
-    final title = schema['title']?.toString() ?? '';
-    final subtitle = schema['subtitle']?.toString();
+    final title = context.tr(schema['title']?.toString() ?? '');
+    final subtitle = schema['subtitle'] == null
+        ? null
+        : context.tr(schema['subtitle'].toString());
     final iconName = schema['leading_icon']?.toString();
     final action = schema['action'] as Map<String, dynamic>?;
 
@@ -943,7 +975,7 @@ class DynamicSchemaParser {
   static Widget _buildTableGrid(
       BuildContext context, Map<String, dynamic> schema) {
     final headers = (schema['headers'] as List<dynamic>? ?? const [])
-        .map((e) => e.toString())
+        .map((e) => context.tr(e.toString()))
         .toList();
     final rows = schema['rows'] as List<dynamic>? ?? const [];
 
@@ -974,7 +1006,7 @@ class DynamicSchemaParser {
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
     final name = schema['name']?.toString() ?? '';
-    final label = schema['label']?.toString() ?? 'Quantity';
+    final label = context.tr(schema['label']?.toString() ?? 'Quantity');
     final initial = (sduiContext?.formValues[name] as num?)?.toInt() ??
         (schema['initial_value'] as num?)?.toInt() ??
         1;
@@ -1015,7 +1047,7 @@ class DynamicSchemaParser {
   static Widget _buildButtonPrimary(
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
-    final label = schema['label']?.toString() ?? 'Submit';
+    final label = context.tr(schema['label']?.toString() ?? 'Submit');
     final iconName = schema['icon']?.toString();
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
     final isFullWidth = schema['full_width'] != false;
@@ -1046,7 +1078,7 @@ class DynamicSchemaParser {
   static Widget _buildButtonOutlined(
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
-    final label = schema['label']?.toString() ?? '';
+    final label = context.tr(schema['label']?.toString() ?? '');
     final iconName = schema['icon']?.toString();
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
     final isFullWidth = schema['full_width'] != false;
@@ -1077,7 +1109,7 @@ class DynamicSchemaParser {
   static Widget _buildButtonDanger(
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
-    final label = schema['label']?.toString() ?? 'Delete';
+    final label = context.tr(schema['label']?.toString() ?? 'Delete');
     final iconName = schema['icon']?.toString();
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
     final isFullWidth = schema['full_width'] != false;
@@ -1090,12 +1122,12 @@ class DynamicSchemaParser {
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogCtx) => AlertDialog(
-            title: const Text('Confirm Action'),
-            content: Text(confirmMessage),
+            title: Text(context.tr('Confirm Action')),
+            content: Text(context.tr(confirmMessage)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogCtx).pop(false),
-                child: const Text('Cancel'),
+                child: Text(context.tr('Cancel')),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(
@@ -1103,7 +1135,7 @@ class DynamicSchemaParser {
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () => Navigator.of(dialogCtx).pop(true),
-                child: const Text('Proceed'),
+                child: Text(context.tr('Proceed')),
               ),
             ],
           ),
@@ -1140,7 +1172,8 @@ class DynamicSchemaParser {
   static Widget _buildFab(BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
     final iconName = schema['icon']?.toString() ?? 'add';
-    final label = schema['label']?.toString();
+    final label =
+        schema['label'] == null ? null : context.tr(schema['label'].toString());
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
 
     if (label != null && label.isNotEmpty) {
@@ -1160,9 +1193,9 @@ class DynamicSchemaParser {
   static Widget _buildActionSheetTrigger(
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
-    final label = schema['label']?.toString() ?? 'Actions';
+    final label = context.tr(schema['label']?.toString() ?? 'Actions');
     final iconName = schema['icon']?.toString() ?? 'more_vert';
-    final sheetTitle = schema['sheet_title']?.toString() ?? label;
+    final sheetTitle = context.tr(schema['sheet_title']?.toString() ?? label);
     final options = schema['options'] as List<dynamic>? ?? const [];
 
     return ListTile(
@@ -1190,7 +1223,7 @@ class DynamicSchemaParser {
                           ? Icon(
                               SduiIconRegistry.resolve(opt['icon'].toString()))
                           : null,
-                      title: Text(opt['label']?.toString() ?? ''),
+                      title: Text(context.tr(opt['label']?.toString() ?? '')),
                       onTap: () {
                         Navigator.of(ctx).pop();
                         final optAction =
@@ -1378,6 +1411,145 @@ class DynamicSchemaParser {
   }
 }
 
+class _SduiFileUploadField extends StatefulWidget {
+  const _SduiFileUploadField({required this.schema});
+
+  final Map<String, dynamic> schema;
+
+  @override
+  State<_SduiFileUploadField> createState() => _SduiFileUploadFieldState();
+}
+
+class _SduiFileUploadFieldState extends State<_SduiFileUploadField> {
+  String? _url;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _url = widget.schema['current_url']?.toString();
+  }
+
+  Future<void> _pickAndUpload() async {
+    final sdui = DynamicSchemaContext.of(context);
+    final client = sdui?.apiClient;
+    final endpoint = widget.schema['upload_endpoint']?.toString() ?? '';
+    if (client == null || endpoint.isEmpty) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    final file = result?.files.single;
+    if (file?.bytes == null) return;
+
+    setState(() => _busy = true);
+    try {
+      final response = await client.postMultipartAbsolute(
+        endpoint,
+        fieldName: widget.schema['field_name']?.toString() ??
+            widget.schema['name']?.toString() ??
+            'file',
+        bytes: file!.bytes!,
+        filename: file.name,
+      );
+      final nextUrl = _readPath(
+        response,
+        widget.schema['response_url_path']?.toString() ?? 'url',
+      )?.toString();
+      if (mounted) setState(() => _url = nextUrl ?? _url);
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _remove() async {
+    final sdui = DynamicSchemaContext.of(context);
+    final client = sdui?.apiClient;
+    final endpoint = widget.schema['delete_endpoint']?.toString() ?? '';
+    if (client == null || endpoint.isEmpty) return;
+
+    setState(() => _busy = true);
+    try {
+      await client.requestAbsolute(endpoint, method: 'DELETE');
+      if (mounted) setState(() => _url = null);
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  static dynamic _readPath(Map<String, dynamic> source, String path) {
+    dynamic value = source;
+    for (final segment in path.split('.')) {
+      if (value is! Map || !value.containsKey(segment)) return null;
+      value = value[segment];
+    }
+    return value;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = context.tr(widget.schema['label']?.toString() ?? 'File');
+    final selectLabel =
+        context.tr(widget.schema['select_label']?.toString() ?? 'Choose File');
+    final removeLabel =
+        context.tr(widget.schema['remove_label']?.toString() ?? 'Remove');
+    final hasFile = _url?.isNotEmpty == true;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          if (hasFile) ...[
+            const SizedBox(height: 8),
+            CachedNetworkImage(
+              imageUrl: _url!,
+              height: 88,
+              fit: BoxFit.contain,
+              errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _pickAndUpload,
+                icon: _busy
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.upload_file),
+                label: Text(selectLabel),
+              ),
+              if (hasFile)
+                TextButton.icon(
+                  onPressed: _busy ? null : _remove,
+                  icon: const Icon(Icons.delete_outline),
+                  label: Text(removeLabel),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SduiColorPickerField extends StatefulWidget {
   const _SduiColorPickerField({
     required this.name,
@@ -1385,6 +1557,12 @@ class _SduiColorPickerField extends StatefulWidget {
     required this.presets,
     required this.initialColor,
     required this.sduiContext,
+    required this.customLabel,
+    required this.hueLabel,
+    required this.saturationLabel,
+    required this.brightnessLabel,
+    required this.cancelLabel,
+    required this.applyLabel,
   });
 
   final String name;
@@ -1392,6 +1570,12 @@ class _SduiColorPickerField extends StatefulWidget {
   final List<String> presets;
   final String initialColor;
   final DynamicSchemaContext? sduiContext;
+  final String customLabel;
+  final String hueLabel;
+  final String saturationLabel;
+  final String brightnessLabel;
+  final String cancelLabel;
+  final String applyLabel;
 
   @override
   State<_SduiColorPickerField> createState() => _SduiColorPickerFieldState();
@@ -1489,7 +1673,7 @@ class _SduiColorPickerFieldState extends State<_SduiColorPickerField> {
                     ),
                     const SizedBox(height: 18),
                     _HsvColorSlider(
-                      label: 'Hue',
+                      label: widget.hueLabel,
                       value: hsv.hue,
                       max: 360,
                       gradientColors: [
@@ -1508,7 +1692,7 @@ class _SduiColorPickerFieldState extends State<_SduiColorPickerField> {
                           setDialogState(() => hsv = hsv.withHue(value)),
                     ),
                     _HsvColorSlider(
-                      label: 'Saturation',
+                      label: widget.saturationLabel,
                       value: hsv.saturation,
                       max: 1,
                       gradientColors: [
@@ -1519,7 +1703,7 @@ class _SduiColorPickerFieldState extends State<_SduiColorPickerField> {
                           setDialogState(() => hsv = hsv.withSaturation(value)),
                     ),
                     _HsvColorSlider(
-                      label: 'Brightness',
+                      label: widget.brightnessLabel,
                       value: hsv.value,
                       max: 1,
                       gradientColors: [
@@ -1537,11 +1721,11 @@ class _SduiColorPickerFieldState extends State<_SduiColorPickerField> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Cancel'),
+                child: Text(widget.cancelLabel),
               ),
               FilledButton(
                 onPressed: () => Navigator.of(dialogContext).pop(hex),
-                child: const Text('Apply color'),
+                child: Text(widget.applyLabel),
               ),
             ],
           );
@@ -1595,7 +1779,7 @@ class _SduiColorPickerFieldState extends State<_SduiColorPickerField> {
           const SizedBox(height: 8),
           Semantics(
             button: true,
-            label: 'Choose ${widget.label}',
+            label: widget.customLabel,
             child: InkWell(
               borderRadius: BorderRadius.circular(10),
               onTap: _openInteractivePicker,
@@ -1622,8 +1806,9 @@ class _SduiColorPickerFieldState extends State<_SduiColorPickerField> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Choose custom color',
-                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          Text(widget.customLabel,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
                           Text(_currentHex,
                               style: TextStyle(
                                   fontSize: 12,

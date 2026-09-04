@@ -16,7 +16,7 @@ import '../../../core/widgets/loading_indicator.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../taxes/screens/taxes_screen.dart';
 import '../settings_repository.dart';
-import 'nav_menu_settings_tab.dart';
+import '../../../core/sdui/components/navigation_tree_builder.dart';
 import 'payment_methods_screen.dart';
 import 'printer_settings_screen.dart';
 

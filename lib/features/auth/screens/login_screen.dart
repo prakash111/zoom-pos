@@ -67,7 +67,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _openServerSettings() async {
     final preferences = context.read<AppPreferences>();
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ServerSettingsScreen(preferences: preferences)),
+      MaterialPageRoute(
+          builder: (_) => ServerSettingsScreen(preferences: preferences)),
     );
   }
 
@@ -102,15 +103,25 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? CachedNetworkImage(
                             imageUrl: _brandLogoUrl!,
                             height: 64,
-                            placeholder: (context, url) => const Icon(Icons.store, size: 64, color: Color(0xFF4A3B32)),
-                            errorWidget: (context, url, error) => const Icon(Icons.store, size: 64, color: Color(0xFF4A3B32)),
+                            placeholder: (context, url) => const Icon(
+                                Icons.store,
+                                size: 64,
+                                color: Color(0xFF4A3B32)),
+                            errorWidget: (context, url, error) => const Icon(
+                                Icons.store,
+                                size: 64,
+                                color: Color(0xFF4A3B32)),
                           )
-                        : const Icon(Icons.store, size: 64, color: Color(0xFF4A3B32)),
+                        : const Icon(Icons.store,
+                            size: 64, color: Color(0xFF4A3B32)),
                     const SizedBox(height: 12),
                     Text(
-                      'Sales & Inventory',
+                      l10n.text('Sales & Inventory'),
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 32),
                     TextFormField(
@@ -121,7 +132,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: l10n.emailOrLogin,
                         prefixIcon: const Icon(Icons.person_outline),
                       ),
-                      validator: (value) => (value == null || value.trim().isEmpty) ? l10n.required : null,
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
+                              ? l10n.required
+                              : null,
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
@@ -131,20 +145,26 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: l10n.password,
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          icon: Icon(_obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
                         ),
                       ),
-                      validator: (value) => (value == null || value.isEmpty) ? l10n.required : null,
+                      validator: (value) => (value == null || value.isEmpty)
+                          ? l10n.required
+                          : null,
                       onFieldSubmitted: (_) => _submit(),
                     ),
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                          MaterialPageRoute(
+                              builder: (_) => const ForgotPasswordScreen()),
                         ),
-                        child: const Text('Forgot password?'),
+                        child: Text(l10n.text('Forgot password?')),
                       ),
                     ),
                     if (_showAccountId) ...[
@@ -161,7 +181,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () => setState(() => _showAccountId = true),
+                          onPressed: () =>
+                              setState(() => _showAccountId = true),
                           child: Text(l10n.iHaveAccountId),
                         ),
                       ),
@@ -172,7 +193,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
                             )
                           : Text(l10n.signIn),
                     ),
@@ -185,7 +207,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: auth.isBusy
                               ? null
                               : () => Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                                    MaterialPageRoute(
+                                        builder: (_) => const RegisterScreen()),
                                   ),
                           child: Text(l10n.createOne),
                         ),

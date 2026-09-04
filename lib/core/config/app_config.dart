@@ -38,6 +38,7 @@ class ApiEndpoints {
   static const String registrationConfig = '/auth/registration-config';
   static const String registrationMeta = '/app/registration-meta';
   static const String registrationMetaAbsolute = '/api/app/registration-meta';
+  static const String appTranslationsAbsolute = '/api/app/translations';
   static const String authBranding = '/auth/branding';
   static const String session = '/auth/session';
   static const String status = '/status';
