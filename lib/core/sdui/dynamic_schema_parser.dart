@@ -86,6 +86,8 @@ class DynamicSchemaParser {
         return _buildButtonPrimary(context, schema);
       case 'button_outlined':
         return _buildButtonOutlined(context, schema);
+      case 'button_danger':
+        return _buildButtonDanger(context, schema);
       case 'fab':
         return _buildFab(context, schema);
       case 'action_sheet_trigger':
@@ -1039,6 +1041,69 @@ class DynamicSchemaParser {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
+      child: btn,
+    );
+  }
+
+  static Widget _buildButtonDanger(
+      BuildContext context, Map<String, dynamic> schema) {
+    final sduiContext = DynamicSchemaContext.of(context);
+    final label = schema['label']?.toString() ?? 'Delete';
+    final iconName = schema['icon']?.toString();
+    final action = schema['action'] as Map<String, dynamic>? ?? const {};
+    final isFullWidth = schema['full_width'] != false;
+    final enabled = schema['enabled'] != false;
+
+    Future<void> handlePress() async {
+      final confirmMessage = action['confirm_message']?.toString() ??
+          schema['confirm_message']?.toString();
+      if (confirmMessage != null && confirmMessage.isNotEmpty) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogCtx) => AlertDialog(
+            title: const Text('Confirm Action'),
+            content: Text(confirmMessage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => Navigator.of(dialogCtx).pop(true),
+                child: const Text('Proceed'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+      }
+      sduiContext?.dispatchAction(action);
+    }
+
+    Widget btn = ElevatedButton.icon(
+      icon: iconName != null
+          ? Icon(SduiIconRegistry.resolve(iconName))
+          : const SizedBox.shrink(),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.red.shade600,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      onPressed: enabled ? handlePress : null,
+    );
+
+    if (isFullWidth) {
+      btn = SizedBox(width: double.infinity, child: btn);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: btn,
     );
   }

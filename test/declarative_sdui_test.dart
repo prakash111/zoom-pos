@@ -378,5 +378,57 @@ void main() {
 
       expect(find.byType(DynamicSchemaPage), findsOneWidget);
     });
+
+    testWidgets('button_danger shows confirmation dialog and dispatches on confirm',
+        (tester) async {
+      Map<String, dynamic>? dispatchedAction;
+      final schema = {
+        'type': 'button_danger',
+        'label': 'Clear Sample Demo Data',
+        'icon': 'delete_forever',
+        'action': {
+          'type': 'form_submit',
+          'endpoint': '/api/tenant/demo-data',
+          'method': 'DELETE',
+          'confirm_message': 'Are you sure you want to delete all sample demo items?',
+        },
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: const {},
+              setFormValue: (_, __) {},
+              dispatchAction: (action) async {
+                dispatchedAction = action;
+              },
+              child: Builder(
+                builder: (ctx) =>
+                    DynamicSchemaParser.buildComponent(ctx, schema),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Clear Sample Demo Data'), findsOneWidget);
+
+      // Tap button -> should open AlertDialog
+      await tester.tap(find.text('Clear Sample Demo Data'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Are you sure you want to delete all sample demo items?'), findsOneWidget);
+      expect(find.text('Proceed'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+
+      // Tap Proceed -> should dispatch action
+      await tester.tap(find.text('Proceed'));
+      await tester.pumpAndSettle();
+
+      expect(dispatchedAction, isNotNull);
+      expect(dispatchedAction!['endpoint'], '/api/tenant/demo-data');
+      expect(dispatchedAction!['method'], 'DELETE');
+    });
   });
 }
