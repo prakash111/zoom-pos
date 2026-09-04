@@ -15,7 +15,7 @@ class Product extends Model
         'company_id', 'external_id', 'code', 'sku', 'barcode', 'name', 'image_url', 'category_id', 'category_name',
         'brand_id', 'brand_name', 'unit', 'cost_price', 'sale_price', 'variants', 'modifiers', 'spice_levels', 'profit_margin',
         'current_stock', 'minimum_stock', 'active', 'is_demo', 'batch_number', 'mfg_date', 'expiry_date',
-        'requires_prescription', 'duration_minutes', 'hsn_code', 'sac_code', 'tax_rate',
+        'requires_prescription', 'narcotic_schedule', 'generic_name', 'composition', 'duration_minutes', 'hsn_code', 'sac_code', 'tax_rate',
         'taxable', 'tax_exempt', 'zero_rate', 'reverse_charge',
     ];
 
@@ -50,6 +50,24 @@ class Product extends Model
     public function brand()
     {
         return $this->belongsTo(Brand::class);
+    }
+
+    public function pharmacyBatches()
+    {
+        return $this->hasMany(PharmacyBatch::class);
+    }
+
+    public function activePharmacyBatches()
+    {
+        return $this->hasMany(PharmacyBatch::class)
+            ->where('is_active', true)
+            ->where('stock_qty', '>', 0)
+            ->orderBy('expiry_date', 'asc');
+    }
+
+    public function repairParts()
+    {
+        return $this->hasMany(RepairTicketPart::class);
     }
 
     public function getImageUrlOrDefault(): string
@@ -109,12 +127,14 @@ class Product extends Model
     public function decrementStock(float $quantity, string $reason = ''): bool
     {
         $this->decrement('current_stock', $quantity);
+
         return true;
     }
 
     public function incrementStock(float $quantity, string $reason = ''): bool
     {
         $this->increment('current_stock', $quantity);
+
         return true;
     }
 

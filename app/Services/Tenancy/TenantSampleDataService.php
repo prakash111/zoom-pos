@@ -9,7 +9,12 @@ use App\Models\CustomerLedger;
 use App\Models\DiningFloor;
 use App\Models\DiningTable;
 use App\Models\KitchenTicket;
+use App\Models\PharmacyBatch;
+use App\Models\PharmacyPrescription;
 use App\Models\Product;
+use App\Models\RepairChecklist;
+use App\Models\RepairTicket;
+use App\Models\RepairTicketPart;
 use App\Models\Sale;
 use App\Models\ServiceOrder;
 use App\Models\TaxRule;
@@ -18,7 +23,6 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class TenantSampleDataService
 {
@@ -37,6 +41,7 @@ class TenantSampleDataService
                 'restaurant' => $this->seedRestaurant($company, $admin),
                 'pharmacy' => $this->seedPharmacy($company, $admin),
                 'service_booking' => $this->seedServiceBooking($company, $admin),
+                'repair', 'repair_technician' => $this->seedRepairTechnician($company, $admin),
                 default => $this->seedRetail($company, $admin),
             };
 
@@ -666,11 +671,23 @@ class TenantSampleDataService
 
         foreach ($drugsData as $d) {
             $cat = $categories[$d['category']] ?? null;
-            Product::withoutGlobalScopes()->firstOrCreate([
+            $product = Product::withoutGlobalScopes()->firstOrCreate([
                 'company_id' => $companyId,
                 'code' => $d['sku'],
             ], [
                 'name' => $d['name'],
+                'generic_name' => match ($d['category']) {
+                    'Antibiotics' => str_contains($d['name'], 'Amoxicillin') ? 'Amoxicillin Trihydrate' : 'Azithromycin Dihydrate',
+                    'Pain Relief' => str_contains($d['name'], 'Paracetamol') ? 'Acetaminophen (Paracetamol)' : 'Ibuprofen Micronized',
+                    'First Aid' => str_contains($d['name'], 'Iodine') ? 'Povidone-Iodine Complex' : 'Sterile Hydrophilic Cotton',
+                    default => 'Ascorbic Acid + Zinc Gluconate',
+                },
+                'composition' => match ($d['category']) {
+                    'Antibiotics' => 'Active pharmaceutical ingredient 500mg, microcrystalline cellulose',
+                    'Pain Relief' => 'Paracetamol BP 500mg, maize starch, sodium starch glycolate',
+                    default => 'Nutraceutical therapeutic formulation',
+                },
+                'narcotic_schedule' => $d['requires_prescription'] ? 'Schedule H' : null,
                 'code' => $d['sku'],
                 'barcode' => $d['barcode'],
                 'category_id' => $cat?->id,
@@ -688,6 +705,40 @@ class TenantSampleDataService
                 'active' => true,
                 'is_demo' => true,
             ]);
+
+            // Seed FEFO batches for each medicine
+            PharmacyBatch::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'product_id' => $product->id,
+                'batch_number' => $d['batch_number'],
+            ], [
+                'tenant_id' => $companyId,
+                'manufacturing_date' => $d['mfg_date'],
+                'expiry_date' => $d['expiry_date'],
+                'cost_price' => $d['cost_price'],
+                'selling_price' => $d['sale_price'],
+                'stock_qty' => (int) ($d['current_stock'] * 0.7),
+                'alert_days_before_expiry' => 90,
+                'is_active' => true,
+                'is_demo' => true,
+            ]);
+
+            // Additional near-expiry or alternate batch for FEFO demonstration
+            PharmacyBatch::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'product_id' => $product->id,
+                'batch_number' => $d['batch_number'].'-ALT',
+            ], [
+                'tenant_id' => $companyId,
+                'manufacturing_date' => Carbon::parse($d['mfg_date'])->subMonths(3)->toDateString(),
+                'expiry_date' => Carbon::now()->addDays(rand(30, 85))->toDateString(),
+                'cost_price' => $d['cost_price'],
+                'selling_price' => $d['sale_price'],
+                'stock_qty' => (int) ($d['current_stock'] * 0.3),
+                'alert_days_before_expiry' => 90,
+                'is_active' => true,
+                'is_demo' => true,
+            ]);
         }
 
         // 3. Patients / Customers
@@ -702,7 +753,51 @@ class TenantSampleDataService
             'due_balance' => 0.00,
         ]);
 
-        // 4. Sample Dispensed Prescription Sale
+        // 4. Sample Prescriptions (Pending & Dispensed)
+        PharmacyPrescription::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'prescription_number' => 'RX-DEMO-2026-001',
+        ], [
+            'tenant_id' => $companyId,
+            'customer_id' => $patient->id,
+            'patient_name' => 'Jane Smith',
+            'patient_phone' => '+1-555-0198',
+            'doctor_name' => 'Dr. Robert Evans, MD',
+            'doctor_registration_no' => 'MED-REG-88392',
+            'prescription_date' => Carbon::today()->subDays(1),
+            'diagnosis' => 'Acute Respiratory Infection / Bronchitis',
+            'medicines' => [
+                ['name' => 'Amoxicillin 500mg Capsules', 'dosage' => '1 cap TID for 7 days', 'quantity' => 21],
+                ['name' => 'Paracetamol 500mg', 'dosage' => '1 tab PRN fever', 'quantity' => 10],
+            ],
+            'notes' => 'Patient advised rest and increased hydration.',
+            'status' => 'pending',
+            'is_demo' => true,
+        ]);
+
+        $dispensedRx = PharmacyPrescription::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'prescription_number' => 'RX-DEMO-2026-002',
+        ], [
+            'tenant_id' => $companyId,
+            'customer_id' => $patient->id,
+            'patient_name' => 'Michael Chang',
+            'patient_phone' => '+1-555-0244',
+            'doctor_name' => 'Dr. Emily Watson, MBBS',
+            'doctor_registration_no' => 'MED-REG-44910',
+            'prescription_date' => Carbon::today(),
+            'diagnosis' => 'Bacterial Pharyngitis',
+            'medicines' => [
+                ['name' => 'Azithromycin 250mg Tablets', 'dosage' => '500mg stat then 250mg OD', 'quantity' => 6],
+            ],
+            'notes' => 'Dispensed full 6-tablet blister.',
+            'status' => 'dispensed',
+            'dispensed_at' => now(),
+            'dispensed_by_user_id' => $admin?->id,
+            'is_demo' => true,
+        ]);
+
+        // 5. Sample Dispensed Prescription Sale
         Sale::withoutGlobalScopes()->firstOrCreate([
             'company_id' => $companyId,
             'sale_number' => 'RX-DEMO-001',
@@ -718,7 +813,7 @@ class TenantSampleDataService
             'payment_status' => 'paid',
             'status' => 'completed',
             'is_demo' => true,
-            'notes' => 'Prescription dispensed by Dr. Robert Evans (License #MD-88392).',
+            'notes' => 'Prescription dispensed against Rx #RX-DEMO-2026-002 (Dr. Emily Watson).',
             'items' => [
                 [
                     'name' => 'Amoxicillin 500mg Capsules (10pk)',
@@ -728,6 +823,246 @@ class TenantSampleDataService
                     'total' => 19.00,
                 ],
             ],
+        ]);
+
+        $this->seedTaxRuleForCountry($company);
+    }
+
+    /**
+     * Mode: Repair & Technician POS Workbench.
+     */
+    public function seedRepairTechnician(Company $company, ?User $admin = null): void
+    {
+        $companyId = $company->id;
+
+        // 1. Repair Parts & Hardware Categories
+        $categoriesData = [
+            ['name' => 'Display Assemblies', 'color' => '#0284c7', 'description' => 'OLED, AMOLED, LCD screens and digitizers'],
+            ['name' => 'Batteries & Power', 'color' => '#10b981', 'description' => 'Original OEM & high-capacity replacement batteries'],
+            ['name' => 'Charging & Ports', 'color' => '#f59e0b', 'description' => 'USB-C, Lightning, DC jacks and flex cables'],
+            ['name' => 'Workshop Consumables', 'color' => '#8b5cf6', 'description' => 'Thermal paste, adhesives, kapton tape, screws'],
+        ];
+
+        $categories = [];
+        foreach ($categoriesData as $c) {
+            $categories[$c['name']] = Category::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'name' => $c['name'],
+            ], [
+                'color' => $c['color'],
+                'description' => $c['description'],
+                'active' => true,
+                'is_demo' => true,
+            ]);
+        }
+
+        // 2. Spare Parts Catalog (Inventory)
+        $partsCatalog = [
+            [
+                'name' => 'iPhone 14 Pro OLED Display Assembly (OEM Grade)',
+                'category' => 'Display Assemblies',
+                'sku' => 'REP-SCR-001',
+                'barcode' => '790101000001',
+                'cost_price' => 75.00,
+                'sale_price' => 160.00,
+                'current_stock' => 12,
+                'unit' => 'pcs',
+            ],
+            [
+                'name' => 'Samsung Galaxy S23 Ultra Replacement Battery 5000mAh',
+                'category' => 'Batteries & Power',
+                'sku' => 'REP-BAT-001',
+                'barcode' => '790101000002',
+                'cost_price' => 18.50,
+                'sale_price' => 55.00,
+                'current_stock' => 20,
+                'unit' => 'pcs',
+            ],
+            [
+                'name' => 'Universal USB-C Fast Charging Flex PCB Sub-Board',
+                'category' => 'Charging & Ports',
+                'sku' => 'REP-CHG-001',
+                'barcode' => '790101000003',
+                'cost_price' => 7.00,
+                'sale_price' => 29.00,
+                'current_stock' => 35,
+                'unit' => 'pcs',
+            ],
+            [
+                'name' => 'Thermal Grizzly Kryonaut High Performance Paste 1g',
+                'category' => 'Workshop Consumables',
+                'sku' => 'REP-CON-001',
+                'barcode' => '790101000004',
+                'cost_price' => 4.50,
+                'sale_price' => 15.00,
+                'current_stock' => 40,
+                'unit' => 'tube',
+            ],
+        ];
+
+        $createdProducts = [];
+        foreach ($partsCatalog as $p) {
+            $cat = $categories[$p['category']] ?? null;
+            $prod = Product::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'code' => $p['sku'],
+            ], [
+                'name' => $p['name'],
+                'code' => $p['sku'],
+                'barcode' => $p['barcode'],
+                'category_id' => $cat?->id,
+                'category_name' => $cat?->name,
+                'cost_price' => $p['cost_price'],
+                'sale_price' => $p['sale_price'],
+                'current_stock' => $p['current_stock'],
+                'minimum_stock' => 5,
+                'unit' => $p['unit'],
+                'active' => true,
+                'is_demo' => true,
+            ]);
+            $createdProducts[$p['sku']] = $prod;
+        }
+
+        // 3. Customers
+        $cust1 = Customer::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'name' => 'Alex Rivera',
+        ], [
+            'phone' => '+1-555-7788',
+            'email' => 'alex.rivera@example.com',
+            'is_demo' => true,
+        ]);
+
+        $cust2 = Customer::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'name' => 'Samantha Lee',
+        ], [
+            'phone' => '+1-555-9922',
+            'email' => 'samantha.lee@example.com',
+            'is_demo' => true,
+        ]);
+
+        // 4. Sample Repair Tickets in Different Lifecycle Stages
+        // Ticket 1: Active Intake
+        $ticket1 = RepairTicket::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'ticket_number' => 'REP-2026-0001',
+        ], [
+            'tenant_id' => $companyId,
+            'customer_id' => $cust1->id,
+            'customer_name' => $cust1->name,
+            'customer_phone' => $cust1->phone,
+            'device_type' => 'Smartphone',
+            'brand' => 'Apple',
+            'model' => 'iPhone 14 Pro',
+            'serial_or_imei' => '359281094827164',
+            'passcode_or_pattern' => '198402',
+            'issue_description' => 'Shattered front screen after drop; display flickers with vertical green line.',
+            'physical_condition_notes' => 'Minor scuffs on stainless steel bezel; back glass pristine.',
+            'status' => 'active',
+            'priority' => 'high',
+            'technician_id' => $admin?->id,
+            'estimated_cost' => 190.00,
+            'advance_paid' => 50.00,
+            'labor_fee' => 30.00,
+            'parts_cost' => 160.00,
+            'total_amount' => 190.00,
+            'intake_at' => now()->subHours(3),
+            'is_demo' => true,
+        ]);
+
+        RepairChecklist::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'repair_ticket_id' => $ticket1->id,
+            'item_name' => 'Power On / Boot',
+        ], [
+            'tenant_id' => $companyId,
+            'type' => 'intake',
+            'status' => 'pass',
+        ]);
+
+        RepairChecklist::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'repair_ticket_id' => $ticket1->id,
+            'item_name' => 'Display & Touchscreen',
+        ], [
+            'tenant_id' => $companyId,
+            'type' => 'intake',
+            'status' => 'fail',
+            'notes' => 'Display flickering with green line',
+        ]);
+
+        // Ticket 2: In Progress with Parts & Labor Billed
+        $ticket2 = RepairTicket::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'ticket_number' => 'REP-2026-0002',
+        ], [
+            'tenant_id' => $companyId,
+            'customer_id' => $cust2->id,
+            'customer_name' => $cust2->name,
+            'customer_phone' => $cust2->phone,
+            'device_type' => 'Smartphone',
+            'brand' => 'Samsung',
+            'model' => 'Galaxy S23 Ultra',
+            'serial_or_imei' => 'R5CW301827Z',
+            'passcode_or_pattern' => 'Pattern: L-shape',
+            'issue_description' => 'Battery draining from 100% to 15% in 2 hours; device gets warm near charging port.',
+            'physical_condition_notes' => 'Clean condition, screen protector installed.',
+            'status' => 'in_progress',
+            'priority' => 'normal',
+            'technician_id' => $admin?->id,
+            'estimated_cost' => 95.00,
+            'advance_paid' => 30.00,
+            'labor_fee' => 40.00,
+            'parts_cost' => 55.00,
+            'total_amount' => 95.00,
+            'intake_at' => now()->subDays(1),
+            'is_demo' => true,
+        ]);
+
+        if (isset($createdProducts['REP-BAT-001'])) {
+            RepairTicketPart::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'repair_ticket_id' => $ticket2->id,
+                'part_name' => 'Samsung Galaxy S23 Ultra Replacement Battery 5000mAh',
+            ], [
+                'tenant_id' => $companyId,
+                'product_id' => $createdProducts['REP-BAT-001']->id,
+                'quantity' => 1,
+                'unit_cost' => 18.50,
+                'unit_price' => 55.00,
+                'subtotal' => 55.00,
+                'billed_to_customer' => true,
+            ]);
+        }
+
+        // Ticket 3: Repaired & Ready for Pickup
+        $ticket3 = RepairTicket::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'ticket_number' => 'REP-2026-0003',
+        ], [
+            'tenant_id' => $companyId,
+            'customer_id' => $cust1->id,
+            'customer_name' => $cust1->name,
+            'customer_phone' => $cust1->phone,
+            'device_type' => 'Laptop',
+            'brand' => 'Dell',
+            'model' => 'XPS 15 9520',
+            'serial_or_imei' => 'DELL-SN-8921A',
+            'passcode_or_pattern' => 'Windows Hello Pin: 4091',
+            'issue_description' => 'Thermal overheating shutdown under load. Thermal paste dried out.',
+            'physical_condition_notes' => 'Missing two bottom rubber feet.',
+            'status' => 'repaired',
+            'priority' => 'normal',
+            'technician_id' => $admin?->id,
+            'estimated_cost' => 65.00,
+            'advance_paid' => 20.00,
+            'labor_fee' => 50.00,
+            'parts_cost' => 15.00,
+            'total_amount' => 65.00,
+            'intake_at' => now()->subDays(2),
+            'completed_at' => now()->subHours(2),
+            'is_demo' => true,
         ]);
 
         $this->seedTaxRuleForCountry($company);
@@ -1002,19 +1337,36 @@ class TenantSampleDataService
                 ->where('is_demo', true)
                 ->delete();
 
-            // 3. Customer Ledgers
+            // 3. Repair Tickets & Parts (before customers/products)
+            $counts['repair_tickets'] = RepairTicket::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->where('is_demo', true)
+                ->delete();
+
+            // 4. Pharmacy Prescriptions & Batches (before sales/products)
+            $counts['pharmacy_prescriptions'] = PharmacyPrescription::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->where('is_demo', true)
+                ->delete();
+
+            $counts['pharmacy_batches'] = PharmacyBatch::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->where('is_demo', true)
+                ->delete();
+
+            // 5. Customer Ledgers
             $counts['customer_ledgers'] = CustomerLedger::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('is_demo', true)
                 ->delete();
 
-            // 4. Sales
+            // 6. Sales
             $counts['sales'] = Sale::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('is_demo', true)
                 ->delete();
 
-            // 5. Dining Tables & Floors
+            // 7. Dining Tables & Floors
             $counts['dining_tables'] = DiningTable::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('is_demo', true)
@@ -1025,7 +1377,7 @@ class TenantSampleDataService
                 ->where('is_demo', true)
                 ->delete();
 
-            // 6. Products & Categories
+            // 8. Products & Categories
             $counts['products'] = Product::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('is_demo', true)
@@ -1036,19 +1388,19 @@ class TenantSampleDataService
                 ->where('is_demo', true)
                 ->delete();
 
-            // 7. Customers
+            // 9. Customers
             $counts['customers'] = Customer::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('is_demo', true)
                 ->delete();
 
-            // 8. Tax Rules
+            // 10. Tax Rules
             $counts['tax_rules'] = TaxRule::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('is_demo', true)
                 ->delete();
 
-            // 9. Demo Users (excluding owner/administrators)
+            // 11. Demo Users (excluding owner/administrators)
             $counts['users'] = User::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('is_demo', true)

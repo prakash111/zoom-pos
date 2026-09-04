@@ -127,6 +127,34 @@ class ModuleRegistry
                     'allow_notes' => true,
                 ],
             ],
+            'repair_technician' => [
+                'id' => 'repair_technician',
+                'title' => 'Repair & Service Workbench',
+                'subtitle' => 'Tickets, parts billing, diagnostics, workbench',
+                'description' => 'Tickets, technician workbench, spare parts billing, diagnostics',
+                'layout_type' => 'repair_kanban',
+                'icon' => 'handyman',
+                'features' => [
+                    'has_tables' => false,
+                    'has_kot' => false,
+                    'has_barcode_scanner' => true,
+                    'has_due_reminders' => true,
+                    'ticket_tracking' => true,
+                    'parts_billing' => true,
+                    'technician_workbench' => true,
+                    'intake_checklist' => true,
+                    'prep_timer' => false,
+                    'order_alerts' => true,
+                ],
+                'cart_configuration' => [
+                    'show_customer_selector' => true,
+                    'allow_split_payment' => true,
+                    'tax_display' => 'country_default',
+                    'allow_discounts' => true,
+                    'allow_held_carts' => true,
+                    'allow_notes' => true,
+                ],
+            ],
         ];
 
         if (! Schema::hasTable('sdui_modules')) {

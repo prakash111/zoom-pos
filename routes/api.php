@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AiImageApiController;
 use App\Http\Controllers\Api\V1\AppBootstrapController;
 use App\Http\Controllers\Api\V1\CashRegisterApiController;
 use App\Http\Controllers\Api\V1\CatalogAdminApiController;
@@ -10,15 +11,17 @@ use App\Http\Controllers\Api\V1\EcommerceWebhookController;
 use App\Http\Controllers\Api\V1\LanguageApiController;
 use App\Http\Controllers\Api\V1\PayablesApiController;
 use App\Http\Controllers\Api\V1\PermissionApiController;
-use App\Http\Controllers\Api\V1\PushDeviceApiController;
+use App\Http\Controllers\Api\V1\PharmacyApiController;
 use App\Http\Controllers\Api\V1\PosDesktopSyncController;
 use App\Http\Controllers\Api\V1\PosSyncApiController;
+use App\Http\Controllers\Api\V1\PushDeviceApiController;
 use App\Http\Controllers\Api\V1\QuotationApiController;
+use App\Http\Controllers\Api\V1\RepairApiController;
 use App\Http\Controllers\Api\V1\ReportsApiController;
 use App\Http\Controllers\Api\V1\RestaurantApiController;
 use App\Http\Controllers\Api\V1\SalesTargetApiController;
-use App\Http\Controllers\Api\V1\ServiceOrderApiController;
 use App\Http\Controllers\Api\V1\SduiViewController;
+use App\Http\Controllers\Api\V1\ServiceOrderApiController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
 use App\Http\Controllers\Api\V1\TaxApiController;
 use App\Http\Controllers\Api\V1\TenantDemoDataController;
@@ -88,6 +91,34 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
         Route::post('/test', [SettingsApiController::class, 'testNotificationChannel']);
     });
 
+    // Pharmacy POS Module Routes
+    Route::prefix('tenant/pharmacy')->group(function () {
+        Route::get('/search', [PharmacyApiController::class, 'search'])->middleware('tenant.api.permission:products,view');
+        Route::post('/checkout', [PharmacyApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
+        Route::get('/batches', [PharmacyApiController::class, 'batchesIndex'])->middleware('tenant.api.permission:products,view');
+        Route::post('/batches', [PharmacyApiController::class, 'batchesStore'])->middleware('tenant.api.permission:products,create');
+        Route::post('/batches/adjust', [PharmacyApiController::class, 'batchesAdjust'])->middleware('tenant.api.permission:products,edit');
+        Route::post('/batches/{id}/adjust', [PharmacyApiController::class, 'batchesAdjust'])->middleware('tenant.api.permission:products,edit');
+        Route::post('/batches/return', [PharmacyApiController::class, 'batchesReturn'])->middleware('tenant.api.permission:products,edit');
+        Route::post('/batches/{id}/return', [PharmacyApiController::class, 'batchesReturn'])->middleware('tenant.api.permission:products,edit');
+        Route::get('/prescriptions', [PharmacyApiController::class, 'prescriptionsIndex'])->middleware('tenant.api.permission:sales,view');
+        Route::post('/prescriptions', [PharmacyApiController::class, 'prescriptionsStore'])->middleware('tenant.api.permission:sales,create');
+        Route::post('/prescriptions/{id}/dispense', [PharmacyApiController::class, 'prescriptionsDispense'])->middleware('tenant.api.permission:pos,edit');
+    });
+
+    // Repair & Technician POS Module Routes
+    Route::prefix('tenant/repair')->group(function () {
+        Route::get('/stats', [RepairApiController::class, 'stats'])->middleware('tenant.api.permission:pos,view');
+        Route::get('/tickets', [RepairApiController::class, 'ticketsIndex'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/tickets', [RepairApiController::class, 'ticketsStore'])->middleware('tenant.api.permission:pos,create');
+        Route::get('/tickets/{id}', [RepairApiController::class, 'ticketsShow'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/tickets/{id}/status', [RepairApiController::class, 'ticketsUpdateStatus'])->middleware('tenant.api.permission:pos,edit');
+        Route::post('/tickets/{id}/parts', [RepairApiController::class, 'ticketsAddPart'])->middleware('tenant.api.permission:pos,edit');
+        Route::delete('/tickets/{ticketId}/parts/{partId}', [RepairApiController::class, 'ticketsRemovePart'])->middleware('tenant.api.permission:pos,edit');
+        Route::post('/tickets/{id}/labor', [RepairApiController::class, 'ticketsSetLabor'])->middleware('tenant.api.permission:pos,edit');
+        Route::post('/tickets/{id}/settle', [RepairApiController::class, 'ticketsSettle'])->middleware('tenant.api.permission:pos,create');
+    });
+
     // One-Click Demo Data Purge
     Route::delete('/tenant/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
     Route::delete('/app/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
@@ -142,8 +173,8 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/inventory/adjust', [PosSyncApiController::class, 'inventoryAdjustStock'])->middleware('tenant.api.permission:products,edit');
 
         // AI Product Image Generation (mobile parity for the web "Generate with AI" button)
-        Route::get('/ai-image/availability', [\App\Http\Controllers\Api\V1\AiImageApiController::class, 'availability'])->middleware('tenant.api.permission:products,view');
-        Route::post('/ai-image/generate', [\App\Http\Controllers\Api\V1\AiImageApiController::class, 'generate'])->middleware('tenant.api.permission:products,edit');
+        Route::get('/ai-image/availability', [AiImageApiController::class, 'availability'])->middleware('tenant.api.permission:products,view');
+        Route::post('/ai-image/generate', [AiImageApiController::class, 'generate'])->middleware('tenant.api.permission:products,edit');
 
         // Customer Ledger & Khata
         Route::get('/customers', [PosSyncApiController::class, 'customersIndex'])->middleware('tenant.api.permission:customers,view');
@@ -292,6 +323,34 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/restaurant/kot', [RestaurantApiController::class, 'kotIndex'])->middleware('tenant.api.permission:pos,view');
         Route::post('/restaurant/kot/{id}/status', [RestaurantApiController::class, 'kotUpdateStatus'])->middleware('tenant.api.permission:pos,edit');
         Route::post('/restaurant/kot/{id}/dismiss-alarm', [RestaurantApiController::class, 'kotDismissAlarm'])->middleware('tenant.api.permission:pos,edit');
+
+        // Pharmacy POS Module Aliases
+        Route::prefix('pharmacy')->group(function () {
+            Route::get('/search', [PharmacyApiController::class, 'search'])->middleware('tenant.api.permission:products,view');
+            Route::post('/checkout', [PharmacyApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
+            Route::get('/batches', [PharmacyApiController::class, 'batchesIndex'])->middleware('tenant.api.permission:products,view');
+            Route::post('/batches', [PharmacyApiController::class, 'batchesStore'])->middleware('tenant.api.permission:products,create');
+            Route::post('/batches/adjust', [PharmacyApiController::class, 'batchesAdjust'])->middleware('tenant.api.permission:products,edit');
+            Route::post('/batches/{id}/adjust', [PharmacyApiController::class, 'batchesAdjust'])->middleware('tenant.api.permission:products,edit');
+            Route::post('/batches/return', [PharmacyApiController::class, 'batchesReturn'])->middleware('tenant.api.permission:products,edit');
+            Route::post('/batches/{id}/return', [PharmacyApiController::class, 'batchesReturn'])->middleware('tenant.api.permission:products,edit');
+            Route::get('/prescriptions', [PharmacyApiController::class, 'prescriptionsIndex'])->middleware('tenant.api.permission:sales,view');
+            Route::post('/prescriptions', [PharmacyApiController::class, 'prescriptionsStore'])->middleware('tenant.api.permission:sales,create');
+            Route::post('/prescriptions/{id}/dispense', [PharmacyApiController::class, 'prescriptionsDispense'])->middleware('tenant.api.permission:pos,edit');
+        });
+
+        // Repair & Technician POS Module Aliases
+        Route::prefix('repair')->group(function () {
+            Route::get('/stats', [RepairApiController::class, 'stats'])->middleware('tenant.api.permission:pos,view');
+            Route::get('/tickets', [RepairApiController::class, 'ticketsIndex'])->middleware('tenant.api.permission:pos,view');
+            Route::post('/tickets', [RepairApiController::class, 'ticketsStore'])->middleware('tenant.api.permission:pos,create');
+            Route::get('/tickets/{id}', [RepairApiController::class, 'ticketsShow'])->middleware('tenant.api.permission:pos,view');
+            Route::post('/tickets/{id}/status', [RepairApiController::class, 'ticketsUpdateStatus'])->middleware('tenant.api.permission:pos,edit');
+            Route::post('/tickets/{id}/parts', [RepairApiController::class, 'ticketsAddPart'])->middleware('tenant.api.permission:pos,edit');
+            Route::delete('/tickets/{ticketId}/parts/{partId}', [RepairApiController::class, 'ticketsRemovePart'])->middleware('tenant.api.permission:pos,edit');
+            Route::post('/tickets/{id}/labor', [RepairApiController::class, 'ticketsSetLabor'])->middleware('tenant.api.permission:pos,edit');
+            Route::post('/tickets/{id}/settle', [RepairApiController::class, 'ticketsSettle'])->middleware('tenant.api.permission:pos,create');
+        });
 
         // Sales Targets & Goals
         Route::get('/sales-targets', [SalesTargetApiController::class, 'index'])->middleware('tenant.api.permission:targets,view');

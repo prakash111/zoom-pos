@@ -4,7 +4,13 @@ namespace App\Services\Sdui;
 
 use App\Models\Company;
 use App\Models\Configuration;
+use App\Models\CustomNotificationChannel;
+use App\Models\PharmacyBatch;
+use App\Models\PharmacyPrescription;
+use App\Models\Product;
+use App\Models\RepairTicket;
 use App\Models\SduiScreen;
+use App\Services\Localization\PlatformRegionalService;
 use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\TenantNavigationConfigService;
 use App\Services\Navigation\TenantNavRegistry;
@@ -382,25 +388,35 @@ class SchemaResponse
         ];
     }
 
-    public static function formSubmitAction(string $endpoint, string $method = 'POST', string $successToast = 'Settings saved successfully', bool $navigateBack = false): array
+    public static function formSubmitAction(string $endpoint, string $method = 'POST', string $successToast = 'Settings saved successfully', bool $navigateBack = false, bool $reload = false): array
     {
-        return [
+        $action = [
             'type' => 'form_submit',
             'endpoint' => $endpoint,
             'method' => strtoupper($method),
             'success_toast' => $successToast,
             'navigate_back' => $navigateBack,
         ];
+        if ($reload) {
+            $action['reload'] = true;
+        }
+
+        return $action;
     }
 
-    public static function apiPostAction(string $endpoint, array $payload = [], string $successToast = 'Action performed'): array
+    public static function apiPostAction(string $endpoint, array $payload = [], string $successToast = 'Action performed', bool $reload = false): array
     {
-        return [
+        $action = [
             'type' => 'api_post',
             'endpoint' => $endpoint,
             'payload' => $payload,
             'success_toast' => $successToast,
         ];
+        if ($reload) {
+            $action['reload'] = true;
+        }
+
+        return $action;
     }
 
     public static function openModalAction(string $title, array $components): array
@@ -576,8 +592,8 @@ class SchemaResponse
                     'AE' => 'United Arab Emirates',
                     'SA' => 'Saudi Arabia',
                 ], $company->country ?? 'US'),
-                self::dropdownSelect('default_locale', 'Store Primary Language', \App\Services\Localization\PlatformRegionalService::languageOptions(), $company->default_locale ?: ($company->language ?: 'en')),
-                self::dropdownSelect('timezone', 'Store Timezone', \App\Services\Localization\PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone()),
+                self::dropdownSelect('default_locale', 'Store Primary Language', PlatformRegionalService::languageOptions(), $company->default_locale ?: ($company->language ?: 'en')),
+                self::dropdownSelect('timezone', 'Store Timezone', PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone()),
             ]),
             self::buttonPrimary('Save Store Profile', self::formSubmitAction(
                 '/api/tenant/settings/profile',
@@ -683,36 +699,740 @@ class SchemaResponse
         ]);
     }
 
+    // =========================================================================
+    // Pharmacy POS Module Views
+    // =========================================================================
+
+    public static function pharmacyPosView(Company $company): array
+    {
+        $products = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->with(['pharmacyBatches' => fn ($q) => $q->where('is_active', true)->orderBy('expiry_date', 'asc')])
+            ->limit(10)
+            ->get();
+
+        $medicineCards = [];
+        foreach ($products as $prod) {
+            $batches = $prod->pharmacyBatches;
+            $fefoBatch = $batches->first(fn ($b) => $b->days_until_expiry >= 0 && $b->stock_qty > 0);
+
+            $batchBadge = $fefoBatch
+                ? self::badge("Batch #{$fefoBatch->batch_number} (Exp: {$fefoBatch->expiry_date?->format('M Y')})", $fefoBatch->expiry_color, 'subtle')
+                : self::badge('No Active Batches', '#64748b', 'subtle');
+
+            $scheduleBadge = $prod->narcotic_schedule
+                ? self::badge($prod->narcotic_schedule, '#ef4444', 'solid')
+                : ($prod->requires_prescription ? self::badge('Rx Required', '#f59e0b', 'subtle') : self::badge('OTC', '#10b981', 'subtle'));
+
+            $batchDropdownOptions = [];
+            foreach ($batches as $b) {
+                $statusTag = $b->days_until_expiry < 0 ? ' [EXPIRED]' : ($b->expiry_status === 'near_expiry' ? ' [EXPIRING SOON]' : '');
+                $batchDropdownOptions[(string) $b->id] = "Batch #{$b->batch_number} - Stock: {$b->stock_qty} - Exp: {$b->expiry_date?->format('Y-m-d')}{$statusTag}";
+            }
+            if (empty($batchDropdownOptions)) {
+                $batchDropdownOptions['default'] = 'Standard Inventory (No Batch)';
+            }
+
+            $medicineCards[] = self::card([
+                self::row([
+                    self::icon('medication', ['color' => '#059669', 'size' => 24]),
+                    self::column([
+                        self::text($prod->name, 'title_medium', ['bold' => true]),
+                        self::text('Generic: '.($prod->generic_name ?: ($prod->composition ?: 'Standard Formulation')), 'body_small', ['color' => '#64748b']),
+                    ]),
+                    $scheduleBadge,
+                ]),
+                self::divider(),
+                self::row([
+                    $batchBadge,
+                    self::text('Price: '.number_format((float) $prod->sale_price, 2), 'label_large', ['bold' => true, 'color' => '#059669']),
+                    self::text('Stock: '.(int) $prod->current_stock, 'body_small', ['color' => '#475569']),
+                ]),
+            ]);
+        }
+
+        return self::screen('Pharmacy Counter POS', [
+            self::card([
+                self::row([
+                    self::icon('local_pharmacy', ['color' => '#059669', 'size' => 28]),
+                    self::column([
+                        self::text('Pharmacy Dispensing Terminal', 'title_medium', ['bold' => true]),
+                        self::text('FEFO Automated Batch Allocation, Controlled Drug Validation & Split Checkout', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::row([
+                    self::badge('FEFO Priority Active', '#059669', 'subtle'),
+                    self::badge('Narcotic Check Enforced', '#dc2626', 'subtle'),
+                ]),
+            ]),
+
+            self::card([
+                self::text('Fast Medicine Search', 'label_large', ['bold' => true]),
+                self::textInput('search_term', 'Search Generic Formula, Brand Name, or Barcode', '', [
+                    'placeholder' => 'e.g. Paracetamol, Amoxicillin, Metformin 500mg',
+                ]),
+            ]),
+
+            self::card([
+                self::text('Prescription (Rx) Attachment', 'title_medium', ['bold' => true]),
+                self::text('Required for Schedule H and narcotic-controlled drugs.', 'body_small', ['color' => '#64748b']),
+                self::divider(),
+                self::textInput('patient_name', 'Patient Full Name', ''),
+                self::textInput('doctor_name', 'Prescribing Doctor Name', ''),
+                self::textInput('doctor_registration_no', 'Doctor Registration / Medical Council #', ''),
+                self::textInput('diagnosis', 'Diagnosis / Dosage Instructions', ''),
+            ]),
+
+            self::card([
+                self::text('Available Medicines & FEFO Batches', 'title_medium', ['bold' => true]),
+                self::column($medicineCards),
+            ]),
+
+            self::card([
+                self::text('Point of Sale Checkout & Settlement', 'title_medium', ['bold' => true]),
+                self::dropdownSelect('payment_method', 'Payment Method', [
+                    ['label' => 'Cash Payment', 'value' => 'cash'],
+                    ['label' => 'Debit / Credit Card', 'value' => 'card'],
+                    ['label' => 'UPI / QR Code', 'value' => 'upi'],
+                    ['label' => 'Split Payment', 'value' => 'split'],
+                ], 'cash'),
+                self::textInput('customer_name', 'Customer / Patient Name', 'Walk-in Customer'),
+                self::textInput('customer_phone', 'Phone Number', ''),
+                self::textInput('discount_amount', 'Discount Amount', '0.00'),
+                self::textInput('checkout_notes', 'Dispensing Notes', 'Counter Sale'),
+                self::divider(),
+                self::buttonPrimary('Complete Checkout & Dispense', self::formSubmitAction(
+                    '/api/tenant/pharmacy/checkout',
+                    'POST',
+                    'Pharmacy transaction completed and stock dispensed successfully.',
+                    reload: true
+                ), 'point_of_sale'),
+            ]),
+        ]);
+    }
+
     public static function pharmacyBatchesView(Company $company): array
     {
+        $batches = PharmacyBatch::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with('product')
+            ->orderBy('expiry_date', 'asc')
+            ->limit(25)
+            ->get();
+
+        $totalBatches = PharmacyBatch::withoutGlobalScope('company')->where('company_id', $company->id)->count();
+        $expiredCount = $batches->filter(fn ($b) => $b->days_until_expiry < 0)->count();
+        $nearExpiryCount = $batches->filter(fn ($b) => $b->days_until_expiry >= 0 && $b->days_until_expiry <= 90)->count();
+        $safeCount = $batches->filter(fn ($b) => $b->days_until_expiry > 90)->count();
+
+        $batchCards = [];
+        foreach ($batches as $b) {
+            $days = $b->days_until_expiry;
+            $statusLabel = $days < 0 ? "EXPIRED ({$days}d)" : ($days <= 90 ? "EXPIRING SOON ({$days}d left)" : "SAFE ({$days}d)");
+
+            $batchCards[] = self::card([
+                self::row([
+                    self::icon('medication', ['color' => $b->expiry_color, 'size' => 24]),
+                    self::column([
+                        self::text("Batch #{$b->batch_number}", 'title_medium', ['bold' => true]),
+                        self::text(($b->product?->name ?? 'Unknown Medicine').' ('.($b->product?->generic_name ?: 'Standard').')', 'body_small', ['color' => '#64748b']),
+                    ]),
+                    self::badge($statusLabel, $b->expiry_color, 'subtle'),
+                ]),
+                self::divider(),
+                self::row([
+                    self::text("Stock: {$b->stock_qty} units", 'label_large', ['bold' => true]),
+                    self::text('Cost: '.number_format((float) $b->cost_price, 2), 'body_small'),
+                    self::text('MRP: '.number_format((float) $b->selling_price, 2), 'body_small', ['color' => '#059669', 'bold' => true]),
+                    self::text("Exp: {$b->expiry_date?->format('Y-m-d')}", 'body_small', ['color' => '#64748b']),
+                ]),
+            ]);
+        }
+
+        $productOptions = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->pluck('name', 'id')
+            ->toArray();
+
+        if (empty($productOptions)) {
+            $productOptions = ['1' => 'General Medicine Item'];
+        }
+
         return self::screen('Batch & Expiry Manager', [
             self::card([
                 self::row([
                     self::icon('medication', ['color' => '#059669', 'size' => 28]),
                     self::column([
                         self::text('Medicine Batches & Expiry Tracking', 'title_medium', ['bold' => true]),
-                        self::text('Track batch numbers, manufacturing dates, and upcoming expirations.', 'body_small', ['color' => '#64748b']),
+                        self::text('Track batch numbers, manufacturing dates, and upcoming expirations under FEFO.', 'body_small', ['color' => '#64748b']),
                     ]),
                 ]),
                 self::divider(),
-                self::badge('Pharmacy Management Active', '#059669', 'subtle'),
+                self::row([
+                    self::badge("Total Batches: {$totalBatches}", '#0284c7', 'subtle'),
+                    self::badge("Safe: {$safeCount}", '#10b981', 'subtle'),
+                    self::badge("Expiring Soon: {$nearExpiryCount}", '#f59e0b', 'subtle'),
+                    self::badge("Expired: {$expiredCount}", '#ef4444', 'subtle'),
+                ]),
+            ]),
+
+            self::accordionGroup('Register New Medicine Batch', [
+                self::dropdownSelect('product_id', 'Select Medicine / Drug', $productOptions),
+                self::textInput('batch_number', 'Batch Number (e.g. BTH-2026-908)', ''),
+                self::dateTimePicker('manufacturing_date', 'Manufacturing Date', mode: 'date'),
+                self::dateTimePicker('expiry_date', 'Expiry Date (FEFO Sorted)', mode: 'date'),
+                self::textInput('cost_price', 'Cost Price (Per Unit)', '0.00'),
+                self::textInput('selling_price', 'Selling Price (MRP / Unit)', '0.00'),
+                self::textInput('stock_qty', 'Initial Received Stock Quantity', '100'),
+                self::textInput('alert_days_before_expiry', 'Alert Days Before Expiry', '90'),
+                self::divider(),
+                self::buttonPrimary('Save Batch to Inventory', self::formSubmitAction(
+                    '/api/tenant/pharmacy/batches',
+                    'POST',
+                    'Batch registered and stock updated.',
+                    reload: true
+                ), 'add_circle'),
+            ]),
+
+            self::card([
+                self::text('Batch Stock Adjustment / Vendor Return', 'label_large', ['bold' => true]),
+                self::text('Adjust damaged stock or record returns to pharmaceutical distributors.', 'body_small', ['color' => '#64748b']),
+                self::divider(),
+                self::textInput('batch_id', 'Batch ID Number', ''),
+                self::textInput('new_stock_qty', 'New Audited Quantity', '0'),
+                self::textInput('reason', 'Adjustment Reason (Damaged / Return / Discrepancy)', 'Audit verification'),
+                self::divider(),
+                self::row([
+                    self::buttonOutlined('Adjust Stock', self::formSubmitAction(
+                        '/api/tenant/pharmacy/batches/adjust',
+                        'POST',
+                        'Batch stock adjusted.',
+                        reload: true
+                    ), 'tune'),
+                    self::buttonDanger('Vendor Return', self::formSubmitAction(
+                        '/api/tenant/pharmacy/batches/return',
+                        'POST',
+                        'Vendor return recorded.',
+                        reload: true
+                    ), 'keyboard_return'),
+                ]),
+            ]),
+
+            self::card([
+                self::text('Active Medicine Batches (FEFO Order)', 'title_medium', ['bold' => true]),
+                self::column(! empty($batchCards) ? $batchCards : [
+                    self::text('No active batches registered yet. Use the form above to add a new batch.', 'body_medium', ['color' => '#64748b']),
+                ]),
             ]),
         ]);
     }
 
     public static function pharmacyPrescriptionsView(Company $company): array
     {
+        $prescriptions = PharmacyPrescription::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->orderByDesc('created_at')
+            ->limit(20)
+            ->get();
+
+        $totalRx = PharmacyPrescription::withoutGlobalScope('company')->where('company_id', $company->id)->count();
+        $pendingRx = PharmacyPrescription::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'pending')->count();
+        $dispensedRx = PharmacyPrescription::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'dispensed')->count();
+
+        $rxCards = [];
+        foreach ($prescriptions as $rx) {
+            $isPending = $rx->status === 'pending';
+            $badgeColor = $isPending ? '#f59e0b' : '#10b981';
+
+            $rxCards[] = self::card([
+                self::row([
+                    self::icon('receipt_long', ['color' => $badgeColor, 'size' => 24]),
+                    self::column([
+                        self::text("Rx #{$rx->prescription_number}", 'title_medium', ['bold' => true]),
+                        self::text("Patient: {$rx->patient_name} | Doctor: {$rx->doctor_name}", 'body_small', ['color' => '#64748b']),
+                    ]),
+                    self::badge(strtoupper($rx->status), $badgeColor, 'subtle'),
+                ]),
+                self::divider(),
+                self::text('Diagnosis / Notes: '.($rx->diagnosis ?: ($rx->notes ?: 'General prescription')), 'body_small'),
+                self::text('Date: '.($rx->prescription_date?->format('Y-m-d') ?? 'Today'), 'body_small', ['color' => '#94a3b8']),
+                $isPending ? self::buttonPrimary('Dispense at POS', self::navigateAction('/api/tenant/views/pharmacy-pos', title: 'Pharmacy Counter POS'), 'point_of_sale') : self::badge('Dispensed Successfully', '#10b981', 'subtle'),
+            ]);
+        }
+
         return self::screen('Prescriptions Queue', [
             self::card([
                 self::row([
                     self::icon('receipt_long', ['color' => '#059669', 'size' => 28]),
                     self::column([
                         self::text('Prescriptions & Patient Queue', 'title_medium', ['bold' => true]),
-                        self::text('Dispensed prescriptions, doctor referrals, and patient records.', 'body_small', ['color' => '#64748b']),
+                        self::text('Doctor referrals, prescription intake, and controlled drug verification.', 'body_small', ['color' => '#64748b']),
                     ]),
                 ]),
                 self::divider(),
-                self::badge('Prescriptions Live', '#059669', 'subtle'),
+                self::row([
+                    self::badge("Total Prescriptions: {$totalRx}", '#0284c7', 'subtle'),
+                    self::badge("Pending: {$pendingRx}", '#f59e0b', 'subtle'),
+                    self::badge("Dispensed: {$dispensedRx}", '#10b981', 'subtle'),
+                ]),
+            ]),
+
+            self::accordionGroup('New Prescription Intake', [
+                self::textInput('patient_name', 'Patient Full Name', ''),
+                self::textInput('patient_phone', 'Patient Contact Phone #', ''),
+                self::textInput('doctor_name', 'Prescribing Doctor Name', ''),
+                self::textInput('doctor_registration_no', 'Doctor Registration / License #', ''),
+                self::dateTimePicker('prescription_date', 'Prescription Date', mode: 'date'),
+                self::textInput('diagnosis', 'Diagnosis / Clinical Indications', ''),
+                self::textInput('notes', 'Prescribed Medicines, Dosages & Frequency', ''),
+                self::divider(),
+                self::buttonPrimary('Save to Prescription Queue', self::formSubmitAction(
+                    '/api/tenant/pharmacy/prescriptions',
+                    'POST',
+                    'Prescription logged to queue.',
+                    reload: true
+                ), 'post_add'),
+            ]),
+
+            self::card([
+                self::text('Prescription Queue', 'title_medium', ['bold' => true]),
+                self::column(! empty($rxCards) ? $rxCards : [
+                    self::text('No prescriptions currently logged. Use the form above to add a new Rx.', 'body_medium', ['color' => '#64748b']),
+                ]),
+            ]),
+        ]);
+    }
+
+    // =========================================================================
+    // Repair & Technician POS Module Views
+    // =========================================================================
+
+    public static function repairDashboardView(Company $company): array
+    {
+        $tickets = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['parts', 'technician:id,name'])
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
+
+        $activeCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'active')->count();
+        $diagCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'diagnosing')->count();
+        $partsCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'waiting_parts')->count();
+        $inProgCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'in_progress')->count();
+        $repairedCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'repaired')->count();
+        $deliveredCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'delivered')->count();
+
+        $recentCards = [];
+        foreach ($tickets as $t) {
+            $recentCards[] = self::card([
+                self::row([
+                    self::icon('handyman', ['color' => $t->status_color, 'size' => 24]),
+                    self::column([
+                        self::text("#{$t->ticket_number} - {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
+                        self::text("Customer: {$t->customer_name} ({$t->customer_phone})", 'body_small', ['color' => '#64748b']),
+                    ]),
+                    self::badge(strtoupper($t->status), $t->status_color, 'subtle'),
+                ]),
+                self::divider(),
+                self::text("Issue: {$t->issue_description}", 'body_small'),
+                self::row([
+                    self::text('Total: '.number_format((float) $t->total_amount, 2), 'label_large', ['bold' => true]),
+                    self::text('Advance: '.number_format((float) $t->advance_paid, 2), 'body_small'),
+                    self::text('Due: '.number_format((float) $t->balance_due, 2), 'label_large', ['color' => '#dc2626', 'bold' => true]),
+                    self::badge($t->priority, $t->priority_color, 'subtle'),
+                ]),
+                self::buttonPrimary('Open Workbench', self::navigateAction('/api/tenant/views/repair-detail', title: 'Ticket Workbench'), 'build'),
+            ]);
+        }
+
+        return self::screen('Repair Workbench', [
+            self::card([
+                self::row([
+                    self::icon('handyman', ['color' => '#0284c7', 'size' => 28]),
+                    self::column([
+                        self::text('Repair & Technician Workbench', 'title_medium', ['bold' => true]),
+                        self::text('Hardware diagnostics, spare parts billing, labor calculation, and POS settlement.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::row([
+                    self::badge("Active: {$activeCount}", '#0284c7', 'subtle'),
+                    self::badge("Diagnosing: {$diagCount}", '#8b5cf6', 'subtle'),
+                    self::badge("Waiting Parts: {$partsCount}", '#f59e0b', 'subtle'),
+                    self::badge("In Progress: {$inProgCount}", '#3b82f6', 'subtle'),
+                    self::badge("Ready: {$repairedCount}", '#10b981', 'subtle'),
+                    self::badge("Delivered: {$deliveredCount}", '#059669', 'subtle'),
+                ]),
+            ]),
+
+            self::row([
+                self::buttonPrimary('New Intake Ticket', self::navigateAction('/api/tenant/views/repair-create-ticket', title: 'New Repair Ticket'), 'add_task'),
+                self::buttonOutlined('All Tickets', self::navigateAction('/api/tenant/views/repair-tickets', title: 'Repair Ticket Register'), 'receipt_long'),
+                self::buttonOutlined('My Jobs', self::navigateAction('/api/tenant/views/repair-my-jobs', title: 'Assigned Jobs'), 'engineering'),
+            ]),
+
+            self::card([
+                self::text('Active Repair Workbench Jobs', 'title_medium', ['bold' => true]),
+                self::column(! empty($recentCards) ? $recentCards : [
+                    self::text('No repair tickets in the workshop. Click "New Intake Ticket" to check in a device.', 'body_medium', ['color' => '#64748b']),
+                ]),
+            ]),
+        ]);
+    }
+
+    public static function repairCreateTicketView(Company $company): array
+    {
+        return self::screen('New Repair Ticket', [
+            self::card([
+                self::row([
+                    self::icon('add_task', ['color' => '#0284c7', 'size' => 28]),
+                    self::column([
+                        self::text('Device Intake & Job Creation', 'title_medium', ['bold' => true]),
+                        self::text('Record customer info, hardware details, passcodes, and physical condition.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+            ]),
+
+            self::card([
+                self::text('Customer Information', 'title_medium', ['bold' => true]),
+                self::textInput('customer_name', 'Customer Full Name', ''),
+                self::textInput('customer_phone', 'Contact Phone Number', ''),
+            ]),
+
+            self::card([
+                self::text('Device Specifications', 'title_medium', ['bold' => true]),
+                self::dropdownSelect('device_type', 'Device Category', [
+                    ['label' => 'Smartphone', 'value' => 'Smartphone'],
+                    ['label' => 'Laptop / PC', 'value' => 'Laptop'],
+                    ['label' => 'Tablet / iPad', 'value' => 'Tablet'],
+                    ['label' => 'Smartwatch / Wearable', 'value' => 'Smartwatch'],
+                    ['label' => 'Audio / Speakers / Headphone', 'value' => 'Audio'],
+                    ['label' => 'Gaming Console', 'value' => 'Console'],
+                    ['label' => 'Home Appliance / Other', 'value' => 'Appliance'],
+                ], 'Smartphone'),
+                self::textInput('brand', 'Brand (e.g. Apple, Samsung, Dell, HP)', ''),
+                self::textInput('model', 'Model Name / Number (e.g. iPhone 14 Pro, Galaxy S23)', ''),
+                self::textInput('serial_or_imei', 'Serial Number or IMEI (Optional)', ''),
+                self::textInput('passcode_or_pattern', 'Device Screen Lock Passcode / Pattern', ''),
+            ]),
+
+            self::card([
+                self::text('Diagnosis & Estimate', 'title_medium', ['bold' => true]),
+                self::textInput('issue_description', 'Customer Reported Defect / Fault Description', ''),
+                self::textInput('physical_condition_notes', 'Physical Condition (Scratches, Dents, Cracks)', ''),
+                self::dropdownSelect('priority', 'Repair Priority Level', [
+                    ['label' => 'Normal Priority', 'value' => 'normal'],
+                    ['label' => 'Low Priority', 'value' => 'low'],
+                    ['label' => 'High Priority', 'value' => 'high'],
+                    ['label' => 'Urgent / Express Service', 'value' => 'urgent'],
+                ], 'normal'),
+                self::textInput('estimated_cost', 'Estimated Repair Cost', '0.00'),
+                self::textInput('advance_paid', 'Advance Deposit Paid', '0.00'),
+            ]),
+
+            self::card([
+                self::text('Intake Inspection Checklist', 'title_medium', ['bold' => true]),
+                self::text('Verify working state of common components before technician disassembly.', 'body_small', ['color' => '#64748b']),
+                self::divider(),
+                self::dropdownSelect('check_power', '1. Power On / Boot Up State', [
+                    ['label' => 'Pass (Powers on normally)', 'value' => 'pass'],
+                    ['label' => 'Fail (Dead / No response)', 'value' => 'fail'],
+                    ['label' => 'Not Tested', 'value' => 'not_tested'],
+                ], 'pass'),
+                self::dropdownSelect('check_display', '2. Display & Touchscreen', [
+                    ['label' => 'Pass (Touch & screen responsive)', 'value' => 'pass'],
+                    ['label' => 'Fail (Lines / Cracks / No Touch)', 'value' => 'fail'],
+                    ['label' => 'Not Tested', 'value' => 'not_tested'],
+                ], 'pass'),
+                self::dropdownSelect('check_cameras', '3. Front & Back Cameras', [
+                    ['label' => 'Pass (Clear picture & flash)', 'value' => 'pass'],
+                    ['label' => 'Fail (Blurry / Black screen)', 'value' => 'fail'],
+                    ['label' => 'Not Tested', 'value' => 'not_tested'],
+                ], 'pass'),
+                self::dropdownSelect('check_charging', '4. Charging Port & Battery', [
+                    ['label' => 'Pass (Detects charger)', 'value' => 'pass'],
+                    ['label' => 'Fail (Loose port / No charge)', 'value' => 'fail'],
+                    ['label' => 'Not Tested', 'value' => 'not_tested'],
+                ], 'pass'),
+                self::dropdownSelect('check_speakers', '5. Audio, Mic & Speakers', [
+                    ['label' => 'Pass (Sound clear)', 'value' => 'pass'],
+                    ['label' => 'Fail (Distorted / No sound)', 'value' => 'fail'],
+                    ['label' => 'Not Tested', 'value' => 'not_tested'],
+                ], 'pass'),
+            ]),
+
+            self::buttonPrimary('Create Intake Ticket & Print Tag', self::formSubmitAction(
+                '/api/tenant/repair/tickets',
+                'POST',
+                'Repair intake ticket created successfully.',
+                reload: true
+            ), 'add_task'),
+        ]);
+    }
+
+    public static function repairTicketsView(Company $company): array
+    {
+        $tickets = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['parts', 'technician:id,name'])
+            ->orderByDesc('created_at')
+            ->limit(30)
+            ->get();
+
+        $ticketCards = [];
+        foreach ($tickets as $t) {
+            $ticketCards[] = self::card([
+                self::row([
+                    self::icon('receipt_long', ['color' => $t->status_color, 'size' => 24]),
+                    self::column([
+                        self::text("#{$t->ticket_number} - {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
+                        self::text("Customer: {$t->customer_name} ({$t->customer_phone})", 'body_small', ['color' => '#64748b']),
+                    ]),
+                    self::badge(strtoupper($t->status), $t->status_color, 'subtle'),
+                ]),
+                self::divider(),
+                self::text("Defect: {$t->issue_description}", 'body_small'),
+                self::row([
+                    self::text('Total: '.number_format((float) $t->total_amount, 2), 'label_large', ['bold' => true]),
+                    self::text('Advance: '.number_format((float) $t->advance_paid, 2), 'body_small'),
+                    self::text('Due: '.number_format((float) $t->balance_due, 2), 'label_large', ['color' => '#dc2626', 'bold' => true]),
+                    self::badge($t->priority, $t->priority_color, 'subtle'),
+                ]),
+                self::divider(),
+                self::row([
+                    self::buttonPrimary('Open Workbench', self::navigateAction('/api/tenant/views/repair-detail', title: 'Ticket Workbench'), 'build'),
+                    self::buttonOutlined('Delivered & Settle', self::formSubmitAction(
+                        "/api/tenant/repair/tickets/{$t->id}/settle",
+                        'POST',
+                        'Ticket settled & converted to POS sale',
+                        reload: true
+                    ), 'point_of_sale'),
+                ]),
+            ]);
+        }
+
+        return self::screen('Repair Ticket Register', [
+            self::card([
+                self::row([
+                    self::icon('receipt_long', ['color' => '#0284c7', 'size' => 28]),
+                    self::column([
+                        self::text('Complete Repair Ticket Register', 'title_medium', ['bold' => true]),
+                        self::text('Filter and manage lifecycle from device check-in to final pickup.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+            ]),
+
+            self::card([
+                self::text('Search Tickets', 'label_large', ['bold' => true]),
+                self::textInput('ticket_search', 'Search Ticket #, Customer Name, Phone, or Serial/IMEI', ''),
+            ]),
+
+            self::column(! empty($ticketCards) ? $ticketCards : [
+                self::card([
+                    self::text('No repair tickets found in register.', 'body_medium', ['color' => '#64748b']),
+                ]),
+            ]),
+        ]);
+    }
+
+    public static function repairMyJobsView(Company $company): array
+    {
+        $tickets = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->whereIn('status', ['active', 'diagnosing', 'waiting_parts', 'in_progress', 'repaired'])
+            ->with(['parts'])
+            ->orderByDesc('priority')
+            ->limit(20)
+            ->get();
+
+        $jobCards = [];
+        foreach ($tickets as $t) {
+            $jobCards[] = self::card([
+                self::row([
+                    self::icon('engineering', ['color' => $t->status_color, 'size' => 24]),
+                    self::column([
+                        self::text("#{$t->ticket_number} - {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
+                        self::text("Category: {$t->device_type} | Serial: ".($t->serial_or_imei ?: 'N/A'), 'body_small', ['color' => '#64748b']),
+                    ]),
+                    self::badge(strtoupper($t->status), $t->status_color, 'subtle'),
+                ]),
+                self::divider(),
+                self::text("Issue: {$t->issue_description}", 'body_medium', ['bold' => true]),
+                self::text('Lock/Passcode: '.($t->passcode_or_pattern ?: 'None'), 'body_small', ['color' => '#dc2626']),
+                self::divider(),
+                self::row([
+                    self::buttonOutlined('Diagnosing', self::formSubmitAction(
+                        "/api/tenant/repair/tickets/{$t->id}/status",
+                        'POST',
+                        'Status set to Diagnosing',
+                        reload: true
+                    ), 'biotech'),
+                    self::buttonOutlined('Waiting Parts', self::formSubmitAction(
+                        "/api/tenant/repair/tickets/{$t->id}/status",
+                        'POST',
+                        'Status set to Waiting Parts',
+                        reload: true
+                    ), 'hourglass_top'),
+                    self::buttonPrimary('Mark Repaired', self::formSubmitAction(
+                        "/api/tenant/repair/tickets/{$t->id}/status",
+                        'POST',
+                        'Marked as Repaired & Ready',
+                        reload: true
+                    ), 'task_alt'),
+                ]),
+            ]);
+        }
+
+        return self::screen('Technician Assigned Jobs', [
+            self::card([
+                self::row([
+                    self::icon('engineering', ['color' => '#0284c7', 'size' => 28]),
+                    self::column([
+                        self::text('Technician Active Workbench', 'title_medium', ['bold' => true]),
+                        self::text('Quick status transition and diagnostics for open assigned hardware repairs.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+            ]),
+
+            self::column(! empty($jobCards) ? $jobCards : [
+                self::card([
+                    self::text('No pending jobs on the workbench.', 'body_medium', ['color' => '#64748b']),
+                ]),
+            ]),
+        ]);
+    }
+
+    public static function repairDetailView(Company $company): array
+    {
+        $ticket = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['parts', 'checklists', 'technician:id,name'])
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (! $ticket) {
+            return self::screen('Repair Workbench', [
+                self::card([
+                    self::text('No active repair ticket selected.', 'title_medium', ['bold' => true]),
+                    self::text('Please select a ticket from the register or create a new intake ticket.', 'body_small', ['color' => '#64748b']),
+                    self::divider(),
+                    self::buttonPrimary('Create New Ticket', self::navigateAction('/api/tenant/views/repair-create-ticket', title: 'New Repair Ticket'), 'add_task'),
+                ]),
+            ]);
+        }
+
+        $partsCards = [];
+        foreach ($ticket->parts as $p) {
+            $partsCards[] = self::row([
+                self::text("• {$p->part_name} (x{$p->quantity})", 'body_medium'),
+                self::text(number_format((float) $p->subtotal, 2), 'body_medium', ['bold' => true]),
+            ]);
+        }
+
+        $checklistItems = [];
+        foreach ($ticket->checklists as $c) {
+            $statusColor = match ($c->status) {
+                'pass' => '#10b981',
+                'fail' => '#ef4444',
+                default => '#64748b',
+            };
+            $checklistItems[] = self::row([
+                self::text($c->item_name, 'body_small'),
+                self::badge(strtoupper($c->status), $statusColor, 'subtle'),
+            ]);
+        }
+
+        return self::screen("Workbench: #{$ticket->ticket_number}", [
+            self::card([
+                self::row([
+                    self::icon('handyman', ['color' => $ticket->status_color, 'size' => 28]),
+                    self::column([
+                        self::text("Ticket #{$ticket->ticket_number}", 'title_large', ['bold' => true]),
+                        self::text("{$ticket->brand} {$ticket->model} ({$ticket->device_type})", 'body_medium', ['color' => '#64748b']),
+                    ]),
+                    self::badge(strtoupper($ticket->status), $ticket->status_color, 'solid'),
+                ]),
+                self::divider(),
+                self::row([
+                    self::text("Customer: {$ticket->customer_name}", 'body_small'),
+                    self::text("Phone: {$ticket->customer_phone}", 'body_small'),
+                    self::text('Serial: '.($ticket->serial_or_imei ?: 'N/A'), 'body_small'),
+                    self::text('Lock Passcode: '.($ticket->passcode_or_pattern ?: 'None'), 'body_small', ['bold' => true, 'color' => '#dc2626']),
+                ]),
+            ]),
+
+            self::card([
+                self::text('Reported Defect & Diagnosis', 'title_medium', ['bold' => true]),
+                self::text($ticket->issue_description, 'body_medium'),
+                self::divider(),
+                self::text('Physical Condition Notes: '.($ticket->physical_condition_notes ?: 'No pre-existing damage noted.'), 'body_small', ['color' => '#64748b']),
+            ]),
+
+            self::card([
+                self::text('Intake Inspection Checklist', 'title_medium', ['bold' => true]),
+                self::column(! empty($checklistItems) ? $checklistItems : [
+                    self::text('No checklist items logged.', 'body_small', ['color' => '#64748b']),
+                ]),
+            ]),
+
+            self::card([
+                self::text('Spare Parts Used & Billed', 'title_medium', ['bold' => true]),
+                self::column(! empty($partsCards) ? $partsCards : [
+                    self::text('No spare parts attached to this ticket yet.', 'body_small', ['color' => '#64748b']),
+                ]),
+                self::divider(),
+                self::text('Add Spare Part to Ticket', 'label_large', ['bold' => true]),
+                self::textInput('part_name', 'Spare Part Name (e.g. OLED Display Assembly, Battery)', ''),
+                self::textInput('quantity', 'Quantity', '1'),
+                self::textInput('unit_price', 'Price Billed to Customer', '0.00'),
+                self::buttonPrimary('Add Part to Job', self::formSubmitAction(
+                    "/api/tenant/repair/tickets/{$ticket->id}/parts",
+                    'POST',
+                    'Spare part added and stock deducted.',
+                    reload: true
+                ), 'add_circle'),
+            ]),
+
+            self::card([
+                self::text('Labor Fee & Cost Summary', 'title_medium', ['bold' => true]),
+                self::textInput('labor_fee', 'Labor / Technician Service Charge', (string) $ticket->labor_fee),
+                self::buttonOutlined('Update Labor Fee', self::formSubmitAction(
+                    "/api/tenant/repair/tickets/{$ticket->id}/labor",
+                    'POST',
+                    'Labor fee updated successfully.',
+                    reload: true
+                ), 'save'),
+                self::divider(),
+                self::row([
+                    self::text('Parts Subtotal: '.number_format((float) $ticket->parts_cost, 2), 'body_medium'),
+                    self::text('Labor Fee: '.number_format((float) $ticket->labor_fee, 2), 'body_medium'),
+                    self::text('Total Amount: '.number_format((float) $ticket->total_amount, 2), 'title_medium', ['bold' => true]),
+                ]),
+                self::row([
+                    self::text('Advance Paid: '.number_format((float) $ticket->advance_paid, 2), 'body_medium', ['color' => '#059669']),
+                    self::text('Balance Due: '.number_format((float) $ticket->balance_due, 2), 'title_medium', ['bold' => true, 'color' => '#dc2626']),
+                ]),
+            ]),
+
+            self::card([
+                self::text('Final POS Settlement & Customer Delivery', 'title_medium', ['bold' => true]),
+                self::text('Settle outstanding balance and generate official POS sale invoice.', 'body_small', ['color' => '#64748b']),
+                self::divider(),
+                self::dropdownSelect('payment_method', 'Settlement Payment Method', [
+                    ['label' => 'Cash', 'value' => 'cash'],
+                    ['label' => 'Credit / Debit Card', 'value' => 'card'],
+                    ['label' => 'UPI / QR', 'value' => 'upi'],
+                ], 'cash'),
+                self::buttonPrimary('Settle & Deliver to Customer (Generate Invoice)', self::formSubmitAction(
+                    "/api/tenant/repair/tickets/{$ticket->id}/settle",
+                    'POST',
+                    'Ticket settled and converted to POS Sale successfully.',
+                    reload: true
+                ), 'receipt_long'),
             ]),
         ]);
     }
@@ -876,7 +1596,7 @@ class SchemaResponse
                 self::text('Base Operating Currency', 'title_medium', ['bold' => true]),
                 self::text('Select default currency code and decimal display parameters.', 'body_small', ['color' => '#6b7280']),
                 self::divider(),
-                self::dropdownSelect('currency', 'Base Currency Code', \App\Services\Localization\PlatformRegionalService::currencyOptions(), $company->currency ?? 'USD'),
+                self::dropdownSelect('currency', 'Base Currency Code', PlatformRegionalService::currencyOptions(), $company->currency ?? 'USD'),
                 self::textInput('currency_symbol', 'Currency Symbol', $company->currency_symbol ?? '$'),
                 self::dropdownSelect('currency_decimals', 'Decimal Precision', [
                     '0' => '0 (e.g. 100)',
@@ -914,8 +1634,8 @@ class SchemaResponse
                 self::text('Regional Localization & Store Defaults', 'title_medium', ['bold' => true]),
                 self::text('Configure primary store language and operating timezone inherited or overridden from platform baseline.', 'body_small', ['color' => '#6b7280']),
                 self::divider(),
-                self::dropdownSelect('default_locale', 'Store Primary Language', \App\Services\Localization\PlatformRegionalService::languageOptions(), $company->default_locale ?: ($company->language ?: 'en')),
-                self::dropdownSelect('timezone', 'Store Operating Timezone', \App\Services\Localization\PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone()),
+                self::dropdownSelect('default_locale', 'Store Primary Language', PlatformRegionalService::languageOptions(), $company->default_locale ?: ($company->language ?: 'en')),
+                self::dropdownSelect('timezone', 'Store Operating Timezone', PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone()),
             ]),
             self::buttonPrimary('Save Localization Settings', self::formSubmitAction(
                 '/api/tenant/settings/profile',
@@ -1311,7 +2031,7 @@ class SchemaResponse
 
     public static function notificationsView(Company $company): array
     {
-        $channels = \App\Models\CustomNotificationChannel::where('company_id', $company->id)->get();
+        $channels = CustomNotificationChannel::where('company_id', $company->id)->get();
         $channelTiles = [];
         foreach ($channels as $channel) {
             $format = strtoupper($channel->payload_format ?: 'JSON');
@@ -1445,12 +2165,16 @@ class SchemaResponse
             return 'sales.view';
         }
 
-        if (in_array($normalized, ['pharmacy-batches'], true)) {
+        if (in_array($normalized, ['pharmacy-pos', 'pharmacy-batches'], true)) {
             return 'products.view';
         }
 
         if (in_array($normalized, ['pharmacy-prescriptions'], true)) {
             return 'sales.view';
+        }
+
+        if (in_array($normalized, ['repair-dashboard', 'repair-create-ticket', 'repair-tickets', 'repair-my-jobs', 'repair-detail'], true)) {
+            return 'pos.view';
         }
 
         if (in_array($normalized, ['service-calendar', 'service-orders'], true)) {
@@ -1526,8 +2250,14 @@ class SchemaResponse
             'restaurant-kds', 'kds', 'kitchen-display' => self::restaurantKdsView($company),
             'restaurant-pos' => self::restaurantPosView($company),
             'dining-history', 'kot-history' => self::diningHistoryView($company),
+            'pharmacy-pos' => self::pharmacyPosView($company),
             'pharmacy-batches', 'batches' => self::pharmacyBatchesView($company),
             'pharmacy-prescriptions', 'prescriptions' => self::pharmacyPrescriptionsView($company),
+            'repair-dashboard', 'repair' => self::repairDashboardView($company),
+            'repair-create-ticket', 'repair-ticket-create' => self::repairCreateTicketView($company),
+            'repair-tickets' => self::repairTicketsView($company),
+            'repair-my-jobs' => self::repairMyJobsView($company),
+            'repair-detail' => self::repairDetailView($company),
             'service-calendar', 'calendar' => self::serviceCalendarView($company),
             'service-stylists', 'stylists' => self::serviceStylistsView($company),
             'service-orders' => self::serviceOrdersView($company),
@@ -1631,6 +2361,7 @@ class SchemaResponse
                         'items' => $treeBuilder['items'],
                     ]);
                     $found = true;
+
                     continue;
                 }
 
@@ -1681,6 +2412,7 @@ class SchemaResponse
                         (string) ($node['label'] ?? $label),
                         (string) ($node['initial_value'] ?? $fallback)
                     ));
+
                     continue;
                 }
 

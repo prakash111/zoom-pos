@@ -18,7 +18,7 @@ class TenantNavRegistry
      * maintaining a clean modular hierarchy at first load with licensed verticals
      * grouped in strict sequence and Administration anchored at the bottom.
      *
-     * @param  \App\Models\Company|string|null  $tenant
+     * @param  Company|string|null  $tenant
      * @return list<array<string, mixed>>
      */
     public static function getEffectiveNavForTenant(mixed $tenant): array
@@ -49,6 +49,7 @@ class TenantNavRegistry
                 $norm = match ($norm) {
                     'general', 'general_retail' => 'retail',
                     'food_restaurant' => 'restaurant',
+                    'repair', 'repairs', 'technician', 'repair_technician' => 'repair_technician',
                     default => $norm,
                 };
                 if ($norm !== '') {
@@ -107,9 +108,21 @@ class TenantNavRegistry
             ]);
         }
 
-        // 5. Future Dynamic Modules (Auto-registered via ModuleRegistry)
+        // 5. Repair & Technician Module Section
+        if (in_array('repair_technician', $licensed, true)) {
+            $sections[] = self::normalizeSection([
+                'id' => 'repair_service',
+                'key' => 'repair_service',
+                'title' => 'Repair & Service Workbench',
+                'label' => 'Repair & Service Workbench',
+                'color' => '#0284c7',
+                'items' => self::getRepairMenuItems(),
+            ]);
+        }
+
+        // 6. Future Dynamic Modules (Auto-registered via ModuleRegistry)
         foreach ($licensed as $mod) {
-            if (! in_array($mod, ['retail', 'restaurant', 'pharmacy', 'service_booking'], true)) {
+            if (! in_array($mod, ['retail', 'restaurant', 'pharmacy', 'service_booking', 'repair_technician'], true)) {
                 $generic = self::buildGenericModuleSection($mod);
                 if ($generic !== null) {
                     $sections[] = self::normalizeSection($generic);
@@ -266,9 +279,9 @@ class TenantNavRegistry
                 'label' => 'Pharmacy Counter POS',
                 'title' => 'Pharmacy Counter POS',
                 'icon' => 'local_pharmacy',
-                'component' => 'pos',
+                'component' => 'pharmacy_pos',
                 'permission' => 'pos',
-                'target_endpoint' => '/api/tenant/views/pos',
+                'target_endpoint' => '/api/tenant/views/pharmacy-pos',
             ],
             [
                 'key' => 'pharmacy_batches',
@@ -287,6 +300,53 @@ class TenantNavRegistry
                 'component' => 'pharmacy_prescriptions',
                 'permission' => 'sales',
                 'target_endpoint' => '/api/tenant/views/pharmacy-prescriptions',
+            ],
+        ];
+    }
+
+    /**
+     * Sub-menu items for Repair & Technician Operations.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function getRepairMenuItems(): array
+    {
+        return [
+            [
+                'key' => 'repair_dashboard',
+                'label' => 'Repair Workbench',
+                'title' => 'Repair Workbench',
+                'icon' => 'handyman',
+                'component' => 'repair_dashboard',
+                'permission' => 'pos',
+                'target_endpoint' => '/api/tenant/views/repair-dashboard',
+            ],
+            [
+                'key' => 'repair_create_ticket',
+                'label' => 'New Intake Ticket',
+                'title' => 'New Intake Ticket',
+                'icon' => 'add_task',
+                'component' => 'repair_create_ticket',
+                'permission' => 'pos',
+                'target_endpoint' => '/api/tenant/views/repair-create-ticket',
+            ],
+            [
+                'key' => 'repair_tickets',
+                'label' => 'Repair Ticket Register',
+                'title' => 'Repair Ticket Register',
+                'icon' => 'receipt_long',
+                'component' => 'repair_tickets',
+                'permission' => 'pos',
+                'target_endpoint' => '/api/tenant/views/repair-tickets',
+            ],
+            [
+                'key' => 'repair_my_jobs',
+                'label' => 'Technician Assigned Jobs',
+                'title' => 'Technician Assigned Jobs',
+                'icon' => 'engineering',
+                'component' => 'repair_my_jobs',
+                'permission' => 'pos',
+                'target_endpoint' => '/api/tenant/views/repair-my-jobs',
             ],
         ];
     }
@@ -332,7 +392,6 @@ class TenantNavRegistry
     /**
      * Builds generic standalone section for dynamic server modules.
      *
-     * @param  string  $mod
      * @return array<string, mixed>|null
      */
     public static function buildGenericModuleSection(string $mod): ?array
@@ -377,7 +436,6 @@ class TenantNavRegistry
     /**
      * Return enriched navigation section for an individual licensed module.
      *
-     * @param  string  $module
      * @return array<string, mixed>|null
      */
     public static function menuStructureForModule(string $module): ?array
@@ -414,6 +472,14 @@ class TenantNavRegistry
                 'color' => '#7c3aed',
                 'items' => self::getSalonMenuItems(),
             ]),
+            'repair_technician' => self::normalizeSection([
+                'id' => 'repair_service',
+                'key' => 'repair_service',
+                'title' => 'Repair & Service Workbench',
+                'label' => 'Repair & Service Workbench',
+                'color' => '#0284c7',
+                'items' => self::getRepairMenuItems(),
+            ]),
             'retail' => self::getRetailSalesSection(),
             default => self::buildGenericModuleSection($mod),
         };
@@ -444,12 +510,14 @@ class TenantNavRegistry
         $mode = match ($mode) {
             'general', 'general_retail' => 'retail',
             'food_restaurant' => 'restaurant',
+            'repair', 'repairs', 'technician', 'repair_technician' => 'repair_technician',
             default => $mode,
         };
         $fallback = match ($mode) {
             'restaurant' => self::restaurantSections(),
             'pharmacy' => self::pharmacySections(),
             'service_booking' => self::serviceBookingSections(),
+            'repair_technician' => self::repairTechnicianSections(),
             default => self::retailSections(),
         };
 
@@ -813,6 +881,44 @@ class TenantNavRegistry
                     ['key' => 'cash_register', 'label' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register'],
                     ['key' => 'due_receivables', 'label' => 'Client Due Receivables', 'icon' => 'notifications_active', 'component' => 'due_receivables', 'permission' => 'finance'],
                     ['key' => 'reports', 'label' => 'Service Reports', 'icon' => 'insights', 'component' => 'reports', 'permission' => 'reports'],
+                ],
+            ],
+            self::administrationSection(),
+        ];
+    }
+
+    private static function repairTechnicianSections(): array
+    {
+        return [
+            [
+                'key' => 'repair_operations',
+                'label' => 'Repair & Workbench',
+                'color' => '#0284c7',
+                'items' => [
+                    ['key' => 'repair_dashboard', 'label' => 'Repair Workbench', 'icon' => 'handyman', 'component' => 'repair_dashboard', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/repair-dashboard'],
+                    ['key' => 'repair_create_ticket', 'label' => 'New Intake Ticket', 'icon' => 'add_task', 'component' => 'repair_create_ticket', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/repair-create-ticket'],
+                    ['key' => 'repair_tickets', 'label' => 'Repair Ticket Register', 'icon' => 'receipt_long', 'component' => 'repair_tickets', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/repair-tickets'],
+                    ['key' => 'repair_my_jobs', 'label' => 'Technician Jobs', 'icon' => 'engineering', 'component' => 'repair_my_jobs', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/repair-my-jobs'],
+                ],
+            ],
+            [
+                'key' => 'spare_parts_inventory',
+                'label' => 'Spare Parts & Inventory',
+                'color' => '#d97706',
+                'items' => [
+                    ['key' => 'inventory', 'label' => 'Parts & Consumables', 'icon' => 'inventory_2', 'component' => 'inventory', 'permission' => 'products'],
+                    ['key' => 'categories', 'label' => 'Device Categories', 'icon' => 'devices_other', 'component' => 'categories', 'permission' => 'categories'],
+                    ['key' => 'suppliers', 'label' => 'Parts Vendors', 'icon' => 'local_shipping', 'component' => 'suppliers', 'permission' => 'suppliers'],
+                ],
+            ],
+            [
+                'key' => 'financial_management',
+                'label' => 'Financial Management',
+                'color' => '#0f766e',
+                'items' => [
+                    ['key' => 'cash_register', 'label' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register'],
+                    ['key' => 'due_receivables', 'label' => 'Repair Invoices Due', 'icon' => 'notifications_active', 'component' => 'due_receivables', 'permission' => 'finance'],
+                    ['key' => 'reports', 'label' => 'Workshop Reports', 'icon' => 'insights', 'component' => 'reports', 'permission' => 'reports'],
                 ],
             ],
             self::administrationSection(),

@@ -1,0 +1,702 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
+use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Models\OrderPayment;
+use App\Models\Product;
+use App\Models\RepairChecklist;
+use App\Models\RepairTicket;
+use App\Models\RepairTicketPart;
+use App\Models\Sale;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+
+class RepairApiController extends Controller
+{
+    use ResolvesTenantSyncContext;
+
+    /**
+     * Kanban counts and financial metrics for repair workshop.
+     * GET /api/tenant/repair/stats
+     */
+    public function stats(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $tickets = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->get();
+
+        $stats = [
+            'active' => $tickets->where('status', 'active')->count(),
+            'diagnosing' => $tickets->where('status', 'diagnosing')->count(),
+            'waiting_parts' => $tickets->where('status', 'waiting_parts')->count(),
+            'in_progress' => $tickets->where('status', 'in_progress')->count(),
+            'repaired' => $tickets->where('status', 'repaired')->count(),
+            'delivered' => $tickets->where('status', 'delivered')->count(),
+            'cancelled' => $tickets->where('status', 'cancelled')->count(),
+            'total' => $tickets->count(),
+            'total_revenue' => round($tickets->whereIn('status', ['repaired', 'delivered'])->sum('total_amount'), 2),
+            'pending_receivables' => round($tickets->whereNotIn('status', ['delivered', 'cancelled'])->sum(fn ($t) => $t->balance_due), 2),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * Filterable ticket list for Workbench & Register.
+     * GET /api/tenant/repair/tickets
+     */
+    public function ticketsIndex(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $status = $request->query('status'); // 'all', 'active', 'diagnosing', etc.
+        $techId = $request->query('technician_id');
+        $search = trim((string) ($request->query('search') ?? ''));
+
+        $query = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['parts', 'checklists', 'technician:id,name']);
+
+        if ($status && $status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        if ($techId === 'me' && $user) {
+            $query->where('technician_id', $user->id);
+        } elseif ($techId && $techId !== 'all') {
+            $query->where('technician_id', $techId);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('ticket_number', 'like', "%{$search}%")
+                    ->orWhere('customer_name', 'like', "%{$search}%")
+                    ->orWhere('customer_phone', 'like', "%{$search}%")
+                    ->orWhere('serial_or_imei', 'like', "%{$search}%")
+                    ->orWhere('brand', 'like', "%{$search}%")
+                    ->orWhere('model', 'like', "%{$search}%");
+            });
+        }
+
+        $tickets = $query->orderByDesc('created_at')->limit(100)->get();
+
+        $formatted = $tickets->map(function (RepairTicket $t) {
+            return [
+                'id' => $t->id,
+                'ticket_number' => $t->ticket_number,
+                'customer_id' => $t->customer_id,
+                'customer_name' => $t->customer_name,
+                'customer_phone' => $t->customer_phone,
+                'device_type' => $t->device_type,
+                'brand' => $t->brand,
+                'model' => $t->model,
+                'serial_or_imei' => $t->serial_or_imei,
+                'passcode_or_pattern' => $t->passcode_or_pattern,
+                'issue_description' => $t->issue_description,
+                'physical_condition_notes' => $t->physical_condition_notes,
+                'status' => $t->status,
+                'status_color' => $t->status_color,
+                'priority' => $t->priority,
+                'priority_color' => $t->priority_color,
+                'technician_id' => $t->technician_id,
+                'technician_name' => $t->technician?->name ?? 'Unassigned',
+                'estimated_cost' => (float) $t->estimated_cost,
+                'advance_paid' => (float) $t->advance_paid,
+                'labor_fee' => (float) $t->labor_fee,
+                'parts_cost' => (float) $t->parts_cost,
+                'total_amount' => (float) $t->total_amount,
+                'balance_due' => (float) $t->balance_due,
+                'parts_count' => $t->parts->count(),
+                'intake_at' => $t->intake_at?->format('Y-m-d H:i'),
+                'completed_at' => $t->completed_at?->format('Y-m-d H:i'),
+                'delivered_at' => $t->delivered_at?->format('Y-m-d H:i'),
+                'created_at' => $t->created_at?->format('Y-m-d H:i'),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'count' => $formatted->count(),
+            'tickets' => $formatted,
+        ]);
+    }
+
+    /**
+     * Single ticket detail with parts, checklist, and actions.
+     * GET /api/tenant/repair/tickets/{id}
+     */
+    public function ticketsShow(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $ticket = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['parts.product', 'checklists', 'technician:id,name', 'finalSale'])
+            ->find($id);
+
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Repair ticket not found.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'ticket' => [
+                'id' => $ticket->id,
+                'ticket_number' => $ticket->ticket_number,
+                'customer_id' => $ticket->customer_id,
+                'customer_name' => $ticket->customer_name,
+                'customer_phone' => $ticket->customer_phone,
+                'device_type' => $ticket->device_type,
+                'brand' => $ticket->brand,
+                'model' => $ticket->model,
+                'serial_or_imei' => $ticket->serial_or_imei,
+                'passcode_or_pattern' => $ticket->passcode_or_pattern,
+                'issue_description' => $ticket->issue_description,
+                'physical_condition_notes' => $ticket->physical_condition_notes,
+                'status' => $ticket->status,
+                'status_color' => $ticket->status_color,
+                'priority' => $ticket->priority,
+                'priority_color' => $ticket->priority_color,
+                'technician_id' => $ticket->technician_id,
+                'technician_name' => $ticket->technician?->name ?? 'Unassigned',
+                'estimated_cost' => (float) $ticket->estimated_cost,
+                'advance_paid' => (float) $ticket->advance_paid,
+                'labor_fee' => (float) $ticket->labor_fee,
+                'parts_cost' => (float) $ticket->parts_cost,
+                'total_amount' => (float) $ticket->total_amount,
+                'balance_due' => (float) $ticket->balance_due,
+                'internal_notes' => $ticket->internal_notes,
+                'intake_at' => $ticket->intake_at?->format('Y-m-d H:i'),
+                'completed_at' => $ticket->completed_at?->format('Y-m-d H:i'),
+                'delivered_at' => $ticket->delivered_at?->format('Y-m-d H:i'),
+                'parts' => $ticket->parts->map(fn ($p) => [
+                    'id' => $p->id,
+                    'product_id' => $p->product_id,
+                    'part_name' => $p->part_name,
+                    'quantity' => $p->quantity,
+                    'unit_cost' => (float) $p->unit_cost,
+                    'unit_price' => (float) $p->unit_price,
+                    'subtotal' => (float) $p->subtotal,
+                    'billed_to_customer' => (bool) $p->billed_to_customer,
+                ]),
+                'checklists' => $ticket->checklists->map(fn ($c) => [
+                    'id' => $c->id,
+                    'item_name' => $c->item_name,
+                    'type' => $c->type,
+                    'status' => $c->status,
+                    'notes' => $c->notes,
+                ]),
+                'final_sale' => $ticket->finalSale ? [
+                    'id' => $ticket->finalSale->id,
+                    'sale_number' => $ticket->finalSale->sale_number,
+                    'total' => (float) $ticket->finalSale->total,
+                ] : null,
+            ],
+        ]);
+    }
+
+    /**
+     * Create new device intake repair ticket.
+     * POST /api/tenant/repair/tickets
+     */
+    public function ticketsStore(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'customer_name' => 'required|string|max:150',
+            'customer_phone' => 'required|string|max:50',
+            'device_type' => 'required|string|max:100',
+            'brand' => 'required|string|max:100',
+            'model' => 'required|string|max:100',
+            'serial_or_imei' => 'nullable|string|max:100',
+            'passcode_or_pattern' => 'nullable|string|max:100',
+            'issue_description' => 'required|string',
+            'physical_condition_notes' => 'nullable|string',
+            'priority' => 'nullable|in:low,normal,high,urgent',
+            'technician_id' => 'nullable|string',
+            'estimated_cost' => 'nullable|numeric|min:0',
+            'advance_paid' => 'nullable|numeric|min:0',
+            'checklists' => 'nullable|array',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
+        }
+
+        $ticket = DB::transaction(function () use ($company, $request) {
+            $year = date('Y');
+            $count = RepairTicket::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->whereYear('created_at', $year)
+                ->count() + 1;
+
+            $ticketNumber = sprintf('REP-%s-%04d', $year, $count);
+            $estimatedCost = (float) $request->input('estimated_cost', 0);
+            $advancePaid = (float) $request->input('advance_paid', 0);
+
+            $ticket = RepairTicket::create([
+                'company_id' => $company->id,
+                'tenant_id' => $company->id,
+                'ticket_number' => $ticketNumber,
+                'customer_id' => $request->input('customer_id'),
+                'customer_name' => trim($request->input('customer_name')),
+                'customer_phone' => trim($request->input('customer_phone')),
+                'device_type' => trim($request->input('device_type')),
+                'brand' => trim($request->input('brand')),
+                'model' => trim($request->input('model')),
+                'serial_or_imei' => $request->input('serial_or_imei'),
+                'passcode_or_pattern' => $request->input('passcode_or_pattern'),
+                'issue_description' => trim($request->input('issue_description')),
+                'physical_condition_notes' => $request->input('physical_condition_notes'),
+                'status' => 'active',
+                'priority' => $request->input('priority', 'normal'),
+                'technician_id' => $request->input('technician_id'),
+                'estimated_cost' => $estimatedCost,
+                'advance_paid' => $advancePaid,
+                'labor_fee' => 0,
+                'parts_cost' => 0,
+                'total_amount' => $estimatedCost > 0 ? $estimatedCost : $advancePaid,
+                'intake_at' => now(),
+            ]);
+
+            // Save checklists
+            $checklists = $request->input('checklists');
+            if (! empty($checklists) && is_array($checklists)) {
+                foreach ($checklists as $item) {
+                    RepairChecklist::create([
+                        'company_id' => $company->id,
+                        'tenant_id' => $company->id,
+                        'repair_ticket_id' => $ticket->id,
+                        'item_name' => $item['item_name'] ?? 'Inspection Item',
+                        'type' => $item['type'] ?? 'intake',
+                        'status' => $item['status'] ?? 'pass',
+                        'notes' => $item['notes'] ?? null,
+                    ]);
+                }
+            } else {
+                // Default inspection checklist
+                $defaultItems = [
+                    'Power On / Boot',
+                    'Display / Touchscreen',
+                    'Front & Rear Cameras',
+                    'Speakers & Microphone',
+                    'Charging Port & Battery',
+                    'Housing / Glass Scratches',
+                ];
+                foreach ($defaultItems as $item) {
+                    RepairChecklist::create([
+                        'company_id' => $company->id,
+                        'tenant_id' => $company->id,
+                        'repair_ticket_id' => $ticket->id,
+                        'item_name' => $item,
+                        'type' => 'intake',
+                        'status' => 'pass',
+                    ]);
+                }
+            }
+
+            return $ticket;
+        });
+
+        AuditLog::record('repair.ticket_created', $company->id, $user?->id, [
+            'ticket_id' => $ticket->id,
+            'ticket_number' => $ticket->ticket_number,
+            'customer_name' => $ticket->customer_name,
+            'device' => "{$ticket->brand} {$ticket->model}",
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Repair intake ticket #{$ticket->ticket_number} created successfully.",
+            'ticket' => $ticket->load(['parts', 'checklists']),
+        ]);
+    }
+
+    /**
+     * Transition ticket status along workbench lifecycle.
+     * POST /api/tenant/repair/tickets/{id}/status
+     */
+    public function ticketsUpdateStatus(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|in:active,diagnosing,waiting_parts,in_progress,repaired,delivered,cancelled',
+            'internal_notes' => 'nullable|string',
+            'technician_id' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
+        }
+
+        $ticket = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->find($id);
+
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Ticket not found.'], 404);
+        }
+
+        $newStatus = $request->input('status');
+        $updates = ['status' => $newStatus];
+
+        if ($request->filled('internal_notes')) {
+            $updates['internal_notes'] = $request->input('internal_notes');
+        }
+        if ($request->filled('technician_id')) {
+            $updates['technician_id'] = $request->input('technician_id');
+        }
+
+        if ($newStatus === 'repaired' && ! $ticket->completed_at) {
+            $updates['completed_at'] = now();
+        }
+        if ($newStatus === 'delivered' && ! $ticket->delivered_at) {
+            $updates['delivered_at'] = now();
+        }
+
+        $ticket->update($updates);
+
+        AuditLog::record('repair.status_changed', $company->id, $user?->id, [
+            'ticket_id' => $ticket->id,
+            'new_status' => $newStatus,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Ticket status transitioned to {$newStatus}.",
+            'ticket' => $ticket->fresh(['parts', 'checklists', 'technician:id,name']),
+        ]);
+    }
+
+    /**
+     * Add spare part to ticket & deduct inventory stock.
+     * POST /api/tenant/repair/tickets/{id}/parts
+     */
+    public function ticketsAddPart(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'part_name' => 'required|string|max:200',
+            'quantity' => 'required|integer|min:1',
+            'unit_price' => 'required|numeric|min:0',
+            'unit_cost' => 'nullable|numeric|min:0',
+            'product_id' => 'nullable|integer',
+            'billed_to_customer' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
+        }
+
+        $ticket = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->find($id);
+
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Ticket not found.'], 404);
+        }
+
+        $productId = $request->input('product_id');
+        $qty = (int) $request->input('quantity', 1);
+        $unitPrice = (float) $request->input('unit_price', 0);
+        $unitCost = (float) ($request->input('unit_cost', 0));
+        $billed = $request->boolean('billed_to_customer', true);
+
+        $part = DB::transaction(function () use ($company, $ticket, $productId, $qty, $unitPrice, $unitCost, $billed, $request) {
+            $product = null;
+            if ($productId) {
+                $product = Product::withoutGlobalScope('company')
+                    ->where('company_id', $company->id)
+                    ->find($productId);
+
+                if ($product) {
+                    $product->decrementStock($qty, "Spare part for Ticket #{$ticket->ticket_number}");
+                    if ($unitCost <= 0) {
+                        $unitCost = (float) $product->cost_price;
+                    }
+                }
+            }
+
+            $subtotal = round($qty * $unitPrice, 2);
+
+            $part = RepairTicketPart::create([
+                'company_id' => $company->id,
+                'tenant_id' => $company->id,
+                'repair_ticket_id' => $ticket->id,
+                'product_id' => $productId,
+                'part_name' => trim($request->input('part_name')),
+                'quantity' => $qty,
+                'unit_cost' => $unitCost,
+                'unit_price' => $unitPrice,
+                'subtotal' => $subtotal,
+                'billed_to_customer' => $billed,
+            ]);
+
+            // Recalculate ticket parts_cost and total_amount
+            $newPartsCost = (float) RepairTicketPart::where('repair_ticket_id', $ticket->id)
+                ->where('billed_to_customer', true)
+                ->sum('subtotal');
+
+            $newTotal = round($newPartsCost + (float) $ticket->labor_fee, 2);
+
+            $ticket->update([
+                'parts_cost' => $newPartsCost,
+                'total_amount' => $newTotal,
+            ]);
+
+            return $part;
+        });
+
+        AuditLog::record('repair.part_added', $company->id, $user?->id, [
+            'ticket_id' => $ticket->id,
+            'part_id' => $part->id,
+            'part_name' => $part->part_name,
+            'subtotal' => $part->subtotal,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Spare part added to repair ticket.',
+            'part' => $part,
+            'ticket' => $ticket->fresh(['parts', 'checklists']),
+        ]);
+    }
+
+    /**
+     * Remove spare part from ticket & restore inventory stock.
+     * DELETE /api/tenant/repair/tickets/{ticketId}/parts/{partId}
+     */
+    public function ticketsRemovePart(Request $request, string $ticketId, string $partId): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $ticket = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->find($ticketId);
+
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Ticket not found.'], 404);
+        }
+
+        $part = RepairTicketPart::where('repair_ticket_id', $ticket->id)->find($partId);
+        if (! $part) {
+            return response()->json(['success' => false, 'error' => 'Part not found on this ticket.'], 404);
+        }
+
+        DB::transaction(function () use ($company, $ticket, $part) {
+            if ($part->product_id) {
+                $product = Product::withoutGlobalScope('company')
+                    ->where('company_id', $company->id)
+                    ->find($part->product_id);
+
+                $product?->incrementStock($part->quantity, "Restored part from Ticket #{$ticket->ticket_number}");
+            }
+
+            $part->delete();
+
+            $newPartsCost = (float) RepairTicketPart::where('repair_ticket_id', $ticket->id)
+                ->where('billed_to_customer', true)
+                ->sum('subtotal');
+
+            $newTotal = round($newPartsCost + (float) $ticket->labor_fee, 2);
+
+            $ticket->update([
+                'parts_cost' => $newPartsCost,
+                'total_amount' => $newTotal,
+            ]);
+        });
+
+        AuditLog::record('repair.part_removed', $company->id, $user?->id, [
+            'ticket_id' => $ticket->id,
+            'part_name' => $part->part_name,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Spare part removed.',
+            'ticket' => $ticket->fresh(['parts', 'checklists']),
+        ]);
+    }
+
+    /**
+     * Set labor fee on ticket.
+     * POST /api/tenant/repair/tickets/{id}/labor
+     */
+    public function ticketsSetLabor(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'labor_fee' => 'required|numeric|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
+        }
+
+        $ticket = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->find($id);
+
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Ticket not found.'], 404);
+        }
+
+        $laborFee = round((float) $request->input('labor_fee'), 2);
+        $newTotal = round((float) $ticket->parts_cost + $laborFee, 2);
+
+        $ticket->update([
+            'labor_fee' => $laborFee,
+            'total_amount' => $newTotal,
+        ]);
+
+        AuditLog::record('repair.labor_updated', $company->id, $user?->id, [
+            'ticket_id' => $ticket->id,
+            'labor_fee' => $laborFee,
+            'total_amount' => $newTotal,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Labor fee updated successfully.',
+            'ticket' => $ticket->fresh(['parts', 'checklists']),
+        ]);
+    }
+
+    /**
+     * Settle repair ticket and convert to POS Sale receipt.
+     * POST /api/tenant/repair/tickets/{id}/settle
+     */
+    public function ticketsSettle(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $ticket = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['parts'])
+            ->find($id);
+
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Ticket not found.'], 404);
+        }
+
+        if ($ticket->status === 'delivered' && $ticket->final_sale_id) {
+            return response()->json(['success' => false, 'error' => 'This repair ticket has already been settled and delivered.'], 422);
+        }
+
+        $paymentMethod = strtolower((string) ($request->input('payment_method', 'cash')));
+        $balanceDue = $ticket->balance_due;
+
+        $sale = DB::transaction(function () use ($company, $user, $ticket, $paymentMethod, $balanceDue) {
+            $items = [];
+
+            // Add spare parts line items
+            foreach ($ticket->parts as $part) {
+                if ($part->billed_to_customer && (float) $part->subtotal > 0) {
+                    $items[] = [
+                        'product_id' => $part->product_id,
+                        'name' => "Part: {$part->part_name}",
+                        'quantity' => $part->quantity,
+                        'price' => (float) $part->unit_price,
+                        'total' => (float) $part->subtotal,
+                    ];
+                }
+            }
+
+            // Add Labor Fee line item
+            if ((float) $ticket->labor_fee > 0) {
+                $items[] = [
+                    'product_id' => null,
+                    'name' => "Labor / Service Charge ({$ticket->device_type})",
+                    'quantity' => 1,
+                    'price' => (float) $ticket->labor_fee,
+                    'total' => (float) $ticket->labor_fee,
+                ];
+            }
+
+            // If no parts or labor were recorded, use the estimated or total amount
+            if (empty($items)) {
+                $items[] = [
+                    'product_id' => null,
+                    'name' => "Repair Service: {$ticket->device_type} - {$ticket->brand} {$ticket->model}",
+                    'quantity' => 1,
+                    'price' => (float) $ticket->total_amount,
+                    'total' => (float) $ticket->total_amount,
+                ];
+            }
+
+            $prefix = $company->invoice_prefix ?: 'INV-';
+            $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
+            $saleNumber = $prefix.sprintf('%04d', $saleCount);
+
+            $sale = Sale::create([
+                'company_id' => $company->id,
+                'sale_number' => $saleNumber,
+                'customer_id' => $ticket->customer_id,
+                'customer_name' => $ticket->customer_name,
+                'user_id' => $user?->id,
+                'total' => (float) $ticket->total_amount,
+                'net_amount' => (float) $ticket->total_amount,
+                'paid_amount' => (float) $ticket->total_amount,
+                'due_amount' => 0,
+                'discount' => 0,
+                'payment_method' => $paymentMethod,
+                'payment_status' => 'paid',
+                'status' => 'completed',
+                'operation_type' => 'sale',
+                'items' => $items,
+                'notes' => "Settled Repair Ticket #{$ticket->ticket_number}. Device: {$ticket->brand} {$ticket->model} (SN: ".($ticket->serial_or_imei ?: 'N/A')."). Advance: {$ticket->advance_paid}, Final Payment: {$balanceDue}.",
+            ]);
+
+            OrderPayment::create([
+                'company_id' => $company->id,
+                'sale_id' => $sale->id,
+                'payment_method' => $paymentMethod,
+                'amount' => $sale->total,
+                'net_amount' => $sale->total,
+            ]);
+
+            $ticket->update([
+                'status' => 'delivered',
+                'delivered_at' => now(),
+                'completed_at' => $ticket->completed_at ?? now(),
+                'final_sale_id' => $sale->id,
+            ]);
+
+            return $sale;
+        });
+
+        AuditLog::record('repair.ticket_settled', $company->id, $user?->id, [
+            'ticket_id' => $ticket->id,
+            'sale_id' => $sale->id,
+            'total' => (float) $sale->total,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Repair ticket #{$ticket->ticket_number} settled and converted to POS Sale #{$sale->sale_number}.",
+            'sale' => $sale,
+            'ticket' => $ticket->fresh(['parts', 'checklists', 'finalSale']),
+        ]);
+    }
+}
