@@ -43,11 +43,11 @@ class AppBootstrapController extends Controller
             $locale = $company->default_locale ?: ($company->language ?: 'en');
         }
 
-        $activeMode = ModuleRegistry::resolveActiveMode($company);
+        $activeMode = strtolower(trim(ModuleRegistry::resolveActiveMode($company)));
         $allModules = ModuleRegistry::allModules();
         $availableModes = ModuleRegistry::availableModes($company);
         $activeModule = ModuleRegistry::getModule($activeMode);
-        $menuStructure = TenantNavRegistry::menuStructureForMode($activeMode);
+        $menuStructure = TenantNavRegistry::getEffectiveNavForTenant($company);
 
         return response()->json([
             'success' => true,
@@ -69,6 +69,7 @@ class AppBootstrapController extends Controller
             'modules' => $allModules,
             'active_module' => $activeModule,
             'menu_structure' => $menuStructure,
+            'navigation' => $menuStructure,
             'theme' => $company->getThemeTokens(),
             'screens' => SchemaResponse::screenDirectory($company),
             'schema_contract' => SchemaResponse::contract(),

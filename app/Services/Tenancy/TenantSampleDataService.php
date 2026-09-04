@@ -180,9 +180,10 @@ class TenantSampleDataService
             $cat = $categories[$p['category']] ?? null;
             $createdProducts[] = Product::withoutGlobalScopes()->firstOrCreate([
                 'company_id' => $companyId,
-                'sku' => $p['sku'],
+                'code' => $p['sku'],
             ], [
                 'name' => $p['name'],
+                'code' => $p['sku'],
                 'barcode' => $p['barcode'],
                 'category_id' => $cat?->id,
                 'category_name' => $cat?->name,
@@ -423,9 +424,10 @@ class TenantSampleDataService
             $cat = $categories[$m['category']] ?? null;
             $products[$m['name']] = Product::withoutGlobalScopes()->firstOrCreate([
                 'company_id' => $companyId,
-                'sku' => $m['sku'],
+                'code' => $m['sku'],
             ], [
                 'name' => $m['name'],
+                'code' => $m['sku'],
                 'category_id' => $cat?->id,
                 'category_name' => $cat?->name,
                 'cost_price' => $m['cost_price'],
@@ -666,9 +668,10 @@ class TenantSampleDataService
             $cat = $categories[$d['category']] ?? null;
             Product::withoutGlobalScopes()->firstOrCreate([
                 'company_id' => $companyId,
-                'sku' => $d['sku'],
+                'code' => $d['sku'],
             ], [
                 'name' => $d['name'],
+                'code' => $d['sku'],
                 'barcode' => $d['barcode'],
                 'category_id' => $cat?->id,
                 'category_name' => $cat?->name,
@@ -801,9 +804,10 @@ class TenantSampleDataService
             $cat = $categories[$s['category']] ?? null;
             Product::withoutGlobalScopes()->firstOrCreate([
                 'company_id' => $companyId,
-                'sku' => $s['sku'],
+                'code' => $s['sku'],
             ], [
                 'name' => $s['name'],
+                'code' => $s['sku'],
                 'category_id' => $cat?->id,
                 'category_name' => $cat?->name,
                 'duration_minutes' => $s['duration_minutes'],

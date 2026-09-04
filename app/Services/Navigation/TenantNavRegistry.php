@@ -2,6 +2,7 @@
 
 namespace App\Services\Navigation;
 
+use App\Models\Company;
 use App\Services\Modular\ModuleRegistry;
 use Illuminate\Support\Facades\Log;
 
@@ -13,15 +14,48 @@ use Illuminate\Support\Facades\Log;
 class TenantNavRegistry
 {
     /**
-     * @return list<array{key: string, label: string, color?: string, items: list<array{key: string, label: string, icon?: string, component?: string, permission?: ?string, parent?: string}>}>
+     * Return guaranteed non-empty navigation sections for a tenant or mode.
+     *
+     * @param  \App\Models\Company|string|null  $companyOrMode
+     * @return list<array<string, mixed>>
+     */
+    public static function getEffectiveNavForTenant(mixed $companyOrMode): array
+    {
+        if ($companyOrMode instanceof Company) {
+            $mode = ModuleRegistry::resolveActiveMode($companyOrMode);
+        } elseif (is_string($companyOrMode) && trim($companyOrMode) !== '') {
+            $mode = trim($companyOrMode);
+        } else {
+            $mode = 'retail';
+        }
+
+        $mode = strtolower(trim($mode));
+        $mode = match ($mode) {
+            'general', 'general_retail' => 'retail',
+            'food_restaurant' => 'restaurant',
+            default => $mode,
+        };
+
+        $sections = self::sectionsFor($mode);
+        if (empty($sections)) {
+            $sections = array_values(array_map([self::class, 'normalizeSection'], self::retailSections()));
+        }
+
+        return $sections;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
      */
     public static function sectionsFor(bool|string $isRestaurantOrMode): array
     {
         if (is_bool($isRestaurantOrMode)) {
-            return $isRestaurantOrMode ? self::restaurantSections() : self::retailSections();
+            $raw = $isRestaurantOrMode ? self::restaurantSections() : self::retailSections();
+
+            return array_values(array_map([self::class, 'normalizeSection'], $raw));
         }
 
-        $mode = strtolower(trim($isRestaurantOrMode));
+        $mode = strtolower(trim((string) $isRestaurantOrMode));
         $mode = match ($mode) {
             'general', 'general_retail' => 'retail',
             'food_restaurant' => 'restaurant',
@@ -34,34 +68,103 @@ class TenantNavRegistry
             default => self::retailSections(),
         };
 
+        $sections = $fallback;
         $module = ModuleRegistry::find($mode);
         $navigation = $module['navigation'] ?? null;
         if (is_array($navigation) && $navigation !== []) {
             $validated = self::validatedCustomNavigation($navigation);
             if ($validated !== null && $validated !== []) {
-                return $validated;
+                $sections = $validated;
+            } else {
+                Log::warning('Invalid database SDUI navigation; using core menu fallback.', [
+                    'mode' => $mode,
+                ]);
             }
-
-            Log::warning('Invalid database SDUI navigation; using core menu fallback.', [
-                'mode' => $mode,
-            ]);
         } elseif (($module['source'] ?? null) === 'database') {
             Log::warning('Empty database SDUI navigation; using core menu fallback.', [
                 'mode' => $mode,
             ]);
         }
 
-        return $fallback;
+        if (empty($sections)) {
+            $sections = self::retailSections();
+        }
+
+        return array_values(array_map([self::class, 'normalizeSection'], $sections));
     }
 
     /**
      * Return enriched menu structure for a given mode.
      *
-     * @return list<array{key: string, label: string, color: string, items: list<array{key: string, label: string, icon: string, component: string, permission: ?string, parent?: string}>}>
+     * @return list<array<string, mixed>>
      */
     public static function menuStructureForMode(string $mode): array
     {
-        return self::sectionsFor($mode);
+        return self::getEffectiveNavForTenant($mode);
+    }
+
+    /**
+     * Normalizes a nav section ensuring id/key, label/title parity.
+     *
+     * @param  array<string, mixed>  $section
+     * @return array<string, mixed>
+     */
+    public static function normalizeSection(array $section): array
+    {
+        $key = trim((string) ($section['key'] ?? $section['id'] ?? ''));
+        $title = trim((string) ($section['title'] ?? $section['label'] ?? $key));
+        $color = $section['color'] ?? $section['header_color'] ?? '#475569';
+
+        $items = [];
+        foreach ($section['items'] ?? $section['children'] ?? [] as $item) {
+            if (is_array($item)) {
+                $items[] = self::normalizeItem($item);
+            }
+        }
+
+        return array_merge($section, [
+            'id' => $key,
+            'key' => $key,
+            'title' => $title,
+            'label' => $title,
+            'color' => $color,
+            'items' => $items,
+        ]);
+    }
+
+    /**
+     * Normalizes a nav item ensuring id/key, label/title parity and recursing into children.
+     *
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    public static function normalizeItem(array $item): array
+    {
+        $key = trim((string) ($item['key'] ?? $item['id'] ?? ''));
+        $title = trim((string) ($item['title'] ?? $item['label'] ?? $key));
+        $icon = (string) ($item['icon'] ?? 'widgets');
+        $component = (string) ($item['component'] ?? $key);
+
+        $normalized = array_merge($item, [
+            'id' => $key,
+            'key' => $key,
+            'title' => $title,
+            'label' => $title,
+            'icon' => $icon,
+            'component' => $component,
+        ]);
+
+        if (isset($item['children']) && is_array($item['children'])) {
+            $children = [];
+            foreach ($item['children'] as $child) {
+                if (is_array($child)) {
+                    $children[] = self::normalizeItem($child);
+                }
+            }
+            $normalized['children'] = $children;
+        }
+
+        return $normalized;
     }
 
     /**
@@ -82,8 +185,8 @@ class TenantNavRegistry
                 return null;
             }
 
-            $key = trim((string) ($section['key'] ?? ''));
-            $items = $section['items'] ?? null;
+            $key = trim((string) ($section['key'] ?? $section['id'] ?? ''));
+            $items = $section['items'] ?? $section['children'] ?? null;
             if ($key === '' || isset($seen[$key]) || ! is_array($items) || $items === []) {
                 return null;
             }
@@ -93,8 +196,15 @@ class TenantNavRegistry
                 return null;
             }
 
+            $title = trim((string) ($section['title'] ?? $section['label'] ?? $key));
+            $color = $section['color'] ?? $section['header_color'] ?? '#475569';
+
             $seen[$key] = true;
+            $section['id'] = $key;
             $section['key'] = $key;
+            $section['title'] = $title;
+            $section['label'] = $title;
+            $section['color'] = $color;
             $section['items'] = $validatedItems;
             $sections[] = $section;
         }
@@ -116,7 +226,7 @@ class TenantNavRegistry
                 return null;
             }
 
-            $key = trim((string) ($item['key'] ?? ''));
+            $key = trim((string) ($item['key'] ?? $item['id'] ?? ''));
             if ($key === '' || isset($seen[$key])) {
                 return null;
             }
@@ -133,9 +243,13 @@ class TenantNavRegistry
                 return null;
             }
 
+            $title = trim((string) ($item['title'] ?? $item['label'] ?? $key));
             $seen[$key] = true;
+            $item['id'] = $key;
             $item['key'] = $key;
-            if (array_key_exists('children', $item)) {
+            $item['title'] = $title;
+            $item['label'] = $title;
+            if (array_key_exists('children', $item) || $validatedChildren !== []) {
                 $item['children'] = $validatedChildren;
             }
             $validated[] = $item;

@@ -295,4 +295,69 @@ class AppBootstrapApiTest extends TestCase
         $res->assertForbidden()
             ->assertJsonPath('success', false);
     }
+
+    public function test_get_effective_nav_for_tenant_guarantees_non_empty_menu_and_key_id_parity(): void
+    {
+        foreach (['retail', 'restaurant', 'pharmacy', 'service_booking'] as $mode) {
+            $sections = TenantNavRegistry::getEffectiveNavForTenant($mode);
+            $this->assertNotEmpty($sections, "Menu sections for mode {$mode} must not be empty.");
+
+            foreach ($sections as $section) {
+                $this->assertArrayHasKey('key', $section);
+                $this->assertArrayHasKey('id', $section);
+                $this->assertEquals($section['key'], $section['id']);
+                $this->assertArrayHasKey('label', $section);
+                $this->assertArrayHasKey('title', $section);
+                $this->assertEquals($section['label'], $section['title']);
+                $this->assertNotEmpty($section['items']);
+
+                foreach ($section['items'] as $item) {
+                    $this->assertArrayHasKey('key', $item);
+                    $this->assertArrayHasKey('id', $item);
+                    $this->assertEquals($item['key'], $item['id']);
+                    $this->assertArrayHasKey('label', $item);
+                    $this->assertArrayHasKey('title', $item);
+                    $this->assertEquals($item['label'], $item['title']);
+                }
+            }
+        }
+    }
+
+    public function test_bootstrap_seeds_sample_data_on_first_launch_without_error(): void
+    {
+        $unseededCompany = \App\Models\Company::create([
+            'id' => 'test_unseeded_' . uniqid(),
+            'name' => 'Unseeded Test Store',
+            'pos_mode' => 'retail',
+            'is_seeding_complete' => false,
+            'status' => 'active',
+        ]);
+
+        $user = \App\Models\User::factory()->create([
+            'company_id' => $unseededCompany->id,
+            'email' => 'unseeded_' . uniqid() . '@example.com',
+            'password' => Hash::make('secret123'),
+            'role' => 'admin',
+        ]);
+
+        $token = $this->postJson('/api/v1/pos/auth/login', [
+            'email' => $user->email,
+            'password' => 'secret123',
+        ])->assertOk()->json('token');
+
+        $response = $this->withToken($token)
+            ->withHeaders(['X-Company-Id' => $unseededCompany->id])
+            ->getJson('/api/v1/pos/app/bootstrap?locale=en');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('tenant.is_seeding_complete', true);
+
+        $this->assertNotEmpty($response->json('menu_structure'));
+        $this->assertNotEmpty($response->json('navigation'));
+        $this->assertDatabaseHas('products', [
+            'company_id' => $unseededCompany->id,
+            'is_demo' => true,
+        ]);
+    }
 }
