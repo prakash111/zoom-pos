@@ -262,6 +262,9 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
         try {
           final res = await _request(endpoint, method: 'POST', data: payload);
           _showToast(res['message']?.toString() ?? successToast);
+          if (action['reload'] == true && mounted) {
+            _fetchSchema();
+          }
         } catch (e) {
           _showToast(e is ApiException ? e.message : 'Action failed: $e',
               isError: true);
@@ -285,6 +288,9 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
                 _showToast('Please correct the highlighted fields.',
                     isError: true);
                 return;
+              }
+              if (Navigator.of(modalCtx).canPop()) {
+                Navigator.of(modalCtx).pop();
               }
               await _dispatchAction(modalAction);
             },
@@ -358,6 +364,7 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
       );
     }
 
+    final appBarConfig = _schema?['app_bar'] as Map<String, dynamic>?;
     final rawTitle =
         _schema?['title']?.toString() ??
         appBarConfig?['title']?.toString() ??
