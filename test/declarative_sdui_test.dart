@@ -1,0 +1,382 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:zoom_pos_mobile/core/sdui/dynamic_schema_context.dart';
+import 'package:zoom_pos_mobile/core/sdui/dynamic_schema_parser.dart';
+import 'package:zoom_pos_mobile/core/sdui/screens/dynamic_schema_page.dart';
+import 'package:zoom_pos_mobile/core/sdui/sdui_component_registry.dart';
+
+void main() {
+  group('Declarative SDUI Schema Parser - Layouts', () {
+    testWidgets('renders container, card, column, and row', (tester) async {
+      final schema = {
+        'type': 'container',
+        'padding': 12,
+        'child': {
+          'type': 'card',
+          'components': [
+            {
+              'type': 'column',
+              'components': [
+                {'type': 'text', 'text': 'Card Header', 'bold': true},
+                {
+                  'type': 'row',
+                  'components': [
+                    {'type': 'text', 'text': 'Left Col'},
+                    {'type': 'text', 'text': 'Right Col'},
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, schema),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Card Header'), findsOneWidget);
+      expect(find.text('Left Col'), findsOneWidget);
+      expect(find.text('Right Col'), findsOneWidget);
+      expect(find.byType(Card), findsOneWidget);
+    });
+
+    testWidgets('renders accordion group with ExpansionTile', (tester) async {
+      final schema = {
+        'type': 'accordion_group',
+        'title': 'Operating Mode Settings',
+        'initially_expanded': true,
+        'components': [
+          {'type': 'text', 'text': 'Strict Lock Notice'},
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, schema),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Operating Mode Settings'), findsOneWidget);
+      expect(find.byType(ExpansionTile), findsOneWidget);
+      expect(find.text('Strict Lock Notice'), findsOneWidget);
+    });
+
+    testWidgets('renders grid view with columns', (tester) async {
+      final schema = {
+        'type': 'grid_view',
+        'cross_axis_count': 2,
+        'components': [
+          {'type': 'text', 'text': 'Grid Item 1'},
+          {'type': 'text', 'text': 'Grid Item 2'},
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, schema),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Grid Item 1'), findsOneWidget);
+      expect(find.text('Grid Item 2'), findsOneWidget);
+      expect(find.byType(Wrap), findsOneWidget);
+    });
+  });
+
+  group('Declarative SDUI Schema Parser - Display Elements', () {
+    testWidgets('renders text, badge, icon, and divider', (tester) async {
+      final schema = {
+        'type': 'column',
+        'components': [
+          {'type': 'text', 'text': 'Store Overview', 'style': 'title_large'},
+          {
+            'type': 'badge',
+            'label': 'ACTIVE',
+            'color': '#16a34a',
+            'badge_style': 'solid'
+          },
+          {'type': 'icon', 'icon': 'settings', 'size': 28},
+          {'type': 'divider'},
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, schema),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Store Overview'), findsOneWidget);
+      expect(find.text('ACTIVE'), findsOneWidget);
+      expect(find.byType(Icon), findsWidgets);
+      expect(find.byType(Divider), findsOneWidget);
+    });
+  });
+
+  group('Declarative SDUI Schema Parser - Forms & Inputs', () {
+    testWidgets(
+        'binds text_input, dropdown_select, toggle_switch, and color_picker',
+        (tester) async {
+      final formValues = <String, dynamic>{};
+      final schema = {
+        'type': 'column',
+        'components': [
+          {
+            'type': 'text_input',
+            'name': 'business_name',
+            'label': 'Business Name',
+            'initial_value': 'Acme Retail',
+          },
+          {
+            'type': 'dropdown_select',
+            'name': 'currency',
+            'label': 'Currency',
+            'initial_value': 'USD',
+            'options': [
+              {'label': r'USD ($)', 'value': 'USD'},
+              {'label': r'EUR (€)', 'value': 'EUR'},
+            ],
+          },
+          {
+            'type': 'toggle_switch',
+            'name': 'tax_inclusive',
+            'label': 'Tax Inclusive',
+            'initial_value': true,
+          },
+          {
+            'type': 'color_picker',
+            'name': 'primary_color',
+            'label': 'Accent Color',
+            'initial_value': '#1d4ed8',
+            'presets': ['#1d4ed8', '#10b981'],
+          },
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: formValues,
+              setFormValue: (k, v) => formValues[k] = v,
+              dispatchAction: (_) async {},
+              child: Builder(
+                builder: (ctx) =>
+                    DynamicSchemaParser.buildComponent(ctx, schema),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Business Name'), findsOneWidget);
+      expect(find.text('Acme Retail'), findsOneWidget);
+      expect(find.text('Tax Inclusive'), findsOneWidget);
+      expect(find.text('Accent Color'), findsOneWidget);
+
+      // Mutate text input
+      await tester.enterText(find.byType(TextFormField), 'Apex Supermarket');
+      expect(formValues['business_name'], 'Apex Supermarket');
+
+      // Toggle switch
+      await tester.tap(find.byType(SwitchListTile));
+      await tester.pump();
+      expect(formValues['tax_inclusive'], isFalse);
+    });
+  });
+
+  group('Declarative SDUI Schema Parser - Lists, Tables & Stepper', () {
+    testWidgets('renders line_item_tile and table_grid', (tester) async {
+      final schema = {
+        'type': 'column',
+        'components': [
+          {
+            'type': 'line_item_tile',
+            'title': 'Dispensed Prescriptions',
+            'subtitle': 'Manage patient orders and batches',
+            'leading_icon': 'receipt_long',
+          },
+          {
+            'type': 'table_grid',
+            'headers': ['Tax Authority', 'Rate', 'Type'],
+            'rows': [
+              ['CGST', '9%', 'Central'],
+              ['SGST', '9%', 'State'],
+            ],
+          },
+          {
+            'type': 'step_counter',
+            'name': 'quantity',
+            'label': 'Order Quantity',
+            'initial_value': 2,
+          },
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, schema),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Dispensed Prescriptions'), findsOneWidget);
+      expect(find.text('CGST'), findsOneWidget);
+      expect(find.text('Order Quantity'), findsOneWidget);
+      expect(find.byType(DataTable), findsOneWidget);
+    });
+  });
+
+  group('DynamicSchemaPage & Action Dispatcher', () {
+    testWidgets('dispatches form_submit with server method and bound values',
+        (tester) async {
+      String? submittedEndpoint;
+      String? submittedMethod;
+      Map<String, dynamic>? submittedData;
+      final schema = {
+        'title': 'Financial Settings',
+        'layout': 'scroll_view',
+        'components': [
+          {
+            'type': 'text_input',
+            'name': 'currency',
+            'label': 'Currency',
+            'initial_value': 'USD',
+          },
+          {
+            'type': 'button_primary',
+            'label': 'Save Financial Settings',
+            'action': {
+              'type': 'form_submit',
+              'endpoint': '/api/tenant/settings/financial',
+              'method': 'POST',
+              'success_toast': 'Financial settings updated successfully',
+            },
+          },
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DynamicSchemaPage(
+            schema: schema,
+            requestExecutor: (endpoint, {required method, data}) async {
+              submittedEndpoint = endpoint;
+              submittedMethod = method;
+              submittedData = Map<String, dynamic>.from(data ?? const {});
+              return {
+                'success': true,
+                'message': 'Financial settings updated successfully',
+              };
+            },
+          ),
+        ),
+      );
+
+      expect(find.text('Financial Settings'), findsOneWidget);
+      expect(find.text('USD'), findsOneWidget);
+      expect(find.text('Save Financial Settings'), findsOneWidget);
+
+      // Tap button to submit form
+      await tester.tap(find.byType(ElevatedButton));
+      await tester.pumpAndSettle();
+
+      expect(submittedEndpoint, '/api/tenant/settings/financial');
+      expect(submittedMethod, 'POST');
+      expect(submittedData, containsPair('currency', 'USD'));
+      expect(
+          find.text('Financial settings updated successfully'), findsOneWidget);
+    });
+
+    testWidgets('validates server-declared required fields before submission',
+        (tester) async {
+      final schema = {
+        'title': 'Profile',
+        'layout': 'column',
+        'components': [
+          {
+            'type': 'text_input',
+            'name': 'business_name',
+            'label': 'Business Name',
+            'required': true,
+            'initial_value': '',
+          },
+          {
+            'type': 'button_primary',
+            'label': 'Save',
+            'action': {
+              'type': 'form_submit',
+              'endpoint': '/api/tenant/settings/profile',
+            },
+          },
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(home: DynamicSchemaPage(schema: schema)),
+      );
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+
+      expect(find.text('Business Name is required.'), findsOneWidget);
+      expect(
+          find.text('Please correct the highlighted fields.'), findsOneWidget);
+    });
+
+    testWidgets('routes unfamiliar paths dynamically to DynamicSchemaPage',
+        (tester) async {
+      final registry = SduiComponentRegistry.instance;
+      // Unmapped vertical e.g. 'hotel_booking'
+      final builder = registry.resolve('hotel_booking');
+      expect(builder, isNotNull);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(builder: builder),
+        ),
+      );
+
+      expect(find.byType(DynamicSchemaPage), findsOneWidget);
+    });
+
+    testWidgets('resolves targetEndpoint explicitly to DynamicSchemaPage',
+        (tester) async {
+      final registry = SduiComponentRegistry.instance;
+      final builder = registry.resolve(
+        'store_mode',
+        targetEndpoint: '/api/tenant/views/settings-mode',
+      );
+      expect(builder, isNotNull);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(builder: builder),
+        ),
+      );
+
+      expect(find.byType(DynamicSchemaPage), findsOneWidget);
+    });
+  });
+}

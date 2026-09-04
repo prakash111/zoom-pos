@@ -4,11 +4,13 @@ import 'package:zoom_pos_mobile/core/config/bootstrap_cache.dart';
 import 'package:zoom_pos_mobile/core/sdui/models/sdui_models.dart';
 import 'package:zoom_pos_mobile/core/sdui/sdui_component_registry.dart';
 import 'package:zoom_pos_mobile/core/sdui/sdui_icon_registry.dart';
+import 'package:zoom_pos_mobile/core/widgets/sdui/sdui_containers.dart';
 import 'package:zoom_pos_mobile/core/widgets/sdui/sdui_controls.dart';
 
 void main() {
   group('SDUI Models & Serialization', () {
-    test('TenantSchema and ModuleSchema decode correctly from JSON payload', () {
+    test('TenantSchema and ModuleSchema decode correctly from JSON payload',
+        () {
       final json = {
         'tenant': {
           'id': 'tenant_123',
@@ -78,8 +80,16 @@ void main() {
           ],
           'status_labels': {
             'sale': {
-              'paid': {'label': 'Fully Paid', 'color': '#16a34a', 'badge_style': 'solid'},
-              'partial': {'label': 'Partially Settled', 'color': '#ca8a04', 'badge_style': 'subtle'},
+              'paid': {
+                'label': 'Fully Paid',
+                'color': '#16a34a',
+                'badge_style': 'solid'
+              },
+              'partial': {
+                'label': 'Partially Settled',
+                'color': '#ca8a04',
+                'badge_style': 'subtle'
+              },
             }
           },
           'tax': {
@@ -94,7 +104,8 @@ void main() {
         }
       };
 
-      final tenant = TenantSchema.fromJson(json['tenant'] as Map<String, dynamic>);
+      final tenant =
+          TenantSchema.fromJson(json['tenant'] as Map<String, dynamic>);
       expect(tenant.id, 'tenant_123');
       expect(tenant.businessName, 'Zoom Fresh');
       expect(tenant.activeMode, 'pharmacy');
@@ -114,31 +125,67 @@ void main() {
       expect(menu.first.items.length, 2);
       expect(menu.first.items.first.title, 'Dispensary POS');
 
-      final uiSchema = SduiUiSchema.fromJson(json['ui_schema'] as Map<String, dynamic>);
+      final uiSchema =
+          SduiUiSchema.fromJson(json['ui_schema'] as Map<String, dynamic>);
       expect(uiSchema.paymentMethods.length, 2);
       expect(uiSchema.paymentMethods.first.code, 'cash');
       expect(uiSchema.statusFor('sale', 'paid')?.label, 'Fully Paid');
       expect(uiSchema.tax.subComponents.length, 2);
       expect(uiSchema.tax.subComponents.first.code, 'CGST');
     });
+
+    test(
+        'SduiNavItemSchema decodes parent_id, effectiveParentId, and recursive children',
+        () {
+      final json = {
+        'key': 'settings',
+        'title': 'Store Settings',
+        'icon': 'settings',
+        'children': [
+          {
+            'key': 'settings_mode',
+            'title': 'Store Operating Mode',
+            'icon': 'tune',
+            'parent_id': 'settings',
+          },
+          {
+            'key': 'settings_profile',
+            'title': 'Store Profile & Branding',
+            'icon': 'storefront',
+            'parent': 'settings',
+          }
+        ]
+      };
+
+      final item = SduiNavItemSchema.fromJson(json);
+      expect(item.key, 'settings');
+      expect(item.children.length, 2);
+      expect(item.children[0].key, 'settings_mode');
+      expect(item.children[0].effectiveParentId, 'settings');
+      expect(item.children[1].key, 'settings_profile');
+      expect(item.children[1].effectiveParentId, 'settings');
+    });
   });
 
   group('SDUI Icon and Color Registry', () {
     test('resolves server icon names to Material Icons', () {
-      expect(SduiIconRegistry.resolve('point_of_sale'), Icons.point_of_sale_outlined);
+      expect(SduiIconRegistry.resolve('point_of_sale'),
+          Icons.point_of_sale_outlined);
       expect(SduiIconRegistry.resolve('restaurant'), Icons.restaurant_outlined);
       expect(SduiIconRegistry.resolve('medication'), Icons.medication_outlined);
-      expect(SduiIconRegistry.resolve('soup_kitchen'), Icons.soup_kitchen_outlined);
+      expect(SduiIconRegistry.resolve('soup_kitchen'),
+          Icons.soup_kitchen_outlined);
       expect(SduiIconRegistry.resolve('qr_code'), Icons.qr_code_outlined);
-      expect(SduiIconRegistry.resolve('unrecognized_xyz'), Icons.widgets_outlined);
+      expect(
+          SduiIconRegistry.resolve('unrecognized_xyz'), Icons.widgets_outlined);
     });
 
     test('parses hex colors correctly with or without hash', () {
       final c1 = SduiIconRegistry.parseColor('#16a34a');
-      expect(c1.value, const Color(0xFF16A34A).value);
+      expect(c1.toARGB32(), const Color(0xFF16A34A).toARGB32());
 
       final c2 = SduiIconRegistry.parseColor('0284c7');
-      expect(c2.value, const Color(0xFF0284C7).value);
+      expect(c2.toARGB32(), const Color(0xFF0284C7).toARGB32());
 
       final c3 = SduiIconRegistry.parseColor(null, fallback: Colors.red);
       expect(c3, Colors.red);
@@ -153,16 +200,28 @@ void main() {
       expect(registry.has('cash_register'), isTrue);
 
       // Register new custom component for future hotel module
-      registry.register('hotel_rooms', (_) => const Scaffold(body: Text('Hotel Rooms')));
+      registry.register(
+          'hotel_rooms', (_) => const Scaffold(body: Text('Hotel Rooms')));
       expect(registry.has('hotel_rooms'), isTrue);
 
       final builder = registry.resolve('hotel_rooms');
       expect(builder, isNotNull);
     });
+
+    test('does not require dedicated settings screen components', () {
+      final registry = SduiComponentRegistry.instance;
+      expect(registry.has('settings'), isTrue);
+      expect(registry.has('settings_mode'), isFalse);
+      expect(registry.has('settings_profile'), isFalse);
+      expect(registry.has('settings_receipts'), isFalse);
+      expect(registry.has('settings_financial'), isFalse);
+      expect(registry.has('settings_navigation'), isFalse);
+    });
   });
 
   group('SDUI Dynamic Widgets', () {
-    testWidgets('SduiActionPill renders badge and responds to taps', (tester) async {
+    testWidgets('SduiActionPill renders badge and responds to taps',
+        (tester) async {
       var tapped = false;
       await tester.pumpWidget(
         MaterialApp(
@@ -185,14 +244,17 @@ void main() {
       expect(tapped, isTrue);
     });
 
-    testWidgets('SduiStatusBadge renders solid and subtle styles', (tester) async {
+    testWidgets('SduiStatusBadge renders solid and subtle styles',
+        (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
             body: Column(
               children: [
-                SduiStatusBadge(label: 'COMPLETED', color: Colors.green, isSolid: true),
-                SduiStatusBadge(label: 'PENDING', color: Colors.amber, isSolid: false),
+                SduiStatusBadge(
+                    label: 'COMPLETED', color: Colors.green, isSolid: true),
+                SduiStatusBadge(
+                    label: 'PENDING', color: Colors.amber, isSolid: false),
               ],
             ),
           ),
@@ -203,7 +265,8 @@ void main() {
       expect(find.text('PENDING'), findsOneWidget);
     });
 
-    testWidgets('SduiStepCounter increments and decrements quantity', (tester) async {
+    testWidgets('SduiStepCounter increments and decrements quantity',
+        (tester) async {
       var currentVal = 1;
       await tester.pumpWidget(
         MaterialApp(
@@ -234,14 +297,73 @@ void main() {
       expect(currentVal, 1);
       expect(find.text('1'), findsOneWidget);
     });
+
+    testWidgets(
+        'SduiSideDrawerContainer renders hierarchical sub-items with branch indicator',
+        (tester) async {
+      final sections = [
+        const SduiNavSectionSchema(
+          key: 'admin',
+          title: 'Administration',
+          items: [
+            SduiNavItemSchema(
+              key: 'settings',
+              title: 'Store Settings',
+              icon: 'settings',
+              children: [
+                SduiNavItemSchema(
+                  key: 'settings_mode',
+                  title: 'Store Operating Mode',
+                  icon: 'tune',
+                  parentId: 'settings',
+                ),
+              ],
+            ),
+            SduiNavItemSchema(
+              key: 'settings_mode',
+              title: 'Store Operating Mode',
+              icon: 'tune',
+              parentId: 'settings',
+            ),
+          ],
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            drawer: SduiSideDrawerContainer(
+              sections: sections,
+              selectedKey: 'settings_mode',
+              onItemTap: (_) {},
+            ),
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () => Scaffold.of(context).openDrawer(),
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Store Settings'), findsOneWidget);
+      expect(find.byType(ExpansionTile), findsOneWidget);
+      expect(find.text('Store Operating Mode'), findsOneWidget);
+      expect(find.text('↳'), findsOneWidget);
+    });
   });
 
   group('BootstrapCache SDUI Integration', () {
-    test('effectiveSections provides clean fallback when cache is empty', () {
+    test(
+        'effectiveSections does not invent business navigation when cache is empty',
+        () {
       final cache = BootstrapCache.instance;
-      expect(cache.effectiveSections, isNotEmpty);
-      final firstSection = cache.effectiveSections.first;
-      expect(firstSection.items, isNotEmpty);
+      cache.menuStructure = [];
+      expect(cache.effectiveSections, isEmpty);
     });
   });
 }

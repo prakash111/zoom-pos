@@ -27,7 +27,8 @@ class SduiHeaderBar extends StatelessWidget implements PreferredSizeWidget {
   final PreferredSizeWidget? bottom;
 
   @override
-  Size get preferredSize => Size.fromHeight(kToolbarHeight + (bottom?.preferredSize.height ?? 0));
+  Size get preferredSize =>
+      Size.fromHeight(kToolbarHeight + (bottom?.preferredSize.height ?? 0));
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +41,9 @@ class SduiHeaderBar extends StatelessWidget implements PreferredSizeWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              Text(title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 18)),
               if (availableModes.length > 1 && onModeSelected != null) ...[
                 const SizedBox(width: 8),
                 PopupMenuButton<String>(
@@ -48,7 +51,8 @@ class SduiHeaderBar extends StatelessWidget implements PreferredSizeWidget {
                   tooltip: 'Switch Operating Mode',
                   onSelected: onModeSelected,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(12),
@@ -61,7 +65,9 @@ class SduiHeaderBar extends StatelessWidget implements PreferredSizeWidget {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onPrimaryContainer,
                           ),
                         ),
                         const Icon(Icons.arrow_drop_down, size: 14),
@@ -82,7 +88,9 @@ class SduiHeaderBar extends StatelessWidget implements PreferredSizeWidget {
           if (subtitle != null && subtitle!.isNotEmpty)
             Text(
               subtitle!,
-              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
         ],
       ),
@@ -115,23 +123,45 @@ class SduiNavTile extends StatelessWidget {
     final iconData = SduiIconRegistry.resolve(item.icon);
 
     return Padding(
-      padding: EdgeInsets.only(left: 12.0 + (indent * 20.0), right: 12.0, top: 2, bottom: 2),
+      padding: EdgeInsets.only(
+          left: 12.0 + (indent * 20.0), right: 12.0, top: 2, bottom: 2),
       child: ListTile(
         dense: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         selected: isSelected,
-        selectedTileColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-        leading: Icon(
-          iconData,
-          size: 20,
-          color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+        selectedTileColor:
+            theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (indent > 0) ...[
+              Text(
+                '↳',
+                style: TextStyle(
+                  color: theme.colorScheme.outline,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+            Icon(
+              iconData,
+              size: indent > 0 ? 18 : 20,
+              color: isSelected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
         ),
         title: Text(
           item.title,
           style: TextStyle(
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            fontSize: 14,
-            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+            fontSize: indent > 0 ? 13 : 14,
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurface,
           ),
         ),
         trailing: badgeText != null
@@ -143,7 +173,10 @@ class SduiNavTile extends StatelessWidget {
                 ),
                 child: Text(
                   badgeText!,
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold),
                 ),
               )
             : null,
@@ -199,13 +232,7 @@ class SduiSideDrawerContainer extends StatelessWidget {
                           ),
                         ),
                       ),
-                    for (final item in section.items)
-                      SduiNavTile(
-                        item: item,
-                        isSelected: item.key == selectedKey,
-                        indent: item.parent != null ? 1 : 0,
-                        onTap: () => onItemTap(item),
-                      ),
+                    ..._buildSectionTree(context, section),
                   ],
                 ],
               ),
@@ -218,5 +245,97 @@ class SduiSideDrawerContainer extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildSectionTree(
+      BuildContext context, SduiNavSectionSchema section) {
+    final childrenByParent = <String?, List<SduiNavItemSchema>>{};
+    final seen = <String>{};
+    final itemsByKey = <String, SduiNavItemSchema>{};
+    final inferredParent = <String, String?>{};
+
+    void collect(SduiNavItemSchema item, String? parent) {
+      if (item.key.isEmpty || !seen.add(item.key)) return;
+      itemsByKey[item.key] = item;
+      inferredParent[item.key] = parent;
+      for (final child in item.children) {
+        collect(child, item.key);
+      }
+    }
+
+    for (final item in section.items) {
+      collect(item, null);
+    }
+
+    for (final item in itemsByKey.values) {
+      final candidate = item.effectiveParentId ?? inferredParent[item.key];
+      String? cursor = candidate;
+      final chain = <String>{item.key};
+      var valid = true;
+      while (cursor != null) {
+        final parent = itemsByKey[cursor];
+        if (parent == null || !chain.add(cursor)) {
+          valid = false;
+          break;
+        }
+        cursor = parent.effectiveParentId ?? inferredParent[parent.key];
+      }
+      (childrenByParent[valid ? candidate : null] ??= []).add(item);
+    }
+
+    bool branchHasSelection(SduiNavItemSchema item) {
+      if (item.key == selectedKey) return true;
+      final children = childrenByParent[item.key] ?? const [];
+      return children.any(branchHasSelection);
+    }
+
+    Widget buildNode(SduiNavItemSchema item, int depth) {
+      final children = childrenByParent[item.key] ?? const [];
+      if (children.isEmpty) {
+        return SduiNavTile(
+          item: item,
+          isSelected: item.key == selectedKey,
+          indent: depth,
+          onTap: () => onItemTap(item),
+        );
+      }
+
+      final theme = Theme.of(context);
+      final iconData = SduiIconRegistry.resolve(item.icon);
+      final isSelected = item.key == selectedKey;
+
+      return ExpansionTile(
+        key: PageStorageKey<String>(
+            'sdui-drawer-branch-${section.key}-${item.key}'),
+        tilePadding: EdgeInsets.only(left: 12.0 + (depth * 20.0), right: 12.0),
+        childrenPadding: EdgeInsets.zero,
+        initiallyExpanded: branchHasSelection(item),
+        leading: Icon(
+          iconData,
+          size: depth == 0 ? 20 : 18,
+          color: isSelected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurfaceVariant,
+        ),
+        title: Text(
+          item.title,
+          style: TextStyle(
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            fontSize: depth > 0 ? 13 : 14,
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurface,
+          ),
+        ),
+        children: [
+          for (final child in children) buildNode(child, depth + 1),
+        ],
+      );
+    }
+
+    final rootItems = childrenByParent[null] ?? const [];
+    return [
+      for (final root in rootItems) buildNode(root, 0),
+    ];
   }
 }

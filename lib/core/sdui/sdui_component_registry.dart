@@ -27,6 +27,7 @@ import '../../features/taxes/screens/taxes_screen.dart';
 import '../config/bootstrap_cache.dart';
 import '../widgets/coming_soon_screen.dart';
 import 'screens/dynamic_module_screen.dart';
+import 'screens/dynamic_schema_page.dart';
 
 /// Registry mapping server-driven component identifiers to screen builders.
 class SduiComponentRegistry {
@@ -71,12 +72,14 @@ class SduiComponentRegistry {
     'taxes': (_) => const TaxesScreen(),
     'catalog': (_) => const CatalogScreen(),
 
-    // Administration
+    // Legacy native destinations. New and settings destinations arrive with
+    // target_endpoint and bypass this compatibility registry entirely.
     'subscription': (_) => const SubscriptionScreen(),
     'settings': (_) => const TenantSettingsScreen(),
     'languages': (_) => const LanguagesScreen(),
     'staff': (_) => const StaffScreen(),
     'devices': (_) => const DevicesScreen(),
+    'dynamic_page': (_) => const DynamicSchemaPage(),
   };
 
   /// Register or override a component builder at runtime.
@@ -90,10 +93,19 @@ class SduiComponentRegistry {
   }
 
   /// Resolves a screen builder for the given component/tile key.
-  /// Falls back to [DynamicModuleScreen] or [ComingSoonScreen] if unmapped.
-  WidgetBuilder resolve(String? componentKey) {
+  /// If [targetEndpoint] is provided, dynamically resolves to [DynamicSchemaPage].
+  /// Unfamiliar/unmapped paths route purely from JSON via [DynamicSchemaPage].
+  WidgetBuilder resolve(String? componentKey, {String? targetEndpoint}) {
+    if (targetEndpoint != null && targetEndpoint.isNotEmpty) {
+      return (_) => DynamicSchemaPage(
+            endpoint: targetEndpoint,
+            initialTitle: componentKey,
+          );
+    }
+
     if (componentKey == null || componentKey.isEmpty) {
-      return (_) => const ComingSoonScreen(title: 'Module', icon: Icons.widgets_outlined);
+      return (_) =>
+          const ComingSoonScreen(title: 'Module', icon: Icons.widgets_outlined);
     }
 
     final key = componentKey.toLowerCase().trim();
@@ -107,11 +119,16 @@ class SduiComponentRegistry {
             module: module,
             onAction: (action) {
               final actionBuilder = resolve(action);
-              Navigator.of(context).push(MaterialPageRoute(builder: actionBuilder));
+              Navigator.of(context)
+                  .push(MaterialPageRoute(builder: actionBuilder));
             },
           );
     }
 
-    return (_) => ComingSoonScreen(title: componentKey, icon: Icons.widgets_outlined);
+    // Route all unfamiliar paths to DynamicSchemaPage so new pages render purely from JSON
+    return (_) => DynamicSchemaPage(
+          endpoint: '/api/tenant/views/$key',
+          initialTitle: componentKey,
+        );
   }
 }

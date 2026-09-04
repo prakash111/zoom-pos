@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/sdui/sdui_icon_registry.dart';
 import '../auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -20,22 +21,55 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   bool _obscurePassword = true;
-  String _posMode = 'general';
-  String _allowedRegistrationModes = 'both';
+  String _posMode = '';
+  List<Map<String, dynamic>> _activeModules = [];
+  bool _loadingModules = true;
+  String? _moduleLoadError;
 
   @override
   void initState() {
     super.initState();
-    context.read<ApiClient>().get(ApiEndpoints.registrationConfig).then((response) {
-      final modes = response['allowed_registration_modes']?.toString() ?? 'both';
+    context
+        .read<ApiClient>()
+        .get(ApiEndpoints.registrationConfig)
+        .then((response) {
+      if (!mounted) return;
+      final rawModules = response['active_modules'];
+      if (rawModules is List && rawModules.isNotEmpty) {
+        final parsed = rawModules
+            .whereType<Map>()
+            .map((m) => Map<String, dynamic>.from(m))
+            .where((m) => (m['id']?.toString() ?? '').isNotEmpty)
+            .toList();
+        if (parsed.isEmpty) {
+          setState(() {
+            _loadingModules = false;
+            _moduleLoadError =
+                'No valid registration modules were returned by the server.';
+          });
+          return;
+        }
+        setState(() {
+          _activeModules = parsed;
+          final defaultMode = response['default_mode']?.toString() ??
+              parsed.first['id'].toString();
+          _posMode = defaultMode;
+          _loadingModules = false;
+          _moduleLoadError = null;
+        });
+      } else {
+        setState(() {
+          _loadingModules = false;
+          _moduleLoadError = 'No registration modules are currently available.';
+        });
+      }
+    }).catchError((_) {
       if (!mounted) return;
       setState(() {
-        _allowedRegistrationModes = modes;
-        if (modes == 'restaurant_only') _posMode = 'restaurant';
-        if (modes == 'retail_only') _posMode = 'general';
+        _loadingModules = false;
+        _moduleLoadError =
+            'Unable to load store types. Check the server connection and retry.';
       });
-    }).catchError((_) {
-      // Pre-auth config fetch is best-effort — fall back to showing both cards.
     });
   }
 
@@ -51,6 +85,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_posMode.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a store type before continuing.')),
+      );
+      return;
+    }
 
     final auth = context.read<AuthProvider>();
     final success = await auth.register(
@@ -97,7 +137,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Store name',
                         prefixIcon: Icon(Icons.storefront_outlined),
                       ),
-                      validator: (value) => (value == null || value.trim().isEmpty) ? 'Required' : null,
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
+                              ? 'Required'
+                              : null,
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
@@ -106,7 +149,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Your name',
                         prefixIcon: Icon(Icons.person_outline),
                       ),
-                      validator: (value) => (value == null || value.trim().isEmpty) ? 'Required' : null,
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
+                              ? 'Required'
+                              : null,
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
@@ -118,7 +164,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                       validator: (value) {
-                        if (value == null || value.trim().isEmpty) return 'Required';
+                        if (value == null || value.trim().isEmpty)
+                          return 'Required';
                         if (!value.contains('@')) return 'Enter a valid email';
                         return null;
                       },
@@ -131,12 +178,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Password',
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          icon: Icon(_obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
                         ),
                       ),
-                      validator: (value) =>
-                          (value == null || value.length < 6) ? 'At least 6 characters' : null,
+                      validator: (value) => (value == null || value.length < 6)
+                          ? 'At least 6 characters'
+                          : null,
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
@@ -150,42 +201,65 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 20),
                     const Align(
                       alignment: Alignment.centerLeft,
-                      child: Text('Store type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      child: Text('Store type',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        if (_allowedRegistrationModes != 'restaurant_only')
-                          Expanded(
-                            child: _StoreTypeCard(
-                              icon: Icons.storefront_outlined,
-                              label: 'Retail',
-                              description: 'Shops, electronics, general stores',
-                              selected: _posMode == 'general',
-                              onTap: () => setState(() => _posMode = 'general'),
-                            ),
-                          ),
-                        if (_allowedRegistrationModes == 'both') const SizedBox(width: 10),
-                        if (_allowedRegistrationModes != 'retail_only')
-                          Expanded(
-                            child: _StoreTypeCard(
-                              icon: Icons.restaurant_outlined,
-                              label: 'Cafe & Restaurant',
-                              description: 'Tables, KOT, kitchen display',
-                              selected: _posMode == 'restaurant',
-                              onTap: () => setState(() => _posMode = 'restaurant'),
-                            ),
-                          ),
-                      ],
-                    ),
+                    if (_loadingModules)
+                      const Center(child: CircularProgressIndicator())
+                    else if (_moduleLoadError != null)
+                      Text(
+                        _moduleLoadError!,
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error),
+                      )
+                    else
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final cardWidth = constraints.maxWidth > 320
+                              ? (constraints.maxWidth - 10) / 2
+                              : constraints.maxWidth;
+                          return Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              for (final mod in _activeModules)
+                                SizedBox(
+                                  width: _activeModules.length == 1
+                                      ? constraints.maxWidth
+                                      : cardWidth,
+                                  child: _StoreTypeCard(
+                                    icon: SduiIconRegistry.resolve(
+                                        mod['icon']?.toString()),
+                                    label: mod['title']?.toString() ??
+                                        mod['id']?.toString() ??
+                                        '',
+                                    description:
+                                        mod['description']?.toString() ?? '',
+                                    selected: _posMode ==
+                                        (mod['id']?.toString() ?? ''),
+                                    onTap: () => setState(
+                                        () => _posMode = mod['id'].toString()),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
                     const SizedBox(height: 24),
                     ElevatedButton(
-                      onPressed: auth.isBusy ? null : _submit,
+                      onPressed: auth.isBusy ||
+                              _loadingModules ||
+                              _moduleLoadError != null
+                          ? null
+                          : _submit,
                       child: auth.isBusy
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
                             )
                           : const Text('Create store'),
                     ),
@@ -226,18 +300,26 @@ class _StoreTypeCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? primaryColor.withValues(alpha: 0.08) : Colors.grey.shade50,
+          color: selected
+              ? primaryColor.withValues(alpha: 0.08)
+              : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? primaryColor : Colors.grey.shade300, width: selected ? 2 : 1),
+          border: Border.all(
+              color: selected ? primaryColor : Colors.grey.shade300,
+              width: selected ? 2 : 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(icon, color: selected ? primaryColor : Colors.grey.shade700),
             const SizedBox(height: 6),
-            Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: selected ? primaryColor : Colors.grey.shade900)),
+            Text(label,
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: selected ? primaryColor : Colors.grey.shade900)),
             const SizedBox(height: 2),
-            Text(description, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+            Text(description,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
           ],
         ),
       ),

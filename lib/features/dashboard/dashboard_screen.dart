@@ -11,6 +11,7 @@ import '../../core/config/theme_provider.dart';
 import '../../core/models/analytics_model.dart';
 import '../../core/models/company_model.dart';
 import '../../core/models/user_model.dart';
+import '../../core/sdui/models/sdui_models.dart';
 import '../../core/sdui/sdui_component_registry.dart';
 import '../../core/sdui/sdui_icon_registry.dart';
 import '../../core/services/sync/sync_status_badge.dart';
@@ -90,29 +91,49 @@ class _NavSection {
 /// resolving icons via [SduiIconRegistry] and screen builders via [SduiComponentRegistry].
 List<_NavSection> _serverDrivenSections() {
   final sduiSections = BootstrapCache.instance.effectiveSections;
-  return [
-    for (final s in sduiSections)
-      _NavSection(
-        s.key,
-        (l10n) => l10n.text(s.title, fallback: s.title),
-        [
-          for (final item in s.items)
-            _FeatureTile(
-              item.key,
-              (l10n) => l10n.text(item.title, fallback: item.title),
-              SduiIconRegistry.resolve(item.icon),
-              SduiComponentRegistry.instance.resolve(item.component ?? item.key),
-              item.permission,
-            ),
-        ],
-        headerColor: s.color != null ? SduiIconRegistry.parseColor(s.color) : null,
-        parentByKey: {
-          for (final item in s.items)
-            if (item.parent != null && item.parent!.isNotEmpty)
-              item.key: item.parent!,
-        },
-      ),
-  ];
+  final result = <_NavSection>[];
+
+  for (final s in sduiSections) {
+    final tiles = <_FeatureTile>[];
+    final parentByKey = <String, String>{};
+    final seenKeys = <String>{};
+
+    void collectItems(List<SduiNavItemSchema> items, String? defaultParent) {
+      for (final item in items) {
+        if (item.key.isEmpty || !seenKeys.add(item.key)) continue;
+        tiles.add(_FeatureTile(
+          item.key,
+          (l10n) => l10n.text(item.title, fallback: item.title),
+          SduiIconRegistry.resolve(item.icon),
+          SduiComponentRegistry.instance.resolve(
+            item.component ?? item.key,
+            targetEndpoint: item.targetEndpoint,
+          ),
+          item.permission,
+        ));
+        final parent = item.effectiveParentId ?? defaultParent;
+        if (parent != null && parent.isNotEmpty) {
+          parentByKey[item.key] = parent;
+        }
+        if (item.children.isNotEmpty) {
+          collectItems(item.children, item.key);
+        }
+      }
+    }
+
+    collectItems(s.items, null);
+
+    result.add(_NavSection(
+      s.key,
+      (l10n) => l10n.text(s.title, fallback: s.title),
+      tiles,
+      headerColor:
+          s.color != null ? SduiIconRegistry.parseColor(s.color) : null,
+      parentByKey: parentByKey,
+    ));
+  }
+
+  return result;
 }
 
 /// The active nav tree for this tenant — loaded dynamically from the backend SDUI
@@ -160,7 +181,9 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
 
     for (final row in rows) {
       final item = itemOverrides[row.tile.key];
-      final rawParent = item?.parentId;
+      final rawParent = item?.parentId ??
+          item?.parent ??
+          sectionMetaByKey[entry.key]?.parentByKey[row.tile.key];
       final candidate =
           rawParent == null || rawParent.isEmpty ? null : rawParent;
       var cursor = candidate;
@@ -175,7 +198,9 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
           valid = false;
           break;
         }
-        cursor = itemOverrides[cursor]?.parentId;
+        cursor = itemOverrides[cursor]?.parentId ??
+            itemOverrides[cursor]?.parent ??
+            sectionMetaByKey[entry.key]?.parentByKey[cursor];
       }
       safeParent[row.tile.key] = valid ? candidate : null;
     }
@@ -216,7 +241,9 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
       appendBranch(root);
     }
     for (final row in rows..sort(compareRows)) {
-      appendBranch(row);
+      if (!visited.contains(row.tile.key)) {
+        appendBranch(row);
+      }
     }
 
     result.add(_NavSection(
@@ -430,7 +457,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
@@ -444,30 +472,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-                if (BootstrapCache.instance.availableModes.length > 1) ...[
-                  const SizedBox(width: 4),
-                  PopupMenuButton<String>(
-                    tooltip: 'Switch Operating Mode',
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.swap_horiz, size: 18, color: Colors.white),
-                    onSelected: (mode) async {
-                      final client = context.read<ApiClient>();
-                      final ok = await BootstrapCache.instance.switchOperatingMode(mode, client);
-                      if (ok && mounted) {
-                        setState(() {});
-                      }
-                    },
-                    itemBuilder: (ctx) => [
-                      for (final m in BootstrapCache.instance.availableModes)
-                        PopupMenuItem(
-                          value: m,
-                          child: Text(
-                            (BootstrapCache.instance.modules[m]?.title ?? m).toUpperCase(),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
               ],
             ),
           ],
@@ -531,7 +535,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final nested = childrenByParent[tile.key] ?? const <_FeatureTile>[];
         final index = indexByKey[tile.key]!;
         final padding = EdgeInsets.only(
-          left: 16 + depth * 30,
+          left: 16 + depth * 24,
           right: 12,
         );
 
@@ -539,8 +543,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
           return ListTile(
             key: ValueKey('drawer-item-${tile.key}'),
             contentPadding: padding,
-            leading: Icon(tile.icon, size: depth == 0 ? 24 : 20),
-            title: Text(tile.titleOf(l10n)),
+            dense: depth > 0,
+            leading: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (depth > 0) ...[
+                  Text(
+                    '↳',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.outline,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Icon(tile.icon, size: depth == 0 ? 24 : 18),
+              ],
+            ),
+            title: Text(
+              tile.titleOf(l10n),
+              style: TextStyle(
+                fontSize: depth > 0 ? 13 : 14,
+                fontWeight: _dockIndex == index
+                    ? FontWeight.w700
+                    : (depth > 0 ? FontWeight.w500 : FontWeight.normal),
+                color: _dockIndex == index
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
+              ),
+            ),
             selected: _dockIndex == index,
             onTap: () => openTile(tile),
           );
@@ -557,18 +589,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           maintainState: true,
           shape: const Border(),
           collapsedShape: const Border(),
-          title: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => openTile(tile),
-            child: Text(
-              tile.titleOf(l10n),
-              style: TextStyle(
-                fontWeight:
-                    _dockIndex == index ? FontWeight.w700 : FontWeight.normal,
-                color: _dockIndex == index
-                    ? Theme.of(context).colorScheme.primary
-                    : null,
-              ),
+          title: Text(
+            tile.titleOf(l10n),
+            style: TextStyle(
+              fontWeight:
+                  _dockIndex == index ? FontWeight.w700 : FontWeight.normal,
+              color: _dockIndex == index
+                  ? Theme.of(context).colorScheme.primary
+                  : null,
             ),
           ),
           children: [
@@ -923,7 +951,8 @@ class _DashboardAnalytics extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                    builder: SduiComponentRegistry.instance.resolve('inventory')),
+                    builder:
+                        SduiComponentRegistry.instance.resolve('inventory')),
               ),
             ),
           ),
@@ -941,7 +970,8 @@ class _DashboardAnalytics extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                    builder: SduiComponentRegistry.instance.resolve('due_receivables')),
+                    builder: SduiComponentRegistry.instance
+                        .resolve('due_receivables')),
               ),
             ),
           ),

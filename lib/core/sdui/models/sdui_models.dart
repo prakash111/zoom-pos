@@ -4,7 +4,7 @@ class TenantSchema {
     required this.id,
     required this.businessName,
     required this.activeMode,
-    this.availableModes = const ['retail'],
+    this.availableModes = const [],
   });
 
   final String id;
@@ -16,11 +16,11 @@ class TenantSchema {
     return TenantSchema(
       id: json['id']?.toString() ?? '',
       businessName: json['business_name']?.toString() ?? '',
-      activeMode: json['active_mode']?.toString() ?? 'retail',
+      activeMode: json['active_mode']?.toString() ?? '',
       availableModes: (json['available_modes'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
-          const ['retail'],
+          const [],
     );
   }
 
@@ -87,27 +87,18 @@ class ModuleSchema {
   final String id;
   final String title;
   final String description;
-  final String layoutType; // 'standard_grid', 'table_floor_plan', 'service_booking_list'
+  final String
+      layoutType; // 'standard_grid', 'table_floor_plan', 'service_booking_list'
   final String? icon;
   final Map<String, dynamic> features;
   final ModuleCartConfig cartConfiguration;
 
-  bool get hasTables => features['has_tables'] == true;
-  bool get hasKot => features['has_kot'] == true;
-  bool get hasBarcodeScanner => features['has_barcode_scanner'] == true;
-  bool get hasDueReminders => features['has_due_reminders'] == true;
-  bool get prepTimer => features['prep_timer'] == true;
-  bool get orderAlerts => features['order_alerts'] == true;
-  bool get batchTracking => features['batch_tracking'] == true;
-  bool get expiryTracking => features['expiry_tracking'] == true;
-  bool get prescriptionRequired => features['prescription_required'] == true;
-  bool get appointmentScheduling => features['appointment_scheduling'] == true;
-  bool get staffAssignment => features['staff_assignment'] == true;
+  bool featureEnabled(String key) => features[key] == true;
 
   factory ModuleSchema.fromJson(Map<String, dynamic> json) {
     return ModuleSchema(
-      id: json['id']?.toString() ?? 'retail',
-      title: json['title']?.toString() ?? 'Retail POS',
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? json['id']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       layoutType: json['layout_type']?.toString() ?? 'standard_grid',
       icon: json['icon']?.toString(),
@@ -138,6 +129,10 @@ class SduiNavItemSchema {
     this.component,
     this.permission,
     this.parent,
+    this.parentId,
+    this.type,
+    this.targetEndpoint,
+    this.children = const [],
   });
 
   final String key;
@@ -146,15 +141,43 @@ class SduiNavItemSchema {
   final String? component;
   final String? permission;
   final String? parent;
+  final String? parentId;
+  final String? type;
+  final String? targetEndpoint;
+  final List<SduiNavItemSchema> children;
+
+  String? get effectiveParentId => parentId ?? parent;
+  bool get isAccordion => type == 'accordion' || children.isNotEmpty;
 
   factory SduiNavItemSchema.fromJson(Map<String, dynamic> json) {
+    final rawParent =
+        json['parent_id']?.toString() ?? json['parent']?.toString();
+    final rawChildren = json['children'];
+    final List<SduiNavItemSchema> parsedChildren = [];
+    if (rawChildren is List) {
+      for (final c in rawChildren) {
+        if (c is Map<String, dynamic>) {
+          parsedChildren.add(SduiNavItemSchema.fromJson(c));
+        } else if (c is Map) {
+          parsedChildren
+              .add(SduiNavItemSchema.fromJson(Map<String, dynamic>.from(c)));
+        }
+      }
+    }
+
     return SduiNavItemSchema(
       key: json['key']?.toString() ?? '',
       title: json['label']?.toString() ?? json['title']?.toString() ?? '',
       icon: json['icon']?.toString() ?? 'widgets',
       component: json['component']?.toString() ?? json['key']?.toString(),
       permission: json['permission']?.toString(),
-      parent: json['parent']?.toString(),
+      parent: rawParent,
+      parentId: rawParent,
+      type: json['type']?.toString() ??
+          (parsedChildren.isNotEmpty ? 'accordion' : 'link'),
+      targetEndpoint:
+          json['target_endpoint']?.toString() ?? json['endpoint']?.toString(),
+      children: parsedChildren,
     );
   }
 
@@ -165,6 +188,11 @@ class SduiNavItemSchema {
         if (component != null) 'component': component,
         if (permission != null) 'permission': permission,
         if (parent != null) 'parent': parent,
+        if (parentId != null) 'parent_id': parentId,
+        if (type != null) 'type': type,
+        if (targetEndpoint != null) 'target_endpoint': targetEndpoint,
+        if (children.isNotEmpty)
+          'children': children.map((c) => c.toJson()).toList(),
       };
 }
 
@@ -189,8 +217,10 @@ class SduiNavSectionSchema {
       title: json['label']?.toString() ?? json['title']?.toString() ?? '',
       color: json['color']?.toString() ?? json['header_color']?.toString(),
       items: rawItems
-          .whereType<Map<String, dynamic>>()
-          .map(SduiNavItemSchema.fromJson)
+          .whereType<Map>()
+          .map((item) => SduiNavItemSchema.fromJson(
+                Map<String, dynamic>.from(item),
+              ))
           .toList(),
     );
   }
@@ -299,7 +329,9 @@ class SduiTaxSubComponent {
     return SduiTaxSubComponent(
       key: json['key']?.toString() ?? json['code']?.toString() ?? '',
       label: json['label']?.toString() ?? '',
-      split: (json['split'] as num?)?.toDouble() ?? (json['rate'] as num?)?.toDouble() ?? 0.5,
+      split: (json['split'] as num?)?.toDouble() ??
+          (json['rate'] as num?)?.toDouble() ??
+          0.5,
     );
   }
 
@@ -410,7 +442,8 @@ class SduiUiSchema {
         .map(SduiPaymentMethodSchema.fromJson)
         .toList();
 
-    final rawStatusMap = json['status_labels'] as Map<String, dynamic>? ?? const {};
+    final rawStatusMap =
+        json['status_labels'] as Map<String, dynamic>? ?? const {};
     final statusLabels = <String, Map<String, SduiStatusSchema>>{};
     rawStatusMap.forEach((domain, statuses) {
       if (statuses is Map<String, dynamic>) {

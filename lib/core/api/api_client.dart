@@ -129,6 +129,61 @@ class ApiClient {
     });
   }
 
+  /// Like [put], but for endpoints outside the `/api/v1/pos` prefix.
+  Future<Map<String, dynamic>> putAbsolute(String path,
+      {Map<String, dynamic>? data}) {
+    return _send(() async {
+      final base = await currentBaseUrl();
+      return _dio.put('$base$path', data: data);
+    });
+  }
+
+  /// Generic executor used by declarative SDUI actions.
+  ///
+  /// Only API paths on the configured server origin are accepted. This keeps
+  /// a malformed schema from forwarding the bearer token to another host.
+  Future<Map<String, dynamic>> requestAbsolute(
+    String path, {
+    String method = 'GET',
+    Map<String, dynamic>? data,
+    Map<String, dynamic>? query,
+  }) {
+    return _send(() async {
+      final base = await currentBaseUrl();
+      final normalizedMethod = method.toUpperCase();
+      const allowedMethods = {'GET', 'POST', 'PUT', 'PATCH', 'DELETE'};
+      if (!allowedMethods.contains(normalizedMethod)) {
+        throw ApiException(
+            'Unsupported SDUI request method: $normalizedMethod');
+      }
+
+      final baseUri = Uri.parse(base);
+      final requestedUri = Uri.tryParse(path);
+      if (requestedUri == null ||
+          (!requestedUri.hasScheme && !path.startsWith('/api/'))) {
+        throw ApiException('SDUI endpoints must start with /api/.');
+      }
+
+      final resolved = requestedUri.hasScheme
+          ? requestedUri
+          : baseUri.resolveUri(requestedUri);
+      if (resolved.scheme != baseUri.scheme ||
+          resolved.host != baseUri.host ||
+          resolved.port != baseUri.port ||
+          !resolved.path.startsWith('/api/')) {
+        throw ApiException(
+            'SDUI endpoint is outside the configured API origin.');
+      }
+
+      return _dio.request(
+        resolved.toString(),
+        data: data,
+        queryParameters: query,
+        options: Options(method: normalizedMethod),
+      );
+    });
+  }
+
   /// Like [post], but for multipart file uploads (product images, business
   /// logo/favicon). Dio sets the correct `multipart/form-data` content-type
   /// and boundary itself whenever [data] is a [FormData] instance,

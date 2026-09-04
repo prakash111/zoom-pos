@@ -32,34 +32,24 @@ class BootstrapCache extends ChangeNotifier {
   Map<String, dynamic> config = {};
 
   String get activeMode =>
-      tenant?.activeMode ??
-      (config['pos_mode'] == 'restaurant' ? 'restaurant' : 'retail');
+      tenant?.activeMode ?? config['pos_mode']?.toString() ?? '';
 
-  List<String> get availableModes =>
-      tenant?.availableModes.isNotEmpty == true
-          ? tenant!.availableModes
-          : const ['retail', 'restaurant', 'pharmacy', 'service_booking'];
+  List<String> get availableModes => tenant?.availableModes.isNotEmpty == true
+      ? tenant!.availableModes
+      : modules.keys.toList(growable: false);
 
   ModuleSchema get activeModule {
     final mode = activeMode;
     return modules[mode] ??
         ModuleSchema(
           id: mode,
-          title: mode == 'restaurant' ? 'Restaurant & Cafe' : 'Retail POS',
-          layoutType: mode == 'restaurant' ? 'table_floor_plan' : 'standard_grid',
-          features: {
-            'has_tables': mode == 'restaurant',
-            'has_kot': mode == 'restaurant',
-            'has_barcode_scanner': mode != 'restaurant',
-            'has_due_reminders': mode != 'restaurant',
-            'prep_timer': mode == 'restaurant',
-            'order_alerts': mode == 'restaurant',
-          },
+          title: mode,
+          layoutType: 'standard_grid',
         );
   }
 
-  /// Server-driven navigation sections. Falls back to default mode sections
-  /// if bootstrap has not yet synced from the network.
+  /// Server-driven navigation sections. Disk cache supplies offline startup;
+  /// an empty cache intentionally renders no business-specific fallback tree.
   List<SduiNavSectionSchema> get effectiveSections {
     if (menuStructure.isNotEmpty) {
       return menuStructure;
@@ -86,7 +76,8 @@ class BootstrapCache extends ChangeNotifier {
 
       final navRaw = prefs.getString(_navCacheKey);
       if (navRaw != null) {
-        navConfig = NavConfig.fromJson(jsonDecode(navRaw) as Map<String, dynamic>);
+        navConfig =
+            NavConfig.fromJson(jsonDecode(navRaw) as Map<String, dynamic>);
       }
 
       final configRaw = prefs.getString(_configCacheKey);
@@ -96,14 +87,16 @@ class BootstrapCache extends ChangeNotifier {
 
       final tenantRaw = prefs.getString(_tenantCacheKey);
       if (tenantRaw != null) {
-        tenant = TenantSchema.fromJson(jsonDecode(tenantRaw) as Map<String, dynamic>);
+        tenant = TenantSchema.fromJson(
+            jsonDecode(tenantRaw) as Map<String, dynamic>);
       }
 
       final modulesRaw = prefs.getString(_modulesCacheKey);
       if (modulesRaw != null) {
         final rawMap = jsonDecode(modulesRaw) as Map<String, dynamic>;
         modules = rawMap.map(
-          (k, v) => MapEntry(k, ModuleSchema.fromJson(v as Map<String, dynamic>)),
+          (k, v) =>
+              MapEntry(k, ModuleSchema.fromJson(v as Map<String, dynamic>)),
         );
       }
 
@@ -136,18 +129,22 @@ class BootstrapCache extends ChangeNotifier {
 
   Future<void> refresh(String locale, ApiClient client) async {
     try {
-      final response = await client.get(ApiEndpoints.appBootstrap, query: {'locale': locale});
+      final response = await client
+          .get(ApiEndpoints.appBootstrap, query: {'locale': locale});
       final prefs = await SharedPreferences.getInstance();
 
       if (response['tenant'] is Map) {
-        tenant = TenantSchema.fromJson(Map<String, dynamic>.from(response['tenant'] as Map));
+        tenant = TenantSchema.fromJson(
+            Map<String, dynamic>.from(response['tenant'] as Map));
         await prefs.setString(_tenantCacheKey, jsonEncode(tenant!.toJson()));
       }
 
       if (response['modules'] is Map) {
-        final rawModules = Map<String, dynamic>.from(response['modules'] as Map);
+        final rawModules =
+            Map<String, dynamic>.from(response['modules'] as Map);
         modules = rawModules.map(
-          (k, v) => MapEntry(k, ModuleSchema.fromJson(Map<String, dynamic>.from(v as Map))),
+          (k, v) => MapEntry(
+              k, ModuleSchema.fromJson(Map<String, dynamic>.from(v as Map))),
         );
         await prefs.setString(
           _modulesCacheKey,
@@ -159,7 +156,8 @@ class BootstrapCache extends ChangeNotifier {
         final rawMenu = response['menu_structure'] as List;
         menuStructure = rawMenu
             .whereType<Map>()
-            .map((m) => SduiNavSectionSchema.fromJson(Map<String, dynamic>.from(m)))
+            .map((m) =>
+                SduiNavSectionSchema.fromJson(Map<String, dynamic>.from(m)))
             .toList();
         await prefs.setString(
           _menuCacheKey,
@@ -168,7 +166,8 @@ class BootstrapCache extends ChangeNotifier {
       }
 
       if (response['ui_schema'] is Map) {
-        uiSchema = SduiUiSchema.fromJson(Map<String, dynamic>.from(response['ui_schema'] as Map));
+        uiSchema = SduiUiSchema.fromJson(
+            Map<String, dynamic>.from(response['ui_schema'] as Map));
         await prefs.setString(_uiSchemaCacheKey, jsonEncode(uiSchema.toJson()));
       }
 
@@ -176,7 +175,8 @@ class BootstrapCache extends ChangeNotifier {
       if (translations is Map && translations.isNotEmpty) {
         await TranslationsCache.instance.applyFetched(
           locale,
-          translations.map((key, value) => MapEntry(key.toString(), value.toString())),
+          translations
+              .map((key, value) => MapEntry(key.toString(), value.toString())),
         );
       }
 
@@ -219,7 +219,8 @@ class BootstrapCache extends ChangeNotifier {
           final rawMenu = response['menu_structure'] as List;
           menuStructure = rawMenu
               .whereType<Map>()
-              .map((m) => SduiNavSectionSchema.fromJson(Map<String, dynamic>.from(m)))
+              .map((m) =>
+                  SduiNavSectionSchema.fromJson(Map<String, dynamic>.from(m)))
               .toList();
           await prefs.setString(
             _menuCacheKey,
@@ -227,7 +228,7 @@ class BootstrapCache extends ChangeNotifier {
           );
         }
 
-        config['pos_mode'] = mode == 'restaurant' ? 'restaurant' : 'general';
+        config['pos_mode'] = mode;
         await prefs.setString(_configCacheKey, jsonEncode(config));
 
         notifyListeners();
@@ -239,120 +240,5 @@ class BootstrapCache extends ChangeNotifier {
     return false;
   }
 
-  List<SduiNavSectionSchema> _defaultFallbackSections() {
-    final isRest = activeMode == 'restaurant';
-    if (isRest) {
-      return const [
-        SduiNavSectionSchema(
-          key: 'restaurant_operations',
-          title: 'Restaurant Operations',
-          color: '#4d7c0f',
-          items: [
-            SduiNavItemSchema(key: 'restaurant_pos', title: 'Restaurant POS', icon: 'restaurant', component: 'restaurant_pos', permission: 'pos'),
-            SduiNavItemSchema(key: 'floor_plan', title: 'Floor Plan & Tables', icon: 'table_restaurant', component: 'floor_plan', permission: 'pos'),
-            SduiNavItemSchema(key: 'kitchen_display', title: 'Kitchen Display', icon: 'soup_kitchen', component: 'kitchen_display', permission: 'pos'),
-          ],
-        ),
-        SduiNavSectionSchema(
-          key: 'orders_cash',
-          title: 'Orders & Cash',
-          color: '#0284c7',
-          items: [
-            SduiNavItemSchema(key: 'dining_history', title: 'Dining History', icon: 'receipt_long', component: 'sales', permission: 'sales'),
-            SduiNavItemSchema(key: 'cash_register', title: 'Cash Register', icon: 'savings', component: 'cash_register', permission: 'cash_register'),
-          ],
-        ),
-        SduiNavSectionSchema(
-          key: 'financial_management',
-          title: 'Financial Management',
-          color: '#0f766e',
-          items: [
-            SduiNavItemSchema(key: 'due_receivables', title: 'Accounts Receivable', icon: 'notifications_active', component: 'due_receivables', permission: 'finance'),
-            SduiNavItemSchema(key: 'payables', title: 'Accounts Payable', icon: 'request_quote', component: 'payables', permission: 'finance'),
-            SduiNavItemSchema(key: 'reports', title: 'Reports & Analytics', icon: 'insights', component: 'reports', permission: 'reports'),
-          ],
-        ),
-        SduiNavSectionSchema(
-          key: 'kitchen_menu_catalog',
-          title: 'Kitchen Menu & Catalog',
-          color: '#d97706',
-          items: [
-            SduiNavItemSchema(key: 'inventory', title: 'Menu Dishes & Stock', icon: 'restaurant_menu', component: 'inventory', permission: 'products'),
-            SduiNavItemSchema(key: 'categories', title: 'Categories', icon: 'sell', component: 'categories', permission: 'categories'),
-            SduiNavItemSchema(key: 'brands', title: 'Brands & Modifiers', icon: 'auto_awesome', component: 'brands', permission: 'categories'),
-            SduiNavItemSchema(key: 'units', title: 'Units of Measure', icon: 'straighten', component: 'units', permission: 'units'),
-            SduiNavItemSchema(key: 'suppliers', title: 'Food Suppliers', icon: 'local_shipping', component: 'suppliers', permission: 'suppliers'),
-            SduiNavItemSchema(key: 'catalog', title: 'Online QR Menu', icon: 'qr_code', component: 'catalog', permission: 'catalog'),
-          ],
-        ),
-        SduiNavSectionSchema(
-          key: 'administration',
-          title: 'Administration & Settings',
-          color: '#475569',
-          items: [
-            SduiNavItemSchema(key: 'subscription', title: 'Subscription & Billing', icon: 'workspace_premium', component: 'subscription'),
-            SduiNavItemSchema(key: 'settings', title: 'Store Settings', icon: 'settings', component: 'settings', permission: 'settings'),
-            SduiNavItemSchema(key: 'languages', title: 'Languages & Translations', icon: 'translate', component: 'languages', permission: 'settings'),
-            SduiNavItemSchema(key: 'staff', title: 'Users & Permissions', icon: 'badge', component: 'staff', permission: 'users'),
-            SduiNavItemSchema(key: 'devices', title: 'Terminals & Devices', icon: 'devices_other', component: 'devices'),
-          ],
-        ),
-      ];
-    }
-
-    return const [
-      SduiNavSectionSchema(
-        key: 'cashier_sales',
-        title: 'Cashier & Sales',
-        color: '#1d4ed8',
-        items: [
-          SduiNavItemSchema(key: 'pos', title: 'Point of Sale', icon: 'point_of_sale', component: 'pos', permission: 'pos'),
-          SduiNavItemSchema(key: 'sales', title: 'Sales & Invoices', icon: 'receipt_long', component: 'sales', permission: 'sales'),
-          SduiNavItemSchema(key: 'quotations', title: 'Quotations', icon: 'description', component: 'quotations', permission: 'quotes'),
-          SduiNavItemSchema(key: 'consignments', title: 'Consignments', icon: 'local_shipping', component: 'consignments', permission: 'consignments'),
-          SduiNavItemSchema(key: 'service_orders', title: 'Service Orders', icon: 'handyman', component: 'service_orders', permission: 'service_orders'),
-          SduiNavItemSchema(key: 'customers', title: 'Customers & CRM', icon: 'people', component: 'customers', permission: 'customers'),
-        ],
-      ),
-      SduiNavSectionSchema(
-        key: 'financial_management',
-        title: 'Financial Management',
-        color: '#0f766e',
-        items: [
-          SduiNavItemSchema(key: 'cash_register', title: 'Cash Register', icon: 'savings', component: 'cash_register', permission: 'cash_register'),
-          SduiNavItemSchema(key: 'due_receivables', title: 'Accounts Receivable', icon: 'notifications_active', component: 'due_receivables', permission: 'finance'),
-          SduiNavItemSchema(key: 'payables', title: 'Accounts Payable', icon: 'request_quote', component: 'payables', permission: 'finance'),
-          SduiNavItemSchema(key: 'sales_targets', title: 'Sales Targets', icon: 'flag', component: 'sales_targets', permission: 'targets'),
-          SduiNavItemSchema(key: 'reports', title: 'Reports', icon: 'insights', component: 'reports', permission: 'reports'),
-          SduiNavItemSchema(key: 'analytics', title: 'Analytics', icon: 'bar_chart', component: 'analytics', permission: 'reports'),
-        ],
-      ),
-      SduiNavSectionSchema(
-        key: 'products_inventory',
-        title: 'Products & Inventory',
-        color: '#b45309',
-        items: [
-          SduiNavItemSchema(key: 'inventory', title: 'All Products', icon: 'inventory_2', component: 'inventory', permission: 'products'),
-          SduiNavItemSchema(key: 'categories', title: 'Categories', icon: 'sell', component: 'categories', permission: 'categories'),
-          SduiNavItemSchema(key: 'brands', title: 'Brands & Manufacturers', icon: 'auto_awesome', component: 'brands', permission: 'categories'),
-          SduiNavItemSchema(key: 'units', title: 'Units of Measure', icon: 'straighten', component: 'units', permission: 'units'),
-          SduiNavItemSchema(key: 'suppliers', title: 'Suppliers & Vendors', icon: 'local_shipping', component: 'suppliers', permission: 'suppliers'),
-          SduiNavItemSchema(key: 'taxes', title: 'Taxes & Compliance', icon: 'percent', component: 'taxes', permission: 'settings'),
-          SduiNavItemSchema(key: 'catalog', title: 'Online Digital Catalog', icon: 'qr_code', component: 'catalog', permission: 'catalog'),
-        ],
-      ),
-      SduiNavSectionSchema(
-        key: 'administration',
-        title: 'Administration & Settings',
-        color: '#475569',
-        items: [
-          SduiNavItemSchema(key: 'subscription', title: 'Subscription & Billing', icon: 'workspace_premium', component: 'subscription'),
-          SduiNavItemSchema(key: 'settings', title: 'Store Settings', icon: 'settings', component: 'settings', permission: 'settings'),
-          SduiNavItemSchema(key: 'languages', title: 'Languages & Translations', icon: 'translate', component: 'languages', permission: 'settings'),
-          SduiNavItemSchema(key: 'staff', title: 'Users & Permissions', icon: 'badge', component: 'staff', permission: 'users'),
-          SduiNavItemSchema(key: 'devices', title: 'Terminals & Devices', icon: 'devices_other', component: 'devices'),
-        ],
-      ),
-    ];
-  }
+  List<SduiNavSectionSchema> _defaultFallbackSections() => const [];
 }
