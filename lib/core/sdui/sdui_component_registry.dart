@@ -39,12 +39,18 @@ class SduiComponentRegistry {
   final Map<String, WidgetBuilder> _registry = {
     // POS & Terminals
     'pos': (_) => const PosScreen(),
+    'point_of_sale': (_) => const PosScreen(),
     'restaurant_pos': (_) => const RestaurantPosScreen(),
     'floor_plan': (_) => const RestaurantTablesScreen(),
     'kitchen_display': (_) => const RestaurantKdsScreen(),
 
     // Cash & Sales
     'sales': (_) => const SalesScreen(),
+    'sale': (_) => const SalesScreen(),
+    'invoices': (_) => const SalesScreen(),
+    'invoice': (_) => const SalesScreen(),
+    'sales_history': (_) => const SalesScreen(),
+    'history': (_) => const SalesScreen(),
     'dining_history': (_) => const SalesScreen(),
     'cash_register': (_) => const CashRegisterScreen(),
     'quotations': (_) => const QuotationsScreen(),
@@ -64,6 +70,8 @@ class SduiComponentRegistry {
 
     // Inventory & Catalog
     'inventory': (_) => const InventoryManagementScreen(),
+    'products': (_) => const InventoryManagementScreen(),
+    'stock': (_) => const InventoryManagementScreen(),
     'menu_dishes': (_) => const InventoryManagementScreen(),
     'categories': (_) => const CategoriesScreen(),
     'brands': (_) => const BrandsScreen(),
@@ -100,20 +108,23 @@ class SduiComponentRegistry {
   }
 
   /// Resolves a screen builder for the given component/tile key.
-  /// If [targetEndpoint] is provided, dynamically resolves to [DynamicSchemaPage].
-  /// Unfamiliar/unmapped paths route purely from JSON via [DynamicSchemaPage].
+  /// Priority order:
+  /// 1. Pre-registered native screens (POS, Invoices, Inventory, etc.)
+  /// 2. Explicit [targetEndpoint] dynamically resolved via [DynamicSchemaPage]
+  /// 3. Registered dynamic server modules via [DynamicModuleScreen]
+  /// 4. Fallback [DynamicSchemaPage] for unfamiliar views
   WidgetBuilder resolve(String? componentKey, {String? targetEndpoint}) {
+    final key = componentKey?.toLowerCase().trim();
+    if (key != null && key.isNotEmpty) {
+      final builder = _registry[key];
+      if (builder != null) return builder;
+    }
+
     if (targetEndpoint != null && targetEndpoint.trim().isNotEmpty) {
       return (_) => DynamicSchemaPage(
             endpoint: targetEndpoint.trim(),
             initialTitle: componentKey,
           );
-    }
-
-    final key = componentKey?.toLowerCase().trim();
-    if (key != null && key.isNotEmpty) {
-      final builder = _registry[key];
-      if (builder != null) return builder;
     }
 
     if (componentKey == null || componentKey.trim().isEmpty) {

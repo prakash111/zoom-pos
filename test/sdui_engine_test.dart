@@ -5,10 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zoom_pos_mobile/core/config/bootstrap_cache.dart';
 import 'package:zoom_pos_mobile/core/sdui/models/sdui_models.dart';
+import 'package:zoom_pos_mobile/core/sdui/screens/dynamic_schema_page.dart';
 import 'package:zoom_pos_mobile/core/sdui/sdui_component_registry.dart';
 import 'package:zoom_pos_mobile/core/sdui/sdui_icon_registry.dart';
 import 'package:zoom_pos_mobile/core/widgets/sdui/sdui_containers.dart';
 import 'package:zoom_pos_mobile/core/widgets/sdui/sdui_controls.dart';
+import 'package:zoom_pos_mobile/features/pos/screens/pos_screen.dart';
+import 'package:zoom_pos_mobile/features/sales/screens/sales_screen.dart';
 
 void main() {
   group('SDUI Models & Serialization', () {
@@ -293,6 +296,39 @@ void main() {
         expect(builder, isNotNull,
             reason: 'Builder for $viewKey should not be null');
       }
+    });
+
+    testWidgets(
+        'POS, Invoices, and core modules resolve to native screen builders even if targetEndpoint is present',
+        (tester) async {
+      final registry = SduiComponentRegistry.instance;
+      BuildContext? capturedContext;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              capturedContext = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final posBuilder =
+          registry.resolve('pos', targetEndpoint: '/api/tenant/views/pos');
+      expect(posBuilder(capturedContext!), isA<PosScreen>());
+
+      final salesBuilder =
+          registry.resolve('sales', targetEndpoint: '/api/tenant/views/sales');
+      expect(salesBuilder(capturedContext!), isA<SalesScreen>());
+
+      final invoicesBuilder = registry.resolve('invoices',
+          targetEndpoint: '/api/tenant/views/invoices');
+      expect(invoicesBuilder(capturedContext!), isA<SalesScreen>());
+
+      final storeModeBuilder = registry.resolve('store_mode',
+          targetEndpoint: '/api/tenant/views/settings-mode');
+      expect(storeModeBuilder(capturedContext!), isA<DynamicSchemaPage>());
     });
   });
 
