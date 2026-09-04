@@ -61,6 +61,8 @@ jobs:
         # generic MSB3073 wrapper (flutter/flutter#154977). With -v the
         # underlying CMake/MSBuild error (e.g. a plugin's bundled-library
         # path being wrong, flutter/flutter#143589) is printed to the log.
+        env:
+          CL: "/D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
         run: flutter build windows --release --verbose
 
       - name: Install Inno Setup
