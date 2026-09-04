@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\ActivationCode;
 use App\Models\Brand;
+use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\Customer;
@@ -514,6 +515,57 @@ class PosSyncApiTest extends TestCase
         $product->refresh();
         $this->assertEquals(18, $product->current_stock);
         $this->assertEquals(1, Sale::where('external_id', $clientSaleUuid)->count());
+    }
+
+    public function test_pos_sale_is_allowed_without_an_open_cash_register(): void
+    {
+        $saleUuid = (string) Str::uuid();
+
+        $this->assertNull(CashRegister::openFor($this->company->id));
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
+            ->postJson('/api/v1/pos/sync-push', [
+                'sales' => [[
+                    'id' => $saleUuid,
+                    'total' => 25,
+                    'payment_method' => 'cash',
+                    'items' => [['name' => 'Counter Sale', 'price' => 25, 'quantity' => 1]],
+                ]],
+            ])
+            ->assertOk()
+            ->assertJsonPath('synced_ids.0', $saleUuid);
+
+        $sale = Sale::where('external_id', $saleUuid)->firstOrFail();
+        $this->assertNull($sale->cash_register_id);
+        $this->assertNull($sale->payments()->firstOrFail()->cash_register_id);
+    }
+
+    public function test_pos_sale_is_associated_when_a_cash_register_is_open(): void
+    {
+        $register = CashRegister::create([
+            'company_id' => $this->company->id,
+            'opened_by' => $this->user->id,
+            'opening_balance' => 50,
+            'status' => 'open',
+            'opened_at' => now(),
+        ]);
+        $saleUuid = (string) Str::uuid();
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
+            ->postJson('/api/v1/pos/sync-push', [
+                'sales' => [[
+                    'id' => $saleUuid,
+                    'total' => 10,
+                    'payment_method' => 'cash',
+                    'items' => [['name' => 'Registered Sale', 'price' => 10, 'quantity' => 1]],
+                ]],
+            ])
+            ->assertOk()
+            ->assertJsonPath('synced_ids.0', $saleUuid);
+
+        $sale = Sale::where('external_id', $saleUuid)->firstOrFail();
+        $this->assertSame($register->id, $sale->cash_register_id);
+        $this->assertSame($register->id, $sale->payments()->firstOrFail()->cash_register_id);
     }
 
     /**

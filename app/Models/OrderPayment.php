@@ -15,6 +15,7 @@ class OrderPayment extends Model
         'company_id',
         'external_id',
         'sale_id',
+        'cash_register_id',
         'payment_method',
         'amount',
         'tendered',
@@ -50,5 +51,10 @@ class OrderPayment extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function cashRegister()
+    {
+        return $this->belongsTo(CashRegister::class, 'cash_register_id');
     }
 }

@@ -92,6 +92,111 @@ class SduiViewApiTest extends TestCase
         $this->assertStringContainsString('financial', json_encode($response->json()));
     }
 
+    public function test_navigation_view_always_returns_a_populated_recursive_tree(): void
+    {
+        $response = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->getJson('/api/tenant/views/settings-navigation')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $builder = collect($response->json('schema.components'))
+            ->firstWhere('type', 'tree_builder');
+
+        $this->assertIsArray($builder);
+        $this->assertNotEmpty($builder['tree_data']);
+        $this->assertSame($builder['tree_data'], $builder['sections']);
+        $this->assertNotEmpty($builder['nav_config']['items']);
+        $this->assertSame('cashier_sales', $builder['tree_data'][0]['key']);
+        $this->assertNotEmpty($builder['tree_data'][0]['items']);
+
+        $settings = collect($builder['tree_data'])
+            ->flatMap(fn (array $section) => $section['items'])
+            ->firstWhere('key', 'settings');
+        $this->assertNotEmpty($settings['children']);
+        $this->assertSame('settings_profile', $settings['children'][1]['key']);
+    }
+
+    public function test_database_authored_navigation_screen_is_hydrated_with_tenant_tree_data(): void
+    {
+        SduiScreen::create([
+            'key' => 'settings-navigation',
+            'title' => 'Custom Navigation Header',
+            'permission' => 'settings.view',
+            'schema' => [
+                'layout' => 'scroll_view',
+                'components' => [
+                    SchemaResponse::text('Custom navigation help'),
+                    ['type' => 'tree_builder', 'title' => 'Menu editor'],
+                ],
+            ],
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->getJson('/api/tenant/views/settings-navigation')
+            ->assertOk()
+            ->assertJsonPath('schema.title', 'Custom Navigation Header');
+
+        $builder = collect($response->json('schema.components'))
+            ->firstWhere('type', 'tree_builder');
+        $this->assertNotEmpty($builder['tree_data']);
+        $this->assertNotEmpty($builder['nav_config']['items']);
+    }
+
+    public function test_profile_brand_colors_are_visual_color_picker_components(): void
+    {
+        $schema = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->getJson('/api/tenant/views/settings-profile')
+            ->assertOk()
+            ->json('schema');
+
+        $componentsByName = [];
+        $visit = function (mixed $nodes) use (&$visit, &$componentsByName): void {
+            foreach (is_array($nodes) ? $nodes : [] as $node) {
+                if (! is_array($node)) {
+                    continue;
+                }
+                if (! empty($node['name'])) {
+                    $componentsByName[$node['name']] = $node;
+                }
+                $visit($node['components'] ?? $node['children'] ?? []);
+            }
+        };
+        $visit($schema['components']);
+
+        foreach (['primary_color', 'accent_color', 'drawer_bg'] as $name) {
+            $this->assertSame('color_picker', $componentsByName[$name]['type']);
+            $this->assertMatchesRegularExpression('/^#[0-9A-Fa-f]{6}$/', $componentsByName[$name]['initial_value']);
+        }
+        $this->assertSame('Sidebar / Drawer Background', $componentsByName['drawer_bg']['label']);
+    }
+
+    public function test_database_authored_profile_screen_upgrades_legacy_color_inputs(): void
+    {
+        SduiScreen::create([
+            'key' => 'settings-profile',
+            'title' => 'Custom Store Profile',
+            'permission' => 'settings.view',
+            'schema' => [
+                'layout' => 'scroll_view',
+                'components' => [
+                    SchemaResponse::textInput('primary_color', 'Primary Accent Color', '#112233'),
+                    SchemaResponse::textInput('accent_color', 'Secondary Accent Color', '#445566'),
+                    SchemaResponse::textInput('drawer_bg', 'Sidebar / Drawer Background', '#778899'),
+                ],
+            ],
+        ]);
+
+        $components = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->getJson('/api/tenant/views/settings-profile')
+            ->assertOk()
+            ->json('schema.components');
+
+        $this->assertSame(
+            ['color_picker', 'color_picker', 'color_picker'],
+            array_column($components, 'type')
+        );
+    }
+
     public function test_every_settings_panel_returns_a_valid_versioned_sdui_tree(): void
     {
         $token = $this->token();

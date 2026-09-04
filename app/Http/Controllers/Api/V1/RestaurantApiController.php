@@ -459,9 +459,9 @@ class RestaurantApiController extends Controller
         }
 
         $openRegister = CashRegister::openFor($company->id);
-        if (! $openRegister) {
-            return response()->json(['success' => false, 'error' => 'No open cash register session. Open a register before settling a bill.'], 422);
-        }
+        // Settling a bill is allowed without an active shift. The nullable
+        // association keeps those sales outside register reconciliation.
+        $cashRegisterId = $openRegister?->id;
 
         $validator = Validator::make($request->all(), [
             'payment_method' => ['required_if:is_split_payment,false,0', 'nullable', 'string'],
@@ -514,7 +514,7 @@ class RestaurantApiController extends Controller
 
         $saleNumber = 'INV-'.sprintf('%04d', Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1);
 
-        $sale = DB::transaction(function () use ($sale, $saleNumber, $total, $discount, $isSplit, $paidAmount, $dueAmount, $paymentStatus, $data, $splitPayments, $company, $user, $customer) {
+        $sale = DB::transaction(function () use ($sale, $saleNumber, $total, $discount, $isSplit, $paidAmount, $dueAmount, $paymentStatus, $data, $splitPayments, $company, $user, $customer, $cashRegisterId) {
             $sale->update([
                 'sale_number' => $saleNumber,
                 'total' => $total,
@@ -529,6 +529,7 @@ class RestaurantApiController extends Controller
                 'kot_status' => 'served',
                 'customer_id' => $customer?->id ?? $sale->customer_id,
                 'customer_name' => $customer?->name ?? $sale->customer_name,
+                'cash_register_id' => $cashRegisterId,
             ]);
 
             if ($isSplit) {
@@ -539,6 +540,7 @@ class RestaurantApiController extends Controller
                     OrderPayment::create([
                         'company_id' => $company->id,
                         'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegisterId,
                         'payment_method' => $sp['payment_method'],
                         'amount' => (float) $sp['amount'],
                         'reference_number' => $sp['reference_number'] ?? null,
@@ -550,6 +552,7 @@ class RestaurantApiController extends Controller
                 OrderPayment::create([
                     'company_id' => $company->id,
                     'sale_id' => $sale->id,
+                    'cash_register_id' => $cashRegisterId,
                     'payment_method' => $method,
                     'amount' => $paidAmount,
                     'tendered' => $method === 'cash' ? $tendered : null,

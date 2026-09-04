@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Brand;
+use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\Customer;
@@ -882,8 +883,12 @@ class PosSyncApiController extends Controller
     {
         $syncedIds = [];
         $rejected = [];
+        // Register sessions are an accounting aid, not a prerequisite for
+        // creating a sale. Associate the batch when a shift is open and
+        // deliberately persist null when registers are closed or disabled.
+        $cashRegisterId = CashRegister::openFor($company->id)?->id;
 
-        DB::transaction(function () use ($salesPayload, $company, $user, &$syncedIds, &$rejected) {
+        DB::transaction(function () use ($salesPayload, $company, $user, $cashRegisterId, &$syncedIds, &$rejected) {
             foreach ($salesPayload as $saleData) {
                 $clientUuid = (string) ($saleData['id'] ?? $saleData['client_uuid'] ?? Str::uuid()->toString());
 
@@ -1043,6 +1048,7 @@ class PosSyncApiController extends Controller
                     'user_id' => $user?->id,
                     'customer_id' => $customerId,
                     'customer_name' => $customerName,
+                    'cash_register_id' => $cashRegisterId,
                     'total' => $total,
                     'net_amount' => max(0, $total - $discount),
                     'discount' => $discount,
@@ -1074,6 +1080,7 @@ class PosSyncApiController extends Controller
                         OrderPayment::create([
                             'company_id' => $company->id,
                             'sale_id' => $sale->id,
+                            'cash_register_id' => $cashRegisterId,
                             'payment_method' => $row['payment_method'] ?? $paymentMethod,
                             'amount' => $rowAmount,
                             'tendered' => $row['tendered'] ?? null,
@@ -1085,6 +1092,7 @@ class PosSyncApiController extends Controller
                     OrderPayment::create([
                         'company_id' => $company->id,
                         'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegisterId,
                         'payment_method' => $paymentMethod,
                         'amount' => $paidAmount,
                         'tendered' => $saleData['tendered'] ?? null,

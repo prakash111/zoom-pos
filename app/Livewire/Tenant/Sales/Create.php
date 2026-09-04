@@ -231,28 +231,9 @@ class Create extends Component
             return true;
         }
 
-        $openRegister = CashRegister::openFor($companyId);
-        if (! $openRegister) {
-            $this->showRegisterGatingModal = true;
-            $this->isStaleMidnightRegister = false;
-
-            if (app()->runningUnitTests()) {
-                return true;
-            }
-
-            return false;
-        }
-
-        if ($openRegister->isStaleMidnight()) {
-            $this->showRegisterGatingModal = true;
-            $this->isStaleMidnightRegister = true;
-            $metrics = $openRegister->computeMetrics();
-            $this->staleExpectedCash = (float) $metrics['expected_cash'];
-            $this->staleCountedCash = (float) $metrics['expected_cash'];
-
-            return false;
-        }
-
+        // A register is optional for checkout. Sales created while no shift
+        // is open are stored with cash_register_id = null; an open shift is
+        // associated below when the completed sale is persisted.
         $this->showRegisterGatingModal = false;
         $this->isStaleMidnightRegister = false;
 
@@ -1196,8 +1177,9 @@ class Create extends Component
 
         $commissionService = app(CommissionService::class);
         $commAmount = $commissionService->calculate($commRate, $commType, (float) $fiscal['total'], $fiscal['items'], $companyId);
+        $cashRegisterId = CashRegister::openFor($companyId)?->id;
 
-        $sale = DB::transaction(function () use ($paidAmount, $dueAmount, $paymentStatus, $assignedUserId, $commRate, $commType, $commAmount, $fiscal, $company) {
+        $sale = DB::transaction(function () use ($paidAmount, $dueAmount, $paymentStatus, $assignedUserId, $commRate, $commType, $commAmount, $fiscal, $company, $cashRegisterId) {
             $customer = $this->customerId ? Customer::find($this->customerId) : null;
             $firstTax = $fiscal['tax_summary_table'][0] ?? null;
 
@@ -1224,6 +1206,7 @@ class Create extends Component
                 'customer_id' => $customer?->id,
                 'customer_name' => $customer?->name,
                 'user_id' => $assignedUserId,
+                'cash_register_id' => $cashRegisterId,
                 'commission_rate' => $commRate,
                 'commission_type' => $commType,
                 'commission_amount' => $commAmount,
@@ -1270,6 +1253,7 @@ class Create extends Component
                     OrderPayment::create([
                         'company_id' => $sale->company_id,
                         'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegisterId,
                         'payment_method' => $spMethod,
                         'amount' => $spAmt,
                         'merchant_fee_percentage' => $spFeePct,
@@ -1315,6 +1299,7 @@ class Create extends Component
                 OrderPayment::create([
                     'company_id' => $sale->company_id,
                     'sale_id' => $sale->id,
+                    'cash_register_id' => $cashRegisterId,
                     'payment_method' => $this->paymentMethod,
                     'amount' => $paidAmount,
                     'merchant_fee_percentage' => $feePct,

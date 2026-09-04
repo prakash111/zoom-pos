@@ -211,28 +211,8 @@ class Pos extends Component
             return true;
         }
 
-        $openRegister = CashRegister::openFor($companyId);
-        if (! $openRegister) {
-            $this->showRegisterGatingModal = true;
-            $this->isStaleMidnightRegister = false;
-
-            if (app()->runningUnitTests()) {
-                return true;
-            }
-
-            return false;
-        }
-
-        if ($openRegister->isStaleMidnight()) {
-            $this->showRegisterGatingModal = true;
-            $this->isStaleMidnightRegister = true;
-            $metrics = $openRegister->computeMetrics();
-            $this->staleExpectedCash = (float) $metrics['expected_cash'];
-            $this->staleCountedCash = (float) $metrics['expected_cash'];
-
-            return false;
-        }
-
+        // Register sessions remain available for shift reconciliation but
+        // are not a prerequisite for settling an order.
         $this->showRegisterGatingModal = false;
         $this->isStaleMidnightRegister = false;
 
@@ -967,14 +947,16 @@ class Pos extends Component
         }
 
         $checkoutCustomer = $this->checkoutCustomer;
+        $cashRegisterId = CashRegister::openFor($companyId)?->id;
 
-        $sale = DB::transaction(function () use ($companyId, $saleNumber, $paidAmount, $dueAmount, $paymentStatus, $commRate, $commAmount, $checkoutCustomer) {
+        $sale = DB::transaction(function () use ($companyId, $saleNumber, $paidAmount, $dueAmount, $paymentStatus, $commRate, $commAmount, $checkoutCustomer, $cashRegisterId) {
             $sale = Sale::create([
                 'company_id' => $companyId,
                 'sale_number' => $saleNumber,
                 'customer_id' => $checkoutCustomer?->id,
                 'customer_name' => $checkoutCustomer?->name ?: ($this->customerName ?: ($this->activeTable ? $this->activeTable->table_number : 'Valued Guest')),
                 'user_id' => auth('web')->id(),
+                'cash_register_id' => $cashRegisterId,
                 'commission_rate' => $commRate,
                 'commission_amount' => $commAmount,
                 'total' => $this->total,
@@ -1002,6 +984,7 @@ class Pos extends Component
                     OrderPayment::create([
                         'company_id' => $companyId,
                         'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegisterId,
                         'payment_method' => $sp['payment_method'],
                         'amount' => (float) $sp['amount'],
                         'reference_number' => $sp['reference_number'] ?: null,
@@ -1011,6 +994,7 @@ class Pos extends Component
                 OrderPayment::create([
                     'company_id' => $companyId,
                     'sale_id' => $sale->id,
+                    'cash_register_id' => $cashRegisterId,
                     'payment_method' => $this->paymentMethod,
                     'amount' => $paidAmount,
                     'tendered' => $this->paymentMethod === 'cash' ? $this->cashTendered : null,

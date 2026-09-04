@@ -12,7 +12,7 @@ class Sale extends Model
     use TracksSyncState;
 
     protected $fillable = [
-        'company_id', 'external_id', 'sale_number', 'customer_id', 'customer_name', 'user_id',
+        'company_id', 'external_id', 'sale_number', 'customer_id', 'customer_name', 'user_id', 'cash_register_id',
         'total', 'net_amount', 'discount', 'payment_method', 'agreed_payment_method', 'installments', 'status', 'is_demo', 'items', 'operation_type', 'gst_invoice',
         'service_type', 'dining_table_id', 'table_name', 'guest_count', 'pickup_time',
         'delivery_address', 'driver_name', 'driver_phone', 'dispatch_status', 'kot_status',
@@ -79,6 +79,11 @@ class Sale extends Model
     public function payments()
     {
         return $this->hasMany(OrderPayment::class, 'sale_id')->orderByDesc('created_at');
+    }
+
+    public function cashRegister()
+    {
+        return $this->belongsTo(CashRegister::class, 'cash_register_id');
     }
 
     public function getTermsAttribute(): ?string

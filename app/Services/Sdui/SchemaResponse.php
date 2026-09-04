@@ -533,7 +533,7 @@ class SchemaResponse
                     self::text('Sidebar & Navigation Styling', 'title_medium', ['bold' => true]),
                     self::text('Configure solid background or multi-color gradients for the navigation drawer.', 'body_small', ['color' => '#6b7280']),
                     self::divider(),
-                    self::colorPicker('drawer_bg', 'Solid Background Color', $company->drawer_bg ?? '#1e293b'),
+                    self::colorPicker('drawer_bg', 'Sidebar / Drawer Background', $company->drawer_bg ?? '#1e293b'),
                     self::toggleSwitch('drawer_gradient_enabled', 'Enable Gradient Background', (bool) ($company->drawer_gradient_enabled ?? false)),
                     self::colorPicker('drawer_gradient_start', 'Gradient Start Color', $company->drawer_gradient_start ?? ($company->drawer_bg ?? '#1e293b')),
                     self::colorPicker('drawer_gradient_end', 'Gradient End Color', $company->drawer_gradient_end ?? '#0f172a'),
@@ -810,29 +810,7 @@ class SchemaResponse
     public static function navigationView(Company $company): array
     {
         $activeMode = ModuleRegistry::resolveActiveMode($company);
-        $menuStructure = TenantNavRegistry::menuStructureForMode($activeMode);
-        $navConfig = $company->normalizedNavConfig();
-
-        // Ensure default items exist if tenant customizations are missing
-        if (empty($navConfig['items'])) {
-            $defaultItems = [];
-            $order = 0;
-            foreach ($menuStructure as $section) {
-                foreach ($section['items'] ?? [] as $item) {
-                    $defaultItems[] = [
-                        'key' => $item['key'],
-                        'section' => $section['key'],
-                        'label' => $item['label'] ?? $item['title'] ?? $item['key'],
-                        'parent' => $item['parent'] ?? null,
-                        'parent_id' => $item['parent'] ?? null,
-                        'level' => ! empty($item['parent']) ? 1 : 0,
-                        'order' => $order++,
-                        'visible' => true,
-                    ];
-                }
-            }
-            $navConfig['items'] = $defaultItems;
-        }
+        [$menuStructure, $navConfig] = self::effectiveNavigationBuilderData($company, $activeMode);
 
         return self::screen('Navigation Menu Customization', [
             [
@@ -842,6 +820,9 @@ class SchemaResponse
                 'active_mode' => $activeMode,
                 'menu_structure' => $menuStructure,
                 'sections' => $menuStructure,
+                // The explicit collection consumed by current tree-builder
+                // clients. Keep the aliases above for older app releases.
+                'tree_data' => $menuStructure,
                 'nav_config' => $navConfig,
                 'items' => $navConfig['items'] ?? [],
             ],
@@ -856,6 +837,178 @@ class SchemaResponse
             ]),
             self::text('Use the server navigation configuration to reorder or hide entries. Changes are reflected by the next bootstrap response.', 'body_small', ['color' => '#6b7280']),
         ]);
+    }
+
+    /**
+     * Build the complete editable navigation hierarchy for the active store.
+     *
+     * normalizedNavConfig() intentionally returns an empty override set for a
+     * tenant that has never customized its menu. A navigation editor cannot
+     * render overrides alone, however, so this method always starts with the
+     * active-mode registry tree, recursively includes its children, and then
+     * overlays any saved placement/order/visibility values. The returned
+     * tree therefore never becomes blank merely because nav_config is null.
+     *
+     * @return array{0: list<array<string, mixed>>, 1: array<string, mixed>}
+     */
+    private static function effectiveNavigationBuilderData(Company $company, string $activeMode): array
+    {
+        $catalog = TenantNavRegistry::menuStructureForMode($activeMode);
+        if ($catalog === []) {
+            $catalog = TenantNavRegistry::menuStructureForMode('retail');
+        }
+
+        $sectionMeta = [];
+        $sectionIndexes = [];
+        $catalogItems = [];
+        $seenItems = [];
+
+        $collectItems = function (mixed $rawItems, string $sectionKey, ?string $parentKey = null) use (&$collectItems, &$catalogItems, &$seenItems): void {
+            if (! is_array($rawItems)) {
+                return;
+            }
+
+            foreach (array_values($rawItems) as $order => $rawItem) {
+                if (! is_array($rawItem)) {
+                    continue;
+                }
+
+                $item = TenantNavRegistry::normalizeItem($rawItem);
+                $key = trim((string) ($item['key'] ?? ''));
+                if ($key === '' || isset($seenItems[$key])) {
+                    continue;
+                }
+
+                $seenItems[$key] = true;
+                $catalogItems[$key] = [
+                    'meta' => $item,
+                    'section' => $sectionKey,
+                    'parent' => $parentKey,
+                    'order' => $order,
+                ];
+
+                // Null/missing children are deliberately normalized to an
+                // empty list so every emitted node has a stable collection.
+                $collectItems(
+                    is_array($item['children'] ?? null) ? $item['children'] : [],
+                    $sectionKey,
+                    $key
+                );
+            }
+        };
+
+        foreach (array_values($catalog) as $sectionIndex => $rawSection) {
+            if (! is_array($rawSection)) {
+                continue;
+            }
+            $section = TenantNavRegistry::normalizeSection($rawSection);
+            $sectionKey = trim((string) ($section['key'] ?? ''));
+            if ($sectionKey === '' || isset($sectionMeta[$sectionKey])) {
+                continue;
+            }
+
+            $sectionMeta[$sectionKey] = $section;
+            $sectionIndexes[$sectionKey] = $sectionIndex;
+            $collectItems($section['items'] ?? [], $sectionKey);
+        }
+
+        $storedConfig = $company->normalizedNavConfig();
+        $itemOverrides = [];
+        foreach ($storedConfig['items'] ?? [] as $item) {
+            if (is_array($item) && ! empty($item['key'])) {
+                $itemOverrides[(string) $item['key']] = $item;
+            }
+        }
+        $sectionOverrides = [];
+        foreach ($storedConfig['sections'] ?? [] as $section) {
+            if (is_array($section) && ! empty($section['key'])) {
+                $sectionOverrides[(string) $section['key']] = max(0, (int) ($section['order'] ?? 0));
+            }
+        }
+
+        $resolvedItems = [];
+        foreach ($catalogItems as $key => $catalogItem) {
+            $override = $itemOverrides[$key] ?? null;
+            // Old hidden_tiles-only payloads have no placement information.
+            // They should change visibility without accidentally un-nesting
+            // an item from its registry-defined parent.
+            $hasPlacementOverride = is_array($override)
+                && isset($override['section'])
+                && trim((string) $override['section']) !== '';
+            $requestedSection = $hasPlacementOverride ? (string) $override['section'] : $catalogItem['section'];
+            $section = isset($sectionMeta[$requestedSection]) ? $requestedSection : $catalogItem['section'];
+            $parent = $hasPlacementOverride
+                ? ($override['parent_id'] ?? $override['parent'] ?? null)
+                : $catalogItem['parent'];
+
+            $resolvedItems[] = [
+                'key' => $key,
+                'section' => $section,
+                'parent' => $parent,
+                'parent_id' => $parent,
+                'order' => is_array($override) && array_key_exists('order', $override) && $override['order'] !== null
+                    ? max(0, (int) $override['order'])
+                    : $catalogItem['order'],
+                'visible' => is_array($override) ? (bool) ($override['visible'] ?? true) : true,
+            ];
+        }
+
+        $sections = [];
+        foreach ($sectionMeta as $key => $_section) {
+            $sections[] = [
+                'key' => $key,
+                'order' => $sectionOverrides[$key] ?? $sectionIndexes[$key],
+            ];
+        }
+
+        $effectiveConfig = app(TenantNavigationConfigService::class)->normalize([
+            'sections' => $sections,
+            'items' => $resolvedItems,
+        ]);
+
+        $decorateNodes = function (mixed $nodes) use (&$decorateNodes, $catalogItems): array {
+            $decorated = [];
+            foreach (is_array($nodes) ? $nodes : [] as $node) {
+                if (! is_array($node)) {
+                    continue;
+                }
+                $key = (string) ($node['key'] ?? '');
+                if ($key === '' || ! isset($catalogItems[$key])) {
+                    continue;
+                }
+                $meta = $catalogItems[$key]['meta'];
+                $decorated[] = array_merge($meta, $node, [
+                    'id' => $key,
+                    'key' => $key,
+                    'title' => $meta['title'] ?? $meta['label'] ?? $key,
+                    'label' => $meta['label'] ?? $meta['title'] ?? $key,
+                    'children' => $decorateNodes($node['children'] ?? []),
+                ]);
+            }
+
+            return $decorated;
+        };
+
+        $activeTree = [];
+        foreach ($effectiveConfig['tree'] ?? [] as $treeSection) {
+            if (! is_array($treeSection)) {
+                continue;
+            }
+            $key = (string) ($treeSection['key'] ?? '');
+            if ($key === '' || ! isset($sectionMeta[$key])) {
+                continue;
+            }
+            $meta = $sectionMeta[$key];
+            $activeTree[] = array_merge($meta, $treeSection, [
+                'id' => $key,
+                'key' => $key,
+                'title' => $meta['title'] ?? $meta['label'] ?? $key,
+                'label' => $meta['label'] ?? $meta['title'] ?? $key,
+                'items' => $decorateNodes($treeSection['items'] ?? []),
+            ]);
+        }
+
+        return [$activeTree, $effectiveConfig];
     }
 
     /**
@@ -1084,6 +1237,16 @@ class SchemaResponse
             $schema['components'] = $schema['components'] ?? [];
             $schema['fab'] = $schema['fab'] ?? null;
 
+            // Database-authored screens provide layout/content, while these
+            // tenant-owned controls still require live company data on every
+            // request. Without this hydration, a stored navigation screen can
+            // render its headings but has no rows to give the Flutter builder.
+            if (in_array($normalized, ['settings-navigation', 'navigation', 'navigation-menu'], true)) {
+                $schema = self::hydrateStoredNavigationSchema($schema, $company);
+            } elseif (in_array($normalized, ['settings-profile', 'profile', 'branding'], true)) {
+                $schema = self::hydrateStoredProfileColorPickers($schema, $company);
+            }
+
             return self::schemaResponse($normalized, $schema);
         }
 
@@ -1114,6 +1277,111 @@ class SchemaResponse
         }
 
         return self::schemaResponse($normalized, $schema);
+    }
+
+    /**
+     * Inject live navigation collections into a database-authored screen.
+     */
+    private static function hydrateStoredNavigationSchema(array $schema, Company $company): array
+    {
+        $canonical = self::navigationView($company);
+        $treeBuilder = collect($canonical['components'] ?? [])->first(
+            fn ($component) => is_array($component) && ($component['type'] ?? null) === 'tree_builder'
+        );
+        if (! is_array($treeBuilder)) {
+            return $schema;
+        }
+
+        $found = false;
+        $hydrate = function (mixed $nodes) use (&$hydrate, &$found, $treeBuilder): mixed {
+            if (! is_array($nodes)) {
+                return $nodes;
+            }
+
+            foreach ($nodes as $index => $node) {
+                if (! is_array($node)) {
+                    continue;
+                }
+                $type = strtolower(trim((string) ($node['type'] ?? '')));
+                if (in_array($type, ['tree_builder', 'navigation_builder'], true)) {
+                    // Preserve presentation fields authored in the stored
+                    // screen, but make the live hierarchy/config authoritative.
+                    $nodes[$index] = array_merge($node, [
+                        'active_mode' => $treeBuilder['active_mode'],
+                        'menu_structure' => $treeBuilder['menu_structure'],
+                        'sections' => $treeBuilder['sections'],
+                        'tree_data' => $treeBuilder['tree_data'],
+                        'nav_config' => $treeBuilder['nav_config'],
+                        'items' => $treeBuilder['items'],
+                    ]);
+                    $found = true;
+                    continue;
+                }
+
+                foreach (['components', 'children', 'tabs'] as $childKey) {
+                    if (isset($node[$childKey]) && is_array($node[$childKey])) {
+                        $node[$childKey] = $hydrate($node[$childKey]);
+                    }
+                }
+                $nodes[$index] = $node;
+            }
+
+            return $nodes;
+        };
+
+        $schema['components'] = $hydrate($schema['components'] ?? []);
+        if (! $found) {
+            $schema['components'][] = $treeBuilder;
+        }
+
+        return $schema;
+    }
+
+    /**
+     * Upgrade legacy database-authored branding inputs to visual pickers.
+     */
+    private static function hydrateStoredProfileColorPickers(array $schema, Company $company): array
+    {
+        $colors = [
+            'primary_color' => ['Primary Accent Color', $company->primary_color ?? '#4F46E5'],
+            'accent_color' => ['Secondary Accent Color', $company->accent_color ?? '#D97706'],
+            'drawer_bg' => ['Sidebar / Drawer Background', $company->drawer_bg ?? '#1e293b'],
+        ];
+
+        $hydrate = function (mixed $nodes) use (&$hydrate, $colors): mixed {
+            if (! is_array($nodes)) {
+                return $nodes;
+            }
+
+            foreach ($nodes as $index => $node) {
+                if (! is_array($node)) {
+                    continue;
+                }
+                $name = (string) ($node['name'] ?? '');
+                if (isset($colors[$name])) {
+                    [$label, $fallback] = $colors[$name];
+                    $nodes[$index] = array_merge($node, self::colorPicker(
+                        $name,
+                        (string) ($node['label'] ?? $label),
+                        (string) ($node['initial_value'] ?? $fallback)
+                    ));
+                    continue;
+                }
+
+                foreach (['components', 'children', 'tabs'] as $childKey) {
+                    if (isset($node[$childKey]) && is_array($node[$childKey])) {
+                        $node[$childKey] = $hydrate($node[$childKey]);
+                    }
+                }
+                $nodes[$index] = $node;
+            }
+
+            return $nodes;
+        };
+
+        $schema['components'] = $hydrate($schema['components'] ?? []);
+
+        return $schema;
     }
 
     private static function schemaResponse(string $view, array $schema): JsonResponse
