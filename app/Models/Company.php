@@ -241,6 +241,21 @@ class Company extends Model
     }
 
     /**
+     * Explicit navigation customization tree if tenant rearranged menus.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    public function getNavigationMenuCustomizationAttribute(): ?array
+    {
+        $raw = $this->nav_config;
+        if (is_array($raw) && ! empty($raw['custom_tree']) && is_array($raw['custom_tree'])) {
+            return $raw['custom_tree'];
+        }
+
+        return null;
+    }
+
+    /**
      * This tenant's nav customization (Settings > Navigation Menu, mobile
      * and web), normalized to the current `{sections: [{key, order}],
      * items: [{key, section, parent, parent_id, level, order, visible}],

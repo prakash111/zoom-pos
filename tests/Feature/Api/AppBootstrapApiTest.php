@@ -385,23 +385,39 @@ class AppBootstrapApiTest extends TestCase
         $this->assertTrue($menu->has('salon_bookings'));
         $this->assertTrue($menu->has('administration'));
 
-        // Administration is positioned last
+        // Verify strict modular section sequence on first load:
         $keys = collect($response->json('menu_structure'))->pluck('key')->all();
-        $this->assertSame('administration', end($keys));
+        $this->assertSame([
+            'cashier_sales',
+            'products_inventory',
+            'financial_management',
+            'restaurant_operations',
+            'pharmacy_management',
+            'salon_bookings',
+            'administration',
+        ], $keys);
+
+        // Verify Administration anchored at the bottom with Change Password
+        $adminItems = collect($menu['administration']['items'])->pluck('key')->all();
+        $this->assertContains('change_password', $adminItems);
+        $this->assertSame('change_password', end($adminItems));
 
         // Verify items in injected module sections
         $restaurantItems = collect($menu['restaurant_operations']['items'])->pluck('key')->all();
         $this->assertContains('floor_plan', $restaurantItems);
         $this->assertContains('kitchen_display', $restaurantItems);
+        $this->assertContains('dining_history', $restaurantItems);
         $this->assertContains('restaurant_pos', $restaurantItems);
 
         $pharmacyItems = collect($menu['pharmacy_management']['items'])->pluck('key')->all();
+        $this->assertContains('pharmacy_pos', $pharmacyItems);
         $this->assertContains('pharmacy_batches', $pharmacyItems);
         $this->assertContains('pharmacy_prescriptions', $pharmacyItems);
 
         $serviceItems = collect($menu['salon_bookings']['items'])->pluck('key')->all();
         $this->assertContains('service_calendar', $serviceItems);
         $this->assertContains('service_stylists', $serviceItems);
+        $this->assertContains('service_orders', $serviceItems);
     }
 }
 

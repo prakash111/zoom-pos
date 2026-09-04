@@ -751,6 +751,80 @@ class SchemaResponse
         ]);
     }
 
+    public static function restaurantPosView(Company $company): array
+    {
+        return self::screen('Restaurant POS Terminal', [
+            self::card([
+                self::row([
+                    self::icon('restaurant', ['color' => '#4d7c0f', 'size' => 28]),
+                    self::column([
+                        self::text('Restaurant Point of Sale', 'title_medium', ['bold' => true]),
+                        self::text('Fast table billing, split checks, and dining room checkout terminal.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::badge('Restaurant POS Active', '#4d7c0f', 'subtle'),
+            ]),
+        ]);
+    }
+
+    public static function diningHistoryView(Company $company): array
+    {
+        return self::screen('KOT Register & Live Orders', [
+            self::card([
+                self::row([
+                    self::icon('receipt_long', ['color' => '#4d7c0f', 'size' => 28]),
+                    self::column([
+                        self::text('Kitchen Order Tickets & Dining History', 'title_medium', ['bold' => true]),
+                        self::text('Track active table tickets, kitchen dispatches, and completed dining tabs.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::badge('KOT Register Active', '#4d7c0f', 'subtle'),
+            ]),
+        ]);
+    }
+
+    public static function serviceOrdersView(Company $company): array
+    {
+        return self::screen('Service Catalog & Rates', [
+            self::card([
+                self::row([
+                    self::icon('spa', ['color' => '#7c3aed', 'size' => 28]),
+                    self::column([
+                        self::text('Service Catalog & Appointment Bookings', 'title_medium', ['bold' => true]),
+                        self::text('Service packages, durations, tiered pricing, and active bookings.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::badge('Service Bookings Active', '#7c3aed', 'subtle'),
+            ]),
+        ]);
+    }
+
+    public static function changePasswordView(Company $company): array
+    {
+        return self::screen('Change Password', [
+            self::card([
+                self::row([
+                    self::icon('tune', ['color' => '#475569', 'size' => 28]),
+                    self::column([
+                        self::text('Account Security', 'title_medium', ['bold' => true]),
+                        self::text('Update your login password to secure your tenant account.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::textInput('current_password', 'Current Password', '', ['obscure_text' => true]),
+                self::textInput('new_password', 'New Password', '', ['obscure_text' => true]),
+                self::textInput('new_password_confirmation', 'Confirm New Password', '', ['obscure_text' => true]),
+                self::buttonPrimary(
+                    'Update Password',
+                    self::formSubmitAction('/api/tenant/profile/change-password', 'POST', 'Password updated successfully')
+                ),
+            ]),
+        ]);
+    }
+
     public static function receiptsView(Company $company): array
     {
         return self::screen('Receipt Prefixes & Bank Terms', [
@@ -1354,6 +1428,10 @@ class SchemaResponse
         }
 
         $normalized = self::normalizeViewKey($viewKey);
+        if (in_array($normalized, ['change-password', 'password'], true)) {
+            return null;
+        }
+
         if (str_starts_with($normalized, 'settings-')
             || in_array($normalized, ['mode', 'profile', 'branding', 'receipts', 'financial', 'localization', 'taxes', 'api', 'api-integrations', 'navigation', 'navigation-menu', 'notifications', 'custom-notifications'], true)) {
             return 'settings.view';
@@ -1361,6 +1439,10 @@ class SchemaResponse
 
         if (in_array($normalized, ['restaurant-tables', 'restaurant-kds', 'restaurant-pos'], true)) {
             return 'pos.view';
+        }
+
+        if (in_array($normalized, ['dining-history', 'kot-history'], true)) {
+            return 'sales.view';
         }
 
         if (in_array($normalized, ['pharmacy-batches'], true)) {
@@ -1371,7 +1453,7 @@ class SchemaResponse
             return 'sales.view';
         }
 
-        if (in_array($normalized, ['service-calendar'], true)) {
+        if (in_array($normalized, ['service-calendar', 'service-orders'], true)) {
             return 'service_orders.view';
         }
 
@@ -1442,10 +1524,14 @@ class SchemaResponse
             'settings-advanced', 'advanced', 'danger-zone' => self::advancedView($company),
             'restaurant-tables', 'tables', 'floor-plan' => self::restaurantTablesView($company),
             'restaurant-kds', 'kds', 'kitchen-display' => self::restaurantKdsView($company),
+            'restaurant-pos' => self::restaurantPosView($company),
+            'dining-history', 'kot-history' => self::diningHistoryView($company),
             'pharmacy-batches', 'batches' => self::pharmacyBatchesView($company),
             'pharmacy-prescriptions', 'prescriptions' => self::pharmacyPrescriptionsView($company),
             'service-calendar', 'calendar' => self::serviceCalendarView($company),
             'service-stylists', 'stylists' => self::serviceStylistsView($company),
+            'service-orders' => self::serviceOrdersView($company),
+            'change-password', 'password' => self::changePasswordView($company),
             default => null,
         };
 

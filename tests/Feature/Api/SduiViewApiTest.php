@@ -405,10 +405,14 @@ class SduiViewApiTest extends TestCase
         $endpoints = [
             'restaurant-tables' => 'Floor Plan & Tables',
             'restaurant-kds' => 'Kitchen Display (KDS)',
+            'restaurant-pos' => 'Restaurant POS Terminal',
+            'dining-history' => 'KOT Register & Live Orders',
             'pharmacy-batches' => 'Batch & Expiry Manager',
             'pharmacy-prescriptions' => 'Prescriptions Queue',
             'service-calendar' => 'Service Booking Calendar',
             'service-stylists' => 'Stylists & Staff Assignments',
+            'service-orders' => 'Service Catalog & Rates',
+            'change-password' => 'Change Password',
         ];
 
         foreach ($endpoints as $viewKey => $expectedTitle) {
