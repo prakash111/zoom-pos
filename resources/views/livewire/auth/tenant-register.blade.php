@@ -210,42 +210,52 @@
                 </div>
 
                 <!-- Operating Mode Selector Pills -->
-                @if ($this->allowedRegistrationModes === 'both')
-                <div class="space-y-1.5 pt-1">
+                @php
+                    $activeMods = $this->activeRegistrationModules;
+                    $normalizedPosMode = $posMode === 'general' ? 'retail' : $posMode;
+                @endphp
+                <div class="space-y-2 pt-1">
                     <div class="flex items-center justify-between text-xs font-bold text-slate-300">
                         <span>{{ __('Select Operating Mode:') }}</span>
-                        <span class="text-[11px] text-brand-lime uppercase font-black">{{ $posMode === 'restaurant' ? __('🍽️ Dining & Food POS') : __('🏪 Retail & Barcode POS') }}</span>
+                        <span class="text-[11px] text-brand-lime uppercase font-black">
+                            {{ $activeMods[$normalizedPosMode]['title'] ?? $posMode }}
+                        </span>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2.5">
-                        <button type="button"
-                                wire:click="$set('posMode', 'general')"
-                                @class([
-                                    'py-2.5 px-3 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer',
-                                    'border-emerald-500 bg-emerald-500/20 text-white shadow-lg shadow-emerald-500/10' => $posMode === 'general',
-                                    'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white' => $posMode !== 'general',
-                                ])>
-                            <span>🏪</span>
-                            <span>{{ __('Retail & Store POS') }}</span>
-                        </button>
-
-                        <button type="button"
-                                wire:click="$set('posMode', 'restaurant')"
-                                @class([
-                                    'py-2.5 px-3 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer',
-                                    'border-brand-lime bg-brand-lime/20 text-white shadow-lg shadow-brand-lime/10' => $posMode === 'restaurant',
-                                    'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white' => $posMode !== 'restaurant',
-                                ])>
-                            <span>🍽️</span>
-                            <span>{{ __('Restaurant & Dining KOT') }}</span>
-                        </button>
-                    </div>
+                    @if (count($activeMods) > 1)
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            @foreach ($activeMods as $mKey => $m)
+                                @php
+                                    $isSelected = ($normalizedPosMode === $mKey);
+                                    $modeVal = ($mKey === 'retail') ? 'general' : $mKey;
+                                @endphp
+                                <button type="button"
+                                        wire:click="$set('posMode', '{{ $modeVal }}')"
+                                        @class([
+                                            'py-2.5 px-3 rounded-2xl border text-xs font-bold transition flex items-center justify-start gap-2.5 text-left cursor-pointer',
+                                            'border-brand-lime bg-brand-lime/20 text-white shadow-lg shadow-brand-lime/10 ring-1 ring-brand-lime/40' => $isSelected,
+                                            'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white' => ! $isSelected,
+                                        ])>
+                                    <span class="text-base shrink-0">
+                                        @if ($mKey === 'restaurant') 🍽️ @elseif ($mKey === 'pharmacy') 💊 @elseif ($mKey === 'service_booking') ✂️ @else 🏪 @endif
+                                    </span>
+                                    <div class="overflow-hidden">
+                                        <span class="block truncate text-xs font-bold">{{ __($m['title']) }}</span>
+                                        <span class="block truncate text-[10px] opacity-75 font-normal">{{ __($m['description']) }}</span>
+                                    </div>
+                                </button>
+                            @endforeach
+                        </div>
+                    @elseif (count($activeMods) === 1)
+                        @php $single = reset($activeMods); @endphp
+                        <div class="p-3 rounded-2xl border border-brand-lime/40 bg-brand-lime/10 text-xs font-bold text-white flex items-center gap-2">
+                            <span>
+                                @if ($single['id'] === 'restaurant') 🍽️ @elseif ($single['id'] === 'pharmacy') 💊 @elseif ($single['id'] === 'service_booking') ✂️ @else 🏪 @endif
+                            </span>
+                            <span>{{ __($single['title']) }} ({{ __('Pre-selected by Platform') }})</span>
+                        </div>
+                    @endif
                 </div>
-                @else
-                    <div class="pt-1 text-xs font-bold text-slate-300">
-                        {{ $this->allowedRegistrationModes === 'restaurant_only' ? __('🍽️ Restaurant & Dining KOT') : __('🏪 Retail & Store POS') }}
-                    </div>
-                @endif
                 @error('posMode') <p class="text-rose-400 text-[11px] mt-0.5">{{ $message }}</p> @enderror
 
                 <!-- Domain & Subdomain Setup (Optional Accordion) -->

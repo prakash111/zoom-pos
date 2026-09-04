@@ -90,6 +90,13 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
 
         // Store Settings & Languages (Reachable by tenant admin to manage store configs)
         Route::get('/settings', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.index');
+        Route::get('/settings/mode', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.mode');
+        Route::get('/settings/profile', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.profile');
+        Route::get('/settings/receipts', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.receipts');
+        Route::get('/settings/financial', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.financial');
+        Route::get('/settings/taxes', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.taxes');
+        Route::get('/settings/api', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.api');
+        Route::get('/settings/navigation', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.navigation');
         Route::post('/settings/navigation-menu', [NavigationMenuController::class, 'store'])
             ->middleware('tenant.permission:settings,edit')
             ->name('settings.navigation-menu.store');

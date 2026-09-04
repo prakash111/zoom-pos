@@ -278,8 +278,32 @@ class Index extends Component
 
     public bool $hasClaudeApiKey = false;
 
+    public string $activeSection = 'overview';
+
     public function mount(): void
     {
+        $routeName = request()->route()?->getName() ?? '';
+        if (str_ends_with($routeName, '.mode') || request()->query('section') === 'mode') {
+            $this->activeSection = 'mode';
+        } elseif (str_ends_with($routeName, '.profile') || request()->query('section') === 'profile') {
+            $this->activeSection = 'profile';
+        } elseif (str_ends_with($routeName, '.receipts') || request()->query('section') === 'receipts') {
+            $this->activeSection = 'receipts';
+        } elseif (str_ends_with($routeName, '.financial') || request()->query('section') === 'financial') {
+            $this->activeSection = 'financial';
+        } elseif (str_ends_with($routeName, '.taxes') || request()->query('section') === 'taxes') {
+            $this->activeSection = 'taxes';
+        } elseif (str_ends_with($routeName, '.api') || request()->query('section') === 'api') {
+            $this->activeSection = 'api';
+        } elseif (str_ends_with($routeName, '.navigation') || request()->query('section') === 'navigation') {
+            $this->activeSection = 'navigation';
+        } else {
+            $this->activeSection = request()->query('section', 'overview');
+            if (! in_array($this->activeSection, ['overview', 'mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'navigation'])) {
+                $this->activeSection = 'overview';
+            }
+        }
+
         $this->company = auth('web')->user()->company;
         $this->name = $this->company->name;
         $this->slug = (string) ($this->company->slug ?? '');

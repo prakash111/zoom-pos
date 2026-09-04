@@ -120,32 +120,62 @@
             </div>
         </div>
 
-        <!-- Allowed Registration Modes -->
-        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/80 dark:border-slate-800 space-y-4">
-            <div>
-                <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>🏪</span> {{ __('Allowed Registration Modes') }}
-                </h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    {{ __('Controls which store-type options new signups can choose on the web and mobile registration screens.') }}
-                </p>
+        <!-- Allowed Registration Modes & Module Governance -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/80 dark:border-slate-800 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                    <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>🧩</span> {{ __('SuperAdmin Module Governance & Registration Modes') }}
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        {{ __('Globally enable or disable modules available across the platform. Only active modules configured here will appear as selectable store types during new tenant signups on web and mobile.') }}
+                    </p>
+                </div>
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 w-fit">
+                    {{ count($enabledRegistrationModules) }} {{ __('Active') }}
+                </span>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <label class="flex items-center gap-2 p-3 rounded-2xl border cursor-pointer {{ $allowedRegistrationModes === 'both' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40' : 'border-slate-200 dark:border-slate-700' }}">
-                    <input type="radio" wire:model.live="allowedRegistrationModes" value="both" class="text-indigo-600">
-                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ __('Both (Retail & Cafe/Restaurant)') }}</span>
-                </label>
-                <label class="flex items-center gap-2 p-3 rounded-2xl border cursor-pointer {{ $allowedRegistrationModes === 'retail_only' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40' : 'border-slate-200 dark:border-slate-700' }}">
-                    <input type="radio" wire:model.live="allowedRegistrationModes" value="retail_only" class="text-indigo-600">
-                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ __('Retail Only') }}</span>
-                </label>
-                <label class="flex items-center gap-2 p-3 rounded-2xl border cursor-pointer {{ $allowedRegistrationModes === 'restaurant_only' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40' : 'border-slate-200 dark:border-slate-700' }}">
-                    <input type="radio" wire:model.live="allowedRegistrationModes" value="restaurant_only" class="text-indigo-600">
-                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ __('Cafe & Restaurant Only') }}</span>
-                </label>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                @foreach (\App\Services\Modular\ModuleRegistry::allModules() as $modKey => $mod)
+                    @php
+                        $isEnabled = in_array($modKey, $enabledRegistrationModules, true);
+                    @endphp
+                    <label class="flex items-start justify-between p-4 rounded-2xl border transition-all cursor-pointer {{ $isEnabled ? 'border-indigo-500/80 bg-indigo-50/60 dark:bg-indigo-950/30 ring-1 ring-indigo-500/40' : 'border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 opacity-75 hover:opacity-100' }}">
+                        <div class="flex items-start gap-3.5 pr-3">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 {{ $isEnabled ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400' }}">
+                                @if ($modKey === 'restaurant')
+                                    <span class="text-lg">🍽️</span>
+                                @elseif ($modKey === 'pharmacy')
+                                    <span class="text-lg">💊</span>
+                                @elseif ($modKey === 'service_booking')
+                                    <span class="text-lg">✂️</span>
+                                @else
+                                    <span class="text-lg">🏪</span>
+                                @endif
+                            </div>
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">{{ __($mod['title']) }}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide {{ $isEnabled ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' }}">
+                                        {{ $modKey }}
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                    {{ __($mod['description']) }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="pt-0.5 shrink-0">
+                            <input type="checkbox"
+                                   wire:model.live="enabledRegistrationModules"
+                                   value="{{ $modKey }}"
+                                   class="w-5 h-5 rounded-lg border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                        </div>
+                    </label>
+                @endforeach
             </div>
-            @error('allowedRegistrationModes') <p class="text-[11px] text-rose-500 font-bold">{{ $message }}</p> @enderror
+            @error('enabledRegistrationModules') <p class="text-[11px] text-rose-500 font-bold">{{ $message }}</p> @enderror
         </div>
 
         <!-- Platform AI Product Image Generation -->

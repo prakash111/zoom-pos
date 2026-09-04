@@ -211,34 +211,123 @@ class TenantNavRegistry
 
     private static function administrationSection(): array
     {
+        $tabs = self::settingsTabItems();
+
         return [
             'key' => 'administration',
             'label' => 'Administration & Settings',
+            'title' => 'Administration & Settings',
             'color' => '#475569',
             'items' => [
-                ['key' => 'subscription', 'label' => 'Subscription & Billing', 'icon' => 'workspace_premium', 'component' => 'subscription', 'permission' => null],
-                ['key' => 'settings', 'label' => 'Store Settings', 'icon' => 'settings', 'component' => 'settings', 'permission' => 'settings'],
-                ...self::settingsTabItems(),
-                ['key' => 'languages', 'label' => 'Languages & Translations', 'icon' => 'translate', 'component' => 'languages', 'permission' => 'settings'],
-                ['key' => 'staff', 'label' => 'Users & Permissions', 'icon' => 'badge', 'component' => 'staff', 'permission' => 'users'],
-                ['key' => 'devices', 'label' => 'Terminals & Devices', 'icon' => 'devices_other', 'component' => 'devices', 'permission' => null],
+                ['key' => 'subscription', 'label' => 'Subscription & Billing', 'title' => 'Subscription & Billing', 'icon' => 'workspace_premium', 'component' => 'subscription', 'type' => 'link', 'permission' => null],
+                [
+                    'key' => 'settings',
+                    'label' => 'Store Settings',
+                    'title' => 'Store Settings',
+                    'icon' => 'settings',
+                    'component' => 'settings',
+                    'type' => 'accordion',
+                    'permission' => 'settings',
+                    'children' => $tabs,
+                ],
+                ...$tabs,
+                ['key' => 'languages', 'label' => 'Languages & Translations', 'title' => 'Languages & Translations', 'icon' => 'translate', 'component' => 'languages', 'type' => 'link', 'permission' => 'settings'],
+                ['key' => 'staff', 'label' => 'Users & Permissions', 'title' => 'Users & Permissions', 'icon' => 'badge', 'component' => 'staff', 'type' => 'link', 'permission' => 'users'],
+                ['key' => 'devices', 'label' => 'Terminals & Devices', 'title' => 'Terminals & Devices', 'icon' => 'devices_other', 'component' => 'devices', 'type' => 'link', 'permission' => null],
             ],
         ];
     }
 
     /**
-     * Store Settings' seven tenant-owned tabs.
+     * Store Settings' seven tenant-owned tabs with declarative SDUI target endpoints.
      */
-    private static function settingsTabItems(): array
+    public static function settingsTabItems(): array
     {
         return [
-            ['key' => 'settings_mode', 'label' => 'Store Operating Mode', 'icon' => 'tune', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
-            ['key' => 'settings_profile', 'label' => 'Store Profile & Branding', 'icon' => 'storefront', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
-            ['key' => 'settings_receipts', 'label' => 'Receipt Prefixes & Bank Terms', 'icon' => 'receipt', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
-            ['key' => 'settings_financial', 'label' => 'Financial & Currency', 'icon' => 'monetization_on', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
-            ['key' => 'settings_taxes', 'label' => 'Taxes & Compliance', 'icon' => 'percent', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
-            ['key' => 'settings_api', 'label' => 'API & Integrations', 'icon' => 'api', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
-            ['key' => 'settings_navigation', 'label' => 'Navigation Menu', 'icon' => 'menu_open', 'component' => 'settings', 'parent' => 'settings', 'permission' => 'settings'],
+            [
+                'key' => 'settings_mode',
+                'label' => 'Store Operating Mode',
+                'title' => 'Store Operating Mode',
+                'icon' => 'flash',
+                'component' => 'settings_mode',
+                'type' => 'link',
+                'target_endpoint' => '/api/tenant/views/settings-mode',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => 'settings',
+            ],
+            [
+                'key' => 'settings_profile',
+                'label' => 'Store Profile & Branding',
+                'title' => 'Store Profile & Branding',
+                'icon' => 'storefront',
+                'component' => 'settings_profile',
+                'type' => 'link',
+                'target_endpoint' => '/api/tenant/views/settings-profile',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => 'settings',
+            ],
+            [
+                'key' => 'settings_receipts',
+                'label' => 'Receipt Prefixes & Bank Terms',
+                'title' => 'Receipt Prefixes & Bank Terms',
+                'icon' => 'receipt',
+                'component' => 'settings_receipts',
+                'type' => 'link',
+                'target_endpoint' => '/api/tenant/views/settings-receipts',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => 'settings',
+            ],
+            [
+                'key' => 'settings_financial',
+                'label' => 'Financial & Currency',
+                'title' => 'Financial & Currency',
+                'icon' => 'monetization_on',
+                'component' => 'settings_financial',
+                'type' => 'link',
+                'target_endpoint' => '/api/tenant/views/settings-financial',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => 'settings',
+            ],
+            [
+                'key' => 'settings_taxes',
+                'label' => 'Taxes & Compliance',
+                'title' => 'Taxes & Compliance',
+                'icon' => 'percent',
+                'component' => 'settings_taxes',
+                'type' => 'link',
+                'target_endpoint' => '/api/tenant/views/settings-taxes',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => 'settings',
+            ],
+            [
+                'key' => 'settings_api',
+                'label' => 'API & Integrations',
+                'title' => 'API & Integrations',
+                'icon' => 'api',
+                'component' => 'settings_api',
+                'type' => 'link',
+                'target_endpoint' => '/api/tenant/views/settings-api',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => 'settings',
+            ],
+            [
+                'key' => 'settings_navigation',
+                'label' => 'Navigation Menu',
+                'title' => 'Navigation Menu',
+                'icon' => 'menu_open',
+                'component' => 'settings_navigation',
+                'type' => 'link',
+                'target_endpoint' => '/api/tenant/views/settings-navigation',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => 'settings',
+            ],
         ];
     }
 }

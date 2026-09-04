@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\ReportsApiController;
 use App\Http\Controllers\Api\V1\RestaurantApiController;
 use App\Http\Controllers\Api\V1\SalesTargetApiController;
 use App\Http\Controllers\Api\V1\ServiceOrderApiController;
+use App\Http\Controllers\Api\V1\SduiViewController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
 use App\Http\Controllers\Api\V1\TaxApiController;
 use App\Http\Controllers\Api\V1\UserApiController;
@@ -52,10 +53,18 @@ Route::prefix('tenant/password')->group(function () {
 Route::post('/tenant/profile/change-password', [PasswordResetController::class, 'changePassword'])
     ->middleware([AuthenticateTenantApi::class]);
 
-// Server-Driven UI Bootstrap routes accessible directly via /api/app/*
+// Server-Driven UI Bootstrap, View Schemas, and Form Action Routes
 Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
     Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
+
+    // Server-Driven UI Dynamic Schema Views
+    Route::get('/tenant/views/{view}', [SduiViewController::class, 'show'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/app/views/{view}', [SduiViewController::class, 'show'])->middleware('tenant.api.permission:settings,view');
+
+    // Server-Driven UI Declarative Form Submissions
+    Route::match(['post', 'put'], '/tenant/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/app/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
 });
 
 /*
@@ -282,5 +291,6 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
         Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/nav-config', [AppBootstrapController::class, 'updateNav'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/views/{view}', [SduiViewController::class, 'show'])->middleware('tenant.api.permission:settings,view');
     });
 });

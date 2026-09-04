@@ -30,6 +30,11 @@ class Show extends Component
 
     public ?int $maxDevices = null;
 
+    public string $posMode = 'retail';
+
+    /** @var array<int, string> */
+    public array $licensedModules = [];
+
     public function mount(Company $company): void
     {
         $this->company = $company;
@@ -41,10 +46,14 @@ class Show extends Component
         $this->expiresAt = $company->expires_at?->format('Y-m-d');
         $this->maxUsers = $company->max_users;
         $this->maxDevices = $company->max_devices;
+        $this->posMode = \App\Services\Modular\ModuleRegistry::resolveActiveMode($company);
+        $this->licensedModules = ! empty($company->licensed_modules) ? $company->licensed_modules : [$this->posMode];
     }
 
     protected function rules(): array
     {
+        $validModules = implode(',', array_keys(\App\Services\Modular\ModuleRegistry::allModules()));
+
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email'],
@@ -54,13 +63,20 @@ class Show extends Component
             'expiresAt' => ['nullable', 'date'],
             'maxUsers' => ['nullable', 'integer', 'min:0'],
             'maxDevices' => ['nullable', 'integer', 'min:0'],
+            'posMode' => ['required', 'string', "in:{$validModules}"],
+            'licensedModules' => ['required', 'array', 'min:1'],
+            'licensedModules.*' => ['string', "in:{$validModules}"],
         ];
     }
 
     public function save(): void
     {
         $data = $this->validate();
-        $before = $this->company->only(['name', 'email', 'phone', 'plan_name', 'status', 'max_users', 'max_devices']);
+        $before = $this->company->only(['name', 'email', 'phone', 'plan_name', 'status', 'max_users', 'max_devices', 'pos_mode', 'licensed_modules']);
+
+        if (! in_array($this->posMode, $this->licensedModules, true)) {
+            $this->licensedModules[] = $this->posMode;
+        }
 
         $this->company->update([
             'name' => $data['name'],
@@ -71,11 +87,13 @@ class Show extends Component
             'expires_at' => $data['expiresAt'] ?: null,
             'max_users' => $data['maxUsers'],
             'max_devices' => $data['maxDevices'],
+            'pos_mode' => $this->posMode,
+            'licensed_modules' => array_values($this->licensedModules),
         ]);
 
         AuditLog::record('tenant.updated', $this->company->id, auth('platform_web')->id(), [
             'before' => $before,
-            'after' => $this->company->only(['name', 'email', 'phone', 'plan_name', 'status', 'max_users', 'max_devices']),
+            'after' => $this->company->only(['name', 'email', 'phone', 'plan_name', 'status', 'max_users', 'max_devices', 'pos_mode', 'licensed_modules']),
         ]);
 
         session()->flash('status', 'Tenant updated.');

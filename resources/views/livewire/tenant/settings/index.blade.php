@@ -1,12 +1,14 @@
 <div class="w-full space-y-6"
      x-data="{
-         activeTab: (window.location.hash ? window.location.hash.substring(1) : 'mode') || 'mode'
+         activeTab: @js($activeSection),
+         validTabs: ['overview', 'mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'navigation']
      }"
      x-init="
-         const validTabs = ['mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'navigation'];
-         if (!validTabs.includes(activeTab)) activeTab = 'mode';
+         if (window.location.hash && validTabs.includes(window.location.hash.substring(1))) {
+             activeTab = window.location.hash.substring(1);
+         }
          window.addEventListener('hashchange', () => {
-             const h = window.location.hash ? window.location.hash.substring(1) : 'mode';
+             const h = window.location.hash ? window.location.hash.substring(1) : '';
              if (validTabs.includes(h)) activeTab = h;
          });
      ">
@@ -25,79 +27,261 @@
         </div>
     @endif
 
-    <!-- Modular Tab Navigation Bar with Smooth Scroll Synchronization & Auto-Center Focus -->
+    <!-- Section Breadcrumb & Back to Overview Navigation -->
+    <div x-show="activeTab !== 'overview'" class="flex items-center justify-between gap-3 pb-1 border-b border-slate-200/60 dark:border-slate-800">
+        <div class="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400">
+            <a href="{{ route('tenant.settings.index') }}" wire:navigate class="hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition">
+                <span>⚙️</span>
+                <span>{{ __('Store Settings') }}</span>
+            </a>
+            <span class="text-slate-300 dark:text-slate-600">/</span>
+            <span class="text-slate-900 dark:text-white font-extrabold" x-text="{
+                'mode': '{{ __('Store Operating Mode') }}',
+                'profile': '{{ __('Store Profile & Branding') }}',
+                'receipts': '{{ __('Receipt Prefixes & Bank Terms') }}',
+                'financial': '{{ __('Financial & Currency') }}',
+                'taxes': '{{ __('Taxes & Compliance') }}',
+                'api': '{{ __('API & Integrations') }}',
+                'navigation': '{{ __('Navigation Menu') }}'
+            }[activeTab] || '{{ __('Settings') }}'"></span>
+        </div>
+        <a href="{{ route('tenant.settings.index') }}" wire:navigate class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-extrabold text-slate-700 dark:text-slate-200 transition active:scale-95 shadow-2xs">
+            <span>←</span>
+            <span>{{ __('Back to Settings Overview') }}</span>
+        </a>
+    </div>
+
+    <!-- Modular Tab Navigation Bar with Smooth Scroll Synchronization & Dedicated URL Links -->
     <div class="settings-subnav-container flex items-center gap-2 overflow-x-auto py-2 px-1 scrollbar-none snap-x snap-mandatory bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-2xs"
          style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
         
+        <!-- Tab 0: Settings Overview -->
+        <a href="{{ route('tenant.settings.index') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'overview' ? 'true' : 'false'"
+           :class="activeTab === 'overview' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+            <span class="text-sm">🏛️</span>
+            <span>{{ __('Overview') }}</span>
+        </a>
+
         <!-- Tab 1: Operating Mode -->
-        <button type="button"
-                @click="activeTab = 'mode'; window.location.hash = 'mode'"
-                :aria-selected="activeTab === 'mode' ? 'true' : 'false'"
-                :class="activeTab === 'mode' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
-                class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+        <a href="{{ route('tenant.settings.mode') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'mode' ? 'true' : 'false'"
+           :class="activeTab === 'mode' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
             <span class="text-sm">⚡</span>
             <span>{{ __('Store Operating Mode') }}</span>
-        </button>
+        </a>
 
         <!-- Tab 2: Profile & Branding -->
-        <button type="button"
-                @click="activeTab = 'profile'; window.location.hash = 'profile'"
-                :aria-selected="activeTab === 'profile' ? 'true' : 'false'"
-                :class="activeTab === 'profile' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
-                class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+        <a href="{{ route('tenant.settings.profile') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'profile' ? 'true' : 'false'"
+           :class="activeTab === 'profile' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
             <span class="text-sm">🏢</span>
             <span>{{ __('Store Profile & Branding') }}</span>
-        </button>
+        </a>
 
         <!-- Tab 3: Receipt Prefixes & Terms -->
-        <button type="button"
-                @click="activeTab = 'receipts'; window.location.hash = 'receipts'"
-                :aria-selected="activeTab === 'receipts' ? 'true' : 'false'"
-                :class="activeTab === 'receipts' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
-                class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+        <a href="{{ route('tenant.settings.receipts') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'receipts' ? 'true' : 'false'"
+           :class="activeTab === 'receipts' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
             <span class="text-sm">📄</span>
             <span>{{ __('Receipt Prefixes & Bank Terms') }}</span>
-        </button>
+        </a>
 
         <!-- Tab 4: Financial & Currency -->
-        <button type="button"
-                @click="activeTab = 'financial'; window.location.hash = 'financial'"
-                :aria-selected="activeTab === 'financial' ? 'true' : 'false'"
-                :class="activeTab === 'financial' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
-                class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+        <a href="{{ route('tenant.settings.financial') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'financial' ? 'true' : 'false'"
+           :class="activeTab === 'financial' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
             <span class="text-sm">💳</span>
             <span>{{ __('Financial & Currency') }}</span>
-        </button>
+        </a>
 
         <!-- Tab 5: Taxes & Compliance -->
-        <button type="button"
-                @click="activeTab = 'taxes'; window.location.hash = 'taxes'"
-                :aria-selected="activeTab === 'taxes' ? 'true' : 'false'"
-                :class="activeTab === 'taxes' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
-                class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+        <a href="{{ route('tenant.settings.taxes') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'taxes' ? 'true' : 'false'"
+           :class="activeTab === 'taxes' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
             <span class="text-sm">⚖️</span>
             <span>{{ __('Taxes & Compliance') }}</span>
-        </button>
+        </a>
 
         <!-- Tab 6: API & Integrations -->
-        <button type="button"
-                @click="activeTab = 'api'; window.location.hash = 'api'"
-                :aria-selected="activeTab === 'api' ? 'true' : 'false'"
-                :class="activeTab === 'api' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
-                class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+        <a href="{{ route('tenant.settings.api') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'api' ? 'true' : 'false'"
+           :class="activeTab === 'api' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
             <span class="text-sm">🔌</span>
             <span>{{ __('API & Integrations') }}</span>
-        </button>
+        </a>
 
         <!-- Tab 7: Navigation Menu -->
-        <button type="button"
-                @click="activeTab = 'navigation'; window.location.hash = 'navigation'"
-                :aria-selected="activeTab === 'navigation' ? 'true' : 'false'"
-                :class="activeTab === 'navigation' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
-                class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+        <a href="{{ route('tenant.settings.navigation') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'navigation' ? 'true' : 'false'"
+           :class="activeTab === 'navigation' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
             <span class="text-sm">🧭</span>
             <span>{{ __('Navigation Menu') }}</span>
-        </button>
+        </a>
+    </div>
+
+    <!-- =========================================================================
+         TAB 0: SETTINGS OVERVIEW HUB (When on /settings or overview tab)
+         ========================================================================= -->
+    <div x-show="activeTab === 'overview'" x-cloak class="space-y-6">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-blue-500/10">
+            <div class="max-w-2xl">
+                <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-white/20 text-white backdrop-blur-xs mb-3 inline-block">
+                    {{ __('Store Administration') }}
+                </span>
+                <h2 class="text-xl sm:text-2xl font-black">{{ __('Store Settings Overview') }}</h2>
+                <p class="text-xs sm:text-sm text-blue-100/90 mt-1 leading-relaxed">
+                    {{ __('Manage operating mode, branding, receipts, currencies, taxes, APIs, and custom sidebar navigation from dedicated settings consoles.') }}
+                </p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <!-- Card 1: Operating Mode -->
+            <a href="{{ route('tenant.settings.mode') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-2xl font-bold">
+                        ⚡
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ __('Operating Mode') }}</h3>
+                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            {{ $posMode === 'restaurant' ? __('Restaurant') : __('Retail') }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Store operational model, consignment controls, and module permissions.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                    <span>{{ __('Configure Mode') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+
+            <!-- Card 2: Profile & Branding -->
+            <a href="{{ route('tenant.settings.profile') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-2xl font-bold">
+                        🏢
+                    </div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ __('Profile & Branding') }}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Store legal name, trading details, address, logos, favicons, and accent colors.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                    <span>{{ __('Configure Profile') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+
+            <!-- Card 3: Receipt Prefixes & Bank Terms -->
+            <a href="{{ route('tenant.settings.receipts') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl font-bold">
+                        📄
+                    </div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ __('Receipts & Terms') }}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Invoice/quote numbering prefixes, receipt formats (80mm/58mm), and bank terms.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                    <span>{{ __('Configure Receipts') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+
+            <!-- Card 4: Financial & Currency -->
+            <a href="{{ route('tenant.settings.financial') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl font-bold">
+                        💳
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ __('Financial & Currency') }}</h3>
+                        <span class="text-[10px] font-extrabold font-mono px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            {{ $currency }} ({{ $currencySymbol }})
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Base and multi-currency rates, payment methods, card processing fee tiers, and PIX/scale.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                    <span>{{ __('Configure Financials') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+
+            <!-- Card 5: Taxes & Compliance -->
+            <a href="{{ route('tenant.settings.taxes') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-2xl font-bold">
+                        ⚖️
+                    </div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ __('Taxes & Compliance') }}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Multi-jurisdiction fiscal rules, inclusive/exclusive modes, and CGST/SGST/VAT splits.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                    <span>{{ __('Configure Taxes') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+
+            <!-- Card 6: API & Integrations -->
+            <a href="{{ route('tenant.settings.api') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center text-2xl font-bold">
+                        🔌
+                    </div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ __('API & Integrations') }}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Sanctum API keys, Generative AI product studio, SMTP mail server, and webhooks.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                    <span>{{ __('Configure Integrations') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+
+            <!-- Card 7: Navigation Menu -->
+            <a href="{{ route('tenant.settings.navigation') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center text-2xl font-bold">
+                        🧭
+                    </div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ __('Navigation Menu') }}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Customize sidebar menu structure, drag-and-drop ordering, visibility, and sub-menu nesting.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                    <span>{{ __('Customize Navigation') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+        </div>
     </div>
 
     <!-- =========================================================================

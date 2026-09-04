@@ -48,6 +48,9 @@ class Index extends Component
 
     public string $allowedRegistrationModes = 'both';
 
+    /** @var array<int, string> */
+    public array $enabledRegistrationModules = [];
+
     // Platform-wide AI Product Image Generation
     public bool $aiImageEnabled = false;
 
@@ -203,7 +206,8 @@ class Index extends Component
         $this->minClientBuildVersion = (string) PlatformSystem::get('min_client_build_version', '0');
         $this->appVersion = (string) PlatformSystem::get('app_version', '1.0.0');
         $this->showPoweredBy = filter_var(PlatformSystem::get('show_powered_by', true), FILTER_VALIDATE_BOOLEAN);
-        $this->allowedRegistrationModes = (string) PlatformSystem::get('allowed_registration_modes', 'both');
+        $this->enabledRegistrationModules = \App\Services\Modular\ModuleRegistry::enabledRegistrationModes();
+        $this->allowedRegistrationModes = in_array('restaurant', $this->enabledRegistrationModules, true) && in_array('retail', $this->enabledRegistrationModules, true) ? 'both' : (in_array('restaurant', $this->enabledRegistrationModules, true) ? 'restaurant_only' : 'retail_only');
         $this->aiImageEnabled = filter_var(PlatformSystem::get('ai_image_enabled', false), FILTER_VALIDATE_BOOLEAN);
         $this->aiImageProvider = (string) PlatformSystem::get('ai_image_provider', 'openai');
         $this->hasAiImageOpenaiApiKey = filled(PlatformSystem::get('ai_image_openai_api_key'));
@@ -454,7 +458,8 @@ class Index extends Component
             'maintenanceMessage' => ['nullable', 'string', 'max:500'],
             'minClientBuildVersion' => ['required', 'string', 'max:50'],
             'appVersion' => ['required', 'string', 'max:50'],
-            'allowedRegistrationModes' => ['required', 'in:both,retail_only,restaurant_only'],
+            'enabledRegistrationModules' => ['required', 'array', 'min:1'],
+            'enabledRegistrationModules.*' => ['string'],
             'aiImageEnabled' => ['boolean'],
             'aiImageProvider' => ['required', 'in:openai,gemini,claude'],
             'aiImageOpenaiApiKey' => ['nullable', 'string', 'max:500'],
@@ -467,6 +472,8 @@ class Index extends Component
             'min_client_build_version' => PlatformSystem::get('min_client_build_version', '0'),
         ];
 
+        $this->allowedRegistrationModes = in_array('restaurant', $this->enabledRegistrationModules, true) && in_array('retail', $this->enabledRegistrationModules, true) ? 'both' : (in_array('restaurant', $this->enabledRegistrationModules, true) ? 'restaurant_only' : 'retail_only');
+
         PlatformSystem::set('app_name', $this->appName);
         PlatformSystem::set('app_currency', $this->appCurrency);
         PlatformSystem::set('app_timezone', $this->appTimezone);
@@ -475,7 +482,7 @@ class Index extends Component
         PlatformSystem::set('min_client_build_version', $this->minClientBuildVersion);
         PlatformSystem::set('app_version', $this->appVersion);
         PlatformSystem::set('show_powered_by', $this->showPoweredBy ? '1' : '0');
-        PlatformSystem::set('allowed_registration_modes', $this->allowedRegistrationModes);
+        PlatformSystem::set('allowed_registration_modes', json_encode(array_values($this->enabledRegistrationModules)));
         PlatformSystem::set('ai_image_enabled', $this->aiImageEnabled ? '1' : '0');
         PlatformSystem::set('ai_image_provider', $this->aiImageProvider);
 

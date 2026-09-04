@@ -206,7 +206,7 @@ class AppBootstrapApiTest extends TestCase
             ->assertJsonPath('tenant.id', (string) $this->company->id)
             ->assertJsonPath('tenant.business_name', 'Metro Mart')
             ->assertJsonPath('tenant.active_mode', 'retail')
-            ->assertJsonPath('tenant.available_modes', ['retail', 'restaurant', 'pharmacy', 'service_booking'])
+            ->assertJsonPath('tenant.available_modes', ['retail'])
             ->assertJsonPath('modules.retail.id', 'retail')
             ->assertJsonPath('modules.retail.layout_type', 'standard_grid')
             ->assertJsonPath('modules.retail.features.has_tables', false)
@@ -228,23 +228,16 @@ class AppBootstrapApiTest extends TestCase
             ]);
     }
 
-    public function test_switch_mode_dynamically(): void
+    public function test_regular_tenant_cannot_switch_mode_dynamically(): void
     {
         $token = $this->token();
 
-        // Switch to restaurant mode
+        // Attempting to switch mode via POST /api/v1/pos/app/mode is forbidden for regular tenants
         $res = $this->withToken($token)->postJson('/api/v1/pos/app/mode', [
             'mode' => 'restaurant',
         ]);
 
-        $res->assertOk()
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('active_mode', 'restaurant')
-            ->assertJsonPath('module.id', 'restaurant');
-
-        // Check bootstrap now returns restaurant active mode
-        $boot = $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap');
-        $boot->assertOk()
-            ->assertJsonPath('tenant.active_mode', 'restaurant');
+        $res->assertForbidden()
+            ->assertJsonPath('success', false);
     }
 }

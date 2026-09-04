@@ -107,41 +107,14 @@ class AppBootstrapController extends Controller
 
     /**
      * POST /api/app/mode or POST /api/v1/pos/app/mode
-     * Switch tenant operating mode dynamically.
+     * Self-service mode switching is strictly locked for tenants.
+     * Only SuperAdmin can modify operating modes.
      */
     public function switchMode(Request $request): JsonResponse
     {
-        $company = $this->resolveCompany($request);
-        $user = $this->resolveUser($request, $company);
-
-        $validator = Validator::make($request->all(), [
-            'mode' => ['required', 'string', 'max:40'],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'error' => 'Invalid mode specified.', 'details' => $validator->errors()], 422);
-        }
-
-        $mode = strtolower(trim((string) $request->input('mode')));
-        $all = ModuleRegistry::allModules();
-
-        if (! isset($all[$mode])) {
-            return response()->json(['success' => false, 'error' => "Mode '{$mode}' is not registered."], 422);
-        }
-
-        if ($company->restaurant_mode_locked && $mode !== 'restaurant') {
-            return response()->json(['success' => false, 'error' => 'Restaurant mode is locked for this company.'], 403);
-        }
-
-        $company->update(['pos_mode' => $mode]);
-        AuditLog::record('company.mode_switched', $company->id, $user?->id, ['pos_mode' => $mode]);
-
         return response()->json([
-            'success' => true,
-            'message' => "Operating mode switched to {$all[$mode]['title']}.",
-            'active_mode' => $mode,
-            'module' => $all[$mode],
-            'menu_structure' => TenantNavRegistry::menuStructureForMode($mode),
-        ]);
+            'success' => false,
+            'error' => 'Store operating mode is permanently locked. Self-service mode switching is disabled. Only a SuperAdmin can modify the store operating mode.',
+        ], 403);
     }
 }

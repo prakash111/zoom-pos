@@ -106,16 +106,47 @@
             </div>
         </div>
 
-        <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <!-- Operating Mode & Licensed Modules (SuperAdmin Override) -->
+        <div class="pt-5 border-t border-slate-100 dark:border-slate-800 space-y-4">
             <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Store Mode") }}</label>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-md">
-                    {{ __("Chosen by the tenant at registration, subject to the platform's Allowed Registration Modes setting. This is no longer editable per tenant here.") }}
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Store Operating Mode (SuperAdmin Override)") }}</label>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {{ __("Strict mode locking is active for tenants. Regular tenants cannot switch operating modes. Only SuperAdmins can override the store mode.") }}
                 </p>
             </div>
-            <span class="px-3 py-1 rounded-full text-[10px] font-extrabold {{ $company->isRestaurantMode() ? 'bg-lime-100 text-lime-700' : 'bg-slate-100 text-slate-600' }}">
-                {{ $company->isRestaurantMode() ? __('Cafe & Restaurant') : __('Retail') }}
-            </span>
+            <div>
+                <select wire:model="posMode" class="w-full sm:w-80 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-semibold focus:ring-indigo-500">
+                    @foreach (\App\Services\Modular\ModuleRegistry::allModules() as $mKey => $mVal)
+                        <option value="{{ $mKey }}">{{ __($mVal['title']) }} ({{ $mKey }})</option>
+                    @endforeach
+                </select>
+                @error('posMode') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
+            </div>
+
+            <div class="pt-3">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Tenant Licensed & Visible Modules") }}</label>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                    {{ __("Select which specific modules are licensed and visible in this tenant's workspace navigation.") }}
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    @foreach (\App\Services\Modular\ModuleRegistry::allModules() as $mKey => $mVal)
+                        @php $isLic = in_array($mKey, $licensedModules, true); @endphp
+                        <label class="flex items-center justify-between p-3 rounded-xl border cursor-pointer {{ $isLic ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30' : 'border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-100' }}">
+                            <div class="flex items-center gap-2">
+                                <span class="text-base">
+                                    @if ($mKey === 'restaurant') 🍽️ @elseif ($mKey === 'pharmacy') 💊 @elseif ($mKey === 'service_booking') ✂️ @else 🏪 @endif
+                                </span>
+                                <div>
+                                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ __($mVal['title']) }}</span>
+                                    <span class="block text-[10px] text-slate-500 dark:text-slate-400">{{ $mVal['layout_type'] }}</span>
+                                </div>
+                            </div>
+                            <input type="checkbox" wire:model="licensedModules" value="{{ $mKey }}" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                        </label>
+                    @endforeach
+                </div>
+                @error('licensedModules') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
+            </div>
         </div>
 
         <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">

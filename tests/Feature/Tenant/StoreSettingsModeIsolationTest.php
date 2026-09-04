@@ -27,7 +27,7 @@ class StoreSettingsModeIsolationTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_admin_can_toggle_operating_mode_in_store_settings(): void
+    public function test_operating_mode_is_strictly_locked_in_store_settings(): void
     {
         [$company, $admin] = $this->actingAsTenantAdmin();
 
@@ -35,26 +35,16 @@ class StoreSettingsModeIsolationTest extends TestCase
         $this->assertTrue($company->isGeneralMode());
         $this->assertFalse($company->isRestaurantMode());
 
-        // Switch to Restaurant Mode
+        // Attempting to switch to Restaurant Mode from store settings is strictly locked
         Livewire::test(SettingsIndex::class)
             ->set('posMode', 'restaurant')
             ->call('save')
             ->assertHasNoErrors();
 
         $company->refresh();
-        $this->assertSame('restaurant', $company->pos_mode);
-        $this->assertTrue($company->isRestaurantMode());
-        $this->assertFalse($company->isGeneralMode());
-
-        // Switch back to General POS Mode
-        Livewire::test(SettingsIndex::class)
-            ->set('posMode', 'general')
-            ->call('save')
-            ->assertHasNoErrors();
-
-        $company->refresh();
         $this->assertSame('general', $company->pos_mode);
         $this->assertTrue($company->isGeneralMode());
+        $this->assertFalse($company->isRestaurantMode());
     }
 
     public function test_general_mode_strictly_restricts_restaurant_routes(): void

@@ -81,6 +81,7 @@ class TenantProvisioningService
                 'currency' => $data['currency'] ?? 'USD',
                 'language' => $data['language'] ?? 'en',
                 'pos_mode' => $posMode,
+                'licensed_modules' => [$posMode === 'general' ? 'retail' : $posMode],
                 'plan_name' => $planName,
                 'status' => 'active',
                 'expires_at' => $expiresAt,
@@ -152,8 +153,10 @@ class TenantProvisioningService
                 'activation_code' => $activationCode,
             ]);
 
-            // 6. Automatically Import Default Demo Data (Categories, Products, Tables, Customers, etc.)
-            $this->seedTenantDemoData($company, $posMode, $admin);
+            // 6. Automatically Import Default Demo Data if explicitly requested
+            if (! empty($data['seed_demo_data'])) {
+                $this->seedTenantDemoData($company, $posMode, $admin);
+            }
 
             AuditLog::record('tenant.self_registered', $company->id, $admin->id, [
                 'store_name' => $company->name,

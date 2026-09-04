@@ -27,16 +27,28 @@ class TenantRegister extends Component
             $this->email = (string) ($profile['email'] ?? '');
         }
 
-        if ($this->allowedRegistrationModes === 'restaurant_only') {
-            $this->posMode = 'restaurant';
-        } elseif ($this->allowedRegistrationModes === 'retail_only') {
-            $this->posMode = 'general';
+        $activeKeys = array_keys(\App\Services\Modular\ModuleRegistry::registrationModules());
+        if (! empty($activeKeys)) {
+            $normalizedCurrent = $this->posMode === 'general' ? 'retail' : $this->posMode;
+            if (! in_array($normalizedCurrent, $activeKeys, true)) {
+                $this->posMode = $activeKeys[0] === 'retail' ? 'general' : $activeKeys[0];
+            }
         }
+    }
+
+    public function getActiveRegistrationModulesProperty(): array
+    {
+        return \App\Services\Modular\ModuleRegistry::registrationModules();
     }
 
     public function getAllowedRegistrationModesProperty(): string
     {
-        return (string) PlatformSystem::get('allowed_registration_modes', 'both');
+        $enabled = \App\Services\Modular\ModuleRegistry::enabledRegistrationModes();
+        if (in_array('restaurant', $enabled, true) && in_array('retail', $enabled, true)) {
+            return 'both';
+        }
+
+        return in_array('restaurant', $enabled, true) ? 'restaurant_only' : 'retail_only';
     }
 
     public int $step = 1; // 1 = Registration Form, 2 = OTP Verification
@@ -132,7 +144,7 @@ class TenantRegister extends Component
                 Rule::unique('companies', 'slug'),
             ],
             'customDomain' => ['nullable', 'string', 'min:3', 'max:100'],
-            'posMode' => ['required', 'in:general,restaurant'],
+            'posMode' => ['required', 'string', Rule::in(array_unique(array_merge(array_keys(\App\Services\Modular\ModuleRegistry::registrationModules()), ['general', 'retail'])))],
             'ownerName' => ['required', 'string', 'min:2', 'max:100'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
@@ -144,14 +156,10 @@ class TenantRegister extends Component
 
         $this->validate($rules);
 
-        $allowedModes = $this->allowedRegistrationModes;
-        if ($allowedModes === 'retail_only' && $this->posMode === 'restaurant') {
-            $this->addError('posMode', 'Cafe & Restaurant registration is currently disabled.');
-
-            return;
-        }
-        if ($allowedModes === 'restaurant_only' && $this->posMode !== 'restaurant') {
-            $this->addError('posMode', 'Retail registration is currently disabled.');
+        $activeKeys = array_keys(\App\Services\Modular\ModuleRegistry::registrationModules());
+        $normalizedMode = $this->posMode === 'general' ? 'retail' : $this->posMode;
+        if (! in_array($normalizedMode, $activeKeys, true)) {
+            $this->addError('posMode', 'Selected operating mode is currently disabled for registration.');
 
             return;
         }

@@ -877,14 +877,13 @@
                             @if ($canSettings)
                                 <x-nav.drawer-link item-key="settings" :route="route('tenant.settings.index')" :title="__('Store Settings')" />
                                 <div class="pl-8 space-y-1 nav-children-container" data-parent-key="settings">
-                                    <x-nav.drawer-link item-key="settings_mode" :route="route('tenant.settings.index').'#mode'" :title="__('Store Operating Mode')" />
-                                    <x-nav.drawer-link item-key="settings_profile" :route="route('tenant.settings.index').'#profile'" :title="__('Store Profile & Branding')" />
-                                    <x-nav.drawer-link item-key="settings_receipts" :route="route('tenant.settings.index').'#receipts'" :title="__('Receipt Prefixes & Bank Terms')" />
-                                    <x-nav.drawer-link item-key="settings_financial" :route="route('tenant.settings.index').'#financial'" :title="__('Financial & Currency')" />
-                                    <x-nav.drawer-link item-key="settings_taxes" :route="route('tenant.settings.index').'#taxes'" :title="__('Taxes & Compliance')" />
-                                    <x-nav.drawer-link item-key="settings_api" :route="route('tenant.settings.index').'#api'" :title="__('API & Integrations')" />
-                                    <x-nav.drawer-link item-key="settings_notifications" :route="route('tenant.settings.index').'#notifications'" :title="__('Notification & Dispatch')" />
-                                    <x-nav.drawer-link item-key="settings_navigation" :route="route('tenant.settings.index').'#navigation'" :title="__('Navigation Menu')" />
+                                    <x-nav.drawer-link item-key="settings_mode" :route="route('tenant.settings.mode')" :title="__('Store Operating Mode')" />
+                                    <x-nav.drawer-link item-key="settings_profile" :route="route('tenant.settings.profile')" :title="__('Store Profile & Branding')" />
+                                    <x-nav.drawer-link item-key="settings_receipts" :route="route('tenant.settings.receipts')" :title="__('Receipt Prefixes & Bank Terms')" />
+                                    <x-nav.drawer-link item-key="settings_financial" :route="route('tenant.settings.financial')" :title="__('Financial & Currency')" />
+                                    <x-nav.drawer-link item-key="settings_taxes" :route="route('tenant.settings.taxes')" :title="__('Taxes & Compliance')" />
+                                    <x-nav.drawer-link item-key="settings_api" :route="route('tenant.settings.api')" :title="__('API & Integrations')" />
+                                    <x-nav.drawer-link item-key="settings_navigation" :route="route('tenant.settings.navigation')" :title="__('Navigation Menu')" />
                                 </div>
                             @endif
 

@@ -218,9 +218,26 @@ class PosSyncApiController extends Controller
      */
     public function registrationConfig(): JsonResponse
     {
+        $enabled = \App\Services\Modular\ModuleRegistry::enabledRegistrationModes();
+        $legacyString = in_array('restaurant', $enabled, true) && in_array('retail', $enabled, true)
+            ? 'both'
+            : (in_array('restaurant', $enabled, true) ? 'restaurant_only' : 'retail_only');
+
+        $activeModules = array_values(array_map(function ($mod) {
+            return [
+                'id' => $mod['id'],
+                'title' => $mod['title'],
+                'description' => $mod['description'],
+                'icon' => $mod['icon'] ?? 'widgets',
+                'layout_type' => $mod['layout_type'] ?? 'standard_grid',
+            ];
+        }, \App\Services\Modular\ModuleRegistry::registrationModules()));
+
         return response()->json([
             'success' => true,
-            'allowed_registration_modes' => (string) \App\Models\PlatformSystem::get('allowed_registration_modes', 'both'),
+            'allowed_registration_modes' => $legacyString,
+            'enabled_modes' => $enabled,
+            'active_modules' => $activeModules,
         ]);
     }
 
@@ -264,13 +281,15 @@ class PosSyncApiController extends Controller
             ], 422);
         }
 
-        $requestedIsRestaurant = in_array($request->input('pos_mode', 'general'), ['restaurant', 'food_restaurant'], true);
-        $allowedModes = (string) \App\Models\PlatformSystem::get('allowed_registration_modes', 'both');
-        if ($allowedModes === 'retail_only' && $requestedIsRestaurant) {
-            return response()->json(['success' => false, 'error' => 'Cafe & Restaurant registration is currently disabled.'], 422);
-        }
-        if ($allowedModes === 'restaurant_only' && ! $requestedIsRestaurant) {
-            return response()->json(['success' => false, 'error' => 'Retail registration is currently disabled.'], 422);
+        $requestedMode = strtolower(trim((string) $request->input('pos_mode', 'general')));
+        $normalizedMode = $requestedMode === 'general' ? 'retail' : $requestedMode;
+        $enabledModes = \App\Services\Modular\ModuleRegistry::enabledRegistrationModes();
+
+        if (! in_array($normalizedMode, $enabledModes, true)) {
+            return response()->json([
+                'success' => false,
+                'error' => "Registration for mode '{$requestedMode}' is currently disabled.",
+            ], 422);
         }
 
         try {

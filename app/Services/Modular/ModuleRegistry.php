@@ -146,18 +146,89 @@ class ModuleRegistry
     }
 
     /**
-     * Return list of all available modes for a tenant.
+     * Get globally enabled modules for tenant registration configured by SuperAdmin.
+     *
+     * @return list<string>
+     */
+    public static function enabledRegistrationModes(): array
+    {
+        $raw = \App\Models\PlatformSystem::get('allowed_registration_modes', '["retail", "restaurant"]');
+        $allKeys = array_keys(self::allModules());
+
+        if (is_string($raw)) {
+            $trimmed = trim($raw);
+            if ($trimmed === 'both') {
+                return array_values(array_intersect(['retail', 'restaurant'], $allKeys));
+            }
+            if ($trimmed === 'retail_only') {
+                return array_values(array_intersect(['retail'], $allKeys));
+            }
+            if ($trimmed === 'restaurant_only') {
+                return array_values(array_intersect(['restaurant'], $allKeys));
+            }
+
+            $decoded = json_decode($trimmed, true);
+            if (is_array($decoded)) {
+                $filtered = array_values(array_intersect($decoded, $allKeys));
+                if (! empty($filtered)) {
+                    return $filtered;
+                }
+            }
+        } elseif (is_array($raw)) {
+            $filtered = array_values(array_intersect($raw, $allKeys));
+            if (! empty($filtered)) {
+                return $filtered;
+            }
+        }
+
+        return array_values(array_intersect(['retail', 'restaurant'], $allKeys));
+    }
+
+    /**
+     * Return module schemas for active registration modes.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function registrationModules(): array
+    {
+        $enabled = self::enabledRegistrationModes();
+        $all = self::allModules();
+        $result = [];
+        foreach ($enabled as $key) {
+            if (isset($all[$key])) {
+                $result[$key] = $all[$key];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Return list of all available/licensed modes for a tenant.
      *
      * @return list<string>
      */
     public static function availableModes(Company $company): array
     {
         $all = array_keys(self::allModules());
-        if ($company->restaurant_mode_locked) {
-            return ['restaurant'];
+        $licensed = $company->licensed_modules;
+
+        if (is_array($licensed) && ! empty($licensed)) {
+            $modes = array_values(array_intersect($licensed, $all));
+        } else {
+            // Default to permanent active mode
+            $active = self::resolveActiveMode($company);
+            $modes = [$active];
         }
 
-        return $all;
+        if ($company->restaurant_mode_locked) {
+            $modes = array_values(array_diff($modes, ['restaurant']));
+            if (empty($modes)) {
+                $modes = ['retail'];
+            }
+        }
+
+        return ! empty($modes) ? $modes : ['retail'];
     }
 
     /**
