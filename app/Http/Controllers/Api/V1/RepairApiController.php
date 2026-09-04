@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Models\OrderPayment;
 use App\Models\Product;
 use App\Models\RepairChecklist;
+use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
 use App\Models\RepairTicketPart;
 use App\Models\Sale;
@@ -15,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class RepairApiController extends Controller
 {
@@ -48,6 +50,221 @@ class RepairApiController extends Controller
         return response()->json([
             'success' => true,
             'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * List all dynamic device repair categories with custom specifications.
+     * GET /api/tenant/repair/categories
+     */
+    public function categoriesIndex(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $categories = RepairDeviceCategory::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        // If company has no categories yet, automatically initialize default presets
+        if ($categories->isEmpty()) {
+            foreach (RepairDeviceCategory::defaultPresets() as $preset) {
+                RepairDeviceCategory::create(array_merge($preset, [
+                    'company_id' => $company->id,
+                    'tenant_id' => $company->id,
+                    'is_active' => true,
+                    'is_demo' => false,
+                ]));
+            }
+
+            $categories = RepairDeviceCategory::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->get();
+        }
+
+        return response()->json([
+            'success' => true,
+            'count' => $categories->count(),
+            'categories' => $categories,
+        ]);
+    }
+
+    /**
+     * Create a new custom device repair category.
+     * POST /api/tenant/repair/categories
+     */
+    public function categoriesStore(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:150',
+            'icon' => 'nullable|string|max:100',
+            'identifier_type' => 'nullable|string|max:100',
+            'brands' => 'nullable',
+            'checklist_items' => 'nullable',
+            'common_issues' => 'nullable',
+            'description' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
+        }
+
+        $parseList = function ($val) {
+            if (is_array($val)) {
+                return array_values(array_filter(array_map('trim', $val)));
+            }
+            if (is_string($val) && trim($val) !== '') {
+                return array_values(array_filter(array_map('trim', explode(',', $val))));
+            }
+
+            return [];
+        };
+
+        $name = trim($request->input('name'));
+        $slug = Str::slug($name);
+        $brands = $parseList($request->input('brands'));
+        $checklistItems = $parseList($request->input('checklist_items'));
+        $commonIssues = $parseList($request->input('common_issues'));
+
+        if (empty($brands)) {
+            $brands = ['Generic', 'OEM', 'Other'];
+        }
+
+        if (empty($checklistItems)) {
+            $checklistItems = ['Power On / Boot', 'Physical Housing Condition', 'Component Functionality'];
+        }
+
+        $category = RepairDeviceCategory::create([
+            'company_id' => $company->id,
+            'tenant_id' => $company->id,
+            'name' => $name,
+            'slug' => $slug,
+            'icon' => $request->input('icon') ?: 'devices',
+            'identifier_type' => $request->input('identifier_type') ?: 'Serial / IMEI',
+            'brands' => $brands,
+            'checklist_items' => $checklistItems,
+            'common_issues' => $commonIssues,
+            'description' => $request->input('description'),
+            'sort_order' => (int) RepairDeviceCategory::withoutGlobalScope('company')->where('company_id', $company->id)->max('sort_order') + 1,
+            'is_active' => true,
+            'is_demo' => false,
+        ]);
+
+        AuditLog::record('repair.category_created', $company->id, $user?->id, [
+            'category_id' => $category->id,
+            'name' => $category->name,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device category created successfully.',
+            'category' => $category,
+        ], 201);
+    }
+
+    /**
+     * Update custom device category specifications.
+     * PUT/POST /api/tenant/repair/categories/{id}
+     */
+    public function categoriesUpdate(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $category = RepairDeviceCategory::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->find($id);
+
+        if (! $category) {
+            return response()->json(['success' => false, 'error' => 'Device category not found.'], 404);
+        }
+
+        $parseList = function ($val, $fallback) {
+            if (is_array($val)) {
+                return array_values(array_filter(array_map('trim', $val)));
+            }
+            if (is_string($val)) {
+                return array_values(array_filter(array_map('trim', explode(',', $val))));
+            }
+
+            return $fallback;
+        };
+
+        $data = [];
+        if ($request->filled('name')) {
+            $data['name'] = trim($request->input('name'));
+            $data['slug'] = Str::slug($data['name']);
+        }
+        if ($request->has('icon')) {
+            $data['icon'] = $request->input('icon') ?: 'devices';
+        }
+        if ($request->has('identifier_type')) {
+            $data['identifier_type'] = $request->input('identifier_type') ?: 'Serial / IMEI';
+        }
+        if ($request->has('brands')) {
+            $data['brands'] = $parseList($request->input('brands'), $category->brands);
+        }
+        if ($request->has('checklist_items')) {
+            $data['checklist_items'] = $parseList($request->input('checklist_items'), $category->checklist_items);
+        }
+        if ($request->has('common_issues')) {
+            $data['common_issues'] = $parseList($request->input('common_issues'), $category->common_issues);
+        }
+        if ($request->has('description')) {
+            $data['description'] = $request->input('description');
+        }
+        if ($request->has('is_active')) {
+            $data['is_active'] = $request->boolean('is_active');
+        }
+
+        $category->update($data);
+
+        AuditLog::record('repair.category_updated', $company->id, $user?->id, [
+            'category_id' => $category->id,
+            'name' => $category->name,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device category updated successfully.',
+            'category' => $category->fresh(),
+        ]);
+    }
+
+    /**
+     * Delete/Deactivate device repair category.
+     * DELETE /api/tenant/repair/categories/{id}
+     */
+    public function categoriesDestroy(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $category = RepairDeviceCategory::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->find($id);
+
+        if (! $category) {
+            return response()->json(['success' => false, 'error' => 'Device category not found.'], 404);
+        }
+
+        $category->delete();
+
+        AuditLog::record('repair.category_deleted', $company->id, $user?->id, [
+            'category_id' => $id,
+            'name' => $category->name,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device category removed successfully.',
         ]);
     }
 
@@ -218,9 +435,10 @@ class RepairApiController extends Controller
         $validator = Validator::make($request->all(), [
             'customer_name' => 'required|string|max:150',
             'customer_phone' => 'required|string|max:50',
-            'device_type' => 'required|string|max:100',
-            'brand' => 'required|string|max:100',
-            'model' => 'required|string|max:100',
+            'device_category_id' => 'nullable|integer',
+            'device_type' => 'nullable|string|max:100',
+            'brand' => 'nullable|string|max:100',
+            'model' => 'nullable|string|max:100',
             'serial_or_imei' => 'nullable|string|max:100',
             'passcode_or_pattern' => 'nullable|string|max:100',
             'issue_description' => 'required|string',
@@ -247,6 +465,24 @@ class RepairApiController extends Controller
             $estimatedCost = (float) $request->input('estimated_cost', 0);
             $advancePaid = (float) $request->input('advance_paid', 0);
 
+            // Resolve dynamic category
+            $category = null;
+            if ($request->filled('device_category_id')) {
+                $category = RepairDeviceCategory::withoutGlobalScope('company')
+                    ->where('company_id', $company->id)
+                    ->find($request->input('device_category_id'));
+            }
+            if (! $category && $request->filled('device_type')) {
+                $category = RepairDeviceCategory::withoutGlobalScope('company')
+                    ->where('company_id', $company->id)
+                    ->where('name', trim($request->input('device_type')))
+                    ->first();
+            }
+
+            $deviceType = $category?->name ?? trim((string) ($request->input('device_type') ?: 'Device'));
+            $brand = trim((string) ($request->input('brand') ?: 'Generic'));
+            $model = trim((string) ($request->input('model') ?: 'Standard'));
+
             $ticket = RepairTicket::create([
                 'company_id' => $company->id,
                 'tenant_id' => $company->id,
@@ -254,9 +490,10 @@ class RepairApiController extends Controller
                 'customer_id' => $request->input('customer_id'),
                 'customer_name' => trim($request->input('customer_name')),
                 'customer_phone' => trim($request->input('customer_phone')),
-                'device_type' => trim($request->input('device_type')),
-                'brand' => trim($request->input('brand')),
-                'model' => trim($request->input('model')),
+                'device_category_id' => $category?->id,
+                'device_type' => $deviceType,
+                'brand' => $brand,
+                'model' => $model,
                 'serial_or_imei' => $request->input('serial_or_imei'),
                 'passcode_or_pattern' => $request->input('passcode_or_pattern'),
                 'issue_description' => trim($request->input('issue_description')),
@@ -272,7 +509,7 @@ class RepairApiController extends Controller
                 'intake_at' => now(),
             ]);
 
-            // Save checklists
+            // Save checklists: from input or category checklist specifications
             $checklists = $request->input('checklists');
             if (! empty($checklists) && is_array($checklists)) {
                 foreach ($checklists as $item) {
@@ -280,15 +517,14 @@ class RepairApiController extends Controller
                         'company_id' => $company->id,
                         'tenant_id' => $company->id,
                         'repair_ticket_id' => $ticket->id,
-                        'item_name' => $item['item_name'] ?? 'Inspection Item',
+                        'item_name' => $item['item_name'] ?? $item['item'] ?? $item['name'] ?? 'Inspection Item',
                         'type' => $item['type'] ?? 'intake',
                         'status' => $item['status'] ?? 'pass',
                         'notes' => $item['notes'] ?? null,
                     ]);
                 }
             } else {
-                // Default inspection checklist
-                $defaultItems = [
+                $checklistNames = ! empty($category?->checklist_items) ? $category->checklist_items : [
                     'Power On / Boot',
                     'Display / Touchscreen',
                     'Front & Rear Cameras',
@@ -296,12 +532,13 @@ class RepairApiController extends Controller
                     'Charging Port & Battery',
                     'Housing / Glass Scratches',
                 ];
-                foreach ($defaultItems as $item) {
+
+                foreach ($checklistNames as $itemName) {
                     RepairChecklist::create([
                         'company_id' => $company->id,
                         'tenant_id' => $company->id,
                         'repair_ticket_id' => $ticket->id,
-                        'item_name' => $item,
+                        'item_name' => is_string($itemName) ? $itemName : ($itemName['item_name'] ?? 'Diagnostic Check'),
                         'type' => 'intake',
                         'status' => 'pass',
                     ]);

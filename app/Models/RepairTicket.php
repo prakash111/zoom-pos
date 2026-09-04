@@ -18,6 +18,7 @@ class RepairTicket extends Model
         'customer_id',
         'customer_name',
         'customer_phone',
+        'device_category_id',
         'device_type',
         'brand',
         'model',
@@ -70,6 +71,11 @@ class RepairTicket extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function deviceCategory(): BelongsTo
+    {
+        return $this->belongsTo(RepairDeviceCategory::class, 'device_category_id');
     }
 
     public function technician(): BelongsTo

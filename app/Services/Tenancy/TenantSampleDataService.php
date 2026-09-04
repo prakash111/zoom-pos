@@ -13,6 +13,7 @@ use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
 use App\Models\Product;
 use App\Models\RepairChecklist;
+use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
 use App\Models\RepairTicketPart;
 use App\Models\Sale;
@@ -942,7 +943,21 @@ class TenantSampleDataService
             'is_demo' => true,
         ]);
 
-        // 4. Sample Repair Tickets in Different Lifecycle Stages
+        // 4. Device Categories & Hardware Specifications
+        $deviceCategories = [];
+        foreach (RepairDeviceCategory::defaultPresets() as $preset) {
+            $cat = RepairDeviceCategory::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'slug' => $preset['slug'],
+            ], array_merge($preset, [
+                'tenant_id' => $companyId,
+                'is_active' => true,
+                'is_demo' => true,
+            ]));
+            $deviceCategories[$preset['slug']] = $cat;
+        }
+
+        // 5. Sample Repair Tickets in Different Lifecycle Stages
         // Ticket 1: Active Intake
         $ticket1 = RepairTicket::withoutGlobalScopes()->firstOrCreate([
             'company_id' => $companyId,
@@ -952,6 +967,7 @@ class TenantSampleDataService
             'customer_id' => $cust1->id,
             'customer_name' => $cust1->name,
             'customer_phone' => $cust1->phone,
+            'device_category_id' => $deviceCategories['smartphone']->id ?? null,
             'device_type' => 'Smartphone',
             'brand' => 'Apple',
             'model' => 'iPhone 14 Pro',
@@ -979,6 +995,8 @@ class TenantSampleDataService
             'tenant_id' => $companyId,
             'type' => 'intake',
             'status' => 'pass',
+            'verified_by' => $admin?->id,
+            'verified_at' => now()->subHours(3),
         ]);
 
         RepairChecklist::withoutGlobalScopes()->firstOrCreate([
@@ -989,10 +1007,28 @@ class TenantSampleDataService
             'tenant_id' => $companyId,
             'type' => 'intake',
             'status' => 'fail',
-            'notes' => 'Display flickering with green line',
+            'technician_notes' => 'Digitizer glass shattered; OLED panel damaged.',
+            'verified_by' => $admin?->id,
+            'verified_at' => now()->subHours(3),
         ]);
 
-        // Ticket 2: In Progress with Parts & Labor Billed
+        if (isset($createdProducts['REP-SCR-001'])) {
+            RepairTicketPart::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'repair_ticket_id' => $ticket1->id,
+                'part_name' => 'iPhone 14 Pro OLED Display Assembly (OEM Quality)',
+            ], [
+                'tenant_id' => $companyId,
+                'product_id' => $createdProducts['REP-SCR-001']->id,
+                'quantity' => 1,
+                'unit_cost' => 65.00,
+                'unit_price' => 160.00,
+                'subtotal' => 160.00,
+                'billed_to_customer' => true,
+            ]);
+        }
+
+        // Ticket 2: In Progress
         $ticket2 = RepairTicket::withoutGlobalScopes()->firstOrCreate([
             'company_id' => $companyId,
             'ticket_number' => 'REP-2026-0002',
@@ -1001,6 +1037,7 @@ class TenantSampleDataService
             'customer_id' => $cust2->id,
             'customer_name' => $cust2->name,
             'customer_phone' => $cust2->phone,
+            'device_category_id' => $deviceCategories['smartphone']->id ?? null,
             'device_type' => 'Smartphone',
             'brand' => 'Samsung',
             'model' => 'Galaxy S23 Ultra',
@@ -1045,6 +1082,7 @@ class TenantSampleDataService
             'customer_id' => $cust1->id,
             'customer_name' => $cust1->name,
             'customer_phone' => $cust1->phone,
+            'device_category_id' => $deviceCategories['laptop-notebook']->id ?? null,
             'device_type' => 'Laptop',
             'brand' => 'Dell',
             'model' => 'XPS 15 9520',
@@ -1339,6 +1377,11 @@ class TenantSampleDataService
 
             // 3. Repair Tickets & Parts (before customers/products)
             $counts['repair_tickets'] = RepairTicket::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->where('is_demo', true)
+                ->delete();
+
+            $counts['repair_device_categories'] = RepairDeviceCategory::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('is_demo', true)
                 ->delete();

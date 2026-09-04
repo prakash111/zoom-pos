@@ -109,6 +109,10 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     // Repair & Technician POS Module Routes
     Route::prefix('tenant/repair')->group(function () {
         Route::get('/stats', [RepairApiController::class, 'stats'])->middleware('tenant.api.permission:pos,view');
+        Route::get('/categories', [RepairApiController::class, 'categoriesIndex'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/categories', [RepairApiController::class, 'categoriesStore'])->middleware('tenant.api.permission:pos,create');
+        Route::match(['put', 'patch', 'post'], '/categories/{id}', [RepairApiController::class, 'categoriesUpdate'])->middleware('tenant.api.permission:pos,edit');
+        Route::delete('/categories/{id}', [RepairApiController::class, 'categoriesDestroy'])->middleware('tenant.api.permission:pos,edit');
         Route::get('/tickets', [RepairApiController::class, 'ticketsIndex'])->middleware('tenant.api.permission:pos,view');
         Route::post('/tickets', [RepairApiController::class, 'ticketsStore'])->middleware('tenant.api.permission:pos,create');
         Route::get('/tickets/{id}', [RepairApiController::class, 'ticketsShow'])->middleware('tenant.api.permission:pos,view');
@@ -342,6 +346,10 @@ Route::prefix('v1/pos')->group(function () {
         // Repair & Technician POS Module Aliases
         Route::prefix('repair')->group(function () {
             Route::get('/stats', [RepairApiController::class, 'stats'])->middleware('tenant.api.permission:pos,view');
+            Route::get('/categories', [RepairApiController::class, 'categoriesIndex'])->middleware('tenant.api.permission:pos,view');
+            Route::post('/categories', [RepairApiController::class, 'categoriesStore'])->middleware('tenant.api.permission:pos,create');
+            Route::match(['put', 'patch', 'post'], '/categories/{id}', [RepairApiController::class, 'categoriesUpdate'])->middleware('tenant.api.permission:pos,edit');
+            Route::delete('/categories/{id}', [RepairApiController::class, 'categoriesDestroy'])->middleware('tenant.api.permission:pos,edit');
             Route::get('/tickets', [RepairApiController::class, 'ticketsIndex'])->middleware('tenant.api.permission:pos,view');
             Route::post('/tickets', [RepairApiController::class, 'ticketsStore'])->middleware('tenant.api.permission:pos,create');
             Route::get('/tickets/{id}', [RepairApiController::class, 'ticketsShow'])->middleware('tenant.api.permission:pos,view');

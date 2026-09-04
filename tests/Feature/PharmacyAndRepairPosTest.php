@@ -9,6 +9,7 @@ use App\Models\PharmacyPrescription;
 use App\Models\Plan;
 use App\Models\Product;
 use App\Models\RepairChecklist;
+use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
 use App\Models\RepairTicketPart;
 use App\Models\Sale;
@@ -511,6 +512,7 @@ class PharmacyAndRepairPosTest extends TestCase
             'repair-tickets' => 'Repair Ticket Register',
             'repair-my-jobs' => 'Technician Assigned Jobs',
             "repair-detail?ticket_id={$ticket->id}" => 'Workbench: #REP-TEST-001',
+            'repair-categories' => 'Device Categories & Specs',
         ];
 
         $validator = new SchemaValidator;
@@ -532,6 +534,68 @@ class PharmacyAndRepairPosTest extends TestCase
         }
     }
 
+    public function test_repair_device_categories_crud_and_ticket_intake(): void
+    {
+        // 1. Categories Index should auto-initialize presets if empty
+        $indexResponse = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/tenant/repair/categories');
+
+        $indexResponse->assertOk()
+            ->assertJsonPath('success', true);
+        $this->assertGreaterThanOrEqual(6, $indexResponse->json('count'));
+
+        // 2. Create custom device category
+        $storeResponse = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/tenant/repair/categories', [
+                'name' => 'Smart Watches & Wearables',
+                'icon' => 'watch',
+                'identifier_type' => 'Serial Number',
+                'brands' => 'Apple Watch, Samsung Galaxy Watch, Garmin, Fitbit',
+                'checklist_items' => 'Power On, Touch Screen, Heart Rate Sensor, Wireless Charging',
+                'common_issues' => 'Cracked OLED, Sensor Failure, Battery Drain',
+                'description' => 'Wearable smart health devices',
+            ]);
+
+        $storeResponse->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('category.name', 'Smart Watches & Wearables')
+            ->assertJsonPath('category.slug', 'smart-watches-wearables');
+
+        $categoryId = $storeResponse->json('category.id');
+        $this->assertNotNull($categoryId);
+
+        $category = RepairDeviceCategory::find($categoryId);
+        $this->assertEquals(['Apple Watch', 'Samsung Galaxy Watch', 'Garmin', 'Fitbit'], $category->brands);
+        $this->assertEquals(['Power On', 'Touch Screen', 'Heart Rate Sensor', 'Wireless Charging'], $category->checklist_items);
+
+        // 3. Create Ticket using dynamic device_category_id
+        $ticketResponse = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/tenant/repair/tickets', [
+                'customer_name' => 'Michael Scott',
+                'customer_phone' => '+15559988',
+                'device_category_id' => $categoryId,
+                'brand' => 'Apple Watch',
+                'model' => 'Ultra 2',
+                'serial_or_imei' => 'WAT-8921-X',
+                'issue_description' => 'Heart rate sensor not responding after swimming',
+                'priority' => 'high',
+                'estimated_cost' => 120.00,
+                'advance_paid' => 40.00,
+            ]);
+
+        $ticketResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('ticket.device_category_id', $categoryId)
+            ->assertJsonPath('ticket.device_type', 'Smart Watches & Wearables')
+            ->assertJsonPath('ticket.brand', 'Apple Watch');
+
+        $ticketId = $ticketResponse->json('ticket.id');
+        $checklists = RepairChecklist::where('repair_ticket_id', $ticketId)->get();
+        // Verifies intake checklist was auto-populated from category specifications
+        $this->assertCount(4, $checklists);
+        $this->assertTrue($checklists->pluck('item_name')->contains('Heart Rate Sensor'));
+    }
+
     public function test_sample_data_service_seed_and_purge_for_pharmacy_and_repair(): void
     {
         $seeder = new TenantSampleDataService;
@@ -545,6 +609,7 @@ class PharmacyAndRepairPosTest extends TestCase
         // 2. Seed Repair Demo Data
         $seeder->seed($this->company, 'repair_technician', $this->admin);
 
+        $this->assertGreaterThan(0, RepairDeviceCategory::withoutGlobalScope('company')->where('company_id', $this->company->id)->where('is_demo', true)->count());
         $this->assertGreaterThan(0, RepairTicket::withoutGlobalScope('company')->where('company_id', $this->company->id)->where('is_demo', true)->count());
         $this->assertGreaterThan(0, RepairTicketPart::withoutGlobalScope('company')->where('company_id', $this->company->id)->count());
         $this->assertGreaterThan(0, RepairChecklist::withoutGlobalScope('company')->where('company_id', $this->company->id)->count());
@@ -552,6 +617,7 @@ class PharmacyAndRepairPosTest extends TestCase
         // 3. Purge Demo Data
         $purgedCounts = $seeder->purgeDemoData($this->company);
 
+        $this->assertGreaterThan(0, $purgedCounts['repair_device_categories'] ?? 0);
         $this->assertGreaterThan(0, $purgedCounts['repair_tickets'] ?? 0);
         $this->assertGreaterThan(0, $purgedCounts['pharmacy_prescriptions'] ?? 0);
         $this->assertGreaterThan(0, $purgedCounts['pharmacy_batches'] ?? 0);
@@ -559,6 +625,7 @@ class PharmacyAndRepairPosTest extends TestCase
         // Verify zero demo records remain
         $this->assertEquals(0, PharmacyBatch::withoutGlobalScope('company')->where('company_id', $this->company->id)->where('is_demo', true)->count());
         $this->assertEquals(0, PharmacyPrescription::withoutGlobalScope('company')->where('company_id', $this->company->id)->where('is_demo', true)->count());
+        $this->assertEquals(0, RepairDeviceCategory::withoutGlobalScope('company')->where('company_id', $this->company->id)->where('is_demo', true)->count());
         $this->assertEquals(0, RepairTicket::withoutGlobalScope('company')->where('company_id', $this->company->id)->where('is_demo', true)->count());
     }
 }

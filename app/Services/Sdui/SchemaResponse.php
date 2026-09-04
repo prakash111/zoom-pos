@@ -8,6 +8,7 @@ use App\Models\CustomNotificationChannel;
 use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
 use App\Models\Product;
+use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
 use App\Models\SduiScreen;
 use App\Services\Localization\PlatformRegionalService;
@@ -736,18 +737,19 @@ class SchemaResponse
 
             $medicineCards[] = self::card([
                 self::row([
-                    self::icon('medication', ['color' => '#059669', 'size' => 24]),
+                    self::column([
+                        self::icon('medication', ['color' => '#059669', 'size' => 28]),
+                        $scheduleBadge,
+                    ]),
                     self::column([
                         self::text($prod->name, 'title_medium', ['bold' => true]),
                         self::text('Generic: '.($prod->generic_name ?: ($prod->composition ?: 'Standard Formulation')), 'body_small', ['color' => '#64748b']),
+                        $batchBadge,
                     ]),
-                    $scheduleBadge,
-                ]),
-                self::divider(),
-                self::row([
-                    $batchBadge,
-                    self::text('Price: '.number_format((float) $prod->sale_price, 2), 'label_large', ['bold' => true, 'color' => '#059669']),
-                    self::text('Stock: '.(int) $prod->current_stock, 'body_small', ['color' => '#475569']),
+                    self::column([
+                        self::text(number_format((float) $prod->sale_price, 2), 'title_large', ['bold' => true, 'color' => '#059669']),
+                        self::text('Stock: '.(int) $prod->current_stock, 'body_small', ['color' => '#64748b']),
+                    ]),
                 ]),
             ]);
         }
@@ -871,13 +873,48 @@ class SchemaResponse
                     ]),
                 ]),
                 self::divider(),
-                self::row([
+                self::wrap([
                     self::badge("Total Batches: {$totalBatches}", '#0284c7', 'subtle'),
                     self::badge("Safe: {$safeCount}", '#10b981', 'subtle'),
                     self::badge("Expiring Soon: {$nearExpiryCount}", '#f59e0b', 'subtle'),
                     self::badge("Expired: {$expiredCount}", '#ef4444', 'subtle'),
                 ]),
             ]),
+
+            self::gridView([
+                self::card([
+                    self::row([
+                        self::icon('inventory_2', ['color' => '#0284c7', 'size' => 22]),
+                        self::text((string) $totalBatches, 'headline_small', ['bold' => true, 'color' => '#0284c7']),
+                    ]),
+                    self::text('Total Batches', 'label_large', ['bold' => true]),
+                    self::text('Registered medicine lots', 'body_small', ['color' => '#64748b']),
+                ]),
+                self::card([
+                    self::row([
+                        self::icon('verified', ['color' => '#10b981', 'size' => 22]),
+                        self::text((string) $safeCount, 'headline_small', ['bold' => true, 'color' => '#10b981']),
+                    ]),
+                    self::text('Safe Batches', 'label_large', ['bold' => true]),
+                    self::text('> 90 days validity', 'body_small', ['color' => '#64748b']),
+                ]),
+                self::card([
+                    self::row([
+                        self::icon('warning', ['color' => '#f59e0b', 'size' => 22]),
+                        self::text((string) $nearExpiryCount, 'headline_small', ['bold' => true, 'color' => '#f59e0b']),
+                    ]),
+                    self::text('Expiring Soon', 'label_large', ['bold' => true]),
+                    self::text('Within 90 days (FEFO alert)', 'body_small', ['color' => '#64748b']),
+                ]),
+                self::card([
+                    self::row([
+                        self::icon('block', ['color' => '#ef4444', 'size' => 22]),
+                        self::text((string) $expiredCount, 'headline_small', ['bold' => true, 'color' => '#ef4444']),
+                    ]),
+                    self::text('Expired Lots', 'label_large', ['bold' => true]),
+                    self::text('Do not dispense to patients', 'body_small', ['color' => '#64748b']),
+                ]),
+            ], 2),
 
             self::accordionGroup('Register New Medicine Batch', [
                 self::dropdownSelect('product_id', 'Select Medicine / Drug', $productOptions),
@@ -1032,20 +1069,23 @@ class SchemaResponse
                 self::row([
                     self::icon('handyman', ['color' => $t->status_color, 'size' => 24]),
                     self::column([
-                        self::text("#{$t->ticket_number} - {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
+                        self::text("#{$t->ticket_number} • {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
                         self::text("Customer: {$t->customer_name} ({$t->customer_phone})", 'body_small', ['color' => '#64748b']),
                     ]),
                     self::badge(strtoupper($t->status), $t->status_color, 'subtle'),
                 ]),
                 self::divider(),
-                self::text("Issue: {$t->issue_description}", 'body_small'),
+                self::card([
+                    self::text("Fault: \"{$t->issue_description}\"", 'body_medium', ['italic' => true]),
+                ], ['color' => '#f8fafc', 'border_color' => '#e2e8f0']),
                 self::row([
                     self::text('Total: '.number_format((float) $t->total_amount, 2), 'label_large', ['bold' => true]),
-                    self::text('Advance: '.number_format((float) $t->advance_paid, 2), 'body_small'),
-                    self::text('Due: '.number_format((float) $t->balance_due, 2), 'label_large', ['color' => '#dc2626', 'bold' => true]),
+                    self::text('Advance: '.number_format((float) $t->advance_paid, 2), 'body_small', ['color' => '#64748b']),
+                    self::text('Due: '.number_format((float) $t->balance_due, 2), 'label_large', ['color' => $t->balance_due > 0 ? '#dc2626' : '#10b981', 'bold' => true]),
                     self::badge($t->priority, $t->priority_color, 'subtle'),
                 ]),
-                self::buttonPrimary('Open Workbench', self::navigateAction('/api/tenant/views/repair-detail', title: 'Ticket Workbench'), 'build'),
+                self::divider(),
+                self::buttonPrimary('Open Workbench', self::navigateAction("/api/tenant/views/repair-detail?ticket_id={$t->id}", title: "Workbench #{$t->ticket_number}"), 'build'),
             ]);
         }
 
@@ -1059,7 +1099,7 @@ class SchemaResponse
                     ]),
                 ]),
                 self::divider(),
-                self::row([
+                self::wrap([
                     self::badge("Active: {$activeCount}", '#0284c7', 'subtle'),
                     self::badge("Diagnosing: {$diagCount}", '#8b5cf6', 'subtle'),
                     self::badge("Waiting Parts: {$partsCount}", '#f59e0b', 'subtle'),
@@ -1069,11 +1109,51 @@ class SchemaResponse
                 ]),
             ]),
 
-            self::row([
-                self::buttonPrimary('New Intake Ticket', self::navigateAction('/api/tenant/views/repair-create-ticket', title: 'New Repair Ticket'), 'add_task'),
-                self::buttonOutlined('All Tickets', self::navigateAction('/api/tenant/views/repair-tickets', title: 'Repair Ticket Register'), 'receipt_long'),
-                self::buttonOutlined('My Jobs', self::navigateAction('/api/tenant/views/repair-my-jobs', title: 'Assigned Jobs'), 'engineering'),
+            self::gridView([
+                self::card([
+                    self::row([
+                        self::icon('pending_actions', ['color' => '#0284c7', 'size' => 22]),
+                        self::text((string) $activeCount, 'headline_small', ['bold' => true, 'color' => '#0284c7']),
+                    ]),
+                    self::text('Active Intake', 'label_large', ['bold' => true]),
+                    self::text('Awaiting diagnostics', 'body_small', ['color' => '#64748b']),
+                ]),
+                self::card([
+                    self::row([
+                        self::icon('biotech', ['color' => '#8b5cf6', 'size' => 22]),
+                        self::text((string) $diagCount, 'headline_small', ['bold' => true, 'color' => '#8b5cf6']),
+                    ]),
+                    self::text('Diagnosing', 'label_large', ['bold' => true]),
+                    self::text('Under bench testing', 'body_small', ['color' => '#64748b']),
+                ]),
+                self::card([
+                    self::row([
+                        self::icon('hourglass_top', ['color' => '#f59e0b', 'size' => 22]),
+                        self::text((string) $partsCount, 'headline_small', ['bold' => true, 'color' => '#f59e0b']),
+                    ]),
+                    self::text('Waiting Parts', 'label_large', ['bold' => true]),
+                    self::text('Parts on order / hold', 'body_small', ['color' => '#64748b']),
+                ]),
+                self::card([
+                    self::row([
+                        self::icon('task_alt', ['color' => '#10b981', 'size' => 22]),
+                        self::text((string) $repairedCount, 'headline_small', ['bold' => true, 'color' => '#10b981']),
+                    ]),
+                    self::text('Repaired & Ready', 'label_large', ['bold' => true]),
+                    self::text('Ready for pickup', 'body_small', ['color' => '#64748b']),
+                ]),
+            ], 2),
+
+            self::card([
+                self::text('Workshop Operations & Navigation', 'label_large', ['bold' => true]),
+                self::divider(),
+                self::lineItemTile('New Intake Ticket', 'Check in a device, record specs & print tag', 'add_task', self::navigateAction('/api/tenant/views/repair-create-ticket', title: 'New Repair Ticket')),
+                self::lineItemTile('Repair Ticket Register', 'Complete register of all customer tickets & status', 'receipt_long', self::navigateAction('/api/tenant/views/repair-tickets', title: 'Repair Ticket Register')),
+                self::lineItemTile('My Assigned Jobs', 'Technician workbench for active diagnostics & status', 'engineering', self::navigateAction('/api/tenant/views/repair-my-jobs', title: 'Assigned Jobs')),
+                self::lineItemTile('Device Categories & Specs', 'Configure dynamic brands, checklists & hardware identifiers', 'category', self::navigateAction('/api/tenant/views/repair-categories', title: 'Device Categories')),
             ]),
+
+            self::buttonPrimary('Quick Device Intake', self::navigateAction('/api/tenant/views/repair-create-ticket', title: 'New Repair Ticket'), 'add_task'),
 
             self::card([
                 self::text('Active Repair Workbench Jobs', 'title_medium', ['bold' => true]),
@@ -1086,6 +1166,44 @@ class SchemaResponse
 
     public static function repairCreateTicketView(Company $company): array
     {
+        $categories = RepairDeviceCategory::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        if ($categories->isEmpty()) {
+            foreach (RepairDeviceCategory::defaultPresets() as $preset) {
+                RepairDeviceCategory::create(array_merge($preset, [
+                    'company_id' => $company->id,
+                    'tenant_id' => $company->id,
+                    'is_active' => true,
+                    'is_demo' => false,
+                ]));
+            }
+            $categories = RepairDeviceCategory::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get();
+        }
+
+        $categoryOptions = [];
+        foreach ($categories as $cat) {
+            $categoryOptions[] = [
+                'label' => "{$cat->name} ({$cat->identifier_type})",
+                'value' => (string) $cat->id,
+            ];
+        }
+        $firstCatId = ! empty($categoryOptions) ? $categoryOptions[0]['value'] : '';
+
+        $categoryBadges = [];
+        foreach ($categories as $cat) {
+            $categoryBadges[] = self::badge($cat->name, '#0284c7', 'subtle');
+        }
+
         return self::screen('New Repair Ticket', [
             self::card([
                 self::row([
@@ -1095,6 +1213,9 @@ class SchemaResponse
                         self::text('Record customer info, hardware details, passcodes, and physical condition.', 'body_small', ['color' => '#64748b']),
                     ]),
                 ]),
+                self::divider(),
+                self::text('Configured Device Categories in Workshop:', 'label_large', ['bold' => true]),
+                self::wrap($categoryBadges),
             ]),
 
             self::card([
@@ -1104,16 +1225,25 @@ class SchemaResponse
             ]),
 
             self::card([
-                self::text('Device Specifications', 'title_medium', ['bold' => true]),
-                self::dropdownSelect('device_type', 'Device Category', [
-                    ['label' => 'Smartphone', 'value' => 'Smartphone'],
-                    ['label' => 'Laptop / PC', 'value' => 'Laptop'],
-                    ['label' => 'Tablet / iPad', 'value' => 'Tablet'],
-                    ['label' => 'Smartwatch / Wearable', 'value' => 'Smartwatch'],
-                    ['label' => 'Audio / Speakers / Headphone', 'value' => 'Audio'],
-                    ['label' => 'Gaming Console', 'value' => 'Console'],
-                    ['label' => 'Home Appliance / Other', 'value' => 'Appliance'],
-                ], 'Smartphone'),
+                self::row([
+                    self::text('Device Specifications', 'title_medium', ['bold' => true]),
+                    self::buttonOutlined('+ Add Category', self::openModalAction('Create Device Category', [
+                        self::text('Register a new hardware category with custom brands & checklist.', 'body_small', ['color' => '#64748b']),
+                        self::textInput('name', 'Category Name (e.g. Drone, Wearable)', ''),
+                        self::textInput('identifier_type', 'Hardware Identifier (e.g. IMEI, Serial, MAC)', 'Serial Number'),
+                        self::textInput('brands', 'Supported Brands (comma-separated)', 'Brand A, Brand B, Other'),
+                        self::textInput('checklist_items', 'Checklist Points (comma-separated)', 'Power On, Display, Battery, Charging Port'),
+                        self::divider(),
+                        self::buttonPrimary('Save Category', self::formSubmitAction(
+                            '/api/tenant/repair/categories',
+                            'POST',
+                            'Device category created successfully.',
+                            reload: true
+                        ), 'add_circle'),
+                    ]), 'add', ['full_width' => false]),
+                ]),
+                self::divider(),
+                self::dropdownSelect('device_category_id', 'Device Category', $categoryOptions, $firstCatId),
                 self::textInput('brand', 'Brand (e.g. Apple, Samsung, Dell, HP)', ''),
                 self::textInput('model', 'Model Name / Number (e.g. iPhone 14 Pro, Galaxy S23)', ''),
                 self::textInput('serial_or_imei', 'Serial Number or IMEI (Optional)', ''),
@@ -1189,29 +1319,31 @@ class SchemaResponse
                 self::row([
                     self::icon('receipt_long', ['color' => $t->status_color, 'size' => 24]),
                     self::column([
-                        self::text("#{$t->ticket_number} - {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
+                        self::text("#{$t->ticket_number} • {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
                         self::text("Customer: {$t->customer_name} ({$t->customer_phone})", 'body_small', ['color' => '#64748b']),
                     ]),
                     self::badge(strtoupper($t->status), $t->status_color, 'subtle'),
                 ]),
                 self::divider(),
-                self::text("Defect: {$t->issue_description}", 'body_small'),
+                self::card([
+                    self::text("Defect: \"{$t->issue_description}\"", 'body_medium', ['italic' => true]),
+                ], ['color' => '#f8fafc', 'border_color' => '#e2e8f0']),
                 self::row([
                     self::text('Total: '.number_format((float) $t->total_amount, 2), 'label_large', ['bold' => true]),
-                    self::text('Advance: '.number_format((float) $t->advance_paid, 2), 'body_small'),
-                    self::text('Due: '.number_format((float) $t->balance_due, 2), 'label_large', ['color' => '#dc2626', 'bold' => true]),
+                    self::text('Advance: '.number_format((float) $t->advance_paid, 2), 'body_small', ['color' => '#64748b']),
+                    self::text('Due: '.number_format((float) $t->balance_due, 2), 'label_large', ['color' => $t->balance_due > 0 ? '#dc2626' : '#10b981', 'bold' => true]),
                     self::badge($t->priority, $t->priority_color, 'subtle'),
                 ]),
                 self::divider(),
-                self::row([
-                    self::buttonPrimary('Open Workbench', self::navigateAction('/api/tenant/views/repair-detail', title: 'Ticket Workbench'), 'build'),
+                self::buttonPrimary('Open Workbench', self::navigateAction("/api/tenant/views/repair-detail?ticket_id={$t->id}", title: "Workbench #{$t->ticket_number}"), 'build'),
+                ...($t->status !== 'delivered' && $t->status !== 'cancelled' ? [
                     self::buttonOutlined('Delivered & Settle', self::formSubmitAction(
                         "/api/tenant/repair/tickets/{$t->id}/settle",
                         'POST',
                         'Ticket settled & converted to POS sale',
                         reload: true
                     ), 'point_of_sale'),
-                ]),
+                ] : []),
             ]);
         }
 
@@ -1255,35 +1387,38 @@ class SchemaResponse
                 self::row([
                     self::icon('engineering', ['color' => $t->status_color, 'size' => 24]),
                     self::column([
-                        self::text("#{$t->ticket_number} - {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
-                        self::text("Category: {$t->device_type} | Serial: ".($t->serial_or_imei ?: 'N/A'), 'body_small', ['color' => '#64748b']),
+                        self::text("#{$t->ticket_number} • {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
+                        self::text("Category: {$t->device_type} | Serial/IMEI: ".($t->serial_or_imei ?: 'N/A'), 'body_small', ['color' => '#64748b']),
                     ]),
                     self::badge(strtoupper($t->status), $t->status_color, 'subtle'),
                 ]),
                 self::divider(),
-                self::text("Issue: {$t->issue_description}", 'body_medium', ['bold' => true]),
-                self::text('Lock/Passcode: '.($t->passcode_or_pattern ?: 'None'), 'body_small', ['color' => '#dc2626']),
+                self::card([
+                    self::text("Issue: \"{$t->issue_description}\"", 'body_medium', ['italic' => true]),
+                    self::text('Lock/Passcode: '.($t->passcode_or_pattern ?: 'None (Unlocked)'), 'body_small', ['color' => '#dc2626', 'bold' => true]),
+                ], ['color' => '#f8fafc', 'border_color' => '#e2e8f0']),
                 self::divider(),
+                self::buttonPrimary('Mark Repaired & Ready', self::apiPostAction(
+                    "/api/tenant/repair/tickets/{$t->id}/status",
+                    ['status' => 'repaired'],
+                    'Marked as Repaired & Ready',
+                    reload: true
+                ), 'task_alt'),
                 self::row([
-                    self::buttonOutlined('Diagnosing', self::formSubmitAction(
+                    self::buttonOutlined('Diagnose', self::apiPostAction(
                         "/api/tenant/repair/tickets/{$t->id}/status",
-                        'POST',
+                        ['status' => 'diagnosing'],
                         'Status set to Diagnosing',
                         reload: true
                     ), 'biotech'),
-                    self::buttonOutlined('Waiting Parts', self::formSubmitAction(
+                    self::buttonOutlined('Wait Parts', self::apiPostAction(
                         "/api/tenant/repair/tickets/{$t->id}/status",
-                        'POST',
+                        ['status' => 'waiting_parts'],
                         'Status set to Waiting Parts',
                         reload: true
                     ), 'hourglass_top'),
-                    self::buttonPrimary('Mark Repaired', self::formSubmitAction(
-                        "/api/tenant/repair/tickets/{$t->id}/status",
-                        'POST',
-                        'Marked as Repaired & Ready',
-                        reload: true
-                    ), 'task_alt'),
                 ]),
+                self::buttonOutlined('Open Workbench', self::navigateAction("/api/tenant/views/repair-detail?ticket_id={$t->id}", title: "Workbench #{$t->ticket_number}"), 'build'),
             ]);
         }
 
@@ -1308,11 +1443,12 @@ class SchemaResponse
 
     public static function repairDetailView(Company $company): array
     {
-        $ticket = RepairTicket::withoutGlobalScope('company')
+        $ticketId = request('ticket_id');
+        $query = RepairTicket::withoutGlobalScope('company')
             ->where('company_id', $company->id)
-            ->with(['parts', 'checklists', 'technician:id,name'])
-            ->orderByDesc('created_at')
-            ->first();
+            ->with(['parts', 'checklists', 'technician:id,name']);
+
+        $ticket = $ticketId ? $query->find($ticketId) : $query->orderByDesc('created_at')->first();
 
         if (! $ticket) {
             return self::screen('Repair Workbench', [
@@ -1354,85 +1490,194 @@ class SchemaResponse
                         self::text("Ticket #{$ticket->ticket_number}", 'title_large', ['bold' => true]),
                         self::text("{$ticket->brand} {$ticket->model} ({$ticket->device_type})", 'body_medium', ['color' => '#64748b']),
                     ]),
-                    self::badge(strtoupper($ticket->status), $ticket->status_color, 'solid'),
+                    self::badge(strtoupper($ticket->status), $ticket->status_color, 'subtle'),
                 ]),
                 self::divider(),
                 self::row([
-                    self::text("Customer: {$ticket->customer_name}", 'body_small'),
+                    self::text("Customer: {$ticket->customer_name}", 'body_medium', ['bold' => true]),
                     self::text("Phone: {$ticket->customer_phone}", 'body_small'),
-                    self::text('Serial: '.($ticket->serial_or_imei ?: 'N/A'), 'body_small'),
-                    self::text('Lock Passcode: '.($ticket->passcode_or_pattern ?: 'None'), 'body_small', ['bold' => true, 'color' => '#dc2626']),
                 ]),
+                self::text('Hardware Serial / IMEI: '.($ticket->serial_or_imei ?: 'N/A'), 'body_small', ['color' => '#64748b']),
+                self::text('Passcode / Unlock Pattern: '.($ticket->passcode_or_pattern ?: 'None'), 'body_small', ['color' => '#dc2626']),
             ]),
 
             self::card([
-                self::text('Reported Defect & Diagnosis', 'title_medium', ['bold' => true]),
+                self::text('Reported Defect / Issue', 'label_large', ['bold' => true]),
                 self::text($ticket->issue_description, 'body_medium'),
                 self::divider(),
-                self::text('Physical Condition Notes: '.($ticket->physical_condition_notes ?: 'No pre-existing damage noted.'), 'body_small', ['color' => '#64748b']),
+                self::text('Physical Condition & Housing Notes', 'label_large', ['bold' => true]),
+                self::text($ticket->physical_condition_notes ?: 'No pre-existing damages noted.', 'body_small', ['color' => '#64748b']),
             ]),
 
             self::card([
-                self::text('Intake Inspection Checklist', 'title_medium', ['bold' => true]),
+                self::text('Intake Diagnostic Checklist', 'title_medium', ['bold' => true]),
                 self::column(! empty($checklistItems) ? $checklistItems : [
-                    self::text('No checklist items logged.', 'body_small', ['color' => '#64748b']),
+                    self::text('No checklist verified at intake.', 'body_small', ['color' => '#64748b']),
                 ]),
             ]),
 
-            self::card([
-                self::text('Spare Parts Used & Billed', 'title_medium', ['bold' => true]),
+            self::accordionGroup('Installed Spare Parts & Consumables', [
                 self::column(! empty($partsCards) ? $partsCards : [
-                    self::text('No spare parts attached to this ticket yet.', 'body_small', ['color' => '#64748b']),
+                    self::text('No replacement parts billed yet.', 'body_small', ['color' => '#64748b']),
                 ]),
                 self::divider(),
-                self::text('Add Spare Part to Ticket', 'label_large', ['bold' => true]),
-                self::textInput('part_name', 'Spare Part Name (e.g. OLED Display Assembly, Battery)', ''),
+                self::text('Add Replacement Part / Material', 'label_large', ['bold' => true]),
+                self::textInput('part_name', 'Part / Component Name', ''),
+                self::textInput('part_cost', 'Part Cost', '0.00'),
                 self::textInput('quantity', 'Quantity', '1'),
-                self::textInput('unit_price', 'Price Billed to Customer', '0.00'),
-                self::buttonPrimary('Add Part to Job', self::formSubmitAction(
+                self::buttonPrimary('Add Part to Ticket', self::formSubmitAction(
                     "/api/tenant/repair/tickets/{$ticket->id}/parts",
                     'POST',
-                    'Spare part added and stock deducted.',
+                    'Part added to ticket.',
                     reload: true
                 ), 'add_circle'),
             ]),
 
             self::card([
-                self::text('Labor Fee & Cost Summary', 'title_medium', ['bold' => true]),
-                self::textInput('labor_fee', 'Labor / Technician Service Charge', (string) $ticket->labor_fee),
+                self::text('Labor Fee & Financial Breakdown', 'title_medium', ['bold' => true]),
+                self::row([
+                    self::text('Labor Fee:', 'body_medium'),
+                    self::text(number_format((float) $ticket->labor_fee, 2), 'body_medium', ['bold' => true]),
+                ]),
+                self::row([
+                    self::text('Parts Subtotal:', 'body_medium'),
+                    self::text(number_format((float) $ticket->parts_cost, 2), 'body_medium', ['bold' => true]),
+                ]),
+                self::divider(),
+                self::row([
+                    self::text('Total Ticket Bill:', 'title_medium', ['bold' => true]),
+                    self::text(number_format((float) $ticket->total_amount, 2), 'title_medium', ['bold' => true, 'color' => '#0284c7']),
+                ]),
+                self::row([
+                    self::text('Advance Deposit Paid:', 'body_small'),
+                    self::text(number_format((float) $ticket->advance_paid, 2), 'body_small'),
+                ]),
+                self::row([
+                    self::text('Remaining Balance Due:', 'title_medium', ['bold' => true, 'color' => '#dc2626']),
+                    self::text(number_format((float) $ticket->balance_due, 2), 'title_medium', ['bold' => true, 'color' => '#dc2626']),
+                ]),
+                self::divider(),
+                self::textInput('labor_fee', 'Update Technician Labor Fee', (string) $ticket->labor_fee),
                 self::buttonOutlined('Update Labor Fee', self::formSubmitAction(
                     "/api/tenant/repair/tickets/{$ticket->id}/labor",
                     'POST',
-                    'Labor fee updated successfully.',
+                    'Labor fee updated.',
                     reload: true
-                ), 'save'),
-                self::divider(),
-                self::row([
-                    self::text('Parts Subtotal: '.number_format((float) $ticket->parts_cost, 2), 'body_medium'),
-                    self::text('Labor Fee: '.number_format((float) $ticket->labor_fee, 2), 'body_medium'),
-                    self::text('Total Amount: '.number_format((float) $ticket->total_amount, 2), 'title_medium', ['bold' => true]),
-                ]),
-                self::row([
-                    self::text('Advance Paid: '.number_format((float) $ticket->advance_paid, 2), 'body_medium', ['color' => '#059669']),
-                    self::text('Balance Due: '.number_format((float) $ticket->balance_due, 2), 'title_medium', ['bold' => true, 'color' => '#dc2626']),
-                ]),
+                ), 'build'),
             ]),
 
             self::card([
-                self::text('Final POS Settlement & Customer Delivery', 'title_medium', ['bold' => true]),
-                self::text('Settle outstanding balance and generate official POS sale invoice.', 'body_small', ['color' => '#64748b']),
+                self::text('Final Delivery & POS Settlement', 'title_medium', ['bold' => true]),
+                self::text('Record customer payment, complete handover, and generate retail POS receipt.', 'body_small', ['color' => '#64748b']),
                 self::divider(),
-                self::dropdownSelect('payment_method', 'Settlement Payment Method', [
+                self::dropdownSelect('payment_method', 'Payment Method', [
                     ['label' => 'Cash', 'value' => 'cash'],
                     ['label' => 'Credit / Debit Card', 'value' => 'card'],
-                    ['label' => 'UPI / QR', 'value' => 'upi'],
+                    ['label' => 'UPI / QR Code', 'value' => 'upi'],
                 ], 'cash'),
-                self::buttonPrimary('Settle & Deliver to Customer (Generate Invoice)', self::formSubmitAction(
+                self::textInput('paid_amount', 'Payment Received', (string) $ticket->balance_due),
+                self::textInput('notes', 'Handover Notes', 'Device tested and handed over to customer'),
+                self::divider(),
+                self::buttonPrimary('Complete Handover & Settle (POS)', self::formSubmitAction(
                     "/api/tenant/repair/tickets/{$ticket->id}/settle",
                     'POST',
-                    'Ticket settled and converted to POS Sale successfully.',
+                    'Ticket settled, closed and sale invoice recorded.',
                     reload: true
-                ), 'receipt_long'),
+                ), 'point_of_sale'),
+            ]),
+        ]);
+    }
+
+    public static function repairCategoriesView(Company $company): array
+    {
+        $categories = RepairDeviceCategory::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        if ($categories->isEmpty()) {
+            foreach (RepairDeviceCategory::defaultPresets() as $preset) {
+                RepairDeviceCategory::create(array_merge($preset, [
+                    'company_id' => $company->id,
+                    'tenant_id' => $company->id,
+                    'is_active' => true,
+                    'is_demo' => false,
+                ]));
+            }
+            $categories = RepairDeviceCategory::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get();
+        }
+
+        $categoryCards = [];
+        foreach ($categories as $cat) {
+            $brandBadges = array_map(
+                fn ($b) => self::badge((string) $b, '#0284c7', 'subtle'),
+                array_slice((array) ($cat->brands ?? []), 0, 8)
+            );
+            $checklistBadges = array_map(
+                fn ($c) => self::badge((string) $c, '#10b981', 'subtle'),
+                array_slice((array) ($cat->checklist_items ?? []), 0, 8)
+            );
+
+            $categoryCards[] = self::card([
+                self::row([
+                    self::icon($cat->icon ?: 'devices', ['color' => '#0284c7', 'size' => 24]),
+                    self::column([
+                        self::text($cat->name, 'title_medium', ['bold' => true]),
+                        self::text("Identifier: {$cat->identifier_type} • ".count((array) ($cat->brands ?? [])).' brands', 'body_small', ['color' => '#64748b']),
+                    ]),
+                    self::badge($cat->is_active ? 'ACTIVE' : 'INACTIVE', $cat->is_active ? '#10b981' : '#ef4444', 'subtle'),
+                ]),
+                self::divider(),
+                self::text('Supported Brands / Manufacturers:', 'label_large', ['bold' => true]),
+                self::wrap($brandBadges),
+                self::divider(),
+                self::text('Intake Inspection Checklist Points:', 'label_large', ['bold' => true]),
+                self::wrap($checklistBadges),
+            ]);
+        }
+
+        return self::screen('Device Categories & Specs', [
+            self::card([
+                self::row([
+                    self::icon('category', ['color' => '#0284c7', 'size' => 28]),
+                    self::column([
+                        self::text('Hardware Categories & Checklists', 'title_medium', ['bold' => true]),
+                        self::text('Define supported device types, brand catalogs, diagnostic checklist points, and hardware identifiers.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::row([
+                    self::badge('Total Categories: '.count($categories), '#0284c7', 'subtle'),
+                    self::badge('Custom Specs Active', '#10b981', 'subtle'),
+                ]),
+            ]),
+
+            self::accordionGroup('Add New Device Category', [
+                self::textInput('name', 'Category Name', '', ['placeholder' => 'e.g. Smart Watch / Wearable, Drone, POS Terminal']),
+                self::textInput('identifier_type', 'Hardware Identifier Name', 'Serial Number', ['placeholder' => 'e.g. IMEI / Serial Number, MAC Address, Service Tag']),
+                self::textInput('brands', 'Supported Brands (comma-separated)', '', ['placeholder' => 'e.g. Apple, Samsung, Garmin, Fitbit, Other']),
+                self::textInput('checklist_items', 'Intake Inspection Points (comma-separated)', '', ['placeholder' => 'e.g. Power On, Touch Screen, Sensors, Battery, Charging Port']),
+                self::textInput('common_issues', 'Common Faults & Symptoms (comma-separated)', '', ['placeholder' => 'e.g. Broken Screen, Battery Draining, Sensor Error']),
+                self::textInput('description', 'Description & Workshop Notes', ''),
+                self::divider(),
+                self::buttonPrimary('Save Category to Workshop', self::formSubmitAction(
+                    '/api/tenant/repair/categories',
+                    'POST',
+                    'Device category created successfully.',
+                    reload: true
+                ), 'add_circle'),
+            ], ['initially_expanded' => false]),
+
+            self::card([
+                self::text('Registered Device Categories', 'title_medium', ['bold' => true]),
+                self::column(! empty($categoryCards) ? $categoryCards : [
+                    self::text('No categories configured yet.', 'body_medium', ['color' => '#64748b']),
+                ]),
             ]),
         ]);
     }
@@ -2173,7 +2418,7 @@ class SchemaResponse
             return 'sales.view';
         }
 
-        if (in_array($normalized, ['repair-dashboard', 'repair-create-ticket', 'repair-tickets', 'repair-my-jobs', 'repair-detail'], true)) {
+        if (in_array($normalized, ['repair-dashboard', 'repair-create-ticket', 'repair-tickets', 'repair-my-jobs', 'repair-detail', 'repair-categories'], true)) {
             return 'pos.view';
         }
 
@@ -2258,6 +2503,7 @@ class SchemaResponse
             'repair-tickets' => self::repairTicketsView($company),
             'repair-my-jobs' => self::repairMyJobsView($company),
             'repair-detail' => self::repairDetailView($company),
+            'repair-categories' => self::repairCategoriesView($company),
             'service-calendar', 'calendar' => self::serviceCalendarView($company),
             'service-stylists', 'stylists' => self::serviceStylistsView($company),
             'service-orders' => self::serviceOrdersView($company),
