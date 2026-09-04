@@ -33,6 +33,11 @@ class AppBootstrapController extends Controller
     {
         $company = $this->resolveCompany($request);
 
+        if (! $company->is_seeding_complete) {
+            app(\App\Services\Tenancy\TenantSampleDataService::class)->seed($company, $company->pos_mode ?: 'general');
+            $company->refresh();
+        }
+
         $locale = strtolower(trim((string) $request->query('locale', '')));
         if ($locale === '' || ! $localization->isValidLocale($locale)) {
             $locale = $company->default_locale ?: ($company->language ?: 'en');
@@ -52,6 +57,7 @@ class AppBootstrapController extends Controller
                 'business_name' => $company->trade_name ?? $company->name,
                 'active_mode' => $activeMode,
                 'available_modes' => $availableModes,
+                'is_seeding_complete' => (bool) $company->is_seeding_complete,
             ],
             'modules' => $allModules,
             'active_module' => $activeModule,

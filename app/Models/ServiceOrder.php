@@ -90,6 +90,7 @@ class ServiceOrder extends Model
         'discount',
         'total_amount',
         'status',
+        'is_demo',
         'priority',
         'warranty_period',
         'warranty_terms',
@@ -103,6 +104,7 @@ class ServiceOrder extends Model
     protected function casts(): array
     {
         return [
+            'is_demo' => 'boolean',
             'parts_used' => 'array',
             'parts_total' => 'decimal:2',
             'labor_cost' => 'decimal:2',

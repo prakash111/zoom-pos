@@ -11,11 +11,14 @@ class Category extends Model
     use BelongsToCompany;
     use TracksSyncState;
 
-    protected $fillable = ['company_id', 'external_id', 'name', 'color', 'description', 'active'];
+    protected $fillable = ['company_id', 'external_id', 'name', 'color', 'description', 'active', 'is_demo'];
 
     protected function casts(): array
     {
-        return ['active' => 'boolean'];
+        return [
+            'active' => 'boolean',
+            'is_demo' => 'boolean',
+        ];
     }
 
     public function products()

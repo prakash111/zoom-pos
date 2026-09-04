@@ -42,6 +42,7 @@ class CustomerLedgerService
             'amount' => $sale->due_amount,
             'balance_after' => $newBalance,
             'description' => 'Sale '.($sale->sale_number ?: '#'.$sale->id),
+            'is_demo' => (bool) $sale->is_demo,
         ]);
     }
 

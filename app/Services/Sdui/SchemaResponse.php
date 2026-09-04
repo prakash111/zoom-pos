@@ -29,7 +29,7 @@ class SchemaResponse
         'badge', 'icon', 'divider', 'text_input', 'dropdown_select',
         'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker',
         'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
-        'button_outlined', 'fab', 'action_sheet_trigger', 'navigation_builder', 'tree_builder',
+        'button_outlined', 'button_danger', 'fab', 'action_sheet_trigger', 'navigation_builder', 'tree_builder',
         'wrap',
     ];
 
@@ -316,6 +316,18 @@ class SchemaResponse
         ], $props);
     }
 
+    public static function buttonDanger(string $label, array $action, ?string $icon = null, array $props = []): array
+    {
+        return array_merge([
+            'type' => 'button_danger',
+            'label' => $label,
+            'action' => $action,
+            'icon' => $icon,
+            'color' => '#dc2626',
+            'full_width' => $props['full_width'] ?? true,
+        ], $props);
+    }
+
     public static function fab(string $icon, array $action, ?string $label = null, array $props = []): array
     {
         return array_merge([
@@ -529,12 +541,44 @@ class SchemaResponse
                         ['label' => 'Radial', 'value' => 'radial'],
                     ], $company->drawer_gradient_direction ?? 'top_to_bottom'),
                 ], ['color' => '#f8fafc', 'border_color' => '#e2e8f0']),
+                self::card([
+                    self::text('Danger Zone & Demo Data', 'title_medium', ['bold' => true, 'color' => '#dc2626']),
+                    self::text('Purge auto-seeded demo products, categories, tables, and test invoices without altering your store branding or custom settings.', 'body_small', ['color' => '#6b7280']),
+                    self::divider(),
+                    self::buttonDanger('Clear Sample Demo Data', [
+                        'type' => 'form_submit',
+                        'endpoint' => '/api/tenant/demo-data',
+                        'method' => 'DELETE',
+                        'success_toast' => 'Sample demo data cleared successfully.',
+                        'confirm_message' => 'Are you sure you want to delete all sample demo items? Real products and settings will not be affected.',
+                        'reload' => true,
+                    ], 'delete_forever'),
+                ], ['color' => '#fef2f2', 'border_color' => '#fecaca']),
             ]),
             self::buttonPrimary('Save Store Profile', self::formSubmitAction(
                 '/api/tenant/settings/profile',
                 'POST',
                 'Store profile updated successfully'
             ), 'save'),
+        ]);
+    }
+
+    public static function advancedView(Company $company): array
+    {
+        return self::screen('Advanced & Danger Zone', [
+            self::card([
+                self::text('Demo Data Reset', 'title_medium', ['bold' => true, 'color' => '#dc2626']),
+                self::text('Clear all auto-seeded sample products, categories, floor plans, and sample transactions. Your store profile and configuration will remain untouched.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::buttonDanger('Clear Sample Demo Data', [
+                    'type' => 'form_submit',
+                    'endpoint' => '/api/tenant/demo-data',
+                    'method' => 'DELETE',
+                    'success_toast' => 'Sample demo data cleared successfully.',
+                    'confirm_message' => 'Are you sure you want to delete all sample demo items? Real products and settings will not be affected.',
+                    'reload' => true,
+                ], 'delete_forever'),
+            ], ['color' => '#fef2f2', 'border_color' => '#fecaca']),
         ]);
     }
 
@@ -931,6 +975,7 @@ class SchemaResponse
             ['key' => 'settings-api', 'title' => 'API & Integrations', 'endpoint' => '/api/tenant/views/settings-api', 'permission' => 'settings.view'],
             ['key' => 'settings-navigation', 'title' => 'Navigation Menu', 'endpoint' => '/api/tenant/views/settings-navigation', 'permission' => 'settings.view'],
             ['key' => 'settings-notifications', 'title' => 'Custom Notification Gateways', 'endpoint' => '/api/tenant/views/settings-notifications', 'permission' => 'settings.view'],
+            ['key' => 'settings-advanced', 'title' => 'Advanced & Danger Zone', 'endpoint' => '/api/tenant/views/settings-advanced', 'permission' => 'settings.view'],
         ];
 
         if (! Schema::hasTable('sdui_screens')) {
@@ -1038,6 +1083,7 @@ class SchemaResponse
             'settings-api', 'api', 'api-integrations' => self::apiView($company),
             'settings-navigation', 'navigation', 'navigation-menu' => self::navigationView($company),
             'settings-notifications', 'notifications', 'custom-notifications' => self::notificationsView($company),
+            'settings-advanced', 'advanced', 'danger-zone' => self::advancedView($company),
             default => null,
         };
 

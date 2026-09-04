@@ -11,13 +11,14 @@ class DiningFloor extends Model
     use BelongsToCompany, HasLegacyStringId;
 
     protected $fillable = [
-        'company_id', 'name', 'order_index', 'is_active',
+        'company_id', 'name', 'order_index', 'is_active', 'is_demo',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'is_demo' => 'boolean',
             'order_index' => 'integer',
         ];
     }

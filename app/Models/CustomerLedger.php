@@ -11,12 +11,13 @@ class CustomerLedger extends Model
 
     protected $fillable = [
         'company_id', 'customer_id', 'sale_id', 'order_payment_id',
-        'type', 'amount', 'balance_after', 'description', 'created_by',
+        'type', 'amount', 'balance_after', 'description', 'created_by', 'is_demo',
     ];
 
     protected function casts(): array
     {
         return [
+            'is_demo' => 'boolean',
             'amount' => 'decimal:2',
             'balance_after' => 'decimal:2',
         ];

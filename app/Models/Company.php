@@ -29,7 +29,7 @@ class Company extends Model
     protected $fillable = [
         'unique_account_id', 'name', 'slug', 'custom_domain', 'trade_name', 'legal_name', 'tax_id', 'tax_id_label',
         'email', 'phone', 'website', 'address', 'city', 'state', 'postal_code', 'country', 'currency',
-        'language', 'default_locale', 'timezone', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'accent_color', 'drawer_bg', 'drawer_gradient_enabled', 'drawer_gradient_start', 'drawer_gradient_end', 'drawer_gradient_direction', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'licensed_modules', 'nav_config', 'receipt_format', 'status', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
+        'language', 'default_locale', 'timezone', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'accent_color', 'drawer_bg', 'drawer_gradient_enabled', 'drawer_gradient_start', 'drawer_gradient_end', 'drawer_gradient_direction', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'licensed_modules', 'nav_config', 'receipt_format', 'status', 'is_seeding_complete', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
         'max_users', 'max_devices', 'pricing_mode', 'tax_api_mode', 'tax_api_key', 'tax_api_endpoint',
         'invoice_prefix', 'quotation_prefix', 'tax_settings', 'invoice_terms', 'quote_terms', 'bank_details',
         'currency_symbol', 'currency_decimals', 'currency_symbol_position', 'other_currencies',
@@ -44,6 +44,7 @@ class Company extends Model
         return [
             'registered_at' => 'datetime',
             'expires_at' => 'datetime',
+            'is_seeding_complete' => 'boolean',
             'drawer_gradient_enabled' => 'boolean',
             'tax_settings' => 'array',
             'tax_api_key' => 'encrypted',

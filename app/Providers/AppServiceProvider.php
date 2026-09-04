@@ -2,12 +2,15 @@
 
 namespace App\Providers;
 
+use App\Events\TenantRegistered;
+use App\Listeners\TenantRegisteredListener;
 use App\Models\Sale;
 use App\Models\User;
 use App\Observers\SaleObserver;
 use App\Services\Auth\PermissionChecker;
 use App\Support\Desktop;
 use App\View\Composers\TenantNavigationComposer;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +33,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Sale::observe(SaleObserver::class);
+        Event::listen(TenantRegistered::class, TenantRegisteredListener::class);
 
         $storageDirs = [
             storage_path('framework/views'),

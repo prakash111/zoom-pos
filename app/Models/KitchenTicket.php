@@ -22,7 +22,7 @@ class KitchenTicket extends Model
 
     protected $fillable = [
         'company_id', 'sale_id', 'kot_number', 'dining_table_id',
-        'table_name', 'service_type', 'status', 'server_name',
+        'table_name', 'service_type', 'status', 'is_demo', 'server_name',
         'items', 'kitchen_notes', 'sent_to_kitchen_at', 'prepared_at', 'ready_at', 'served_at',
         'prep_minutes', 'intimation_minutes', 'target_completion_at', 'alarm_at',
         'alarm_sent_at', 'alarm_dismissed_at',
@@ -31,6 +31,7 @@ class KitchenTicket extends Model
     protected function casts(): array
     {
         return [
+            'is_demo' => 'boolean',
             'items' => 'array',
             'sent_to_kitchen_at' => 'datetime',
             'prepared_at' => 'datetime',

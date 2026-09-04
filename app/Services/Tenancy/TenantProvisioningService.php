@@ -153,9 +153,14 @@ class TenantProvisioningService
                 'activation_code' => $activationCode,
             ]);
 
-            // 6. Automatically Import Default Demo Data if explicitly requested
-            if (! empty($data['seed_demo_data'])) {
-                $this->seedTenantDemoData($company, $posMode, $admin);
+            // 6. Automatically Import Default Demo Data tailored to the operating mode
+            $shouldSeed = ! array_key_exists('seed_demo_data', $data) || ! empty($data['seed_demo_data']);
+            if ($shouldSeed) {
+                if (app()->environment('testing') || ! empty($data['sync_seed'])) {
+                    $this->seedTenantDemoData($company, $posMode, $admin);
+                } else {
+                    event(new \App\Events\TenantRegistered($company, $admin, $posMode));
+                }
             }
 
             AuditLog::record('tenant.self_registered', $company->id, $admin->id, [
@@ -179,11 +184,7 @@ class TenantProvisioningService
     public function seedTenantDemoData(Company $company, string $posMode = 'general', ?User $admin = null): void
     {
         try {
-            if ($posMode === 'restaurant') {
-                app(RestaurantDemoSeeder::class)->run($company);
-            } else {
-                app(TenantDemoSeeder::class)->run($company);
-            }
+            app(TenantSampleDataService::class)->seed($company, $posMode, $admin);
         } catch (\Throwable $e) {
             Log::warning("Failed to auto-seed demo data for tenant [{$company->id}]: ".$e->getMessage());
         }

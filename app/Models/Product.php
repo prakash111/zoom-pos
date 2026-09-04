@@ -14,7 +14,8 @@ class Product extends Model
     protected $fillable = [
         'company_id', 'external_id', 'code', 'sku', 'barcode', 'name', 'image_url', 'category_id', 'category_name',
         'brand_id', 'brand_name', 'unit', 'cost_price', 'sale_price', 'variants', 'modifiers', 'spice_levels', 'profit_margin',
-        'current_stock', 'minimum_stock', 'active', 'hsn_code', 'sac_code', 'tax_rate',
+        'current_stock', 'minimum_stock', 'active', 'is_demo', 'batch_number', 'mfg_date', 'expiry_date',
+        'requires_prescription', 'duration_minutes', 'hsn_code', 'sac_code', 'tax_rate',
         'taxable', 'tax_exempt', 'zero_rate', 'reverse_charge',
     ];
 
@@ -22,6 +23,11 @@ class Product extends Model
     {
         return [
             'active' => 'boolean',
+            'is_demo' => 'boolean',
+            'requires_prescription' => 'boolean',
+            'duration_minutes' => 'integer',
+            'mfg_date' => 'date',
+            'expiry_date' => 'date',
             'taxable' => 'boolean',
             'tax_exempt' => 'boolean',
             'zero_rate' => 'boolean',

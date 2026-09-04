@@ -13,7 +13,7 @@ class Sale extends Model
 
     protected $fillable = [
         'company_id', 'external_id', 'sale_number', 'customer_id', 'customer_name', 'user_id',
-        'total', 'net_amount', 'discount', 'payment_method', 'agreed_payment_method', 'installments', 'status', 'items', 'operation_type', 'gst_invoice',
+        'total', 'net_amount', 'discount', 'payment_method', 'agreed_payment_method', 'installments', 'status', 'is_demo', 'items', 'operation_type', 'gst_invoice',
         'service_type', 'dining_table_id', 'table_name', 'guest_count', 'pickup_time',
         'delivery_address', 'driver_name', 'driver_phone', 'dispatch_status', 'kot_status',
         'notes', 'paid_amount', 'due_amount', 'due_date', 'due_reminder_at',
@@ -27,6 +27,7 @@ class Sale extends Model
     protected function casts(): array
     {
         return [
+            'is_demo' => 'boolean',
             'total' => 'decimal:2',
             'net_amount' => 'decimal:2',
             'discount' => 'decimal:2',

@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\ServiceOrderApiController;
 use App\Http\Controllers\Api\V1\SduiViewController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
 use App\Http\Controllers\Api\V1\TaxApiController;
+use App\Http\Controllers\Api\V1\TenantDemoDataController;
 use App\Http\Controllers\Api\V1\UserApiController;
 use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Middleware\AuthenticateTenantApi;
@@ -85,6 +86,10 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
         Route::delete('/{id}', [SettingsApiController::class, 'notificationChannelsDestroy']);
         Route::post('/test', [SettingsApiController::class, 'testNotificationChannel']);
     });
+
+    // One-Click Demo Data Purge
+    Route::delete('/tenant/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
+    Route::delete('/app/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
 
     // Server-Driven UI Declarative Form Submissions
     Route::match(['post', 'put'], '/tenant/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
@@ -247,6 +252,7 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/settings/payment-methods/{id}/toggle', [SettingsApiController::class, 'paymentMethodsToggle'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/settings/payment-methods/{id}/transactions', [SettingsApiController::class, 'paymentMethodTransactions'])->middleware('tenant.api.permission:settings,view');
         Route::get('/settings/payment-methods/{id}/transactions/export', [SettingsApiController::class, 'paymentMethodTransactionsExport'])->middleware('tenant.api.permission:settings,view');
+        Route::delete('/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
 
         // Consignments (draft -> dispatched -> reconciled -> finalized)
         Route::get('/consignments', [ConsignmentApiController::class, 'index'])->middleware('tenant.api.permission:consignments,view');

@@ -13,7 +13,7 @@ class TaxRule extends Model
     protected $fillable = [
         'company_id', 'tax_name', 'tax_code', 'rate', 'type', 'country', 'region',
         'category', 'calc_type', 'is_inclusive', 'is_compound', 'is_default',
-        'sub_components', 'priority', 'description', 'effective_from', 'active',
+        'sub_components', 'priority', 'description', 'effective_from', 'active', 'is_demo',
     ];
 
     protected function casts(): array
@@ -23,6 +23,7 @@ class TaxRule extends Model
             'is_inclusive' => 'boolean',
             'is_compound' => 'boolean',
             'is_default' => 'boolean',
+            'is_demo' => 'boolean',
             'sub_components' => 'array',
             'priority' => 'integer',
             'effective_from' => 'date',

@@ -21,7 +21,7 @@ class DiningTable extends Model
 
     protected $fillable = [
         'company_id', 'dining_floor_id', 'table_number', 'seating_capacity',
-        'status', 'current_sale_id', 'guest_count', 'qr_token', 'is_active',
+        'status', 'current_sale_id', 'guest_count', 'qr_token', 'is_active', 'is_demo',
     ];
 
     protected function casts(): array
@@ -30,6 +30,7 @@ class DiningTable extends Model
             'seating_capacity' => 'integer',
             'guest_count' => 'integer',
             'is_active' => 'boolean',
+            'is_demo' => 'boolean',
         ];
     }
 
