@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'core/api/api_client.dart';
+import 'core/config/bootstrap_cache.dart';
 import 'core/config/locale_provider.dart';
 import 'core/config/nav_dock_provider.dart';
 import 'core/config/theme.dart';
@@ -40,6 +41,7 @@ Future<void> main() async {
 
   final heldCartsStore = HeldCartsStore()..load();
   final themeProvider = ThemeProvider()..load();
+  BootstrapCache.globalThemeProvider = themeProvider;
   final localeProvider =
       LocaleProvider(preferences: preferences, apiClient: apiClient)..load();
   final navDockProvider = NavDockProvider(preferences: preferences)..load();
@@ -106,6 +108,8 @@ class ZoomPosApp extends StatelessWidget {
       providers: [
         Provider<AppPreferences>.value(value: preferences),
         Provider<ApiClient>.value(value: apiClient),
+        ChangeNotifierProvider<BootstrapCache>.value(
+            value: BootstrapCache.instance),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         ChangeNotifierProvider<HeldCartsStore>.value(value: heldCartsStore),
         ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
@@ -121,7 +125,10 @@ class ZoomPosApp extends StatelessWidget {
             scaffoldMessengerKey: appMessengerKey,
             title: 'Sales & Inventory',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.light(seedColor: theme.seedColor),
+            theme: AppTheme.light(
+              seedColor: theme.seedColor,
+              drawerBg: theme.drawerBg,
+            ),
             locale: locale,
             supportedLocales: LocaleProvider.supportedCodes.map(Locale.new),
             localizationsDelegates: const [

@@ -20,6 +20,7 @@ import '../../features/restaurant/screens/restaurant_tables_screen.dart';
 import '../../features/sales/screens/sales_screen.dart';
 import '../../features/sales_targets/screens/sales_targets_screen.dart';
 import '../../features/service_orders/screens/service_orders_screen.dart';
+import '../../features/settings/screens/nav_menu_settings_tab.dart';
 import '../../features/settings/screens/tenant_settings_screen.dart';
 import '../../features/staff/screens/staff_screen.dart';
 import '../../features/subscription/screens/subscription_screen.dart';
@@ -76,6 +77,10 @@ class SduiComponentRegistry {
     // target_endpoint and bypass this compatibility registry entirely.
     'subscription': (_) => const SubscriptionScreen(),
     'settings': (_) => const TenantSettingsScreen(),
+    'navigation': (_) => const NavMenuSettingsTab(),
+    'navigation_menu': (_) => const NavMenuSettingsTab(),
+    'settings-navigation': (_) => const NavMenuSettingsTab(),
+    'settings_navigation': (_) => const NavMenuSettingsTab(),
     'languages': (_) => const LanguagesScreen(),
     'staff': (_) => const StaffScreen(),
     'devices': (_) => const DevicesScreen(),

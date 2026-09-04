@@ -31,6 +31,8 @@ class SduiIconRegistry {
 
     // Service & Salon
     'spa': Icons.spa_outlined,
+    'content_cut': Icons.content_cut_outlined,
+    'cut': Icons.content_cut_outlined,
     'event_available': Icons.event_available_outlined,
     'schedule': Icons.schedule_outlined,
 

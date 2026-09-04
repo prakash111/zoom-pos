@@ -4,7 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/config/bootstrap_cache.dart';
 import '../../../core/models/settings_models.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/auth_provider.dart';
@@ -59,10 +61,10 @@ class _WorkingSection {
 /// changes preorder; horizontal dragging snaps the active row to 0/30/60 px
 /// and derives its parent from the nearest valid preceding row.
 class NavMenuSettingsTab extends StatefulWidget {
-  const NavMenuSettingsTab({required this.repository, required this.initial});
+  const NavMenuSettingsTab({super.key, this.repository, this.initial});
 
-  final SettingsRepository repository;
-  final NavConfig initial;
+  final SettingsRepository? repository;
+  final NavConfig? initial;
 
   @override
   State<NavMenuSettingsTab> createState() => _NavMenuSettingsTabState();
@@ -70,6 +72,11 @@ class NavMenuSettingsTab extends StatefulWidget {
 
 class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   final ValueNotifier<int> _dragDepthNotifier = ValueNotifier<int>(0);
+
+  SettingsRepository get _repository =>
+      widget.repository ?? SettingsRepository(context.read<ApiClient>());
+  NavConfig get _initialConfig =>
+      widget.initial ?? BootstrapCache.instance.navConfig;
 
   List<_WorkingSection> _sections = [];
   bool _saving = false;
@@ -101,10 +108,10 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       for (final section in compiled) section.key: section
     };
     final itemOverrides = {
-      for (final item in widget.initial.items) item.key: item
+      for (final item in _initialConfig.items) item.key: item
     };
     final sectionOrderOverrides = {
-      for (final section in widget.initial.sections) section.key: section.order
+      for (final section in _initialConfig.sections) section.key: section.order
     };
     final grouped =
         <String, List<({int order, int fallback, _WorkingItem item})>>{};
@@ -480,7 +487,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         }
       }
 
-      await widget.repository.updateNavConfig(NavConfig(
+      await _repository.updateNavConfig(NavConfig(
         sections: [
           for (var index = 0; index < _sections.length; index++)
             NavSectionOrder(key: _sections[index].key, order: index),

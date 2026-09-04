@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../features/settings/screens/nav_menu_settings_tab.dart';
 import '../widgets/sdui/sdui_controls.dart';
 import 'dynamic_schema_context.dart';
 import 'sdui_icon_registry.dart';
@@ -33,6 +34,8 @@ class DynamicSchemaParser {
         return _buildRow(context, schema);
       case 'tabs':
         return _buildTabs(context, schema);
+      case 'navigation_builder':
+        return const NavMenuSettingsTab();
 
       // Display
       case 'text':

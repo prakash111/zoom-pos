@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zoom_pos_mobile/core/config/bootstrap_cache.dart';
 import 'package:zoom_pos_mobile/core/sdui/models/sdui_models.dart';
 import 'package:zoom_pos_mobile/core/sdui/sdui_component_registry.dart';
@@ -165,6 +168,35 @@ void main() {
       expect(item.children[1].key, 'settings_profile');
       expect(item.children[1].effectiveParentId, 'settings');
     });
+
+    test('navigation parser keeps valid siblings when one item is malformed',
+        () {
+      final section = SduiNavSectionSchema.fromJson({
+        'key': 'operations',
+        'label': 'Operations',
+        'items': [
+          {
+            'key': 'pos',
+            'label': 'Point of Sale',
+            'icon': 'point_of_sale',
+            'children': null,
+          },
+          'not-an-object',
+          {
+            'key': 'settings',
+            'label': 'Settings',
+            'icon': <String, dynamic>{'unexpected': true},
+            'children': 'not-a-list',
+          },
+        ],
+      });
+
+      expect(section.items.map((item) => item.key), ['pos', 'settings']);
+      expect(section.items.first.children, isEmpty);
+      expect(section.items.last.children, isEmpty);
+      expect(SduiIconRegistry.resolve(section.items.last.icon),
+          Icons.widgets_outlined);
+    });
   });
 
   group('SDUI Icon and Color Registry', () {
@@ -215,7 +247,9 @@ void main() {
       expect(registry.has('settings_profile'), isFalse);
       expect(registry.has('settings_receipts'), isFalse);
       expect(registry.has('settings_financial'), isFalse);
-      expect(registry.has('settings_navigation'), isFalse);
+      expect(registry.has('settings_billing'), isFalse);
+      expect(registry.has('settings_navigation'), isTrue);
+      expect(registry.has('navigation'), isTrue);
     });
   });
 
@@ -359,11 +393,48 @@ void main() {
 
   group('BootstrapCache SDUI Integration', () {
     test(
-        'effectiveSections does not invent business navigation when cache is empty',
+        'empty cache reports navigation loading before disk hydration',
         () {
       final cache = BootstrapCache.instance;
       cache.menuStructure = [];
       expect(cache.effectiveSections, isEmpty);
+      expect(cache.isNavigationLoading, isTrue);
+    });
+
+    test('disk hydration salvages valid sections from a damaged menu cache',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        'zoom_pos.bootstrap.menu': jsonEncode([
+          'bad-section',
+          {
+            'key': 'operations',
+            'label': 'Operations',
+            'items': [
+              'bad-item',
+              {
+                'key': 'pos',
+                'label': 'Point of Sale',
+                'icon': 'point_of_sale',
+                'children': null,
+              },
+            ],
+          },
+          {
+            'key': 'broken',
+            'label': 'Broken',
+            'items': 'not-a-list',
+          },
+        ]),
+      });
+
+      final cache = BootstrapCache.instance;
+      cache.menuStructure = [];
+      await cache.loadFromDisk();
+
+      expect(cache.isNavigationLoading, isFalse);
+      expect(cache.effectiveSections, hasLength(1));
+      expect(cache.effectiveSections.single.key, 'operations');
+      expect(cache.effectiveSections.single.items.single.key, 'pos');
     });
   });
 }

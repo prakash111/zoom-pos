@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/config/bootstrap_cache.dart';
+import '../../core/config/locale_provider.dart';
 import '../../core/config/nav_dock_provider.dart';
 import '../../core/config/theme_provider.dart';
 import '../../core/models/analytics_model.dart';
@@ -57,10 +58,16 @@ class _FeatureTile {
   /// dedicated backend module, e.g. Subscription/Devices).
   final String? permissionModule;
 
-  bool visibleTo(UserModel? user) =>
-      permissionModule == null ||
-      user == null ||
-      user.can('$permissionModule.view');
+  bool visibleTo(UserModel? user) {
+    final permission = permissionModule?.trim();
+    if (permission == null || permission.isEmpty || user == null) return true;
+
+    // Built-in menu rows use a module slug (`pos`), while database-authored
+    // SDUI rows may already use the full permission (`pos.view`).
+    final requiredPermission =
+        permission.contains('.') ? permission : '$permission.view';
+    return user.can(requiredPermission);
+  }
 }
 
 /// One labeled group of [_FeatureTile]s in the drawer — e.g. web's
@@ -93,44 +100,76 @@ List<_NavSection> _serverDrivenSections() {
   final sduiSections = BootstrapCache.instance.effectiveSections;
   final result = <_NavSection>[];
 
-  for (final s in sduiSections) {
-    final tiles = <_FeatureTile>[];
-    final parentByKey = <String, String>{};
-    final seenKeys = <String>{};
+  for (var sectionIndex = 0;
+      sectionIndex < sduiSections.length;
+      sectionIndex++) {
+    final section = sduiSections[sectionIndex];
+    try {
+      final tiles = <_FeatureTile>[];
+      final parentByKey = <String, String>{};
+      final seenKeys = <String>{};
 
-    void collectItems(List<SduiNavItemSchema> items, String? defaultParent) {
-      for (final item in items) {
-        if (item.key.isEmpty || !seenKeys.add(item.key)) continue;
-        tiles.add(_FeatureTile(
-          item.key,
-          (l10n) => l10n.text(item.title, fallback: item.title),
-          SduiIconRegistry.resolve(item.icon),
-          SduiComponentRegistry.instance.resolve(
-            item.component ?? item.key,
-            targetEndpoint: item.targetEndpoint,
-          ),
-          item.permission,
-        ));
-        final parent = item.effectiveParentId ?? defaultParent;
-        if (parent != null && parent.isNotEmpty) {
-          parentByKey[item.key] = parent;
-        }
-        if (item.children.isNotEmpty) {
-          collectItems(item.children, item.key);
+      void collectItems(List<SduiNavItemSchema> items, String? defaultParent) {
+        for (var itemIndex = 0; itemIndex < items.length; itemIndex++) {
+          final item = items[itemIndex];
+          try {
+            if (item.key.isEmpty) {
+              debugPrint(
+                  'Drawer navigation: ignoring item without a key in section ${section.key} at index $itemIndex.');
+              continue;
+            }
+            if (!seenKeys.add(item.key)) continue;
+
+            tiles.add(_FeatureTile(
+              item.key,
+              (l10n) => l10n.text(item.title, fallback: item.title),
+              SduiIconRegistry.resolve(item.icon),
+              SduiComponentRegistry.instance.resolve(
+                item.component ?? item.key,
+                targetEndpoint: item.targetEndpoint,
+              ),
+              item.permission,
+            ));
+            final parent = item.effectiveParentId ?? defaultParent;
+            if (parent != null && parent.isNotEmpty) {
+              parentByKey[item.key] = parent;
+            }
+            if (item.children.isNotEmpty) {
+              collectItems(item.children, item.key);
+            }
+          } catch (error, stackTrace) {
+            debugPrint(
+                'Drawer navigation: failed to compile item ${item.key} in section ${section.key}: $error');
+            debugPrintStack(stackTrace: stackTrace);
+            // A bad accordion parent must not hide otherwise valid children.
+            if (item.children.isNotEmpty) {
+              collectItems(item.children, defaultParent);
+            }
+          }
         }
       }
+
+      collectItems(section.items, null);
+      if (section.key.isEmpty || tiles.isEmpty) {
+        debugPrint(
+            'Drawer navigation: ignoring empty section at index $sectionIndex (${section.key.isEmpty ? 'missing key' : section.key}).');
+        continue;
+      }
+
+      result.add(_NavSection(
+        section.key,
+        (l10n) => l10n.text(section.title, fallback: section.title),
+        tiles,
+        headerColor: section.color != null
+            ? SduiIconRegistry.parseColor(section.color)
+            : null,
+        parentByKey: parentByKey,
+      ));
+    } catch (error, stackTrace) {
+      debugPrint(
+          'Drawer navigation: failed to compile section ${section.key}: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
-
-    collectItems(s.items, null);
-
-    result.add(_NavSection(
-      s.key,
-      (l10n) => l10n.text(s.title, fallback: s.title),
-      tiles,
-      headerColor:
-          s.color != null ? SduiIconRegistry.parseColor(s.color) : null,
-      parentByKey: parentByKey,
-    ));
   }
 
   return result;
@@ -346,6 +385,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     context
         .read<ThemeProvider>()
         .refreshFromServer(SettingsRepository(context.read<ApiClient>()));
+
+    // The unauthenticated startup refresh cannot fetch the protected
+    // bootstrap on a fresh install. Retry as soon as Dashboard exists, which
+    // means login/session restoration has supplied the bearer token.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<LocaleProvider>().refreshFromServer();
+    });
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
@@ -412,82 +458,105 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Section headers are omitted from the rail/top bar/bottom bar (see
   /// [_dockDestinationsFor]), which just render the same tiles flat.
   Widget _buildDrawer(
-      BuildContext context, CompanyModel? company, UserModel? user) {
-    final l10n = AppLocalizations.of(context);
+    BuildContext context,
+    CompanyModel? company,
+    UserModel? user,
+    BootstrapCache bootstrap,
+  ) {
+    return AnimatedBuilder(
+      animation: bootstrap,
+      builder: (context, _) {
+        final l10n = AppLocalizations.of(context);
 
-    final coverUrl = company?.drawerCoverUrl;
-    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
+        final coverUrl = company?.drawerCoverUrl;
+        final hasCover = coverUrl != null && coverUrl.isNotEmpty;
+        final primaryColor = bootstrap.theme.primaryColorValue ??
+            Theme.of(context).colorScheme.primary;
+        final drawerBgColor = bootstrap.theme.drawerBgValue ??
+            Theme.of(context).drawerTheme.backgroundColor;
 
-    final children = <Widget>[
-      Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(
-            16, MediaQuery.of(context).padding.top + 12, 16, 14),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary,
-          image: hasCover
-              ? DecorationImage(
-                  image: CachedNetworkImageProvider(coverUrl),
-                  fit: BoxFit.cover,
-                )
-              : null,
-          gradient: hasCover
-              ? LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.15),
-                    Colors.black.withValues(alpha: 0.55)
-                  ],
-                )
-              : null,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              company?.tradeName ?? company?.name ?? 'Sales & Inventory',
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold),
+        final children = <Widget>[
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(
+                16, MediaQuery.of(context).padding.top + 12, 16, 14),
+            decoration: BoxDecoration(
+              color: primaryColor,
+              image: hasCover
+                  ? DecorationImage(
+                      image: CachedNetworkImageProvider(coverUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+              gradient: hasCover
+                  ? LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.15),
+                        Colors.black.withValues(alpha: 0.55)
+                      ],
+                    )
+                  : null,
             ),
-            const SizedBox(height: 4),
-            Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    BootstrapCache.instance.activeModule.title.toUpperCase(),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.95),
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                Text(
+                  company?.tradeName ?? company?.name ?? 'Sales & Inventory',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        BootstrapCache.instance.activeModule.title.toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.95),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-      ListTile(
-        leading: const Icon(Icons.home_outlined),
-        title: Text(l10n.navHome),
-        selected: _dockIndex == 0,
-        onTap: () {
-          Navigator.of(context).pop();
-          _onDockItemSelected(context, 0);
-        },
-      ),
-    ];
+          ),
+          ListTile(
+            leading: const Icon(Icons.home_outlined),
+            title: Text(l10n.navHome),
+            selected: _dockIndex == 0,
+            onTap: () {
+              Navigator.of(context).pop();
+              _onDockItemSelected(context, 0);
+            },
+          ),
+        ];
     final navSections = _sectionsFor(company, user);
+    if (navSections.isEmpty) {
+      children.add(
+        bootstrap.isNavigationLoading
+            ? const _DrawerNavigationSkeleton()
+            : _DrawerNavigationUnavailable(
+                message: bootstrap.navigationError ??
+                    'No navigation items are available for this account.',
+                onRetry: () =>
+                    context.read<LocaleProvider>().refreshFromServer(),
+              ),
+      );
+    }
     final indexByKey = <String, int>{};
     var nextIndex = 1;
     for (final section in navSections) {
@@ -535,7 +604,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final nested = childrenByParent[tile.key] ?? const <_FeatureTile>[];
         final index = indexByKey[tile.key]!;
         final padding = EdgeInsets.only(
-          left: 16 + depth * 24,
+          left: 16 + depth * 30,
           right: 12,
         );
 
@@ -584,7 +653,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           tilePadding: padding,
           childrenPadding: EdgeInsets.zero,
-          leading: Icon(tile.icon, size: depth == 0 ? 24 : 20),
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (depth > 0) ...[
+                Text(
+                  '↳',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.outline,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Icon(tile.icon, size: depth == 0 ? 24 : 20),
+            ],
+          ),
           initiallyExpanded: branchContainsSelection(tile),
           maintainState: true,
           shape: const Border(),
@@ -626,6 +711,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ));
 
     return Drawer(
+      backgroundColor: drawerBgColor,
       child: SafeArea(
         top: false,
         bottom: true,
@@ -636,6 +722,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: children,
         ),
       ),
+    );
+      },
     );
   }
 
@@ -723,6 +811,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final bootstrap = context.watch<BootstrapCache>();
     final company = auth.company;
     final l10n = AppLocalizations.of(context);
     final dock = context.watch<NavDockProvider>().position;
@@ -742,14 +831,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (wide) {
           leftRail = _buildRail(context);
         } else {
-          drawer = _buildDrawer(context, company, auth.user);
+          drawer = _buildDrawer(context, company, auth.user, bootstrap);
         }
         break;
       case NavDockPosition.right:
         if (wide) {
           rightRail = _buildRail(context);
         } else {
-          endDrawer = _buildDrawer(context, company, auth.user);
+          endDrawer = _buildDrawer(context, company, auth.user, bootstrap);
         }
         break;
       case NavDockPosition.top:
@@ -771,9 +860,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             tooltip: l10n.refresh,
             icon: const Icon(Icons.refresh),
-            onPressed: () => setState(() {
-              _analyticsFuture = _analyticsRepository.fetchAnalytics();
-            }),
+            onPressed: () {
+              setState(() {
+                _analyticsFuture = _analyticsRepository.fetchAnalytics();
+              });
+              context.read<LocaleProvider>().refreshFromServer();
+            },
           ),
           IconButton(
             tooltip: l10n.serverAddress,
@@ -848,6 +940,124 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const VerticalDivider(width: 1),
             rightRail
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact pulsing placeholders keep the drawer's dynamic region visibly in
+/// a loading state instead of leaving a large unexplained white gap.
+class _DrawerNavigationSkeleton extends StatefulWidget {
+  const _DrawerNavigationSkeleton();
+
+  @override
+  State<_DrawerNavigationSkeleton> createState() =>
+      _DrawerNavigationSkeletonState();
+}
+
+class _DrawerNavigationSkeletonState extends State<_DrawerNavigationSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    )..repeat(reverse: true);
+    _opacity = Tween<double>(begin: 0.35, end: 0.75).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
+    Widget bar(double width, double height) => Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(height / 2),
+          ),
+        );
+
+    return FadeTransition(
+      opacity: _opacity,
+      child: Padding(
+        key: const ValueKey('drawer-navigation-loading'),
+        padding: const EdgeInsets.fromLTRB(20, 20, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            bar(112, 10),
+            const SizedBox(height: 18),
+            for (var index = 0; index < 4; index++) ...[
+              Row(
+                children: [
+                  bar(22, 22),
+                  const SizedBox(width: 16),
+                  bar(index.isEven ? 150 : 118, 13),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawerNavigationUnavailable extends StatelessWidget {
+  const _DrawerNavigationUnavailable({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: const ValueKey('drawer-navigation-unavailable'),
+      padding: const EdgeInsets.fromLTRB(20, 18, 16, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.cloud_off_outlined,
+            size: 20,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Retry navigation'),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

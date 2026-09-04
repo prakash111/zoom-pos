@@ -3,16 +3,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/settings/settings_repository.dart';
 import '../utils/color_utils.dart';
+import 'bootstrap_cache.dart';
 import 'theme.dart';
 
-/// Holds the tenant's chosen brand color, persisted locally so the correct
+/// Holds the tenant's chosen brand colors, persisted locally so the correct
 /// theme paints immediately on the next launch, and refreshed in the
-/// background from the tenant's saved Settings profile — the same
-/// local-first, network-refresh-second pattern as [HeldCartsStore].
+/// background from the server bootstrap payload or saved Settings profile.
 class ThemeProvider extends ChangeNotifier {
   static const _colorKey = 'zoom_pos.primary_color';
+  static const _accentKey = 'zoom_pos.accent_color';
+  static const _drawerBgKey = 'zoom_pos.drawer_bg';
 
   Color seedColor = AppTheme.primary;
+  Color? accentColor;
+  Color? drawerBg;
 
   Future<void> load() async {
     try {
@@ -21,10 +25,52 @@ class ThemeProvider extends ChangeNotifier {
       final parsed = hex != null ? parseHexColor(hex) : null;
       if (parsed != null) {
         seedColor = parsed;
-        notifyListeners();
       }
+      final accentHex = prefs.getString(_accentKey);
+      if (accentHex != null) {
+        accentColor = parseHexColor(accentHex);
+      }
+      final drawerHex = prefs.getString(_drawerBgKey);
+      if (drawerHex != null) {
+        drawerBg = parseHexColor(drawerHex);
+      }
+      notifyListeners();
     } catch (e) {
       debugPrint('ThemeProvider.load error: $e');
+    }
+  }
+
+  Future<void> syncFromBootstrap(BootstrapTheme theme) async {
+    bool changed = false;
+    final primary = theme.primaryColorValue;
+    if (primary != null && primary.toARGB32() != seedColor.toARGB32()) {
+      seedColor = primary;
+      changed = true;
+    }
+    final accent = theme.accentColorValue;
+    if (accent != null && accent.toARGB32() != accentColor?.toARGB32()) {
+      accentColor = accent;
+      changed = true;
+    }
+    final drawer = theme.drawerBgValue;
+    if (drawer != null && drawer.toARGB32() != drawerBg?.toARGB32()) {
+      drawerBg = drawer;
+      changed = true;
+    }
+    if (changed) {
+      notifyListeners();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_colorKey, toHexColor(seedColor));
+        if (accentColor != null) {
+          await prefs.setString(_accentKey, toHexColor(accentColor!));
+        }
+        if (drawerBg != null) {
+          await prefs.setString(_drawerBgKey, toHexColor(drawerBg!));
+        }
+      } catch (e) {
+        debugPrint('ThemeProvider.syncFromBootstrap error: $e');
+      }
     }
   }
 
@@ -36,6 +82,28 @@ class ThemeProvider extends ChangeNotifier {
       await prefs.setString(_colorKey, toHexColor(color));
     } catch (e) {
       debugPrint('ThemeProvider.setColor error: $e');
+    }
+  }
+
+  Future<void> setAccentColor(Color color) async {
+    accentColor = color;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_accentKey, toHexColor(color));
+    } catch (e) {
+      debugPrint('ThemeProvider.setAccentColor error: $e');
+    }
+  }
+
+  Future<void> setDrawerBg(Color color) async {
+    drawerBg = color;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_drawerBgKey, toHexColor(color));
+    } catch (e) {
+      debugPrint('ThemeProvider.setDrawerBg error: $e');
     }
   }
 

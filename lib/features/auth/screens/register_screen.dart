@@ -22,24 +22,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   bool _obscurePassword = true;
   String _posMode = '';
-  List<Map<String, dynamic>> _activeModules = [];
+  List<Map<String, dynamic>> _registrationModes = [];
   bool _loadingModules = true;
   String? _moduleLoadError;
 
   @override
   void initState() {
     super.initState();
-    context
-        .read<ApiClient>()
-        .get(ApiEndpoints.registrationConfig)
-        .then((response) {
+    final client = context.read<ApiClient>();
+    Future<Map<String, dynamic>> fetch() async {
+      try {
+        return await client.getAbsolute(ApiEndpoints.registrationMetaAbsolute);
+      } catch (_) {
+        return await client.get(ApiEndpoints.registrationConfig);
+      }
+    }
+
+    fetch().then((response) {
       if (!mounted) return;
-      final rawModules = response['active_modules'];
-      if (rawModules is List && rawModules.isNotEmpty) {
-        final parsed = rawModules
+      final rawModes = response['registration_modes'] ?? response['active_modules'];
+      if (rawModes is List && rawModes.isNotEmpty) {
+        final parsed = rawModes
             .whereType<Map>()
             .map((m) => Map<String, dynamic>.from(m))
-            .where((m) => (m['id']?.toString() ?? '').isNotEmpty)
+            .where((m) =>
+                (m['key']?.toString() ?? m['id']?.toString() ?? '')
+                    .isNotEmpty)
             .toList();
         if (parsed.isEmpty) {
           setState(() {
@@ -50,9 +58,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           return;
         }
         setState(() {
-          _activeModules = parsed;
+          _registrationModes = parsed;
           final defaultMode = response['default_mode']?.toString() ??
-              parsed.first['id'].toString();
+              (parsed.first['key'] ?? parsed.first['id']).toString();
           _posMode = defaultMode;
           _loadingModules = false;
           _moduleLoadError = null;
@@ -224,23 +232,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             spacing: 10,
                             runSpacing: 10,
                             children: [
-                              for (final mod in _activeModules)
+                              for (final mod in _registrationModes)
                                 SizedBox(
-                                  width: _activeModules.length == 1
+                                  width: _registrationModes.length == 1
                                       ? constraints.maxWidth
                                       : cardWidth,
                                   child: _StoreTypeCard(
                                     icon: SduiIconRegistry.resolve(
                                         mod['icon']?.toString()),
                                     label: mod['title']?.toString() ??
+                                        mod['key']?.toString() ??
                                         mod['id']?.toString() ??
                                         '',
                                     description:
-                                        mod['description']?.toString() ?? '',
+                                        mod['subtitle']?.toString() ??
+                                        mod['description']?.toString() ??
+                                        '',
                                     selected: _posMode ==
-                                        (mod['id']?.toString() ?? ''),
-                                    onTap: () => setState(
-                                        () => _posMode = mod['id'].toString()),
+                                        (mod['key']?.toString() ??
+                                            mod['id']?.toString() ??
+                                            ''),
+                                    onTap: () => setState(() => _posMode =
+                                        (mod['key'] ?? mod['id']).toString()),
                                   ),
                                 ),
                             ],

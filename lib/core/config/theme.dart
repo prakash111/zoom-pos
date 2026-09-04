@@ -6,7 +6,7 @@ class AppTheme {
   static const Color primary = Color(0xFF2563EB);
   static const Color surface = Color(0xFFF8FAFC);
 
-  static ThemeData light({Color? seedColor}) {
+  static ThemeData light({Color? seedColor, Color? drawerBg}) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor ?? primary,
       brightness: Brightness.light,
@@ -16,6 +16,9 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: surface,
+      drawerTheme: DrawerThemeData(
+        backgroundColor: drawerBg ?? Colors.white,
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
+import '../../core/config/bootstrap_cache.dart';
 import '../../core/models/company_model.dart';
 import '../../core/models/user_model.dart';
 import '../../core/services/tenant_time_service.dart';
@@ -19,12 +20,14 @@ class AuthProvider extends ChangeNotifier {
     required SecureStorageService secureStorage,
     required ApiClient apiClient,
   })  : _authRepository = authRepository,
-        _secureStorage = secureStorage {
+        _secureStorage = secureStorage,
+        _apiClient = apiClient {
     apiClient.onUnauthenticated = _handleUnauthenticated;
   }
 
   final AuthRepository _authRepository;
   final SecureStorageService _secureStorage;
+  final ApiClient _apiClient;
 
   AuthStatus _status = AuthStatus.unknown;
   UserModel? _user;
@@ -66,6 +69,10 @@ class AuthProvider extends ChangeNotifier {
           );
       _user = result.user;
       _applyCompany(result.company);
+      try {
+        await BootstrapCache.instance
+            .hydrate(forceRefresh: false, client: _apiClient);
+      } catch (_) {}
       _status = AuthStatus.authenticated;
     } on ApiException {
       await _secureStorage.clearToken();
@@ -132,6 +139,15 @@ class AuthProvider extends ChangeNotifier {
         if (refreshed.user != null) _user = refreshed.user;
       } catch (_) {
         // Keep the company from the login/register response if this fails.
+      }
+
+      // Pre-hydrate bootstrap menu and theme before setting status to authenticated
+      // so first login / signup renders the populated server-driven drawer instantly!
+      try {
+        await BootstrapCache.instance
+            .hydrate(forceRefresh: true, client: _apiClient);
+      } catch (e) {
+        debugPrint('Bootstrap pre-hydration error: $e');
       }
 
       _status = AuthStatus.authenticated;

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Represents tenant information delivered from the bootstrap engine.
 class TenantSchema {
   const TenantSchema({
@@ -155,14 +157,26 @@ class SduiNavItemSchema {
     final rawChildren = json['children'];
     final List<SduiNavItemSchema> parsedChildren = [];
     if (rawChildren is List) {
-      for (final c in rawChildren) {
-        if (c is Map<String, dynamic>) {
-          parsedChildren.add(SduiNavItemSchema.fromJson(c));
-        } else if (c is Map) {
-          parsedChildren
-              .add(SduiNavItemSchema.fromJson(Map<String, dynamic>.from(c)));
+      for (var index = 0; index < rawChildren.length; index++) {
+        final child = rawChildren[index];
+        if (child is! Map) {
+          debugPrint(
+              'Bootstrap navigation: ignoring non-object child at index $index for ${json['key'] ?? '(unknown)'}.');
+          continue;
+        }
+        try {
+          parsedChildren.add(SduiNavItemSchema.fromJson(
+            Map<String, dynamic>.from(child),
+          ));
+        } catch (error, stackTrace) {
+          debugPrint(
+              'Bootstrap navigation: failed to parse child at index $index for ${json['key'] ?? '(unknown)'}: $error');
+          debugPrintStack(stackTrace: stackTrace);
         }
       }
+    } else if (rawChildren != null) {
+      debugPrint(
+          'Bootstrap navigation: expected children to be a list for ${json['key'] ?? '(unknown)'}, got ${rawChildren.runtimeType}.');
     }
 
     return SduiNavItemSchema(
@@ -211,17 +225,36 @@ class SduiNavSectionSchema {
   final List<SduiNavItemSchema> items;
 
   factory SduiNavSectionSchema.fromJson(Map<String, dynamic> json) {
-    final rawItems = json['items'] as List<dynamic>? ?? const [];
+    final rawItems = json['items'] ?? json['children'];
+    final parsedItems = <SduiNavItemSchema>[];
+    if (rawItems is List) {
+      for (var index = 0; index < rawItems.length; index++) {
+        final item = rawItems[index];
+        if (item is! Map) {
+          debugPrint(
+              'Bootstrap navigation: ignoring non-object item at index $index for section ${json['key'] ?? '(unknown)'}.');
+          continue;
+        }
+        try {
+          parsedItems.add(SduiNavItemSchema.fromJson(
+            Map<String, dynamic>.from(item),
+          ));
+        } catch (error, stackTrace) {
+          debugPrint(
+              'Bootstrap navigation: failed to parse item at index $index for section ${json['key'] ?? '(unknown)'}: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+      }
+    } else if (rawItems != null) {
+      debugPrint(
+          'Bootstrap navigation: expected items to be a list for section ${json['key'] ?? '(unknown)'}, got ${rawItems.runtimeType}.');
+    }
+
     return SduiNavSectionSchema(
       key: json['key']?.toString() ?? '',
       title: json['label']?.toString() ?? json['title']?.toString() ?? '',
       color: json['color']?.toString() ?? json['header_color']?.toString(),
-      items: rawItems
-          .whereType<Map>()
-          .map((item) => SduiNavItemSchema.fromJson(
-                Map<String, dynamic>.from(item),
-              ))
-          .toList(),
+      items: parsedItems,
     );
   }
 
