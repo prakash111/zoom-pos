@@ -81,6 +81,8 @@ class SduiComponentRegistry {
     'navigation_menu': (_) => const NavMenuSettingsTab(),
     'settings-navigation': (_) => const NavMenuSettingsTab(),
     'settings_navigation': (_) => const NavMenuSettingsTab(),
+    'tree_builder': (_) => const NavMenuSettingsTab(),
+    'navigation_builder': (_) => const NavMenuSettingsTab(),
     'languages': (_) => const LanguagesScreen(),
     'staff': (_) => const StaffScreen(),
     'devices': (_) => const DevicesScreen(),

@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../features/settings/screens/nav_menu_settings_tab.dart';
+import '../models/settings_models.dart';
 import '../widgets/sdui/sdui_controls.dart';
 import 'dynamic_schema_context.dart';
 import 'sdui_icon_registry.dart';
@@ -32,10 +33,19 @@ class DynamicSchemaParser {
         return _buildColumn(context, schema);
       case 'row':
         return _buildRow(context, schema);
+      case 'wrap':
+        return _buildWrap(context, schema);
       case 'tabs':
         return _buildTabs(context, schema);
+      case 'tree_builder':
       case 'navigation_builder':
-        return const NavMenuSettingsTab();
+        return NavMenuSettingsTab(
+          schema: schema,
+          initial: schema['nav_config'] is Map
+              ? NavConfig.fromJson(
+                  Map<String, dynamic>.from(schema['nav_config'] as Map))
+              : null,
+        );
 
       // Display
       case 'text':
@@ -269,6 +279,9 @@ class DynamicSchemaParser {
   }
 
   static Widget _buildRow(BuildContext context, Map<String, dynamic> schema) {
+    if (schema['wrap'] == true) {
+      return _buildWrap(context, schema);
+    }
     final children = _extractChildren(schema);
     final spacing = _parseDouble(schema['spacing']);
 
@@ -284,6 +297,61 @@ class DynamicSchemaParser {
         ],
       ],
     );
+  }
+
+  static Widget _buildWrap(BuildContext context, Map<String, dynamic> schema) {
+    final children = _extractChildren(schema);
+    final spacing = _parseDouble(schema['spacing']) ?? 8.0;
+    final runSpacing = _parseDouble(schema['run_spacing']) ?? 8.0;
+
+    return Wrap(
+      spacing: spacing,
+      runSpacing: runSpacing,
+      alignment: _parseWrapAlignment(schema['alignment']),
+      crossAxisAlignment:
+          _parseWrapCrossAlignment(schema['cross_axis_alignment']),
+      children: [
+        for (final child in children)
+          buildComponent(context, child),
+      ],
+    );
+  }
+
+  static WrapAlignment _parseWrapAlignment(dynamic value) {
+    switch (value?.toString().toLowerCase()) {
+      case 'center':
+        return WrapAlignment.center;
+      case 'end':
+      case 'trailing':
+        return WrapAlignment.end;
+      case 'space_between':
+      case 'spacebetween':
+        return WrapAlignment.spaceBetween;
+      case 'space_around':
+      case 'spacearound':
+        return WrapAlignment.spaceAround;
+      case 'space_evenly':
+      case 'spaceevenly':
+        return WrapAlignment.spaceEvenly;
+      case 'start':
+      case 'leading':
+      default:
+        return WrapAlignment.start;
+    }
+  }
+
+  static WrapCrossAlignment _parseWrapCrossAlignment(dynamic value) {
+    switch (value?.toString().toLowerCase()) {
+      case 'center':
+        return WrapCrossAlignment.center;
+      case 'end':
+      case 'trailing':
+        return WrapCrossAlignment.end;
+      case 'start':
+      case 'leading':
+      default:
+        return WrapCrossAlignment.start;
+    }
   }
 
   static Widget _buildTabs(BuildContext context, Map<String, dynamic> schema) {
@@ -786,72 +854,28 @@ class DynamicSchemaParser {
     final sduiContext = DynamicSchemaContext.of(context);
     final name = schema['name']?.toString() ?? '';
     final label = schema['label']?.toString() ?? 'Color';
-    final rawPresets = schema['presets'] as List<dynamic>? ??
-        [
-          '#1d4ed8',
-          '#10b981',
-          '#f59e0b',
-          '#ef4444',
-          '#6366f1',
-          '#8b5cf6',
-          '#0284c7'
-        ];
+    final rawPresets = (schema['presets'] as List<dynamic>? ??
+            [
+              '#1d4ed8',
+              '#10b981',
+              '#f59e0b',
+              '#ef4444',
+              '#6366f1',
+              '#8b5cf6',
+              '#0284c7',
+            ])
+        .map((p) => p.toString())
+        .toList();
     final currentColor = sduiContext?.formValues[name]?.toString() ??
         schema['initial_value']?.toString() ??
         '#1d4ed8';
 
-    return StatefulBuilder(
-      builder: (context, setState) {
-        final activeHex =
-            sduiContext?.formValues[name]?.toString() ?? currentColor;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 13)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                children: [
-                  for (final p in rawPresets) ...[
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          sduiContext?.setFormValue(name, p.toString());
-                        });
-                      },
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: SduiIconRegistry.parseColor(p.toString()),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: activeHex.toLowerCase() ==
-                                    p.toString().toLowerCase()
-                                ? Colors.black
-                                : Colors.transparent,
-                            width: 2.5,
-                          ),
-                        ),
-                        child: activeHex.toLowerCase() ==
-                                p.toString().toLowerCase()
-                            ? const Icon(Icons.check,
-                                size: 18, color: Colors.white)
-                            : null,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+    return _SduiColorPickerField(
+      name: name,
+      label: label,
+      presets: rawPresets,
+      initialColor: currentColor,
+      sduiContext: sduiContext,
     );
   }
 
@@ -1257,5 +1281,161 @@ class DynamicSchemaParser {
       default:
         return TextAlign.left;
     }
+  }
+}
+
+class _SduiColorPickerField extends StatefulWidget {
+  const _SduiColorPickerField({
+    required this.name,
+    required this.label,
+    required this.presets,
+    required this.initialColor,
+    required this.sduiContext,
+  });
+
+  final String name;
+  final String label;
+  final List<String> presets;
+  final String initialColor;
+  final DynamicSchemaContext? sduiContext;
+
+  @override
+  State<_SduiColorPickerField> createState() => _SduiColorPickerFieldState();
+}
+
+class _SduiColorPickerFieldState extends State<_SduiColorPickerField> {
+  late TextEditingController _textController;
+  late String _currentHex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentHex = widget.sduiContext?.formValues[widget.name]?.toString() ??
+        widget.initialColor;
+    if (!_currentHex.startsWith('#')) {
+      _currentHex = '#$_currentHex';
+    }
+    _textController = TextEditingController(text: _currentHex);
+  }
+
+  @override
+  void didUpdateWidget(covariant _SduiColorPickerField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final contextVal = widget.sduiContext?.formValues[widget.name]?.toString();
+    if (contextVal != null && contextVal != _currentHex) {
+      _currentHex = contextVal.startsWith('#') ? contextVal : '#$contextVal';
+      _textController.text = _currentHex;
+    }
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  void _onColorSelected(String hex) {
+    var formatted = hex.trim();
+    if (!formatted.startsWith('#')) formatted = '#$formatted';
+    setState(() {
+      _currentHex = formatted;
+      _textController.text = formatted;
+    });
+    widget.sduiContext?.setFormValue(widget.name, formatted);
+  }
+
+  void _onTextChanged(String text) {
+    var clean = text.trim();
+    if (!clean.startsWith('#')) clean = '#$clean';
+    final hexVal = clean.replaceFirst('#', '');
+    if ((hexVal.length == 6 || hexVal.length == 8) &&
+        int.tryParse(hexVal, radix: 16) != null) {
+      setState(() {
+        _currentHex = clean;
+      });
+      widget.sduiContext?.setFormValue(widget.name, clean);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = SduiIconRegistry.parseColor(_currentHex);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.label,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              for (final p in widget.presets)
+                GestureDetector(
+                  onTap: () => _onColorSelected(p),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: SduiIconRegistry.parseColor(p),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _currentHex.toLowerCase() == p.toLowerCase()
+                            ? Colors.black
+                            : Colors.transparent,
+                        width: 2.5,
+                      ),
+                    ),
+                    child: _currentHex.toLowerCase() == p.toLowerCase()
+                        ? const Icon(Icons.check, size: 18, color: Colors.white)
+                        : null,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: activeColor,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.grey.shade400),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 140,
+                height: 38,
+                child: TextField(
+                  controller: _textController,
+                  onChanged: _onTextChanged,
+                  style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                  decoration: InputDecoration(
+                    hintText: '#RRGGBB',
+                    isDense: true,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Custom Hex',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

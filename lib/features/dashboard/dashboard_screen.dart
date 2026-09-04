@@ -710,16 +710,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
     ));
 
+    final drawerGradient = bootstrap.theme.drawerGradient;
+
     return Drawer(
-      backgroundColor: drawerBgColor,
-      child: SafeArea(
-        top: false,
-        bottom: true,
-        child: ListView(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).padding.bottom + 16,
+      backgroundColor: drawerGradient != null ? Colors.transparent : drawerBgColor,
+      child: Container(
+        decoration: BoxDecoration(
+          color: drawerGradient == null ? drawerBgColor : null,
+          gradient: drawerGradient,
+        ),
+        child: SafeArea(
+          top: false,
+          bottom: true,
+          child: ListView(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).padding.bottom + 16,
+            ),
+            children: children,
           ),
-          children: children,
         ),
       ),
     );

@@ -8,9 +8,11 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/config/bootstrap_cache.dart';
 import '../../../core/models/settings_models.dart';
+import '../../../core/sdui/models/sdui_models.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/auth_provider.dart';
-import '../../dashboard/dashboard_screen.dart' show navSectionsForSettings;
+import '../../dashboard/dashboard_screen.dart'
+    show navSectionsForSettings, NavSectionDescriptor, NavTileDescriptor;
 import '../settings_repository.dart';
 
 const double navigationIndentStep = 30;
@@ -61,10 +63,11 @@ class _WorkingSection {
 /// changes preorder; horizontal dragging snaps the active row to 0/30/60 px
 /// and derives its parent from the nearest valid preceding row.
 class NavMenuSettingsTab extends StatefulWidget {
-  const NavMenuSettingsTab({super.key, this.repository, this.initial});
+  const NavMenuSettingsTab({super.key, this.repository, this.initial, this.schema});
 
   final SettingsRepository? repository;
   final NavConfig? initial;
+  final Map<String, dynamic>? schema;
 
   @override
   State<NavMenuSettingsTab> createState() => _NavMenuSettingsTabState();
@@ -75,8 +78,16 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
 
   SettingsRepository get _repository =>
       widget.repository ?? SettingsRepository(context.read<ApiClient>());
-  NavConfig get _initialConfig =>
-      widget.initial ?? BootstrapCache.instance.navConfig;
+  NavConfig get _initialConfig {
+    if (widget.initial != null) return widget.initial!;
+    if (widget.schema?['nav_config'] is Map) {
+      try {
+        return NavConfig.fromJson(
+            Map<String, dynamic>.from(widget.schema!['nav_config'] as Map));
+      } catch (_) {}
+    }
+    return BootstrapCache.instance.navConfig;
+  }
 
   List<_WorkingSection> _sections = [];
   bool _saving = false;
@@ -103,12 +114,90 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     if (_sections.isNotEmpty) return;
 
     final company = context.read<AuthProvider>().company;
-    final compiled = navSectionsForSettings(l10n, company);
+    var compiled = navSectionsForSettings(l10n, company);
+
+    // If compiled navigation is empty, attempt to hydrate directly from schema or defaults
+    if (compiled.isEmpty) {
+      final rawSections = widget.schema?['sections'] ??
+          widget.schema?['menu_structure'] ??
+          BootstrapCache.instance.effectiveSections;
+
+      if (rawSections is List && rawSections.isNotEmpty) {
+        final parsedSections = <NavSectionDescriptor>[];
+        for (final s in rawSections) {
+          if (s is Map) {
+            final sKey = s['key']?.toString() ?? '';
+            final sTitle = s['title']?.toString() ?? s['label']?.toString() ?? sKey;
+            final rawItems = s['items'] as List<dynamic>? ?? const [];
+            final tiles = <NavTileDescriptor>[];
+            for (final it in rawItems) {
+              if (it is Map) {
+                final itKey = it['key']?.toString() ?? '';
+                final itTitle = it['title']?.toString() ?? it['label']?.toString() ?? itKey;
+                if (itKey.isNotEmpty) {
+                  tiles.add(NavTileDescriptor(itKey, itTitle));
+                }
+              }
+            }
+            if (sKey.isNotEmpty && tiles.isNotEmpty) {
+              parsedSections.add(NavSectionDescriptor(sKey, sTitle, tiles));
+            }
+          } else if (s is SduiNavSectionSchema) {
+            final tiles = [
+              for (final it in s.items)
+                if (it.key.isNotEmpty)
+                  NavTileDescriptor(it.key, it.title)
+            ];
+            if (s.key.isNotEmpty && tiles.isNotEmpty) {
+              parsedSections.add(NavSectionDescriptor(s.key, s.title, tiles));
+            }
+          }
+        }
+        if (parsedSections.isNotEmpty) {
+          compiled = parsedSections;
+        }
+      }
+    }
+
+    if (compiled.isEmpty) {
+      compiled = [
+        NavSectionDescriptor('cashier_sales', 'Cashier & Sales', [
+          NavTileDescriptor('pos_terminal', 'Point of Sale'),
+          NavTileDescriptor('sales_history', 'Sales History'),
+          NavTileDescriptor('quotations', 'Quotations'),
+        ]),
+        NavSectionDescriptor('financial_mgmt', 'Financial Management', [
+          NavTileDescriptor('cash_register', 'Cash Register'),
+          NavTileDescriptor('receivables', 'Customer Ledger'),
+          NavTileDescriptor('reports', 'Analytics & Reports'),
+        ]),
+        NavSectionDescriptor('products_inventory', 'Products & Inventory', [
+          NavTileDescriptor('products', 'Products'),
+          NavTileDescriptor('categories', 'Categories'),
+        ]),
+        NavSectionDescriptor('settings', 'Administration & Settings', [
+          NavTileDescriptor('settings', 'Settings'),
+        ]),
+      ];
+    }
+
     final compiledByKey = {
       for (final section in compiled) section.key: section
     };
+
+    final rawItemsFromSchema = widget.schema?['items'] is List
+        ? (widget.schema!['items'] as List)
+            .whereType<Map>()
+            .map((it) => NavItemConfig.fromJson(Map<String, dynamic>.from(it)))
+            .toList()
+        : const <NavItemConfig>[];
+
+    final effectiveItems = _initialConfig.items.isNotEmpty
+        ? _initialConfig.items
+        : rawItemsFromSchema;
+
     final itemOverrides = {
-      for (final item in _initialConfig.items) item.key: item
+      for (final item in effectiveItems) item.key: item
     };
     final sectionOrderOverrides = {
       for (final section in _initialConfig.sections) section.key: section.order

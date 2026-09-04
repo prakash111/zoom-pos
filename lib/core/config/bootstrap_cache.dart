@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,11 +17,19 @@ class BootstrapTheme {
     this.primaryColor,
     this.accentColor,
     this.drawerBg,
+    this.drawerGradientEnabled = false,
+    this.drawerGradientStart,
+    this.drawerGradientEnd,
+    this.drawerGradientDirection = 'top_to_bottom',
   });
 
   final String? primaryColor;
   final String? accentColor;
   final String? drawerBg;
+  final bool drawerGradientEnabled;
+  final String? drawerGradientStart;
+  final String? drawerGradientEnd;
+  final String? drawerGradientDirection;
 
   Color? get primaryColorValue =>
       primaryColor != null ? parseHexColor(primaryColor!) : null;
@@ -31,11 +38,43 @@ class BootstrapTheme {
   Color? get drawerBgValue =>
       drawerBg != null ? parseHexColor(drawerBg!) : null;
 
+  Gradient? get drawerGradient {
+    if (!drawerGradientEnabled) return null;
+    final start = parseHexColor(drawerGradientStart ?? drawerBg ?? '#1e293b');
+    final end = parseHexColor(drawerGradientEnd ?? '#0f172a');
+    if (start == null || end == null) return null;
+
+    switch (drawerGradientDirection) {
+      case 'diagonal':
+        return LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [start, end],
+        );
+      case 'radial':
+        return RadialGradient(
+          colors: [start, end],
+          radius: 1.0,
+        );
+      case 'top_to_bottom':
+      default:
+        return LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [start, end],
+        );
+    }
+  }
+
   factory BootstrapTheme.fromJson(Map<String, dynamic> json) {
     return BootstrapTheme(
       primaryColor: json['primary_color']?.toString(),
       accentColor: json['accent_color']?.toString(),
       drawerBg: json['drawer_bg']?.toString(),
+      drawerGradientEnabled: json['drawer_gradient_enabled'] == true,
+      drawerGradientStart: json['drawer_gradient_start']?.toString(),
+      drawerGradientEnd: json['drawer_gradient_end']?.toString(),
+      drawerGradientDirection: json['drawer_gradient_direction']?.toString() ?? 'top_to_bottom',
     );
   }
 
@@ -43,6 +82,10 @@ class BootstrapTheme {
         if (primaryColor != null) 'primary_color': primaryColor,
         if (accentColor != null) 'accent_color': accentColor,
         if (drawerBg != null) 'drawer_bg': drawerBg,
+        'drawer_gradient_enabled': drawerGradientEnabled,
+        if (drawerGradientStart != null) 'drawer_gradient_start': drawerGradientStart,
+        if (drawerGradientEnd != null) 'drawer_gradient_end': drawerGradientEnd,
+        'drawer_gradient_direction': drawerGradientDirection,
       };
 }
 
