@@ -267,7 +267,7 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   const _AppLocalizationsDelegate();
 
   @override
-  bool isSupported(Locale locale) => AppLocalizations._byLocale.containsKey(locale.languageCode);
+  bool isSupported(Locale locale) => true;
 
   @override
   Future<AppLocalizations> load(Locale locale) async => AppLocalizations(locale.languageCode);

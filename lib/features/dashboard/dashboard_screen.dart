@@ -741,23 +741,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// heights.
   Widget _buildRail(BuildContext context) {
     final extended = MediaQuery.sizeOf(context).width >= Breakpoints.desktop;
-    return SingleChildScrollView(
-      child: NavigationRail(
-        extended: extended,
-        selectedIndex: _dockIndex,
-        onDestinationSelected: (index) => _onDockItemSelected(context, index),
-        labelType: extended
-            ? NavigationRailLabelType.none
-            : NavigationRailLabelType.all,
-        destinations: [
-          for (final destination in _dockDestinationsFor(
-              AppLocalizations.of(context),
-              context.read<AuthProvider>().company,
-              context.read<AuthProvider>().user))
-            NavigationRailDestination(
-                icon: Icon(destination.$1), label: Text(destination.$2)),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: IntrinsicHeight(
+              child: NavigationRail(
+                extended: extended,
+                selectedIndex: _dockIndex,
+                onDestinationSelected: (index) => _onDockItemSelected(context, index),
+                labelType: extended
+                    ? NavigationRailLabelType.none
+                    : NavigationRailLabelType.all,
+                destinations: [
+                  for (final destination in _dockDestinationsFor(
+                      AppLocalizations.of(context),
+                      context.read<AuthProvider>().company,
+                      context.read<AuthProvider>().user))
+                    NavigationRailDestination(
+                        icon: Icon(destination.$1), label: Text(destination.$2)),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -925,10 +934,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       FutureBuilder<AnalyticsModel>(
                         future: _analyticsFuture,
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState !=
-                                  ConnectionState.done ||
-                              !snapshot.hasData) {
-                            return const SizedBox.shrink();
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 48),
+                              child: Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          }
+                          if (snapshot.hasError || !snapshot.hasData) {
+                            return Card(
+                              margin: const EdgeInsets.symmetric(vertical: 16),
+                              child: Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.storefront,
+                                        size: 48,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      company?.tradeName ??
+                                          company?.name ??
+                                          'Sales & Inventory',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Open the drawer to access POS, Sales, Products & Settings.',
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                              color: Colors.grey.shade600),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    OutlinedButton.icon(
+                                      icon: const Icon(Icons.refresh),
+                                      label: Text(l10n.refresh),
+                                      onPressed: () {
+                                        setState(() {
+                                          _analyticsFuture =
+                                              _analyticsRepository
+                                                  .fetchAnalytics();
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
                           }
                           return _DashboardAnalytics(
                             analytics: snapshot.data!,

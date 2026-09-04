@@ -13,14 +13,17 @@ class SettingsRepository {
   Future<TenantSettingsBundle> fetchAll() async {
     final response = await _client.get(ApiEndpoints.settings);
     return TenantSettingsBundle(
-      profile:
-          ProfileSettings.fromJson(response['profile'] as Map<String, dynamic>),
+      profile: ProfileSettings.fromJson(
+          response['profile'] as Map<String, dynamic>? ?? const {}),
       receipts: ReceiptSettings.fromJson(
-          response['receipts'] as Map<String, dynamic>),
+          response['receipts'] as Map<String, dynamic>? ?? const {}),
       financial: FinancialSettings.fromJson(
-          response['financial'] as Map<String, dynamic>),
+          response['financial'] as Map<String, dynamic>? ?? const {}),
       paymentMethods: (response['payment_methods'] as List? ?? [])
-          .map((e) => PaymentMethodModel.fromJson(e as Map<String, dynamic>))
+          .map((e) => e is Map<String, dynamic>
+              ? PaymentMethodModel.fromJson(e)
+              : null)
+          .whereType<PaymentMethodModel>()
           .toList(),
       nav: NavConfig.fromJson(
           response['nav'] as Map<String, dynamic>? ?? const {}),
@@ -81,8 +84,8 @@ class SettingsRepository {
       if (defaultCommissionType != null)
         'default_commission_type': defaultCommissionType,
     });
-    final profile =
-        ProfileSettings.fromJson(response['profile'] as Map<String, dynamic>);
+    final profile = ProfileSettings.fromJson(
+        response['profile'] as Map<String, dynamic>? ?? const {});
 
     // Applied immediately (not just on next login/restart) so timestamps
     // update in the same session the store owner picks a new zone.
@@ -144,7 +147,7 @@ class SettingsRepository {
       if (bankDetails != null) 'bank_details': bankDetails,
     });
     return ReceiptSettings.fromJson(
-        response['receipts'] as Map<String, dynamic>);
+        response['receipts'] as Map<String, dynamic>? ?? const {});
   }
 
   Future<FinancialSettings> updateFinancial({
@@ -164,7 +167,7 @@ class SettingsRepository {
         'other_currencies': otherCurrencies.map((c) => c.toJson()).toList(),
     });
     return FinancialSettings.fromJson(
-        response['financial'] as Map<String, dynamic>);
+        response['financial'] as Map<String, dynamic>? ?? const {});
   }
 
   Future<List<PaymentMethodModel>> fetchPaymentMethods() async {

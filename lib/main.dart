@@ -5,16 +5,24 @@ import 'package:provider/provider.dart';
 import 'core/api/api_client.dart';
 import 'core/config/bootstrap_cache.dart';
 import 'core/config/locale_provider.dart';
+import 'core/config/nav_dock_provider.dart';
 import 'core/config/theme.dart';
 import 'core/config/theme_provider.dart';
 import 'core/sdui/app_router.dart';
 import 'core/services/desktop/window_close_guard.dart';
 import 'core/services/dynamic_string_service.dart';
+import 'core/services/sync/sync_engine.dart';
+import 'core/storage/app_database.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/storage/secure_storage_service.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_repository.dart';
 import 'features/auth/screens/auth_gate.dart';
+import 'features/customers/customers_repository.dart';
+import 'features/inventory/inventory_repository.dart';
+import 'features/pos/held_carts_store.dart';
+import 'features/pos/sales_repository.dart';
+import 'features/taxes/taxes_repository.dart';
 import 'l10n/app_localizations.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -36,10 +44,22 @@ Future<void> main() async {
     apiClient: apiClient,
   );
 
-  final themeProvider = ThemeProvider()..load();
+  final heldCartsStore = HeldCartsStore()..load();
+  final themeProvider = ThemeProvider();
+  await themeProvider.load();
   BootstrapCache.globalThemeProvider = themeProvider;
+  await BootstrapCache.instance.loadFromDisk();
   final localeProvider =
       LocaleProvider(preferences: preferences, apiClient: apiClient)..load();
+  final navDockProvider = NavDockProvider(preferences: preferences)..load();
+
+  final syncEngine = SyncEngine(
+    database: AppDatabase.instance,
+    salesRepository: SalesRepository(apiClient),
+    inventoryRepository: InventoryRepository(apiClient),
+    customersRepository: CustomersRepository(apiClient),
+    taxesRepository: TaxesRepository(apiClient),
+  )..init();
 
   // Restore session in background, then re-fetch translations now that
   // requests carry a token (LocaleProvider's own initial load may have run
@@ -59,6 +79,9 @@ Future<void> main() async {
     authProvider: authProvider,
     themeProvider: themeProvider,
     localeProvider: localeProvider,
+    heldCartsStore: heldCartsStore,
+    navDockProvider: navDockProvider,
+    syncEngine: syncEngine,
   ));
 }
 
@@ -70,6 +93,9 @@ class ZoomPosApp extends StatelessWidget {
     required this.authProvider,
     required this.themeProvider,
     required this.localeProvider,
+    required this.heldCartsStore,
+    required this.navDockProvider,
+    required this.syncEngine,
   });
 
   final AppPreferences preferences;
@@ -77,6 +103,9 @@ class ZoomPosApp extends StatelessWidget {
   final AuthProvider authProvider;
   final ThemeProvider themeProvider;
   final LocaleProvider localeProvider;
+  final HeldCartsStore heldCartsStore;
+  final NavDockProvider navDockProvider;
+  final SyncEngine syncEngine;
 
   @override
   Widget build(BuildContext context) {
@@ -87,8 +116,11 @@ class ZoomPosApp extends StatelessWidget {
         ChangeNotifierProvider<BootstrapCache>.value(
             value: BootstrapCache.instance),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
+        ChangeNotifierProvider<HeldCartsStore>.value(value: heldCartsStore),
         ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
         ChangeNotifierProvider<LocaleProvider>.value(value: localeProvider),
+        ChangeNotifierProvider<NavDockProvider>.value(value: navDockProvider),
+        ChangeNotifierProvider<SyncEngine>.value(value: syncEngine),
         ChangeNotifierProvider<DynamicStringService>.value(
             value: DynamicStringService.instance),
       ],

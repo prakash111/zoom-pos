@@ -3,17 +3,26 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:zoom_pos_mobile/core/api/api_client.dart';
+import 'package:zoom_pos_mobile/core/config/bootstrap_cache.dart';
+import 'package:zoom_pos_mobile/core/config/locale_provider.dart';
+import 'package:zoom_pos_mobile/core/config/nav_dock_provider.dart';
+import 'package:zoom_pos_mobile/core/config/theme_provider.dart';
 import 'package:zoom_pos_mobile/core/models/company_model.dart';
 import 'package:zoom_pos_mobile/core/models/user_model.dart';
+import 'package:zoom_pos_mobile/core/services/dynamic_string_service.dart';
+import 'package:zoom_pos_mobile/core/services/sync/sync_engine.dart';
 import 'package:zoom_pos_mobile/core/storage/app_preferences.dart';
 import 'package:zoom_pos_mobile/features/auth/auth_provider.dart';
 import 'package:zoom_pos_mobile/features/auth/screens/auth_gate.dart';
 import 'package:zoom_pos_mobile/features/auth/screens/login_screen.dart';
+import 'package:zoom_pos_mobile/features/dashboard/dashboard_screen.dart';
+import 'package:zoom_pos_mobile/features/pos/held_carts_store.dart';
 import 'package:zoom_pos_mobile/l10n/app_localizations.dart';
 
 class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
   AuthStatus _status = AuthStatus.unknown;
   String? _errorMessage;
+  CompanyModel? _company;
 
   @override
   AuthStatus get status => _status;
@@ -30,7 +39,12 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
   bool get isBusy => _status == AuthStatus.authenticating;
 
   @override
-  CompanyModel? get company => null;
+  CompanyModel? get company => _company;
+
+  set company(CompanyModel? value) {
+    _company = value;
+    notifyListeners();
+  }
 
   @override
   UserModel? get user => null;
@@ -72,11 +86,55 @@ class FakeApiClient extends Fake implements ApiClient {
     String path, {
     Map<String, dynamic>? query,
   }) async {
-    return <String, dynamic>{};
+    return <String, dynamic>{
+      'today_revenue': 1250.0,
+      'today_orders_count': 15,
+      'today_profit': 340.0,
+      'low_stock_count': 2,
+      'total_receivables': 0.0,
+      'revenue_trend': <dynamic>[],
+      'top_products': <dynamic>[],
+      'payment_breakdown': <dynamic>[],
+    };
   }
 }
 
-class FakeAppPreferences extends Fake implements AppPreferences {}
+class FakeAppPreferences extends Fake implements AppPreferences {
+  @override
+  Future<String> readLocale() async => 'en';
+
+  @override
+  Future<String?> readNavDockPosition() async => 'left';
+}
+
+class FakeSyncEngine extends Fake implements SyncEngine {
+  @override
+  bool isSyncing = false;
+
+  @override
+  int unsyncedCount = 0;
+
+  @override
+  DateTime? lastSyncedAt;
+
+  @override
+  String? lastError;
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  Future<void> syncNow() async {}
+
+  @override
+  void addListener(VoidCallback listener) {}
+
+  @override
+  void removeListener(VoidCallback listener) {}
+
+  @override
+  bool get hasListeners => false;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -133,13 +191,38 @@ void main() {
     late FakeAuthProvider fakeAuth;
     late FakeApiClient fakeApi;
     late FakeAppPreferences fakePreferences;
+    late FakeSyncEngine fakeSync;
+    late HeldCartsStore heldCartsStore;
+    late ThemeProvider themeProvider;
+    late LocaleProvider localeProvider;
+    late NavDockProvider navDockProvider;
+
+    setUp(() {
+      fakeAuth = FakeAuthProvider();
+      fakeApi = FakeApiClient();
+      fakePreferences = FakeAppPreferences();
+      fakeSync = FakeSyncEngine();
+      heldCartsStore = HeldCartsStore();
+      themeProvider = ThemeProvider();
+      localeProvider = LocaleProvider(preferences: fakePreferences, apiClient: fakeApi);
+      navDockProvider = NavDockProvider(preferences: fakePreferences);
+    });
 
     Widget buildTestApp({required Widget child}) {
       return MultiProvider(
         providers: [
-          ChangeNotifierProvider<AuthProvider>.value(value: fakeAuth),
-          Provider<ApiClient>.value(value: fakeApi),
           Provider<AppPreferences>.value(value: fakePreferences),
+          Provider<ApiClient>.value(value: fakeApi),
+          ChangeNotifierProvider<BootstrapCache>.value(
+              value: BootstrapCache.instance),
+          ChangeNotifierProvider<AuthProvider>.value(value: fakeAuth),
+          ChangeNotifierProvider<HeldCartsStore>.value(value: heldCartsStore),
+          ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
+          ChangeNotifierProvider<LocaleProvider>.value(value: localeProvider),
+          ChangeNotifierProvider<NavDockProvider>.value(value: navDockProvider),
+          ChangeNotifierProvider<SyncEngine>.value(value: fakeSync),
+          ChangeNotifierProvider<DynamicStringService>.value(
+              value: DynamicStringService.instance),
         ],
         child: MaterialApp(
           localizationsDelegates: const [
@@ -152,12 +235,6 @@ void main() {
         ),
       );
     }
-
-    setUp(() {
-      fakeAuth = FakeAuthProvider();
-      fakeApi = FakeApiClient();
-      fakePreferences = FakeAppPreferences();
-    });
 
     testWidgets('AuthGate renders splash indicator when status is unknown',
         (tester) async {
@@ -192,6 +269,32 @@ void main() {
 
       // Clean up timer
       await tester.pump(const Duration(seconds: 5));
+    });
+
+    testWidgets(
+        'AuthGate transitions to DashboardScreen when authenticated without missing provider crash',
+        (tester) async {
+      fakeAuth.company = CompanyModel(
+        id: '1',
+        name: 'Acme Supermarket',
+        tradeName: 'Acme Supermarket',
+        currency: 'USD',
+        currencySymbol: '\$',
+        planName: 'Pro',
+      );
+      fakeAuth.status = AuthStatus.authenticated;
+
+      await tester.pumpWidget(buildTestApp(child: const AuthGate()));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(DashboardScreen), findsOneWidget);
+      expect(find.text('Acme Supermarket'), findsWidgets);
+
+      // Settle analytics future
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Acme Supermarket'), findsWidgets);
     });
   });
 }
