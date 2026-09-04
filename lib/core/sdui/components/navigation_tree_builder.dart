@@ -134,6 +134,28 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
           _parseSectionCollection(BootstrapCache.instance.effectiveSections);
     }
 
+    if (compiled.isEmpty) {
+      compiled = const [
+        NavSectionDescriptor('cashier_sales', 'Cashier & Sales', [
+          NavTileDescriptor('pos', 'Point of Sale'),
+          NavTileDescriptor('sales', 'Sales History'),
+          NavTileDescriptor('quotations', 'Quotations'),
+        ]),
+        NavSectionDescriptor('financial_mgmt', 'Financial Management', [
+          NavTileDescriptor('cash_register', 'Cash Register'),
+          NavTileDescriptor('receivables', 'Customer Ledger'),
+          NavTileDescriptor('reports', 'Analytics & Reports'),
+        ]),
+        NavSectionDescriptor('products_inventory', 'Products & Inventory', [
+          NavTileDescriptor('products', 'Products'),
+          NavTileDescriptor('categories', 'Categories'),
+        ]),
+        NavSectionDescriptor('settings', 'Administration & Settings', [
+          NavTileDescriptor('settings', 'Settings'),
+        ]),
+      ];
+    }
+
     final compiledByKey = {
       for (final section in compiled) section.key: section
     };
@@ -180,6 +202,8 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
 
     final sections = <_WorkingSection>[];
     for (final entry in grouped.entries) {
+      final meta = compiledByKey[entry.key];
+      if (meta == null) continue;
       entry.value.sort((first, second) {
         final byOrder = first.order.compareTo(second.order);
         return byOrder != 0
@@ -188,11 +212,26 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       });
       final section = _WorkingSection(
         key: entry.key,
-        label: compiledByKey[entry.key]!.label,
+        label: meta.label,
         tiles: [for (final row in entry.value) row.item],
       );
       _repairAndArrange(section);
       sections.add(section);
+    }
+
+    if (sections.isEmpty) {
+      for (final s in compiled) {
+        final sec = _WorkingSection(
+          key: s.key,
+          label: s.label,
+          tiles: [
+            for (final t in s.tiles)
+              _WorkingItem(key: t.key, label: t.label, visible: true)
+          ],
+        );
+        _repairAndArrange(sec);
+        sections.add(sec);
+      }
     }
 
     final compiledIndex = {
@@ -274,7 +313,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                 (item['title'] ?? item['label'])?.toString() ?? itemKey;
             tiles.add(NavTileDescriptor(itemKey, itemTitle));
           }
-          collectMaps(item['children']);
+          collectMaps(item['children'] ?? item['items']);
         }
       }
 
@@ -688,7 +727,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return AnimatedContainer(
-      key: ValueKey(tile.key),
+      key: ValueKey('item_${section.key}_${tile.key}'),
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeOut,
       margin: EdgeInsets.only(
@@ -769,13 +808,60 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     );
   }
 
+  Widget _buildHeader(BuildContext context) {
+    final descriptionText = context.tr(
+      widget.schema?['description']?.toString() ??
+          'Hide destinations, drag vertically to reorder, and move a row left or right to snap it between Main Menu, Sub-Menu, and Sub-Sub-Menu. Applies to every device signed in to this store.',
+    );
+    final sectionHintText = context.tr('Drag to reorder sections');
+    final rowHintText =
+        context.tr('Drag menu rows left/right to snap their level.');
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            descriptionText,
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(Icons.drag_handle, size: 18, color: Colors.grey.shade600),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '$sectionHintText. $rowHintText',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _IndentLegend(label: 'Main Menu', offset: '0 px'),
+              _IndentLegend(label: 'Sub-Menu', offset: '30 px'),
+              _IndentLegend(label: 'Sub-Sub-Menu', offset: '60 px'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     _ensureSectionsLoaded();
     final embeddedInSduiScrollView = widget.schema != null;
 
     final sectionList = ReorderableListView(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      header: _buildHeader(context),
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
       shrinkWrap: embeddedInSduiScrollView,
       physics: embeddedInSduiScrollView
           ? const NeverScrollableScrollPhysics()
@@ -792,7 +878,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             sectionIndex < _sections.length;
             sectionIndex++)
           Card(
-            key: ValueKey(_sections[sectionIndex].key),
+            key: ValueKey('section_${_sections[sectionIndex].key}'),
             margin: const EdgeInsets.symmetric(vertical: 6),
             clipBehavior: Clip.hardEdge,
             child: Column(
@@ -843,7 +929,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       ],
     );
 
-    return Column(
+    final content = Column(
       mainAxisSize:
           embeddedInSduiScrollView ? MainAxisSize.min : MainAxisSize.max,
       children: [
@@ -852,7 +938,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         else
           Expanded(child: sectionList),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50)),
@@ -868,6 +954,42 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
           ),
         ),
       ],
+    );
+
+    final hasScaffold = Scaffold.maybeOf(context) != null;
+    if (!hasScaffold) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(context.tr(
+            widget.schema?['title']?.toString() ?? 'Navigation Menu',
+          )),
+        ),
+        body: content,
+      );
+    }
+
+    return content;
+  }
+}
+
+class _IndentLegend extends StatelessWidget {
+  const _IndentLegend({required this.label, required this.offset});
+
+  final String label;
+  final String offset;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Text('$label · $offset',
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+      ),
     );
   }
 }

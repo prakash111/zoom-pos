@@ -20,7 +20,7 @@ import '../../features/restaurant/screens/restaurant_tables_screen.dart';
 import '../../features/sales/screens/sales_screen.dart';
 import '../../features/sales_targets/screens/sales_targets_screen.dart';
 import '../../features/service_orders/screens/service_orders_screen.dart';
-import '../../features/settings/screens/nav_menu_settings_tab.dart';
+import 'components/navigation_tree_builder.dart';
 import '../../features/settings/screens/tenant_settings_screen.dart';
 import '../../features/staff/screens/staff_screen.dart';
 import '../../features/subscription/screens/subscription_screen.dart';
@@ -103,20 +103,20 @@ class SduiComponentRegistry {
   /// If [targetEndpoint] is provided, dynamically resolves to [DynamicSchemaPage].
   /// Unfamiliar/unmapped paths route purely from JSON via [DynamicSchemaPage].
   WidgetBuilder resolve(String? componentKey, {String? targetEndpoint}) {
+    if (targetEndpoint != null && targetEndpoint.trim().isNotEmpty) {
+      return (_) => DynamicSchemaPage(
+            endpoint: targetEndpoint.trim(),
+            initialTitle: componentKey,
+          );
+    }
+
     final key = componentKey?.toLowerCase().trim();
     if (key != null && key.isNotEmpty) {
       final builder = _registry[key];
       if (builder != null) return builder;
     }
 
-    if (targetEndpoint != null && targetEndpoint.isNotEmpty) {
-      return (_) => DynamicSchemaPage(
-            endpoint: targetEndpoint,
-            initialTitle: componentKey,
-          );
-    }
-
-    if (componentKey == null || componentKey.isEmpty) {
+    if (componentKey == null || componentKey.trim().isEmpty) {
       return (_) =>
           const ComingSoonScreen(title: 'Module', icon: Icons.widgets_outlined);
     }
@@ -136,7 +136,7 @@ class SduiComponentRegistry {
 
     // Route all unfamiliar paths to DynamicSchemaPage so new pages render purely from JSON
     return (_) => DynamicSchemaPage(
-          endpoint: '/api/tenant/views/$key',
+          endpoint: '/api/tenant/views/${key!.replaceAll('_', '-')}',
           initialTitle: componentKey,
         );
   }
