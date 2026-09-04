@@ -127,6 +127,7 @@ List<_NavSection> _serverDrivenSections() {
               SduiComponentRegistry.instance.resolve(
                 item.component ?? item.key,
                 targetEndpoint: item.targetEndpoint,
+                title: item.title,
               ),
               item.permission,
             ));

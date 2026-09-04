@@ -358,9 +358,27 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
       );
     }
 
-    final title =
-        _schema?['title']?.toString() ?? widget.initialTitle ?? 'screen';
-    final appBarConfig = _schema?['app_bar'] as Map<String, dynamic>?;
+    final rawTitle =
+        _schema?['title']?.toString() ??
+        appBarConfig?['title']?.toString() ??
+        widget.initialTitle;
+
+    String displayTitle = 'Screen';
+    if (rawTitle != null && rawTitle.trim().isNotEmpty) {
+      final trimmed = rawTitle.trim();
+      if (trimmed.contains('_') || (trimmed.contains('-') && !trimmed.contains(' '))) {
+        displayTitle = trimmed
+            .replaceAll('-', ' ')
+            .replaceAll('_', ' ')
+            .split(' ')
+            .where((w) => w.isNotEmpty)
+            .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
+            .join(' ');
+      } else {
+        displayTitle = trimmed;
+      }
+    }
+
     final showBackButton = appBarConfig?['show_back_button'] != false;
     final fabConfig = _schema?['fab'] as Map<String, dynamic>?;
 
@@ -371,7 +389,7 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
       apiClient: client,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(context.tr(appBarConfig?['title']?.toString() ?? title)),
+          title: Text(context.tr(displayTitle)),
           automaticallyImplyLeading: showBackButton,
           actions: [
             if (appBarConfig?['actions'] is List)

@@ -113,7 +113,7 @@ class SduiComponentRegistry {
   /// 2. Explicit [targetEndpoint] dynamically resolved via [DynamicSchemaPage]
   /// 3. Registered dynamic server modules via [DynamicModuleScreen]
   /// 4. Fallback [DynamicSchemaPage] for unfamiliar views
-  WidgetBuilder resolve(String? componentKey, {String? targetEndpoint}) {
+  WidgetBuilder resolve(String? componentKey, {String? targetEndpoint, String? title}) {
     final key = componentKey?.toLowerCase().trim();
     if (key != null && key.isNotEmpty) {
       final builder = _registry[key];
@@ -123,7 +123,7 @@ class SduiComponentRegistry {
     if (targetEndpoint != null && targetEndpoint.trim().isNotEmpty) {
       return (_) => DynamicSchemaPage(
             endpoint: targetEndpoint.trim(),
-            initialTitle: componentKey,
+            initialTitle: title ?? componentKey,
           );
     }
 
