@@ -11,7 +11,8 @@ class AppLocalizations {
   final String localeName;
 
   static AppLocalizations of(BuildContext context) {
-    return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    return Localizations.of<AppLocalizations>(context, AppLocalizations) ??
+        AppLocalizations(DynamicStringService.instance.locale);
   }
 
   static const LocalizationsDelegate<AppLocalizations> delegate =

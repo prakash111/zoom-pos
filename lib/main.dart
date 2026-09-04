@@ -15,6 +15,7 @@ import 'core/storage/secure_storage_service.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_repository.dart';
 import 'features/auth/screens/auth_gate.dart';
+import 'l10n/app_localizations.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> appMessengerKey =
@@ -43,7 +44,10 @@ Future<void> main() async {
   // Restore session in background, then re-fetch translations now that
   // requests carry a token (LocaleProvider's own initial load may have run
   // before restoreSession finished).
-  authProvider.restoreSession().then((_) => localeProvider.refreshFromServer());
+  authProvider
+      .restoreSession()
+      .then((_) => localeProvider.refreshFromServer())
+      .catchError((_) {});
 
   // Windows only: clear the session when the window is closed so the next
   // launch always starts at the login screen. No-op on Android.
@@ -102,8 +106,36 @@ class ZoomPosApp extends StatelessWidget {
               drawerBg: theme.drawerBg,
             ),
             locale: locale,
-            supportedLocales: [locale],
+            supportedLocales: {
+              locale,
+              const Locale('en'),
+              const Locale('es'),
+              const Locale('fr'),
+              const Locale('ar'),
+              const Locale('hi'),
+              const Locale('bn'),
+              const Locale('ta'),
+              const Locale('te'),
+              const Locale('mr'),
+              const Locale('gu'),
+              const Locale('kn'),
+              const Locale('ml'),
+              const Locale('pa'),
+              const Locale('ur'),
+              const Locale('zh'),
+              const Locale('ja'),
+              const Locale('de'),
+              const Locale('pt'),
+              const Locale('ru'),
+              const Locale('it'),
+              const Locale('ko'),
+              const Locale('tr'),
+              const Locale('vi'),
+              const Locale('th'),
+              const Locale('id'),
+            }.toList(),
             localizationsDelegates: const [
+              AppLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
