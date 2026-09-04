@@ -41,10 +41,7 @@ class DynamicSchemaParser {
       case 'navigation_builder':
         return NavMenuSettingsTab(
           schema: schema,
-          initial: schema['nav_config'] is Map
-              ? NavConfig.fromJson(
-                  Map<String, dynamic>.from(schema['nav_config'] as Map))
-              : null,
+          initial: _navigationConfigFromSchema(schema),
         );
 
       // Display
@@ -109,6 +106,39 @@ class DynamicSchemaParser {
       }
     }
     return widgets;
+  }
+
+  /// Reads both the canonical nav_config and the self-contained tree_data
+  /// fallback used by the settings-navigation SDUI response. Older servers
+  /// may omit nav_config entirely, so deriving it from the tree preserves
+  /// nesting and visibility instead of rendering every row at root level.
+  static NavConfig? _navigationConfigFromSchema(Map<String, dynamic> schema) {
+    try {
+      if (schema['nav_config'] is Map) {
+        final config = NavConfig.fromJson(
+            Map<String, dynamic>.from(schema['nav_config'] as Map));
+        if (config.items.isNotEmpty) return config;
+      }
+
+      final rawItems = schema['items'];
+      final sectionItems = rawItems is List &&
+              rawItems.any((item) =>
+                  item is Map &&
+                  (item.containsKey('items') || item.containsKey('children')))
+          ? rawItems
+          : null;
+      final tree = schema['tree_data'] ??
+          schema['sections'] ??
+          schema['menu_structure'] ??
+          sectionItems;
+      if (tree is List && tree.isNotEmpty) {
+        return NavConfig.fromJson({'tree': tree, 'sections': tree});
+      }
+    } catch (_) {
+      // NavMenuSettingsTab has additional catalog/default fallbacks. A bad
+      // optional alias must not collapse the entire SDUI component.
+    }
+    return null;
   }
 
   // ===========================================================================
@@ -313,8 +343,7 @@ class DynamicSchemaParser {
       crossAxisAlignment:
           _parseWrapCrossAlignment(schema['cross_axis_alignment']),
       children: [
-        for (final child in children)
-          buildComponent(context, child),
+        for (final child in children) buildComponent(context, child),
       ],
     );
   }
@@ -1369,57 +1398,158 @@ class _SduiColorPickerField extends StatefulWidget {
 }
 
 class _SduiColorPickerFieldState extends State<_SduiColorPickerField> {
-  late TextEditingController _textController;
   late String _currentHex;
 
   @override
   void initState() {
     super.initState();
-    _currentHex = widget.sduiContext?.formValues[widget.name]?.toString() ??
-        widget.initialColor;
-    if (!_currentHex.startsWith('#')) {
-      _currentHex = '#$_currentHex';
-    }
-    _textController = TextEditingController(text: _currentHex);
+    _currentHex = _normalizeHex(
+      widget.sduiContext?.formValues[widget.name]?.toString() ??
+          widget.initialColor,
+    );
   }
 
   @override
   void didUpdateWidget(covariant _SduiColorPickerField oldWidget) {
     super.didUpdateWidget(oldWidget);
     final contextVal = widget.sduiContext?.formValues[widget.name]?.toString();
-    if (contextVal != null && contextVal != _currentHex) {
-      _currentHex = contextVal.startsWith('#') ? contextVal : '#$contextVal';
-      _textController.text = _currentHex;
+    if (contextVal != null) {
+      final normalized = _normalizeHex(contextVal);
+      if (normalized != _currentHex) _currentHex = normalized;
     }
   }
 
-  @override
-  void dispose() {
-    _textController.dispose();
-    super.dispose();
+  String _normalizeHex(String raw) {
+    var clean = raw.trim().replaceAll('#', '').toUpperCase();
+    // Existing installations may contain #AARRGGBB. The SDUI form contract
+    // now always writes opaque #RRGGBB values.
+    if (clean.length == 8) clean = clean.substring(2);
+    if (clean.length != 6 || int.tryParse(clean, radix: 16) == null) {
+      clean = '1D4ED8';
+    }
+    return '#$clean';
+  }
+
+  String _hexFromColor(Color color) {
+    final rgb = color.toARGB32() & 0x00FFFFFF;
+    return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
   }
 
   void _onColorSelected(String hex) {
-    var formatted = hex.trim();
-    if (!formatted.startsWith('#')) formatted = '#$formatted';
-    setState(() {
-      _currentHex = formatted;
-      _textController.text = formatted;
-    });
+    final formatted = _normalizeHex(hex);
+    setState(() => _currentHex = formatted);
     widget.sduiContext?.setFormValue(widget.name, formatted);
   }
 
-  void _onTextChanged(String text) {
-    var clean = text.trim();
-    if (!clean.startsWith('#')) clean = '#$clean';
-    final hexVal = clean.replaceFirst('#', '');
-    if ((hexVal.length == 6 || hexVal.length == 8) &&
-        int.tryParse(hexVal, radix: 16) != null) {
-      setState(() {
-        _currentHex = clean;
-      });
-      widget.sduiContext?.setFormValue(widget.name, clean);
-    }
+  Future<void> _openInteractivePicker() async {
+    var hsv = HSVColor.fromColor(SduiIconRegistry.parseColor(_currentHex));
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final color = hsv.toColor();
+          final hex = _hexFromColor(color);
+          return AlertDialog(
+            title: Text(widget.label),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 360,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      height: 88,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                            color: Theme.of(context).colorScheme.outline),
+                      ),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: ThemeData.estimateBrightnessForColor(color) ==
+                                  Brightness.dark
+                              ? Colors.black54
+                              : Colors.white70,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          child: Text(
+                            hex,
+                            style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _HsvColorSlider(
+                      label: 'Hue',
+                      value: hsv.hue,
+                      max: 360,
+                      gradientColors: [
+                        for (final hue in const [
+                          0.0,
+                          60.0,
+                          120.0,
+                          180.0,
+                          240.0,
+                          300.0,
+                          360.0
+                        ])
+                          HSVColor.fromAHSV(1, hue, 1, 1).toColor(),
+                      ],
+                      onChanged: (value) =>
+                          setDialogState(() => hsv = hsv.withHue(value)),
+                    ),
+                    _HsvColorSlider(
+                      label: 'Saturation',
+                      value: hsv.saturation,
+                      max: 1,
+                      gradientColors: [
+                        HSVColor.fromAHSV(1, hsv.hue, 0, hsv.value).toColor(),
+                        HSVColor.fromAHSV(1, hsv.hue, 1, hsv.value).toColor(),
+                      ],
+                      onChanged: (value) =>
+                          setDialogState(() => hsv = hsv.withSaturation(value)),
+                    ),
+                    _HsvColorSlider(
+                      label: 'Brightness',
+                      value: hsv.value,
+                      max: 1,
+                      gradientColors: [
+                        Colors.black,
+                        HSVColor.fromAHSV(1, hsv.hue, hsv.saturation, 1)
+                            .toColor(),
+                      ],
+                      onChanged: (value) =>
+                          setDialogState(() => hsv = hsv.withValue(value)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(hex),
+                child: const Text('Apply color'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (selected != null && mounted) _onColorSelected(selected);
   }
 
   @override
@@ -1463,41 +1593,126 @@ class _SduiColorPickerFieldState extends State<_SduiColorPickerField> {
             ],
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
+          Semantics(
+            button: true,
+            label: 'Choose ${widget.label}',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: _openInteractivePicker,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: activeColor,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.grey.shade400),
                 ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 140,
-                height: 38,
-                child: TextField(
-                  controller: _textController,
-                  onChanged: _onTextChanged,
-                  style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
-                  decoration: InputDecoration(
-                    hintText: '#RRGGBB',
-                    isDense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6)),
-                  ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: activeColor,
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(color: Colors.grey.shade400),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Choose custom color',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          Text(_currentHex,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'monospace',
+                                  color: Colors.grey.shade700)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.colorize_outlined),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Custom Hex',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HsvColorSlider extends StatelessWidget {
+  const _HsvColorSlider({
+    required this.label,
+    required this.value,
+    required this.max,
+    required this.gradientColors,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final double max;
+  final List<Color> gradientColors;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayed =
+        max == 1 ? '${(value * 100).round()}%' : '${value.round()}°';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(displayed,
+                  style:
+                      const TextStyle(fontFamily: 'monospace', fontSize: 12)),
             ],
+          ),
+          const SizedBox(height: 2),
+          SizedBox(
+            height: 38,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  child: Container(
+                    height: 10,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(5),
+                      gradient: LinearGradient(colors: gradientColors),
+                      border: Border.all(color: Colors.black26),
+                    ),
+                  ),
+                ),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: Colors.transparent,
+                    inactiveTrackColor: Colors.transparent,
+                    trackHeight: 10,
+                    overlayShape: SliderComponentShape.noOverlay,
+                    thumbColor: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  child: Slider(
+                    value: value.clamp(0, max),
+                    min: 0,
+                    max: max,
+                    onChanged: onChanged,
+                    semanticFormatterCallback: (_) => '$label $displayed',
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

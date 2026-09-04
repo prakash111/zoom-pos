@@ -276,10 +276,13 @@ class NavItemConfig {
       level: ((json['level'] as num?)?.toInt() ?? 0).clamp(0, 2),
       order: (json['order'] as num?)?.toInt(),
       visible: json['visible'] as bool? ?? true,
-      children: (json['children'] as List? ?? const [])
-          .map((item) =>
-              NavItemConfig.fromJson(Map<String, dynamic>.from(item as Map)))
-          .toList(),
+      children: json['children'] is List
+          ? (json['children'] as List)
+              .whereType<Map>()
+              .map((item) =>
+                  NavItemConfig.fromJson(Map<String, dynamic>.from(item)))
+              .toList()
+          : const [],
     );
   }
 
@@ -334,16 +337,22 @@ class NavConfig {
   const NavConfig({this.sections = const [], this.items = const []});
 
   factory NavConfig.fromJson(Map<String, dynamic> json) {
-    final flatItems = (json['items'] as List? ?? const [])
-        .map((item) =>
-            NavItemConfig.fromJson(Map<String, dynamic>.from(item as Map)))
-        .toList();
+    final flatItems = json['items'] is List
+        ? (json['items'] as List)
+            .whereType<Map>()
+            .map((item) =>
+                NavItemConfig.fromJson(Map<String, dynamic>.from(item)))
+            .toList()
+        : <NavItemConfig>[];
 
     return NavConfig(
-      sections: (json['sections'] as List? ?? const [])
-          .map((section) => NavSectionOrder.fromJson(
-              Map<String, dynamic>.from(section as Map)))
-          .toList(),
+      sections: json['sections'] is List
+          ? (json['sections'] as List)
+              .whereType<Map>()
+              .map((section) =>
+                  NavSectionOrder.fromJson(Map<String, dynamic>.from(section)))
+              .toList()
+          : const [],
       items: flatItems.isNotEmpty ? flatItems : _flattenTree(json['tree']),
     );
   }
@@ -355,8 +364,9 @@ class NavConfig {
     final flattened = <NavItemConfig>[];
 
     void visit(dynamic rawNodes, String section, String? parent, int level) {
-      for (final raw in rawNodes as List? ?? const []) {
-        final json = Map<String, dynamic>.from(raw as Map);
+      if (rawNodes is! List) return;
+      for (final raw in rawNodes.whereType<Map>()) {
+        final json = Map<String, dynamic>.from(raw);
         final node = NavItemConfig.fromJson({
           ...json,
           'section': section,
@@ -369,8 +379,9 @@ class NavConfig {
       }
     }
 
-    for (final rawSection in source as List? ?? const []) {
-      final section = Map<String, dynamic>.from(rawSection as Map);
+    if (source is! List) return flattened;
+    for (final rawSection in source.whereType<Map>()) {
+      final section = Map<String, dynamic>.from(rawSection);
       final key = section['key'] as String? ?? '';
       if (key.isNotEmpty) visit(section['items'], key, null, 0);
     }

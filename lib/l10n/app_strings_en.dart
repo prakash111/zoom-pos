@@ -83,6 +83,8 @@ const Map<String, String> kEnStrings = {
   'scanBarcode': 'Scan barcode',
   'registerClosedBanner':
       'No cash register is open. Sales are blocked until one is opened.',
+  'registerOptionalBanner':
+      'No cash register is open. Sales can continue outside a register session.',
   'open': 'Open',
   'saleCompleted': 'Sale completed.',
   'saleQueuedOffline':

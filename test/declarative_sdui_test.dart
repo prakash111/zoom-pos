@@ -202,6 +202,53 @@ void main() {
       await tester.pump();
       expect(formValues['tax_inclusive'], isFalse);
     });
+
+    testWidgets('color_picker opens an HSV dialog and stores #RRGGBB',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final formValues = <String, dynamic>{};
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: formValues,
+              setFormValue: (key, value) => formValues[key] = value,
+              dispatchAction: (_) async {},
+              child: Builder(
+                builder: (context) => DynamicSchemaParser.buildComponent(
+                  context,
+                  {
+                    'type': 'color_picker',
+                    'name': 'primary_color',
+                    'label': 'Primary Accent Color',
+                    'initial_value': '#1d4ed8',
+                    'presets': ['#1d4ed8'],
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Choose custom color'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hue'), findsOneWidget);
+      expect(find.text('Saturation'), findsOneWidget);
+      expect(find.text('Brightness'), findsOneWidget);
+      expect(find.byType(Slider), findsNWidgets(3));
+
+      await tester.drag(find.byType(Slider).first, const Offset(80, 0));
+      await tester.pump();
+      await tester.tap(find.text('Apply color'));
+      await tester.pumpAndSettle();
+
+      expect(formValues['primary_color'], matches(RegExp(r'^#[0-9A-F]{6}$')));
+      expect(find.byType(TextField), findsNothing);
+    });
   });
 
   group('Declarative SDUI Schema Parser - Lists, Tables & Stepper', () {
@@ -379,7 +426,8 @@ void main() {
       expect(find.byType(DynamicSchemaPage), findsOneWidget);
     });
 
-    testWidgets('button_danger shows confirmation dialog and dispatches on confirm',
+    testWidgets(
+        'button_danger shows confirmation dialog and dispatches on confirm',
         (tester) async {
       Map<String, dynamic>? dispatchedAction;
       final schema = {
@@ -390,7 +438,8 @@ void main() {
           'type': 'form_submit',
           'endpoint': '/api/tenant/demo-data',
           'method': 'DELETE',
-          'confirm_message': 'Are you sure you want to delete all sample demo items?',
+          'confirm_message':
+              'Are you sure you want to delete all sample demo items?',
         },
       };
 
@@ -418,7 +467,9 @@ void main() {
       await tester.tap(find.text('Clear Sample Demo Data'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Are you sure you want to delete all sample demo items?'), findsOneWidget);
+      expect(
+          find.text('Are you sure you want to delete all sample demo items?'),
+          findsOneWidget);
       expect(find.text('Proceed'), findsOneWidget);
       expect(find.text('Cancel'), findsOneWidget);
 

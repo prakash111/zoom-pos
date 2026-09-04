@@ -90,7 +90,8 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     await showDialog(
       context: context,
       builder: (_) => ChangeNotifierProvider(
-        create: (_) => CashRegisterProvider(repository: CashRegisterRepository(apiClient)),
+        create: (_) =>
+            CashRegisterProvider(repository: CashRegisterRepository(apiClient)),
         child: const OpenRegisterSheet(),
       ),
     );
@@ -109,7 +110,8 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) => ChangeNotifierProvider.value(
         value: posProvider,
         child: CartSheet(customersRepository: customersRepository),
@@ -125,7 +127,8 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).saleCompleted)));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).saleCompleted)));
     await showInvoiceActionsSheet(
       context,
       InvoiceActionsData(
@@ -144,7 +147,9 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
         taxId: company?.taxId,
         taxLabel: company?.taxLabel ?? 'Tax',
         isIndia: company?.isIndia ?? false,
-        taxRate: (result.subtotal - result.discount) > 0 ? result.tax / (result.subtotal - result.discount) * 100 : 0,
+        taxRate: (result.subtotal - result.discount) > 0
+            ? result.tax / (result.subtotal - result.discount) * 100
+            : 0,
         paidAmount: result.paidAmount,
         dueAmount: result.dueAmount,
         lines: result.items
@@ -177,9 +182,16 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               children: [
-                Icon(Icons.lock_clock_outlined, size: 18, color: Colors.orange.shade800),
+                Icon(Icons.info_outline,
+                    size: 18, color: Colors.orange.shade800),
                 const SizedBox(width: 8),
-                Expanded(child: Text(l10n.registerClosedBanner)),
+                Expanded(
+                  child: Text(l10n.text(
+                    'registerOptionalBanner',
+                    fallback:
+                        'No cash register is open. Sales can continue outside a register session.',
+                  )),
+                ),
                 TextButton(
                   onPressed: () => _openRegisterPrompt(context),
                   child: Text(l10n.open),
@@ -271,7 +283,9 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
                 const VerticalDivider(width: 1),
                 SizedBox(
                   width: 400,
-                  child: CartSheet(customersRepository: CustomersRepository(context.read<ApiClient>())),
+                  child: CartSheet(
+                      customersRepository:
+                          CustomersRepository(context.read<ApiClient>())),
                 ),
               ],
             )
@@ -284,13 +298,15 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () => _openCart(context),
                   icon: const Icon(Icons.shopping_cart_checkout),
                   label: Text(
                     '${l10n.text('viewCart', fallback: 'View Cart')} · ${pos.cartCount} ${pos.cartCount == 1 ? l10n.text('item', fallback: 'item') : l10n.text('items', fallback: 'items')} · ${formatter.format(pos.grandTotal)}',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -298,13 +314,16 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     );
   }
 
-  Widget _buildBody(PosProvider pos, CurrencyFormatter formatter, String? baseUrl, AppLocalizations l10n) {
+  Widget _buildBody(PosProvider pos, CurrencyFormatter formatter,
+      String? baseUrl, AppLocalizations l10n) {
     switch (pos.catalogStatus) {
       case CatalogStatus.loading:
         return const LoadingIndicator();
       case CatalogStatus.error:
         return ErrorView(
-          message: pos.catalogError ?? l10n.text('couldNotLoadProducts', fallback: 'Could not load products.'),
+          message: pos.catalogError ??
+              l10n.text('couldNotLoadProducts',
+                  fallback: 'Could not load products.'),
           onRetry: pos.loadCatalog,
         );
       case CatalogStatus.loaded:
@@ -314,7 +333,8 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
           formatter: formatter,
           baseUrl: baseUrl,
           onProductSelected: pos.addToCart,
-          emptyMessage: l10n.text('noProductsFound', fallback: 'No products found.'),
+          emptyMessage:
+              l10n.text('noProductsFound', fallback: 'No products found.'),
         );
     }
   }

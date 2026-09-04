@@ -63,7 +63,8 @@ class _WorkingSection {
 /// changes preorder; horizontal dragging snaps the active row to 0/30/60 px
 /// and derives its parent from the nearest valid preceding row.
 class NavMenuSettingsTab extends StatefulWidget {
-  const NavMenuSettingsTab({super.key, this.repository, this.initial, this.schema});
+  const NavMenuSettingsTab(
+      {super.key, this.repository, this.initial, this.schema});
 
   final SettingsRepository? repository;
   final NavConfig? initial;
@@ -113,50 +114,23 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   void _ensureSectionsLoaded(AppLocalizations l10n) {
     if (_sections.isNotEmpty) return;
 
-    final company = context.read<AuthProvider>().company;
-    var compiled = navSectionsForSettings(l10n, company);
-
-    // If compiled navigation is empty, attempt to hydrate directly from schema or defaults
+    // An SDUI navigation screen is self-contained. Prefer its active
+    // hierarchy over the bootstrap cache so a newly changed mode/menu does
+    // not briefly show stale rows, and so this component remains renderable
+    // when no AuthProvider is above it (for example in schema previews).
+    var compiled = _sectionsFromSchema();
     if (compiled.isEmpty) {
-      final rawSections = widget.schema?['sections'] ??
-          widget.schema?['menu_structure'] ??
-          BootstrapCache.instance.effectiveSections;
-
-      if (rawSections is List && rawSections.isNotEmpty) {
-        final parsedSections = <NavSectionDescriptor>[];
-        for (final s in rawSections) {
-          if (s is Map) {
-            final sKey = s['key']?.toString() ?? '';
-            final sTitle = s['title']?.toString() ?? s['label']?.toString() ?? sKey;
-            final rawItems = s['items'] as List<dynamic>? ?? const [];
-            final tiles = <NavTileDescriptor>[];
-            for (final it in rawItems) {
-              if (it is Map) {
-                final itKey = it['key']?.toString() ?? '';
-                final itTitle = it['title']?.toString() ?? it['label']?.toString() ?? itKey;
-                if (itKey.isNotEmpty) {
-                  tiles.add(NavTileDescriptor(itKey, itTitle));
-                }
-              }
-            }
-            if (sKey.isNotEmpty && tiles.isNotEmpty) {
-              parsedSections.add(NavSectionDescriptor(sKey, sTitle, tiles));
-            }
-          } else if (s is SduiNavSectionSchema) {
-            final tiles = [
-              for (final it in s.items)
-                if (it.key.isNotEmpty)
-                  NavTileDescriptor(it.key, it.title)
-            ];
-            if (s.key.isNotEmpty && tiles.isNotEmpty) {
-              parsedSections.add(NavSectionDescriptor(s.key, s.title, tiles));
-            }
-          }
-        }
-        if (parsedSections.isNotEmpty) {
-          compiled = parsedSections;
-        }
+      try {
+        final company = context.read<AuthProvider>().company;
+        compiled = navSectionsForSettings(l10n, company);
+      } catch (_) {
+        // Continue to bootstrap and built-in fallbacks below.
       }
+    }
+
+    if (compiled.isEmpty) {
+      compiled =
+          _parseSectionCollection(BootstrapCache.instance.effectiveSections);
     }
 
     if (compiled.isEmpty) {
@@ -196,9 +170,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         ? _initialConfig.items
         : rawItemsFromSchema;
 
-    final itemOverrides = {
-      for (final item in effectiveItems) item.key: item
-    };
+    final itemOverrides = {for (final item in effectiveItems) item.key: item};
     final sectionOrderOverrides = {
       for (final section in _initialConfig.sections) section.key: section.order
     };
@@ -256,6 +228,84 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       return firstOrder.compareTo(secondOrder);
     });
     _sections = sections;
+  }
+
+  List<NavSectionDescriptor> _sectionsFromSchema() {
+    final schema = widget.schema;
+    if (schema == null) return const [];
+
+    // Current contract first, followed by aliases emitted for old clients.
+    for (final source in [
+      schema['tree_data'],
+      schema['sections'],
+      schema['menu_structure'],
+      schema['items'],
+    ]) {
+      final parsed = _parseSectionCollection(source);
+      if (parsed.isNotEmpty) return parsed;
+    }
+    return const [];
+  }
+
+  /// Converts section maps or typed bootstrap schemas to flat descriptors
+  /// while recursively retaining all children. Missing/null/non-list child
+  /// values are treated as empty collections rather than aborting the tree.
+  List<NavSectionDescriptor> _parseSectionCollection(dynamic source) {
+    if (source is! List) return const [];
+
+    final parsed = <NavSectionDescriptor>[];
+    for (final rawSection in source) {
+      if (rawSection is SduiNavSectionSchema) {
+        final tiles = <NavTileDescriptor>[];
+        final seen = <String>{};
+
+        void collectTyped(Iterable<SduiNavItemSchema> items) {
+          for (final item in items) {
+            if (item.key.isNotEmpty && seen.add(item.key)) {
+              tiles.add(NavTileDescriptor(item.key, item.title));
+            }
+            collectTyped(item.children);
+          }
+        }
+
+        collectTyped(rawSection.items);
+        if (rawSection.key.isNotEmpty && tiles.isNotEmpty) {
+          parsed.add(
+              NavSectionDescriptor(rawSection.key, rawSection.title, tiles));
+        }
+        continue;
+      }
+      if (rawSection is! Map) continue;
+
+      final section = Map<String, dynamic>.from(rawSection);
+      final key = (section['key'] ?? section['id'])?.toString() ?? '';
+      if (key.isEmpty) continue;
+      final title = (section['title'] ?? section['label'])?.toString() ?? key;
+      final tiles = <NavTileDescriptor>[];
+      final seen = <String>{};
+
+      void collectMaps(dynamic rawItems) {
+        if (rawItems is! List) return;
+        for (final rawItem in rawItems) {
+          if (rawItem is! Map) continue;
+          final item = Map<String, dynamic>.from(rawItem);
+          final itemKey = (item['key'] ?? item['id'])?.toString() ?? '';
+          if (itemKey.isNotEmpty && seen.add(itemKey)) {
+            final itemTitle =
+                (item['title'] ?? item['label'])?.toString() ?? itemKey;
+            tiles.add(NavTileDescriptor(itemKey, itemTitle));
+          }
+          collectMaps(item['children']);
+        }
+      }
+
+      collectMaps(section['items'] ?? section['children']);
+      if (tiles.isNotEmpty) {
+        parsed.add(NavSectionDescriptor(key, title, tiles));
+      }
+    }
+
+    return parsed;
   }
 
   /// Repairs dangling/cyclic/deep links, then lays rows out in preorder so a
@@ -744,8 +794,80 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     _ensureSectionsLoaded(l10n);
+    final embeddedInSduiScrollView = widget.schema != null;
+
+    final sectionList = ReorderableListView(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      shrinkWrap: embeddedInSduiScrollView,
+      physics: embeddedInSduiScrollView
+          ? const NeverScrollableScrollPhysics()
+          : null,
+      buildDefaultDragHandles: false,
+      onReorderItem: (oldIndex, newIndex) {
+        setState(() {
+          final section = _sections.removeAt(oldIndex);
+          _sections.insert(newIndex, section);
+        });
+      },
+      children: [
+        for (var sectionIndex = 0;
+            sectionIndex < _sections.length;
+            sectionIndex++)
+          Card(
+            key: ValueKey(_sections[sectionIndex].key),
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            clipBehavior: Clip.hardEdge,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 12, 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _sections[sectionIndex].label,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      ReorderableDragStartListener(
+                        index: sectionIndex,
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(Icons.drag_handle,
+                              color: Colors.grey.shade400),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ReorderableListView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  proxyDecorator: _dragProxy,
+                  onReorderStart: (index) =>
+                      _onItemDragStart(sectionIndex, index),
+                  onReorderEnd: (_) => _scheduleFinishItemDrag(),
+                  onReorderItem: (oldIndex, newIndex) =>
+                      _onItemReorder(sectionIndex, oldIndex, newIndex),
+                  children: [
+                    for (var itemIndex = 0;
+                        itemIndex < _sections[sectionIndex].tiles.length;
+                        itemIndex++)
+                      _buildItemRow(sectionIndex, itemIndex),
+                  ],
+                ),
+                const SizedBox(height: 6),
+              ],
+            ),
+          ),
+      ],
+    );
 
     return Column(
+      mainAxisSize:
+          embeddedInSduiScrollView ? MainAxisSize.min : MainAxisSize.max,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -786,73 +908,10 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             ],
           ),
         ),
-        Expanded(
-          child: ReorderableListView(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            buildDefaultDragHandles: false,
-            onReorderItem: (oldIndex, newIndex) {
-              setState(() {
-                final section = _sections.removeAt(oldIndex);
-                _sections.insert(newIndex, section);
-              });
-            },
-            children: [
-              for (var sectionIndex = 0;
-                  sectionIndex < _sections.length;
-                  sectionIndex++)
-                Card(
-                  key: ValueKey(_sections[sectionIndex].key),
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  clipBehavior: Clip.hardEdge,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 12, 6),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _sections[sectionIndex].label,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            ReorderableDragStartListener(
-                              index: sectionIndex,
-                              child: Padding(
-                                padding: const EdgeInsets.all(6),
-                                child: Icon(Icons.drag_handle,
-                                    color: Colors.grey.shade400),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ReorderableListView(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        buildDefaultDragHandles: false,
-                        proxyDecorator: _dragProxy,
-                        onReorderStart: (index) =>
-                            _onItemDragStart(sectionIndex, index),
-                        onReorderEnd: (_) => _scheduleFinishItemDrag(),
-                        onReorderItem: (oldIndex, newIndex) =>
-                            _onItemReorder(sectionIndex, oldIndex, newIndex),
-                        children: [
-                          for (var itemIndex = 0;
-                              itemIndex < _sections[sectionIndex].tiles.length;
-                              itemIndex++)
-                            _buildItemRow(sectionIndex, itemIndex),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
+        if (embeddedInSduiScrollView)
+          sectionList
+        else
+          Expanded(child: sectionList),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: ElevatedButton(

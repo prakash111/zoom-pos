@@ -505,12 +505,6 @@ class PosProvider extends ChangeNotifier {
   Future<PosCheckoutResult?> checkout({String? taxLabel}) async {
     if (_cart.isEmpty) return null;
 
-    if (registerOpen == false) {
-      checkoutError = 'Open a cash register before completing a sale.';
-      notifyListeners();
-      return null;
-    }
-
     if (requiresCustomerForDue) {
       checkoutError = 'Attach a customer for due, partial, or credit sales.';
       notifyListeners();
