@@ -3,8 +3,11 @@
 namespace App\Services\Sdui;
 
 use App\Models\Company;
+use App\Models\Configuration;
+use App\Models\SduiScreen;
 use App\Services\Modular\ModuleRegistry;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Centralized Server-Driven UI (SDUI) Schema Response Builder.
@@ -14,6 +17,32 @@ use Illuminate\Http\JsonResponse;
  */
 class SchemaResponse
 {
+    public const SCHEMA_VERSION = 1;
+
+    public const LAYOUT_TYPES = ['column', 'grid', 'grid_view', 'tabs', 'scroll_view'];
+
+    public const COMPONENT_TYPES = [
+        'container', 'card', 'scroll_view', 'grid_view', 'accordion_group',
+        'accordion', 'column', 'row', 'tabs', 'text', 'image_network',
+        'badge', 'icon', 'divider', 'text_input', 'dropdown_select',
+        'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker',
+        'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
+        'button_outlined', 'fab', 'action_sheet_trigger',
+    ];
+
+    public const INPUT_TYPES = [
+        'text_input', 'dropdown_select', 'checkbox', 'toggle_switch',
+        'date_time_picker', 'color_picker', 'step_counter',
+    ];
+
+    public const ACTION_COMPONENT_TYPES = [
+        'button_primary', 'button_outlined', 'fab',
+    ];
+
+    public const ACTION_TYPES = [
+        'navigate', 'form_submit', 'api_post', 'open_modal', 'navigate_back', 'pop',
+    ];
+
     // =========================================================================
     // Layout Primitives
     // =========================================================================
@@ -345,6 +374,9 @@ class SchemaResponse
     public static function screen(string $title, array $components, string $layout = 'scroll_view', array $options = []): array
     {
         return [
+            'type' => 'screen',
+            'schema_version' => self::SCHEMA_VERSION,
+            'key' => $options['key'] ?? null,
             'title' => $title,
             'layout' => $layout,
             'app_bar' => [
@@ -359,10 +391,36 @@ class SchemaResponse
 
     public static function jsonResponse(string $title, array $components, string $layout = 'scroll_view', array $options = []): JsonResponse
     {
+        $schema = self::screen($title, $components, $layout, $options);
+        $errors = app(SchemaValidator::class)->validate($schema);
+        if ($errors !== []) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid SDUI schema.',
+                'details' => ['schema' => $errors],
+            ], 500);
+        }
+
         return response()->json([
             'success' => true,
-            'schema' => self::screen($title, $components, $layout, $options),
+            'schema' => $schema,
         ]);
+    }
+
+    /**
+     * The renderer contract is delivered with bootstrap so clients can reject
+     * an incompatible schema version explicitly.
+     *
+     * @return array<string, mixed>
+     */
+    public static function contract(): array
+    {
+        return [
+            'version' => self::SCHEMA_VERSION,
+            'layouts' => self::LAYOUT_TYPES,
+            'components' => self::COMPONENT_TYPES,
+            'actions' => self::ACTION_TYPES,
+        ];
     }
 
     // =========================================================================
@@ -564,7 +622,7 @@ class SchemaResponse
                 self::textInput('tax_id', 'Tax Registration ID (GSTIN/VAT)', $company->tax_id),
                 self::textInput('tax_label', 'Tax Label On Receipts', $taxLabel),
                 self::toggleSwitch('tax_inclusive', 'Tax Inclusive Pricing', (bool) ($company->tax_settings['inclusive'] ?? false)),
-                self::toggleSwitch('show_tax_summary', 'Show Detailed Tax Breakdown on Receipts', true),
+                self::toggleSwitch('show_tax_summary', 'Show Detailed Tax Breakdown on Receipts', (bool) ($company->tax_settings['show_tax_summary'] ?? true)),
             ]),
         ];
 
@@ -590,28 +648,28 @@ class SchemaResponse
 
     public static function apiView(Company $company): array
     {
+        $configuration = Configuration::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->whereIn('key', ['webhook_url', 'ai_catalog_enrichment', 'ai_receipt_ocr'])
+            ->pluck('value', 'key');
+
         return self::screen('API & Integrations', [
             self::card([
                 self::text('Sanctum API Access', 'title_medium', ['bold' => true]),
                 self::text('Connect external ERPs, Shopify, WooCommerce, and mobile apps securely.', 'body_small', ['color' => '#6b7280']),
                 self::divider(),
                 self::text('Active Token Status: ENABLED', 'label_medium', ['bold' => true, 'color' => '#16a34a']),
-                self::buttonOutlined('Generate New API Token', self::apiPostAction(
-                    '/api/tenant/api-tokens/generate',
-                    [],
-                    'New API token generated'
-                ), 'vpn_key'),
             ]),
             self::card([
                 self::text('AI Assistant Studio Integration', 'title_medium', ['bold' => true]),
                 self::text('Empower point-of-sale catalog management with AI recommendations and OCR.', 'body_small', ['color' => '#6b7280']),
                 self::divider(),
-                self::toggleSwitch('ai_catalog_enrichment', 'Enable AI Product Description & Categorization', true),
-                self::toggleSwitch('ai_receipt_ocr', 'Enable Invoice & Bill OCR Scanner', true),
+                self::toggleSwitch('ai_catalog_enrichment', 'Enable AI Product Description & Categorization', filter_var($configuration->get('ai_catalog_enrichment', true), FILTER_VALIDATE_BOOL)),
+                self::toggleSwitch('ai_receipt_ocr', 'Enable Invoice & Bill OCR Scanner', filter_var($configuration->get('ai_receipt_ocr', true), FILTER_VALIDATE_BOOL)),
             ]),
             self::card([
                 self::text('Webhook Subscriptions', 'title_medium', ['bold' => true]),
-                self::textInput('webhook_url', 'Order Notification Webhook URL', '', [
+                self::textInput('webhook_url', 'Order Notification Webhook URL', $configuration->get('webhook_url', ''), [
                     'placeholder' => 'https://example.com/webhooks/pos-orders',
                 ]),
             ]),
@@ -635,11 +693,7 @@ class SchemaResponse
                 self::lineItemTile('Products & Inventory', 'All Products, Categories, Brands, Suppliers', 'inventory_2'),
                 self::lineItemTile('Administration & Settings', 'Store Settings (Expandable Accordion)', 'settings'),
             ]),
-            self::buttonPrimary('Save Navigation Layout', self::formSubmitAction(
-                '/api/tenant/settings/navigation',
-                'POST',
-                'Navigation preferences saved'
-            ), 'save'),
+            self::text('Use the server navigation configuration to reorder or hide entries. Changes are reflected by the next bootstrap response.', 'body_small', ['color' => '#6b7280']),
         ]);
     }
 
@@ -679,31 +733,117 @@ class SchemaResponse
                     self::row($featureChips, ['spacing' => 6]),
                 ] : []),
             ]),
-            self::card([
-                self::text('Module Actions', 'title_medium', ['bold' => true]),
-                self::divider(),
-                self::lineItemTile(
-                    'Launch '.$title.' POS',
-                    'Open primary checkout terminal for this vertical',
-                    'point_of_sale',
-                    self::navigateAction('/api/tenant/views/'.$moduleKey.'-pos', 'pos')
-                ),
-                self::lineItemTile(
-                    'Vertical Inventory & Catalog',
-                    'Manage items, categories, and pricing',
-                    'inventory_2',
-                    self::navigateAction('/api/tenant/views/'.$moduleKey.'-inventory', 'inventory')
-                ),
-                self::lineItemTile(
-                    'Transactions & Invoices',
-                    'Review transaction logs and orders',
-                    'receipt_long',
-                    self::navigateAction('/api/tenant/views/'.$moduleKey.'-sales', 'sales')
-                ),
-            ]),
         ];
 
+        $routeItems = [];
+        foreach (($module['routes'] ?? []) as $routeKey => $route) {
+            if ($routeKey === 'cart_configuration') {
+                continue;
+            }
+
+            $definition = is_array($route) ? $route : ['endpoint' => $route];
+            $endpoint = (string) ($definition['endpoint'] ?? '');
+            if (! str_starts_with($endpoint, '/api/')) {
+                continue;
+            }
+
+            $routeItems[] = self::lineItemTile(
+                (string) ($definition['title'] ?? ucwords(str_replace(['_', '-'], ' ', (string) $routeKey))),
+                (string) ($definition['description'] ?? ''),
+                (string) ($definition['icon'] ?? 'arrow_forward'),
+                self::navigateAction($endpoint, 'dynamic_page')
+            );
+        }
+
+        if ($routeItems !== []) {
+            $components[] = self::card([
+                self::text('Module Actions', 'title_medium', ['bold' => true]),
+                self::divider(),
+                ...$routeItems,
+            ]);
+        }
+
         return self::screen($title, $components);
+    }
+
+    /**
+     * Lightweight screen directory shipped by /api/app/bootstrap. Navigation
+     * remains the source of visual placement; this directory describes every
+     * endpoint-backed screen the current tenant may request.
+     *
+     * @return list<array{key: string, title: string, endpoint: string, permission: ?string}>
+     */
+    public static function screenDirectory(Company $company): array
+    {
+        $screens = [
+            ['key' => 'settings-mode', 'title' => 'Store Operating Mode', 'endpoint' => '/api/tenant/views/settings-mode', 'permission' => 'settings.view'],
+            ['key' => 'settings-profile', 'title' => 'Store Profile & Branding', 'endpoint' => '/api/tenant/views/settings-profile', 'permission' => 'settings.view'],
+            ['key' => 'settings-receipts', 'title' => 'Receipt Prefixes & Bank Terms', 'endpoint' => '/api/tenant/views/settings-receipts', 'permission' => 'settings.view'],
+            ['key' => 'settings-financial', 'title' => 'Financial & Currency', 'endpoint' => '/api/tenant/views/settings-financial', 'permission' => 'settings.view'],
+            ['key' => 'settings-taxes', 'title' => 'Taxes & Compliance', 'endpoint' => '/api/tenant/views/settings-taxes', 'permission' => 'settings.view'],
+            ['key' => 'settings-api', 'title' => 'API & Integrations', 'endpoint' => '/api/tenant/views/settings-api', 'permission' => 'settings.view'],
+            ['key' => 'settings-navigation', 'title' => 'Navigation Menu', 'endpoint' => '/api/tenant/views/settings-navigation', 'permission' => 'settings.view'],
+        ];
+
+        if (! Schema::hasTable('sdui_screens')) {
+            return $screens;
+        }
+
+        $licensed = ModuleRegistry::availableModes($company);
+        $stored = SduiScreen::query()
+            ->with('module:id,slug,is_active')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
+        foreach ($stored as $screen) {
+            if ($screen->module !== null
+                && (! $screen->module->is_active || ! in_array($screen->module->slug, $licensed, true))) {
+                continue;
+            }
+
+            $screens[] = [
+                'key' => $screen->key,
+                'title' => $screen->title,
+                'endpoint' => '/api/tenant/views/'.$screen->key,
+                'permission' => $screen->permission,
+            ];
+        }
+
+        return $screens;
+    }
+
+    public static function normalizeViewKey(string $viewKey): string
+    {
+        return strtolower(trim(str_replace(['_', 'views/'], ['-', ''], $viewKey)));
+    }
+
+    public static function storedScreen(string $viewKey): ?SduiScreen
+    {
+        if (! Schema::hasTable('sdui_screens')) {
+            return null;
+        }
+
+        return SduiScreen::query()
+            ->with('module')
+            ->where('key', self::normalizeViewKey($viewKey))
+            ->where('is_active', true)
+            ->first();
+    }
+
+    public static function requiredPermission(string $viewKey, ?SduiScreen $storedScreen = null): ?string
+    {
+        if ($storedScreen !== null) {
+            return $storedScreen->permission;
+        }
+
+        $normalized = self::normalizeViewKey($viewKey);
+        if (str_starts_with($normalized, 'settings-')
+            || in_array($normalized, ['mode', 'profile', 'branding', 'receipts', 'financial', 'taxes', 'api', 'api-integrations', 'navigation', 'navigation-menu'], true)) {
+            return 'settings.view';
+        }
+
+        return 'pos.view';
     }
 
     /**
@@ -711,7 +851,35 @@ class SchemaResponse
      */
     public static function renderView(string $viewKey, Company $company): JsonResponse
     {
-        $normalized = strtolower(trim(str_replace(['_', 'views/'], ['-', ''], $viewKey)));
+        $normalized = self::normalizeViewKey($viewKey);
+        $stored = self::storedScreen($normalized);
+
+        if ($stored !== null) {
+            if ($stored->module !== null
+                && (! $stored->module->is_active
+                    || ! in_array($stored->module->slug, ModuleRegistry::availableModes($company), true))) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'This screen is not enabled for the current tenant.',
+                ], 404);
+            }
+
+            $schema = $stored->schema;
+            $schema['title'] = $schema['title'] ?? $stored->title;
+            $schema['type'] = 'screen';
+            $schema['key'] = $stored->key;
+            $schema['schema_version'] = self::SCHEMA_VERSION;
+            $schema['layout'] = $schema['layout'] ?? 'scroll_view';
+            $schema['app_bar'] = $schema['app_bar'] ?? [
+                'title' => $schema['title'],
+                'show_back_button' => true,
+                'actions' => [],
+            ];
+            $schema['components'] = $schema['components'] ?? [];
+            $schema['fab'] = $schema['fab'] ?? null;
+
+            return self::schemaResponse($normalized, $schema);
+        }
 
         $schema = match ($normalized) {
             'settings-mode', 'mode' => self::modeView($company),
@@ -721,12 +889,38 @@ class SchemaResponse
             'settings-taxes', 'taxes' => self::taxesView($company),
             'settings-api', 'api', 'api-integrations' => self::apiView($company),
             'settings-navigation', 'navigation', 'navigation-menu' => self::navigationView($company),
-            default => self::moduleView($normalized, $company),
+            default => null,
         };
+
+        if ($schema === null) {
+            $module = ModuleRegistry::find($normalized);
+            if ($module === null || ! in_array($normalized, ModuleRegistry::availableModes($company), true)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'SDUI view not found.',
+                ], 404);
+            }
+
+            $schema = self::moduleView($normalized, $company);
+        }
+
+        return self::schemaResponse($normalized, $schema);
+    }
+
+    private static function schemaResponse(string $view, array $schema): JsonResponse
+    {
+        $errors = app(SchemaValidator::class)->validate($schema);
+        if ($errors !== []) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid SDUI schema.',
+                'details' => ['schema' => $errors],
+            ], 500);
+        }
 
         return response()->json([
             'success' => true,
-            'view' => $normalized,
+            'view' => $view,
             'schema' => $schema,
         ]);
     }

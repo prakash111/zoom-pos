@@ -5,7 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
-use App\Services\Navigation\TenantNavigationConfigService;
+use App\Models\Configuration;
+use App\Services\Auth\PermissionChecker;
 use App\Services\Sdui\SchemaResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,9 +23,24 @@ class SduiViewController extends Controller
     /**
      * GET /api/tenant/views/{view} or GET /api/app/views/{view}
      */
-    public function show(Request $request, string $view): JsonResponse
+    public function show(Request $request, string $view, PermissionChecker $permissions): JsonResponse
     {
         $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+        $storedScreen = SchemaResponse::storedScreen($view);
+        $requiredPermission = SchemaResponse::requiredPermission($view, $storedScreen);
+
+        if ($user !== null && $requiredPermission !== null) {
+            [$module, $action] = array_pad(explode('.', $requiredPermission, 2), 2, 'view');
+            if (! $permissions->allows($user, $module, $action)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Forbidden',
+                    'message' => "Your role cannot {$action} {$module}.",
+                ], 403);
+            }
+        }
+
         return SchemaResponse::renderView($view, $company);
     }
 
@@ -35,8 +51,7 @@ class SduiViewController extends Controller
     public function submitSettings(
         Request $request,
         string $section,
-        SettingsApiController $settingsController,
-        TenantNavigationConfigService $navigation
+        SettingsApiController $settingsController
     ): JsonResponse {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
@@ -58,6 +73,7 @@ class SduiViewController extends Controller
                     'tax_id' => ['nullable', 'string', 'max:60'],
                     'tax_label' => ['nullable', 'string', 'max:50'],
                     'tax_inclusive' => ['nullable', 'boolean'],
+                    'show_tax_summary' => ['nullable', 'boolean'],
                 ]);
                 if ($validator->fails()) {
                     return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
@@ -67,12 +83,16 @@ class SduiViewController extends Controller
                 if (isset($data['tax_inclusive'])) {
                     $taxSettings['inclusive'] = (bool) $data['tax_inclusive'];
                 }
+                if (isset($data['show_tax_summary'])) {
+                    $taxSettings['show_tax_summary'] = (bool) $data['show_tax_summary'];
+                }
                 $company->update([
                     'tax_id' => $data['tax_id'] ?? $company->tax_id,
                     'tax_id_label' => $data['tax_label'] ?? $company->tax_id_label,
                     'tax_settings' => $taxSettings,
                 ]);
                 AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'taxes']);
+
                 return response()->json(['success' => true, 'message' => 'Tax settings updated successfully.']);
 
             case 'api':
@@ -85,12 +105,15 @@ class SduiViewController extends Controller
                 if ($validator->fails()) {
                     return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
                 }
+                foreach ($validator->validated() as $key => $value) {
+                    Configuration::withoutGlobalScopes()->updateOrCreate(
+                        ['company_id' => $company->id, 'key' => $key],
+                        ['value' => is_bool($value) ? ($value ? '1' : '0') : $value]
+                    );
+                }
                 AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'api_integrations']);
-                return response()->json(['success' => true, 'message' => 'API and integration settings updated successfully.']);
 
-            case 'navigation':
-            case 'navigation-menu':
-                return response()->json(['success' => true, 'message' => 'Navigation preferences saved successfully.']);
+                return response()->json(['success' => true, 'message' => 'API and integration settings updated successfully.']);
 
             case 'mode':
                 return response()->json([
@@ -99,7 +122,7 @@ class SduiViewController extends Controller
                 ], 403);
 
             default:
-                return response()->json(['success' => true, 'message' => 'Settings updated successfully.']);
+                return response()->json(['success' => false, 'error' => 'Settings section not found.'], 404);
         }
     }
 }

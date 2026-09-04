@@ -4,6 +4,9 @@ namespace App\Services\Modular;
 
 use App\Models\Company;
 use App\Models\PaymentMethod;
+use App\Models\PlatformSystem;
+use App\Models\SduiModule;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Registry of pluggable business modules, schemas, and UI configurations.
@@ -22,7 +25,7 @@ class ModuleRegistry
      */
     public static function allModules(): array
     {
-        return [
+        $builtIn = [
             'retail' => [
                 'id' => 'retail',
                 'title' => 'Retail POS',
@@ -121,6 +124,50 @@ class ModuleRegistry
                 ],
             ],
         ];
+
+        if (! Schema::hasTable('sdui_modules')) {
+            return $builtIn;
+        }
+
+        try {
+            $databaseModules = SduiModule::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->get()
+                ->mapWithKeys(function (SduiModule $module): array {
+                    $routes = $module->routes ?? [];
+
+                    return [$module->slug => [
+                        'id' => $module->slug,
+                        'title' => $module->name,
+                        'description' => $module->description ?? '',
+                        'layout_type' => $module->layout_type,
+                        'icon' => $module->icon,
+                        'features' => $module->features ?? [],
+                        'cart_configuration' => $routes['cart_configuration'] ?? [],
+                        'routes' => $routes,
+                        'navigation' => $module->navigation ?? [],
+                        'source' => 'database',
+                    ]];
+                })
+                ->all();
+
+            // Database rows intentionally override built-ins with the same
+            // slug, letting SuperAdmin change presentation without an app build.
+            return array_replace($builtIn, $databaseModules);
+        } catch (\Throwable) {
+            // Bootstrap must remain available while migrations are running or
+            // when an older installation has not created the SDUI tables yet.
+            return $builtIn;
+        }
+    }
+
+    /** @return array<string, mixed>|null */
+    public static function find(string $modeId): ?array
+    {
+        $key = strtolower(trim($modeId));
+
+        return self::allModules()[$key] ?? null;
     }
 
     /**
@@ -152,13 +199,26 @@ class ModuleRegistry
      */
     public static function enabledRegistrationModes(): array
     {
-        $raw = \App\Models\PlatformSystem::get('allowed_registration_modes', '["retail", "restaurant"]');
+        $raw = PlatformSystem::get('allowed_registration_modes', '["retail", "restaurant"]');
         $allKeys = array_keys(self::allModules());
+        $databaseDefaults = [];
+        if (Schema::hasTable('sdui_modules')) {
+            try {
+                $databaseDefaults = SduiModule::query()
+                    ->where('is_active', true)
+                    ->where('registration_allowed', true)
+                    ->orderBy('sort_order')
+                    ->pluck('slug')
+                    ->all();
+            } catch (\Throwable) {
+                $databaseDefaults = [];
+            }
+        }
 
         if (is_string($raw)) {
             $trimmed = trim($raw);
             if ($trimmed === 'both') {
-                return array_values(array_intersect(['retail', 'restaurant'], $allKeys));
+                return array_values(array_intersect(array_unique(['retail', 'restaurant', ...$databaseDefaults]), $allKeys));
             }
             if ($trimmed === 'retail_only') {
                 return array_values(array_intersect(['retail'], $allKeys));
@@ -169,19 +229,19 @@ class ModuleRegistry
 
             $decoded = json_decode($trimmed, true);
             if (is_array($decoded)) {
-                $filtered = array_values(array_intersect($decoded, $allKeys));
+                $filtered = array_values(array_intersect(array_unique([...$decoded, ...$databaseDefaults]), $allKeys));
                 if (! empty($filtered)) {
                     return $filtered;
                 }
             }
         } elseif (is_array($raw)) {
-            $filtered = array_values(array_intersect($raw, $allKeys));
+            $filtered = array_values(array_intersect(array_unique([...$raw, ...$databaseDefaults]), $allKeys));
             if (! empty($filtered)) {
                 return $filtered;
             }
         }
 
-        return array_values(array_intersect(['retail', 'restaurant'], $allKeys));
+        return array_values(array_intersect(array_unique(['retail', 'restaurant', ...$databaseDefaults]), $allKeys));
     }
 
     /**
@@ -238,9 +298,9 @@ class ModuleRegistry
      */
     public static function getModule(string $modeId): array
     {
-        $all = self::allModules();
-        if (isset($all[$modeId])) {
-            return $all[$modeId];
+        $module = self::find($modeId);
+        if ($module !== null) {
+            return $module;
         }
 
         return [

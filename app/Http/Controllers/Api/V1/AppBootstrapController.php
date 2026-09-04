@@ -10,6 +10,7 @@ use App\Services\Localization\LocalizationService;
 use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\TenantNavigationConfigService;
 use App\Services\Navigation\TenantNavRegistry;
+use App\Services\Sdui\SchemaResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -55,6 +56,8 @@ class AppBootstrapController extends Controller
             'modules' => $allModules,
             'active_module' => $activeModule,
             'menu_structure' => $menuStructure,
+            'screens' => SchemaResponse::screenDirectory($company),
+            'schema_contract' => SchemaResponse::contract(),
             'ui_schema' => [
                 'payment_methods' => ModuleRegistry::paymentMethodsSchema($company),
                 'status_labels' => ModuleRegistry::statusLabelsSchema(),

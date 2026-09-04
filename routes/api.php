@@ -59,8 +59,8 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
 
     // Server-Driven UI Dynamic Schema Views
-    Route::get('/tenant/views/{view}', [SduiViewController::class, 'show'])->middleware('tenant.api.permission:settings,view');
-    Route::get('/app/views/{view}', [SduiViewController::class, 'show'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/tenant/views/{view}', [SduiViewController::class, 'show']);
+    Route::get('/app/views/{view}', [SduiViewController::class, 'show']);
 
     // Server-Driven UI Declarative Form Submissions
     Route::match(['post', 'put'], '/tenant/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
@@ -291,6 +291,6 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
         Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/nav-config', [AppBootstrapController::class, 'updateNav'])->middleware('tenant.api.permission:settings,edit');
-        Route::get('/views/{view}', [SduiViewController::class, 'show'])->middleware('tenant.api.permission:settings,view');
+        Route::get('/views/{view}', [SduiViewController::class, 'show']);
     });
 });

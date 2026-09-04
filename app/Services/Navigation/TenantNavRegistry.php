@@ -12,13 +12,17 @@ use App\Services\Modular\ModuleRegistry;
 class TenantNavRegistry
 {
     /**
-     * @param  bool|string  $isRestaurantOrMode
      * @return list<array{key: string, label: string, color?: string, items: list<array{key: string, label: string, icon?: string, component?: string, permission?: ?string, parent?: string}>}>
      */
     public static function sectionsFor(bool|string $isRestaurantOrMode): array
     {
         if (is_bool($isRestaurantOrMode)) {
             return $isRestaurantOrMode ? self::restaurantSections() : self::retailSections();
+        }
+
+        $module = ModuleRegistry::find($isRestaurantOrMode);
+        if (is_array($module['navigation'] ?? null) && $module['navigation'] !== []) {
+            return array_values(array_filter($module['navigation'], 'is_array'));
         }
 
         return match ($isRestaurantOrMode) {
@@ -230,6 +234,9 @@ class TenantNavRegistry
                     'permission' => 'settings',
                     'children' => $tabs,
                 ],
+                // Retain the flat rows for the existing navigation editor and
+                // older clients. Current SDUI clients de-duplicate by key and
+                // use the canonical children tree above for drawer rendering.
                 ...$tabs,
                 ['key' => 'languages', 'label' => 'Languages & Translations', 'title' => 'Languages & Translations', 'icon' => 'translate', 'component' => 'languages', 'type' => 'link', 'permission' => 'settings'],
                 ['key' => 'staff', 'label' => 'Users & Permissions', 'title' => 'Users & Permissions', 'icon' => 'badge', 'component' => 'staff', 'type' => 'link', 'permission' => 'users'],
