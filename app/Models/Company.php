@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasLegacyStringId;
+use App\Services\Navigation\TenantNavigationConfigService;
 use App\Support\IdGenerator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class Company extends Model
@@ -27,7 +29,7 @@ class Company extends Model
     protected $fillable = [
         'unique_account_id', 'name', 'slug', 'custom_domain', 'trade_name', 'legal_name', 'tax_id', 'tax_id_label',
         'email', 'phone', 'website', 'address', 'city', 'state', 'postal_code', 'country', 'currency',
-        'language', 'default_locale', 'timezone', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'licensed_modules', 'nav_config', 'receipt_format', 'status', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
+        'language', 'default_locale', 'timezone', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'accent_color', 'drawer_bg', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'licensed_modules', 'nav_config', 'receipt_format', 'status', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
         'max_users', 'max_devices', 'pricing_mode', 'tax_api_mode', 'tax_api_key', 'tax_api_endpoint',
         'invoice_prefix', 'quotation_prefix', 'tax_settings', 'invoice_terms', 'quote_terms', 'bank_details',
         'currency_symbol', 'currency_decimals', 'currency_symbol_position', 'other_currencies',
@@ -259,25 +261,44 @@ class Company extends Model
     public function normalizedNavConfig(): array
     {
         $raw = $this->nav_config ?? [];
+        $normalizer = app(TenantNavigationConfigService::class);
 
-        if (isset($raw['items']) || isset($raw['sections']) || isset($raw['tree'])) {
-            return app(\App\Services\Navigation\TenantNavigationConfigService::class)->normalize($raw);
+        if (! is_array($raw)) {
+            Log::warning('Invalid tenant navigation configuration; using defaults.', [
+                'company_id' => $this->id,
+                'value_type' => get_debug_type($raw),
+            ]);
+
+            return $normalizer->normalize([]);
         }
 
-        $sectionOrder = array_values($raw['section_order'] ?? []);
-        $hiddenTiles = array_values($raw['hidden_tiles'] ?? []);
+        try {
+            if (isset($raw['items']) || isset($raw['sections']) || isset($raw['tree'])) {
+                return $normalizer->normalize($raw);
+            }
 
-        return app(\App\Services\Navigation\TenantNavigationConfigService::class)->normalize([
-            'sections' => array_map(
-                fn ($key, $order) => ['key' => $key, 'order' => $order],
-                $sectionOrder,
-                array_keys($sectionOrder)
-            ),
-            'items' => array_map(
-                fn ($key) => ['key' => $key, 'section' => null, 'parent' => null, 'order' => null, 'visible' => false],
-                $hiddenTiles
-            ),
-        ]);
+            $sectionOrder = array_values(is_array($raw['section_order'] ?? null) ? $raw['section_order'] : []);
+            $hiddenTiles = array_values(is_array($raw['hidden_tiles'] ?? null) ? $raw['hidden_tiles'] : []);
+
+            return $normalizer->normalize([
+                'sections' => array_map(
+                    fn ($key, $order) => ['key' => $key, 'order' => $order],
+                    $sectionOrder,
+                    array_keys($sectionOrder)
+                ),
+                'items' => array_map(
+                    fn ($key) => ['key' => $key, 'section' => null, 'parent' => null, 'order' => null, 'visible' => false],
+                    $hiddenTiles
+                ),
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('Tenant navigation configuration could not be normalized; using defaults.', [
+                'company_id' => $this->id,
+                'exception' => $exception,
+            ]);
+
+            return $normalizer->normalize([]);
+        }
     }
 
     /**
@@ -350,6 +371,30 @@ class Company extends Model
     public function getThemeColor(): string
     {
         return $this->theme_color ?: 'blue';
+    }
+
+    public function getPrimaryColor(): string
+    {
+        return $this->primary_color ?: '#4F46E5';
+    }
+
+    public function getAccentColor(): string
+    {
+        return $this->accent_color ?: '#D97706';
+    }
+
+    public function getDrawerBg(): string
+    {
+        return $this->drawer_bg ?: '#FFF7ED';
+    }
+
+    public function getThemeTokens(): array
+    {
+        return [
+            'primary_color' => $this->getPrimaryColor(),
+            'accent_color' => $this->getAccentColor(),
+            'drawer_bg' => $this->getDrawerBg(),
+        ];
     }
 
     public function getPosLayout(): string

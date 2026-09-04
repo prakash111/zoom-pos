@@ -91,7 +91,11 @@ class Index extends Component
 
     public string $drawerCover = '';
 
-    public string $primaryColor = '#2d7a58';
+    public string $primaryColor = '#4F46E5';
+
+    public string $accentColor = '#D97706';
+
+    public string $drawerBg = '#FFF7ED';
 
     public string $themeColor = 'blue';
 
@@ -333,7 +337,9 @@ class Index extends Component
         $this->logo = (string) ($this->company->logo ?? '');
         $this->favicon = (string) ($this->company->favicon ?? '');
         $this->drawerCover = (string) ($this->company->drawer_cover ?? '');
-        $this->primaryColor = (string) ($this->company->primary_color ?: '#2d7a58');
+        $this->primaryColor = (string) ($this->company->primary_color ?: '#4F46E5');
+        $this->accentColor = (string) ($this->company->accent_color ?: '#D97706');
+        $this->drawerBg = (string) ($this->company->drawer_bg ?: '#FFF7ED');
         $this->themeColor = (string) ($this->company->theme_color ?: 'blue');
         $this->posLayout = (string) ($this->company->pos_layout ?: 'standard');
         $this->receiptFormat = (string) ($this->company->receipt_format ?: '80mm');
@@ -420,6 +426,8 @@ class Index extends Component
             'otherCurrencies.*.symbol' => ['nullable', 'string', 'max:8'],
             'otherCurrencies.*.exchange_rate' => ['nullable', 'numeric', 'min:0'],
             'primaryColor' => ['required', 'string', 'max:20'],
+            'accentColor' => ['nullable', 'string', 'max:20'],
+            'drawerBg' => ['nullable', 'string', 'max:20'],
             'themeColor' => ['required', 'string', 'max:30'],
             'posLayout' => ['required', 'in:standard,touch,stand'],
             'receiptFormat' => ['required', 'in:80mm,58mm'],
@@ -670,7 +678,9 @@ class Index extends Component
             'logo' => $this->logo ?: null,
             'favicon' => $this->favicon ?: null,
             'drawer_cover' => $this->drawerCover ?: null,
-            'primary_color' => $this->primaryColor ?: '#2563eb',
+            'primary_color' => $this->primaryColor ?: '#4F46E5',
+            'accent_color' => $this->accentColor ?: '#D97706',
+            'drawer_bg' => $this->drawerBg ?: '#FFF7ED',
             'theme_color' => $this->themeColor ?: 'blue',
             'pos_layout' => $this->posLayout ?: 'standard',
             'receipt_format' => $this->receiptFormat ?: '80mm',

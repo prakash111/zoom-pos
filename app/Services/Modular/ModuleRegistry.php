@@ -28,10 +28,11 @@ class ModuleRegistry
         $builtIn = [
             'retail' => [
                 'id' => 'retail',
-                'title' => 'Retail POS',
-                'description' => 'General retail point of sale with inventory, barcodes, and billing',
+                'title' => 'Retail',
+                'subtitle' => 'Shops, electronics, general stores',
+                'description' => 'Shops, electronics, general stores',
                 'layout_type' => 'standard_grid',
-                'icon' => 'point_of_sale',
+                'icon' => 'storefront',
                 'features' => [
                     'has_tables' => false,
                     'has_kot' => false,
@@ -51,8 +52,9 @@ class ModuleRegistry
             ],
             'restaurant' => [
                 'id' => 'restaurant',
-                'title' => 'Restaurant & Cafe',
-                'description' => 'Food service POS with table management, floor plan, and KDS',
+                'title' => 'Cafe & Restaurant',
+                'subtitle' => 'Tables, KOT, kitchen display',
+                'description' => 'Tables, KOT, kitchen display',
                 'layout_type' => 'table_floor_plan',
                 'icon' => 'restaurant',
                 'features' => [
@@ -75,9 +77,10 @@ class ModuleRegistry
             'pharmacy' => [
                 'id' => 'pharmacy',
                 'title' => 'Pharmacy POS',
-                'description' => 'Healthcare POS with drug batches, expiry tracking, and prescriptions',
+                'subtitle' => 'Batches, expiry dates, medicines',
+                'description' => 'Batches, expiry dates, medicines',
                 'layout_type' => 'standard_grid',
-                'icon' => 'local_pharmacy',
+                'icon' => 'medication',
                 'features' => [
                     'has_tables' => false,
                     'has_kot' => false,
@@ -100,10 +103,11 @@ class ModuleRegistry
             ],
             'service_booking' => [
                 'id' => 'service_booking',
-                'title' => 'Service & Salon POS',
-                'description' => 'Appointment booking, stylist scheduling, and service orders',
+                'title' => 'Service & Salon',
+                'subtitle' => 'Appointments, stylist bookings',
+                'description' => 'Appointments, stylist bookings',
                 'layout_type' => 'service_booking_list',
-                'icon' => 'spa',
+                'icon' => 'content_cut',
                 'features' => [
                     'has_tables' => false,
                     'has_kot' => false,
@@ -199,8 +203,8 @@ class ModuleRegistry
      */
     public static function enabledRegistrationModes(): array
     {
-        $raw = PlatformSystem::get('allowed_registration_modes', '["retail", "restaurant"]');
         $allKeys = array_keys(self::allModules());
+        $raw = PlatformSystem::get('allowed_registration_modes', json_encode($allKeys));
         $databaseDefaults = [];
         if (Schema::hasTable('sdui_modules')) {
             try {
@@ -217,8 +221,8 @@ class ModuleRegistry
 
         if (is_string($raw)) {
             $trimmed = trim($raw);
-            if ($trimmed === 'both') {
-                return array_values(array_intersect(array_unique(['retail', 'restaurant', ...$databaseDefaults]), $allKeys));
+            if ($trimmed === 'both' || $trimmed === 'all') {
+                return array_values(array_intersect(array_unique([...$allKeys, ...$databaseDefaults]), $allKeys));
             }
             if ($trimmed === 'retail_only') {
                 return array_values(array_intersect(['retail'], $allKeys));
@@ -241,7 +245,7 @@ class ModuleRegistry
             }
         }
 
-        return array_values(array_intersect(array_unique(['retail', 'restaurant', ...$databaseDefaults]), $allKeys));
+        return array_values(array_intersect(array_unique([...$allKeys, ...$databaseDefaults]), $allKeys));
     }
 
     /**

@@ -212,32 +212,62 @@ class PosSyncApiController extends Controller
      */
     /**
      * Pre-auth config for the "Create your store" screen — which store-type
-     * cards (Retail / Cafe & Restaurant) it should offer, per the Superadmin's
-     * global "Allowed Registration Modes" setting.
+     * cards (Retail / Cafe & Restaurant / Pharmacy / Service & Salon) it should offer,
+     * per the Superadmin's global "Allowed Registration Modes" setting.
      * GET /api/v1/pos/auth/registration-config
      */
     public function registrationConfig(): JsonResponse
+    {
+        return $this->registrationMeta();
+    }
+
+    /**
+     * Unauthenticated endpoint returning active registration modes licensed by SuperAdmin.
+     * GET /api/app/registration-meta
+     * GET /api/v1/pos/app/registration-meta
+     */
+    public function registrationMeta(): JsonResponse
     {
         $enabled = \App\Services\Modular\ModuleRegistry::enabledRegistrationModes();
         $legacyString = in_array('restaurant', $enabled, true) && in_array('retail', $enabled, true)
             ? 'both'
             : (in_array('restaurant', $enabled, true) ? 'restaurant_only' : 'retail_only');
 
+        $activeModulesMap = \App\Services\Modular\ModuleRegistry::registrationModules();
+
+        $registrationModes = [];
+        foreach ($enabled as $key) {
+            if (! isset($activeModulesMap[$key])) {
+                continue;
+            }
+            $mod = $activeModulesMap[$key];
+            $registrationModes[] = [
+                'key' => $mod['id'] ?? $key,
+                'title' => $mod['title'] ?? ucfirst(str_replace('_', ' ', $key)),
+                'subtitle' => $mod['subtitle'] ?? $mod['description'] ?? '',
+                'icon' => $mod['icon'] ?? 'widgets',
+            ];
+        }
+
         $activeModules = array_values(array_map(function ($mod) {
             return [
                 'id' => $mod['id'],
+                'key' => $mod['id'],
                 'title' => $mod['title'],
+                'subtitle' => $mod['subtitle'] ?? $mod['description'] ?? '',
                 'description' => $mod['description'],
                 'icon' => $mod['icon'] ?? 'widgets',
                 'layout_type' => $mod['layout_type'] ?? 'standard_grid',
             ];
-        }, \App\Services\Modular\ModuleRegistry::registrationModules()));
+        }, $activeModulesMap));
 
         return response()->json([
             'success' => true,
+            'registration_modes' => $registrationModes,
+            'active_modules' => $activeModules,
             'allowed_registration_modes' => $legacyString,
             'enabled_modes' => $enabled,
-            'active_modules' => $activeModules,
+            'default_mode' => $registrationModes[0]['key'] ?? 'retail',
         ]);
     }
 

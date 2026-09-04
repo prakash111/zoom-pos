@@ -3,6 +3,7 @@
 namespace App\Services\Navigation;
 
 use App\Services\Modular\ModuleRegistry;
+use Illuminate\Support\Facades\Log;
 
 /**
  * The nav tree for the tenant sidebar/drawer and mobile client,
@@ -20,17 +21,37 @@ class TenantNavRegistry
             return $isRestaurantOrMode ? self::restaurantSections() : self::retailSections();
         }
 
-        $module = ModuleRegistry::find($isRestaurantOrMode);
-        if (is_array($module['navigation'] ?? null) && $module['navigation'] !== []) {
-            return array_values(array_filter($module['navigation'], 'is_array'));
-        }
-
-        return match ($isRestaurantOrMode) {
-            'restaurant', 'food_restaurant' => self::restaurantSections(),
+        $mode = strtolower(trim($isRestaurantOrMode));
+        $mode = match ($mode) {
+            'general', 'general_retail' => 'retail',
+            'food_restaurant' => 'restaurant',
+            default => $mode,
+        };
+        $fallback = match ($mode) {
+            'restaurant' => self::restaurantSections(),
             'pharmacy' => self::pharmacySections(),
             'service_booking' => self::serviceBookingSections(),
             default => self::retailSections(),
         };
+
+        $module = ModuleRegistry::find($mode);
+        $navigation = $module['navigation'] ?? null;
+        if (is_array($navigation) && $navigation !== []) {
+            $validated = self::validatedCustomNavigation($navigation);
+            if ($validated !== null && $validated !== []) {
+                return $validated;
+            }
+
+            Log::warning('Invalid database SDUI navigation; using core menu fallback.', [
+                'mode' => $mode,
+            ]);
+        } elseif (($module['source'] ?? null) === 'database') {
+            Log::warning('Empty database SDUI navigation; using core menu fallback.', [
+                'mode' => $mode,
+            ]);
+        }
+
+        return $fallback;
     }
 
     /**
@@ -41,6 +62,86 @@ class TenantNavRegistry
     public static function menuStructureForMode(string $mode): array
     {
         return self::sectionsFor($mode);
+    }
+
+    /**
+     * Validate database-authored navigation before it can replace the core
+     * tree. One corrupted section must never turn the bootstrap menu into an
+     * empty or partially unusable payload.
+     *
+     * @param  list<mixed>  $navigation
+     * @return list<array<string, mixed>>|null
+     */
+    private static function validatedCustomNavigation(array $navigation): ?array
+    {
+        $sections = [];
+        $seen = [];
+
+        foreach ($navigation as $section) {
+            if (! is_array($section)) {
+                return null;
+            }
+
+            $key = trim((string) ($section['key'] ?? ''));
+            $items = $section['items'] ?? null;
+            if ($key === '' || isset($seen[$key]) || ! is_array($items) || $items === []) {
+                return null;
+            }
+
+            $validatedItems = self::validatedCustomItems($items);
+            if ($validatedItems === null || $validatedItems === []) {
+                return null;
+            }
+
+            $seen[$key] = true;
+            $section['key'] = $key;
+            $section['items'] = $validatedItems;
+            $sections[] = $section;
+        }
+
+        return $sections === [] ? null : $sections;
+    }
+
+    /**
+     * @param  list<mixed>  $items
+     * @return list<array<string, mixed>>|null
+     */
+    private static function validatedCustomItems(array $items): ?array
+    {
+        $validated = [];
+        $seen = [];
+
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                return null;
+            }
+
+            $key = trim((string) ($item['key'] ?? ''));
+            if ($key === '' || isset($seen[$key])) {
+                return null;
+            }
+
+            $children = $item['children'] ?? [];
+            if ($children !== null && ! is_array($children)) {
+                return null;
+            }
+
+            $validatedChildren = is_array($children) && $children !== []
+                ? self::validatedCustomItems($children)
+                : [];
+            if ($validatedChildren === null) {
+                return null;
+            }
+
+            $seen[$key] = true;
+            $item['key'] = $key;
+            if (array_key_exists('children', $item)) {
+                $item['children'] = $validatedChildren;
+            }
+            $validated[] = $item;
+        }
+
+        return $validated;
     }
 
     private static function retailSections(): array

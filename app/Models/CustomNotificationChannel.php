@@ -10,7 +10,7 @@ class CustomNotificationChannel extends Model
     use BelongsToCompany;
 
     protected $fillable = [
-        'company_id', 'name', 'icon', 'url', 'method', 'headers',
+        'company_id', 'name', 'icon', 'url', 'method', 'payload_format', 'headers',
         'auth_type', 'auth_value', 'payload_template', 'event_types', 'is_active',
     ];
 

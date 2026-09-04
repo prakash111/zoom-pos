@@ -5,7 +5,9 @@ namespace Tests\Feature\Api;
 use App\Models\Company;
 use App\Models\Plan;
 use App\Models\User;
+use App\Services\Navigation\TenantNavRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -217,6 +219,8 @@ class AppBootstrapApiTest extends TestCase
             ->assertJsonPath('modules.restaurant.features.has_kot', true)
             ->assertJsonPath('modules.pharmacy.id', 'pharmacy')
             ->assertJsonPath('modules.service_booking.id', 'service_booking')
+            ->assertJsonPath('menu_structure.0.key', 'cashier_sales')
+            ->assertJsonPath('menu_structure.0.items.0.key', 'pos')
             ->assertJsonStructure([
                 'tenant' => ['id', 'business_name', 'active_mode', 'available_modes'],
                 'modules' => [
@@ -226,6 +230,57 @@ class AppBootstrapApiTest extends TestCase
                 'menu_structure',
                 'ui_schema' => ['payment_methods', 'status_labels', 'tax_configuration', 'action_pills'],
             ]);
+    }
+
+    public function test_empty_or_corrupted_database_navigation_falls_back_to_core_sections(): void
+    {
+        DB::table('sdui_modules')->insert([
+            'name' => 'Retail Override',
+            'slug' => 'retail',
+            'layout_type' => 'standard_grid',
+            'navigation' => json_encode([]),
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $assertCoreMenu = function (array $menu): void {
+            $sections = collect($menu)->keyBy('key');
+            $this->assertTrue($sections->has('cashier_sales'));
+            $this->assertTrue($sections->has('products_inventory'));
+            $this->assertTrue($sections->has('administration'));
+            $this->assertContains('pos', collect($sections['cashier_sales']['items'])->pluck('key')->all());
+            $this->assertContains('settings', collect($sections['administration']['items'])->pluck('key')->all());
+        };
+
+        $assertCoreMenu(TenantNavRegistry::menuStructureForMode(' RETAIL '));
+
+        DB::table('sdui_modules')->where('slug', 'retail')->update([
+            'navigation' => json_encode([
+                ['key' => 'broken', 'label' => 'Broken', 'items' => 'not-an-array'],
+            ]),
+        ]);
+
+        $assertCoreMenu(TenantNavRegistry::menuStructureForMode('retail'));
+    }
+
+    public function test_corrupted_tenant_navigation_order_cannot_break_bootstrap_menu(): void
+    {
+        $token = $this->token();
+        DB::table('companies')->where('id', $this->company->id)->update([
+            'nav_config' => json_encode('corrupted-order-data'),
+        ]);
+
+        $response = $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap?locale=en');
+
+        $response->assertOk()
+            ->assertJsonPath('nav.sections', [])
+            ->assertJsonPath('nav.items', []);
+
+        $menu = collect($response->json('menu_structure'))->keyBy('key');
+        $this->assertTrue($menu->has('cashier_sales'));
+        $this->assertTrue($menu->has('products_inventory'));
+        $this->assertTrue($menu->has('administration'));
     }
 
     public function test_regular_tenant_cannot_switch_mode_dynamically(): void

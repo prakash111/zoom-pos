@@ -6,6 +6,8 @@ use App\Models\Company;
 use App\Models\Configuration;
 use App\Models\SduiScreen;
 use App\Services\Modular\ModuleRegistry;
+use App\Services\Navigation\TenantNavigationConfigService;
+use App\Services\Navigation\TenantNavRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Schema;
 
@@ -27,7 +29,7 @@ class SchemaResponse
         'badge', 'icon', 'divider', 'text_input', 'dropdown_select',
         'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker',
         'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
-        'button_outlined', 'fab', 'action_sheet_trigger',
+        'button_outlined', 'fab', 'action_sheet_trigger', 'navigation_builder',
     ];
 
     public const INPUT_TYPES = [
@@ -509,7 +511,9 @@ class SchemaResponse
                     'AE' => 'United Arab Emirates',
                     'SA' => 'Saudi Arabia',
                 ], $company->country ?? 'US'),
-                self::colorPicker('primary_color', 'Theme Accent Color', $company->primary_color ?? '#1d4ed8'),
+                self::colorPicker('primary_color', 'Primary Accent Color', $company->primary_color ?? '#4F46E5'),
+                self::colorPicker('accent_color', 'Secondary Accent Color', $company->accent_color ?? '#D97706'),
+                self::colorPicker('drawer_bg', 'Sidebar / Drawer Background', $company->drawer_bg ?? '#FFF7ED'),
             ]),
             self::buttonPrimary('Save Store Profile', self::formSubmitAction(
                 '/api/tenant/settings/profile',
@@ -650,8 +654,16 @@ class SchemaResponse
     {
         $configuration = Configuration::withoutGlobalScopes()
             ->where('company_id', $company->id)
-            ->whereIn('key', ['webhook_url', 'ai_catalog_enrichment', 'ai_receipt_ocr'])
+            ->whereIn('key', [
+                'webhook_url', 'ai_catalog_enrichment', 'ai_receipt_ocr',
+                'webhook_platform', 'webhook_hmac_secret',
+                'outbound_webhook_url', 'outbound_webhook_secret', 'outbound_events',
+            ])
             ->pluck('value', 'key');
+
+        $inboundWebhookUrl = url('/api/v1/integrations/webhooks/'.($company->unique_account_id ?: $company->id).'/orders');
+        $platform = $configuration->get('webhook_platform', 'shopify');
+        $outboundEvents = json_decode($configuration->get('outbound_events', '[]'), true) ?: [];
 
         return self::screen('API & Integrations', [
             self::card([
@@ -661,17 +673,43 @@ class SchemaResponse
                 self::text('Active Token Status: ENABLED', 'label_medium', ['bold' => true, 'color' => '#16a34a']),
             ]),
             self::card([
+                self::text('E-Commerce Inbound Webhooks (Shopify / WooCommerce)', 'title_medium', ['bold' => true]),
+                self::text('Receive sales orders in real-time. Automatically decodes payloads, decrements inventory, creates kitchen tickets, and sends push alerts.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::textInput('inbound_webhook_url', 'Your Unique Webhook Endpoint URL', $inboundWebhookUrl, [
+                    'placeholder' => $inboundWebhookUrl,
+                    'read_only' => true,
+                ]),
+                self::dropdownSelect('webhook_platform', 'E-Commerce Platform', [
+                    ['label' => 'Shopify (HMAC-SHA256)', 'value' => 'shopify'],
+                    ['label' => 'WooCommerce (HMAC-SHA256)', 'value' => 'woocommerce'],
+                    ['label' => 'Generic JSON / Custom Store', 'value' => 'generic'],
+                ], $platform),
+                self::textInput('webhook_hmac_secret', 'Webhook Secret / HMAC Key', $configuration->get('webhook_hmac_secret', ''), [
+                    'placeholder' => 'Enter shared secret key for signature verification',
+                ]),
+            ]),
+            self::card([
+                self::text('Outbound Webhook Subscriptions', 'title_medium', ['bold' => true]),
+                self::text('Notify your external systems and third-party gateways when POS events take place.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::textInput('outbound_webhook_url', 'Outbound Webhook URL', $configuration->get('outbound_webhook_url', $configuration->get('webhook_url', '')), [
+                    'placeholder' => 'https://example.com/webhooks/pos-events',
+                ]),
+                self::textInput('outbound_webhook_secret', 'Outbound HMAC Secret', $configuration->get('outbound_webhook_secret', ''), [
+                    'placeholder' => 'Secret used to sign outbound X-Webhook-Signature headers',
+                ]),
+                self::checkbox('event_order_created', 'order.created (When a new sale or order is registered)', in_array('order.created', $outboundEvents, true)),
+                self::checkbox('event_order_settled', 'order.settled (When payment is completed in full)', in_array('order.settled', $outboundEvents, true)),
+                self::checkbox('event_order_cancelled', 'order.cancelled (When a sale is voided or cancelled)', in_array('order.cancelled', $outboundEvents, true)),
+                self::checkbox('event_stock_low_alert', 'stock.low_alert (When an item reaches or drops below minimum stock)', in_array('stock.low_alert', $outboundEvents, true)),
+            ]),
+            self::card([
                 self::text('AI Assistant Studio Integration', 'title_medium', ['bold' => true]),
                 self::text('Empower point-of-sale catalog management with AI recommendations and OCR.', 'body_small', ['color' => '#6b7280']),
                 self::divider(),
                 self::toggleSwitch('ai_catalog_enrichment', 'Enable AI Product Description & Categorization', filter_var($configuration->get('ai_catalog_enrichment', true), FILTER_VALIDATE_BOOL)),
                 self::toggleSwitch('ai_receipt_ocr', 'Enable Invoice & Bill OCR Scanner', filter_var($configuration->get('ai_receipt_ocr', true), FILTER_VALIDATE_BOOL)),
-            ]),
-            self::card([
-                self::text('Webhook Subscriptions', 'title_medium', ['bold' => true]),
-                self::textInput('webhook_url', 'Order Notification Webhook URL', $configuration->get('webhook_url', ''), [
-                    'placeholder' => 'https://example.com/webhooks/pos-orders',
-                ]),
             ]),
             self::buttonPrimary('Save API Integrations', self::formSubmitAction(
                 '/api/tenant/settings/api',
@@ -683,7 +721,19 @@ class SchemaResponse
 
     public static function navigationView(Company $company): array
     {
+        $activeMode = ModuleRegistry::resolveActiveMode($company);
+        $menuStructure = TenantNavRegistry::menuStructureForMode($activeMode);
+        $navConfig = $company->normalizedNavConfig();
+
         return self::screen('Navigation Menu Customization', [
+            [
+                'type' => 'navigation_builder',
+                'title' => 'Menu Hierarchy & Arrangement',
+                'description' => 'Drag and drop items to re-order, indent right (+30px) to nest under previous item, drag left to outdent.',
+                'active_mode' => $activeMode,
+                'menu_structure' => $menuStructure,
+                'nav_config' => $navConfig,
+            ],
             self::card([
                 self::text('Server-Driven Navigation Structure', 'title_medium', ['bold' => true]),
                 self::text('The mobile app updates its menu hierarchy dynamically based on this server schema.', 'body_small', ['color' => '#6b7280']),
@@ -766,6 +816,48 @@ class SchemaResponse
         return self::screen($title, $components);
     }
 
+    public static function notificationsView(Company $company): array
+    {
+        $channels = \App\Models\CustomNotificationChannel::where('company_id', $company->id)->get();
+        $channelTiles = [];
+        foreach ($channels as $channel) {
+            $format = strtoupper($channel->payload_format ?: 'JSON');
+            $channelTiles[] = self::lineItemTile(
+                $channel->name,
+                "{$channel->method} ({$format}) · {$channel->url}",
+                $channel->icon ?: 'sms'
+            );
+        }
+
+        return self::screen('Custom Notification Channels', [
+            self::card([
+                self::text('Custom SMS & Unofficial WhatsApp Gateways', 'title_medium', ['bold' => true]),
+                self::text('Dispatch automated notifications via generic HTTP endpoints supporting JSON, Form-Data, and Query Params.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::text('Supported Dynamic Tags: {phone}, {customer_name}, {invoice_id}, {amount}, {order_link}', 'label_medium', ['bold' => true, 'color' => '#2563eb']),
+            ]),
+            ...(! empty($channelTiles) ? [
+                self::card([
+                    self::text('Configured Notification Channels', 'title_medium', ['bold' => true]),
+                    ...$channelTiles,
+                ]),
+            ] : []),
+            self::card([
+                self::text('Send Test Message', 'title_medium', ['bold' => true]),
+                self::text('Test your configured notification gateway with sample variables.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::textInput('phone', 'Recipient Phone Number', $company->phone ?: '+1234567890', ['placeholder' => '+1234567890']),
+                self::textInput('customer_name', 'Customer Name', 'John Doe', ['placeholder' => 'John Doe']),
+                self::textInput('amount', 'Amount', '150.00', ['placeholder' => '150.00']),
+            ]),
+            self::buttonPrimary('Send Test Message', self::formSubmitAction(
+                '/api/tenant/settings/custom-notifications/test',
+                'POST',
+                'Test notification triggered'
+            ), 'send'),
+        ]);
+    }
+
     /**
      * Lightweight screen directory shipped by /api/app/bootstrap. Navigation
      * remains the source of visual placement; this directory describes every
@@ -783,6 +875,7 @@ class SchemaResponse
             ['key' => 'settings-taxes', 'title' => 'Taxes & Compliance', 'endpoint' => '/api/tenant/views/settings-taxes', 'permission' => 'settings.view'],
             ['key' => 'settings-api', 'title' => 'API & Integrations', 'endpoint' => '/api/tenant/views/settings-api', 'permission' => 'settings.view'],
             ['key' => 'settings-navigation', 'title' => 'Navigation Menu', 'endpoint' => '/api/tenant/views/settings-navigation', 'permission' => 'settings.view'],
+            ['key' => 'settings-notifications', 'title' => 'Custom Notification Gateways', 'endpoint' => '/api/tenant/views/settings-notifications', 'permission' => 'settings.view'],
         ];
 
         if (! Schema::hasTable('sdui_screens')) {
@@ -839,7 +932,7 @@ class SchemaResponse
 
         $normalized = self::normalizeViewKey($viewKey);
         if (str_starts_with($normalized, 'settings-')
-            || in_array($normalized, ['mode', 'profile', 'branding', 'receipts', 'financial', 'taxes', 'api', 'api-integrations', 'navigation', 'navigation-menu'], true)) {
+            || in_array($normalized, ['mode', 'profile', 'branding', 'receipts', 'financial', 'taxes', 'api', 'api-integrations', 'navigation', 'navigation-menu', 'notifications', 'custom-notifications'], true)) {
             return 'settings.view';
         }
 
@@ -889,6 +982,7 @@ class SchemaResponse
             'settings-taxes', 'taxes' => self::taxesView($company),
             'settings-api', 'api', 'api-integrations' => self::apiView($company),
             'settings-navigation', 'navigation', 'navigation-menu' => self::navigationView($company),
+            'settings-notifications', 'notifications', 'custom-notifications' => self::notificationsView($company),
             default => null,
         };
 

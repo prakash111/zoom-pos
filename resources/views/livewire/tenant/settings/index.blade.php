@@ -587,6 +587,35 @@
                     </div>
                 </div>
 
+                <!-- Secondary Accent & Drawer / Sidebar Background -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <div class="space-y-1.5 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Secondary Accent Color') }}</label>
+                                <p class="text-[10px] text-slate-400">{{ __('Highlights, badges, and status pills') }}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="color" wire:model.live="accentColor" class="w-8 h-8 rounded-lg border-none cursor-pointer p-0 bg-transparent" title="{{ __('Pick Secondary Accent Color') }}">
+                                <span class="font-mono text-xs font-bold text-slate-700 dark:text-slate-300">{{ $accentColor }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Sidebar / Drawer Background') }}</label>
+                                <p class="text-[10px] text-slate-400">{{ __('Custom tint for mobile drawer & sidebar') }}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="color" wire:model.live="drawerBg" class="w-8 h-8 rounded-lg border-none cursor-pointer p-0 bg-transparent" title="{{ __('Pick Sidebar / Drawer Background') }}">
+                                <span class="font-mono text-xs font-bold text-slate-700 dark:text-slate-300">{{ $drawerBg }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Default POS Layout Design Selector -->
                 <div class="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                     <div>

@@ -73,6 +73,8 @@ class SettingsApiController extends Controller
             'country' => ['nullable', 'string', 'max:2'],
             'timezone' => ['nullable', 'string', 'max:64', 'timezone'],
             'primary_color' => ['nullable', 'string', 'max:16'],
+            'accent_color' => ['nullable', 'string', 'max:16'],
+            'drawer_bg' => ['nullable', 'string', 'max:16'],
             'default_commission_rate' => ['nullable', 'numeric', 'min:0'],
             'default_commission_type' => ['nullable', 'string', 'in:percentage,fixed'],
         ]);
@@ -516,7 +518,9 @@ class SettingsApiController extends Controller
             'timezone' => $company->timezone ?? '',
             'resolved_timezone' => $company->resolveTimezone(),
             'default_timezone_for_country' => \App\Models\Company::defaultTimezoneForCountry($company->country),
-            'primary_color' => $company->primary_color ?: '#2563eb',
+            'primary_color' => $company->primary_color ?: '#4F46E5',
+            'accent_color' => $company->accent_color ?: '#D97706',
+            'drawer_bg' => $company->drawer_bg ?: '#FFF7ED',
             'logo_url' => $company->getLogoUrl(),
             'favicon_url' => $company->getFaviconUrl(),
             'drawer_cover_url' => $company->getDrawerCoverUrl(),
@@ -727,12 +731,13 @@ class SettingsApiController extends Controller
             'icon' => ['nullable', 'string', 'max:255'],
             'url' => ['required', 'string', 'max:500', 'url'],
             'method' => ['nullable', 'string', 'in:POST,GET'],
+            'payload_format' => ['nullable', 'string', 'in:json,form_data,query_params'],
             'headers' => ['nullable', 'array'],
             'auth_type' => ['nullable', 'string', 'in:none,bearer,api_key'],
             'auth_value' => ['nullable', 'string', 'max:1000'],
             'payload_template' => ['nullable', 'string', 'max:5000'],
             'event_types' => ['nullable', 'array'],
-            'event_types.*' => ['string', 'in:invoice,quotation,due_reminder'],
+            'event_types.*' => ['string', 'in:invoice,quotation,due_reminder,due_invoice_reminder,delayed_order_alert'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
@@ -747,6 +752,7 @@ class SettingsApiController extends Controller
         $data = $validator->validated();
         $data['icon'] = $data['icon'] ?? 'webhook';
         $data['method'] = $data['method'] ?? 'POST';
+        $data['payload_format'] = $data['payload_format'] ?? 'json';
         $data['auth_type'] = $data['auth_type'] ?? 'none';
         $data['is_active'] = $data['is_active'] ?? true;
 
@@ -767,6 +773,73 @@ class SettingsApiController extends Controller
         ], $id === null ? 201 : 200);
     }
 
+    public function testNotificationChannel(
+        Request $request,
+        \App\Services\Notifications\CustomChannelDispatcherService $dispatcher
+    ): JsonResponse {
+        $company = $this->resolveCompany($request);
+
+        $channelId = $request->input('channel_id') ?? $request->input('id');
+        $channel = null;
+
+        if (! empty($channelId)) {
+            $channel = \App\Models\CustomNotificationChannel::where('company_id', $company->id)->find($channelId);
+            if (! $channel) {
+                return response()->json(['success' => false, 'error' => 'Notification channel not found.'], 404);
+            }
+        } else {
+            $validator = Validator::make($request->all(), [
+                'url' => ['required', 'string', 'url'],
+                'method' => ['nullable', 'string', 'in:POST,GET'],
+                'payload_format' => ['nullable', 'string', 'in:json,form_data,query_params'],
+                'headers' => ['nullable', 'array'],
+                'auth_type' => ['nullable', 'string', 'in:none,bearer,api_key'],
+                'auth_value' => ['nullable', 'string', 'max:1000'],
+                'payload_template' => ['nullable', 'string', 'max:5000'],
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Validation error.',
+                    'details' => $validator->errors(),
+                ], 422);
+            }
+
+            $channel = new \App\Models\CustomNotificationChannel([
+                'company_id' => $company->id,
+                'name' => 'Test Channel',
+                'url' => $request->input('url'),
+                'method' => $request->input('method', 'POST'),
+                'payload_format' => $request->input('payload_format', 'json'),
+                'headers' => $request->input('headers'),
+                'auth_type' => $request->input('auth_type', 'none'),
+                'auth_value' => $request->input('auth_value'),
+                'payload_template' => $request->input('payload_template'),
+                'is_active' => true,
+            ]);
+        }
+
+        $variables = [
+            'phone' => $request->input('phone', $company->phone ?: '+1234567890'),
+            'customer_name' => $request->input('customer_name', 'Test Customer'),
+            'invoice_id' => $request->input('invoice_id', 'INV-TEST-'.rand(100, 999)),
+            'amount' => $request->input('amount', '99.99'),
+            'order_link' => $request->input('order_link', url('/invoices/test')),
+            'date' => date('Y-m-d'),
+        ];
+
+        $result = $dispatcher->dispatch($channel, $variables);
+
+        return response()->json([
+            'success' => $result['success'],
+            'status_code' => $result['status_code'],
+            'response' => $result['response'],
+            'error' => $result['error'],
+            'message' => $result['success'] ? 'Test message sent successfully.' : 'Test message dispatch failed: '.$result['error'],
+        ], $result['success'] ? 200 : 422);
+    }
+
     private function presentChannel(\App\Models\CustomNotificationChannel $channel): array
     {
         return [
@@ -777,6 +850,7 @@ class SettingsApiController extends Controller
             'icon_is_url' => $channel->isIconUrl(),
             'url' => $channel->url,
             'method' => $channel->method,
+            'payload_format' => $channel->payload_format ?: 'json',
             'headers' => $channel->headers ?: (object) [],
             'auth_type' => $channel->auth_type,
             'has_auth_value' => filled($channel->auth_value),

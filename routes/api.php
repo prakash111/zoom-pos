@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\CatalogAdminApiController;
 use App\Http\Controllers\Api\V1\CatalogApiController;
 use App\Http\Controllers\Api\V1\ConsignmentApiController;
 use App\Http\Controllers\Api\V1\DeviceApiController;
+use App\Http\Controllers\Api\V1\EcommerceWebhookController;
 use App\Http\Controllers\Api\V1\LanguageApiController;
 use App\Http\Controllers\Api\V1\PayablesApiController;
 use App\Http\Controllers\Api\V1\PermissionApiController;
@@ -53,6 +54,13 @@ Route::prefix('tenant/password')->group(function () {
 Route::post('/tenant/profile/change-password', [PasswordResetController::class, 'changePassword'])
     ->middleware([AuthenticateTenantApi::class]);
 
+// Unauthenticated Dynamic Store Registration Metadata
+Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
+
+// Inbound Two-Way E-Commerce Webhook Receiver (Shopify / WooCommerce / Generic)
+Route::post('/v1/integrations/webhooks/{tenant_uuid}/orders', [EcommerceWebhookController::class, 'handleOrders']);
+Route::post('/integrations/webhooks/{tenant_uuid}/orders', [EcommerceWebhookController::class, 'handleOrders']);
+
 // Server-Driven UI Bootstrap, View Schemas, and Form Action Routes
 Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
@@ -61,6 +69,22 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     // Server-Driven UI Dynamic Schema Views
     Route::get('/tenant/views/{view}', [SduiViewController::class, 'show']);
     Route::get('/app/views/{view}', [SduiViewController::class, 'show']);
+
+    // Custom Notification Channels (SMS & Unofficial WhatsApp Gateways)
+    Route::prefix('tenant/settings/custom-notifications')->group(function () {
+        Route::get('/', [SettingsApiController::class, 'notificationChannelsIndex']);
+        Route::post('/', [SettingsApiController::class, 'notificationChannelsStore']);
+        Route::put('/{id}', [SettingsApiController::class, 'notificationChannelsUpdate']);
+        Route::delete('/{id}', [SettingsApiController::class, 'notificationChannelsDestroy']);
+        Route::post('/test', [SettingsApiController::class, 'testNotificationChannel']);
+    });
+    Route::prefix('pos/settings/custom-notifications')->group(function () {
+        Route::get('/', [SettingsApiController::class, 'notificationChannelsIndex']);
+        Route::post('/', [SettingsApiController::class, 'notificationChannelsStore']);
+        Route::put('/{id}', [SettingsApiController::class, 'notificationChannelsUpdate']);
+        Route::delete('/{id}', [SettingsApiController::class, 'notificationChannelsDestroy']);
+        Route::post('/test', [SettingsApiController::class, 'testNotificationChannel']);
+    });
 
     // Server-Driven UI Declarative Form Submissions
     Route::match(['post', 'put'], '/tenant/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
@@ -80,6 +104,8 @@ Route::prefix('v1/pos')->group(function () {
     Route::post('/auth/login', [PosSyncApiController::class, 'login']);
     Route::post('/auth/register', [PosSyncApiController::class, 'register']);
     Route::get('/auth/registration-config', [PosSyncApiController::class, 'registrationConfig']);
+    Route::get('/auth/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
+    Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
     Route::get('/auth/branding', [PosSyncApiController::class, 'branding']);
     Route::get('/auth/push-config', [PushDeviceApiController::class, 'config']);
 
@@ -290,7 +316,15 @@ Route::prefix('v1/pos')->group(function () {
         // App bootstrap (translations + nav customization + config + SDUI modules in one call)
         Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
         Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
+        // Settings: Nav & Custom Notifications
         Route::post('/settings/nav-config', [AppBootstrapController::class, 'updateNav'])->middleware('tenant.api.permission:settings,edit');
+        Route::prefix('settings/custom-notifications')->group(function () {
+            Route::get('/', [SettingsApiController::class, 'notificationChannelsIndex']);
+            Route::post('/', [SettingsApiController::class, 'notificationChannelsStore']);
+            Route::put('/{id}', [SettingsApiController::class, 'notificationChannelsUpdate']);
+            Route::delete('/{id}', [SettingsApiController::class, 'notificationChannelsDestroy']);
+            Route::post('/test', [SettingsApiController::class, 'testNotificationChannel']);
+        });
         Route::get('/views/{view}', [SduiViewController::class, 'show']);
     });
 });

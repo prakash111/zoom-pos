@@ -99,13 +99,42 @@ class SduiViewController extends Controller
             case 'api-integrations':
                 $validator = Validator::make($request->all(), [
                     'webhook_url' => ['nullable', 'url', 'max:255'],
+                    'outbound_webhook_url' => ['nullable', 'url', 'max:255'],
+                    'webhook_platform' => ['nullable', 'string', 'in:shopify,woocommerce,generic'],
+                    'webhook_hmac_secret' => ['nullable', 'string', 'max:500'],
+                    'outbound_webhook_secret' => ['nullable', 'string', 'max:500'],
+                    'outbound_events' => ['nullable', 'array'],
+                    'event_order_created' => ['nullable', 'boolean'],
+                    'event_order_settled' => ['nullable', 'boolean'],
+                    'event_order_cancelled' => ['nullable', 'boolean'],
+                    'event_stock_low_alert' => ['nullable', 'boolean'],
                     'ai_catalog_enrichment' => ['nullable', 'boolean'],
                     'ai_receipt_ocr' => ['nullable', 'boolean'],
                 ]);
                 if ($validator->fails()) {
                     return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
                 }
-                foreach ($validator->validated() as $key => $value) {
+                $validated = $validator->validated();
+
+                $outboundEvents = [];
+                if ($request->boolean('event_order_created')) $outboundEvents[] = 'order.created';
+                if ($request->boolean('event_order_settled')) $outboundEvents[] = 'order.settled';
+                if ($request->boolean('event_order_cancelled')) $outboundEvents[] = 'order.cancelled';
+                if ($request->boolean('event_stock_low_alert')) $outboundEvents[] = 'stock.low_alert';
+                if ($request->has('outbound_events') && is_array($request->input('outbound_events'))) {
+                    $outboundEvents = array_values(array_unique(array_merge($outboundEvents, $request->input('outbound_events'))));
+                }
+                if ($request->has('event_order_created') || $request->has('outbound_events')) {
+                    $validated['outbound_events'] = json_encode($outboundEvents);
+                }
+
+                // If outbound_webhook_url was passed, ensure webhook_url stays in sync
+                if (isset($validated['outbound_webhook_url']) && empty($validated['webhook_url'])) {
+                    $validated['webhook_url'] = $validated['outbound_webhook_url'];
+                }
+
+                foreach ($validated as $key => $value) {
+                    if (str_starts_with($key, 'event_')) continue;
                     Configuration::withoutGlobalScopes()->updateOrCreate(
                         ['company_id' => $company->id, 'key' => $key],
                         ['value' => is_bool($value) ? ($value ? '1' : '0') : $value]
@@ -114,6 +143,10 @@ class SduiViewController extends Controller
                 AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'api_integrations']);
 
                 return response()->json(['success' => true, 'message' => 'API and integration settings updated successfully.']);
+
+            case 'notifications':
+            case 'custom-notifications':
+                return $settingsController->testNotificationChannel($request, app(\App\Services\Notifications\CustomChannelDispatcherService::class));
 
             case 'mode':
                 return response()->json([

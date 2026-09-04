@@ -56,6 +56,7 @@ class AppBootstrapController extends Controller
             'modules' => $allModules,
             'active_module' => $activeModule,
             'menu_structure' => $menuStructure,
+            'theme' => $company->getThemeTokens(),
             'screens' => SchemaResponse::screenDirectory($company),
             'schema_contract' => SchemaResponse::contract(),
             'ui_schema' => [
