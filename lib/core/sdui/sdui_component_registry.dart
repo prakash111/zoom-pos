@@ -48,6 +48,8 @@ class SduiComponentRegistry {
         const UniversalPosScreen(endpoint: '/api/tenant/views/pharmacy-pos'),
     'repair_pos': (_) =>
         const UniversalPosScreen(endpoint: '/api/tenant/views/repair-pos'),
+    'salon_pos': (_) =>
+        const UniversalPosScreen(endpoint: '/api/tenant/views/salon-pos'),
 
     // Cash & Sales
     'sales': (_) => const SalesScreen(),
