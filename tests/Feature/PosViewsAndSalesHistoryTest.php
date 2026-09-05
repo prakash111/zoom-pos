@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\CashRegister;
 use App\Models\Company;
+use App\Models\Customer;
 use App\Models\Plan;
 use App\Models\Product;
 use App\Models\Sale;
@@ -246,5 +248,118 @@ class PosViewsAndSalesHistoryTest extends TestCase
 
         $terminalToken->refresh();
         $this->assertFalse((bool) $terminalToken->active);
+    }
+
+    public function test_quotations_customers_cash_register_views_render_valid_sdui_schemas(): void
+    {
+        Customer::create([
+            'company_id' => $this->company->id,
+            'name' => 'Jim Halpert',
+            'phone' => '+1555123456',
+            'email' => 'jim@dundermifflin.com',
+            'due_balance' => 45.00,
+        ]);
+
+        Sale::create([
+            'company_id' => $this->company->id,
+            'sale_number' => 'QUO-0001',
+            'customer_name' => 'Jim Halpert',
+            'user_id' => $this->admin->id,
+            'total' => 350.00,
+            'operation_type' => 'quotation',
+            'status' => 'draft',
+        ]);
+
+        CashRegister::create([
+            'company_id' => $this->company->id,
+            'opened_by' => $this->admin->id,
+            'opening_balance' => 100.00,
+            'expected_closing_balance' => 100.00,
+            'status' => 'open',
+            'opened_at' => now(),
+        ]);
+
+        $views = ['quotations', 'customers', 'cash-register'];
+
+        foreach ($views as $view) {
+            $response = $this->getJson("/api/tenant/views/{$view}", $this->authHeaders());
+            $response->assertStatus(200);
+            $response->assertJsonPath('success', true);
+            $response->assertJsonPath('view', $view);
+
+            $schema = $response->json('schema');
+            $this->assertIsArray($schema);
+            $this->assertNotEmpty($schema['components']);
+
+            $errors = app(SchemaValidator::class)->validate($schema);
+            $this->assertEmpty($errors, "Schema validation failed for view '{$view}': ".json_encode($errors));
+        }
+    }
+
+    public function test_navigation_drawer_accordion_is_collapsed_by_default_and_has_consistent_metadata(): void
+    {
+        $bootstrapRes = $this->getJson('/api/v1/pos/app/bootstrap?locale=en', $this->authHeaders());
+        $bootstrapRes->assertStatus(200);
+
+        $menuStructure = $bootstrapRes->json('menu_structure');
+        $this->assertIsArray($menuStructure);
+        $this->assertNotEmpty($menuStructure);
+
+        $foundAccordion = false;
+        foreach ($menuStructure as $section) {
+            foreach ($section['items'] ?? [] as $item) {
+                if (! empty($item['children'])) {
+                    $foundAccordion = true;
+                    // Accordion must be collapsed by default
+                    $this->assertFalse($item['initially_expanded'] ?? true, "Parent item {$item['key']} must have initially_expanded: false");
+                    $this->assertFalse($item['expanded'] ?? true, "Parent item {$item['key']} must have expanded: false");
+                    $this->assertFalse($item['is_expanded'] ?? true, "Parent item {$item['key']} must have is_expanded: false");
+                    $this->assertSame('accordion', $item['type']);
+
+                    // Children must carry parent_id and type link
+                    foreach ($item['children'] as $child) {
+                        $this->assertSame($item['key'], $child['parent_id'] ?? $child['parent']);
+                        $this->assertSame('link', $child['type']);
+                    }
+                }
+            }
+        }
+
+        $this->assertTrue($foundAccordion, 'Expected to find at least one accordion parent item with children');
+    }
+
+    public function test_custom_nav_config_persists_and_serves_in_bootstrap_menu_structure(): void
+    {
+        $savePayload = [
+            'sections' => [
+                ['key' => 'cashier_sales', 'order' => 0],
+                ['key' => 'administration', 'order' => 1],
+            ],
+            'items' => [
+                ['key' => 'pos', 'section' => 'cashier_sales', 'order' => 0, 'visible' => true],
+                ['key' => 'sales', 'section' => 'cashier_sales', 'order' => 1, 'visible' => true],
+                ['key' => 'quotations', 'section' => 'cashier_sales', 'order' => 2, 'visible' => false],
+            ],
+        ];
+
+        $saveRes = $this->postJson('/api/v1/pos/settings/nav-config', $savePayload, $this->authHeaders());
+        $saveRes->assertStatus(200);
+        $saveRes->assertJsonPath('success', true);
+
+        // Verify that bootstrap serves the custom menu structure
+        $bootstrapRes = $this->getJson('/api/v1/pos/app/bootstrap?locale=en', $this->authHeaders());
+        $bootstrapRes->assertStatus(200);
+
+        $customStructure = $bootstrapRes->json('menu_structure');
+        $this->assertIsArray($customStructure);
+
+        $cashierSection = collect($customStructure)->firstWhere('key', 'cashier_sales');
+        $this->assertNotNull($cashierSection);
+
+        $itemKeys = collect($cashierSection['items'])->pluck('key')->all();
+        $this->assertContains('pos', $itemKeys);
+        $this->assertContains('sales', $itemKeys);
+        // Hidden items must be excluded from the live menu structure
+        $this->assertNotContains('quotations', $itemKeys);
     }
 }

@@ -2,8 +2,10 @@
 
 namespace App\Services\Sdui;
 
+use App\Models\CashRegister;
 use App\Models\Company;
 use App\Models\Configuration;
+use App\Models\Customer;
 use App\Models\CustomNotificationChannel;
 use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
@@ -729,7 +731,7 @@ class SchemaResponse
             ->where('company_id', $company->id)
             ->where('active', true)
             ->with(['pharmacyBatches' => fn ($q) => $q->where('is_active', true)->orderBy('expiry_date', 'asc')])
-            ->limit(15)
+            ->limit(20)
             ->get();
 
         $medicineCards = [];
@@ -738,12 +740,12 @@ class SchemaResponse
             $fefoBatch = $batches->first(fn ($b) => $b->days_until_expiry >= 0 && $b->stock_qty > 0);
 
             $batchBadge = $fefoBatch
-                ? self::badge("FEFO Batch #{$fefoBatch->batch_number} (Exp: {$fefoBatch->expiry_date?->format('M Y')})", $fefoBatch->expiry_color, 'subtle')
-                : self::badge('No Active Batches', '#64748b', 'subtle');
+                ? self::badge("Batch #{$fefoBatch->batch_number} (Exp: {$fefoBatch->expiry_date?->format('M y')})", $fefoBatch->expiry_color, 'subtle')
+                : self::badge('No Batches', '#64748b', 'subtle');
 
             $scheduleBadge = $prod->narcotic_schedule
                 ? self::badge($prod->narcotic_schedule, '#ef4444', 'solid')
-                : ($prod->requires_prescription ? self::badge('Rx Required', '#f59e0b', 'subtle') : self::badge('OTC', '#10b981', 'subtle'));
+                : ($prod->requires_prescription ? self::badge('Rx', '#f59e0b', 'subtle') : self::badge('OTC', '#10b981', 'subtle'));
 
             // Build FEFO batch selection modal sheet
             $batchModalComponents = [
@@ -784,48 +786,21 @@ class SchemaResponse
 
             $medicineCards[] = self::card([
                 self::row([
-                    self::column([
-                        self::icon('medication', ['color' => '#059669', 'size' => 28]),
-                        $scheduleBadge,
-                    ]),
-                    self::column([
-                        self::text($prod->name, 'title_medium', ['bold' => true]),
-                        self::text('Generic: '.($prod->generic_name ?: ($prod->composition ?: 'Standard Formulation')), 'body_small', ['color' => '#64748b']),
-                        $batchBadge,
-                    ]),
-                    self::column([
-                        self::text($currency.number_format((float) $prod->sale_price, 2), 'title_large', ['bold' => true, 'color' => '#059669']),
-                        self::text('Stock: '.(int) $prod->current_stock.' units', 'body_small', ['color' => '#64748b']),
-                    ]),
-                ]),
-                self::divider(),
+                    self::icon('medication', ['color' => '#059669', 'size' => 22]),
+                    $scheduleBadge,
+                ], ['main_axis_alignment' => 'space_between']),
+                self::text($prod->name, 'title_small', ['bold' => true]),
+                self::text($prod->generic_name ?: ($prod->composition ?: 'Standard Formulation'), 'body_small', ['color' => '#64748b']),
+                $batchBadge,
                 self::row([
-                    self::text('Unit MRP: '.$currency.number_format((float) $prod->sale_price, 2), 'label_medium', ['bold' => true]),
-                    self::buttonPrimary('Select Batch & Add', self::openModalAction("Select FEFO Batch - {$prod->name}", $batchModalComponents), 'add_circle'),
-                ]),
+                    self::text($currency.number_format((float) $prod->sale_price, 2), 'title_medium', ['bold' => true, 'color' => '#059669']),
+                    self::badge('Stock: '.(int) $prod->current_stock, (int) $prod->current_stock > 0 ? '#10b981' : '#ef4444', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::buttonPrimary('Select Batch', self::openModalAction("Select FEFO Batch - {$prod->name}", $batchModalComponents), 'add_circle'),
             ]);
         }
 
         return self::screen('Pharmacy Counter POS', [
-            self::card([
-                self::row([
-                    self::icon('local_pharmacy', ['color' => '#059669', 'size' => 28]),
-                    self::column([
-                        self::text('Pharmacy Dispensing Terminal', 'title_medium', ['bold' => true]),
-                        self::text('FEFO Automated Batch Allocation, Controlled Drug Validation & Split Checkout', 'body_small', ['color' => '#64748b']),
-                    ]),
-                ]),
-                self::divider(),
-                self::wrap([
-                    self::badge('All Medicines', '#059669', 'solid'),
-                    self::badge('Antibiotics', '#64748b', 'subtle'),
-                    self::badge('Analgesics', '#64748b', 'subtle'),
-                    self::badge('Cardiology', '#64748b', 'subtle'),
-                    self::badge('Schedule H (Rx)', '#ef4444', 'subtle'),
-                    self::badge('OTC Health', '#10b981', 'subtle'),
-                ]),
-            ]),
-
             self::card([
                 self::row([
                     self::column([
@@ -833,6 +808,12 @@ class SchemaResponse
                             'placeholder' => 'e.g. Paracetamol, Amoxicillin 500mg...',
                         ]),
                     ]),
+                    self::buttonOutlined('Scan', self::openModalAction('Medicine Barcode Scanner', [
+                        self::text('Scan Medicine Barcode or DataMatrix', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::textInput('scanned_barcode', 'Barcode / GS1 Code', '', ['placeholder' => 'Point scanner or enter code...']),
+                        self::buttonPrimary('Lookup & Allocate FEFO Batch', self::popAction(), 'qr_code_scanner'),
+                    ]), 'qr_code_scanner'),
                     self::buttonOutlined('Patient / Rx', self::openModalAction('Prescription (Rx) & Patient Details', [
                         self::text('Prescription Details for Schedule H & Narcotic Drugs', 'title_medium', ['bold' => true]),
                         self::divider(),
@@ -843,34 +824,56 @@ class SchemaResponse
                         self::textInput('diagnosis', 'Diagnosis / Dosage Instructions', ''),
                         self::buttonPrimary('Save Patient Details', self::popAction(), 'check'),
                     ]), 'person_add'),
-                ]),
-            ]),
-
-            self::card([
-                self::text('Medicine Catalog & FEFO Stock', 'title_medium', ['bold' => true]),
-                self::column($medicineCards),
-            ]),
-
-            self::card([
-                self::text('Dispensing Register & Checkout', 'title_medium', ['bold' => true]),
-                self::dropdownSelect('payment_method', 'Payment Method', [
-                    ['label' => 'Cash Payment', 'value' => 'cash'],
-                    ['label' => 'Debit / Credit Card', 'value' => 'card'],
-                    ['label' => 'UPI / QR Code', 'value' => 'upi'],
-                    ['label' => 'Split Payment', 'value' => 'split'],
-                    ['label' => 'Patient Credit / Khata', 'value' => 'credit'],
-                ], 'cash'),
-                self::textInput('customer_name', 'Customer / Patient Name', 'Walk-in Customer'),
-                self::textInput('customer_phone', 'Phone Number', ''),
-                self::textInput('discount_amount', 'Discount Amount', '0.00'),
-                self::textInput('checkout_notes', 'Dispensing Notes', 'Counter Sale'),
+                ], ['spacing' => 8]),
                 self::divider(),
-                self::buttonPrimary('Complete Checkout & Dispense', self::formSubmitAction(
-                    '/api/tenant/pharmacy/checkout',
-                    'POST',
-                    'Pharmacy transaction completed and stock dispensed successfully.',
-                    reload: true
-                ), 'point_of_sale'),
+                self::wrap([
+                    self::badge('All Medicines', '#059669', 'solid'),
+                    self::badge('Antibiotics', '#64748b', 'subtle'),
+                    self::badge('Analgesics', '#64748b', 'subtle'),
+                    self::badge('Cardiology', '#64748b', 'subtle'),
+                    self::badge('Schedule H (Rx)', '#ef4444', 'subtle'),
+                    self::badge('OTC Health', '#10b981', 'subtle'),
+                ], ['spacing' => 6, 'run_spacing' => 6]),
+            ]),
+
+            self::card([
+                self::text('Medicine Catalog & FEFO Batches', 'title_medium', ['bold' => true]),
+                self::text('Tap medicine to select active FEFO batch before adding to cart:', 'body_small', ['color' => '#64748b']),
+                self::divider(),
+                ! empty($medicineCards)
+                    ? self::gridView($medicineCards, 2, ['spacing' => 10, 'run_spacing' => 10])
+                    : self::text('No active medicines found. Add products and batches to begin dispensing.', 'body_medium', ['color' => '#64748b']),
+            ]),
+
+            self::card([
+                self::row([
+                    self::column([
+                        self::text('Dispensing Cart: 0 items', 'label_medium', ['color' => '#64748b']),
+                        self::text($currency.'0.00', 'title_large', ['bold' => true, 'color' => '#059669']),
+                    ]),
+                    self::buttonPrimary('Open Cart / Checkout', self::openModalAction('Dispensing Cart & Payment Settlement', [
+                        self::text('Order Summary & Payment', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::textInput('customer_name', 'Customer / Patient Name', 'Walk-in Customer'),
+                        self::textInput('customer_phone', 'Phone Number', ''),
+                        self::dropdownSelect('payment_method', 'Payment Method', [
+                            ['label' => 'Cash Payment', 'value' => 'cash'],
+                            ['label' => 'Debit / Credit Card', 'value' => 'card'],
+                            ['label' => 'UPI / QR Code', 'value' => 'upi'],
+                            ['label' => 'Patient Credit / Khata', 'value' => 'credit'],
+                            ['label' => 'Split Payment', 'value' => 'split'],
+                        ], 'cash'),
+                        self::textInput('discount_amount', 'Discount Amount', '0.00'),
+                        self::textInput('checkout_notes', 'Dispensing Notes', 'Counter Sale'),
+                        self::divider(),
+                        self::buttonPrimary('Complete Checkout & Dispense', self::formSubmitAction(
+                            '/api/tenant/pharmacy/checkout',
+                            'POST',
+                            'Pharmacy transaction completed and stock dispensed successfully.',
+                            reload: true
+                        ), 'point_of_sale'),
+                    ]), 'shopping_cart_checkout'),
+                ], ['main_axis_alignment' => 'space_between']),
             ]),
         ]);
     }
@@ -1846,45 +1849,49 @@ class SchemaResponse
         foreach ($services as $svc) {
             $serviceCards[] = self::card([
                 self::row([
-                    self::icon('spa', ['color' => '#7c3aed', 'size' => 26]),
-                    self::column([
-                        self::text($svc['name'], 'title_medium', ['bold' => true]),
-                        self::text("Duration: {$svc['duration']} • {$svc['category']}", 'body_small', ['color' => '#64748b']),
-                    ]),
-                    self::column([
-                        self::text($currency.number_format($svc['price'], 2), 'title_large', ['bold' => true, 'color' => '#7c3aed']),
-                        self::badge($svc['duration'], '#8b5cf6', 'subtle'),
-                    ]),
-                ]),
-                self::divider(),
+                    self::icon('spa', ['color' => '#7c3aed', 'size' => 22]),
+                    self::badge($svc['duration'], '#8b5cf6', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::text($svc['name'], 'title_small', ['bold' => true]),
+                self::text("Duration: {$svc['duration']} • {$svc['category']}", 'body_small', ['color' => '#64748b']),
                 self::row([
-                    self::text("Category: {$svc['category']}", 'label_medium'),
-                    self::buttonPrimary('Book & Add to Bill', self::openModalAction("Book {$svc['name']}", [
-                        self::text("Add {$svc['name']} ({$currency}".number_format($svc['price'], 2).') to cart.', 'body_medium'),
-                        self::textInput('client_name', 'Client Full Name', 'Walk-in Client'),
-                        self::textInput('client_phone', 'Phone Number', ''),
-                        self::dropdownSelect('stylist_assigned', 'Assigned Stylist / Specialist', [
-                            ['label' => 'Any Available Specialist', 'value' => 'any'],
-                            ['label' => 'Senior Stylist Alex', 'value' => 'alex'],
-                            ['label' => 'Esthetician Sarah', 'value' => 'sarah'],
-                            ['label' => 'Therapist David', 'value' => 'david'],
-                        ], 'any'),
-                        self::textInput('appointment_time', 'Booking Time Slot', date('Y-m-d H:i')),
-                        self::buttonPrimary('Add Service to Cart', self::popAction(), 'add_shopping_cart'),
-                    ]), 'add'),
-                ]),
+                    self::text($currency.number_format($svc['price'], 2), 'title_medium', ['bold' => true, 'color' => '#7c3aed']),
+                    self::badge($svc['category'], '#64748b', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::buttonPrimary('Book & Add', self::openModalAction("Book {$svc['name']}", [
+                    self::text("Add {$svc['name']} ({$currency}".number_format($svc['price'], 2).') to bill.', 'body_medium'),
+                    self::divider(),
+                    self::textInput('client_name', 'Client Full Name', 'Walk-in Client'),
+                    self::textInput('client_phone', 'Phone Number', ''),
+                    self::dropdownSelect('stylist_assigned', 'Assigned Stylist / Specialist', [
+                        ['label' => 'Any Available Specialist', 'value' => 'any'],
+                        ['label' => 'Senior Stylist Alex', 'value' => 'alex'],
+                        ['label' => 'Esthetician Sarah', 'value' => 'sarah'],
+                        ['label' => 'Therapist David', 'value' => 'david'],
+                    ], 'any'),
+                    self::textInput('appointment_time', 'Booking Time Slot', date('Y-m-d H:i')),
+                    self::buttonPrimary('Add Service to Cart', self::popAction(), 'add_shopping_cart'),
+                ]), 'add'),
             ]);
         }
 
         return self::screen('Salon & Service POS', [
             self::card([
                 self::row([
-                    self::icon('spa', ['color' => '#7c3aed', 'size' => 28]),
                     self::column([
-                        self::text('Service & Salon POS Terminal', 'title_medium', ['bold' => true]),
-                        self::text('Fast appointment billing, specialist assignments, packages, and instant checkout.', 'body_small', ['color' => '#64748b']),
+                        self::textInput('search_service', 'Search Services or Treatment Packages', '', [
+                            'placeholder' => 'e.g. Haircut, Facial, Pedicure, Massage...',
+                        ]),
                     ]),
-                ]),
+                    self::buttonOutlined('Client', self::openModalAction('Assign Client Details', [
+                        self::text('Client Details & Preferences', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::textInput('client_name', 'Client Name', ''),
+                        self::textInput('client_phone', 'Client Phone Number', ''),
+                        self::textInput('notes', 'Preferences / Allergies', ''),
+                        self::buttonPrimary('Confirm Client', self::popAction(), 'check'),
+                    ]), 'person_add'),
+                ], ['spacing' => 8]),
                 self::divider(),
                 self::wrap([
                     self::badge('All Services', '#7c3aed', 'solid'),
@@ -1893,49 +1900,44 @@ class SchemaResponse
                     self::badge('Nails & Pedicure', '#64748b', 'subtle'),
                     self::badge('Body Massage', '#64748b', 'subtle'),
                     self::badge('Packages', '#64748b', 'subtle'),
-                ]),
+                ], ['spacing' => 6, 'run_spacing' => 6]),
+            ]),
+
+            self::card([
+                self::text('Available Services & Treatments', 'title_medium', ['bold' => true]),
+                self::text('Select beauty treatments or salon packages:', 'body_small', ['color' => '#64748b']),
+                self::divider(),
+                self::gridView($serviceCards, 2, ['spacing' => 10, 'run_spacing' => 10]),
             ]),
 
             self::card([
                 self::row([
                     self::column([
-                        self::textInput('search_service', 'Search Services or Treatment Packages', '', [
-                            'placeholder' => 'e.g. Haircut, Facial, Pedicure, Massage',
-                        ]),
+                        self::text('Service Cart: 0 items', 'label_medium', ['color' => '#64748b']),
+                        self::text($currency.'0.00', 'title_large', ['bold' => true, 'color' => '#7c3aed']),
                     ]),
-                    self::buttonOutlined('Assign Client', self::openModalAction('Assign Client Details', [
-                        self::textInput('client_name', 'Client Name', ''),
-                        self::textInput('client_phone', 'Client Phone Number', ''),
-                        self::textInput('notes', 'Preferences / Allergies', ''),
-                        self::buttonPrimary('Confirm Client', self::popAction(), 'check'),
-                    ]), 'person_add'),
-                ]),
-            ]),
-
-            self::card([
-                self::text('Available Services & Treatments', 'title_medium', ['bold' => true]),
-                self::column($serviceCards),
-            ]),
-
-            self::card([
-                self::text('Service Checkout & Settlement', 'title_medium', ['bold' => true]),
-                self::dropdownSelect('payment_method', 'Payment Method', [
-                    ['label' => 'Cash Payment', 'value' => 'cash'],
-                    ['label' => 'Debit / Credit Card', 'value' => 'card'],
-                    ['label' => 'UPI / QR Code', 'value' => 'upi'],
-                    ['label' => 'Split Payment', 'value' => 'split'],
-                    ['label' => 'Client Credit / Khata', 'value' => 'credit'],
-                ], 'cash'),
-                self::textInput('client_name', 'Client Name', 'Walk-in Client'),
-                self::textInput('discount_amount', 'Discount Amount', '0.00'),
-                self::textInput('tip_amount', 'Stylist Tip Amount', '0.00'),
-                self::divider(),
-                self::buttonPrimary('Complete Checkout & Settle', self::formSubmitAction(
-                    '/api/tenant/pharmacy/checkout',
-                    'POST',
-                    'Service order settled and receipt generated.',
-                    reload: true
-                ), 'point_of_sale'),
+                    self::buttonPrimary('Open Cart / Checkout', self::openModalAction('Service Checkout & Settlement', [
+                        self::text('Service Order & Settlement', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::dropdownSelect('payment_method', 'Payment Method', [
+                            ['label' => 'Cash Payment', 'value' => 'cash'],
+                            ['label' => 'Debit / Credit Card', 'value' => 'card'],
+                            ['label' => 'UPI / QR Code', 'value' => 'upi'],
+                            ['label' => 'Client Credit / Khata', 'value' => 'credit'],
+                            ['label' => 'Split Payment', 'value' => 'split'],
+                        ], 'cash'),
+                        self::textInput('client_name', 'Client Name', 'Walk-in Client'),
+                        self::textInput('discount_amount', 'Discount Amount', '0.00'),
+                        self::textInput('tip_amount', 'Stylist Tip Amount', '0.00'),
+                        self::divider(),
+                        self::buttonPrimary('Complete Checkout & Settle', self::formSubmitAction(
+                            '/api/tenant/pharmacy/checkout',
+                            'POST',
+                            'Service order settled and receipt generated.',
+                            reload: true
+                        ), 'point_of_sale'),
+                    ]), 'shopping_cart_checkout'),
+                ], ['main_axis_alignment' => 'space_between']),
             ]),
         ]);
     }
@@ -1953,47 +1955,25 @@ class SchemaResponse
         foreach ($products as $p) {
             $productCards[] = self::card([
                 self::row([
-                    self::icon('inventory_2', ['color' => '#0284c7', 'size' => 26]),
-                    self::column([
-                        self::text($p->name, 'title_medium', ['bold' => true]),
-                        self::text('SKU: '.($p->sku ?: ($p->barcode ?: 'General')).' • Stock: '.(int) $p->current_stock, 'body_small', ['color' => '#64748b']),
-                    ]),
-                    self::column([
-                        self::text($currency.number_format((float) $p->sale_price, 2), 'title_large', ['bold' => true, 'color' => '#059669']),
-                        self::badge('In Stock', '#10b981', 'subtle'),
-                    ]),
-                ]),
-                self::divider(),
+                    self::icon('inventory_2', ['color' => '#1d4ed8', 'size' => 22]),
+                    self::badge('In Stock', '#10b981', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::text($p->name, 'title_small', ['bold' => true]),
+                self::text('SKU: '.($p->sku ?: ($p->barcode ?: 'General')).' • Stock: '.(int) $p->current_stock, 'body_small', ['color' => '#64748b']),
                 self::row([
-                    self::text('Unit Price: '.$currency.number_format((float) $p->sale_price, 2), 'label_medium', ['bold' => true]),
-                    self::buttonPrimary('Add to Cart', self::openModalAction("Add {$p->name}", [
-                        self::text("Adding {$p->name} to current register cart.", 'body_medium'),
-                        self::stepCounter('cart_qty', 'Quantity', 1, 1, max(1, (int) $p->current_stock)),
-                        self::buttonPrimary('Confirm Add', self::popAction(), 'add_shopping_cart'),
-                    ]), 'add_shopping_cart'),
-                ]),
+                    self::text($currency.number_format((float) $p->sale_price, 2), 'title_medium', ['bold' => true, 'color' => '#059669']),
+                    self::badge($currency.number_format((float) $p->sale_price, 2), '#1d4ed8', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::buttonPrimary('Add to Cart', self::openModalAction("Add {$p->name}", [
+                    self::text("Adding {$p->name} to current register cart.", 'body_medium'),
+                    self::divider(),
+                    self::stepCounter('cart_qty', 'Quantity', 1, 1, max(1, (int) $p->current_stock)),
+                    self::buttonPrimary('Confirm Add to Cart', self::popAction(), 'add_shopping_cart'),
+                ]), 'add_shopping_cart'),
             ]);
         }
 
         return self::screen('Retail Point of Sale', [
-            self::card([
-                self::row([
-                    self::icon('point_of_sale', ['color' => '#0284c7', 'size' => 28]),
-                    self::column([
-                        self::text('Counter POS Terminal', 'title_medium', ['bold' => true]),
-                        self::text('Fast barcode scanning, customer ledger, split tenders, and instant invoice printing.', 'body_small', ['color' => '#64748b']),
-                    ]),
-                ]),
-                self::divider(),
-                self::wrap([
-                    self::badge('All Items', '#0284c7', 'solid'),
-                    self::badge('General', '#64748b', 'subtle'),
-                    self::badge('Beverages', '#64748b', 'subtle'),
-                    self::badge('Electronics', '#64748b', 'subtle'),
-                    self::badge('Grocery', '#64748b', 'subtle'),
-                ]),
-            ]),
-
             self::card([
                 self::row([
                     self::column([
@@ -2001,39 +1981,65 @@ class SchemaResponse
                             'placeholder' => 'Enter item name, barcode, or SKU...',
                         ]),
                     ]),
+                    self::buttonOutlined('Scan', self::openModalAction('Barcode Scanner', [
+                        self::text('Scan Product Barcode', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::textInput('scanned_code', 'Barcode / UPC / EAN', '', ['placeholder' => 'Point scanner or enter barcode...']),
+                        self::buttonPrimary('Lookup & Add Item', self::popAction(), 'qr_code_scanner'),
+                    ]), 'qr_code_scanner'),
                     self::buttonOutlined('Customer', self::openModalAction('Assign Customer', [
+                        self::text('Customer Information', 'title_medium', ['bold' => true]),
+                        self::divider(),
                         self::textInput('cust_name', 'Customer Full Name', ''),
                         self::textInput('cust_phone', 'Phone Number', ''),
                         self::buttonPrimary('Assign Customer', self::popAction(), 'check'),
                     ]), 'person_add'),
-                ]),
+                ], ['spacing' => 8]),
+                self::divider(),
+                self::wrap([
+                    self::badge('All Items', '#1d4ed8', 'solid'),
+                    self::badge('General', '#64748b', 'subtle'),
+                    self::badge('Beverages', '#64748b', 'subtle'),
+                    self::badge('Electronics', '#64748b', 'subtle'),
+                    self::badge('Grocery', '#64748b', 'subtle'),
+                ], ['spacing' => 6, 'run_spacing' => 6]),
             ]),
 
             self::card([
                 self::text('Product Catalog', 'title_medium', ['bold' => true]),
-                self::column(! empty($productCards) ? $productCards : [
-                    self::text('No active products in catalog. Add inventory items to begin selling.', 'body_medium', ['color' => '#64748b']),
-                ]),
+                self::divider(),
+                ! empty($productCards)
+                    ? self::gridView($productCards, 2, ['spacing' => 10, 'run_spacing' => 10])
+                    : self::text('No active products in catalog. Add inventory items to begin selling.', 'body_medium', ['color' => '#64748b']),
             ]),
 
             self::card([
-                self::text('Register Checkout & Settlement', 'title_medium', ['bold' => true]),
-                self::dropdownSelect('payment_method', 'Payment Method', [
-                    ['label' => 'Cash Payment', 'value' => 'cash'],
-                    ['label' => 'Debit / Credit Card', 'value' => 'card'],
-                    ['label' => 'UPI / QR Code', 'value' => 'upi'],
-                    ['label' => 'Split Payment', 'value' => 'split'],
-                    ['label' => 'Customer Credit / Khata', 'value' => 'credit'],
-                ], 'cash'),
-                self::textInput('customer_name', 'Customer Name', 'Walk-in Customer'),
-                self::textInput('discount_amount', 'Discount Amount', '0.00'),
-                self::divider(),
-                self::buttonPrimary('Complete Checkout & Settle', self::formSubmitAction(
-                    '/api/tenant/pharmacy/checkout',
-                    'POST',
-                    'Sale completed and invoice generated.',
-                    reload: true
-                ), 'point_of_sale'),
+                self::row([
+                    self::column([
+                        self::text('Cart: 0 items', 'label_medium', ['color' => '#64748b']),
+                        self::text($currency.'0.00', 'title_large', ['bold' => true, 'color' => '#059669']),
+                    ]),
+                    self::buttonPrimary('Open Cart / Checkout', self::openModalAction('Register Checkout & Settlement', [
+                        self::text('Order Summary & Payment', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::dropdownSelect('payment_method', 'Payment Method', [
+                            ['label' => 'Cash Payment', 'value' => 'cash'],
+                            ['label' => 'Debit / Credit Card', 'value' => 'card'],
+                            ['label' => 'UPI / QR Code', 'value' => 'upi'],
+                            ['label' => 'Customer Credit / Khata', 'value' => 'credit'],
+                            ['label' => 'Split Payment', 'value' => 'split'],
+                        ], 'cash'),
+                        self::textInput('customer_name', 'Customer Name', 'Walk-in Customer'),
+                        self::textInput('discount_amount', 'Discount Amount', '0.00'),
+                        self::divider(),
+                        self::buttonPrimary('Complete Checkout & Settle', self::formSubmitAction(
+                            '/api/tenant/pharmacy/checkout',
+                            'POST',
+                            'Sale completed and invoice generated.',
+                            reload: true
+                        ), 'point_of_sale'),
+                    ]), 'shopping_cart_checkout'),
+                ], ['main_axis_alignment' => 'space_between']),
             ]),
         ]);
     }
@@ -2044,7 +2050,7 @@ class SchemaResponse
 
         $catalogItems = [
             [
-                'name' => 'OLED Display & Touch Digitizer Assembly',
+                'name' => 'OLED Display Assembly',
                 'category' => 'Screens & Displays',
                 'type' => 'spare_part',
                 'sku' => 'PART-DISP-01',
@@ -2054,7 +2060,7 @@ class SchemaResponse
                 'color' => '#0284c7',
             ],
             [
-                'name' => 'High-Capacity Replacement Battery (OEM)',
+                'name' => 'Replacement Battery (OEM)',
                 'category' => 'Batteries & Charging',
                 'type' => 'spare_part',
                 'sku' => 'PART-BATT-02',
@@ -2064,7 +2070,7 @@ class SchemaResponse
                 'color' => '#10b981',
             ],
             [
-                'name' => 'USB-C / Lightning Charging Port Board',
+                'name' => 'USB-C Charging Port Board',
                 'category' => 'Ports & Flex',
                 'type' => 'spare_part',
                 'sku' => 'PART-PORT-03',
@@ -2074,7 +2080,7 @@ class SchemaResponse
                 'color' => '#f59e0b',
             ],
             [
-                'name' => 'Rear Camera Module (Dual Sensor)',
+                'name' => 'Rear Camera Module',
                 'category' => 'Camera & Audio',
                 'type' => 'spare_part',
                 'sku' => 'PART-CAM-04',
@@ -2084,7 +2090,7 @@ class SchemaResponse
                 'color' => '#8b5cf6',
             ],
             [
-                'name' => 'Earpiece Speaker & Sensor Ribbon',
+                'name' => 'Earpiece Speaker Ribbon',
                 'category' => 'Camera & Audio',
                 'type' => 'spare_part',
                 'sku' => 'PART-SPK-05',
@@ -2094,7 +2100,7 @@ class SchemaResponse
                 'color' => '#06b6d4',
             ],
             [
-                'name' => 'Precision Bench Diagnostic & Testing',
+                'name' => 'Bench Diagnostic & Testing',
                 'category' => 'Technician Labor',
                 'type' => 'labor',
                 'sku' => 'SRV-DIAG-01',
@@ -2104,7 +2110,7 @@ class SchemaResponse
                 'color' => '#6366f1',
             ],
             [
-                'name' => 'Screen Replacement Standard Labor Fee',
+                'name' => 'Screen Replacement Labor',
                 'category' => 'Technician Labor',
                 'type' => 'labor',
                 'sku' => 'SRV-SCR-02',
@@ -2114,7 +2120,7 @@ class SchemaResponse
                 'color' => '#6366f1',
             ],
             [
-                'name' => 'Logic Board Micro-Soldering / Rework',
+                'name' => 'Logic Board Micro-Soldering',
                 'category' => 'Technician Labor',
                 'type' => 'labor',
                 'sku' => 'SRV-SOLDER-03',
@@ -2129,7 +2135,7 @@ class SchemaResponse
         $dbProducts = Product::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('active', true)
-            ->limit(10)
+            ->limit(12)
             ->get();
 
         foreach ($dbProducts as $p) {
@@ -2149,43 +2155,53 @@ class SchemaResponse
         foreach ($catalogItems as $item) {
             $isLabor = $item['type'] === 'labor';
             $stockBadge = $isLabor
-                ? self::badge('Labor / Service', '#6366f1', 'subtle')
-                : self::badge("Parts Stock: {$item['stock']} units", $item['stock'] > 0 ? '#10b981' : '#ef4444', 'subtle');
+                ? self::badge('Labor Fee', '#6366f1', 'subtle')
+                : self::badge("Stock: {$item['stock']}", ($item['stock'] ?? 0) > 0 ? '#10b981' : '#ef4444', 'subtle');
 
             $itemCards[] = self::card([
                 self::row([
-                    self::icon($item['icon'], ['color' => $item['color'], 'size' => 26]),
-                    self::column([
-                        self::text($item['name'], 'title_medium', ['bold' => true]),
-                        self::text("SKU: {$item['sku']} • {$item['category']}", 'body_small', ['color' => '#64748b']),
-                    ]),
-                    self::column([
-                        self::text($currency.number_format($item['price'], 2), 'title_large', ['bold' => true, 'color' => '#0284c7']),
-                        $stockBadge,
-                    ]),
-                ]),
-                self::divider(),
+                    self::icon($item['icon'], ['color' => $item['color'], 'size' => 22]),
+                    $stockBadge,
+                ], ['main_axis_alignment' => 'space_between']),
+                self::text($item['name'], 'title_small', ['bold' => true]),
+                self::text("SKU: {$item['sku']} • {$item['category']}", 'body_small', ['color' => '#64748b']),
                 self::row([
-                    self::text("Price: {$currency}".number_format($item['price'], 2), 'label_medium', ['bold' => true]),
-                    self::buttonPrimary('Add to Bill', self::openModalAction("Add {$item['name']}", [
-                        self::text("Add {$item['name']} ({$currency}".number_format($item['price'], 2).') to current bill.', 'body_medium'),
-                        self::stepCounter('line_qty', 'Quantity', 1, 1, $isLabor ? 10 : max(1, $item['stock'] ?? 10)),
-                        self::textInput('ticket_ref', 'Assign to Repair Ticket # (Optional)', ''),
-                        self::buttonPrimary('Confirm Add', self::popAction(), 'add_shopping_cart'),
-                    ]), 'add_circle'),
-                ]),
+                    self::text($currency.number_format($item['price'], 2), 'title_medium', ['bold' => true, 'color' => '#0284c7']),
+                    self::badge($isLabor ? 'Service' : 'Hardware', '#64748b', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::buttonPrimary('Add to Bill', self::openModalAction("Add {$item['name']}", [
+                    self::text("Add {$item['name']} ({$currency}".number_format($item['price'], 2).') to ticket bill.', 'body_medium'),
+                    self::divider(),
+                    self::stepCounter('line_qty', 'Quantity', 1, 1, $isLabor ? 10 : max(1, (int) ($item['stock'] ?? 10))),
+                    self::textInput('ticket_ref', 'Assign to Repair Ticket # (Optional)', ''),
+                    self::buttonPrimary('Confirm Add to Bill', self::popAction(), 'add_shopping_cart'),
+                ]), 'add_circle'),
             ]);
         }
 
         return self::screen('Repair Counter & Parts POS', [
             self::card([
                 self::row([
-                    self::icon('handyman', ['color' => '#0284c7', 'size' => 28]),
                     self::column([
-                        self::text('Repair & Technician POS Counter', 'title_medium', ['bold' => true]),
-                        self::text('Spare parts counter sales, diagnostic & bench labor billing, and work-order settlement.', 'body_small', ['color' => '#64748b']),
+                        self::textInput('search_part', 'Search Spare Parts, Hardware Modules, or Labor Fees', '', [
+                            'placeholder' => 'e.g. Display OLED, Battery, USB-C Port, Diagnostic...',
+                        ]),
                     ]),
-                ]),
+                    self::buttonOutlined('Scan', self::openModalAction('Parts Barcode Scanner', [
+                        self::text('Scan Spare Part Barcode or SKU', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::textInput('scanned_part_barcode', 'Part Barcode / QR Code', '', ['placeholder' => 'Point scanner or type code...']),
+                        self::buttonPrimary('Lookup & Add Part', self::popAction(), 'qr_code_scanner'),
+                    ]), 'qr_code_scanner'),
+                    self::buttonOutlined('Customer / Ticket', self::openModalAction('Assign Customer or Repair Ticket', [
+                        self::text('Customer & Intake Ticket Assignment', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::textInput('cust_name', 'Customer Full Name', ''),
+                        self::textInput('cust_phone', 'Phone Number', ''),
+                        self::textInput('ticket_id', 'Repair Ticket # (Optional)', ''),
+                        self::buttonPrimary('Assign to Register', self::popAction(), 'check'),
+                    ]), 'person_add'),
+                ], ['spacing' => 8]),
                 self::divider(),
                 self::wrap([
                     self::badge('All Items', '#0284c7', 'solid'),
@@ -2194,49 +2210,44 @@ class SchemaResponse
                     self::badge('Ports & Flex', '#64748b', 'subtle'),
                     self::badge('Camera & Audio', '#64748b', 'subtle'),
                     self::badge('Technician Labor', '#6366f1', 'subtle'),
-                ]),
+                ], ['spacing' => 6, 'run_spacing' => 6]),
+            ]),
+
+            self::card([
+                self::text('Spare Parts & Labor Services Catalog', 'title_medium', ['bold' => true]),
+                self::text('Select replacement parts or technician bench services:', 'body_small', ['color' => '#64748b']),
+                self::divider(),
+                self::gridView($itemCards, 2, ['spacing' => 10, 'run_spacing' => 10]),
             ]),
 
             self::card([
                 self::row([
                     self::column([
-                        self::textInput('search_part', 'Search Spare Parts, Hardware Modules, or Labor Fees', '', [
-                            'placeholder' => 'e.g. Display OLED, Battery, USB-C Port, Diagnostic...',
-                        ]),
+                        self::text('Ticket Bill: 0 items', 'label_medium', ['color' => '#64748b']),
+                        self::text($currency.'0.00', 'title_large', ['bold' => true, 'color' => '#0284c7']),
                     ]),
-                    self::buttonOutlined('Customer / Ticket', self::openModalAction('Assign Customer or Repair Ticket', [
-                        self::textInput('cust_name', 'Customer Full Name', ''),
-                        self::textInput('cust_phone', 'Phone Number', ''),
-                        self::textInput('ticket_id', 'Repair Ticket # (Optional)', ''),
-                        self::buttonPrimary('Assign to Register', self::popAction(), 'check'),
-                    ]), 'person_add'),
-                ]),
-            ]),
-
-            self::card([
-                self::text('Spare Parts & Labor Services Catalog', 'title_medium', ['bold' => true]),
-                self::column($itemCards),
-            ]),
-
-            self::card([
-                self::text('Register Checkout & Settlement', 'title_medium', ['bold' => true]),
-                self::dropdownSelect('payment_method', 'Payment Method', [
-                    ['label' => 'Cash Payment', 'value' => 'cash'],
-                    ['label' => 'Debit / Credit Card', 'value' => 'card'],
-                    ['label' => 'UPI / QR Code', 'value' => 'upi'],
-                    ['label' => 'Split Payment', 'value' => 'split'],
-                    ['label' => 'Customer Credit / Khata', 'value' => 'credit'],
-                ], 'cash'),
-                self::textInput('customer_name', 'Customer / Ticket Holder Name', 'Walk-in Customer'),
-                self::textInput('discount_amount', 'Discount Amount', '0.00'),
-                self::textInput('checkout_notes', 'Technician / Settlement Notes', 'Counter Sale / Repair Settlement'),
-                self::divider(),
-                self::buttonPrimary('Complete Checkout & Settle', self::formSubmitAction(
-                    '/api/tenant/pharmacy/checkout',
-                    'POST',
-                    'Repair transaction completed and invoice generated.',
-                    reload: true
-                ), 'point_of_sale'),
+                    self::buttonPrimary('Open Bill / Settle', self::openModalAction('Repair Bill Settlement & Checkout', [
+                        self::text('Register Checkout & Settlement', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::dropdownSelect('payment_method', 'Payment Method', [
+                            ['label' => 'Cash Payment', 'value' => 'cash'],
+                            ['label' => 'Debit / Credit Card', 'value' => 'card'],
+                            ['label' => 'UPI / QR Code', 'value' => 'upi'],
+                            ['label' => 'Customer Credit / Khata', 'value' => 'credit'],
+                            ['label' => 'Split Payment', 'value' => 'split'],
+                        ], 'cash'),
+                        self::textInput('customer_name', 'Customer / Ticket Holder Name', 'Walk-in Customer'),
+                        self::textInput('discount_amount', 'Discount Amount', '0.00'),
+                        self::textInput('checkout_notes', 'Technician / Settlement Notes', 'Counter Sale / Repair Settlement'),
+                        self::divider(),
+                        self::buttonPrimary('Complete Checkout & Settle', self::formSubmitAction(
+                            '/api/tenant/pharmacy/checkout',
+                            'POST',
+                            'Repair transaction completed and invoice generated.',
+                            reload: true
+                        ), 'point_of_sale'),
+                    ]), 'point_of_sale'),
+                ], ['main_axis_alignment' => 'space_between']),
             ]),
         ]);
     }
@@ -2375,6 +2386,387 @@ class SchemaResponse
                 self::text('Transaction History', 'title_medium', ['bold' => true]),
                 self::column(! empty($saleCards) ? $saleCards : [
                     self::text('No sales recorded yet. Completed POS transactions will appear here.', 'body_medium', ['color' => '#64748b']),
+                ]),
+            ]),
+        ]);
+    }
+
+    public static function quotationsView(Company $company): array
+    {
+        $quotes = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('operation_type', 'quotation')
+            ->with(['customer'])
+            ->orderByDesc('created_at')
+            ->limit(25)
+            ->get();
+
+        $currency = $company->currency_symbol ?: '$';
+        $totalQuotes = $quotes->count();
+        $totalValue = $quotes->sum(fn ($q) => (float) $q->total);
+
+        $quoteCards = [];
+        foreach ($quotes as $q) {
+            $status = strtolower((string) ($q->status ?: 'draft'));
+            $statusBadge = match ($status) {
+                'accepted', 'converted' => self::badge('ACCEPTED', '#10b981', 'subtle'),
+                'sent' => self::badge('SENT', '#0284c7', 'subtle'),
+                'rejected', 'expired' => self::badge(strtoupper($status), '#ef4444', 'subtle'),
+                default => self::badge('DRAFT', '#f59e0b', 'subtle'),
+            };
+
+            $customerName = $q->customer?->name ?? $q->customer_name ?? 'Walk-in Customer';
+            $itemsCount = is_array($q->items) ? count($q->items) : 1;
+
+            $quoteCards[] = self::card([
+                self::row([
+                    self::icon('description', ['color' => '#0284c7', 'size' => 24]),
+                    self::column([
+                        self::text("Quotation #{$q->sale_number}", 'title_medium', ['bold' => true]),
+                        self::text("{$customerName} • {$itemsCount} items", 'body_small', ['color' => '#64748b']),
+                        self::text($q->created_at?->format('M d, Y · h:i A') ?? 'Recent', 'body_small', ['color' => '#94a3b8']),
+                    ]),
+                    self::column([
+                        self::text($currency.number_format((float) $q->total, 2), 'title_large', ['bold' => true, 'color' => '#0284c7']),
+                        $statusBadge,
+                    ]),
+                ]),
+                self::divider(),
+                self::wrap([
+                    self::buttonPrimary('Convert to Sale', self::apiPostAction(
+                        "/api/tenant/quotations/{$q->id}/convert",
+                        [],
+                        'Quotation converted to active sale invoice.',
+                        reload: true
+                    ), 'shopping_cart_checkout'),
+                    self::buttonOutlined('Print / PDF', self::apiPostAction(
+                        "/api/tenant/quotations/{$q->id}/pdf",
+                        [],
+                        'Opening quotation PDF...',
+                        reload: false
+                    ), 'print'),
+                ]),
+            ]);
+        }
+
+        return self::screen('Quotations & Estimates', [
+            self::card([
+                self::row([
+                    self::icon('description', ['color' => '#0284c7', 'size' => 28]),
+                    self::column([
+                        self::text('Quotations & Estimates Register', 'title_medium', ['bold' => true]),
+                        self::text('Formal price estimates, quotation drafting, PDF exports, and one-tap checkout conversion.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::wrap([
+                    self::badge("Total Quotes: {$totalQuotes}", '#0284c7', 'subtle'),
+                    self::badge("Total Pipeline: {$currency}".number_format($totalValue, 2), '#059669', 'subtle'),
+                ]),
+            ]),
+
+            self::card([
+                self::row([
+                    self::column([
+                        self::textInput('search_quotes', 'Search Quotations', '', [
+                            'placeholder' => 'Search by quote number or customer name...',
+                        ]),
+                    ]),
+                    self::buttonPrimary('+ New Quote', self::openModalAction('Draft New Quotation', [
+                        self::text('Draft Formal Quotation / Estimate', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::textInput('customer_name', 'Customer / Client Name', ''),
+                        self::textInput('customer_phone', 'Phone Number', ''),
+                        self::textInput('valid_until', 'Valid Until (YYYY-MM-DD)', date('Y-m-d', strtotime('+30 days'))),
+                        self::textInput('notes', 'Terms & Remarks', 'Valid for 30 days. Standard warranty applies.'),
+                        self::buttonPrimary('Save & Create Quote', self::formSubmitAction(
+                            '/api/tenant/quotations',
+                            'POST',
+                            'Quotation drafted successfully.',
+                            reload: true
+                        ), 'check'),
+                    ]), 'add'),
+                ], ['spacing' => 8]),
+            ]),
+
+            self::card([
+                self::text('Quotation History', 'title_medium', ['bold' => true]),
+                self::column(! empty($quoteCards) ? $quoteCards : [
+                    self::text('No quotations drafted yet. Tap "+ New Quote" to create an estimate.', 'body_medium', ['color' => '#64748b']),
+                ]),
+            ]),
+        ]);
+    }
+
+    public static function customersView(Company $company): array
+    {
+        $customers = Customer::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->orderByDesc('created_at')
+            ->limit(30)
+            ->get();
+
+        $currency = $company->currency_symbol ?: '$';
+        $totalCustomers = Customer::withoutGlobalScope('company')->where('company_id', $company->id)->count();
+        $totalDue = (float) Customer::withoutGlobalScope('company')->where('company_id', $company->id)->sum('due_balance');
+
+        $customerCards = [];
+        foreach ($customers as $c) {
+            $due = (float) $c->due_balance;
+            $dueBadge = $due > 0
+                ? self::badge("Due: {$currency}".number_format($due, 2), '#ef4444', 'subtle')
+                : self::badge('No Due', '#10b981', 'subtle');
+
+            $contactInfo = trim(($c->phone ?: '').($c->phone && $c->email ? ' • ' : '').($c->email ?: ''));
+            if ($contactInfo === '') {
+                $contactInfo = 'No contact details';
+            }
+
+            $details = [];
+            if ($contactInfo !== '') {
+                $details[] = self::text($contactInfo, 'body_small', ['color' => '#64748b']);
+            }
+            if (! empty($c->address)) {
+                $details[] = self::text((string) $c->address, 'body_small', ['color' => '#94a3b8']);
+            }
+
+            $customerCards[] = self::card([
+                self::row([
+                    self::icon('person', ['color' => '#0284c7', 'size' => 24]),
+                    self::column(array_merge([
+                        self::text($c->name, 'title_medium', ['bold' => true]),
+                    ], $details)),
+                    self::column([
+                        $dueBadge,
+                        self::text('Pts: '.(int) $c->loyalty_points, 'body_small', ['color' => '#8b5cf6']),
+                    ]),
+                ]),
+                self::divider(),
+                self::wrap([
+                    self::buttonPrimary('Record Payment', self::openModalAction("Record Payment - {$c->name}", [
+                        self::text("Customer Khata Settlement: {$c->name}", 'title_medium', ['bold' => true]),
+                        self::text("Current Due Balance: {$currency}".number_format($due, 2), 'body_medium', ['color' => $due > 0 ? '#ef4444' : '#10b981']),
+                        self::divider(),
+                        self::textInput('amount', 'Payment Amount', $due > 0 ? number_format($due, 2, '.', '') : '0.00'),
+                        self::dropdownSelect('payment_method', 'Payment Mode', [
+                            ['label' => 'Cash Payment', 'value' => 'cash'],
+                            ['label' => 'Debit / Credit Card', 'value' => 'card'],
+                            ['label' => 'UPI / QR Code', 'value' => 'upi'],
+                            ['label' => 'Bank Transfer', 'value' => 'bank_transfer'],
+                        ], 'cash'),
+                        self::textInput('notes', 'Payment Reference / Note', 'Customer Khata settlement'),
+                        self::buttonPrimary('Confirm Settlement', self::formSubmitAction(
+                            "/api/tenant/customers/{$c->id}/payment",
+                            'POST',
+                            'Customer payment recorded successfully.',
+                            reload: true
+                        ), 'check'),
+                    ]), 'payment'),
+                    self::buttonOutlined('Ledger', self::openModalAction("Ledger History - {$c->name}", [
+                        self::text("Khata Statement: {$c->name}", 'title_medium', ['bold' => true]),
+                        self::text("Outstanding Balance: {$currency}".number_format($due, 2), 'body_small', ['color' => '#64748b']),
+                        self::divider(),
+                        self::text('View complete ledger transactions and audit logs in financial reports.', 'body_medium'),
+                    ]), 'menu_book'),
+                ]),
+            ]);
+        }
+
+        return self::screen('Customers & CRM', [
+            self::card([
+                self::row([
+                    self::icon('people', ['color' => '#0284c7', 'size' => 28]),
+                    self::column([
+                        self::text('Customer Directory & Khata Register', 'title_medium', ['bold' => true]),
+                        self::text('Client directory, credit khata tracking, loyalty points, and receivables settlement.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::wrap([
+                    self::badge("Total Customers: {$totalCustomers}", '#0284c7', 'subtle'),
+                    self::badge("Total Khata Due: {$currency}".number_format($totalDue, 2), $totalDue > 0 ? '#ef4444' : '#10b981', 'subtle'),
+                ]),
+            ]),
+
+            self::card([
+                self::row([
+                    self::column([
+                        self::textInput('search_customers', 'Search Directory', '', [
+                            'placeholder' => 'Search by customer name or phone number...',
+                        ]),
+                    ]),
+                    self::buttonPrimary('+ Add Customer', self::openModalAction('Register New Customer', [
+                        self::text('Register Customer / Client', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::textInput('name', 'Full Name', ''),
+                        self::textInput('phone', 'Phone Number', ''),
+                        self::textInput('email', 'Email Address (Optional)', ''),
+                        self::textInput('address', 'Billing / Street Address', ''),
+                        self::textInput('city', 'City', ''),
+                        self::textInput('gstin', 'GSTIN / Tax ID (Optional)', ''),
+                        self::buttonPrimary('Save Customer', self::formSubmitAction(
+                            '/api/tenant/customers',
+                            'POST',
+                            'Customer registered successfully.',
+                            reload: true
+                        ), 'check'),
+                    ]), 'person_add'),
+                ], ['spacing' => 8]),
+            ]),
+
+            self::card([
+                self::text('Customer Directory', 'title_medium', ['bold' => true]),
+                self::column(! empty($customerCards) ? $customerCards : [
+                    self::text('No customer records found. Tap "+ Add Customer" to register clients.', 'body_medium', ['color' => '#64748b']),
+                ]),
+            ]),
+        ]);
+    }
+
+    public static function cashRegisterView(Company $company): array
+    {
+        $currency = $company->currency_symbol ?: '$';
+
+        $activeRegister = CashRegister::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', 'open')
+            ->latest('opened_at')
+            ->first();
+
+        $historyRegisters = CashRegister::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['opener', 'closer'])
+            ->orderByDesc('opened_at')
+            ->limit(10)
+            ->get();
+
+        $historyCards = [];
+        foreach ($historyRegisters as $reg) {
+            $isOpen = $reg->status === 'open';
+            $regBadge = $isOpen
+                ? self::badge('CURRENT SHIFT', '#10b981', 'solid')
+                : self::badge('CLOSED', '#64748b', 'subtle');
+
+            $openedText = $reg->opened_at?->format('M d, Y · h:i A') ?? 'Unknown';
+            $closedText = $reg->closed_at?->format('M d, Y · h:i A') ?? ($isOpen ? 'In Progress' : 'Closed');
+            $openerName = $reg->opener?->name ?? 'Staff';
+
+            $diff = (float) ($reg->cash_difference ?? 0);
+            $diffBadge = $diff == 0
+                ? self::badge('Balanced', '#10b981', 'subtle')
+                : ($diff > 0
+                    ? self::badge("Over: +{$currency}".number_format($diff, 2), '#3b82f6', 'subtle')
+                    : self::badge("Short: -{$currency}".number_format(abs($diff), 2), '#ef4444', 'subtle'));
+
+            $historyCards[] = self::card([
+                self::row([
+                    self::icon('savings', ['color' => $isOpen ? '#10b981' : '#64748b', 'size' => 24]),
+                    self::column([
+                        self::text("Shift #{$reg->id} • {$openerName}", 'title_medium', ['bold' => true]),
+                        self::text("Opened: {$openedText}", 'body_small', ['color' => '#64748b']),
+                        self::text("Closed: {$closedText}", 'body_small', ['color' => '#94a3b8']),
+                    ]),
+                    self::column([
+                        $regBadge,
+                        $diffBadge,
+                    ]),
+                ]),
+                self::divider(),
+                self::row([
+                    self::text("Opening: {$currency}".number_format((float) $reg->opening_balance, 2), 'body_small'),
+                    self::text("Closing: {$currency}".number_format((float) ($reg->counted_closing_balance ?? $reg->expected_closing_balance ?? 0), 2), 'body_small', ['bold' => true]),
+                ], ['main_axis_alignment' => 'space_between']),
+            ]);
+        }
+
+        $activeSectionComponents = [];
+        if ($activeRegister !== null) {
+            $activeSectionComponents = [
+                self::row([
+                    self::icon('point_of_sale', ['color' => '#10b981', 'size' => 28]),
+                    self::column([
+                        self::text('Register Shift Open', 'title_medium', ['bold' => true, 'color' => '#10b981']),
+                        self::text("Opened by {$activeRegister->opener?->name} at {$activeRegister->opened_at?->format('M d, Y · h:i A')}", 'body_small', ['color' => '#64748b']),
+                    ]),
+                    self::badge('ACTIVE', '#10b981', 'solid'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::gridView([
+                    self::card([
+                        self::text('Opening Cash Float', 'label_medium', ['color' => '#64748b']),
+                        self::text($currency.number_format((float) $activeRegister->opening_balance, 2), 'title_large', ['bold' => true, 'color' => '#0f766e']),
+                    ]),
+                    self::card([
+                        self::text('Expected Drawer Cash', 'label_medium', ['color' => '#64748b']),
+                        self::text($currency.number_format((float) $activeRegister->expected_closing_balance, 2), 'title_large', ['bold' => true, 'color' => '#10b981']),
+                    ]),
+                ], 2),
+                self::divider(),
+                self::wrap([
+                    self::buttonPrimary('Cash In / Cash Out', self::openModalAction('Record Drawer Transaction', [
+                        self::text('Cash Drawer Deposit / Withdrawal', 'title_medium', ['bold' => true]),
+                        self::divider(),
+                        self::dropdownSelect('transaction_type', 'Transaction Type', [
+                            ['label' => 'Cash In (Deposit / Float Add)', 'value' => 'cash_in'],
+                            ['label' => 'Cash Out (Expense / Drawer Drop)', 'value' => 'cash_out'],
+                        ], 'cash_in'),
+                        self::textInput('amount', 'Amount', '0.00'),
+                        self::textInput('notes', 'Reason / Receipt Reference', ''),
+                        self::buttonPrimary('Confirm Drawer Entry', self::formSubmitAction(
+                            "/api/tenant/cash-register/{$activeRegister->id}/transaction",
+                            'POST',
+                            'Drawer cash transaction recorded.',
+                            reload: true
+                        ), 'check'),
+                    ]), 'payments'),
+                    self::buttonOutlined('Close Register / End Shift', self::openModalAction('Close Cash Register Shift', [
+                        self::text('End Shift & Reconcile Cash Drawer', 'title_medium', ['bold' => true]),
+                        self::text("Expected Cash in Drawer: {$currency}".number_format((float) $activeRegister->expected_closing_balance, 2), 'body_medium', ['color' => '#0f766e']),
+                        self::divider(),
+                        self::textInput('counted_closing_balance', 'Physical Counted Cash in Drawer', number_format((float) $activeRegister->expected_closing_balance, 2, '.', '')),
+                        self::textInput('closing_notes', 'Shift Closing Remarks', 'Shift completed successfully.'),
+                        self::buttonPrimary('Close Register & Print Z-Report', self::formSubmitAction(
+                            "/api/tenant/cash-register/{$activeRegister->id}/close",
+                            'POST',
+                            'Cash register shift closed successfully.',
+                            reload: true
+                        ), 'lock'),
+                    ]), 'lock_clock'),
+                ]),
+            ];
+        } else {
+            $activeSectionComponents = [
+                self::row([
+                    self::icon('lock', ['color' => '#f59e0b', 'size' => 28]),
+                    self::column([
+                        self::text('Cash Drawer is Closed', 'title_medium', ['bold' => true]),
+                        self::text('No active cashier shift is running on this terminal. Open the drawer to begin.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                    self::badge('CLOSED', '#64748b', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::buttonPrimary('Open Cash Register Shift', self::openModalAction('Start Cashier Shift', [
+                    self::text('Open Register & Declare Opening Float', 'title_medium', ['bold' => true]),
+                    self::divider(),
+                    self::textInput('opening_balance', 'Opening Cash Float', '0.00'),
+                    self::textInput('notes', 'Shift Notes (Optional)', 'Morning Shift'),
+                    self::buttonPrimary('Open Register Drawer', self::formSubmitAction(
+                        '/api/tenant/cash-register/open',
+                        'POST',
+                        'Register opened successfully. Shift started.',
+                        reload: true
+                    ), 'point_of_sale'),
+                ]), 'savings'),
+            ];
+        }
+
+        return self::screen('Cash Register & Shifts', [
+            self::card($activeSectionComponents),
+
+            self::card([
+                self::text('Shift & Register History', 'title_medium', ['bold' => true]),
+                self::column(! empty($historyCards) ? $historyCards : [
+                    self::text('No past register shifts found.', 'body_medium', ['color' => '#64748b']),
                 ]),
             ]),
         ]);
@@ -2825,9 +3217,9 @@ class SchemaResponse
      */
     private static function effectiveNavigationBuilderData(Company $company, string $activeMode): array
     {
-        $catalog = TenantNavRegistry::getEffectiveNavForTenant($company);
+        $catalog = TenantNavRegistry::getBaseNavSectionsForTenant($company);
         if ($catalog === []) {
-            $catalog = TenantNavRegistry::menuStructureForMode('retail');
+            $catalog = TenantNavRegistry::menuStructureForMode($activeMode ?: 'retail');
         }
 
         $sectionMeta = [];
@@ -3116,6 +3508,10 @@ class SchemaResponse
             ['key' => 'settings-navigation', 'title' => 'Navigation Menu', 'endpoint' => '/api/tenant/views/settings-navigation', 'permission' => 'settings.view'],
             ['key' => 'settings-notifications', 'title' => 'Custom Notification Gateways', 'endpoint' => '/api/tenant/views/settings-notifications', 'permission' => 'settings.view'],
             ['key' => 'settings-advanced', 'title' => 'Advanced & Danger Zone', 'endpoint' => '/api/tenant/views/settings-advanced', 'permission' => 'settings.view'],
+            ['key' => 'sales', 'title' => 'Sales & Invoices History', 'endpoint' => '/api/tenant/views/sales', 'permission' => 'sales.view'],
+            ['key' => 'quotations', 'title' => 'Quotations & Estimates', 'endpoint' => '/api/tenant/views/quotations', 'permission' => 'quotes.view'],
+            ['key' => 'customers', 'title' => 'Customers & CRM', 'endpoint' => '/api/tenant/views/customers', 'permission' => 'customers.view'],
+            ['key' => 'cash-register', 'title' => 'Cash Register', 'endpoint' => '/api/tenant/views/cash-register', 'permission' => 'cash_register.view'],
         ];
 
         if (! Schema::hasTable('sdui_screens')) {
@@ -3188,7 +3584,19 @@ class SchemaResponse
             return 'sales.view';
         }
 
-        if (in_array($normalized, ['pharmacy-pos', 'pharmacy-batches'], true)) {
+        if (in_array($normalized, ['quotations', 'quotes', 'estimates'], true)) {
+            return 'quotes.view';
+        }
+
+        if (in_array($normalized, ['customers', 'crm', 'clients'], true)) {
+            return 'customers.view';
+        }
+
+        if (in_array($normalized, ['cash-register', 'cash_register', 'register'], true)) {
+            return 'cash_register.view';
+        }
+
+        if (in_array($normalized, ['pharmacy-batches'], true)) {
             return 'products.view';
         }
 
@@ -3287,6 +3695,9 @@ class SchemaResponse
             'retail-pos' => self::retailPosView($company),
             'salon-pos', 'service-pos', 'spa-pos' => self::salonPosView($company),
             'sales', 'invoices', 'sales-invoices', 'pos-sales' => self::salesView($company),
+            'quotations', 'quotes', 'estimates' => self::quotationsView($company),
+            'customers', 'crm', 'clients' => self::customersView($company),
+            'cash-register', 'cash_register', 'register' => self::cashRegisterView($company),
             'devices', 'device-sessions', 'terminals' => self::devicesView($company),
             default => null,
         };

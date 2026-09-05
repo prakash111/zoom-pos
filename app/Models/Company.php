@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasLegacyStringId;
 use App\Services\Navigation\TenantNavigationConfigService;
+use App\Services\Navigation\TenantNavRegistry;
 use App\Support\IdGenerator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -248,11 +249,15 @@ class Company extends Model
     public function getNavigationMenuCustomizationAttribute(): ?array
     {
         $raw = $this->nav_config;
-        if (is_array($raw) && ! empty($raw['custom_tree']) && is_array($raw['custom_tree'])) {
+        if (! is_array($raw) || empty($raw)) {
+            return null;
+        }
+
+        if (! empty($raw['custom_tree']) && is_array($raw['custom_tree'])) {
             return $raw['custom_tree'];
         }
 
-        return null;
+        return TenantNavRegistry::buildCustomNavTree($this);
     }
 
     /**
