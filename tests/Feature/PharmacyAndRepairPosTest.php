@@ -504,7 +504,6 @@ class PharmacyAndRepairPosTest extends TestCase
         ]);
 
         $views = [
-            'pharmacy-pos' => 'Pharmacy Counter POS',
             'pharmacy-batches' => 'Batch & Expiry Manager',
             'pharmacy-prescriptions' => 'Prescriptions Queue',
             'repair-dashboard' => 'Repair Workbench',
@@ -532,6 +531,198 @@ class PharmacyAndRepairPosTest extends TestCase
             $validationErrors = $validator->validate($schema);
             $this->assertEmpty($validationErrors, "SDUI Schema validation failed for view [{$viewEndpoint}]: ".implode(', ', $validationErrors));
         }
+    }
+
+    public function test_pharmacy_and_repair_pos_return_the_universal_pos_screen_contract(): void
+    {
+        $validator = new SchemaValidator;
+
+        foreach (['pharmacy-pos' => '/api/tenant/pharmacy/checkout-sheet', 'repair-pos' => '/api/tenant/repair/checkout-sheet'] as $view => $expectedCheckoutEndpoint) {
+            $response = $this->withHeaders($this->authHeaders())
+                ->getJson("/api/tenant/views/{$view}");
+
+            $response->assertOk()->assertJsonPath('success', true);
+
+            $schema = $response->json('schema');
+            $this->assertSame('pos_screen', $schema['type']);
+            $this->assertIsArray($schema['catalog']['items'] ?? null);
+            $this->assertSame($expectedCheckoutEndpoint, $schema['cart_bar']['checkout_sheet_endpoint'] ?? null);
+            $this->assertArrayHasKey('search', $schema);
+            $this->assertArrayHasKey('categories', $schema);
+
+            $validationErrors = $validator->validate($schema);
+            $this->assertEmpty($validationErrors, "SDUI Schema validation failed for view [{$view}]: ".implode(', ', $validationErrors));
+        }
+    }
+
+    public function test_pharmacy_batch_sheet_and_checkout_sheet_endpoints(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Ibuprofen 200mg',
+            'sku' => 'IBU-200',
+            'sale_price' => 5.00,
+            'current_stock' => 20,
+            'active' => true,
+        ]);
+
+        PharmacyBatch::create([
+            'company_id' => $this->company->id,
+            'tenant_id' => $this->company->id,
+            'product_id' => $product->id,
+            'batch_number' => 'BATCH-IBU-1',
+            'expiry_date' => now()->addMonths(4),
+            'cost_price' => 2.00,
+            'selling_price' => 5.00,
+            'stock_qty' => 20,
+            'is_active' => true,
+        ]);
+
+        $validator = new SchemaValidator;
+
+        $batchSheetResponse = $this->withHeaders($this->authHeaders())
+            ->getJson("/api/tenant/pharmacy/batch-sheet?product_id={$product->id}");
+        $batchSheetResponse->assertOk()->assertJsonPath('success', true);
+        $batchSchema = $batchSheetResponse->json('schema');
+        $this->assertSame('sheet', $batchSchema['type']);
+        $this->assertEmpty($validator->validate($batchSchema));
+
+        $cart = urlencode(json_encode([['title' => 'Ibuprofen 200mg', 'qty' => 2, 'price' => 5.00]]));
+        $checkoutSheetResponse = $this->withHeaders($this->authHeaders())
+            ->getJson("/api/tenant/pharmacy/checkout-sheet?cart={$cart}");
+        $checkoutSheetResponse->assertOk()->assertJsonPath('success', true);
+        $checkoutSchema = $checkoutSheetResponse->json('schema');
+        $this->assertSame('sheet', $checkoutSchema['type']);
+        $this->assertEmpty($validator->validate($checkoutSchema));
+    }
+
+    public function test_repair_pos_checkout_creates_a_real_sale_with_real_items(): void
+    {
+        $part = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Replacement Screen',
+            'sku' => 'SCR-001',
+            'sale_price' => 60.00,
+            'cost_price' => 25.00,
+            'current_stock' => 5,
+            'active' => true,
+        ]);
+
+        $response = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/tenant/repair/pos-checkout', [
+                'items' => [
+                    ['product_id' => $part->id, 'quantity' => 1],
+                ],
+                'payment_method' => 'cash',
+                'customer_name' => 'Walk-in Customer',
+            ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $this->assertSame(60.0, (float) $response->json('sale.total'));
+        $this->assertCount(1, $response->json('sale.items'));
+
+        $part->refresh();
+        $this->assertSame(4.0, (float) $part->current_stock);
+    }
+
+    public function test_repair_pos_checkout_links_a_ticket_and_updates_its_totals(): void
+    {
+        $ticket = RepairTicket::create([
+            'company_id' => $this->company->id,
+            'ticket_number' => 'REP-TEST-LINK',
+            'customer_name' => 'Bob Link',
+            'customer_phone' => '+15551234',
+            'device_type' => 'Phone',
+            'brand' => 'Acme',
+            'model' => 'X1',
+            'issue_description' => 'Cracked screen',
+            'status' => 'in_progress',
+            'labor_fee' => 20.00,
+            'parts_cost' => 0,
+            'total_amount' => 20.00,
+        ]);
+
+        $part = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Battery Pack',
+            'sku' => 'BATT-001',
+            'sale_price' => 30.00,
+            'current_stock' => 3,
+            'active' => true,
+        ]);
+
+        $response = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/tenant/repair/pos-checkout', [
+                'items' => [['product_id' => $part->id, 'quantity' => 1]],
+                'payment_method' => 'cash',
+                'ticket_id' => $ticket->id,
+            ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+
+        $ticket->refresh();
+        $this->assertSame(30.0, (float) $ticket->parts_cost);
+        $this->assertSame(50.0, (float) $ticket->total_amount);
+        $this->assertDatabaseHas('repair_ticket_parts', [
+            'repair_ticket_id' => $ticket->id,
+            'product_id' => $part->id,
+        ]);
+    }
+
+    public function test_pharmacy_checkout_requires_prescription_details_for_controlled_items(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Codeine 30mg',
+            'sku' => 'COD-30',
+            'sale_price' => 15.00,
+            'current_stock' => 10,
+            'active' => true,
+            'requires_prescription' => true,
+        ]);
+
+        $withoutRx = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/tenant/pharmacy/checkout', [
+                'items' => [['product_id' => $product->id, 'quantity' => 1]],
+                'payment_method' => 'cash',
+            ]);
+        $withoutRx->assertStatus(422);
+
+        $withRx = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/tenant/pharmacy/checkout', [
+                'items' => [['product_id' => $product->id, 'quantity' => 1]],
+                'payment_method' => 'cash',
+                'patient_name' => 'Jane Doe',
+                'doctor_name' => 'Dr. Smith',
+            ]);
+        $withRx->assertOk()->assertJsonPath('success', true);
+        $this->assertNotNull($withRx->json('prescription'));
+    }
+
+    public function test_pharmacy_checkout_accepts_two_fixed_split_payment_rows(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Vitamin C',
+            'sku' => 'VITC-01',
+            'sale_price' => 25.00,
+            'current_stock' => 10,
+            'active' => true,
+        ]);
+
+        $response = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/tenant/pharmacy/checkout', [
+                'items' => [['product_id' => $product->id, 'quantity' => 1]],
+                'payment_method' => 'split',
+                'payment_1_method' => 'cash',
+                'payment_1_amount' => 15,
+                'payment_2_method' => 'card',
+                'payment_2_amount' => 10,
+            ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $this->assertDatabaseHas('order_payments', ['sale_id' => $response->json('sale.id'), 'payment_method' => 'cash', 'amount' => 15]);
+        $this->assertDatabaseHas('order_payments', ['sale_id' => $response->json('sale.id'), 'payment_method' => 'card', 'amount' => 10]);
     }
 
     public function test_repair_device_categories_crud_and_ticket_intake(): void

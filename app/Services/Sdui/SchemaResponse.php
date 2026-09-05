@@ -56,6 +56,7 @@ class SchemaResponse
 
     public const ACTION_TYPES = [
         'navigate', 'form_submit', 'api_post', 'open_modal', 'navigate_back', 'pop',
+        'add_to_cart', 'open_remote_sheet',
     ];
 
     // =========================================================================
@@ -434,6 +435,37 @@ class SchemaResponse
         ];
     }
 
+    /**
+     * Adds an item to the client's local POS cart. Handled entirely
+     * client-side (never hits the network) — used by universal POS catalog
+     * cards and sheets (e.g. a pharmacy FEFO batch picker) to build up a
+     * real cart before checkout.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    public static function addToCartAction(array $item): array
+    {
+        return [
+            'type' => 'add_to_cart',
+            'item' => $item,
+        ];
+    }
+
+    /**
+     * Fetches a small component tree from $sheetEndpoint and renders it in
+     * a modal bottom sheet — the remote counterpart to open_modal, used
+     * when the sheet's content depends on live server data (e.g. a
+     * product's current batches) rather than being known up front.
+     */
+    public static function openRemoteSheetAction(string $sheetEndpoint, string $title = ''): array
+    {
+        return [
+            'type' => 'open_remote_sheet',
+            'sheet_endpoint' => $sheetEndpoint,
+            'title' => $title,
+        ];
+    }
+
     public static function popAction(): array
     {
         return [
@@ -726,156 +758,7 @@ class SchemaResponse
 
     public static function pharmacyPosView(Company $company): array
     {
-        $currency = $company->currency_symbol ?: '$';
-        $products = Product::withoutGlobalScope('company')
-            ->where('company_id', $company->id)
-            ->where('active', true)
-            ->with(['pharmacyBatches' => fn ($q) => $q->where('is_active', true)->orderBy('expiry_date', 'asc')])
-            ->limit(20)
-            ->get();
-
-        $medicineCards = [];
-        foreach ($products as $prod) {
-            $batches = $prod->pharmacyBatches;
-            $fefoBatch = $batches->first(fn ($b) => $b->days_until_expiry >= 0 && $b->stock_qty > 0);
-
-            $batchBadge = $fefoBatch
-                ? self::badge("Batch #{$fefoBatch->batch_number} (Exp: {$fefoBatch->expiry_date?->format('M y')})", $fefoBatch->expiry_color, 'subtle')
-                : self::badge('No Batches', '#64748b', 'subtle');
-
-            $scheduleBadge = $prod->narcotic_schedule
-                ? self::badge($prod->narcotic_schedule, '#ef4444', 'solid')
-                : ($prod->requires_prescription ? self::badge('Rx', '#f59e0b', 'subtle') : self::badge('OTC', '#10b981', 'subtle'));
-
-            // Build FEFO batch selection modal sheet
-            $batchModalComponents = [
-                self::row([
-                    self::icon('medication', ['color' => '#059669', 'size' => 28]),
-                    self::column([
-                        self::text($prod->name, 'title_medium', ['bold' => true]),
-                        self::text('Generic: '.($prod->generic_name ?: ($prod->composition ?: 'Standard Formulation')), 'body_small', ['color' => '#64748b']),
-                    ]),
-                    $scheduleBadge,
-                ]),
-                self::divider(),
-                self::text('Active FEFO Batches (Earliest Expiry Priority):', 'label_large', ['bold' => true]),
-            ];
-
-            if ($batches->isEmpty()) {
-                $batchModalComponents[] = self::text('No dedicated batch tracked for this product. Default stock will be dispensed.', 'body_small', ['color' => '#64748b']);
-            } else {
-                foreach ($batches as $b) {
-                    $expLabel = $b->days_until_expiry < 0 ? 'EXPIRED' : ($b->days_until_expiry <= 90 ? "EXPIRING ({$b->days_until_expiry}d)" : "SAFE ({$b->days_until_expiry}d)");
-                    $batchModalComponents[] = self::card([
-                        self::row([
-                            self::icon('inventory_2', ['color' => $b->expiry_color, 'size' => 20]),
-                            self::column([
-                                self::text("Batch #{$b->batch_number}", 'title_small', ['bold' => true]),
-                                self::text("Stock: {$b->stock_qty} • Exp: {$b->expiry_date?->format('Y-m-d')}", 'body_small', ['color' => '#64748b']),
-                            ]),
-                            self::badge($expLabel, $b->expiry_color, 'subtle'),
-                            self::text($currency.number_format((float) $b->selling_price, 2), 'label_large', ['bold' => true, 'color' => '#059669']),
-                        ]),
-                    ]);
-                }
-            }
-
-            $batchModalComponents[] = self::divider();
-            $batchModalComponents[] = self::stepCounter('dispense_qty', 'Dispense Quantity', 1, 1, max(1, (int) $prod->current_stock));
-            $batchModalComponents[] = self::buttonPrimary('Add to Dispensing Cart', self::popAction(), 'add_shopping_cart');
-
-            $medicineCards[] = self::card([
-                self::row([
-                    self::icon('medication', ['color' => '#059669', 'size' => 22]),
-                    $scheduleBadge,
-                ], ['main_axis_alignment' => 'space_between']),
-                self::text($prod->name, 'title_small', ['bold' => true]),
-                self::text($prod->generic_name ?: ($prod->composition ?: 'Standard Formulation'), 'body_small', ['color' => '#64748b']),
-                $batchBadge,
-                self::row([
-                    self::text($currency.number_format((float) $prod->sale_price, 2), 'title_medium', ['bold' => true, 'color' => '#059669']),
-                    self::badge('Stock: '.(int) $prod->current_stock, (int) $prod->current_stock > 0 ? '#10b981' : '#ef4444', 'subtle'),
-                ], ['main_axis_alignment' => 'space_between']),
-                self::buttonPrimary('Select Batch', self::openModalAction("Select FEFO Batch - {$prod->name}", $batchModalComponents), 'add_circle'),
-            ]);
-        }
-
-        return self::screen('Pharmacy Counter POS', [
-            self::card([
-                self::row([
-                    self::column([
-                        self::textInput('search_medicine', 'Search Generic Formula, Brand Name, or Barcode', '', [
-                            'placeholder' => 'e.g. Paracetamol, Amoxicillin 500mg...',
-                        ]),
-                    ]),
-                    self::buttonOutlined('Scan', self::openModalAction('Medicine Barcode Scanner', [
-                        self::text('Scan Medicine Barcode or DataMatrix', 'title_medium', ['bold' => true]),
-                        self::divider(),
-                        self::textInput('scanned_barcode', 'Barcode / GS1 Code', '', ['placeholder' => 'Point scanner or enter code...']),
-                        self::buttonPrimary('Lookup & Allocate FEFO Batch', self::popAction(), 'qr_code_scanner'),
-                    ]), 'qr_code_scanner'),
-                    self::buttonOutlined('Patient / Rx', self::openModalAction('Prescription (Rx) & Patient Details', [
-                        self::text('Prescription Details for Schedule H & Narcotic Drugs', 'title_medium', ['bold' => true]),
-                        self::divider(),
-                        self::textInput('patient_name', 'Patient Full Name', ''),
-                        self::textInput('patient_phone', 'Patient Phone Number', ''),
-                        self::textInput('doctor_name', 'Prescribing Doctor Name', ''),
-                        self::textInput('doctor_registration_no', 'Doctor Registration / Medical Council #', ''),
-                        self::textInput('diagnosis', 'Diagnosis / Dosage Instructions', ''),
-                        self::buttonPrimary('Save Patient Details', self::popAction(), 'check'),
-                    ]), 'person_add'),
-                ], ['spacing' => 8]),
-                self::divider(),
-                self::wrap([
-                    self::badge('All Medicines', '#059669', 'solid'),
-                    self::badge('Antibiotics', '#64748b', 'subtle'),
-                    self::badge('Analgesics', '#64748b', 'subtle'),
-                    self::badge('Cardiology', '#64748b', 'subtle'),
-                    self::badge('Schedule H (Rx)', '#ef4444', 'subtle'),
-                    self::badge('OTC Health', '#10b981', 'subtle'),
-                ], ['spacing' => 6, 'run_spacing' => 6]),
-            ]),
-
-            self::card([
-                self::text('Medicine Catalog & FEFO Batches', 'title_medium', ['bold' => true]),
-                self::text('Tap medicine to select active FEFO batch before adding to cart:', 'body_small', ['color' => '#64748b']),
-                self::divider(),
-                ! empty($medicineCards)
-                    ? self::gridView($medicineCards, 2, ['spacing' => 10, 'run_spacing' => 10])
-                    : self::text('No active medicines found. Add products and batches to begin dispensing.', 'body_medium', ['color' => '#64748b']),
-            ]),
-
-            self::card([
-                self::row([
-                    self::column([
-                        self::text('Dispensing Cart: 0 items', 'label_medium', ['color' => '#64748b']),
-                        self::text($currency.'0.00', 'title_large', ['bold' => true, 'color' => '#059669']),
-                    ]),
-                    self::buttonPrimary('Open Cart / Checkout', self::openModalAction('Dispensing Cart & Payment Settlement', [
-                        self::text('Order Summary & Payment', 'title_medium', ['bold' => true]),
-                        self::divider(),
-                        self::textInput('customer_name', 'Customer / Patient Name', 'Walk-in Customer'),
-                        self::textInput('customer_phone', 'Phone Number', ''),
-                        self::dropdownSelect('payment_method', 'Payment Method', [
-                            ['label' => 'Cash Payment', 'value' => 'cash'],
-                            ['label' => 'Debit / Credit Card', 'value' => 'card'],
-                            ['label' => 'UPI / QR Code', 'value' => 'upi'],
-                            ['label' => 'Patient Credit / Khata', 'value' => 'credit'],
-                            ['label' => 'Split Payment', 'value' => 'split'],
-                        ], 'cash'),
-                        self::textInput('discount_amount', 'Discount Amount', '0.00'),
-                        self::textInput('checkout_notes', 'Dispensing Notes', 'Counter Sale'),
-                        self::divider(),
-                        self::buttonPrimary('Complete Checkout & Dispense', self::formSubmitAction(
-                            '/api/tenant/pharmacy/checkout',
-                            'POST',
-                            'Pharmacy transaction completed and stock dispensed successfully.',
-                            reload: true
-                        ), 'point_of_sale'),
-                    ]), 'shopping_cart_checkout'),
-                ], ['main_axis_alignment' => 'space_between']),
-            ]),
-        ]);
+        return PosScreenBuilder::pharmacyPosScreen($company);
     }
 
     public static function pharmacyBatchesView(Company $company): array
@@ -2046,210 +1929,7 @@ class SchemaResponse
 
     public static function repairPosView(Company $company): array
     {
-        $currency = $company->currency_symbol ?: '$';
-
-        $catalogItems = [
-            [
-                'name' => 'OLED Display Assembly',
-                'category' => 'Screens & Displays',
-                'type' => 'spare_part',
-                'sku' => 'PART-DISP-01',
-                'stock' => 8,
-                'price' => 85.00,
-                'icon' => 'smartphone',
-                'color' => '#0284c7',
-            ],
-            [
-                'name' => 'Replacement Battery (OEM)',
-                'category' => 'Batteries & Charging',
-                'type' => 'spare_part',
-                'sku' => 'PART-BATT-02',
-                'stock' => 14,
-                'price' => 38.00,
-                'icon' => 'battery_charging_full',
-                'color' => '#10b981',
-            ],
-            [
-                'name' => 'USB-C Charging Port Board',
-                'category' => 'Ports & Flex',
-                'type' => 'spare_part',
-                'sku' => 'PART-PORT-03',
-                'stock' => 19,
-                'price' => 24.50,
-                'icon' => 'usb',
-                'color' => '#f59e0b',
-            ],
-            [
-                'name' => 'Rear Camera Module',
-                'category' => 'Camera & Audio',
-                'type' => 'spare_part',
-                'sku' => 'PART-CAM-04',
-                'stock' => 5,
-                'price' => 65.00,
-                'icon' => 'photo_camera',
-                'color' => '#8b5cf6',
-            ],
-            [
-                'name' => 'Earpiece Speaker Ribbon',
-                'category' => 'Camera & Audio',
-                'type' => 'spare_part',
-                'sku' => 'PART-SPK-05',
-                'stock' => 12,
-                'price' => 18.00,
-                'icon' => 'volume_up',
-                'color' => '#06b6d4',
-            ],
-            [
-                'name' => 'Bench Diagnostic & Testing',
-                'category' => 'Technician Labor',
-                'type' => 'labor',
-                'sku' => 'SRV-DIAG-01',
-                'stock' => null,
-                'price' => 20.00,
-                'icon' => 'build',
-                'color' => '#6366f1',
-            ],
-            [
-                'name' => 'Screen Replacement Labor',
-                'category' => 'Technician Labor',
-                'type' => 'labor',
-                'sku' => 'SRV-SCR-02',
-                'stock' => null,
-                'price' => 30.00,
-                'icon' => 'handyman',
-                'color' => '#6366f1',
-            ],
-            [
-                'name' => 'Logic Board Micro-Soldering',
-                'category' => 'Technician Labor',
-                'type' => 'labor',
-                'sku' => 'SRV-SOLDER-03',
-                'stock' => null,
-                'price' => 75.00,
-                'icon' => 'memory',
-                'color' => '#ec4899',
-            ],
-        ];
-
-        // Also query inventory products
-        $dbProducts = Product::withoutGlobalScope('company')
-            ->where('company_id', $company->id)
-            ->where('active', true)
-            ->limit(12)
-            ->get();
-
-        foreach ($dbProducts as $p) {
-            $catalogItems[] = [
-                'name' => $p->name,
-                'category' => 'Inventory Parts',
-                'type' => 'spare_part',
-                'sku' => $p->sku ?: ($p->barcode ?: 'PART-'.$p->id),
-                'stock' => (int) $p->current_stock,
-                'price' => (float) $p->sale_price,
-                'icon' => 'hardware',
-                'color' => '#0284c7',
-            ];
-        }
-
-        $itemCards = [];
-        foreach ($catalogItems as $item) {
-            $isLabor = $item['type'] === 'labor';
-            $stockBadge = $isLabor
-                ? self::badge('Labor Fee', '#6366f1', 'subtle')
-                : self::badge("Stock: {$item['stock']}", ($item['stock'] ?? 0) > 0 ? '#10b981' : '#ef4444', 'subtle');
-
-            $itemCards[] = self::card([
-                self::row([
-                    self::icon($item['icon'], ['color' => $item['color'], 'size' => 22]),
-                    $stockBadge,
-                ], ['main_axis_alignment' => 'space_between']),
-                self::text($item['name'], 'title_small', ['bold' => true]),
-                self::text("SKU: {$item['sku']} • {$item['category']}", 'body_small', ['color' => '#64748b']),
-                self::row([
-                    self::text($currency.number_format($item['price'], 2), 'title_medium', ['bold' => true, 'color' => '#0284c7']),
-                    self::badge($isLabor ? 'Service' : 'Hardware', '#64748b', 'subtle'),
-                ], ['main_axis_alignment' => 'space_between']),
-                self::buttonPrimary('Add to Bill', self::openModalAction("Add {$item['name']}", [
-                    self::text("Add {$item['name']} ({$currency}".number_format($item['price'], 2).') to ticket bill.', 'body_medium'),
-                    self::divider(),
-                    self::stepCounter('line_qty', 'Quantity', 1, 1, $isLabor ? 10 : max(1, (int) ($item['stock'] ?? 10))),
-                    self::textInput('ticket_ref', 'Assign to Repair Ticket # (Optional)', ''),
-                    self::buttonPrimary('Confirm Add to Bill', self::popAction(), 'add_shopping_cart'),
-                ]), 'add_circle'),
-            ]);
-        }
-
-        return self::screen('Repair Counter & Parts POS', [
-            self::card([
-                self::row([
-                    self::column([
-                        self::textInput('search_part', 'Search Spare Parts, Hardware Modules, or Labor Fees', '', [
-                            'placeholder' => 'e.g. Display OLED, Battery, USB-C Port, Diagnostic...',
-                        ]),
-                    ]),
-                    self::buttonOutlined('Scan', self::openModalAction('Parts Barcode Scanner', [
-                        self::text('Scan Spare Part Barcode or SKU', 'title_medium', ['bold' => true]),
-                        self::divider(),
-                        self::textInput('scanned_part_barcode', 'Part Barcode / QR Code', '', ['placeholder' => 'Point scanner or type code...']),
-                        self::buttonPrimary('Lookup & Add Part', self::popAction(), 'qr_code_scanner'),
-                    ]), 'qr_code_scanner'),
-                    self::buttonOutlined('Customer / Ticket', self::openModalAction('Assign Customer or Repair Ticket', [
-                        self::text('Customer & Intake Ticket Assignment', 'title_medium', ['bold' => true]),
-                        self::divider(),
-                        self::textInput('cust_name', 'Customer Full Name', ''),
-                        self::textInput('cust_phone', 'Phone Number', ''),
-                        self::textInput('ticket_id', 'Repair Ticket # (Optional)', ''),
-                        self::buttonPrimary('Assign to Register', self::popAction(), 'check'),
-                    ]), 'person_add'),
-                ], ['spacing' => 8]),
-                self::divider(),
-                self::wrap([
-                    self::badge('All Items', '#0284c7', 'solid'),
-                    self::badge('Screens & Displays', '#64748b', 'subtle'),
-                    self::badge('Batteries & Charging', '#64748b', 'subtle'),
-                    self::badge('Ports & Flex', '#64748b', 'subtle'),
-                    self::badge('Camera & Audio', '#64748b', 'subtle'),
-                    self::badge('Technician Labor', '#6366f1', 'subtle'),
-                ], ['spacing' => 6, 'run_spacing' => 6]),
-            ]),
-
-            self::card([
-                self::text('Spare Parts & Labor Services Catalog', 'title_medium', ['bold' => true]),
-                self::text('Select replacement parts or technician bench services:', 'body_small', ['color' => '#64748b']),
-                self::divider(),
-                self::gridView($itemCards, 2, ['spacing' => 10, 'run_spacing' => 10]),
-            ]),
-
-            self::card([
-                self::row([
-                    self::column([
-                        self::text('Ticket Bill: 0 items', 'label_medium', ['color' => '#64748b']),
-                        self::text($currency.'0.00', 'title_large', ['bold' => true, 'color' => '#0284c7']),
-                    ]),
-                    self::buttonPrimary('Open Bill / Settle', self::openModalAction('Repair Bill Settlement & Checkout', [
-                        self::text('Register Checkout & Settlement', 'title_medium', ['bold' => true]),
-                        self::divider(),
-                        self::dropdownSelect('payment_method', 'Payment Method', [
-                            ['label' => 'Cash Payment', 'value' => 'cash'],
-                            ['label' => 'Debit / Credit Card', 'value' => 'card'],
-                            ['label' => 'UPI / QR Code', 'value' => 'upi'],
-                            ['label' => 'Customer Credit / Khata', 'value' => 'credit'],
-                            ['label' => 'Split Payment', 'value' => 'split'],
-                        ], 'cash'),
-                        self::textInput('customer_name', 'Customer / Ticket Holder Name', 'Walk-in Customer'),
-                        self::textInput('discount_amount', 'Discount Amount', '0.00'),
-                        self::textInput('checkout_notes', 'Technician / Settlement Notes', 'Counter Sale / Repair Settlement'),
-                        self::divider(),
-                        self::buttonPrimary('Complete Checkout & Settle', self::formSubmitAction(
-                            '/api/tenant/pharmacy/checkout',
-                            'POST',
-                            'Repair transaction completed and invoice generated.',
-                            reload: true
-                        ), 'point_of_sale'),
-                    ]), 'point_of_sale'),
-                ], ['main_axis_alignment' => 'space_between']),
-            ]),
-        ]);
+        return PosScreenBuilder::repairPosScreen($company);
     }
 
     public static function posView(Company $company): array

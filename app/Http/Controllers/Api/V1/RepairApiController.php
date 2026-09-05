@@ -12,6 +12,8 @@ use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
 use App\Models\RepairTicketPart;
 use App\Models\Sale;
+use App\Services\Sdui\PosScreenBuilder;
+use App\Services\Sdui\SchemaValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -935,5 +937,252 @@ class RepairApiController extends Controller
             'sale' => $sale,
             'ticket' => $ticket->fresh(['parts', 'checklists', 'finalSale']),
         ]);
+    }
+
+    /**
+     * Checkout/settlement sheet (component tree) for the repair parts &
+     * labor counter-sale catalog, driven by the client's current local
+     * cart preview. Distinct from ticketsSettle(), which settles an
+     * *existing* ticket's bill rather than a fresh counter sale.
+     * GET /api/tenant/repair/checkout-sheet
+     */
+    public function checkoutSheet(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $cartPreview = $this->decodeCartPreview($request);
+
+        $schema = PosScreenBuilder::checkoutSheet(
+            $company,
+            '/api/tenant/repair/pos-checkout',
+            $cartPreview,
+            ticketFieldLabel: 'Repair Ticket # (Optional)',
+        );
+
+        $errors = app(SchemaValidator::class)->validate($schema);
+        if ($errors !== []) {
+            return response()->json(['success' => false, 'error' => 'Invalid SDUI schema.', 'details' => ['schema' => $errors]], 500);
+        }
+
+        return response()->json(['success' => true, 'schema' => $schema]);
+    }
+
+    /**
+     * Completes a repair counter sale (spare parts + optional labor items
+     * sold independently of any ticket workflow). If an optional
+     * `ticket_id` is supplied, each line is also recorded against that
+     * ticket via RepairTicketPart, mirroring ticketsAddPart()'s bookkeeping
+     * — but this endpoint always creates its own Sale, unlike
+     * ticketsAddPart() which only updates the ticket's running total.
+     * POST /api/tenant/repair/pos-checkout
+     */
+    public function posCheckout(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $this->normalizeFixedSplitPayments($request);
+
+        $validator = Validator::make($request->all(), [
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer',
+            'items.*.quantity' => 'required|numeric|min:1',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'ticket_id' => 'nullable|integer',
+            'payment_method' => 'nullable|string',
+            'payments' => 'nullable|array',
+            'discount' => 'nullable|numeric',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
+        }
+
+        $items = $request->input('items', []);
+        $ticketId = $request->input('ticket_id');
+
+        try {
+            $sale = DB::transaction(function () use ($company, $user, $request, $items, $ticketId) {
+                $ticket = null;
+                if (! empty($ticketId)) {
+                    $ticket = RepairTicket::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->find($ticketId);
+                }
+
+                $saleLineItems = [];
+                $totalRevenue = 0;
+
+                foreach ($items as $itemData) {
+                    $productId = $itemData['product_id'];
+                    $qty = (int) $itemData['quantity'];
+
+                    $product = Product::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->find($productId);
+
+                    if (! $product) {
+                        throw new \InvalidArgumentException("Part with ID {$productId} not found.");
+                    }
+
+                    $product->decrementStock($qty, 'Repair Counter POS sale');
+
+                    $unitPrice = isset($itemData['unit_price']) && (float) $itemData['unit_price'] > 0
+                        ? (float) $itemData['unit_price']
+                        : (float) $product->sale_price;
+
+                    $lineTotal = round($qty * $unitPrice, 2);
+                    $totalRevenue += $lineTotal;
+
+                    $saleLineItems[] = [
+                        'product_id' => $product->id,
+                        'name' => $product->name,
+                        'quantity' => $qty,
+                        'unit_price' => $unitPrice,
+                        'price' => $unitPrice,
+                        'total' => $lineTotal,
+                    ];
+
+                    if ($ticket) {
+                        RepairTicketPart::create([
+                            'company_id' => $company->id,
+                            'tenant_id' => $company->id,
+                            'repair_ticket_id' => $ticket->id,
+                            'product_id' => $product->id,
+                            'part_name' => $product->name,
+                            'quantity' => $qty,
+                            'unit_cost' => (float) $product->cost_price,
+                            'unit_price' => $unitPrice,
+                            'subtotal' => $lineTotal,
+                            'billed_to_customer' => true,
+                        ]);
+                    }
+                }
+
+                if ($ticket) {
+                    $newPartsCost = (float) RepairTicketPart::where('repair_ticket_id', $ticket->id)
+                        ->where('billed_to_customer', true)
+                        ->sum('subtotal');
+
+                    $ticket->update([
+                        'parts_cost' => $newPartsCost,
+                        'total_amount' => round($newPartsCost + (float) $ticket->labor_fee, 2),
+                    ]);
+                }
+
+                $discount = (float) $request->input('discount', 0);
+                $netAmount = max(0, $totalRevenue - $discount);
+                $paymentMethod = strtolower((string) $request->input('payment_method', 'cash'));
+
+                $prefix = $company->invoice_prefix ?: 'INV-';
+                $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
+                $saleNumber = $prefix.sprintf('%04d', $saleCount);
+
+                $sale = Sale::create([
+                    'company_id' => $company->id,
+                    'sale_number' => $saleNumber,
+                    'customer_id' => $request->input('customer_id'),
+                    'customer_name' => $request->input('customer_name') ?: ($ticket->customer_name ?? 'Walk-in Customer'),
+                    'user_id' => $user?->id,
+                    'total' => $totalRevenue,
+                    'discount' => $discount,
+                    'net_amount' => $netAmount,
+                    'paid_amount' => $netAmount,
+                    'due_amount' => 0,
+                    'payment_method' => $paymentMethod,
+                    'payment_status' => 'paid',
+                    'status' => 'completed',
+                    'operation_type' => 'sale',
+                    'items' => $saleLineItems,
+                    'notes' => $ticket
+                        ? "Repair counter sale linked to Ticket #{$ticket->ticket_number}"
+                        : ($request->input('notes') ?? 'Repair Counter POS Sale'),
+                ]);
+
+                $payments = $request->input('payments');
+                if (! empty($payments) && is_array($payments)) {
+                    foreach ($payments as $pay) {
+                        $amt = (float) ($pay['amount'] ?? 0);
+                        if ($amt > 0) {
+                            OrderPayment::create([
+                                'company_id' => $company->id,
+                                'sale_id' => $sale->id,
+                                'payment_method' => strtolower((string) ($pay['method'] ?? 'cash')),
+                                'amount' => $amt,
+                                'net_amount' => $amt,
+                            ]);
+                        }
+                    }
+                } else {
+                    OrderPayment::create([
+                        'company_id' => $company->id,
+                        'sale_id' => $sale->id,
+                        'payment_method' => $paymentMethod,
+                        'amount' => $netAmount,
+                        'net_amount' => $netAmount,
+                    ]);
+                }
+
+                return $sale;
+            });
+
+            AuditLog::record('repair.pos_sale_completed', $company->id, $user?->id, [
+                'sale_id' => $sale->id,
+                'total' => (float) $sale->total,
+                'ticket_id' => $ticketId,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Repair counter sale completed successfully',
+                'sale' => $sale,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'error' => 'Checkout failed: '.$e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function decodeCartPreview(Request $request): array
+    {
+        $raw = $request->query('cart');
+        if (! is_string($raw) || $raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? array_values($decoded) : [];
+    }
+
+    /**
+     * The checkout sheet ships two fixed optional split-payment rows
+     * rather than a dynamic list (see PharmacyApiController for the same
+     * pattern) — normalize them into the `payments[]` array posCheckout()
+     * understands, when a split is actually being used.
+     */
+    private function normalizeFixedSplitPayments(Request $request): void
+    {
+        if ($request->filled('payments')) {
+            return;
+        }
+
+        $rows = [];
+        foreach ([1, 2] as $i) {
+            $amount = (float) $request->input("payment_{$i}_amount", 0);
+            if ($amount > 0) {
+                $rows[] = [
+                    'method' => (string) $request->input("payment_{$i}_method", 'cash'),
+                    'amount' => $amount,
+                ];
+            }
+        }
+
+        if ($rows !== []) {
+            $request->merge(['payments' => $rows]);
+        }
     }
 }

@@ -10,6 +10,8 @@ use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Services\Sdui\PosScreenBuilder;
+use App\Services\Sdui\SchemaValidator;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -143,6 +145,9 @@ class PharmacyApiController extends Controller
                 ],
             ]);
         }
+
+        $this->normalizeFixedSplitPayments($request);
+        $this->normalizePrescriptionDetails($request);
 
         $validator = Validator::make($request->all(), [
             'items' => 'required|array|min:1',
@@ -773,6 +778,137 @@ class PharmacyApiController extends Controller
             'success' => true,
             'message' => 'Prescription marked as dispensed',
             'prescription' => $prescription,
+        ]);
+    }
+
+    /**
+     * Batch-picker sheet (component tree) for a single product's active
+     * FEFO batches. Rendered by UniversalPosScreen when a pharmacy catalog
+     * item is tapped.
+     * GET /api/tenant/pharmacy/batch-sheet
+     */
+    public function batchSheet(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $productId = (int) $request->query('product_id');
+
+        if ($productId <= 0) {
+            return response()->json(['success' => false, 'error' => 'product_id is required.'], 422);
+        }
+
+        $schema = PosScreenBuilder::pharmacyBatchSheet($company, $productId);
+        $errors = app(SchemaValidator::class)->validate($schema);
+        if ($errors !== []) {
+            return response()->json(['success' => false, 'error' => 'Invalid SDUI schema.', 'details' => ['schema' => $errors]], 500);
+        }
+
+        return response()->json(['success' => true, 'schema' => $schema]);
+    }
+
+    /**
+     * Checkout/settlement sheet (component tree) driven by the client's
+     * current local cart preview.
+     * GET /api/tenant/pharmacy/checkout-sheet
+     */
+    public function checkoutSheet(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $cartPreview = $this->decodeCartPreview($request);
+
+        $schema = PosScreenBuilder::checkoutSheet(
+            $company,
+            '/api/tenant/pharmacy/checkout',
+            $cartPreview,
+            customerFieldLabel: 'Customer / Patient Name',
+            collectPrescription: true,
+        );
+
+        $errors = app(SchemaValidator::class)->validate($schema);
+        if ($errors !== []) {
+            return response()->json(['success' => false, 'error' => 'Invalid SDUI schema.', 'details' => ['schema' => $errors]], 500);
+        }
+
+        return response()->json(['success' => true, 'schema' => $schema]);
+    }
+
+    /**
+     * Decodes the `?cart=<json>` query param sent by UniversalPosScreen
+     * into a plain array for rendering an order-summary preview. Never
+     * authoritative — checkout always recomputes totals from `items`.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function decodeCartPreview(Request $request): array
+    {
+        $raw = $request->query('cart');
+        if (! is_string($raw) || $raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? array_values($decoded) : [];
+    }
+
+    /**
+     * The checkout sheet ships two fixed optional split-payment rows
+     * (payment_1_method/amount, payment_2_method/amount) rather than a
+     * dynamic list, since the component vocabulary has no repeating-list
+     * primitive yet. Normalize them into the `payments[]` array
+     * checkout() already understands, when a split is actually being used.
+     */
+    private function normalizeFixedSplitPayments(Request $request): void
+    {
+        if ($request->filled('payments')) {
+            return;
+        }
+
+        $rows = [];
+        foreach ([1, 2] as $i) {
+            $amount = (float) $request->input("payment_{$i}_amount", 0);
+            if ($amount > 0) {
+                $rows[] = [
+                    'method' => (string) $request->input("payment_{$i}_method", 'cash'),
+                    'amount' => $amount,
+                ];
+            }
+        }
+
+        if ($rows !== []) {
+            $request->merge(['payments' => $rows]);
+        }
+    }
+
+    /**
+     * The universal checkout sheet posts flat patient_name/doctor_name/
+     * doctor_registration_no fields (a client form_submit posts a flat
+     * values map — it cannot nest them under prescription_details.* without
+     * a bespoke component), rather than the nested `prescription_details`
+     * array this endpoint otherwise expects. Fold them into that nested
+     * shape here when present and no explicit prescription_details/
+     * prescription_id was already supplied.
+     */
+    private function normalizePrescriptionDetails(Request $request): void
+    {
+        if ($request->filled('prescription_details') || $request->filled('prescription_id')) {
+            return;
+        }
+
+        $patientName = trim((string) $request->input('patient_name', ''));
+        $doctorName = trim((string) $request->input('doctor_name', ''));
+
+        if ($patientName === '' && $doctorName === '') {
+            return;
+        }
+
+        $request->merge([
+            'prescription_details' => [
+                'patient_name' => $patientName,
+                'patient_phone' => $request->input('patient_phone'),
+                'doctor_name' => $doctorName,
+                'doctor_registration_no' => $request->input('doctor_registration_no'),
+                'diagnosis' => $request->input('diagnosis'),
+            ],
         ]);
     }
 }

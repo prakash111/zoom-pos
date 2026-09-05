@@ -146,5 +146,10 @@ class SchemaValidator
                 $this->validateComponent($component, "{$path}.components.{$index}", $errors);
             }
         }
+
+        if ($type === 'open_remote_sheet'
+            && ! str_starts_with(trim((string) ($action['sheet_endpoint'] ?? '')), '/api/')) {
+            $errors[] = "{$path}.sheet_endpoint: must be a same-origin /api/ path";
+        }
     }
 }
