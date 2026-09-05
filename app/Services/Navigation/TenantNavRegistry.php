@@ -688,15 +688,6 @@ class TenantNavRegistry
                 'permission' => 'pos',
                 'target_endpoint' => '/api/tenant/views/repair-my-jobs',
             ],
-            [
-                'key' => 'repair_categories',
-                'label' => 'Device Categories & Specs',
-                'title' => 'Device Categories',
-                'icon' => 'category',
-                'component' => 'repair_categories',
-                'permission' => 'pos',
-                'target_endpoint' => '/api/tenant/views/repair-categories',
-            ],
         ];
     }
 
@@ -1336,7 +1327,6 @@ class TenantNavRegistry
                     ['key' => 'repair_create_ticket', 'label' => 'New Intake Ticket', 'icon' => 'add_task', 'component' => 'repair_create_ticket', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/repair-create-ticket'],
                     ['key' => 'repair_tickets', 'label' => 'Repair Ticket Register', 'icon' => 'receipt_long', 'component' => 'repair_tickets', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/repair-tickets'],
                     ['key' => 'repair_my_jobs', 'label' => 'Technician Jobs', 'icon' => 'engineering', 'component' => 'repair_my_jobs', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/repair-my-jobs'],
-                    ['key' => 'repair_categories', 'label' => 'Device Categories', 'icon' => 'category', 'component' => 'repair_categories', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/repair-categories'],
                 ],
             ],
             [
@@ -1345,7 +1335,7 @@ class TenantNavRegistry
                 'color' => '#d97706',
                 'items' => [
                     ['key' => 'inventory', 'label' => 'Parts & Consumables', 'icon' => 'inventory_2', 'component' => 'inventory', 'permission' => 'products'],
-                    ['key' => 'repair_categories', 'label' => 'Device Categories & Specs', 'icon' => 'category', 'component' => 'repair_categories', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/repair-categories'],
+                    ['key' => 'categories', 'label' => 'Categories', 'icon' => 'category', 'component' => 'categories', 'permission' => 'categories', 'target_endpoint' => '/api/tenant/views/categories'],
                     ['key' => 'suppliers', 'label' => 'Parts Vendors', 'icon' => 'local_shipping', 'component' => 'suppliers', 'permission' => 'suppliers'],
                 ],
             ],

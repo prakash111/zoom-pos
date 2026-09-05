@@ -3,6 +3,7 @@
 namespace App\Services\Sdui;
 
 use App\Models\CashRegister;
+use App\Models\Category;
 use App\Models\Company;
 use App\Models\Product;
 use App\Models\RepairTicket;
@@ -183,6 +184,30 @@ class UniversalPosBuilder
         $seenCategories = [];
         $items = [];
 
+        $dbCategories = Category::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->orderBy('name')
+            ->get();
+
+        if ($dbCategories->isEmpty()) {
+            $defaultCategories = ['Screens', 'Batteries', 'Charging Ports', 'Diagnostic Services', 'Labor'];
+            foreach ($defaultCategories as $catName) {
+                $categories[] = [
+                    'id' => null,
+                    'label' => $catName,
+                ];
+            }
+        } else {
+            foreach ($dbCategories as $cat) {
+                $seenCategories[$cat->id] = true;
+                $categories[] = [
+                    'id' => $cat->id,
+                    'label' => $cat->name,
+                ];
+            }
+        }
+
         foreach ($products as $product) {
             self::collectCategory($product, $categories, $seenCategories);
 
@@ -193,7 +218,7 @@ class UniversalPosBuilder
                 'id' => $product->id,
                 'category_id' => $product->category_id,
                 'title' => $product->name,
-                'subtitle' => 'SKU: '.($product->sku ?: ($product->barcode ?: 'General')),
+                'subtitle' => $product->category_name ?: 'Spare Part / Service',
                 'price' => (float) $product->sale_price,
                 'image_url' => $product->image_url,
                 'stock' => $stock,
@@ -205,7 +230,7 @@ class UniversalPosBuilder
                     'id' => $product->id,
                     'batch_id' => null,
                     'title' => $product->name,
-                    'subtitle' => $product->category_name ?: 'Spare Part',
+                    'subtitle' => $product->category_name ?: 'Spare Part / Service',
                     'price' => (float) $product->sale_price,
                     'quantity' => 1,
                     'max_quantity' => max(1, $stock),
@@ -228,7 +253,7 @@ class UniversalPosBuilder
         return self::envelope(
             title: 'Repair',
             company: $company,
-            searchPlaceholder: 'Search by Product Name, SKU, or Barcode',
+            searchPlaceholder: 'Search Spare Parts, Labor Services, SKU, or Barcode',
             categories: $categories,
             items: $items,
             checkoutSheetEndpoint: $checkoutEndpoint,
@@ -902,7 +927,7 @@ class UniversalPosBuilder
             ['label' => 'Cash', 'value' => 'cash', 'icon' => 'payments'],
             ['label' => 'Card', 'value' => 'card', 'icon' => 'credit_card'],
             ['label' => 'Transfer', 'value' => 'transfer', 'icon' => 'account_balance'],
-            ['label' => 'Due / Credit', 'value' => 'credit', 'icon' => 'schedule'],
+            ['label' => 'Store Credit / Khata Due', 'value' => 'credit', 'icon' => 'schedule'],
         ];
         $allowedPaymentMethods = array_column($paymentMethods, 'value');
         $rawMethod = strtolower((string) request('selected_payment_method', request('payment_method', 'cash')));

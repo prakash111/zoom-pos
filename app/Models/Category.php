@@ -11,14 +11,77 @@ class Category extends Model
     use BelongsToCompany;
     use TracksSyncState;
 
-    protected $fillable = ['company_id', 'external_id', 'name', 'color', 'description', 'active', 'is_demo'];
+    protected $fillable = [
+        'company_id',
+        'external_id',
+        'name',
+        'type',
+        'color',
+        'description',
+        'metadata',
+        'active',
+        'is_demo',
+    ];
 
     protected function casts(): array
     {
         return [
             'active' => 'boolean',
             'is_demo' => 'boolean',
+            'metadata' => 'array',
         ];
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('active', true);
+    }
+
+    public function scopeOfType($query, string $type)
+    {
+        return $query->where('type', $type);
+    }
+
+    public function scopeForDevices($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('type', 'device')
+                ->orWhereNull('type')
+                ->orWhere('type', 'retail');
+        });
+    }
+
+    public function getBrandsListAttribute(): array
+    {
+        $brands = $this->metadata['brands'] ?? null;
+        if (is_string($brands)) {
+            return array_values(array_filter(array_map('trim', explode(',', $brands))));
+        }
+
+        if (is_array($brands) && ! empty($brands)) {
+            return array_values($brands);
+        }
+
+        return ['Apple', 'Samsung', 'Generic', 'Other'];
+    }
+
+    public function getChecklistPointsAttribute(): array
+    {
+        $items = $this->metadata['checklist_points'] ?? $this->metadata['checklist_items'] ?? null;
+        if (is_string($items)) {
+            return array_values(array_filter(array_map('trim', explode(',', $items))));
+        }
+
+        if (is_array($items) && ! empty($items)) {
+            return array_values($items);
+        }
+
+        return ['Power On / Boot', 'Physical Housing Condition', 'Touch Screen / Display', 'Battery / Charging'];
+    }
+
+    public function getIdentifierTypeAttribute(): string
+    {
+        return (string) ($this->metadata['identifier_type'] ?? 'Serial / IMEI');
     }
 
     public function products()

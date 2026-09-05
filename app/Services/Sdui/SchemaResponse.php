@@ -3,6 +3,7 @@
 namespace App\Services\Sdui;
 
 use App\Models\CashRegister;
+use App\Models\Category;
 use App\Models\Company;
 use App\Models\Configuration;
 use App\Models\Customer;
@@ -1129,12 +1130,18 @@ class SchemaResponse
 
             return self::card([
                 self::row([
-                    self::icon('handyman', ['color' => $t->status_color, 'size' => 24]),
-                    self::column([
-                        self::text("#{$t->ticket_number} • {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
-                        self::text("Customer: {$t->customer_name} ({$t->customer_phone})", 'body_small', ['color' => '#64748b']),
-                    ]),
-                    self::badge(strtoupper($t->status), $t->status_color, 'subtle'),
+                    self::badge("#{$t->ticket_number}", '#0284c7', 'subtle'),
+                    self::badge(strtoupper(str_replace('_', ' ', $t->status)), $t->status_color, 'subtle'),
+                    self::badge($t->priority, $t->priority_color, 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::row([
+                    self::icon('handyman', ['color' => $t->status_color, 'size' => 20]),
+                    self::text("{$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
+                ]),
+                self::row([
+                    self::icon('person', ['color' => '#64748b', 'size' => 16]),
+                    self::text($t->customer_name, 'body_small', ['bold' => true]),
+                    self::badge($t->customer_phone, '#475569', 'subtle'),
                 ]),
                 self::divider(),
                 self::card([
@@ -1144,11 +1151,10 @@ class SchemaResponse
                     self::text('Total: '.number_format((float) $t->total_amount, 2), 'label_large', ['bold' => true]),
                     self::text('Advance: '.number_format((float) $t->advance_paid, 2), 'body_small', ['color' => '#64748b']),
                     self::text('Due: '.number_format((float) $t->balance_due, 2), 'label_large', ['color' => $t->balance_due > 0 ? '#dc2626' : '#10b981', 'bold' => true]),
-                    self::badge($t->priority, $t->priority_color, 'subtle'),
-                ]),
+                ], ['main_axis_alignment' => 'space_between']),
                 self::divider(),
                 self::wrap($actions),
-            ]);
+            ], ['padding' => 14, 'border_radius' => 14]);
         };
 
         $stageActiveCards = $allTickets->where('status', 'active')->map(fn ($t) => $renderKanbanCard($t, 'active'))->values()->all();
@@ -1220,7 +1226,7 @@ class SchemaResponse
                 self::lineItemTile('Parts & Labor POS Counter', 'Sell spare parts, bill diagnostic/repair labor, and settle tickets', 'point_of_sale', self::navigateAction('/api/tenant/views/repair-pos', title: 'Repair Counter POS')),
                 self::lineItemTile('Repair Ticket Register', 'Complete register of all customer tickets & status', 'receipt_long', self::navigateAction('/api/tenant/views/repair-tickets', title: 'Repair Ticket Register')),
                 self::lineItemTile('My Assigned Jobs', 'Technician workbench for active diagnostics & status', 'engineering', self::navigateAction('/api/tenant/views/repair-my-jobs', title: 'Assigned Jobs')),
-                self::lineItemTile('Device Categories & Specs', 'Configure dynamic brands, checklists & hardware identifiers', 'category', self::navigateAction('/api/tenant/views/repair-categories', title: 'Device Categories')),
+                self::lineItemTile('Inventory & Device Categories', 'Centralized product, hardware, and parts classification', 'sell', self::navigateAction('/api/tenant/views/categories', title: 'Categories')),
             ]),
 
             self::buttonPrimary('Quick Device Intake', self::navigateAction('/api/tenant/views/repair-create-ticket', title: 'New Repair Ticket'), 'add_task'),
@@ -1263,15 +1269,30 @@ class SchemaResponse
 
     public static function repairCreateTicketView(Company $company): array
     {
-        $categories = RepairDeviceCategory::withoutGlobalScope('company')
+        $categories = Category::withoutGlobalScope('company')
             ->where('company_id', $company->id)
-            ->where('is_active', true)
-            ->orderBy('sort_order')
+            ->where('active', true)
             ->orderBy('name')
             ->get();
 
         if ($categories->isEmpty()) {
             foreach (RepairDeviceCategory::defaultPresets() as $preset) {
+                Category::firstOrCreate([
+                    'company_id' => $company->id,
+                    'name' => $preset['name'],
+                ], [
+                    'type' => 'device',
+                    'color' => '#0284c7',
+                    'description' => $preset['description'] ?? null,
+                    'metadata' => [
+                        'identifier_type' => $preset['identifier_type'] ?? 'Serial / IMEI',
+                        'brands' => $preset['brands'] ?? [],
+                        'checklist_items' => $preset['checklist_items'] ?? [],
+                    ],
+                    'active' => true,
+                    'is_demo' => false,
+                ]);
+
                 RepairDeviceCategory::create(array_merge($preset, [
                     'company_id' => $company->id,
                     'tenant_id' => $company->id,
@@ -1279,10 +1300,9 @@ class SchemaResponse
                     'is_demo' => false,
                 ]));
             }
-            $categories = RepairDeviceCategory::withoutGlobalScope('company')
+            $categories = Category::withoutGlobalScope('company')
                 ->where('company_id', $company->id)
-                ->where('is_active', true)
-                ->orderBy('sort_order')
+                ->where('active', true)
                 ->orderBy('name')
                 ->get();
         }
@@ -1290,7 +1310,7 @@ class SchemaResponse
         $categoryOptions = [];
         foreach ($categories as $cat) {
             $categoryOptions[] = [
-                'label' => "{$cat->name} ({$cat->identifier_type})",
+                'label' => $cat->name,
                 'value' => (string) $cat->id,
             ];
         }
@@ -1298,7 +1318,7 @@ class SchemaResponse
 
         $categoryBadges = [];
         foreach ($categories as $cat) {
-            $categoryBadges[] = self::badge($cat->name, '#0284c7', 'subtle');
+            $categoryBadges[] = self::badge($cat->name, $cat->color ?: '#0284c7', 'subtle');
         }
 
         return self::screen('New Repair Ticket', [
@@ -1419,12 +1439,18 @@ class SchemaResponse
         foreach ($tickets as $t) {
             $ticketCards[] = self::card([
                 self::row([
-                    self::icon('receipt_long', ['color' => $t->status_color, 'size' => 24]),
-                    self::column([
-                        self::text("#{$t->ticket_number} • {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
-                        self::text("Customer: {$t->customer_name} ({$t->customer_phone})", 'body_small', ['color' => '#64748b']),
-                    ]),
-                    self::badge(strtoupper($t->status), $t->status_color, 'subtle'),
+                    self::badge("#{$t->ticket_number}", '#0284c7', 'subtle'),
+                    self::badge(strtoupper(str_replace('_', ' ', $t->status)), $t->status_color, 'subtle'),
+                    self::badge($t->priority, $t->priority_color, 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::row([
+                    self::icon('receipt_long', ['color' => $t->status_color, 'size' => 20]),
+                    self::text("{$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
+                ]),
+                self::row([
+                    self::icon('person', ['color' => '#64748b', 'size' => 16]),
+                    self::text($t->customer_name, 'body_small', ['bold' => true]),
+                    self::badge($t->customer_phone, '#475569', 'subtle'),
                 ]),
                 self::divider(),
                 self::card([
@@ -1434,17 +1460,18 @@ class SchemaResponse
                     self::text('Total: '.number_format((float) $t->total_amount, 2), 'label_large', ['bold' => true]),
                     self::text('Advance: '.number_format((float) $t->advance_paid, 2), 'body_small', ['color' => '#64748b']),
                     self::text('Due: '.number_format((float) $t->balance_due, 2), 'label_large', ['color' => $t->balance_due > 0 ? '#dc2626' : '#10b981', 'bold' => true]),
-                    self::badge($t->priority, $t->priority_color, 'subtle'),
-                ]),
+                ], ['main_axis_alignment' => 'space_between']),
                 self::divider(),
-                self::buttonPrimary('Open Workbench', self::navigateAction("/api/tenant/views/repair-detail?ticket_id={$t->id}", title: "Workbench #{$t->ticket_number}"), 'build'),
-                ...($t->status !== 'delivered' && $t->status !== 'cancelled' ? [
-                    self::buttonOutlined('Parts, Labor & Final Checkout', self::navigateAction(
-                        "/api/tenant/views/repair-pos?ticket_id={$t->id}",
-                        title: "Checkout Repair #{$t->ticket_number}"
-                    ), 'point_of_sale'),
-                ] : []),
-            ]);
+                self::wrap([
+                    self::buttonPrimary('Open Workbench', self::navigateAction("/api/tenant/views/repair-detail?ticket_id={$t->id}", title: "Workbench #{$t->ticket_number}"), 'build', ['full_width' => false]),
+                    ...($t->status !== 'delivered' && $t->status !== 'cancelled' ? [
+                        self::buttonOutlined('Checkout Repair', self::navigateAction(
+                            "/api/tenant/views/repair-pos?ticket_id={$t->id}",
+                            title: "Checkout Repair #{$t->ticket_number}"
+                        ), 'point_of_sale', ['full_width' => false]),
+                    ] : []),
+                ]),
+            ], ['padding' => 14, 'border_radius' => 14]);
         }
 
         return self::screen('Repair Ticket Register', [
@@ -1773,6 +1800,100 @@ class SchemaResponse
                 self::text('Registered Device Categories', 'title_medium', ['bold' => true]),
                 self::column(! empty($categoryCards) ? $categoryCards : [
                     self::text('No categories configured yet.', 'body_medium', ['color' => '#64748b']),
+                ]),
+            ]),
+        ]);
+    }
+
+    public static function categoriesView(Company $company): array
+    {
+        $categories = Category::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->withCount('products')
+            ->orderBy('name')
+            ->get();
+
+        $activeCount = $categories->where('active', true)->count();
+        $totalCount = $categories->count();
+
+        $categoryCards = [];
+        foreach ($categories as $cat) {
+            $typeLabel = match ($cat->type) {
+                'device' => 'Device Model',
+                'spare_part' => 'Spare Part',
+                'service' => 'Service / Labor',
+                default => 'Retail Product',
+            };
+            $typeColor = match ($cat->type) {
+                'device' => '#0284c7',
+                'spare_part' => '#f59e0b',
+                'service' => '#8b5cf6',
+                default => '#10b981',
+            };
+
+            $categoryCards[] = self::card([
+                self::row([
+                    self::icon('category', ['color' => $cat->color ?: '#4f46e5', 'size' => 24]),
+                    self::column([
+                        self::text($cat->name, 'title_medium', ['bold' => true]),
+                        self::text($cat->description ?: 'Central inventory & catalog classification', 'body_small', ['color' => '#64748b']),
+                    ]),
+                    self::badge($cat->active ? 'ACTIVE' : 'INACTIVE', $cat->active ? '#10b981' : '#ef4444', 'subtle'),
+                ]),
+                self::divider(),
+                self::row([
+                    self::badge($typeLabel, $typeColor, 'subtle'),
+                    self::text("Products / Items: {$cat->products_count}", 'body_small', ['bold' => true, 'color' => '#475569']),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::row([
+                    self::buttonDanger('Delete', self::formSubmitAction(
+                        "/api/tenant/categories/{$cat->id}",
+                        'DELETE',
+                        'Category deleted.',
+                        reload: true
+                    ), ['full_width' => false]),
+                ], ['main_axis_alignment' => 'end']),
+            ], ['padding' => 14, 'border_radius' => 14]);
+        }
+
+        return self::screen('Categories', [
+            self::card([
+                self::row([
+                    self::icon('sell', ['color' => '#4f46e5', 'size' => 28]),
+                    self::column([
+                        self::text('Products & Inventory Categories', 'title_medium', ['bold' => true]),
+                        self::text('Centralized categories for retail stock, spare parts, repair devices, and services.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                self::divider(),
+                self::row([
+                    self::badge("Total Categories: {$totalCount}", '#4f46e5', 'subtle'),
+                    self::badge("Active: {$activeCount}", '#10b981', 'subtle'),
+                ]),
+            ]),
+
+            self::accordionGroup('+ Add New Category', [
+                self::textInput('name', 'Category Name', '', ['placeholder' => 'e.g. Gaming Consoles, Screens, Wearables']),
+                self::dropdownSelect('type', 'Classification / Module Context', [
+                    ['label' => 'Standard Retail Product', 'value' => 'retail'],
+                    ['label' => 'Repair Device Hardware (Intake)', 'value' => 'device'],
+                    ['label' => 'Spare Part / Component', 'value' => 'spare_part'],
+                    ['label' => 'Service / Diagnostic Labor', 'value' => 'service'],
+                ], 'retail'),
+                self::textInput('description', 'Description (Optional)', '', ['placeholder' => 'Category specifications or notes']),
+                self::divider(),
+                self::buttonPrimary('Save Category', self::formSubmitAction(
+                    '/api/tenant/categories',
+                    'POST',
+                    'Category created successfully.',
+                    reload: true
+                ), 'add_circle'),
+            ], ['initially_expanded' => $totalCount === 0]),
+
+            self::column(! empty($categoryCards) ? $categoryCards : [
+                self::card([
+                    self::text('No categories created yet. Click "+ Add New Category" above to create your first category.', 'body_medium', ['color' => '#64748b']),
                 ]),
             ]),
         ]);
@@ -3452,6 +3573,7 @@ class SchemaResponse
             'customers', 'crm', 'clients' => self::customersView($company),
             'cash-register', 'cash_register', 'register' => self::cashRegisterView($company),
             'devices', 'device-sessions', 'terminals' => self::devicesView($company),
+            'categories', 'product-categories', 'inventory-categories' => self::categoriesView($company),
             default => null,
         };
 

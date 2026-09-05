@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\CashRegister;
+use App\Models\Category;
 use App\Models\OrderPayment;
 use App\Models\Product;
 use App\Models\RepairChecklist;
@@ -81,6 +82,22 @@ class RepairApiController extends Controller
                     'is_active' => true,
                     'is_demo' => false,
                 ]));
+
+                Category::firstOrCreate([
+                    'company_id' => $company->id,
+                    'name' => $preset['name'],
+                ], [
+                    'type' => 'device',
+                    'color' => '#0284c7',
+                    'description' => $preset['description'] ?? null,
+                    'metadata' => [
+                        'identifier_type' => $preset['identifier_type'] ?? 'Serial / IMEI',
+                        'brands' => $preset['brands'] ?? [],
+                        'checklist_items' => $preset['checklist_items'] ?? [],
+                    ],
+                    'active' => true,
+                    'is_demo' => false,
+                ]);
             }
 
             $categories = RepairDeviceCategory::withoutGlobalScope('company')
@@ -89,6 +106,39 @@ class RepairApiController extends Controller
                 ->orderBy('sort_order')
                 ->get();
         }
+
+        // Bridge any core Category created from Products & Inventory into RepairDeviceCategory
+        $coreCategories = Category::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->get();
+
+        foreach ($coreCategories as $coreCat) {
+            $exists = $categories->first(fn ($c) => strcasecmp($c->name, $coreCat->name) === 0);
+            if (! $exists) {
+                RepairDeviceCategory::create([
+                    'company_id' => $company->id,
+                    'tenant_id' => $company->id,
+                    'name' => $coreCat->name,
+                    'slug' => Str::slug($coreCat->name),
+                    'icon' => $coreCat->icon ?: 'devices',
+                    'identifier_type' => $coreCat->identifier_type ?: 'Serial / IMEI',
+                    'brands' => $coreCat->brands_list ?: ['Generic', 'OEM', 'Other'],
+                    'checklist_items' => $coreCat->checklist_points ?: ['Power On / Boot', 'Physical Housing Condition', 'Component Functionality'],
+                    'description' => $coreCat->description,
+                    'sort_order' => 10,
+                    'is_active' => true,
+                    'is_demo' => (bool) $coreCat->is_demo,
+                ]);
+            }
+        }
+
+        $categories = RepairDeviceCategory::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -158,6 +208,23 @@ class RepairApiController extends Controller
             'description' => $request->input('description'),
             'sort_order' => (int) RepairDeviceCategory::withoutGlobalScope('company')->where('company_id', $company->id)->max('sort_order') + 1,
             'is_active' => true,
+            'is_demo' => false,
+        ]);
+
+        Category::firstOrCreate([
+            'company_id' => $company->id,
+            'name' => $name,
+        ], [
+            'type' => 'device',
+            'color' => '#0284c7',
+            'description' => $request->input('description'),
+            'metadata' => [
+                'identifier_type' => $request->input('identifier_type') ?: 'Serial / IMEI',
+                'brands' => $brands,
+                'checklist_items' => $checklistItems,
+                'common_issues' => $commonIssues,
+            ],
+            'active' => true,
             'is_demo' => false,
         ]);
 
@@ -472,15 +539,26 @@ class RepairApiController extends Controller
             // Resolve dynamic category
             $category = null;
             if ($request->filled('device_category_id')) {
-                $category = RepairDeviceCategory::withoutGlobalScope('company')
+                $category = Category::withoutGlobalScope('company')
                     ->where('company_id', $company->id)
                     ->find($request->input('device_category_id'));
+                if (! $category) {
+                    $category = RepairDeviceCategory::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->find($request->input('device_category_id'));
+                }
             }
             if (! $category && $request->filled('device_type')) {
-                $category = RepairDeviceCategory::withoutGlobalScope('company')
+                $category = Category::withoutGlobalScope('company')
                     ->where('company_id', $company->id)
                     ->where('name', trim($request->input('device_type')))
                     ->first();
+                if (! $category) {
+                    $category = RepairDeviceCategory::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where('name', trim($request->input('device_type')))
+                        ->first();
+                }
             }
 
             $deviceType = $category?->name ?? trim((string) ($request->input('device_type') ?: 'Device'));
@@ -550,7 +628,10 @@ class RepairApiController extends Controller
                         ]);
                     }
                 } else {
-                    $checklistNames = ! empty($category?->checklist_items) ? $category->checklist_items : [
+                    $catChecklist = $category instanceof Category
+                        ? $category->checklist_points
+                        : ($category?->checklist_items ?? []);
+                    $checklistNames = ! empty($catChecklist) ? $catChecklist : [
                         'Power On / Boot Up State',
                         'Display & Touchscreen',
                         'Front & Rear Cameras',

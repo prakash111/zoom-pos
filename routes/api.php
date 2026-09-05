@@ -184,6 +184,20 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::post('/tenant/devices/{token}/revoke', [DeviceApiController::class, 'revoke']);
     Route::get('/devices', [DeviceApiController::class, 'index']);
     Route::post('/devices/{token}/revoke', [DeviceApiController::class, 'revoke']);
+
+    // Centralized Products & Inventory Categories (Mobile SDUI & API)
+    Route::prefix('tenant/categories')->group(function () {
+        Route::get('/', [CatalogAdminApiController::class, 'categoriesIndex'])->middleware('tenant.api.permission:categories,view');
+        Route::post('/', [CatalogAdminApiController::class, 'categoriesStore'])->middleware('tenant.api.permission:categories,create');
+        Route::match(['put', 'patch', 'post'], '/{id}', [CatalogAdminApiController::class, 'categoriesUpdate'])->middleware('tenant.api.permission:categories,edit');
+        Route::delete('/{id}', [CatalogAdminApiController::class, 'categoriesDestroy'])->middleware('tenant.api.permission:categories,edit');
+    });
+    Route::prefix('app/categories')->group(function () {
+        Route::get('/', [CatalogAdminApiController::class, 'categoriesIndex'])->middleware('tenant.api.permission:categories,view');
+        Route::post('/', [CatalogAdminApiController::class, 'categoriesStore'])->middleware('tenant.api.permission:categories,create');
+        Route::match(['put', 'patch', 'post'], '/{id}', [CatalogAdminApiController::class, 'categoriesUpdate'])->middleware('tenant.api.permission:categories,edit');
+        Route::delete('/{id}', [CatalogAdminApiController::class, 'categoriesDestroy'])->middleware('tenant.api.permission:categories,edit');
+    });
 });
 
 /*

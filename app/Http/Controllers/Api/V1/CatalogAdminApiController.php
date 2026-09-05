@@ -45,8 +45,10 @@ class CatalogAdminApiController extends Controller
     {
         return $this->saveSimple($request, Category::class, [
             'name' => ['required', 'string', 'max:255'],
+            'type' => ['nullable', 'string', 'max:50'],
             'color' => ['nullable', 'string', 'max:16'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'metadata' => ['nullable'],
         ], fn (Category $c) => $this->presentCategory($c), 'category.saved');
     }
 
@@ -54,8 +56,10 @@ class CatalogAdminApiController extends Controller
     {
         return $this->saveSimple($request, Category::class, [
             'name' => ['required', 'string', 'max:255'],
+            'type' => ['nullable', 'string', 'max:50'],
             'color' => ['nullable', 'string', 'max:16'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'metadata' => ['nullable'],
         ], fn (Category $c) => $this->presentCategory($c), 'category.saved', $id);
     }
 
@@ -295,8 +299,10 @@ class CatalogAdminApiController extends Controller
         return [
             'id' => (string) $c->id,
             'name' => $c->name,
+            'type' => $c->type ?? 'retail',
             'color' => $c->color ?? '#4f46e5',
             'description' => $c->description ?? '',
+            'metadata' => $c->metadata,
             'active' => (bool) $c->active,
         ];
     }

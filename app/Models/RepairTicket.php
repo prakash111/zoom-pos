@@ -78,6 +78,11 @@ class RepairTicket extends Model
         return $this->belongsTo(RepairDeviceCategory::class, 'device_category_id');
     }
 
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'device_category_id');
+    }
+
     public function technician(): BelongsTo
     {
         return $this->belongsTo(User::class, 'technician_id');

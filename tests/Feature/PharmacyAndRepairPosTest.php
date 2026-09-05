@@ -1010,4 +1010,165 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertNotEmpty($posRes->json('invoice_url'));
         $this->assertNotEmpty($posRes->json('thermal_print_url'));
     }
+
+    public function test_repair_device_categories_merged_into_inventory_and_universal_pos_contract(): void
+    {
+        // 1. Navigation Menu: Device Categories is absent from repair menu items
+        $repairMenuItems = \App\Services\Navigation\TenantNavRegistry::getRepairMenuItems();
+        $menuKeys = array_column($repairMenuItems, 'key');
+        $this->assertNotContains('repair_categories', $menuKeys, 'repair_categories must be removed from repair menu items');
+
+        $baseSections = \App\Services\Navigation\TenantNavRegistry::getBaseNavSectionsForTenant($this->company);
+        $allItemKeys = [];
+        foreach ($baseSections as $section) {
+            foreach ($section['items'] ?? [] as $item) {
+                $allItemKeys[] = $item['key'] ?? '';
+            }
+        }
+        $this->assertNotContains('repair_categories', $allItemKeys, 'repair_categories should not be an independent navigation item');
+
+        // 2. Core inventory categories SDUI view rendering and schema validation
+        $views = ['categories', 'product-categories', 'inventory-categories'];
+        $validator = new SchemaValidator;
+
+        foreach ($views as $view) {
+            $catViewRes = $this->withHeaders($this->authHeaders())->getJson("/api/tenant/views/{$view}");
+            $catViewRes->assertOk()
+                ->assertJsonPath('success', true)
+                ->assertJsonPath('schema.title', 'Categories');
+
+            $schema = $catViewRes->json('schema');
+            $this->assertNotEmpty($schema['components']);
+            $errors = $validator->validate($schema);
+            $this->assertEmpty($errors, "SDUI Schema validation failed for categories view [{$view}]: ".implode(', ', $errors));
+        }
+
+        // 3. Centralized Category creation under Products & Inventory (/api/tenant/categories) with classification type and metadata
+        $catPayload = [
+            'name' => 'Gaming Consoles',
+            'code' => 'CAT-GAME-01',
+            'type' => 'device',
+            'description' => 'Home & portable gaming systems',
+            'metadata' => [
+                'brands' => ['Sony PlayStation', 'Microsoft Xbox', 'Nintendo Switch', 'Steam Deck'],
+                'checklist_points' => ['HDMI Video Output', 'Disc Drive / Optical Reader', 'Power Port / USB-C', 'Controller Bluetooth Sync', 'Thermal Fan'],
+                'identifier_type' => 'Serial Number',
+            ],
+        ];
+
+        $storeRes = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/categories', $catPayload);
+        $storeRes->assertCreated()
+            ->assertJsonPath('data.name', 'Gaming Consoles')
+            ->assertJsonPath('data.type', 'device');
+
+        $createdCatId = $storeRes->json('data.id');
+        $this->assertNotNull($createdCatId);
+
+        $coreCat = Category::find($createdCatId);
+        $this->assertNotNull($coreCat);
+        $this->assertEquals('device', $coreCat->type);
+        $this->assertEquals(['Sony PlayStation', 'Microsoft Xbox', 'Nintendo Switch', 'Steam Deck'], $coreCat->brands_list);
+        $this->assertEquals(['HDMI Video Output', 'Disc Drive / Optical Reader', 'Power Port / USB-C', 'Controller Bluetooth Sync', 'Thermal Fan'], $coreCat->checklist_points);
+        $this->assertEquals('Serial Number', $coreCat->identifier_type);
+
+        // 4. Updating category via core inventory endpoint preserves type and metadata
+        $updateRes = $this->withHeaders($this->authHeaders())->putJson("/api/tenant/categories/{$createdCatId}", [
+            'name' => 'Next-Gen Gaming Consoles',
+            'type' => 'device',
+            'description' => 'Updated next-gen console specs',
+            'metadata' => [
+                'brands' => ['Sony PlayStation 5', 'Xbox Series X', 'Nintendo Switch OLED'],
+                'checklist_points' => ['4K HDMI 2.1 Output', 'Optical Blu-ray Drive', 'DualSense Sync'],
+                'identifier_type' => 'Serial Number',
+            ],
+        ]);
+        $updateRes->assertOk()
+            ->assertJsonPath('data.name', 'Next-Gen Gaming Consoles')
+            ->assertJsonPath('data.type', 'device');
+
+        // 5. Verify dynamic auto-population into Repair Ticket Intake View (repair-create-ticket)
+        $createTicketViewRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/repair-create-ticket');
+        $createTicketViewRes->assertOk();
+        $ticketSchemaStr = json_encode($createTicketViewRes->json());
+        $this->assertStringContainsString('Next-Gen Gaming Consoles', $ticketSchemaStr, 'Created inventory category must dynamically appear in repair intake ticket dropdown');
+
+        // 6. Create Intake Ticket linking to dynamic Category with auto-populated checklist points
+        $ticketPayload = [
+            'customer_name' => 'Alex Gamer',
+            'customer_phone' => '9988776655',
+            'device_category_id' => $createdCatId,
+            'brand' => 'Sony PlayStation 5',
+            'model' => 'PS5 Disc Edition',
+            'serial_or_imei' => 'SN-PS5-998811',
+            'issue_description' => 'HDMI port pins bent, no 4K video signal',
+            'priority' => 'urgent',
+            'estimated_cost' => 120.00,
+            'advance_paid' => 30.00,
+        ];
+
+        $ticketRes = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/repair/tickets', $ticketPayload);
+        $ticketRes->assertOk()
+            ->assertJsonPath('success', true);
+
+        $ticketId = $ticketRes->json('ticket.id');
+        $ticket = RepairTicket::with('category')->find($ticketId);
+        $this->assertNotNull($ticket);
+        $this->assertEquals($createdCatId, $ticket->device_category_id);
+        $this->assertEquals('Next-Gen Gaming Consoles', $ticket->category?->name);
+
+        // Verify checklist items were dynamically populated from the category specifications
+        $checklists = RepairChecklist::where('repair_ticket_id', $ticketId)->get();
+        $this->assertNotEmpty($checklists);
+        $checkNames = $checklists->pluck('item_name')->all();
+        $this->assertContains('4K HDMI 2.1 Output', $checkNames);
+        $this->assertContains('Optical Blu-ray Drive', $checkNames);
+
+        // 7. Repair POS Screen layout conforms to Universal POS Contract (UniversalPosBuilder)
+        $posViewRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/repair-pos');
+        $posViewRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('schema.title', 'Repair');
+
+        $posSchema = $posViewRes->json('schema');
+        $posSchemaErrors = $validator->validate($posSchema);
+        $this->assertEmpty($posSchemaErrors, 'Repair POS schema must be valid SDUI');
+
+        $posSchemaStr = json_encode($posSchema, JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('Search Spare Parts, Labor Services, SKU, or Barcode', $posSchemaStr);
+        $this->assertStringContainsString('Next-Gen Gaming Consoles', $posSchemaStr);
+        $this->assertStringContainsString('/api/tenant/repair/checkout-sheet', $posSchemaStr);
+
+        // 8. Repair Counter Sale Checkout Drawer
+        $counterDrawerRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/repair/checkout-sheet');
+        $counterDrawerRes->assertOk()
+            ->assertJsonPath('success', true);
+        $counterDrawerStr = json_encode($counterDrawerRes->json('schema'), JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('Store Credit / Khata Due', $counterDrawerStr);
+        $this->assertStringContainsString('CHANGE DUE TO CUSTOMER', $counterDrawerStr);
+
+        // 9. Universal POS Checkout Drawer for Ticket Settlement
+        $ticketDrawerRes = $this->withHeaders($this->authHeaders())->getJson("/api/tenant/repair/tickets/{$ticketId}/checkout-sheet");
+        $ticketDrawerRes->assertOk()
+            ->assertJsonPath('success', true);
+
+        $drawerSchema = $ticketDrawerRes->json('schema');
+        $drawerSchemaErrors = $validator->validate($drawerSchema);
+        $this->assertEmpty($drawerSchemaErrors, 'Repair ticket checkout drawer must be valid SDUI');
+
+        $drawerSchemaStr = json_encode($drawerSchema, JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('Advance Deposit Paid', $drawerSchemaStr);
+        $this->assertStringContainsString('Store Credit / Khata Due', $drawerSchemaStr);
+        $this->assertStringContainsString('CHANGE DUE TO CUSTOMER', $drawerSchemaStr);
+
+        // 9. Settle repair ticket and verify unified post-sale dispatch
+        $settleRes = $this->withHeaders($this->authHeaders())->postJson("/api/tenant/repair/tickets/{$ticketId}/settle", [
+            'payment_method' => 'cash',
+            'tendered' => 100.00,
+        ]);
+        $settleRes->assertOk()->assertJsonPath('success', true);
+        $this->assertNotEmpty($settleRes->json('whatsapp_url'));
+        $this->assertNotEmpty($settleRes->json('invoice_url'));
+        $this->assertNotEmpty($settleRes->json('thermal_print_url'));
+    }
 }
+
