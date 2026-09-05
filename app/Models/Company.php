@@ -54,6 +54,7 @@ class Company extends Model
             'restaurant_mode_locked' => 'boolean',
             'licensed_modules' => 'array',
             'nav_config' => 'array',
+            'navigation_menu_customization' => 'array',
             'default_commission_rate' => 'decimal:2',
             'card_fee_debit' => 'decimal:2',
             'card_fee_credit_1x' => 'decimal:2',
@@ -248,6 +249,18 @@ class Company extends Model
      */
     public function getNavigationMenuCustomizationAttribute(): ?array
     {
+        $custom = $this->attributes['navigation_menu_customization'] ?? null;
+        if (! empty($custom)) {
+            if (is_string($custom)) {
+                $decoded = json_decode($custom, true);
+                if (is_array($decoded)) {
+                    return $decoded;
+                }
+            } elseif (is_array($custom)) {
+                return $custom;
+            }
+        }
+
         $raw = $this->nav_config;
         if (! is_array($raw) || empty($raw)) {
             return null;

@@ -87,4 +87,26 @@ class NavigationMenuCustomizationTest extends TestCase
         $response->assertSee('"sections":[]', false);
         $response->assertSee('"items":[]', false);
     }
+
+    public function test_tenant_alias_and_navigation_menu_customization_query_reset(): void
+    {
+        [$company] = $this->actingAsTenantAdmin();
+
+        \App\Models\Tenant::query()->where('id', $company->id)->update([
+            'navigation_menu_customization' => json_encode([
+                'tree' => [
+                    ['key' => 'cashier_sales', 'title' => 'Custom Sales', 'items' => []],
+                ],
+            ]),
+        ]);
+
+        $tenant = \App\Models\Tenant::find($company->id);
+        $this->assertNotNull($tenant->navigation_menu_customization);
+
+        \App\Models\Tenant::query()->where('id', $company->id)->update([
+            'navigation_menu_customization' => null,
+        ]);
+
+        $this->assertNull(\App\Models\Tenant::find($company->id)->navigation_menu_customization);
+    }
 }

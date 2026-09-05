@@ -218,7 +218,7 @@ class TenantNavRegistry
      */
     public static function buildCustomNavTree(Company $company): ?array
     {
-        $raw = $company->nav_config;
+        $raw = $company->nav_config ?? $company->navigation_menu_customization;
         if (! is_array($raw) || empty($raw)) {
             return null;
         }
