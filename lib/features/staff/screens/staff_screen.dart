@@ -153,7 +153,19 @@ class _StaffScreenState extends State<StaffScreen> {
     final myId = context.watch<AuthProvider>().user?.id;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Staff & Access')),
+      appBar: AppBar(
+        title: const Text('Staff & Access'),
+        actions: [
+          TextButton.icon(
+            onPressed: () async {
+              await Navigator.of(context).pushNamed('/api/tenant/views/roles');
+              _reload();
+            },
+            icon: const Icon(Icons.admin_panel_settings_outlined, size: 18),
+            label: const Text('Manage Roles'),
+          ),
+        ],
+      ),
       body: FutureBuilder<({List<StaffUserModel> users, Map<String, String> roles})>(
         future: _future,
         builder: (context, snapshot) {
