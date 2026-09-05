@@ -10,9 +10,11 @@ use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\CustomNotificationChannel;
 use App\Models\OrderPayment;
 use App\Models\PaymentMethod;
 use App\Models\Plan;
+use App\Models\PlatformBranding;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\Subscription;
@@ -21,12 +23,15 @@ use App\Models\TaxRule;
 use App\Models\TenantApiKey;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Auth\PermissionChecker;
 use App\Services\Delivery\MessageQueueService;
+use App\Services\Delivery\WebhookDispatchService;
 use App\Services\Financial\CustomerLedgerService;
 use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\Modular\ModuleRegistry;
 use App\Services\Payment\SubscriptionPaymentGatewayService;
-use App\Services\Tenancy\TenantProvisioningService;
 use App\Services\TaxEngineService;
+use App\Services\Tenancy\TenantProvisioningService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -36,7 +41,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -63,7 +67,7 @@ class PosSyncApiController extends Controller
         // PermissionChecker::MODULES exactly) so the mobile drawer/menu can
         // gate each feature tile by the user's own authorized modules
         // instead of showing every module to every role.
-        foreach (array_keys(\App\Services\Auth\PermissionChecker::MODULES) as $module) {
+        foreach (array_keys(PermissionChecker::MODULES) as $module) {
             $permissions["{$module}.view"] ??= $user->hasPermission($module, 'view');
         }
 
@@ -137,19 +141,52 @@ class PosSyncApiController extends Controller
             ], 403);
         }
 
+        // Detect client terminal / device platform metadata
+        $deviceName = $request->input('device_name')
+            ?? $request->header('X-Device-Name')
+            ?? null;
+
+        if (! $deviceName) {
+            $ua = strtolower((string) $request->userAgent());
+            if (str_contains($ua, 'android')) {
+                $platform = 'Android POS Terminal';
+            } elseif (str_contains($ua, 'iphone') || str_contains($ua, 'ipad') || str_contains($ua, 'ios')) {
+                $platform = 'iOS POS Terminal';
+            } elseif (str_contains($ua, 'dart') || str_contains($ua, 'flutter')) {
+                $platform = 'Mobile POS Terminal';
+            } elseif (str_contains($ua, 'macintosh') || str_contains($ua, 'mac os')) {
+                $platform = 'macOS POS Desktop';
+            } elseif (str_contains($ua, 'windows')) {
+                $platform = 'Windows POS Desktop';
+            } else {
+                $platform = 'POS Terminal';
+            }
+            $deviceName = $platform.' ('.($user->name ?: 'Staff').')';
+        }
+
         // Generate or fetch active Tenant API Key for POS terminal authentication
-        $apiKey = TenantApiKey::firstOrCreate(
-            [
+        $apiKey = TenantApiKey::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('user_id', $user->id)
+            ->where('active', true)
+            ->first();
+
+        if ($apiKey) {
+            $apiKey->update([
+                'name' => $deviceName,
+                'last_used_at' => now(),
+            ]);
+        } else {
+            $apiKey = TenantApiKey::create([
                 'company_id' => $company->id,
                 'user_id' => $user->id,
-                'name' => 'Desktop POS Client ('.($user->name ?: 'Terminal').')',
-                'active' => true,
-            ],
-            [
+                'name' => $deviceName,
                 'token' => 'zk_live_'.Str::random(40),
                 'permissions' => ['*'],
-            ]
-        );
+                'active' => true,
+                'last_used_at' => now(),
+            ]);
+        }
 
         $subscription = Subscription::query()
             ->withoutGlobalScope('company')
@@ -229,12 +266,12 @@ class PosSyncApiController extends Controller
      */
     public function registrationMeta(): JsonResponse
     {
-        $enabled = \App\Services\Modular\ModuleRegistry::enabledRegistrationModes();
+        $enabled = ModuleRegistry::enabledRegistrationModes();
         $legacyString = in_array('restaurant', $enabled, true) && in_array('retail', $enabled, true)
             ? 'both'
             : (in_array('restaurant', $enabled, true) ? 'restaurant_only' : 'retail_only');
 
-        $activeModulesMap = \App\Services\Modular\ModuleRegistry::registrationModules();
+        $activeModulesMap = ModuleRegistry::registrationModules();
 
         $registrationModes = [];
         foreach ($enabled as $key) {
@@ -279,7 +316,7 @@ class PosSyncApiController extends Controller
      */
     public function branding(): JsonResponse
     {
-        $branding = \App\Models\PlatformBranding::current();
+        $branding = PlatformBranding::current();
 
         return response()->json([
             'success' => true,
@@ -314,7 +351,7 @@ class PosSyncApiController extends Controller
 
         $requestedMode = strtolower(trim((string) $request->input('pos_mode', 'general')));
         $normalizedMode = $requestedMode === 'general' ? 'retail' : $requestedMode;
-        $enabledModes = \App\Services\Modular\ModuleRegistry::enabledRegistrationModes();
+        $enabledModes = ModuleRegistry::enabledRegistrationModes();
 
         if (! in_array($normalizedMode, $enabledModes, true)) {
             return response()->json([
@@ -1627,7 +1664,7 @@ class PosSyncApiController extends Controller
             ->map(fn (PaymentMethod $pm) => [
                 'id' => (string) $pm->id,
                 'name' => $pm->name,
-                'code' => $pm->code ?: \Illuminate\Support\Str::slug($pm->name, '_'),
+                'code' => $pm->code ?: Str::slug($pm->name, '_'),
                 'description' => $pm->description ?? '',
                 'is_active' => (bool) $pm->is_active,
                 'order_index' => (int) $pm->order_index,
@@ -2356,6 +2393,7 @@ class PosSyncApiController extends Controller
         $availablePlans = Plan::where('active', true)->get()->map(function (Plan $p) {
             $features = is_array($p->features) ? $p->features : (is_string($p->features) ? (json_decode($p->features, true) ?: []) : []);
             $limits = is_array($p->limits) ? $p->limits : (is_string($p->limits) ? (json_decode($p->limits, true) ?: []) : []);
+
             return [
                 'name' => $p->name,
                 'display_name' => $p->display_name ?: ucfirst($p->name),
@@ -2721,7 +2759,7 @@ class PosSyncApiController extends Controller
 
         try {
             if ($type === 'custom') {
-                $channel = \App\Models\CustomNotificationChannel::where('company_id', $company->id)
+                $channel = CustomNotificationChannel::where('company_id', $company->id)
                     ->where('is_active', true)
                     ->find($request->input('channel_id'));
 
@@ -2729,7 +2767,7 @@ class PosSyncApiController extends Controller
                     return response()->json(['success' => false, 'error' => 'That notification channel is unavailable.'], 422);
                 }
 
-                app(\App\Services\Delivery\WebhookDispatchService::class)->dispatch($channel, [
+                app(WebhookDispatchService::class)->dispatch($channel, [
                     'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? '',
                     'invoice_no' => $sale->sale_number,
                     'total' => (float) $sale->total,
@@ -3173,7 +3211,7 @@ class PosSyncApiController extends Controller
         }
 
         // custom
-        app(\App\Services\Delivery\WebhookDispatchService::class)->dispatchEvent($company->id, 'due_reminder', [
+        app(WebhookDispatchService::class)->dispatchEvent($company->id, 'due_reminder', [
             'customer_name' => $saleModel->customer?->name ?? $saleModel->customer_name ?? '',
             'invoice_no' => $saleModel->sale_number,
             'due_amount' => (float) $saleModel->due_amount,

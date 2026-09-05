@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\QuotationApiController;
 use App\Http\Controllers\Api\V1\RepairApiController;
 use App\Http\Controllers\Api\V1\ReportsApiController;
 use App\Http\Controllers\Api\V1\RestaurantApiController;
+use App\Http\Controllers\Api\V1\SaleApiController;
 use App\Http\Controllers\Api\V1\SalesTargetApiController;
 use App\Http\Controllers\Api\V1\SduiViewController;
 use App\Http\Controllers\Api\V1\ServiceOrderApiController;
@@ -130,6 +131,18 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     // Server-Driven UI Declarative Form Submissions
     Route::match(['post', 'put'], '/tenant/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
     Route::match(['post', 'put'], '/app/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
+
+    // Post-Checkout Invoicing & Sales History Actions
+    Route::post('/tenant/sales/{id}/send-invoice', [SaleApiController::class, 'sendInvoice']);
+    Route::post('/app/sales/{id}/send-invoice', [SaleApiController::class, 'sendInvoice']);
+    Route::post('/tenant/sales/{id}/print', [SaleApiController::class, 'printInvoice']);
+    Route::post('/app/sales/{id}/print', [SaleApiController::class, 'printInvoice']);
+
+    // Terminal Devices & Active Session Management
+    Route::get('/tenant/devices', [DeviceApiController::class, 'index']);
+    Route::post('/tenant/devices/{token}/revoke', [DeviceApiController::class, 'revoke']);
+    Route::get('/devices', [DeviceApiController::class, 'index']);
+    Route::post('/devices/{token}/revoke', [DeviceApiController::class, 'revoke']);
 });
 
 /*
@@ -380,9 +393,15 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/catalog', [CatalogApiController::class, 'store'])->middleware('tenant.api.permission:catalog,create');
         Route::delete('/catalog/{id}', [CatalogApiController::class, 'destroy'])->middleware('tenant.api.permission:catalog,edit');
 
-        // Devices (active web-login sessions — not TenantApiKey terminals)
+        // Devices & POS Terminals
         Route::get('/devices', [DeviceApiController::class, 'index']);
         Route::post('/devices/{token}/revoke', [DeviceApiController::class, 'revoke']);
+        Route::get('/device-sessions', [DeviceApiController::class, 'index']);
+        Route::post('/device-sessions/{token}/revoke', [DeviceApiController::class, 'revoke']);
+
+        // Sales Invoice Actions
+        Route::post('/sales/{id}/send-invoice', [SaleApiController::class, 'sendInvoice']);
+        Route::post('/sales/{id}/print', [SaleApiController::class, 'printInvoice']);
 
         // Languages (store default language only — see LanguageApiController)
         Route::get('/languages', [LanguageApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
