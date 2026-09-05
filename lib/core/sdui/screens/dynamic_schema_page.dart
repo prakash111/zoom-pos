@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/api_client.dart';
 import '../../api/api_exception.dart';
@@ -234,6 +235,17 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
             await BootstrapCache.instance
                 .applyThemeJson(Map<String, dynamic>.from(rawTheme));
           }
+          final formUrlToOpen = res['url']?.toString() ??
+              res['print_url']?.toString() ??
+              res['whatsapp_url']?.toString();
+          if (formUrlToOpen != null && formUrlToOpen.isNotEmpty) {
+            final uri = Uri.tryParse(formUrlToOpen);
+            if (uri != null) {
+              try {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (_) {}
+            }
+          }
           _showToast(message);
           if (navigateBack && mounted) {
             Navigator.of(context).pop();
@@ -262,12 +274,37 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
         try {
           final res = await _request(endpoint, method: 'POST', data: payload);
           _showToast(res['message']?.toString() ?? successToast);
+          final urlToOpen = res['url']?.toString() ??
+              res['print_url']?.toString() ??
+              res['whatsapp_url']?.toString();
+          if (urlToOpen != null && urlToOpen.isNotEmpty) {
+            final uri = Uri.tryParse(urlToOpen);
+            if (uri != null) {
+              try {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (_) {}
+            }
+          }
           if (action['reload'] == true && mounted) {
             _fetchSchema();
           }
         } catch (e) {
           _showToast(e is ApiException ? e.message : 'Action failed: $e',
               isError: true);
+        }
+        break;
+
+      case 'open_url':
+        final rawUrl = action['url']?.toString() ?? '';
+        if (rawUrl.isNotEmpty) {
+          final uri = Uri.tryParse(rawUrl);
+          if (uri != null) {
+            try {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            } catch (e) {
+              _showToast('Failed to open link: $e', isError: true);
+            }
+          }
         }
         break;
 
