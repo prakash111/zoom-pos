@@ -41,7 +41,7 @@ class SchemaResponse
 
     public const COMPONENT_TYPES = [
         'container', 'card', 'scroll_view', 'grid_view', 'accordion_group',
-        'accordion', 'column', 'row', 'tabs', 'text', 'image_network',
+        'accordion', 'column', 'row', 'tabs', 'stepper', 'text', 'image_network',
         'badge', 'icon', 'divider', 'text_input', 'dropdown_select',
         'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker', 'file_upload',
         'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
@@ -509,6 +509,33 @@ class SchemaResponse
             'components' => $components,
             'fab' => $options['fab'] ?? null,
         ];
+    }
+
+    /**
+     * Multi-step form wizard. Each step is ['title' => ..., 'subtitle' => ...,
+     * 'components' => [...]]. All steps share one form scope on the client, and
+     * the final "Submit" fires $submitAction with the whole accumulated form.
+     *
+     * @param  list<array<string, mixed>>  $steps
+     * @param  array<string, mixed>  $submitAction
+     */
+    public static function stepper(array $steps, array $submitAction, string $submitLabel = 'Submit', array $props = []): array
+    {
+        return array_merge([
+            'type' => 'stepper',
+            'steps' => array_values(array_map(static function (array $step): array {
+                return [
+                    'title' => (string) ($step['title'] ?? ''),
+                    'subtitle' => isset($step['subtitle']) ? (string) $step['subtitle'] : null,
+                    'icon' => $step['icon'] ?? null,
+                    'components' => array_values($step['components'] ?? []),
+                ];
+            }, $steps)),
+            'submit_action' => $submitAction,
+            'submit_label' => $submitLabel,
+            'next_label' => $props['next_label'] ?? 'Next',
+            'back_label' => $props['back_label'] ?? 'Back',
+        ], array_diff_key($props, ['next_label' => 1, 'back_label' => 1]));
     }
 
     public static function jsonResponse(string $title, array $components, string $layout = 'scroll_view', array $options = []): JsonResponse
@@ -1292,13 +1319,6 @@ class SchemaResponse
                     'active' => true,
                     'is_demo' => false,
                 ]);
-
-                RepairDeviceCategory::create(array_merge($preset, [
-                    'company_id' => $company->id,
-                    'tenant_id' => $company->id,
-                    'is_active' => true,
-                    'is_demo' => false,
-                ]));
             }
             $categories = Category::withoutGlobalScope('company')
                 ->where('company_id', $company->id)
@@ -1338,133 +1358,115 @@ class SchemaResponse
             ];
         }
 
+        $checkOptions = [
+            ['label' => 'Pass', 'value' => 'pass'],
+            ['label' => 'Fail', 'value' => 'fail'],
+            ['label' => 'Not Tested', 'value' => 'not_tested'],
+        ];
+
         return self::screen('New Repair Ticket', [
             self::card([
                 self::row([
-                    self::icon('add_task', ['color' => '#0284c7', 'size' => 28]),
+                    self::icon('add_task', ['color' => '#0284c7', 'size' => 24]),
                     self::column([
                         self::text('Device Intake & Job Creation', 'title_medium', ['bold' => true]),
-                        self::text('Record customer info, hardware details, passcodes, and physical condition.', 'body_small', ['color' => '#64748b']),
+                        self::text('Complete each step, then create the ticket & print the tag.', 'body_small', ['color' => '#64748b']),
                     ]),
                 ]),
-                self::divider(),
-                self::text('Configured Device Categories in Workshop:', 'label_large', ['bold' => true]),
-                self::wrap($categoryBadges),
             ]),
 
-            self::card([
-                self::row([
-                    self::column([
-                        self::text('Customer Information', 'title_medium', ['bold' => true]),
-                        self::text('Select existing client from CRM directory or register a new customer.', 'body_small', ['color' => '#64748b']),
-                    ]),
-                    self::buttonOutlined('+ Quick Add', self::openModalAction('Register New Customer', [
-                        self::text('Register a new client in the core CRM database.', 'body_small', ['color' => '#64748b']),
-                        self::textInput('name', 'Customer Full Name *', ''),
-                        self::textInput('phone', 'Phone Number *', '', ['keyboard_type' => 'phone']),
-                        self::textInput('email', 'Email Address (Optional)', '', ['keyboard_type' => 'email']),
-                        self::textInput('address', 'Street / Billing Address (Optional)', ''),
-                        self::textInput('city', 'City (Optional)', ''),
-                        self::divider(),
-                        self::buttonPrimary('Save Customer', self::formSubmitAction(
-                            '/api/tenant/customers',
-                            'POST',
-                            'Customer registered successfully.',
-                            reload: true
-                        ), 'person_add'),
-                    ]), 'person_add', ['full_width' => false]),
-                ], ['main_axis_alignment' => 'space_between']),
-                self::divider(),
-                self::dropdownSelect('customer_id', 'Search & Select Existing Customer', $customerOptions, ''),
-                self::textInput('customer_name', 'Customer Full Name (Required if not selected above)', ''),
-                self::textInput('customer_phone', 'Contact Phone Number', '', ['keyboard_type' => 'phone']),
-            ]),
+            self::stepper([
+                // Step 1 — Customer
+                [
+                    'title' => 'Customer',
+                    'subtitle' => 'Select an existing client from the CRM directory or register a walk-in customer.',
+                    'components' => [
+                        self::buttonOutlined('+ Quick Add New Customer', self::openModalAction('Register New Customer', [
+                            self::text('Register a new client in the core CRM database.', 'body_small', ['color' => '#64748b']),
+                            self::textInput('name', 'Customer Full Name *', ''),
+                            self::textInput('phone', 'Phone Number *', '', ['keyboard_type' => 'phone']),
+                            self::textInput('email', 'Email Address (Optional)', '', ['keyboard_type' => 'email']),
+                            self::textInput('address', 'Street / Billing Address (Optional)', ''),
+                            self::textInput('city', 'City (Optional)', ''),
+                            self::divider(),
+                            self::buttonPrimary('Save Customer', self::formSubmitAction(
+                                '/api/tenant/customers',
+                                'POST',
+                                'Customer registered successfully.',
+                                reload: true
+                            ), 'person_add'),
+                        ]), 'person_add'),
+                        self::dropdownSelect('customer_id', 'Search & Select Existing Customer', $customerOptions, ''),
+                        self::textInput('customer_name', 'Customer Full Name (leave blank for a Walk-in Customer)', ''),
+                        self::textInput('customer_phone', 'Contact Phone Number (for WhatsApp / SMS updates)', '', ['keyboard_type' => 'phone']),
+                    ],
+                ],
 
-            self::card([
-                self::row([
-                    self::column([
-                        self::text('Device Specifications', 'title_medium', ['bold' => true]),
-                        self::text('Select hardware category and specify device brand and identifiers.', 'body_small', ['color' => '#64748b']),
-                    ]),
-                    self::buttonOutlined('+ Add Category', self::openModalAction('Create Device Category', [
-                        self::text('Register a new category in core inventory categories.', 'body_small', ['color' => '#64748b']),
-                        self::textInput('name', 'Category Name * (e.g. Drone, Wearable)', ''),
-                        self::textInput('code', 'Category Code / SKU Prefix (Optional)', ''),
-                        self::textInput('description', 'Description (Optional)', ''),
-                        self::textInput('type', 'Category Type', 'device', ['read_only' => true]),
-                        self::divider(),
-                        self::buttonPrimary('Save Category', self::formSubmitAction(
-                            '/api/tenant/categories',
-                            'POST',
-                            'Device category created successfully.',
-                            reload: true
-                        ), 'add_circle'),
-                    ]), 'add', ['full_width' => false]),
-                ], ['main_axis_alignment' => 'space_between']),
-                self::divider(),
-                self::dropdownSelect('device_category_id', 'Device Category', $categoryOptions, $firstCatId),
-                self::textInput('brand', 'Brand (e.g. Apple, Samsung, Dell, HP)', ''),
-                self::textInput('model', 'Model Name / Number (e.g. iPhone 14 Pro, Galaxy S23)', ''),
-                self::textInput('serial_or_imei', 'Serial Number or IMEI (Optional)', ''),
-                self::textInput('passcode_or_pattern', 'Device Screen Lock Passcode / Pattern', ''),
-            ]),
+                // Step 2 — Device
+                [
+                    'title' => 'Device Specifications',
+                    'subtitle' => 'Pick the hardware category and record the device identifiers.',
+                    'components' => [
+                        self::buttonOutlined('+ Add Category', self::openModalAction('Create Device Category', [
+                            self::text('Register a new category in core inventory categories.', 'body_small', ['color' => '#64748b']),
+                            self::textInput('name', 'Category Name * (e.g. Drone, Wearable)', ''),
+                            self::textInput('code', 'Category Code / SKU Prefix (Optional)', ''),
+                            self::textInput('description', 'Description (Optional)', ''),
+                            self::textInput('type', 'Category Type', 'device', ['read_only' => true]),
+                            self::divider(),
+                            self::buttonPrimary('Save Category', self::formSubmitAction(
+                                '/api/tenant/categories',
+                                'POST',
+                                'Device category created successfully.',
+                                reload: true
+                            ), 'add_circle'),
+                        ]), 'add'),
+                        self::dropdownSelect('device_category_id', 'Device Category *', $categoryOptions, $firstCatId, ['required' => true]),
+                        self::textInput('brand', 'Brand (e.g. Apple, Samsung, Dell, HP)', ''),
+                        self::textInput('model', 'Model Name / Number (e.g. iPhone 14 Pro, Galaxy S23)', ''),
+                        self::textInput('serial_or_imei', 'Serial Number or IMEI (Optional)', ''),
+                        self::textInput('passcode_or_pattern', 'Device Screen Lock Passcode / Pattern', ''),
+                        self::wrap($categoryBadges),
+                    ],
+                ],
 
-            self::card([
-                self::text('Diagnosis & Estimate', 'title_medium', ['bold' => true]),
-                self::textInput('issue_description', 'Customer Reported Defect / Fault Description', ''),
-                self::textInput('physical_condition_notes', 'Physical Condition (Scratches, Dents, Cracks)', ''),
-                self::dropdownSelect('priority', 'Repair Priority Level', [
-                    ['label' => 'Normal Priority', 'value' => 'normal'],
-                    ['label' => 'Low Priority', 'value' => 'low'],
-                    ['label' => 'High Priority', 'value' => 'high'],
-                    ['label' => 'Urgent / Express Service', 'value' => 'urgent'],
-                ], 'normal'),
-                self::textInput('estimated_cost', 'Estimated Repair Cost', '0.00'),
-                self::textInput('advance_paid', 'Advance Deposit Paid', '0.00'),
-            ]),
+                // Step 3 — Diagnosis & Estimate
+                [
+                    'title' => 'Fault & Estimate',
+                    'subtitle' => 'Describe the reported problem and the commercial terms.',
+                    'components' => [
+                        self::textInput('issue_description', 'Customer Reported Defect / Fault Description *', '', ['required' => true, 'max_lines' => 3]),
+                        self::textInput('physical_condition_notes', 'Physical Condition (Scratches, Dents, Cracks)', '', ['max_lines' => 2]),
+                        self::dropdownSelect('priority', 'Repair Priority Level', [
+                            ['label' => 'Normal Priority', 'value' => 'normal'],
+                            ['label' => 'Low Priority', 'value' => 'low'],
+                            ['label' => 'High Priority', 'value' => 'high'],
+                            ['label' => 'Urgent / Express Service', 'value' => 'urgent'],
+                        ], 'normal'),
+                        self::textInput('estimated_cost', 'Estimated Repair Cost', '0.00', ['keyboard_type' => 'number']),
+                        self::textInput('advance_paid', 'Advance Deposit Paid', '0.00', ['keyboard_type' => 'number']),
+                    ],
+                ],
 
-            self::card([
-                self::text('Intake Inspection Checklist', 'title_medium', ['bold' => true]),
-                self::text('Verify working state of common components before technician disassembly.', 'body_small', ['color' => '#64748b']),
-                self::divider(),
-                self::dropdownSelect('check_power', '1. Power On / Boot Up State', [
-                    ['label' => 'Pass (Powers on normally)', 'value' => 'pass'],
-                    ['label' => 'Fail (Dead / No response)', 'value' => 'fail'],
-                    ['label' => 'Not Tested', 'value' => 'not_tested'],
-                ], 'pass'),
-                self::dropdownSelect('check_display', '2. Display & Touchscreen', [
-                    ['label' => 'Pass (Touch & screen responsive)', 'value' => 'pass'],
-                    ['label' => 'Fail (Lines / Cracks / No Touch)', 'value' => 'fail'],
-                    ['label' => 'Not Tested', 'value' => 'not_tested'],
-                ], 'pass'),
-                self::dropdownSelect('check_cameras', '3. Front & Back Cameras', [
-                    ['label' => 'Pass (Clear picture & flash)', 'value' => 'pass'],
-                    ['label' => 'Fail (Blurry / Black screen)', 'value' => 'fail'],
-                    ['label' => 'Not Tested', 'value' => 'not_tested'],
-                ], 'pass'),
-                self::dropdownSelect('check_charging', '4. Charging Port & Battery', [
-                    ['label' => 'Pass (Detects charger)', 'value' => 'pass'],
-                    ['label' => 'Fail (Loose port / No charge)', 'value' => 'fail'],
-                    ['label' => 'Not Tested', 'value' => 'not_tested'],
-                ], 'pass'),
-                self::dropdownSelect('check_speakers', '5. Audio, Mic & Speakers', [
-                    ['label' => 'Pass (Sound clear)', 'value' => 'pass'],
-                    ['label' => 'Fail (Distorted / No sound)', 'value' => 'fail'],
-                    ['label' => 'Not Tested', 'value' => 'not_tested'],
-                ], 'pass'),
-                self::dropdownSelect('check_battery', '6. Battery Health & State', [
-                    ['label' => 'Pass (Holds charge / Healthy)', 'value' => 'pass'],
-                    ['label' => 'Fail (Swollen / Drains rapidly / Service required)', 'value' => 'fail'],
-                    ['label' => 'Not Tested', 'value' => 'not_tested'],
-                ], 'pass'),
-            ]),
-
-            self::buttonPrimary('Create Intake Ticket & Print Tag', self::formSubmitAction(
+                // Step 4 — Inspection Checklist
+                [
+                    'title' => 'Intake Inspection Checklist',
+                    'subtitle' => 'Verify the working state of common components before disassembly.',
+                    'components' => [
+                        self::dropdownSelect('check_power', '1. Power On / Boot Up State', $checkOptions, 'pass'),
+                        self::dropdownSelect('check_display', '2. Display & Touchscreen', $checkOptions, 'pass'),
+                        self::dropdownSelect('check_cameras', '3. Front & Back Cameras', $checkOptions, 'pass'),
+                        self::dropdownSelect('check_charging', '4. Charging Port & Battery', $checkOptions, 'pass'),
+                        self::dropdownSelect('check_speakers', '5. Audio, Mic & Speakers', $checkOptions, 'pass'),
+                        self::dropdownSelect('check_battery', '6. Battery Health & State', $checkOptions, 'pass'),
+                    ],
+                ],
+            ], self::formSubmitAction(
                 '/api/tenant/repair/tickets',
                 'POST',
                 'Repair intake ticket created successfully.',
                 reload: true
-            ), 'add_task'),
+            ), 'Create Intake Ticket & Print Tag'),
         ]);
     }
 

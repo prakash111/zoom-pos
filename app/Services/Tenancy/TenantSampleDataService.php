@@ -931,7 +931,7 @@ class TenantSampleDataService
             'company_id' => $companyId,
             'name' => 'Alex Rivera',
         ], [
-            'phone' => '+1-555-7788',
+            'phone' => '+14155550142',
             'email' => 'alex.rivera@example.com',
             'is_demo' => true,
         ]);
@@ -940,7 +940,7 @@ class TenantSampleDataService
             'company_id' => $companyId,
             'name' => 'Samantha Lee',
         ], [
-            'phone' => '+1-555-9922',
+            'phone' => '+14155550188',
             'email' => 'samantha.lee@example.com',
             'is_demo' => true,
         ]);

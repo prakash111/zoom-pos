@@ -104,6 +104,25 @@ class SchemaValidator
                 }
             }
         }
+
+        if ($type === 'stepper') {
+            $steps = $component['steps'] ?? null;
+            if (! is_array($steps) || $steps === []) {
+                $errors[] = "{$path}.steps: must be a non-empty array";
+            } else {
+                foreach ($steps as $stepIndex => $step) {
+                    if (! is_array($step)) {
+                        $errors[] = "{$path}.steps.{$stepIndex}: must be an object";
+
+                        continue;
+                    }
+                    foreach (($step['components'] ?? $step['children'] ?? []) as $index => $child) {
+                        $this->validateComponent($child, "{$path}.steps.{$stepIndex}.components.{$index}", $errors);
+                    }
+                }
+            }
+            $this->validateAction($component['submit_action'] ?? null, "{$path}.submit_action", $errors);
+        }
     }
 
     /** @param list<string> $errors */

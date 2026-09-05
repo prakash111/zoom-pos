@@ -75,6 +75,33 @@ class RepairApiController extends Controller
     }
 
     /**
+     * Fold fixed split-payment fields (payment_1_amount, payment_2_amount, ...)
+     * emitted by the Universal POS checkout drawer into a `payments` array so
+     * repair settlement consumes the exact same contract as retail / salon POS.
+     */
+    protected function normalizeSplitPayments(Request $request): void
+    {
+        if ($request->filled('payments')) {
+            return;
+        }
+
+        $rows = [];
+        foreach ([1, 2, 3] as $i) {
+            $amount = (float) $request->input("payment_{$i}_amount", 0);
+            if ($amount > 0) {
+                $rows[] = [
+                    'method' => (string) $request->input("payment_{$i}_method", 'cash'),
+                    'amount' => $amount,
+                ];
+            }
+        }
+
+        if ($rows !== []) {
+            $request->merge(['payments' => $rows]);
+        }
+    }
+
+    /**
      * Kanban counts and financial metrics for repair workshop.
      * GET /api/tenant/repair/stats
      */
@@ -438,7 +465,7 @@ class RepairApiController extends Controller
         $company = $this->resolveCompany($request);
 
         $validator = Validator::make($request->all(), [
-            'customer_name' => 'required_without:customer_id|nullable|string|max:150',
+            'customer_name' => 'nullable|string|max:150',
             'customer_phone' => 'nullable|string|max:50',
             'customer_id' => 'nullable',
             'category_id' => 'nullable|integer',
@@ -519,6 +546,12 @@ class RepairApiController extends Controller
             }
         }
 
+        // Walk-in intake with no CRM selection and no typed name: record it as a
+        // Walk-in ticket rather than rejecting the form (matches core POS behaviour).
+        if (! $customerId && $customerName === '') {
+            $customerName = 'Walk-in Customer';
+        }
+
         // Generate unique sequential ticket number: REP-YYYY-XXXX
         $year = date('Y');
         $lastTicket = RepairTicket::withoutGlobalScope('company')
@@ -584,20 +617,34 @@ class RepairApiController extends Controller
             // If advance deposit was paid, create an initial sale transaction / drawer record
             if ($advanceDeposit > 0) {
                 $saleNumber = 'ADV-'.$ticket->ticket_number;
+                $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? ''));
+                $advanceLineName = 'Advance Deposit — Repair Ticket #'.$ticket->ticket_number
+                    .($device !== '' ? " ({$device})" : '');
                 $advanceSale = Sale::create([
                     'company_id' => $company->id,
                     'tenant_id' => $company->id,
                     'sale_number' => $saleNumber,
                     'invoice_number' => $saleNumber,
                     'customer_id' => $customerId,
+                    'customer_name' => $customerName ?: 'Walk-in Customer',
                     'user_id' => $user->id,
                     'status' => 'completed',
                     'payment_status' => 'paid',
                     'payment_method' => $advanceMethod ?: 'cash',
+                    'operation_type' => 'sale',
                     'subtotal' => $advanceDeposit,
                     'total' => $advanceDeposit,
                     'net_amount' => $advanceDeposit,
                     'paid_amount' => $advanceDeposit,
+                    'items' => [[
+                        'product_id' => null,
+                        'name' => $advanceLineName,
+                        'quantity' => 1,
+                        'price' => $advanceDeposit,
+                        'unit_price' => $advanceDeposit,
+                        'subtotal' => $advanceDeposit,
+                        'total' => $advanceDeposit,
+                    ]],
                     'notes' => "Advance Deposit for Repair Ticket #{$ticket->ticket_number}",
                 ]);
 
@@ -1103,128 +1150,206 @@ class RepairApiController extends Controller
 
         $user = $this->authorizeAction($request, 'checkout', $ticket);
 
+        $this->normalizeSplitPayments($request);
+
         $validator = Validator::make($request->all(), [
             'payment_method' => 'nullable|string',
+            'selected_payment_method' => 'nullable|string',
+            'payments' => 'nullable|array',
+            'discount' => 'nullable|numeric|min:0',
             'tendered' => 'nullable|numeric|min:0',
-            'notes' => 'nullable|string',
+            'quick_cash_tendered' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
         }
 
-        $paymentMethod = $request->input('payment_method') ?: 'cash';
-        $total = $ticket->total_amount;
-        $deposit = (float) $ticket->advance_deposit;
-        $balanceDue = max(0, round($total - $deposit, 2));
+        try {
+            $result = DB::transaction(function () use ($company, $user, $ticket, $request) {
+                // Cart lines come from the ticket's own parts & labor — the source of truth.
+                $saleLineItems = [];
+                foreach ($ticket->items as $item) {
+                    $qty = max(0.01, (float) $item->quantity);
+                    $unitPrice = max(0, (float) $item->unit_price);
+                    $saleLineItems[] = [
+                        'product_id' => $item->product_id,
+                        'name' => $item->item_name,
+                        'quantity' => $qty,
+                        'unit_price' => $unitPrice,
+                        'price' => $unitPrice,
+                        'total' => round($qty * $unitPrice, 2),
+                    ];
+                }
 
-        return DB::transaction(function () use ($company, $user, $ticket, $total, $deposit, $balanceDue, $paymentMethod, $request) {
-            // Generate Sale Number
-            $prefix = $company->invoice_prefix ?: 'INV-';
-            $saleNumber = $prefix.date('Ymd').'-'.str_pad((string) (Sale::where('company_id', $company->id)->count() + 1), 4, '0', STR_PAD_LEFT);
+                if ($saleLineItems === []) {
+                    $fallback = max(0, (float) ($ticket->estimated_cost ?: $ticket->total_amount));
+                    $saleLineItems[] = [
+                        'product_id' => null,
+                        'name' => trim("Repair Service — {$ticket->brand} {$ticket->model}"),
+                        'quantity' => 1,
+                        'unit_price' => $fallback,
+                        'price' => $fallback,
+                        'total' => $fallback,
+                    ];
+                }
 
-            $saleLineItems = [];
-            foreach ($ticket->items as $item) {
-                $saleLineItems[] = [
-                    'product_id' => $item->product_id,
-                    'name' => $item->item_name,
-                    'quantity' => (float) $item->quantity,
-                    'price' => (float) $item->unit_price,
-                    'subtotal' => (float) $item->subtotal,
-                    'total' => (float) $item->total,
-                ];
-            }
+                // Universal tax engine — computed from the tenant's global tax settings.
+                $discount = (float) $request->input('discount', $request->input('discount_amount', 0));
+                $taxTotals = app(TaxCalculationService::class)->calculateCartTotals($saleLineItems, $company, null, $discount);
+                $saleLineItems = $taxTotals['items'];
+                $discount = (float) $taxTotals['discount'];
+                $netAmount = (float) $taxTotals['total'];
 
-            $totalSaleAmount = $total > 0 ? $total : $deposit;
-            $balanceDue = max(0, round($totalSaleAmount - $deposit, 2));
+                // Advance deposit is applied before the balance due is calculated.
+                $advanceApplied = min((float) $ticket->advance_deposit, $netAmount);
+                $balanceToCollect = max(0, round($netAmount - $advanceApplied, 2));
 
-            // Create core Sale record
-            $sale = Sale::create([
-                'company_id' => $company->id,
-                'tenant_id' => $company->id,
-                'sale_number' => $saleNumber,
-                'invoice_number' => $saleNumber,
-                'customer_id' => $ticket->customer_id,
-                'customer_name' => $ticket->customer_name ?: ($ticket->customer?->name ?? 'Walk-in Customer'),
-                'user_id' => $user->id,
-                'status' => 'completed',
-                'payment_status' => 'paid',
-                'payment_method' => $paymentMethod,
-                'subtotal' => $totalSaleAmount,
-                'tax_amount' => 0.00,
-                'discount_amount' => 0.00,
-                'total' => $totalSaleAmount,
-                'net_amount' => $totalSaleAmount,
-                'paid_amount' => $totalSaleAmount,
-                'items' => $saleLineItems,
-                'notes' => "Repair Settlement #{$ticket->ticket_number} (Advance Deposit Deducted: {$company->currency_symbol}".number_format($deposit, 2).")",
-            ]);
+                $paymentMethod = strtolower((string) $request->input('payment_method', $request->input('selected_payment_method', 'cash')));
+                if ($paymentMethod === 'upi') {
+                    $paymentMethod = 'transfer';
+                }
+                $isCredit = in_array($paymentMethod, ['credit', 'khata', 'due'], true);
+                $payments = $request->input('payments');
 
-            // Register payment against cash drawer
-            $register = CashRegister::where('company_id', $company->id)->where('status', 'open')->first();
-            if ($deposit > 0) {
-                OrderPayment::create([
+                $collectedNow = $isCredit
+                    ? 0.0
+                    : (! empty($payments) && is_array($payments)
+                        ? min($balanceToCollect, collect($payments)->sum(fn ($p) => max(0, (float) ($p['amount'] ?? 0))))
+                        : $balanceToCollect);
+
+                $paidAmount = min($netAmount, round($advanceApplied + $collectedNow, 2));
+                $dueAmount = max(0, round($netAmount - $paidAmount, 2));
+                $paymentStatus = $dueAmount <= 0.001 ? 'paid' : ($paidAmount > 0 ? 'partially_paid' : 'pending');
+
+                $cashRegister = CashRegister::openFor($company->id);
+
+                $prefix = $company->invoice_prefix ?: 'INV-';
+                $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
+                $saleNumber = $prefix.sprintf('%04d', $saleCount);
+
+                $sale = Sale::create([
                     'company_id' => $company->id,
-                    'tenant_id' => $company->id,
-                    'sale_id' => $sale->id,
-                    'cash_register_id' => $register?->id,
+                    'sale_number' => $saleNumber,
+                    'customer_id' => $ticket->customer_id,
+                    'customer_name' => $ticket->customer_name ?: ($ticket->customer?->name ?? 'Walk-in Customer'),
                     'user_id' => $user->id,
-                    'payment_method' => 'advance_deposit',
-                    'amount' => $deposit,
-                    'notes' => "Advance deposit previously received for Repair Ticket #{$ticket->ticket_number}",
-                ]);
-            }
-
-            if ($balanceDue > 0) {
-                OrderPayment::create([
-                    'company_id' => $company->id,
-                    'tenant_id' => $company->id,
-                    'sale_id' => $sale->id,
-                    'cash_register_id' => $register?->id,
-                    'user_id' => $user->id,
-                    'amount' => $balanceDue,
-                    'payment_method' => $paymentMethod,
+                    'cash_register_id' => $cashRegister?->id,
+                    'total' => $netAmount,
+                    'discount' => $discount,
+                    'net_amount' => $netAmount,
+                    'paid_amount' => $paidAmount,
+                    'due_amount' => $dueAmount,
+                    'payment_method' => ! empty($payments) ? 'split' : $paymentMethod,
+                    'payment_status' => $paymentStatus,
                     'status' => 'completed',
-                    'notes' => "Settlement: Ticket #{$ticket->ticket_number}",
+                    'operation_type' => 'sale',
+                    'items' => $saleLineItems,
+                    'tax_amount' => $taxTotals['tax_amount'],
+                    'tax_name' => $company->tax_id_label ?: 'Tax',
+                    'tax_breakdown' => $taxTotals['tax_summary_table'],
+                    'notes' => $request->input('notes')
+                        ?: ("Repair Settlement #{$ticket->ticket_number} (Advance Deposit Applied: ".number_format($advanceApplied, 2).')'),
                 ]);
+
+                if ($advanceApplied > 0) {
+                    OrderPayment::create([
+                        'company_id' => $company->id,
+                        'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegister?->id,
+                        'payment_method' => 'advance_deposit',
+                        'amount' => $advanceApplied,
+                        'net_amount' => $advanceApplied,
+                        'notes' => "Advance deposit previously received for Repair Ticket #{$ticket->ticket_number}",
+                    ]);
+                }
+
+                if (! empty($payments) && is_array($payments)) {
+                    foreach ($payments as $pay) {
+                        $amt = (float) ($pay['amount'] ?? 0);
+                        if ($amt > 0) {
+                            OrderPayment::create([
+                                'company_id' => $company->id,
+                                'sale_id' => $sale->id,
+                                'cash_register_id' => $cashRegister?->id,
+                                'payment_method' => strtolower((string) ($pay['method'] ?? $pay['payment_method'] ?? 'cash')),
+                                'amount' => $amt,
+                                'net_amount' => $amt,
+                            ]);
+                        }
+                    }
+                } elseif (! $isCredit && $collectedNow > 0) {
+                    $tendered = $request->filled('tendered')
+                        ? (float) $request->input('tendered')
+                        : (float) $request->input('quick_cash_tendered', $request->input('selected_tendered', $collectedNow));
+                    OrderPayment::create([
+                        'company_id' => $company->id,
+                        'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegister?->id,
+                        'payment_method' => $paymentMethod,
+                        'amount' => $collectedNow,
+                        'tendered' => $paymentMethod === 'cash' ? max($collectedNow, $tendered) : null,
+                        'change_returned' => $paymentMethod === 'cash' ? max(0, round($tendered - $collectedNow, 2)) : 0,
+                        'net_amount' => $collectedNow,
+                    ]);
+                }
+
+                $ticket->update([
+                    'status' => RepairTicket::STATUS_DELIVERED,
+                    'final_sale_id' => $sale->id,
+                    'delivered_at' => now(),
+                ]);
+
+                AuditLog::record('repair.ticket_settled', $company->id, $user->id, [
+                    'ticket_id' => $ticket->id,
+                    'sale_id' => $sale->id,
+                    'net_amount' => $netAmount,
+                    'advance_applied' => $advanceApplied,
+                    'balance_collected' => $collectedNow,
+                    'due_amount' => $dueAmount,
+                    'payment_method' => $sale->payment_method,
+                ]);
+
+                return [
+                    'sale' => $sale,
+                    'net_amount' => $netAmount,
+                    'advance_applied' => $advanceApplied,
+                    'balance_collected' => $collectedNow,
+                    'due_amount' => $dueAmount,
+                ];
+            });
+
+            $sale = $result['sale'];
+            $currency = $company->currency_symbol ?: '';
+            $waPhone = $ticket->customer?->phone ?: $ticket->customer_phone;
+            if (strlen(preg_replace('/\D+/', '', (string) $waPhone)) < 10) {
+                $waPhone = null; // fall back to the WhatsApp composer instead of an invalid wa.me/<short> link
             }
-
-            // Mark ticket delivered and closed
-            $ticket->update([
-                'status' => RepairTicket::STATUS_DELIVERED,
-                'final_sale_id' => $sale->id,
-                'delivered_at' => now(),
-            ]);
-
-            // Build thermal receipt PDF and WhatsApp URLs
-            $phone = $ticket->customer?->phone ?: $ticket->customer_phone;
-            $cleanPhone = preg_replace('/\D+/', '', (string) $phone);
-            $whatsappUrl = 'https://wa.me/'.$cleanPhone.'?text='.rawurlencode(
-                "Hello ".($ticket->customer?->name ?: 'Customer').", thank you for your business! Your device ({$ticket->brand} {$ticket->model}) has been delivered. Invoice #{$sale->invoice_number} Total: {$company->currency_symbol}".number_format($totalSaleAmount, 2)
-            );
-            $invoiceUrl = "/tenant/sales/{$sale->id}/invoice";
-            $thermalPrintUrl = "/tenant/sales/{$sale->id}/receipt/print";
-            $pdfUrl = url("/api/tenant/sales/{$sale->id}/receipt-pdf");
-
-            AuditLog::record('repair.ticket_settled', $company->id, $user->id, [
-                'ticket_id' => $ticket->id,
-                'sale_id' => $sale->id,
-                'balance_settled' => $balanceDue,
-                'payment_method' => $paymentMethod,
-            ]);
+            $whatsappUrl = $this->invoiceDeliveryService->generateInvoiceWhatsAppUrl($sale->fresh(), $waPhone);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Ticket settled and delivered successfully.',
-                'ticket' => $ticket->fresh(['finalSale']),
-                'sale' => $sale->fresh(),
+                'ticket' => $ticket->fresh(['finalSale', 'items.product', 'customer']),
+                'sale' => $sale->fresh(['customer', 'payments']),
+                'net_amount' => $result['net_amount'],
+                'advance_applied' => $result['advance_applied'],
+                'balance_collected' => $result['balance_collected'],
+                'due_amount' => $result['due_amount'],
                 'whatsapp_url' => $whatsappUrl,
-                'invoice_url' => $invoiceUrl,
-                'thermal_print_url' => $thermalPrintUrl,
-                'pdf_url' => $pdfUrl,
-                'sms_text' => "Invoice #{$sale->invoice_number} paid. Total: {$company->currency_symbol}".number_format($totalSaleAmount, 2),
+                'invoice_url' => "/tenant/sales/{$sale->id}/invoice",
+                'thermal_print_url' => "/tenant/sales/{$sale->id}/receipt/print",
+                'print_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 0, 'embed' => 1]),
+                'download_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 1]),
+                'pdf_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 1]),
+                'sms_text' => "Invoice #{$sale->sale_number} settled. Total: {$currency}".number_format($result['net_amount'], 2),
             ]);
-        });
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'error' => 'Settlement failed: '.$e->getMessage()], 500);
+        }
     }
 
     /**
@@ -1314,151 +1439,256 @@ class RepairApiController extends Controller
         $user = $this->authorizeAction($request, 'checkout');
         $company = $this->resolveCompany($request);
 
+        $this->normalizeSplitPayments($request);
+
         $validator = Validator::make($request->all(), [
             'items' => 'required|array|min:1',
             'payment_method' => 'nullable|string',
+            'selected_payment_method' => 'nullable|string',
+            'payments' => 'nullable|array',
+            'discount' => 'nullable|numeric|min:0',
+            'tendered' => 'nullable|numeric|min:0',
+            'quick_cash_tendered' => 'nullable|numeric|min:0',
             'customer_id' => 'nullable|integer',
+            'customer_name' => 'nullable|string|max:255',
             'ticket_id' => 'nullable|integer',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
         }
 
-        $paymentMethod = $request->input('payment_method') ?: 'cash';
         $items = $request->input('items');
 
-        return DB::transaction(function () use ($company, $user, $paymentMethod, $items, $request) {
-            $prefix = $company->invoice_prefix ?: 'INV-';
-            $saleNumber = $prefix.date('Ymd').'-'.str_pad((string) (Sale::where('company_id', $company->id)->count() + 1), 4, '0', STR_PAD_LEFT);
+        try {
+            $result = DB::transaction(function () use ($company, $user, $items, $request) {
+                $ticket = null;
+                if ($request->filled('ticket_id')) {
+                    $ticket = RepairTicket::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->find($request->input('ticket_id'));
+                }
 
-            $ticket = null;
-            if ($request->filled('ticket_id')) {
-                $ticket = RepairTicket::where('company_id', $company->id)->find($request->input('ticket_id'));
-            }
+                $saleLineItems = [];
+                foreach ($items as $it) {
+                    $qty = max(0.01, (float) ($it['quantity'] ?? $it['qty'] ?? 1));
+                    $productId = ! empty($it['product_id']) ? (int) $it['product_id'] : null;
+                    $price = (float) ($it['unit_price'] ?? $it['price'] ?? 0);
+                    $prod = null;
+                    if ($productId) {
+                        $prod = Product::where('company_id', $company->id)->find($productId);
+                        if ($price <= 0 && $prod) {
+                            $price = (float) $prod->sale_price;
+                        }
+                    }
+                    $lineTotal = round($qty * $price, 2);
 
-            $subtotal = 0.0;
-            $processedItems = [];
-            foreach ($items as $it) {
-                $qty = (float) ($it['quantity'] ?? 1);
-                $productId = ! empty($it['product_id']) ? (int) $it['product_id'] : null;
-                $price = (float) ($it['unit_price'] ?? $it['price'] ?? 0);
-                $prod = null;
-                if ($productId) {
-                    $prod = Product::where('company_id', $company->id)->find($productId);
-                    if ($price <= 0 && $prod) {
-                        $price = (float) $prod->sale_price;
+                    $name = (string) ($it['name'] ?? $it['item_name'] ?? ($prod ? $prod->name : 'Repair Part / Labor'));
+
+                    $saleLineItems[] = [
+                        'product_id' => $productId,
+                        'name' => $name,
+                        'quantity' => $qty,
+                        'unit_price' => $price,
+                        'price' => $price,
+                        'total' => $lineTotal,
+                    ];
+
+                    // Central inventory binding — decrement core product stock.
+                    if ($prod) {
+                        $prod->decrement('current_stock', $qty);
+                    }
+
+                    // Mirror the counter sale onto the linked ticket for a full audit trail.
+                    if ($ticket) {
+                        $ticket->items()->create([
+                            'company_id' => $company->id,
+                            'tenant_id' => $company->id,
+                            'product_id' => $productId,
+                            'item_name' => $name,
+                            'item_type' => $productId ? RepairTicketItem::TYPE_SPARE_PART : RepairTicketItem::TYPE_SERVICE_LABOR,
+                            'quantity' => $qty,
+                            'unit_price' => $price,
+                            'subtotal' => $lineTotal,
+                            'total' => $lineTotal,
+                            'billed_to_customer' => true,
+                        ]);
                     }
                 }
-                $itemSubtotal = round($qty * $price, 2);
-                $subtotal += $itemSubtotal;
-                $processedItems[] = [
-                    'product_id' => $productId,
-                    'product_name' => (string) ($it['name'] ?? $it['item_name'] ?? ($prod ? $prod->name : 'Repair Part/Labor')),
-                    'quantity' => $qty,
-                    'unit_price' => $price,
-                    'subtotal' => $itemSubtotal,
-                    'total' => $itemSubtotal,
-                    'prod' => $prod,
-                ];
-            }
 
-            if ($ticket) {
-                foreach ($processedItems as $pItem) {
-                    $ticket->items()->create([
+                // When settling against a ticket, the sale bills the WHOLE ticket
+                // (pre-existing labor + all parts), not just the cart lines added now.
+                if ($ticket) {
+                    $ticket->load('items');
+                    $ticketLines = [];
+                    foreach ($ticket->items as $item) {
+                        $qty = max(0.01, (float) $item->quantity);
+                        $unitPrice = max(0, (float) $item->unit_price);
+                        $ticketLines[] = [
+                            'product_id' => $item->product_id,
+                            'name' => $item->item_name,
+                            'quantity' => $qty,
+                            'unit_price' => $unitPrice,
+                            'price' => $unitPrice,
+                            'total' => round($qty * $unitPrice, 2),
+                        ];
+                    }
+                    if ($ticketLines !== []) {
+                        $saleLineItems = $ticketLines;
+                    }
+                }
+
+                // Universal tax engine — tenant global tax settings.
+                $discount = (float) $request->input('discount', $request->input('discount_amount', 0));
+                $taxTotals = app(TaxCalculationService::class)->calculateCartTotals($saleLineItems, $company, null, $discount);
+                $saleLineItems = $taxTotals['items'];
+                $discount = (float) $taxTotals['discount'];
+                $netAmount = (float) $taxTotals['total'];
+
+                // Advance deposit on a linked ticket is applied before the balance due.
+                $advanceApplied = $ticket ? min((float) $ticket->advance_deposit, $netAmount) : 0.0;
+                $balanceToCollect = max(0, round($netAmount - $advanceApplied, 2));
+
+                $paymentMethod = strtolower((string) $request->input('payment_method', $request->input('selected_payment_method', 'cash')));
+                if ($paymentMethod === 'upi') {
+                    $paymentMethod = 'transfer';
+                }
+                $isCredit = in_array($paymentMethod, ['credit', 'khata', 'due'], true);
+                $payments = $request->input('payments');
+
+                $collectedNow = $isCredit
+                    ? 0.0
+                    : (! empty($payments) && is_array($payments)
+                        ? min($balanceToCollect, collect($payments)->sum(fn ($p) => max(0, (float) ($p['amount'] ?? 0))))
+                        : $balanceToCollect);
+
+                $paidAmount = min($netAmount, round($advanceApplied + $collectedNow, 2));
+                $dueAmount = max(0, round($netAmount - $paidAmount, 2));
+                $paymentStatus = $dueAmount <= 0.001 ? 'paid' : ($paidAmount > 0 ? 'partially_paid' : 'pending');
+
+                $cashRegister = CashRegister::openFor($company->id);
+
+                $customerId = $request->input('customer_id') ?: ($ticket?->customer_id);
+                $customerName = trim((string) $request->input('customer_name'))
+                    ?: ($ticket?->customer_name ?: 'Walk-in Customer');
+
+                $prefix = $company->invoice_prefix ?: 'INV-';
+                $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
+                $saleNumber = $prefix.sprintf('%04d', $saleCount);
+
+                $sale = Sale::create([
+                    'company_id' => $company->id,
+                    'sale_number' => $saleNumber,
+                    'customer_id' => $customerId,
+                    'customer_name' => $customerName,
+                    'user_id' => $user->id,
+                    'cash_register_id' => $cashRegister?->id,
+                    'total' => $netAmount,
+                    'discount' => $discount,
+                    'net_amount' => $netAmount,
+                    'paid_amount' => $paidAmount,
+                    'due_amount' => $dueAmount,
+                    'payment_method' => ! empty($payments) ? 'split' : $paymentMethod,
+                    'payment_status' => $paymentStatus,
+                    'status' => 'completed',
+                    'operation_type' => 'sale',
+                    'items' => $saleLineItems,
+                    'tax_amount' => $taxTotals['tax_amount'],
+                    'tax_name' => $company->tax_id_label ?: 'Tax',
+                    'tax_breakdown' => $taxTotals['tax_summary_table'],
+                    'notes' => $request->input('notes')
+                        ?: ($ticket ? "Repair Ticket #{$ticket->ticket_number} Settlement" : 'Repair Counter POS Sale'),
+                ]);
+
+                if ($advanceApplied > 0 && $ticket) {
+                    OrderPayment::create([
                         'company_id' => $company->id,
-                        'tenant_id' => $company->id,
-                        'product_id' => $pItem['product_id'],
-                        'item_name' => $pItem['product_name'],
-                        'item_type' => RepairTicketItem::TYPE_SPARE_PART,
-                        'quantity' => $pItem['quantity'],
-                        'unit_price' => $pItem['unit_price'],
-                        'subtotal' => $pItem['subtotal'],
-                        'total' => $pItem['total'],
-                        'billed_to_customer' => true,
+                        'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegister?->id,
+                        'payment_method' => 'advance_deposit',
+                        'amount' => $advanceApplied,
+                        'net_amount' => $advanceApplied,
+                        'notes' => "Advance deposit previously received for Repair Ticket #{$ticket->ticket_number}",
                     ]);
                 }
-                $ticket->refresh();
-                $deposit = (float) $ticket->advance_deposit;
-                $totalToPay = max(0, round($ticket->total_amount - $deposit, 2));
-            } else {
-                $totalToPay = $subtotal;
-            }
 
-            $saleLineItems = [];
-            foreach ($processedItems as $pItem) {
-                $saleLineItems[] = [
-                    'product_id' => $pItem['product_id'],
-                    'name' => $pItem['product_name'],
-                    'quantity' => $pItem['quantity'],
-                    'price' => $pItem['unit_price'],
-                    'subtotal' => $pItem['subtotal'],
-                    'total' => $pItem['total'],
-                ];
-
-                if ($pItem['prod']) {
-                    $pItem['prod']->decrement('current_stock', $pItem['quantity']);
+                if (! empty($payments) && is_array($payments)) {
+                    foreach ($payments as $pay) {
+                        $amt = (float) ($pay['amount'] ?? 0);
+                        if ($amt > 0) {
+                            OrderPayment::create([
+                                'company_id' => $company->id,
+                                'sale_id' => $sale->id,
+                                'cash_register_id' => $cashRegister?->id,
+                                'payment_method' => strtolower((string) ($pay['method'] ?? $pay['payment_method'] ?? 'cash')),
+                                'amount' => $amt,
+                                'net_amount' => $amt,
+                            ]);
+                        }
+                    }
+                } elseif (! $isCredit && $collectedNow > 0) {
+                    $tendered = $request->filled('tendered')
+                        ? (float) $request->input('tendered')
+                        : (float) $request->input('quick_cash_tendered', $request->input('selected_tendered', $collectedNow));
+                    OrderPayment::create([
+                        'company_id' => $company->id,
+                        'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegister?->id,
+                        'payment_method' => $paymentMethod,
+                        'amount' => $collectedNow,
+                        'tendered' => $paymentMethod === 'cash' ? max($collectedNow, $tendered) : null,
+                        'change_returned' => $paymentMethod === 'cash' ? max(0, round($tendered - $collectedNow, 2)) : 0,
+                        'net_amount' => $collectedNow,
+                    ]);
                 }
-            }
 
-            $sale = Sale::create([
-                'company_id' => $company->id,
-                'tenant_id' => $company->id,
-                'sale_number' => $saleNumber,
-                'invoice_number' => $saleNumber,
-                'customer_id' => $request->input('customer_id') ?: ($ticket ? $ticket->customer_id : null),
-                'user_id' => $user->id,
-                'status' => 'completed',
-                'payment_status' => 'paid',
-                'payment_method' => $paymentMethod,
-                'subtotal' => $ticket ? $ticket->total_amount : $subtotal,
-                'total' => $ticket ? $ticket->total_amount : $subtotal,
-                'net_amount' => $totalToPay,
-                'paid_amount' => $totalToPay,
-                'items' => $saleLineItems,
-                'notes' => $ticket ? "Repair Ticket #{$ticket->ticket_number} Settlement" : 'Repair POS Checkout',
-            ]);
+                if ($ticket) {
+                    $ticket->update([
+                        'status' => RepairTicket::STATUS_DELIVERED,
+                        'final_sale_id' => $sale->id,
+                        'delivered_at' => now(),
+                    ]);
+                }
 
-            // Register payment
-            $register = CashRegister::where('company_id', $company->id)->where('status', 'open')->first();
-            if ($totalToPay > 0) {
-                OrderPayment::create([
-                    'company_id' => $company->id,
-                    'tenant_id' => $company->id,
+                AuditLog::record('repair.pos_checkout', $company->id, $user->id, [
                     'sale_id' => $sale->id,
-                    'cash_register_id' => $register?->id,
-                    'user_id' => $user->id,
-                    'amount' => $totalToPay,
-                    'payment_method' => $paymentMethod,
-                    'status' => 'completed',
+                    'ticket_id' => $ticket?->id,
+                    'net_amount' => $netAmount,
+                    'payment_method' => $sale->payment_method,
                 ]);
-            }
 
-            // If a ticket was linked, link it to this sale and mark delivered
-            if ($ticket) {
-                $ticket->update([
-                    'status' => RepairTicket::STATUS_DELIVERED,
-                    'final_sale_id' => $sale->id,
-                    'delivered_at' => now(),
-                ]);
-            }
+                return ['sale' => $sale, 'net_amount' => $netAmount, 'due_amount' => $dueAmount, 'ticket' => $ticket];
+            });
 
-            $pdfUrl = url("/api/tenant/sales/{$sale->id}/receipt-pdf");
-            $whatsappUrl = 'https://wa.me/?text='.rawurlencode("Invoice #{$sale->invoice_number} paid. Total: {$company->currency_symbol}".number_format($subtotal, 2));
-            $invoiceUrl = "/tenant/sales/{$sale->id}/invoice";
-            $thermalPrintUrl = "/tenant/sales/{$sale->id}/receipt/print";
+            $sale = $result['sale'];
+            $currency = $company->currency_symbol ?: '';
+            $phone = $result['ticket']?->customer?->phone
+                ?: ($result['ticket']?->customer_phone ?: $request->input('customer_phone'));
+            if (strlen(preg_replace('/\D+/', '', (string) $phone)) < 10) {
+                $phone = null; // fall back to the WhatsApp composer instead of an invalid wa.me/<short> link
+            }
+            $whatsappUrl = $this->invoiceDeliveryService->generateInvoiceWhatsAppUrl($sale->fresh(), $phone);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Sale processed successfully.',
-                'sale' => $sale->fresh(),
-                'pdf_url' => $pdfUrl,
+                'sale' => $sale->fresh(['customer', 'payments']),
+                'net_amount' => $result['net_amount'],
+                'due_amount' => $result['due_amount'],
                 'whatsapp_url' => $whatsappUrl,
-                'invoice_url' => $invoiceUrl,
-                'thermal_print_url' => $thermalPrintUrl,
-                'sms_text' => "Invoice #{$sale->invoice_number} paid. Total: {$company->currency_symbol}".number_format($subtotal, 2),
+                'invoice_url' => "/tenant/sales/{$sale->id}/invoice",
+                'thermal_print_url' => "/tenant/sales/{$sale->id}/receipt/print",
+                'print_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 0, 'embed' => 1]),
+                'download_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 1]),
+                'pdf_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 1]),
+                'sms_text' => "Invoice #{$sale->sale_number} paid. Total: {$currency}".number_format($result['net_amount'], 2),
             ]);
-        });
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'error' => 'Checkout failed: '.$e->getMessage()], 500);
+        }
     }
 
     /**

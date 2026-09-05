@@ -131,8 +131,8 @@ class TenantNavRegistry
             $sections[] = self::normalizeSection([
                 'id' => 'repair_service',
                 'key' => 'repair_service',
-                'title' => 'Repair & Service Workbench',
-                'label' => 'Repair & Service Workbench',
+                'title' => 'REPAIR OPERATIONS & SALES',
+                'label' => 'REPAIR OPERATIONS & SALES',
                 'color' => '#0284c7',
                 'items' => self::getRepairMenuItems(),
             ]);

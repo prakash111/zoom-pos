@@ -155,9 +155,32 @@ class MessageQueueService
 
     protected function deliverWhatsApp(Sale $sale, Company $company, string $recipientPhone, ?string $customMessage): void
     {
-        $text = $sale->operation_type === 'quotation'
+        $isQuotation = $sale->operation_type === 'quotation';
+
+        $text = $isQuotation
             ? $this->delivery->buildQuotationWhatsAppMessage($sale, $customMessage)
             : $this->delivery->buildInvoiceWhatsAppMessage($sale, $customMessage);
+
+        // Deliver the real receipt/quotation PDF as a WhatsApp document with the
+        // formatted summary as its caption. If PDF generation fails for any
+        // reason, still get the text summary out rather than nothing.
+        try {
+            $pdf = $isQuotation
+                ? $this->delivery->generateQuotationPdf($sale)
+                : $this->delivery->generateInvoicePdf($sale);
+
+            $label = $isQuotation ? 'Quotation' : 'Receipt';
+            $filename = ($isQuotation ? 'Quotation-' : 'Receipt-').preg_replace('/[^A-Za-z0-9_-]+/', '', (string) $sale->sale_number).'.pdf';
+
+            $this->whatsapp->sendDocument($company, $recipientPhone, $pdf, $filename, $text);
+
+            return;
+        } catch (\Throwable $e) {
+            Log::warning('WhatsApp PDF document send failed, falling back to text.', [
+                'sale_id' => $sale->id,
+                'exception' => $e->getMessage(),
+            ]);
+        }
 
         $this->whatsapp->sendText($company, $recipientPhone, $text);
     }

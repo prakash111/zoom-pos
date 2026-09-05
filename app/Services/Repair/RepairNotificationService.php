@@ -18,6 +18,29 @@ class RepairNotificationService
     ) {}
 
     /**
+     * Build a WhatsApp deep link the same way the rest of the platform does
+     * (InvoiceDeliveryService / CashRegisterReportService): only address a
+     * specific recipient when the phone looks like a real, dialable
+     * international number, otherwise open the WhatsApp composer with the
+     * message pre-filled so the user can pick the contact. This prevents the
+     * client from launching `https://wa.me/?text=` or `wa.me/<too-short>` and
+     * getting WhatsApp's "not a valid phone number" error.
+     */
+    public static function whatsAppUrl(string $message, ?string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $phone);
+
+        // Drop a leading 0 (trunk prefix) which is never part of an E.164 number.
+        $digits = ltrim($digits, '0');
+
+        if (strlen($digits) >= 10) {
+            return 'https://wa.me/'.$digits.'?text='.rawurlencode($message);
+        }
+
+        return 'https://api.whatsapp.com/send?text='.rawurlencode($message);
+    }
+
+    /**
      * Dispatches notification when a new intake ticket is created.
      * Generates customer tracking link, WhatsApp URL, SMS text, and internal notification.
      *
@@ -28,7 +51,6 @@ class RepairNotificationService
         $company = $ticket->company ?? Company::find($ticket->company_id);
         $customerName = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Valued Customer');
         $phone = $ticket->customer?->phone ?: $ticket->customer_phone;
-        $cleanPhone = preg_replace('/\D+/', '', (string) $phone);
 
         $currency = $company?->currency_symbol ?: '$';
         $trackingUrl = url("/portal/repair/{$ticket->ticket_number}");
@@ -43,7 +65,7 @@ class RepairNotificationService
         $estimatedFormatted = $currency.number_format((float) $ticket->estimated_cost, 2);
 
         $smsText = "Hello {$customerName}, repair ticket #{$ticket->ticket_number} for your {$device} has been received at ".($company?->name ?? 'our service center').". Advance Paid: {$depositFormatted}. Track progress: {$trackingUrl}";
-        $whatsappUrl = 'https://wa.me/'.$cleanPhone.'?text='.rawurlencode($smsText);
+        $whatsappUrl = self::whatsAppUrl($smsText, $phone);
 
         // 1. Dispatch through registered webhooks / custom channels (SMS, WhatsApp API gateways)
         try {
@@ -97,7 +119,6 @@ class RepairNotificationService
         $company = $ticket->company ?? Company::find($ticket->company_id);
         $customerName = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Valued Customer');
         $phone = $ticket->customer?->phone ?: $ticket->customer_phone;
-        $cleanPhone = preg_replace('/\D+/', '', (string) $phone);
 
         $currency = $company?->currency_symbol ?: '$';
         $balanceDue = $ticket->balance_due;
@@ -109,7 +130,7 @@ class RepairNotificationService
         }
 
         $smsText = "Good news {$customerName}! Your {$device} (Ticket #{$ticket->ticket_number}) is REPAIRED & READY for pickup at ".($company?->name ?? 'our service center').". Balance Due: {$balanceFormatted}. Thank you!";
-        $whatsappUrl = 'https://wa.me/'.$cleanPhone.'?text='.rawurlencode($smsText);
+        $whatsappUrl = self::whatsAppUrl($smsText, $phone);
 
         // 1. Dispatch Push Notification to all active store devices & customer apps
         try {
@@ -214,13 +235,12 @@ class RepairNotificationService
                 continue;
             }
 
-            $cleanPhone = preg_replace('/\D+/', '', (string) $phone);
             $currency = $company?->currency_symbol ?: '$';
             $balanceFormatted = $currency.number_format($ticket->balance_due, 2);
             $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? 'Device'));
 
             $smsText = "Reminder: Your {$device} (Ticket #{$ticket->ticket_number}) is ready for pickup at ".($company?->name ?? 'our store').". Outstanding Balance: {$balanceFormatted}. Please pick up at your earliest convenience.";
-            $whatsappUrl = 'https://wa.me/'.$cleanPhone.'?text='.rawurlencode($smsText);
+            $whatsappUrl = self::whatsAppUrl($smsText, $phone);
 
             try {
                 $this->channelDispatcher->dispatchEvent($ticket->company_id, 'repair.pickup_reminder', [

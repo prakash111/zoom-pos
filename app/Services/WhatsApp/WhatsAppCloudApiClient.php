@@ -57,6 +57,75 @@ class WhatsAppCloudApiClient
         return (string) ($response->json('messages.0.id') ?: '');
     }
 
+    /**
+     * Upload binary media to the tenant's WhatsApp number and send it as a
+     * document message with an optional caption. Used to deliver the actual
+     * receipt/invoice PDF to the customer's chat (deep links cannot carry a
+     * file, so this path only runs when the Cloud API is configured).
+     *
+     * @throws \RuntimeException on missing config or a non-2xx API response.
+     */
+    public function sendDocument(
+        Company $company,
+        string $toPhone,
+        string $binary,
+        string $filename,
+        ?string $caption = null,
+        string $mimeType = 'application/pdf',
+    ): string {
+        if (! $this->isConfigured($company)) {
+            throw new \RuntimeException('WhatsApp Cloud API credentials are not configured for this store.');
+        }
+
+        $sanitizedPhone = preg_replace('/[^0-9]/', '', $toPhone);
+        if (empty($sanitizedPhone)) {
+            throw new \RuntimeException("Invalid WhatsApp recipient phone number: '{$toPhone}'.");
+        }
+
+        $token = $this->accessToken($company);
+        $phoneNumberId = $this->phoneNumberId($company);
+        $baseUrl = "https://graph.facebook.com/{$this->apiVersion}";
+
+        // 1. Upload the file, get a media id scoped to this phone number.
+        $upload = Http::withToken($token)
+            ->timeout(30)
+            ->attach('file', $binary, $filename, ['Content-Type' => $mimeType])
+            ->post("{$baseUrl}/{$phoneNumberId}/media", [
+                'messaging_product' => 'whatsapp',
+                'type' => $mimeType,
+            ]);
+
+        if (! $upload->successful() || ! filled($upload->json('id'))) {
+            $error = $upload->json('error.message') ?: $upload->body();
+            throw new \RuntimeException("WhatsApp Cloud API media upload failed: {$error}");
+        }
+
+        $mediaId = (string) $upload->json('id');
+
+        // 2. Send the document message referencing the uploaded media.
+        $document = ['id' => $mediaId, 'filename' => $filename];
+        if (filled($caption)) {
+            $document['caption'] = $caption;
+        }
+
+        $response = Http::withToken($token)
+            ->timeout(15)
+            ->post("{$baseUrl}/{$phoneNumberId}/messages", [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
+                'to' => $sanitizedPhone,
+                'type' => 'document',
+                'document' => $document,
+            ]);
+
+        if (! $response->successful()) {
+            $error = $response->json('error.message') ?: $response->body();
+            throw new \RuntimeException("WhatsApp Cloud API document delivery failed: {$error}");
+        }
+
+        return (string) ($response->json('messages.0.id') ?: '');
+    }
+
     protected function phoneNumberId(Company $company): ?string
     {
         return $this->config($company, 'whatsapp_phone_number_id');
