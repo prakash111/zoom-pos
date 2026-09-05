@@ -808,60 +808,13 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    final descriptionText = context.tr(
-      widget.schema?['description']?.toString() ??
-          'Hide destinations, drag vertically to reorder, and move a row left or right to snap it between Main Menu, Sub-Menu, and Sub-Sub-Menu. Applies to every device signed in to this store.',
-    );
-    final sectionHintText = context.tr('Drag to reorder sections');
-    final rowHintText =
-        context.tr('Drag menu rows left/right to snap their level.');
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            descriptionText,
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Icon(Icons.drag_handle, size: 18, color: Colors.grey.shade600),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '$sectionHintText. $rowHintText',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              _IndentLegend(label: 'Main Menu', offset: '0 px'),
-              _IndentLegend(label: 'Sub-Menu', offset: '30 px'),
-              _IndentLegend(label: 'Sub-Sub-Menu', offset: '60 px'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     _ensureSectionsLoaded();
     final embeddedInSduiScrollView = widget.schema != null;
 
     final sectionList = ReorderableListView(
-      header: _buildHeader(context),
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       shrinkWrap: embeddedInSduiScrollView,
       physics: embeddedInSduiScrollView
           ? const NeverScrollableScrollPhysics()
@@ -972,24 +925,3 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   }
 }
 
-class _IndentLegend extends StatelessWidget {
-  const _IndentLegend({required this.label, required this.offset});
-
-  final String label;
-  final String offset;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        child: Text('$label · $offset',
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
-      ),
-    );
-  }
-}

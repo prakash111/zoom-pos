@@ -665,7 +665,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Icon(tile.icon, size: depth == 0 ? 24 : 20),
             ],
           ),
-          initiallyExpanded: true,
+          // Parent branches always mount collapsed; they open only when the
+          // user taps them (PageStorageKey keeps that choice for the session).
+          initiallyExpanded: false,
           maintainState: true,
           shape: const Border(),
           collapsedShape: const Border(),
