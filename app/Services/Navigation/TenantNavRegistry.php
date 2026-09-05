@@ -316,9 +316,7 @@ class TenantNavRegistry
             $decorated['children'] = $children;
             if (! empty($children)) {
                 $decorated['type'] = 'accordion';
-                $decorated['initially_expanded'] = false;
-                $decorated['expanded'] = false;
-                $decorated['is_expanded'] = false;
+                $decorated = array_merge($decorated, self::collapsedFlags());
             } else {
                 $decorated['type'] = 'link';
             }
@@ -949,10 +947,28 @@ class TenantNavRegistry
             'label' => $title,
             'color' => $color,
             'items' => $items,
+        ], self::collapsedFlags());
+    }
+
+    /**
+     * Every parent/accordion node in the drawer must render closed on mount and
+     * only open when the user taps it. Emit every flag name the various client
+     * releases have looked at so none of them can fall back to "expanded".
+     *
+     * @return array<string, bool>
+     */
+    public static function collapsedFlags(): array
+    {
+        return [
             'initially_expanded' => false,
+            'initiallyExpanded' => false,
             'expanded' => false,
             'is_expanded' => false,
-        ]);
+            'isExpanded' => false,
+            'default_open' => false,
+            'defaultOpen' => false,
+            'auto_expand' => false,
+        ];
     }
 
     /**
@@ -996,9 +1012,7 @@ class TenantNavRegistry
         $hasChildren = ! empty($normalized['children']);
         if ($hasChildren || ($normalized['type'] ?? null) === 'accordion') {
             $normalized['type'] = 'accordion';
-            $normalized['initially_expanded'] = false;
-            $normalized['expanded'] = false;
-            $normalized['is_expanded'] = false;
+            $normalized = array_merge($normalized, self::collapsedFlags());
         } else {
             $normalized['type'] = $normalized['type'] ?? 'link';
         }
