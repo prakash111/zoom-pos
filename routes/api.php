@@ -77,6 +77,17 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::get('/tenant/views/{view}', [SduiViewController::class, 'show']);
     Route::get('/app/views/{view}', [SduiViewController::class, 'show']);
 
+    // Native mobile cash-register contract. These unversioned tenant URLs
+    // are emitted by SchemaResponse and intentionally coexist with the
+    // versioned /v1/pos endpoints used by desktop/offline clients.
+    Route::prefix('tenant/cash-register')->group(function () {
+        Route::get('/status', [CashRegisterApiController::class, 'status'])->middleware('tenant.api.permission:cash_register,view');
+        Route::post('/open', [CashRegisterApiController::class, 'openRegister'])->middleware('tenant.api.permission:cash_register,create');
+        Route::post('/close', [CashRegisterApiController::class, 'closeRegister'])->middleware('tenant.api.permission:cash_register,edit');
+        Route::get('/history', [CashRegisterApiController::class, 'history'])->middleware('tenant.api.permission:cash_register,view');
+        Route::post('/{id}/transaction', [CashRegisterApiController::class, 'recordTransaction'])->middleware('tenant.api.permission:cash_register,edit');
+    });
+
     // Custom Notification Channels (SMS & Unofficial WhatsApp Gateways)
     Route::prefix('tenant/settings/custom-notifications')->group(function () {
         Route::get('/', [SettingsApiController::class, 'notificationChannelsIndex']);
@@ -107,6 +118,8 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
         Route::post('/batches/{id}/return', [PharmacyApiController::class, 'batchesReturn'])->middleware('tenant.api.permission:products,edit');
         Route::get('/prescriptions', [PharmacyApiController::class, 'prescriptionsIndex'])->middleware('tenant.api.permission:sales,view');
         Route::post('/prescriptions', [PharmacyApiController::class, 'prescriptionsStore'])->middleware('tenant.api.permission:sales,create');
+        Route::get('/prescriptions/{id}/checkout-sheet', [PharmacyApiController::class, 'prescriptionCheckoutSheet'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/prescriptions/{id}/checkout', [PharmacyApiController::class, 'prescriptionCheckout'])->middleware('tenant.api.permission:pos,create');
         Route::post('/prescriptions/{id}/dispense', [PharmacyApiController::class, 'prescriptionsDispense'])->middleware('tenant.api.permission:pos,edit');
     });
 
@@ -125,6 +138,7 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
         Route::delete('/tickets/{ticketId}/parts/{partId}', [RepairApiController::class, 'ticketsRemovePart'])->middleware('tenant.api.permission:pos,edit');
         Route::post('/tickets/{id}/labor', [RepairApiController::class, 'ticketsSetLabor'])->middleware('tenant.api.permission:pos,edit');
         Route::post('/tickets/{id}/settle', [RepairApiController::class, 'ticketsSettle'])->middleware('tenant.api.permission:pos,create');
+        Route::get('/tickets/{id}/checkout-sheet', [RepairApiController::class, 'ticketCheckoutSheet'])->middleware('tenant.api.permission:pos,view');
         Route::get('/checkout-sheet', [RepairApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
         Route::post('/pos-checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
     });
@@ -133,6 +147,10 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::prefix('tenant/salon')->group(function () {
         Route::get('/checkout-sheet', [SalonApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
         Route::post('/pos-checkout', [SalonApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
+        Route::get('/appointments', [SalonApiController::class, 'appointmentsIndex'])->middleware('tenant.api.permission:service_orders,view');
+        Route::post('/appointments', [SalonApiController::class, 'appointmentsStore'])->middleware('tenant.api.permission:service_orders,create');
+        Route::get('/appointments/availability', [SalonApiController::class, 'appointmentsAvailability'])->middleware('tenant.api.permission:service_orders,view');
+        Route::post('/appointments/{id}/status', [SalonApiController::class, 'appointmentsUpdateStatus'])->middleware('tenant.api.permission:service_orders,edit');
         Route::get('/specialists', [SalonApiController::class, 'specialistsIndex'])->middleware('tenant.api.permission:users,view');
         Route::post('/specialists/{id}/toggle', [SalonApiController::class, 'specialistsToggle'])->middleware('tenant.api.permission:users,edit');
     });
@@ -368,6 +386,8 @@ Route::prefix('v1/pos')->group(function () {
             Route::post('/batches/{id}/return', [PharmacyApiController::class, 'batchesReturn'])->middleware('tenant.api.permission:products,edit');
             Route::get('/prescriptions', [PharmacyApiController::class, 'prescriptionsIndex'])->middleware('tenant.api.permission:sales,view');
             Route::post('/prescriptions', [PharmacyApiController::class, 'prescriptionsStore'])->middleware('tenant.api.permission:sales,create');
+            Route::get('/prescriptions/{id}/checkout-sheet', [PharmacyApiController::class, 'prescriptionCheckoutSheet'])->middleware('tenant.api.permission:pos,view');
+            Route::post('/prescriptions/{id}/checkout', [PharmacyApiController::class, 'prescriptionCheckout'])->middleware('tenant.api.permission:pos,create');
             Route::post('/prescriptions/{id}/dispense', [PharmacyApiController::class, 'prescriptionsDispense'])->middleware('tenant.api.permission:pos,edit');
         });
 
@@ -386,6 +406,7 @@ Route::prefix('v1/pos')->group(function () {
             Route::delete('/tickets/{ticketId}/parts/{partId}', [RepairApiController::class, 'ticketsRemovePart'])->middleware('tenant.api.permission:pos,edit');
             Route::post('/tickets/{id}/labor', [RepairApiController::class, 'ticketsSetLabor'])->middleware('tenant.api.permission:pos,edit');
             Route::post('/tickets/{id}/settle', [RepairApiController::class, 'ticketsSettle'])->middleware('tenant.api.permission:pos,create');
+            Route::get('/tickets/{id}/checkout-sheet', [RepairApiController::class, 'ticketCheckoutSheet'])->middleware('tenant.api.permission:pos,view');
             Route::get('/checkout-sheet', [RepairApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
             Route::post('/pos-checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
         });
@@ -394,6 +415,10 @@ Route::prefix('v1/pos')->group(function () {
         Route::prefix('salon')->group(function () {
             Route::get('/checkout-sheet', [SalonApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
             Route::post('/pos-checkout', [SalonApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
+            Route::get('/appointments', [SalonApiController::class, 'appointmentsIndex'])->middleware('tenant.api.permission:service_orders,view');
+            Route::post('/appointments', [SalonApiController::class, 'appointmentsStore'])->middleware('tenant.api.permission:service_orders,create');
+            Route::get('/appointments/availability', [SalonApiController::class, 'appointmentsAvailability'])->middleware('tenant.api.permission:service_orders,view');
+            Route::post('/appointments/{id}/status', [SalonApiController::class, 'appointmentsUpdateStatus'])->middleware('tenant.api.permission:service_orders,edit');
             Route::get('/specialists', [SalonApiController::class, 'specialistsIndex'])->middleware('tenant.api.permission:users,view');
             Route::post('/specialists/{id}/toggle', [SalonApiController::class, 'specialistsToggle'])->middleware('tenant.api.permission:users,edit');
         });

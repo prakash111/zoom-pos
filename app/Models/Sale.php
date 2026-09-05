@@ -18,7 +18,7 @@ class Sale extends Model
         'delivery_address', 'driver_name', 'driver_phone', 'dispatch_status', 'kot_status',
         'notes', 'paid_amount', 'due_amount', 'due_date', 'due_reminder_at',
         'due_reminder_sent_at', 'due_reminder_dismissed_at', 'payment_status',
-        'payment_terms', 'terms', 'commission_rate', 'commission_amount',
+        'payment_terms', 'terms', 'commission_rate', 'commission_type', 'commission_amount',
         'merchant_fee_percentage', 'merchant_fee_amount',
         'tax_amount', 'tax_name', 'tax_rate', 'tax_breakdown',
         'einvoice_status', 'einvoice_irn', 'einvoice_qr', 'einvoice_signed_payload',

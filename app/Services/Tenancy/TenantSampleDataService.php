@@ -17,6 +17,7 @@ use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
 use App\Models\RepairTicketPart;
 use App\Models\Sale;
+use App\Models\SalonAppointment;
 use App\Models\ServiceOrder;
 use App\Models\TaxRule;
 use App\Models\User;
@@ -1173,9 +1174,10 @@ class TenantSampleDataService
             ],
         ];
 
+        $serviceProducts = [];
         foreach ($servicesData as $s) {
             $cat = $categories[$s['category']] ?? null;
-            Product::withoutGlobalScopes()->firstOrCreate([
+            $serviceProducts[$s['name']] = Product::withoutGlobalScopes()->firstOrCreate([
                 'company_id' => $companyId,
                 'code' => $s['sku'],
             ], [
@@ -1259,13 +1261,32 @@ class TenantSampleDataService
             'reported_defect' => 'Requested consultation: Haircut & Styling appointment',
             'status' => ServiceOrder::STATUS_RECEIVED,
             'priority' => 'normal',
-            'technician_id' => $primarySpecialist?->name ?? 'Elena Rostova',
+            'technician_id' => $primarySpecialist?->id,
             'received_at' => $appointmentTime,
             'labor_cost' => 25.00,
             'total_amount' => 25.00,
             'notes' => "Scheduled appointment for today at 2:00 PM with {$primarySpecialist?->name}.",
             'is_demo' => true,
         ]);
+
+        if ($primarySpecialist && isset($serviceProducts['Haircut & Styling'])) {
+            SalonAppointment::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'appointment_number' => 'APT-DEMO-001',
+            ], [
+                'tenant_id' => $companyId,
+                'customer_id' => $client->id,
+                'customer_name' => $client->name,
+                'customer_phone' => $client->phone,
+                'product_id' => $serviceProducts['Haircut & Styling']->id,
+                'specialist_id' => $primarySpecialist->id,
+                'starts_at' => $appointmentTime,
+                'ends_at' => $appointmentTime->copy()->addMinutes(30),
+                'status' => 'scheduled',
+                'notes' => 'Demo salon appointment.',
+                'is_demo' => true,
+            ]);
+        }
 
         Sale::withoutGlobalScopes()->firstOrCreate([
             'company_id' => $companyId,
@@ -1372,6 +1393,11 @@ class TenantSampleDataService
 
             // 2. Service Orders
             $counts['service_orders'] = ServiceOrder::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->where('is_demo', true)
+                ->delete();
+
+            $counts['salon_appointments'] = SalonAppointment::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('is_demo', true)
                 ->delete();

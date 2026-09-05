@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\CashRegister;
 use App\Models\OrderPayment;
 use App\Models\Product;
 use App\Models\RepairChecklist;
@@ -14,6 +15,7 @@ use App\Models\RepairTicketPart;
 use App\Models\Sale;
 use App\Services\Sdui\PosScreenBuilder;
 use App\Services\Sdui\SchemaValidator;
+use App\Services\TaxCalculationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -843,10 +845,13 @@ class RepairApiController extends Controller
             return response()->json(['success' => false, 'error' => 'This repair ticket has already been settled and delivered.'], 422);
         }
 
-        $paymentMethod = strtolower((string) ($request->input('payment_method', 'cash')));
+        $paymentMethod = strtolower((string) $request->input('payment_method', $request->input('selected_payment_method', 'cash')));
         $balanceDue = $ticket->balance_due;
+        $tendered = $request->filled('tendered')
+            ? (float) $request->input('tendered')
+            : (float) $request->input('quick_cash_tendered', $request->input('selected_tendered', $balanceDue));
 
-        $sale = DB::transaction(function () use ($company, $user, $ticket, $paymentMethod, $balanceDue) {
+        $sale = DB::transaction(function () use ($company, $user, $ticket, $paymentMethod, $balanceDue, $tendered) {
             $items = [];
 
             // Add spare parts line items
@@ -884,9 +889,18 @@ class RepairApiController extends Controller
                 ];
             }
 
+            $taxTotals = app(TaxCalculationService::class)->calculateCartTotals($items, $company);
+            $items = $taxTotals['items'];
+            $invoiceTotal = (float) $taxTotals['total'];
+            $balanceDue = max(0, round($invoiceTotal - (float) $ticket->advance_paid, 2));
+
             $prefix = $company->invoice_prefix ?: 'INV-';
             $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
             $saleNumber = $prefix.sprintf('%04d', $saleCount);
+            $cashRegister = CashRegister::openFor($company->id);
+            $isCredit = $paymentMethod === 'credit';
+            $paidAmount = $isCredit ? min((float) $ticket->advance_paid, $invoiceTotal) : $invoiceTotal;
+            $remainingDue = $isCredit ? $balanceDue : 0.0;
 
             $sale = Sale::create([
                 'company_id' => $company->id,
@@ -894,26 +908,47 @@ class RepairApiController extends Controller
                 'customer_id' => $ticket->customer_id,
                 'customer_name' => $ticket->customer_name,
                 'user_id' => $user?->id,
-                'total' => (float) $ticket->total_amount,
-                'net_amount' => (float) $ticket->total_amount,
-                'paid_amount' => (float) $ticket->total_amount,
-                'due_amount' => 0,
+                'cash_register_id' => $cashRegister?->id,
+                'total' => $invoiceTotal,
+                'net_amount' => $invoiceTotal,
+                'paid_amount' => $paidAmount,
+                'due_amount' => $remainingDue,
                 'discount' => 0,
                 'payment_method' => $paymentMethod,
-                'payment_status' => 'paid',
+                'payment_status' => $remainingDue > 0 ? ($paidAmount > 0 ? 'partial' : 'pending') : 'paid',
                 'status' => 'completed',
                 'operation_type' => 'sale',
                 'items' => $items,
+                'tax_amount' => $taxTotals['tax_amount'],
+                'tax_name' => $company->tax_id_label ?: 'Tax',
+                'tax_breakdown' => $taxTotals['tax_summary_table'],
                 'notes' => "Settled Repair Ticket #{$ticket->ticket_number}. Device: {$ticket->brand} {$ticket->model} (SN: ".($ticket->serial_or_imei ?: 'N/A')."). Advance: {$ticket->advance_paid}, Final Payment: {$balanceDue}.",
             ]);
 
-            OrderPayment::create([
-                'company_id' => $company->id,
-                'sale_id' => $sale->id,
-                'payment_method' => $paymentMethod,
-                'amount' => $sale->total,
-                'net_amount' => $sale->total,
-            ]);
+            if ((float) $ticket->advance_paid > 0) {
+                OrderPayment::create([
+                    'company_id' => $company->id,
+                    'sale_id' => $sale->id,
+                    'cash_register_id' => $cashRegister?->id,
+                    'payment_method' => 'advance_deposit',
+                    'amount' => min((float) $ticket->advance_paid, $invoiceTotal),
+                    'net_amount' => min((float) $ticket->advance_paid, $invoiceTotal),
+                    'notes' => "Advance previously received for Repair Ticket #{$ticket->ticket_number}",
+                ]);
+            }
+            if (! $isCredit && $balanceDue > 0) {
+                OrderPayment::create([
+                    'company_id' => $company->id,
+                    'sale_id' => $sale->id,
+                    'cash_register_id' => $cashRegister?->id,
+                    'payment_method' => $paymentMethod,
+                    'amount' => $balanceDue,
+                    'tendered' => $paymentMethod === 'cash' ? max($balanceDue, $tendered) : null,
+                    'change_returned' => $paymentMethod === 'cash' ? max(0, $tendered - $balanceDue) : 0,
+                    'net_amount' => $balanceDue,
+                    'notes' => "Final balance for Repair Ticket #{$ticket->ticket_number}",
+                ]);
+            }
 
             $ticket->update([
                 'status' => 'delivered',
@@ -950,18 +985,95 @@ class RepairApiController extends Controller
     {
         $company = $this->resolveCompany($request);
         $cartPreview = $this->decodeCartPreview($request);
+        $tickets = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->whereNotIn('status', ['delivered', 'cancelled'])
+            ->latest('intake_at')
+            ->limit(50)
+            ->get(['id', 'ticket_number', 'customer_name', 'device_type', 'advance_paid', 'total_amount'])
+            ->map(fn (RepairTicket $ticket) => [
+                'id' => $ticket->id,
+                'label' => "#{$ticket->ticket_number} · {$ticket->customer_name} · {$ticket->device_type}",
+                'advance_paid' => (float) $ticket->advance_paid,
+                'total_amount' => (float) $ticket->total_amount,
+            ])
+            ->all();
+        $selectedTicketId = $request->integer('ticket_id') ?: null;
+        $selectedTicketCustomer = $selectedTicketId
+            ? RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->whereKey($selectedTicketId)->value('customer_name')
+            : null;
 
         $schema = PosScreenBuilder::checkoutSheet(
             $company,
             '/api/tenant/repair/pos-checkout',
             $cartPreview,
             ticketFieldLabel: 'Repair Ticket # (Optional)',
+            module: 'repair',
+            repairTicketOptions: $tickets,
+            selectedTicketId: $selectedTicketId,
+            defaultCustomerName: $selectedTicketCustomer,
         );
 
         $errors = app(SchemaValidator::class)->validate($schema);
         if ($errors !== []) {
             return response()->json(['success' => false, 'error' => 'Invalid SDUI schema.', 'details' => ['schema' => $errors]], 500);
         }
+
+        return response()->json(['success' => true, 'schema' => $schema]);
+    }
+
+    /** Native final-payment drawer for an existing workbench ticket. */
+    public function ticketCheckoutSheet(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $ticket = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with('parts')
+            ->find($id);
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Repair ticket not found.'], 404);
+        }
+
+        $preview = $ticket->parts
+            ->where('billed_to_customer', true)
+            ->map(fn (RepairTicketPart $part) => [
+                'title' => "Part: {$part->part_name}",
+                'quantity' => (int) $part->quantity,
+                'price' => (float) $part->unit_price,
+            ])
+            ->values()
+            ->all();
+        if ((float) $ticket->labor_fee > 0) {
+            $preview[] = [
+                'title' => "Labor / Service Charge ({$ticket->device_type})",
+                'quantity' => 1,
+                'price' => (float) $ticket->labor_fee,
+            ];
+        }
+        if ($preview === [] && (float) $ticket->total_amount > 0) {
+            $preview[] = [
+                'title' => "Repair Service: {$ticket->brand} {$ticket->model}",
+                'quantity' => 1,
+                'price' => (float) $ticket->total_amount,
+            ];
+        }
+
+        $schema = PosScreenBuilder::checkoutSheet(
+            $company,
+            "/api/tenant/repair/tickets/{$ticket->id}/settle",
+            $preview,
+            ticketFieldLabel: 'Repair Ticket',
+            module: 'repair',
+            repairTicketOptions: [[
+                'id' => $ticket->id,
+                'label' => "#{$ticket->ticket_number} · {$ticket->customer_name} · {$ticket->device_type}",
+                'advance_paid' => (float) $ticket->advance_paid,
+                'total_amount' => (float) $ticket->total_amount,
+            ]],
+            selectedTicketId: $ticket->id,
+            previewIncludesTicket: true,
+            defaultCustomerName: $ticket->customer_name,
+        );
 
         return response()->json(['success' => true, 'schema' => $schema]);
     }
@@ -991,6 +1103,8 @@ class RepairApiController extends Controller
             'payment_method' => 'nullable|string',
             'payments' => 'nullable|array',
             'discount' => 'nullable|numeric',
+            'tendered' => 'nullable|numeric|min:0',
+            'quick_cash_tendered' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -1067,11 +1181,55 @@ class RepairApiController extends Controller
                         'parts_cost' => $newPartsCost,
                         'total_amount' => round($newPartsCost + (float) $ticket->labor_fee, 2),
                     ]);
+
+                    // Issue one complete delivery receipt containing every
+                    // billed part and the labor line, not only this cart's
+                    // newly added parts.
+                    $ticket->refresh()->load('parts');
+                    $saleLineItems = $ticket->parts
+                        ->where('billed_to_customer', true)
+                        ->map(fn (RepairTicketPart $part) => [
+                            'product_id' => $part->product_id,
+                            'name' => "Part: {$part->part_name}",
+                            'quantity' => (int) $part->quantity,
+                            'unit_price' => (float) $part->unit_price,
+                            'price' => (float) $part->unit_price,
+                            'total' => (float) $part->subtotal,
+                        ])
+                        ->values()
+                        ->all();
+                    if ((float) $ticket->labor_fee > 0) {
+                        $saleLineItems[] = [
+                            'product_id' => null,
+                            'name' => "Labor / Service Charge ({$ticket->device_type})",
+                            'quantity' => 1,
+                            'unit_price' => (float) $ticket->labor_fee,
+                            'price' => (float) $ticket->labor_fee,
+                            'total' => (float) $ticket->labor_fee,
+                        ];
+                    }
+                    $totalRevenue = (float) $ticket->total_amount;
                 }
 
                 $discount = (float) $request->input('discount', 0);
-                $netAmount = max(0, $totalRevenue - $discount);
-                $paymentMethod = strtolower((string) $request->input('payment_method', 'cash'));
+                $taxTotals = app(TaxCalculationService::class)->calculateCartTotals($saleLineItems, $company, null, $discount);
+                $saleLineItems = $taxTotals['items'];
+                $discount = (float) $taxTotals['discount'];
+                $netAmount = (float) $taxTotals['total'];
+                $totalRevenue = (float) $taxTotals['total'];
+                $paymentMethod = strtolower((string) $request->input('payment_method', $request->input('selected_payment_method', 'cash')));
+                $advanceApplied = $ticket ? min((float) $ticket->advance_paid, $netAmount) : 0.0;
+                $balanceToCollect = max(0, round($netAmount - $advanceApplied, 2));
+                $payments = $request->input('payments');
+                $collectedNow = $paymentMethod === 'credit'
+                    ? 0.0
+                    : (! empty($payments) && is_array($payments)
+                        ? min($balanceToCollect, collect($payments)->sum(fn ($payment) => max(0, (float) ($payment['amount'] ?? 0))))
+                        : $balanceToCollect);
+                $paidAmount = min($netAmount, $advanceApplied + $collectedNow);
+                $dueAmount = max(0, round($netAmount - $paidAmount, 2));
+                $paymentStatus = $dueAmount <= 0 ? 'paid' : ($paidAmount > 0 ? 'partial' : 'pending');
+                $cashRegister = CashRegister::openFor($company->id);
 
                 $prefix = $company->invoice_prefix ?: 'INV-';
                 $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
@@ -1083,22 +1241,36 @@ class RepairApiController extends Controller
                     'customer_id' => $request->input('customer_id'),
                     'customer_name' => $request->input('customer_name') ?: ($ticket->customer_name ?? 'Walk-in Customer'),
                     'user_id' => $user?->id,
+                    'cash_register_id' => $cashRegister?->id,
                     'total' => $totalRevenue,
                     'discount' => $discount,
                     'net_amount' => $netAmount,
-                    'paid_amount' => $netAmount,
-                    'due_amount' => 0,
+                    'paid_amount' => $paidAmount,
+                    'due_amount' => $dueAmount,
                     'payment_method' => $paymentMethod,
-                    'payment_status' => 'paid',
+                    'payment_status' => $paymentStatus,
                     'status' => 'completed',
                     'operation_type' => 'sale',
                     'items' => $saleLineItems,
+                    'tax_amount' => $taxTotals['tax_amount'],
+                    'tax_name' => $company->tax_id_label ?: 'Tax',
+                    'tax_breakdown' => $taxTotals['tax_summary_table'],
                     'notes' => $ticket
                         ? "Repair counter sale linked to Ticket #{$ticket->ticket_number}"
                         : ($request->input('notes') ?? 'Repair Counter POS Sale'),
                 ]);
 
-                $payments = $request->input('payments');
+                if ($advanceApplied > 0) {
+                    OrderPayment::create([
+                        'company_id' => $company->id,
+                        'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegister?->id,
+                        'payment_method' => 'advance_deposit',
+                        'amount' => $advanceApplied,
+                        'net_amount' => $advanceApplied,
+                        'notes' => "Advance previously received for Repair Ticket #{$ticket->ticket_number}",
+                    ]);
+                }
                 if (! empty($payments) && is_array($payments)) {
                     foreach ($payments as $pay) {
                         $amt = (float) ($pay['amount'] ?? 0);
@@ -1106,19 +1278,35 @@ class RepairApiController extends Controller
                             OrderPayment::create([
                                 'company_id' => $company->id,
                                 'sale_id' => $sale->id,
+                                'cash_register_id' => $cashRegister?->id,
                                 'payment_method' => strtolower((string) ($pay['method'] ?? 'cash')),
                                 'amount' => $amt,
                                 'net_amount' => $amt,
                             ]);
                         }
                     }
-                } else {
+                } elseif ($paymentMethod !== 'credit' && $collectedNow > 0) {
+                    $tendered = $request->filled('tendered')
+                        ? (float) $request->input('tendered')
+                        : (float) $request->input('quick_cash_tendered', $request->input('selected_tendered', $collectedNow));
                     OrderPayment::create([
                         'company_id' => $company->id,
                         'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegister?->id,
                         'payment_method' => $paymentMethod,
-                        'amount' => $netAmount,
-                        'net_amount' => $netAmount,
+                        'amount' => $collectedNow,
+                        'tendered' => $paymentMethod === 'cash' ? max($collectedNow, $tendered) : null,
+                        'change_returned' => $paymentMethod === 'cash' ? max(0, $tendered - $collectedNow) : 0,
+                        'net_amount' => $collectedNow,
+                    ]);
+                }
+
+                if ($ticket) {
+                    $ticket->update([
+                        'status' => 'delivered',
+                        'completed_at' => $ticket->completed_at ?? now(),
+                        'delivered_at' => now(),
+                        'final_sale_id' => $sale->id,
                     ]);
                 }
 

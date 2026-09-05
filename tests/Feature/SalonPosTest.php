@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Company;
 use App\Models\Plan;
 use App\Models\Product;
+use App\Models\SalonAppointment;
 use App\Models\User;
 use App\Services\Sdui\SchemaValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -171,12 +172,17 @@ class SalonPosTest extends TestCase
         $this->assertStringNotContainsString('specialist_id', json_encode($withoutSpecialists->json()));
 
         $this->createSpecialist();
+        $this->createService();
         $cart = urlencode(json_encode([['title' => 'Haircut & Styling', 'qty' => 1, 'price' => 25.00]]));
         $withSpecialists = $this->getJson("/api/tenant/salon/checkout-sheet?cart={$cart}", $this->authHeaders());
         $withSpecialists->assertOk();
         $json = json_encode($withSpecialists->json());
         $this->assertStringContainsString('specialist_id', $json);
         $this->assertStringContainsString('Jane Stylist', $json);
+        $this->assertStringContainsString('line_specialist_0', $json);
+        $this->assertSame('native_pos_checkout_drawer', $withSpecialists->json('schema.presentation'));
+        $this->assertCount(4, $withSpecialists->json('schema.payment_methods'));
+        $this->assertCount(5, $withSpecialists->json('schema.quick_cash.suggestions'));
 
         $errors = app(SchemaValidator::class)->validate($withSpecialists->json('schema'));
         $this->assertEmpty($errors);
@@ -219,5 +225,74 @@ class SalonPosTest extends TestCase
         $saleId = $response->json('sale.id');
         $this->assertDatabaseHas('order_payments', ['sale_id' => $saleId, 'payment_method' => 'cash', 'amount' => 15]);
         $this->assertDatabaseHas('order_payments', ['sale_id' => $saleId, 'payment_method' => 'card', 'amount' => 10]);
+    }
+
+    public function test_calendar_books_specialist_slots_and_rejects_overlap(): void
+    {
+        $service = $this->createService(['duration_minutes' => 60]);
+        $specialist = $this->createSpecialist();
+        $date = now()->addDay()->toDateString();
+
+        $booking = $this->postJson('/api/tenant/salon/appointments', [
+            'service_id' => $service->id,
+            'specialist_id' => $specialist->id,
+            'customer_name' => 'Maya Client',
+            'customer_phone' => '+15550001',
+            'appointment_date' => $date,
+            'appointment_time' => '10:00',
+        ], $this->authHeaders());
+        $booking->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('appointment.specialist_name', 'Jane Stylist');
+
+        $this->postJson('/api/tenant/salon/appointments', [
+            'service_id' => $service->id,
+            'specialist_id' => $specialist->id,
+            'customer_name' => 'Overlapping Client',
+            'appointment_date' => $date,
+            'appointment_time' => '10:30',
+        ], $this->authHeaders())->assertUnprocessable();
+
+        $this->getJson("/api/tenant/salon/appointments?date={$date}", $this->authHeaders())
+            ->assertOk()
+            ->assertJsonCount(1, 'appointments');
+        $calendar = $this->getJson("/api/tenant/views/service-calendar?date={$date}", $this->authHeaders());
+        $calendar->assertOk();
+        $this->assertStringContainsString('Maya Client', json_encode($calendar->json('schema')));
+        $this->assertDatabaseCount('salon_appointments', 1);
+    }
+
+    public function test_checkout_snapshots_per_service_stylist_commission_and_completes_booking(): void
+    {
+        $service = $this->createService();
+        $specialist = $this->createSpecialist(['commission_rate' => 10, 'commission_type' => 'percentage']);
+        $appointment = SalonAppointment::create([
+            'company_id' => $this->company->id,
+            'appointment_number' => 'APT-TEST-001',
+            'customer_name' => 'Booked Client',
+            'product_id' => $service->id,
+            'specialist_id' => $specialist->id,
+            'starts_at' => now()->addHour(),
+            'ends_at' => now()->addMinutes(90),
+            'status' => 'checked_in',
+        ]);
+
+        $response = $this->postJson('/api/tenant/salon/pos-checkout', [
+            'items' => [['product_id' => $service->id, 'quantity' => 1]],
+            'line_specialist_0' => $specialist->id,
+            'appointment_id' => $appointment->id,
+            'payment_method' => 'cash',
+            'quick_cash_tendered' => 30,
+        ], $this->authHeaders());
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $this->assertSame($specialist->id, $response->json('sale.items.0.specialist_id'));
+        $this->assertSame(2.5, (float) $response->json('sale.items.0.commission_amount'));
+        $this->assertSame('completed', $appointment->fresh()->status);
+        $this->assertDatabaseHas('order_payments', [
+            'sale_id' => $response->json('sale.id'),
+            'tendered' => 30,
+            'change_returned' => 5,
+        ]);
     }
 }

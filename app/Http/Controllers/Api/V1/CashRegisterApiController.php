@@ -34,6 +34,12 @@ class CashRegisterApiController extends Controller
         ]);
     }
 
+    /** Unversioned SDUI alias for the native cash-register status URL. */
+    public function status(Request $request): JsonResponse
+    {
+        return $this->current($request);
+    }
+
     public function open(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
@@ -83,6 +89,12 @@ class CashRegisterApiController extends Controller
             'message' => 'Cash register opened.',
             'register' => $this->present($register),
         ], 201);
+    }
+
+    /** Unversioned SDUI alias retained separately from the desktop API. */
+    public function openRegister(Request $request): JsonResponse
+    {
+        return $this->open($request);
     }
 
     public function recordTransaction(Request $request, string $id): JsonResponse
@@ -227,6 +239,22 @@ class CashRegisterApiController extends Controller
             'message' => 'Cash register closed. Z-Report generated.',
             'register' => $this->present($register->fresh()),
         ]);
+    }
+
+    /**
+     * Close the tenant's active register without requiring the SDUI client
+     * to know its database identifier.
+     */
+    public function closeRegister(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $register = CashRegister::openFor($company->id);
+
+        if (! $register) {
+            return response()->json(['success' => false, 'error' => 'No open cash register found.'], 404);
+        }
+
+        return $this->close($request, (string) $register->id);
     }
 
     public function history(Request $request): JsonResponse

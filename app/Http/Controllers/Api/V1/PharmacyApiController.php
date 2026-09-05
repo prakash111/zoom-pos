@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\CashRegister;
 use App\Models\OrderPayment;
 use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
@@ -12,6 +13,7 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Services\Sdui\PosScreenBuilder;
 use App\Services\Sdui\SchemaValidator;
+use App\Services\TaxCalculationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -163,6 +165,8 @@ class PharmacyApiController extends Controller
             'payments' => 'nullable|array',
             'total' => 'nullable|numeric',
             'discount' => 'nullable|numeric',
+            'tendered' => 'nullable|numeric|min:0',
+            'quick_cash_tendered' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -195,7 +199,7 @@ class PharmacyApiController extends Controller
                         throw new \InvalidArgumentException("Medicine with ID {$productId} not found.");
                     }
 
-                    if ($product->requires_prescription) {
+                    if ($product->requires_prescription || filled($product->narcotic_schedule)) {
                         $hasPrescriptionControlledItem = true;
                         $prescriptionControlledNames[] = "{$product->name} (".($product->narcotic_schedule ?: 'Rx Required').')';
                     }
@@ -264,7 +268,11 @@ class PharmacyApiController extends Controller
                     if ($prescriptionId) {
                         $prescription = PharmacyPrescription::withoutGlobalScope('company')
                             ->where('company_id', $company->id)
+                            ->where('status', 'pending')
                             ->find($prescriptionId);
+                        if (! $prescription) {
+                            throw new \InvalidArgumentException('The selected prescription is unavailable or has already been dispensed.');
+                        }
                     } elseif (! empty($prescriptionDetails['patient_name']) && ! empty($prescriptionDetails['doctor_name'])) {
                         $prescriptionPrefix = 'RX-'.date('Ymd').'-';
                         $rxCount = PharmacyPrescription::withoutGlobalScope('company')
@@ -295,8 +303,21 @@ class PharmacyApiController extends Controller
                 }
 
                 $discount = (float) ($request->input('discount', $request->input('discount_amount', 0)));
-                $netAmount = max(0, $totalRevenue - $discount);
-                $paymentMethod = strtolower((string) ($request->input('payment_method', 'cash')));
+                $taxTotals = app(TaxCalculationService::class)->calculateCartTotals($saleLineItems, $company, null, $discount);
+                $saleLineItems = $taxTotals['items'];
+                $discount = (float) $taxTotals['discount'];
+                $netAmount = (float) $taxTotals['total'];
+                $totalRevenue = (float) $taxTotals['total'];
+                $paymentMethod = strtolower((string) $request->input('payment_method', $request->input('selected_payment_method', 'cash')));
+                $payments = $request->input('payments');
+                $paidAmount = $paymentMethod === 'credit'
+                    ? 0.0
+                    : (! empty($payments) && is_array($payments)
+                        ? min($netAmount, collect($payments)->sum(fn ($payment) => max(0, (float) ($payment['amount'] ?? 0))))
+                        : $netAmount);
+                $dueAmount = max(0, round($netAmount - $paidAmount, 2));
+                $paymentStatus = $dueAmount <= 0 ? 'paid' : ($paidAmount > 0 ? 'partial' : 'pending');
+                $cashRegister = CashRegister::openFor($company->id);
 
                 // Generate Sale
                 $prefix = $company->invoice_prefix ?: 'INV-';
@@ -309,21 +330,24 @@ class PharmacyApiController extends Controller
                     'customer_id' => $request->input('customer_id'),
                     'customer_name' => $request->input('customer_name') ?? $prescription?->patient_name ?? 'Walk-in Customer',
                     'user_id' => $user?->id,
+                    'cash_register_id' => $cashRegister?->id,
                     'total' => $totalRevenue,
                     'discount' => $discount,
                     'net_amount' => $netAmount,
-                    'paid_amount' => $netAmount,
-                    'due_amount' => 0,
+                    'paid_amount' => $paidAmount,
+                    'due_amount' => $dueAmount,
                     'payment_method' => $paymentMethod,
-                    'payment_status' => 'paid',
+                    'payment_status' => $paymentStatus,
                     'status' => 'completed',
                     'operation_type' => 'sale',
                     'items' => $saleLineItems,
+                    'tax_amount' => $taxTotals['tax_amount'],
+                    'tax_name' => $company->tax_id_label ?: 'Tax',
+                    'tax_breakdown' => $taxTotals['tax_summary_table'],
                     'notes' => $prescription ? "Dispensed against Rx #{$prescription->prescription_number} (Dr. {$prescription->doctor_name})" : ($request->input('notes') ?? $request->input('checkout_notes') ?? 'POS Sale'),
                 ]);
 
                 // Record Payments
-                $payments = $request->input('payments');
                 if (! empty($payments) && is_array($payments)) {
                     foreach ($payments as $pay) {
                         $amt = (float) ($pay['amount'] ?? 0);
@@ -331,19 +355,26 @@ class PharmacyApiController extends Controller
                             OrderPayment::create([
                                 'company_id' => $company->id,
                                 'sale_id' => $sale->id,
+                                'cash_register_id' => $cashRegister?->id,
                                 'payment_method' => strtolower((string) ($pay['method'] ?? 'cash')),
                                 'amount' => $amt,
                                 'net_amount' => $amt,
                             ]);
                         }
                     }
-                } else {
+                } elseif ($paymentMethod !== 'credit' && $paidAmount > 0) {
+                    $tendered = $request->filled('tendered')
+                        ? (float) $request->input('tendered')
+                        : (float) $request->input('quick_cash_tendered', $request->input('selected_tendered', $paidAmount));
                     OrderPayment::create([
                         'company_id' => $company->id,
                         'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegister?->id,
                         'payment_method' => $paymentMethod,
-                        'amount' => $netAmount,
-                        'net_amount' => $netAmount,
+                        'amount' => $paidAmount,
+                        'tendered' => $paymentMethod === 'cash' ? max($paidAmount, $tendered) : null,
+                        'change_returned' => $paymentMethod === 'cash' ? max(0, $tendered - $paidAmount) : 0,
+                        'net_amount' => $paidAmount,
                     ]);
                 }
 
@@ -781,6 +812,79 @@ class PharmacyApiController extends Controller
         ]);
     }
 
+    /** Load scanned/recorded prescription medicines into the checkout drawer. */
+    public function prescriptionCheckoutSheet(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $prescription = PharmacyPrescription::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->find($id);
+
+        if (! $prescription) {
+            return response()->json(['success' => false, 'error' => 'Pending prescription not found.'], 404);
+        }
+
+        [$items, $preview, $unmatched] = $this->resolvePrescriptionCart($company->id, (array) $prescription->medicines);
+        $schema = PosScreenBuilder::checkoutSheet(
+            $company,
+            "/api/tenant/pharmacy/prescriptions/{$prescription->id}/checkout",
+            $preview,
+            customerFieldLabel: 'Patient Name',
+            collectPrescription: true,
+            module: 'pharmacy',
+            prescriptionOptions: [[
+                'id' => $prescription->id,
+                'label' => "{$prescription->prescription_number} · {$prescription->patient_name} · Dr {$prescription->doctor_name}",
+            ]],
+            defaultCustomerName: $prescription->patient_name,
+        );
+        $schema['prescription_context'] = [
+            'id' => $prescription->id,
+            'number' => $prescription->prescription_number,
+            'patient_name' => $prescription->patient_name,
+            'doctor_name' => $prescription->doctor_name,
+            'resolved_items' => $items,
+            'unmatched_medicines' => $unmatched,
+        ];
+
+        return response()->json(['success' => true, 'schema' => $schema]);
+    }
+
+    /** Complete checkout using the medicines stored on a queued prescription. */
+    public function prescriptionCheckout(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $prescription = PharmacyPrescription::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->find($id);
+
+        if (! $prescription) {
+            return response()->json(['success' => false, 'error' => 'Pending prescription not found.'], 404);
+        }
+
+        [$items, , $unmatched] = $this->resolvePrescriptionCart($company->id, (array) $prescription->medicines);
+        if ($items === []) {
+            return response()->json([
+                'success' => false,
+                'error' => 'No prescribed medicines could be matched to active catalog products.',
+                'unmatched_medicines' => $unmatched,
+            ], 422);
+        }
+
+        $request->merge([
+            'items' => $items,
+            'prescription_id' => $prescription->id,
+            'patient_name' => $prescription->patient_name,
+            'customer_name' => $request->input('customer_name') ?: $prescription->patient_name,
+            'doctor_name' => $prescription->doctor_name,
+            'doctor_registration_no' => $prescription->doctor_registration_no,
+        ]);
+
+        return $this->checkout($request);
+    }
+
     /**
      * Batch-picker sheet (component tree) for a single product's active
      * FEFO batches. Rendered by UniversalPosScreen when a pharmacy catalog
@@ -814,6 +918,17 @@ class PharmacyApiController extends Controller
     {
         $company = $this->resolveCompany($request);
         $cartPreview = $this->decodeCartPreview($request);
+        $prescriptions = PharmacyPrescription::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->latest('prescription_date')
+            ->limit(50)
+            ->get(['id', 'prescription_number', 'patient_name', 'doctor_name'])
+            ->map(fn (PharmacyPrescription $rx) => [
+                'id' => $rx->id,
+                'label' => "{$rx->prescription_number} · {$rx->patient_name} · Dr {$rx->doctor_name}",
+            ])
+            ->all();
 
         $schema = PosScreenBuilder::checkoutSheet(
             $company,
@@ -821,6 +936,8 @@ class PharmacyApiController extends Controller
             $cartPreview,
             customerFieldLabel: 'Customer / Patient Name',
             collectPrescription: true,
+            module: 'pharmacy',
+            prescriptionOptions: $prescriptions,
         );
 
         $errors = app(SchemaValidator::class)->validate($schema);
@@ -848,6 +965,70 @@ class PharmacyApiController extends Controller
         $decoded = json_decode($raw, true);
 
         return is_array($decoded) ? array_values($decoded) : [];
+    }
+
+    /**
+     * Match the structured lines captured by the prescription scanner/intake
+     * against this tenant's active medicine catalog.
+     *
+     * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>, 2: list<string>}
+     */
+    private function resolvePrescriptionCart(string $companyId, array $medicines): array
+    {
+        $items = [];
+        $preview = [];
+        $unmatched = [];
+
+        foreach ($medicines as $medicine) {
+            $medicine = is_array($medicine) ? $medicine : ['name' => (string) $medicine];
+            $name = trim((string) ($medicine['name'] ?? $medicine['medicine_name'] ?? ''));
+            $productId = (int) ($medicine['product_id'] ?? 0);
+            $productQuery = Product::withoutGlobalScope('company')
+                ->where('company_id', $companyId)
+                ->where('active', true);
+            $product = $productId > 0 ? (clone $productQuery)->find($productId) : null;
+            if (! $product && $name !== '') {
+                $product = (clone $productQuery)
+                    ->where(function ($query) use ($name) {
+                        $query->where('name', $name)
+                            ->orWhere('generic_name', $name)
+                            ->orWhere('name', 'like', '%'.$name.'%')
+                            ->orWhere('generic_name', 'like', '%'.$name.'%');
+                    })
+                    ->first();
+            }
+
+            if (! $product) {
+                $unmatched[] = $name ?: 'Unnamed prescribed medicine';
+
+                continue;
+            }
+
+            $qty = max(1, (int) ($medicine['qty'] ?? $medicine['quantity'] ?? 1));
+            $batch = PharmacyBatch::withoutGlobalScope('company')
+                ->where('company_id', $companyId)
+                ->where('product_id', $product->id)
+                ->where('is_active', true)
+                ->where('stock_qty', '>=', $qty)
+                ->where('expiry_date', '>=', Carbon::today())
+                ->orderBy('expiry_date')
+                ->first();
+            $price = (float) ($batch && $batch->selling_price > 0 ? $batch->selling_price : $product->sale_price);
+            $items[] = [
+                'product_id' => $product->id,
+                'batch_id' => $batch?->id,
+                'quantity' => $qty,
+                'unit_price' => $price,
+            ];
+            $preview[] = [
+                'title' => $product->name,
+                'quantity' => $qty,
+                'price' => $price,
+                'dosage' => $medicine['dosage'] ?? null,
+            ];
+        }
+
+        return [$items, $preview, $unmatched];
     }
 
     /**

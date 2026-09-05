@@ -13,13 +13,16 @@ use App\Models\Product;
 use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
 use App\Models\Sale;
+use App\Models\SalonAppointment;
 use App\Models\SduiScreen;
 use App\Models\TenantApiKey;
 use App\Models\TenantSession;
+use App\Models\User;
 use App\Services\Localization\PlatformRegionalService;
 use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\TenantNavigationConfigService;
 use App\Services\Navigation\TenantNavRegistry;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Schema;
 
@@ -942,7 +945,10 @@ class SchemaResponse
                 self::divider(),
                 self::text('Diagnosis / Notes: '.($rx->diagnosis ?: ($rx->notes ?: 'General prescription')), 'body_small'),
                 self::text('Date: '.($rx->prescription_date?->format('Y-m-d') ?? 'Today'), 'body_small', ['color' => '#94a3b8']),
-                $isPending ? self::buttonPrimary('Dispense at POS', self::navigateAction('/api/tenant/views/pharmacy-pos', title: 'Pharmacy Counter POS'), 'point_of_sale') : self::badge('Dispensed Successfully', '#10b981', 'subtle'),
+                $isPending ? self::buttonPrimary('Load Prescription into POS', self::openRemoteSheetAction(
+                    "/api/tenant/pharmacy/prescriptions/{$rx->id}/checkout-sheet",
+                    "Dispense Rx #{$rx->prescription_number}"
+                ), 'point_of_sale') : self::badge('Dispensed Successfully', '#10b981', 'subtle'),
             ]);
         }
 
@@ -1284,11 +1290,9 @@ class SchemaResponse
                 self::divider(),
                 self::buttonPrimary('Open Workbench', self::navigateAction("/api/tenant/views/repair-detail?ticket_id={$t->id}", title: "Workbench #{$t->ticket_number}"), 'build'),
                 ...($t->status !== 'delivered' && $t->status !== 'cancelled' ? [
-                    self::buttonOutlined('Delivered & Settle', self::formSubmitAction(
-                        "/api/tenant/repair/tickets/{$t->id}/settle",
-                        'POST',
-                        'Ticket settled & converted to POS sale',
-                        reload: true
+                    self::buttonOutlined('Parts, Labor & Final Checkout', self::navigateAction(
+                        "/api/tenant/views/repair-pos?ticket_id={$t->id}",
+                        title: "Checkout Repair #{$t->ticket_number}"
                     ), 'point_of_sale'),
                 ] : []),
             ]);
@@ -1470,7 +1474,7 @@ class SchemaResponse
                 self::divider(),
                 self::text('Add Replacement Part / Material', 'label_large', ['bold' => true]),
                 self::textInput('part_name', 'Part / Component Name', ''),
-                self::textInput('part_cost', 'Part Cost', '0.00'),
+                self::textInput('unit_price', 'Customer Part Price', '0.00'),
                 self::textInput('quantity', 'Quantity', '1'),
                 self::buttonPrimary('Add Part to Ticket', self::formSubmitAction(
                     "/api/tenant/repair/tickets/{$ticket->id}/parts",
@@ -1517,19 +1521,15 @@ class SchemaResponse
                 self::text('Final Delivery & POS Settlement', 'title_medium', ['bold' => true]),
                 self::text('Record customer payment, complete handover, and generate retail POS receipt.', 'body_small', ['color' => '#64748b']),
                 self::divider(),
-                self::dropdownSelect('payment_method', 'Payment Method', [
-                    ['label' => 'Cash', 'value' => 'cash'],
-                    ['label' => 'Credit / Debit Card', 'value' => 'card'],
-                    ['label' => 'UPI / QR Code', 'value' => 'upi'],
-                ], 'cash'),
-                self::textInput('paid_amount', 'Payment Received', (string) $ticket->balance_due),
-                self::textInput('notes', 'Handover Notes', 'Device tested and handed over to customer'),
+                self::wrap([
+                    self::badge('Parts + Labor', '#0284c7', 'subtle'),
+                    self::badge('Advance Deducted', '#10b981', 'subtle'),
+                    self::badge('Tax Receipt', '#7c3aed', 'subtle'),
+                ]),
                 self::divider(),
-                self::buttonPrimary('Complete Handover & Settle (POS)', self::formSubmitAction(
-                    "/api/tenant/repair/tickets/{$ticket->id}/settle",
-                    'POST',
-                    'Ticket settled, closed and sale invoice recorded.',
-                    reload: true
+                self::buttonPrimary('Open Parts & Labor Checkout', self::openRemoteSheetAction(
+                    "/api/tenant/repair/tickets/{$ticket->id}/checkout-sheet",
+                    "Checkout Repair #{$ticket->ticket_number}"
                 ), 'point_of_sale'),
             ]),
         ]);
@@ -1631,17 +1631,128 @@ class SchemaResponse
 
     public static function serviceCalendarView(Company $company): array
     {
+        $timezone = $company->resolveTimezone();
+        $selectedDate = request('date', now($timezone)->toDateString());
+        $day = Carbon::parse($selectedDate, $timezone);
+        // The calendar is an optional enhancement to the counter POS. During
+        // a rolling deploy the appointments table may briefly lag behind the
+        // application code; render an empty calendar instead of a 500/blank
+        // screen until migrations have caught up.
+        $appointments = Schema::hasTable('salon_appointments')
+            ? SalonAppointment::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->whereBetween('starts_at', [$day->copy()->startOfDay()->utc(), $day->copy()->endOfDay()->utc()])
+                ->with(['service:id,name,duration_minutes,sale_price', 'specialist:id,name'])
+                ->orderBy('starts_at')
+                ->get()
+            : collect();
+        $services = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->whereNotNull('duration_minutes')
+            ->orderBy('name')
+            ->get(['id', 'name', 'duration_minutes', 'sale_price']);
+        $specialists = User::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('is_specialist', true)
+            ->where('status', 'approved')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        $currency = $company->currency_symbol ?: '$';
+
+        $appointmentCards = [];
+        foreach ($appointments as $appointment) {
+            $localStart = $appointment->starts_at->copy()->setTimezone($timezone);
+            $localEnd = $appointment->ends_at->copy()->setTimezone($timezone);
+            $statusColor = match ($appointment->status) {
+                'checked_in' => '#0284c7',
+                'completed' => '#10b981',
+                'cancelled', 'no_show' => '#ef4444',
+                default => '#7c3aed',
+            };
+            $actions = [];
+            if ($appointment->status === 'scheduled') {
+                $actions[] = self::buttonOutlined('Check In', self::apiPostAction(
+                    "/api/tenant/salon/appointments/{$appointment->id}/status",
+                    ['status' => 'checked_in'],
+                    'Client checked in.',
+                    reload: true
+                ), 'how_to_reg');
+            }
+            if (in_array($appointment->status, ['scheduled', 'checked_in'], true)) {
+                $actions[] = self::buttonPrimary('Open in POS', self::navigateAction(
+                    "/api/tenant/views/salon-pos?appointment_id={$appointment->id}",
+                    title: 'Salon & Service POS'
+                ), 'point_of_sale');
+            }
+
+            $appointmentCards[] = self::card([
+                self::row([
+                    self::container([
+                        self::text($localStart->format('g:i'), 'title_large', ['bold' => true, 'color' => '#7c3aed']),
+                        self::text($localStart->format('A'), 'body_small', ['color' => '#64748b']),
+                    ], ['padding' => 8, 'color' => '#f5f3ff', 'border_radius' => 10]),
+                    self::column([
+                        self::text($appointment->service?->name ?? 'Salon Service', 'title_medium', ['bold' => true]),
+                        self::text("{$appointment->customer_name} · ".($appointment->specialist?->name ?? 'Unassigned'), 'body_small', ['color' => '#64748b']),
+                        self::text($localStart->format('g:i A').' – '.$localEnd->format('g:i A'), 'body_small', ['color' => '#94a3b8']),
+                    ]),
+                    self::badge(strtoupper(str_replace('_', ' ', $appointment->status)), $statusColor, 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                ! empty($actions) ? self::wrap($actions) : self::badge('Appointment closed', $statusColor, 'subtle'),
+            ]);
+        }
+
+        $serviceOptions = $services->map(fn (Product $service) => [
+            'label' => "{$service->name} · {$service->duration_minutes} min · {$currency}".number_format((float) $service->sale_price, 2),
+            'value' => (string) $service->id,
+        ])->all();
+        $specialistOptions = $specialists->map(fn ($specialist) => [
+            'label' => $specialist->name,
+            'value' => (string) $specialist->id,
+        ])->all();
+        $timeOptions = [];
+        for ($minutes = 9 * 60; $minutes < 20 * 60; $minutes += 30) {
+            $time = sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+            $timeOptions[] = ['label' => Carbon::createFromFormat('H:i', $time)->format('g:i A'), 'value' => $time];
+        }
+
         return self::screen('Service Booking Calendar', [
             self::card([
                 self::row([
                     self::icon('event_available', ['color' => '#7c3aed', 'size' => 28]),
                     self::column([
                         self::text('Service Appointments Calendar', 'title_medium', ['bold' => true]),
-                        self::text('Schedule appointments, view booking slots, and manage reservations.', 'body_small', ['color' => '#64748b']),
+                        self::text("{$day->format('l, M j')} · {$timezone} · technician time-slot booking", 'body_small', ['color' => '#64748b']),
                     ]),
                 ]),
                 self::divider(),
-                self::badge('Bookings Active', '#7c3aed', 'subtle'),
+                self::wrap([
+                    self::badge('Appointments: '.$appointments->count(), '#7c3aed', 'subtle'),
+                    self::badge('Checked In: '.$appointments->where('status', 'checked_in')->count(), '#0284c7', 'subtle'),
+                    self::badge('Available Specialists: '.$specialists->count(), '#10b981', 'subtle'),
+                ]),
+            ]),
+            self::accordionGroup('Book Appointment / Reserve Time Slot', [
+                self::dropdownSelect('service_id', 'Service & Duration', $serviceOptions),
+                self::dropdownSelect('specialist_id', 'Stylist / Specialist', $specialistOptions),
+                self::dateTimePicker('appointment_date', 'Appointment Date', $day->toDateString(), 'date'),
+                self::dropdownSelect('appointment_time', 'Start Time', $timeOptions, '09:00'),
+                self::textInput('customer_name', 'Client Name', ''),
+                self::textInput('customer_phone', 'Client Phone', '', ['keyboard_type' => 'phone']),
+                self::textInput('notes', 'Booking Notes', '', ['max_lines' => 2]),
+                self::buttonPrimary('Confirm Appointment', self::formSubmitAction(
+                    '/api/tenant/salon/appointments',
+                    'POST',
+                    'Appointment booked successfully.',
+                    reload: true
+                ), 'event_available'),
+            ], ['initially_expanded' => $appointments->isEmpty()]),
+            self::card([
+                self::text('Daily Appointment Timeline', 'title_medium', ['bold' => true]),
+                self::column($appointmentCards ?: [
+                    self::text('No appointments booked for this date. Use the booking panel above to reserve a specialist.', 'body_medium', ['color' => '#64748b']),
+                ]),
             ]),
         ]);
     }
@@ -1687,6 +1798,26 @@ class SchemaResponse
 
     public static function serviceOrdersView(Company $company): array
     {
+        $currency = $company->currency_symbol ?: '$';
+        $services = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->whereNotNull('duration_minutes')
+            ->orderBy('name')
+            ->get();
+        $cards = $services->map(fn (Product $service) => self::card([
+            self::row([
+                self::icon('spa', ['color' => '#7c3aed', 'size' => 24]),
+                self::badge("{$service->duration_minutes} min", '#7c3aed', 'subtle'),
+            ], ['main_axis_alignment' => 'space_between']),
+            self::text($service->name, 'title_medium', ['bold' => true]),
+            self::text($service->description ?: 'Professional salon service', 'body_small', ['color' => '#64748b']),
+            self::row([
+                self::text($currency.number_format((float) $service->sale_price, 2), 'title_medium', ['bold' => true, 'color' => '#166534']),
+                self::buttonPrimary('Sell / Book', self::navigateAction('/api/tenant/views/salon-pos', title: 'Salon & Service POS'), 'add_shopping_cart'),
+            ], ['main_axis_alignment' => 'space_between']),
+        ]))->all();
+
         return self::screen('Service Catalog & Rates', [
             self::card([
                 self::row([
@@ -1697,8 +1828,12 @@ class SchemaResponse
                     ]),
                 ]),
                 self::divider(),
-                self::badge('Service Bookings Active', '#7c3aed', 'subtle'),
+                self::wrap([
+                    self::badge('Services: '.$services->count(), '#7c3aed', 'subtle'),
+                    self::badge('Duration-based scheduling active', '#10b981', 'subtle'),
+                ]),
             ]),
+            self::gridView($cards ?: [self::text('No timed services configured yet.', 'body_medium', ['color' => '#64748b'])], 2),
         ]);
     }
 
@@ -2268,12 +2403,18 @@ class SchemaResponse
                     self::buttonPrimary('Cash In / Cash Out', self::openModalAction('Record Drawer Transaction', [
                         self::text('Cash Drawer Deposit / Withdrawal', 'title_medium', ['bold' => true]),
                         self::divider(),
-                        self::dropdownSelect('transaction_type', 'Transaction Type', [
+                        self::dropdownSelect('type', 'Transaction Type', [
                             ['label' => 'Cash In (Deposit / Float Add)', 'value' => 'cash_in'],
                             ['label' => 'Cash Out (Expense / Drawer Drop)', 'value' => 'cash_out'],
                         ], 'cash_in'),
+                        self::dropdownSelect('category', 'Drawer Entry Category', [
+                            ['label' => 'Petty Cash', 'value' => 'petty_cash'],
+                            ['label' => 'Bank Deposit / Withdrawal', 'value' => 'bank'],
+                            ['label' => 'Supplier / Expense', 'value' => 'expense'],
+                            ['label' => 'Cash Float Adjustment', 'value' => 'float_adjustment'],
+                        ], 'petty_cash'),
                         self::textInput('amount', 'Amount', '0.00'),
-                        self::textInput('notes', 'Reason / Receipt Reference', ''),
+                        self::textInput('reason', 'Reason / Receipt Reference', ''),
                         self::buttonPrimary('Confirm Drawer Entry', self::formSubmitAction(
                             "/api/tenant/cash-register/{$activeRegister->id}/transaction",
                             'POST',
@@ -2286,9 +2427,9 @@ class SchemaResponse
                         self::text("Expected Cash in Drawer: {$currency}".number_format((float) $activeRegister->expected_closing_balance, 2), 'body_medium', ['color' => '#0f766e']),
                         self::divider(),
                         self::textInput('counted_closing_balance', 'Physical Counted Cash in Drawer', number_format((float) $activeRegister->expected_closing_balance, 2, '.', '')),
-                        self::textInput('closing_notes', 'Shift Closing Remarks', 'Shift completed successfully.'),
+                        self::textInput('notes', 'Shift Closing Remarks', 'Shift completed successfully.'),
                         self::buttonPrimary('Close Register & Print Z-Report', self::formSubmitAction(
-                            "/api/tenant/cash-register/{$activeRegister->id}/close",
+                            '/api/tenant/cash-register/close',
                             'POST',
                             'Cash register shift closed successfully.',
                             reload: true
@@ -2311,7 +2452,7 @@ class SchemaResponse
                     self::text('Open Register & Declare Opening Float', 'title_medium', ['bold' => true]),
                     self::divider(),
                     self::textInput('opening_balance', 'Opening Cash Float', '0.00'),
-                    self::textInput('notes', 'Shift Notes (Optional)', 'Morning Shift'),
+                    self::textInput('opening_notes', 'Shift Notes (Optional)', 'Morning Shift'),
                     self::buttonPrimary('Open Register Drawer', self::formSubmitAction(
                         '/api/tenant/cash-register/open',
                         'POST',

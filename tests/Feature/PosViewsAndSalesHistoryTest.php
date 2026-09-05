@@ -312,6 +312,40 @@ class PosViewsAndSalesHistoryTest extends TestCase
         }
     }
 
+    public function test_unversioned_cash_register_sdui_routes_open_report_and_close_a_shift(): void
+    {
+        $view = $this->getJson('/api/tenant/views/cash-register', $this->authHeaders());
+        $view->assertOk();
+        $this->assertStringContainsString('/api/tenant/cash-register/open', json_encode($view->json('schema'), JSON_UNESCAPED_SLASHES));
+
+        $this->getJson('/api/tenant/cash-register/status', $this->authHeaders())
+            ->assertOk()
+            ->assertJsonPath('register', null);
+
+        $this->postJson('/api/tenant/cash-register/open', [
+            'opening_balance' => 125.50,
+            'opening_notes' => 'Morning shift',
+        ], $this->authHeaders())
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('register.status', 'open');
+
+        $this->getJson('/api/tenant/cash-register/status', $this->authHeaders())
+            ->assertOk()
+            ->assertJsonPath('register.opening_balance', 125.5);
+        $this->getJson('/api/tenant/cash-register/history', $this->authHeaders())
+            ->assertOk()
+            ->assertJsonCount(1, 'registers');
+
+        $this->postJson('/api/tenant/cash-register/close', [
+            'counted_closing_balance' => 125.50,
+            'notes' => 'Reconciled',
+        ], $this->authHeaders())
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('register.status', 'closed');
+    }
+
     public function test_navigation_drawer_accordion_is_collapsed_by_default_and_has_consistent_metadata(): void
     {
         $bootstrapRes = $this->getJson('/api/v1/pos/app/bootstrap?locale=en', $this->authHeaders());

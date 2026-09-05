@@ -593,7 +593,19 @@ class PharmacyAndRepairPosTest extends TestCase
         $checkoutSheetResponse->assertOk()->assertJsonPath('success', true);
         $checkoutSchema = $checkoutSheetResponse->json('schema');
         $this->assertSame('sheet', $checkoutSchema['type']);
+        $this->assertSame('native_pos_checkout_drawer', $checkoutSchema['presentation']);
+        $this->assertSame('pharmacy', $checkoutSchema['module']);
+        $this->assertSame(10.0, (float) $checkoutSchema['order_summary']['grand_total']);
+        $this->assertCount(4, $checkoutSchema['payment_methods']);
+        $this->assertCount(5, $checkoutSchema['quick_cash']['suggestions']);
+        $this->assertStringContainsString('Attach Doctor & Rx Details', json_encode($checkoutSchema));
         $this->assertEmpty($validator->validate($checkoutSchema));
+
+        $selectedCashSheet = $this->withHeaders($this->authHeaders())
+            ->getJson("/api/tenant/pharmacy/checkout-sheet?cart={$cart}&selected_tendered=20");
+        $selectedCashSheet->assertOk()
+            ->assertJsonPath('schema.quick_cash.selected_tendered', 20)
+            ->assertJsonPath('schema.quick_cash.change_due', 10);
     }
 
     public function test_repair_pos_checkout_creates_a_real_sale_with_real_items(): void
@@ -637,6 +649,7 @@ class PharmacyAndRepairPosTest extends TestCase
             'model' => 'X1',
             'issue_description' => 'Cracked screen',
             'status' => 'in_progress',
+            'advance_paid' => 10.00,
             'labor_fee' => 20.00,
             'parts_cost' => 0,
             'total_amount' => 20.00,
@@ -663,10 +676,22 @@ class PharmacyAndRepairPosTest extends TestCase
         $ticket->refresh();
         $this->assertSame(30.0, (float) $ticket->parts_cost);
         $this->assertSame(50.0, (float) $ticket->total_amount);
+        $this->assertDatabaseHas('order_payments', [
+            'sale_id' => $response->json('sale.id'),
+            'payment_method' => 'cash',
+            'amount' => 40,
+        ]);
         $this->assertDatabaseHas('repair_ticket_parts', [
             'repair_ticket_id' => $ticket->id,
             'product_id' => $part->id,
         ]);
+
+        $drawer = $this->withHeaders($this->authHeaders())
+            ->getJson("/api/tenant/repair/tickets/{$ticket->id}/checkout-sheet");
+        $drawer->assertOk()
+            ->assertJsonPath('schema.presentation', 'native_pos_checkout_drawer')
+            ->assertJsonPath('schema.order_summary.advance_paid', 10)
+            ->assertJsonPath('schema.order_summary.grand_total', 40);
     }
 
     public function test_pharmacy_checkout_requires_prescription_details_for_controlled_items(): void
@@ -723,6 +748,58 @@ class PharmacyAndRepairPosTest extends TestCase
         $response->assertOk()->assertJsonPath('success', true);
         $this->assertDatabaseHas('order_payments', ['sale_id' => $response->json('sale.id'), 'payment_method' => 'cash', 'amount' => 15]);
         $this->assertDatabaseHas('order_payments', ['sale_id' => $response->json('sale.id'), 'payment_method' => 'card', 'amount' => 10]);
+    }
+
+    public function test_pending_prescription_loads_catalog_medicines_into_native_checkout(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Azithromycin 500mg',
+            'generic_name' => 'Azithromycin',
+            'sale_price' => 18,
+            'current_stock' => 10,
+            'active' => true,
+            'requires_prescription' => true,
+            'narcotic_schedule' => 'Schedule H',
+        ]);
+        PharmacyBatch::create([
+            'company_id' => $this->company->id,
+            'product_id' => $product->id,
+            'batch_number' => 'RX-FEFO-1',
+            'expiry_date' => now()->addMonths(6),
+            'selling_price' => 18,
+            'stock_qty' => 10,
+            'is_active' => true,
+        ]);
+        $prescription = PharmacyPrescription::create([
+            'company_id' => $this->company->id,
+            'prescription_number' => 'RX-QUEUE-001',
+            'patient_name' => 'Queue Patient',
+            'doctor_name' => 'Dr Queue',
+            'prescription_date' => today(),
+            'medicines' => [['name' => 'Azithromycin 500mg', 'qty' => 2]],
+            'status' => 'pending',
+        ]);
+
+        $sheet = $this->withHeaders($this->authHeaders())
+            ->getJson("/api/tenant/pharmacy/prescriptions/{$prescription->id}/checkout-sheet");
+        $sheet->assertOk()
+            ->assertJsonPath('schema.presentation', 'native_pos_checkout_drawer')
+            ->assertJsonPath('schema.order_summary.line_item_count', 1)
+            ->assertJsonPath('schema.prescription_context.patient_name', 'Queue Patient');
+
+        $checkout = $this->withHeaders($this->authHeaders())
+            ->postJson("/api/tenant/pharmacy/prescriptions/{$prescription->id}/checkout", [
+                'payment_method' => 'cash',
+                'quick_cash_tendered' => 40,
+            ]);
+        $checkout->assertOk()->assertJsonPath('success', true);
+        $this->assertSame('dispensed', $prescription->fresh()->status);
+        $this->assertDatabaseHas('order_payments', [
+            'sale_id' => $checkout->json('sale.id'),
+            'tendered' => 40,
+            'change_returned' => 4,
+        ]);
     }
 
     public function test_repair_device_categories_crud_and_ticket_intake(): void

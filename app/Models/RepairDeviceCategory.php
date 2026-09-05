@@ -135,6 +135,30 @@ class RepairDeviceCategory extends Model
                 'sort_order' => 3,
             ],
             [
+                'name' => 'Home Appliance',
+                'slug' => 'home-appliance',
+                'icon' => 'kitchen',
+                'identifier_type' => 'Model / Serial Number',
+                'brands' => ['LG', 'Samsung', 'Whirlpool', 'Bosch', 'Panasonic', 'Philips', 'Haier', 'Godrej', 'Other'],
+                'checklist_items' => [
+                    'Power Input & Fuse',
+                    'Control Panel & Display',
+                    'Motor / Compressor Operation',
+                    'Heating / Cooling Test',
+                    'Water / Gas Leakage Inspection',
+                    'Cables, Hoses & Safety Ground',
+                ],
+                'common_issues' => [
+                    'No Power / Fuse Trips',
+                    'Motor or Compressor Noise',
+                    'Water Leakage',
+                    'Not Heating / Cooling',
+                    'Control Board Error',
+                ],
+                'description' => 'Kitchen, laundry, cooling, and small domestic appliances',
+                'sort_order' => 4,
+            ],
+            [
                 'name' => 'Gaming Console',
                 'slug' => 'gaming-console',
                 'icon' => 'sports_esports',
@@ -156,7 +180,7 @@ class RepairDeviceCategory extends Model
                     'Drifting Stick / Controller Port Fault',
                 ],
                 'description' => 'Video game consoles and handheld gaming devices',
-                'sort_order' => 4,
+                'sort_order' => 5,
             ],
             [
                 'name' => 'Audio & Headphones',
@@ -179,7 +203,7 @@ class RepairDeviceCategory extends Model
                     'Distorted Sound / Buzzing Noise',
                 ],
                 'description' => 'Wireless earbuds, over-ear headphones, and portable speakers',
-                'sort_order' => 5,
+                'sort_order' => 6,
             ],
             [
                 'name' => 'Drone & Aerial Equipment',
@@ -202,7 +226,7 @@ class RepairDeviceCategory extends Model
                     'Camera Vision Sensor Error',
                 ],
                 'description' => 'Drones, gimbals, and quadcopter accessories',
-                'sort_order' => 6,
+                'sort_order' => 7,
             ],
         ];
     }
