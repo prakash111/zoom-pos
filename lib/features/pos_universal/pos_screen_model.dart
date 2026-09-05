@@ -73,6 +73,7 @@ class PosCatalogItem {
   final Map<String, dynamic> onTap;
 
   bool get isOutOfStock => stock != null && stock! <= 0;
+  bool get isLowStock => stock != null && stock! > 0 && stock! <= 5;
 
   static PosCatalogItem fromJson(Map<String, dynamic> json) {
     return PosCatalogItem(

@@ -263,7 +263,6 @@ class _UniversalPosScreenState extends State<UniversalPosScreen> {
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    backgroundColor: const Color(0xFF1B5E20),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: _openCheckout,

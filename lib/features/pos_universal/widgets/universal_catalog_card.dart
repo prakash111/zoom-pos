@@ -120,9 +120,8 @@ class UniversalCatalogCard extends StatelessWidget {
                   ),
                   if (item.isOutOfStock)
                     Text('Out of stock', style: TextStyle(color: Colors.red.shade400, fontSize: 11))
-                  else if (item.stock != null)
-                    Text('Stock: ${item.stock}',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
+                  else if (item.isLowStock)
+                    Text('Low stock', style: TextStyle(color: Colors.orange.shade700, fontSize: 11)),
                 ],
               ),
             ],
