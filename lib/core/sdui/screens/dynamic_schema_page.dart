@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/api_client.dart';
 import '../../api/api_exception.dart';
-import '../../config/bootstrap_cache.dart';
 import '../../services/dynamic_string_service.dart';
 import '../dynamic_schema_context.dart';
 import '../dynamic_schema_parser.dart';
+import '../sdui_action_dispatcher.dart';
 import '../sdui_icon_registry.dart';
 
 typedef DynamicSchemaRequest = Future<Map<String, dynamic>> Function(
@@ -177,204 +176,20 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
     _formValues[key] = value;
   }
 
-  Future<void> _dispatchAction(Map<String, dynamic> action) async {
-    final type = action['type']?.toString().toLowerCase().trim();
-    final client = _resolveApiClient();
+  SduiActionDispatcher get _dispatcher => SduiActionDispatcher(
+        resolveApiClient: _resolveApiClient,
+        requestExecutor: widget.requestExecutor,
+        formKey: _formKey,
+        formValues: _formValues,
+        setFormValue: _setFormValue,
+        onReload: () {
+          if (mounted) _fetchSchema();
+        },
+        showToast: _showToast,
+      );
 
-    switch (type) {
-      case 'navigate':
-        final endpoint = action['endpoint']?.toString() ??
-            action['target_endpoint']?.toString();
-        final title = action['title']?.toString();
-
-        if (endpoint != null && endpoint.isNotEmpty) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => DynamicSchemaPage(
-                endpoint: endpoint,
-                initialTitle: title,
-                apiClient: client,
-                requestExecutor: widget.requestExecutor,
-              ),
-            ),
-          );
-        } else {
-          _showToast('Navigation action is missing an endpoint.',
-              isError: true);
-        }
-        break;
-
-      case 'form_submit':
-        final endpoint = action['endpoint']?.toString() ?? '';
-        final method = action['method']?.toString() ?? 'POST';
-        final successToast =
-            action['success_toast']?.toString() ?? 'Saved successfully';
-        final navigateBack = action['navigate_back'] == true;
-
-        if (!(_formKey.currentState?.validate() ?? true)) {
-          _showToast('Please correct the highlighted fields.', isError: true);
-          return;
-        }
-
-        if (endpoint.isEmpty ||
-            (client == null && widget.requestExecutor == null)) {
-          _showToast('Unable to submit this form: API client is unavailable.',
-              isError: true);
-          return;
-        }
-
-        try {
-          final res = await _request(
-            endpoint,
-            method: method,
-            data: _formValues,
-          );
-          final message = res['message']?.toString() ?? successToast;
-          final rawTheme = res['theme'];
-          if (rawTheme is Map) {
-            await BootstrapCache.instance
-                .applyThemeJson(Map<String, dynamic>.from(rawTheme));
-          }
-          final formUrlToOpen = res['url']?.toString() ??
-              res['print_url']?.toString() ??
-              res['whatsapp_url']?.toString();
-          if (formUrlToOpen != null && formUrlToOpen.isNotEmpty) {
-            final uri = Uri.tryParse(formUrlToOpen);
-            if (uri != null) {
-              try {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              } catch (_) {}
-            }
-          }
-          _showToast(message);
-          if (navigateBack && mounted) {
-            Navigator.of(context).pop();
-          } else if (action['reload'] == true && mounted) {
-            _fetchSchema();
-          }
-        } catch (e) {
-          _showToast(e is ApiException ? e.message : 'Submission failed: $e',
-              isError: true);
-        }
-        break;
-
-      case 'api_post':
-        final endpoint = action['endpoint']?.toString() ?? '';
-        final payload = (action['payload'] as Map<String, dynamic>?) ?? {};
-        final successToast = action['success_toast']?.toString() ?? 'Completed';
-
-        if ((client == null && widget.requestExecutor == null) ||
-            endpoint.isEmpty) {
-          _showToast(
-              'Unable to perform this action: API client is unavailable.',
-              isError: true);
-          return;
-        }
-
-        try {
-          final res = await _request(endpoint, method: 'POST', data: payload);
-          _showToast(res['message']?.toString() ?? successToast);
-          final urlToOpen = res['url']?.toString() ??
-              res['print_url']?.toString() ??
-              res['whatsapp_url']?.toString();
-          if (urlToOpen != null && urlToOpen.isNotEmpty) {
-            final uri = Uri.tryParse(urlToOpen);
-            if (uri != null) {
-              try {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              } catch (_) {}
-            }
-          }
-          if (action['reload'] == true && mounted) {
-            _fetchSchema();
-          }
-        } catch (e) {
-          _showToast(e is ApiException ? e.message : 'Action failed: $e',
-              isError: true);
-        }
-        break;
-
-      case 'open_url':
-        final rawUrl = action['url']?.toString() ?? '';
-        if (rawUrl.isNotEmpty) {
-          final uri = Uri.tryParse(rawUrl);
-          if (uri != null) {
-            try {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            } catch (e) {
-              _showToast('Failed to open link: $e', isError: true);
-            }
-          }
-        }
-        break;
-
-      case 'open_modal':
-        final title = action['title']?.toString() ?? '';
-        final rawComponents =
-            action['components'] as List<dynamic>? ?? const [];
-        final modalFormKey = GlobalKey<FormState>();
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          builder: (modalCtx) => DynamicSchemaContext(
-            formValues: _formValues,
-            setFormValue: _setFormValue,
-            dispatchAction: (modalAction) async {
-              if (modalAction['type']?.toString() == 'form_submit' &&
-                  !(modalFormKey.currentState?.validate() ?? true)) {
-                _showToast('Please correct the highlighted fields.',
-                    isError: true);
-                return;
-              }
-              if (Navigator.of(modalCtx).canPop()) {
-                Navigator.of(modalCtx).pop();
-              }
-              await _dispatchAction(modalAction);
-            },
-            apiClient: client,
-            child: SafeArea(
-              child: Form(
-                key: modalFormKey,
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    16,
-                    16,
-                    16 + MediaQuery.viewInsetsOf(modalCtx).bottom,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (title.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Text(title,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16)),
-                        ),
-                      for (final c in rawComponents)
-                        if (c is Map)
-                          DynamicSchemaParser.buildComponent(
-                            modalCtx,
-                            Map<String, dynamic>.from(c),
-                          ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-        break;
-
-      case 'pop':
-      case 'navigate_back':
-        Navigator.of(context).pop();
-        break;
-
-      default:
-        break;
-    }
+  Future<void> _dispatchAction(Map<String, dynamic> action) {
+    return _dispatcher.dispatch(context, action);
   }
 
   void _showToast(String message, {bool isError = false}) {

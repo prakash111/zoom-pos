@@ -11,6 +11,7 @@ import '../../features/inventory/screens/inventory_management_screen.dart';
 import '../../features/languages/screens/languages_screen.dart';
 import '../../features/payables/screens/payables_screen.dart';
 import '../../features/pos/screens/pos_screen.dart';
+import '../../features/pos_universal/screens/universal_pos_screen.dart';
 import '../../features/quotations/screens/quotations_screen.dart';
 import '../../features/receivables/screens/due_receivables_screen.dart';
 import '../../features/reports/screens/reports_screen.dart';
@@ -43,6 +44,10 @@ class SduiComponentRegistry {
     'restaurant_pos': (_) => const RestaurantPosScreen(),
     'floor_plan': (_) => const RestaurantTablesScreen(),
     'kitchen_display': (_) => const RestaurantKdsScreen(),
+    'pharmacy_pos': (_) =>
+        const UniversalPosScreen(endpoint: '/api/tenant/views/pharmacy-pos'),
+    'repair_pos': (_) =>
+        const UniversalPosScreen(endpoint: '/api/tenant/views/repair-pos'),
 
     // Cash & Sales
     'sales': (_) => const SalesScreen(),
