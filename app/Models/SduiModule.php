@@ -54,6 +54,23 @@ class SduiModule extends Model
         static::saving(function (SduiModule $module): void {
             $module->slug = Str::slug($module->slug ?: $module->name);
 
+            $navigation = $module->navigation ?? [];
+            if (is_array($navigation)) {
+                $normalizedNav = [];
+                foreach ($navigation as $sectionIndex => $section) {
+                    if (is_array($section)) {
+                        if (! isset($section['key']) && isset($section['id'])) {
+                            $section['key'] = (string) $section['id'];
+                        }
+                        if (isset($section['items']) && is_array($section['items'])) {
+                            $section['items'] = self::normalizeNavigationItems($section['items']);
+                        }
+                    }
+                    $normalizedNav[] = $section;
+                }
+                $module->navigation = $normalizedNav;
+            }
+
             foreach (($module->navigation ?? []) as $sectionIndex => $section) {
                 if (! is_array($section)
                     || trim((string) ($section['key'] ?? '')) === ''
@@ -75,6 +92,41 @@ class SduiModule extends Model
             app(\App\Services\Localization\LocalizationService::class)
                 ->registerModuleTranslations($module->slug, $strings);
         });
+    }
+
+    private static function normalizeNavigationItems(array $items): array
+    {
+        $normalized = [];
+        foreach ($items as $index => $item) {
+            if (! is_array($item)) {
+                $normalized[] = $item;
+                continue;
+            }
+
+            if (! isset($item['key'])) {
+                if (isset($item['id'])) {
+                    $item['key'] = (string) $item['id'];
+                } elseif (! empty($item['title'])) {
+                    $item['key'] = Str::slug($item['title'], '_');
+                } elseif (! empty($item['route'])) {
+                    $item['key'] = Str::slug(basename($item['route']), '_');
+                } else {
+                    $item['key'] = 'item_'.$index;
+                }
+            }
+
+            if (! isset($item['target_endpoint']) && isset($item['route'])) {
+                $item['target_endpoint'] = $item['route'];
+            }
+
+            if (isset($item['children']) && is_array($item['children'])) {
+                $item['children'] = self::normalizeNavigationItems($item['children']);
+            }
+
+            $normalized[] = $item;
+        }
+
+        return $normalized;
     }
 
     private static function validateNavigationItems(array $items, string $path): void

@@ -1,0 +1,416 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\CashRegister;
+use App\Models\Company;
+use App\Models\Customer;
+use App\Models\OrderPayment;
+use App\Models\Plan;
+use App\Models\Product;
+use App\Models\Sale;
+use App\Models\SduiModule;
+use App\Models\User;
+use App\Services\Modular\ModulePackageService;
+use App\Services\Navigation\TenantNavRegistry;
+use App\Services\Sdui\SchemaValidator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
+use ZipArchive;
+
+class UniversalPosAndGlobalEngineContractTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected Company $company;
+    protected User $admin;
+    protected string $token;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Plan::create([
+            'name' => 'enterprise',
+            'display_name' => 'Enterprise Plan',
+            'price' => 99.00,
+            'currency' => 'USD',
+            'billing_cycle' => 'monthly',
+            'duration_days' => 30,
+            'features' => ['pos' => true, 'offline' => true, 'inventory' => true],
+            'limits' => ['products' => 5000, 'users' => 20],
+            'active' => true,
+        ]);
+
+        $this->company = Company::create([
+            'name' => 'Universal Retail Corp',
+            'trade_name' => 'Universal Retail',
+            'slug' => 'universal-retail',
+            'email' => 'admin@universal.test',
+            'country' => 'US',
+            'currency' => 'USD',
+            'currency_symbol' => '$',
+            'plan_name' => 'enterprise',
+            'expires_at' => now()->addDays(30),
+            'licensed_modules' => ['retail', 'restaurant', 'pharmacy', 'repair_technician', 'service_booking'],
+        ]);
+
+        $this->admin = User::factory()->create([
+            'company_id' => $this->company->id,
+            'email' => 'admin@universal.test',
+            'password' => Hash::make('secret123'),
+            'role' => 'admin',
+        ]);
+
+        $loginResponse = $this->postJson('/api/v1/pos/auth/login', [
+            'email' => 'admin@universal.test',
+            'password' => 'secret123',
+        ]);
+
+        $this->token = (string) $loginResponse->json('token');
+    }
+
+    protected function tearDown(): void
+    {
+        File::deleteDirectory(base_path('modules/hardwareshop'));
+        File::deleteDirectory(storage_path('framework/testing/hardwareshop_src'));
+        @unlink(storage_path('framework/testing/hardwareshop.zip'));
+
+        parent::tearDown();
+    }
+
+    protected function authHeaders(): array
+    {
+        return [
+            'Authorization' => 'Bearer '.$this->token,
+            'Accept' => 'application/json',
+        ];
+    }
+
+    public function test_universal_pos_screens_have_identical_catalog_grid_and_drawer_actions(): void
+    {
+        Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Standard Item A',
+            'code' => 'ITEM-A',
+            'sale_price' => 25.00,
+            'current_stock' => 50,
+            'active' => true,
+        ]);
+
+        $endpoints = [
+            'retail' => '/api/tenant/views/retail-pos',
+            'restaurant' => '/api/tenant/views/restaurant-pos',
+            'pharmacy' => '/api/tenant/views/pharmacy-pos',
+            'repair' => '/api/tenant/views/repair-pos',
+            'salon' => '/api/tenant/views/salon-pos',
+            'pos' => '/api/tenant/views/pos',
+            'dynamic-pos' => '/api/tenant/views/hardware-pos',
+        ];
+
+        foreach ($endpoints as $vertical => $url) {
+            $response = $this->getJson($url, $this->authHeaders());
+            $response->assertOk();
+
+            $schema = $response->json('schema');
+            $this->assertIsArray($schema, "Schema for {$vertical} must be an array");
+            $this->assertSame('pos_screen', $schema['type'], "Type for {$vertical} must be pos_screen");
+
+            // Universal Material catalog cards grid
+            $this->assertArrayHasKey('catalog', $schema, "Catalog missing for {$vertical}");
+            $this->assertSame('grid', $schema['catalog']['display_mode']);
+            $this->assertSame(2, $schema['catalog']['columns']);
+            $this->assertNotEmpty($schema['catalog']['items']);
+
+            // Full-width search bar with barcode scan
+            $this->assertArrayHasKey('search', $schema);
+            $this->assertTrue($schema['search']['full_width']);
+            $this->assertTrue($schema['search']['enable_barcode_scanner']);
+
+            // Horizontal category chips
+            $this->assertArrayHasKey('categories', $schema);
+            $this->assertSame('chips', $schema['categories']['display_type']);
+
+            // Floating bottom cart bar
+            $this->assertArrayHasKey('cart_bar', $schema);
+            $this->assertTrue($schema['cart_bar']['floating']);
+            $this->assertNotEmpty($schema['cart_bar']['checkout_endpoint']);
+
+            // SDUI Schema Validator must pass cleanly
+            $errors = app(SchemaValidator::class)->validate($schema);
+            $this->assertEmpty($errors, "Schema validation failed for {$vertical}: ".json_encode($errors));
+        }
+    }
+
+    public function test_universal_checkout_drawer_matches_standard_settlement_spec(): void
+    {
+        $response = $this->getJson('/api/tenant/pos/checkout-sheet', $this->authHeaders());
+        $response->assertOk();
+
+        $schema = $response->json('schema');
+        $this->assertIsArray($schema);
+        $this->assertSame('sheet', $schema['type']);
+        $this->assertSame('native_pos_checkout_drawer', $schema['presentation']);
+
+        // Order summary and action pills
+        $this->assertArrayHasKey('order_summary', $schema);
+        $this->assertContains('add_customer', $schema['customer_actions']);
+        $this->assertContains('hold', $schema['customer_actions']);
+        $this->assertContains('note', $schema['customer_actions']);
+        $this->assertContains('discount', $schema['customer_actions']);
+        $this->assertContains('split_payment', $schema['customer_actions']);
+
+        // Payment method selector
+        $methods = array_column($schema['payment_methods'], 'value');
+        $this->assertContains('cash', $methods);
+        $this->assertContains('card', $methods);
+        $this->assertContains('transfer', $methods);
+
+        // Quick cash suggestions & change due box
+        $this->assertArrayHasKey('quick_cash', $schema);
+        $this->assertNotEmpty($schema['quick_cash']['suggestions']);
+        $this->assertSame('Change Due to Customer', $schema['quick_cash']['change_due_label']);
+
+        // Settlement breakdown
+        $this->assertArrayHasKey('bottom_bar', $schema);
+        $this->assertSame('Complete Sale / Collect Payment', $schema['bottom_bar']['primary_action_label']);
+    }
+
+    public function test_universal_checkout_records_sale_inventory_and_payments(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Universal Drill Set',
+            'code' => 'DRILL-01',
+            'sale_price' => 50.00,
+            'current_stock' => 20,
+            'active' => true,
+        ]);
+
+        $cashRegister = CashRegister::create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->admin->id,
+            'opened_at' => now(),
+            'opening_balance' => 100.00,
+            'status' => 'open',
+        ]);
+
+        $payload = [
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 2,
+                    'unit_price' => 50.00,
+                ],
+            ],
+            'customer_name' => 'Walk-in Customer',
+            'payment_method' => 'cash',
+            'tendered' => 120.00,
+        ];
+
+        $response = $this->postJson('/api/tenant/pos/checkout', $payload, $this->authHeaders());
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+
+        $saleId = $response->json('sale.id');
+        $this->assertNotNull($saleId);
+
+        // Verify product stock decremented
+        $product->refresh();
+        $this->assertSame(18, (int) $product->current_stock);
+
+        // Verify sale row in core database
+        $sale = Sale::find($saleId);
+        $this->assertNotNull($sale);
+        $this->assertSame('completed', $sale->status);
+        $this->assertSame('100.00', number_format((float) $sale->total, 2, '.', ''));
+        $this->assertSame($cashRegister->id, $sale->cash_register_id);
+
+        // Verify OrderPayment created with tendered and change
+        $payment = OrderPayment::where('sale_id', $saleId)->first();
+        $this->assertNotNull($payment);
+        $this->assertSame('cash', $payment->payment_method);
+        $this->assertSame('100.00', number_format((float) $payment->amount, 2, '.', ''));
+        $this->assertSame('120.00', number_format((float) $payment->tendered, 2, '.', ''));
+        $this->assertSame('20.00', number_format((float) $payment->change_returned, 2, '.', ''));
+
+        // Verify Invoice PDF links
+        $this->assertNotEmpty($response->json('print_url'));
+        $this->assertNotEmpty($response->json('download_url'));
+    }
+
+    public function test_universal_checkout_supports_split_payments_and_khata_due_tracking(): void
+    {
+        $customer = Customer::create([
+            'company_id' => $this->company->id,
+            'name' => 'Acme Wholesale',
+            'phone' => '+1555123456',
+            'due_balance' => 0.00,
+        ]);
+
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Pro Router Table',
+            'code' => 'ROUTER-01',
+            'sale_price' => 100.00,
+            'current_stock' => 10,
+            'active' => true,
+        ]);
+
+        // 1. Test Split Payments (Cash $40 + Card $30 + Due $30)
+        $splitPayload = [
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 100.00],
+            ],
+            'customer_id' => $customer->id,
+            'payments' => [
+                ['method' => 'cash', 'amount' => 40.00],
+                ['method' => 'card', 'amount' => 30.00],
+            ],
+        ];
+
+        $response = $this->postJson('/api/tenant/pos/checkout', $splitPayload, $this->authHeaders());
+        $response->assertOk();
+        $saleId = $response->json('sale.id');
+
+        $sale = Sale::find($saleId);
+        $this->assertSame('70.00', number_format((float) $sale->paid_amount, 2, '.', ''));
+        $this->assertSame('30.00', number_format((float) $sale->due_amount, 2, '.', ''));
+        $this->assertSame('partially_paid', $sale->payment_status);
+
+        // Core CustomerLedgerService & SaleObserver guarantee Khata update
+        $customer->refresh();
+        $this->assertSame('30.00', number_format((float) $customer->due_balance, 2, '.', ''));
+        $this->assertDatabaseHas('customer_ledgers', [
+            'company_id' => $this->company->id,
+            'customer_id' => $customer->id,
+            'sale_id' => $sale->id,
+            'type' => 'invoice',
+        ]);
+    }
+
+    public function test_perfex_style_module_package_upload_and_auto_navigation_hydration(): void
+    {
+        $key = 'hardwareshop';
+        $sourceDir = storage_path('framework/testing/'.$key.'_src');
+        File::deleteDirectory($sourceDir);
+        File::makeDirectory($sourceDir.'/Database/Migrations', 0700, true);
+
+        // Perfex CRM manifest with inherits_ui: "universal_pos" and id/route fields
+        File::put($sourceDir.'/module.json', json_encode([
+            'key' => $key,
+            'name' => 'Hardware Shop Pro',
+            'version' => '1.0.0',
+            'author' => 'Perfex Partner',
+            'inherits_ui' => 'universal_pos',
+            'navigation' => [
+                [
+                    'id' => 'hardware_management',
+                    'title' => 'Hardware Management',
+                    'color' => '#b45309',
+                    'items' => [
+                        [
+                            'title' => 'Hardware POS Register',
+                            'route' => '/api/tenant/views/hardwareshop-pos',
+                            'icon' => 'build',
+                        ],
+                    ],
+                ],
+            ],
+        ]));
+
+        $zipPath = storage_path('framework/testing/'.$key.'.zip');
+        @unlink($zipPath);
+
+        $zip = new ZipArchive;
+        $zip->open($zipPath, ZipArchive::CREATE);
+        $zip->addFile($sourceDir.'/module.json', 'module.json');
+        $zip->close();
+
+        $uploaded = UploadedFile::fake()->createWithContent($key.'.zip', file_get_contents($zipPath));
+
+        $service = app(ModulePackageService::class);
+        $module = $service->install($uploaded, $this->admin->id);
+
+        $this->assertNotNull($module);
+        $this->assertSame('hardwareshop', $module->slug);
+        $this->assertSame('universal_pos', $module->layout_type);
+        $this->assertSame('universal_pos', $module->features['inherits_ui'] ?? null);
+
+        // Activate module (Perfex plugin pattern)
+        $service->activate($module, $this->admin->id);
+        $module->refresh();
+        $this->assertTrue($module->is_active);
+
+        // Auto-hydration into Tenant Navigation
+        $nav = TenantNavRegistry::getEffectiveNavForTenant($this->company);
+        $sectionKeys = array_column($nav, 'key');
+        $this->assertContains('hardware_management', $sectionKeys);
+
+        // Verify collapsed-by-default rule
+        foreach ($nav as $sec) {
+            $this->assertFalse($sec['initially_expanded'] ?? true);
+            foreach ($sec['items'] ?? [] as $item) {
+                if (! empty($item['children'])) {
+                    $this->assertFalse($item['initially_expanded'] ?? true);
+                    $this->assertFalse($item['expanded'] ?? true);
+                }
+            }
+        }
+
+        // Verify dynamic view endpoint renders Universal POS screen
+        $posView = $this->getJson('/api/tenant/views/hardwareshop-pos', $this->authHeaders());
+        $posView->assertOk();
+        $schema = $posView->json('schema');
+        $this->assertSame('pos_screen', $schema['type']);
+        $this->assertArrayHasKey('catalog', $schema);
+        $this->assertArrayHasKey('cart_bar', $schema);
+    }
+
+    public function test_centralized_invoice_dispatch_and_print_urls(): void
+    {
+        $customer = Customer::create([
+            'company_id' => $this->company->id,
+            'name' => 'John Buyer',
+            'phone' => '+1234567890',
+            'email' => 'john@buyer.test',
+        ]);
+
+        $sale = Sale::create([
+            'company_id' => $this->company->id,
+            'sale_number' => 'INV-9999',
+            'customer_id' => $customer->id,
+            'customer_name' => $customer->name,
+            'user_id' => $this->admin->id,
+            'total' => 150.00,
+            'net_amount' => 150.00,
+            'paid_amount' => 150.00,
+            'due_amount' => 0.00,
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'status' => 'completed',
+            'operation_type' => 'sale',
+            'items' => [],
+        ]);
+
+        // WhatsApp Invoice Dispatch
+        $resWa = $this->postJson("/api/tenant/sales/{$sale->id}/send-invoice", [
+            'channel' => 'whatsapp',
+        ], $this->authHeaders());
+        $resWa->assertOk();
+        $resWa->assertJsonPath('success', true);
+        $resWa->assertJsonPath('channel', 'whatsapp');
+        $this->assertNotEmpty($resWa->json('whatsapp_url') ?? $resWa->json('url'));
+
+        // Print URLs
+        $resPrint = $this->postJson("/api/tenant/sales/{$sale->id}/print", [], $this->authHeaders());
+        $resPrint->assertOk();
+        $resPrint->assertJsonPath('success', true);
+        $this->assertNotEmpty($resPrint->json('print_url'));
+        $this->assertNotEmpty($resPrint->json('download_url'));
+    }
+}

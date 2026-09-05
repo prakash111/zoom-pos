@@ -148,6 +148,52 @@ class TenantNavRegistry
             }
         }
 
+        // 7. Active Package Modules (Perfex CRM pattern)
+        if (\Illuminate\Support\Facades\Schema::hasTable('sdui_modules')) {
+            try {
+                $activePackageModules = \App\Models\SduiModule::query()
+                    ->where('is_active', true)
+                    ->where('source_type', 'package')
+                    ->orderBy('sort_order')
+                    ->get();
+
+                foreach ($activePackageModules as $pkgModule) {
+                    $pkgSlug = $pkgModule->slug;
+                    $alreadyAdded = false;
+                    foreach ($sections as $sec) {
+                        $secKey = $sec['key'] ?? $sec['id'] ?? '';
+                        if (str_starts_with($secKey, $pkgSlug) || $secKey === $pkgSlug) {
+                            $alreadyAdded = true;
+                            break;
+                        }
+                    }
+
+                    if (! $alreadyAdded) {
+                        $nav = $pkgModule->navigation;
+                        if (is_array($nav) && ! empty($nav)) {
+                            $validated = self::validatedCustomNavigation($nav);
+                            if (! empty($validated)) {
+                                foreach ($validated as $sec) {
+                                    $secKey = trim((string) ($sec['key'] ?? $sec['id'] ?? ''));
+                                    if ($secKey !== 'administration') {
+                                        $sections[] = self::normalizeSection($sec);
+                                    }
+                                }
+                                continue;
+                            }
+                        }
+
+                        $generic = self::buildGenericModuleSection($pkgSlug);
+                        if ($generic !== null) {
+                            $sections[] = self::normalizeSection($generic);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Table might not exist or be accessible in early bootstrapping
+            }
+        }
+
         // Single-mode vertical stores (e.g. restaurant-only) without retail still receive
         // inventory and financial management sections.
         if (! in_array('retail', $licensed, true)) {
@@ -159,7 +205,7 @@ class TenantNavRegistry
             }
         }
 
-        // 6. Administration & Settings (Strictly at the bottom)
+        // 8. Administration & Settings (Strictly at the bottom)
         $sections[] = self::getAdministrationSection();
 
         return array_values($sections);
@@ -930,6 +976,9 @@ class TenantNavRegistry
             'label' => $title,
             'color' => $color,
             'items' => $items,
+            'initially_expanded' => false,
+            'expanded' => false,
+            'is_expanded' => false,
         ]);
     }
 
@@ -1049,8 +1098,21 @@ class TenantNavRegistry
             }
 
             $key = trim((string) ($item['key'] ?? $item['id'] ?? ''));
+            if ($key === '') {
+                if (! empty($item['title'])) {
+                    $key = \Illuminate\Support\Str::slug($item['title'], '_');
+                } elseif (! empty($item['label'])) {
+                    $key = \Illuminate\Support\Str::slug($item['label'], '_');
+                } elseif (! empty($item['route'])) {
+                    $key = \Illuminate\Support\Str::slug(basename($item['route']), '_');
+                }
+            }
             if ($key === '' || isset($seen[$key])) {
                 return null;
+            }
+
+            if (! empty($item['route']) && empty($item['target_endpoint'])) {
+                $item['target_endpoint'] = $item['route'];
             }
 
             $children = $item['children'] ?? [];

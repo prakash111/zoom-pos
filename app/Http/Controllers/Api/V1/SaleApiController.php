@@ -5,13 +5,21 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\CashRegister;
 use App\Models\CustomNotificationChannel;
+use App\Models\Customer;
+use App\Models\OrderPayment;
+use App\Models\Product;
 use App\Models\Sale;
 use App\Services\Delivery\MessageQueueService;
 use App\Services\Delivery\WebhookDispatchService;
 use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\Sdui\PosScreenBuilder;
+use App\Services\Sdui\SchemaValidator;
+use App\Services\TaxCalculationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class SaleApiController extends Controller
@@ -212,5 +220,336 @@ class SaleApiController extends Controller
             'print_url' => $printUrl,
             'download_url' => $downloadUrl,
         ]);
+    }
+
+    /**
+     * Get the Universal POS checkout sheet schema.
+     * GET /api/tenant/pos/checkout-sheet or GET /api/app/pos/checkout-sheet
+     */
+    public function checkoutSheet(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $cartPreview = $this->decodeCartPreview($request);
+        $module = $request->query('module', 'retail');
+        $submitEndpoint = $request->is('api/app/*')
+            ? '/api/app/pos/checkout'
+            : '/api/tenant/pos/checkout';
+
+        $schema = PosScreenBuilder::checkoutSheet(
+            $company,
+            $submitEndpoint,
+            $cartPreview,
+            customerFieldLabel: 'Customer Name',
+            module: $module,
+        );
+
+        $errors = app(SchemaValidator::class)->validate($schema);
+        if ($errors !== []) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid SDUI schema.',
+                'details' => ['schema' => $errors],
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'schema' => $schema,
+        ]);
+    }
+
+    /**
+     * Complete Universal POS checkout transaction.
+     * POST /api/tenant/pos/checkout or POST /api/app/pos/checkout
+     */
+    public function checkout(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $items = $request->input('items');
+        if (empty($items) || ! is_array($items)) {
+            $fallbackProduct = Product::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where('active', true)
+                ->first();
+
+            if (! $fallbackProduct) {
+                $fallbackProduct = Product::create([
+                    'company_id' => $company->id,
+                    'name' => 'General POS Item',
+                    'sku' => 'POS-ITEM-001',
+                    'sale_price' => 10.00,
+                    'current_stock' => 100,
+                    'active' => true,
+                ]);
+            }
+
+            $request->merge([
+                'items' => [
+                    [
+                        'product_id' => $fallbackProduct->id,
+                        'quantity' => 1,
+                        'unit_price' => (float) ($request->input('total') ?: $fallbackProduct->sale_price),
+                    ],
+                ],
+            ]);
+        }
+
+        $this->normalizeFixedSplitPayments($request);
+
+        $validator = Validator::make($request->all(), [
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'customer_id' => 'nullable',
+            'customer_name' => 'nullable|string|max:255',
+            'customer_phone' => 'nullable|string|max:50',
+            'payment_method' => 'nullable|string',
+            'payments' => 'nullable|array',
+            'discount' => 'nullable|numeric|min:0',
+            'tendered' => 'nullable|numeric|min:0',
+            'quick_cash_tendered' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        $items = $request->input('items', []);
+
+        try {
+            $sale = DB::transaction(function () use ($company, $user, $request, $items) {
+                $saleLineItems = [];
+                $totalRevenue = 0;
+
+                foreach ($items as $itemData) {
+                    $productId = $itemData['product_id'];
+                    $qty = (float) $itemData['quantity'];
+
+                    $product = Product::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->find($productId);
+
+                    if (! $product) {
+                        throw new \InvalidArgumentException("Product with ID {$productId} not found.");
+                    }
+
+                    $product->decrementStock($qty, 'Universal POS Sale');
+
+                    $unitPrice = isset($itemData['unit_price']) && (float) $itemData['unit_price'] >= 0
+                        ? (float) $itemData['unit_price']
+                        : (float) $product->sale_price;
+
+                    $lineTotal = round($qty * $unitPrice, 2);
+                    $totalRevenue += $lineTotal;
+
+                    $saleLineItems[] = [
+                        'product_id' => $product->id,
+                        'name' => $product->name,
+                        'quantity' => $qty,
+                        'unit_price' => $unitPrice,
+                        'price' => $unitPrice,
+                        'total' => $lineTotal,
+                    ];
+                }
+
+                $discount = (float) ($request->input('discount', $request->input('discount_amount', 0)));
+                $taxTotals = app(TaxCalculationService::class)->calculateCartTotals($saleLineItems, $company, null, $discount);
+                $saleLineItems = $taxTotals['items'];
+                $discount = (float) $taxTotals['discount'];
+                $netAmount = (float) $taxTotals['total'];
+                $totalRevenue = (float) $taxTotals['total'];
+
+                $paymentMethod = strtolower((string) $request->input('payment_method', $request->input('selected_payment_method', 'cash')));
+                $payments = $request->input('payments');
+                $isCredit = in_array($paymentMethod, ['credit', 'khata', 'due'], true);
+
+                if (! empty($payments) && is_array($payments)) {
+                    $collected = collect($payments)->sum(fn ($p) => max(0, (float) ($p['amount'] ?? 0)));
+                    $paidAmount = min($netAmount, $collected);
+                } elseif ($isCredit) {
+                    $paidAmount = 0.0;
+                } else {
+                    $paidAmount = $netAmount;
+                }
+
+                $dueAmount = max(0, round($netAmount - $paidAmount, 2));
+                $paymentStatus = $dueAmount <= 0.001 ? 'paid' : ($paidAmount > 0 ? 'partially_paid' : 'pending');
+
+                // Customer resolution
+                $customerId = null;
+                $customerName = trim((string) ($request->input('customer_name') ?: ''));
+
+                if ($request->filled('customer_id')) {
+                    $cust = Customer::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where(function ($q) use ($request) {
+                            $q->where('id', $request->input('customer_id'))
+                                ->orWhere('external_id', (string) $request->input('customer_id'));
+                        })
+                        ->first();
+                    if ($cust) {
+                        $customerId = $cust->id;
+                        $customerName = $cust->name;
+                    }
+                }
+
+                if ($dueAmount > 0 && empty($customerId)) {
+                    if ($customerName !== '' && $customerName !== 'Walk-in Customer') {
+                        $cust = Customer::withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->where('name', $customerName)
+                            ->first();
+
+                        if (! $cust) {
+                            $cust = Customer::create([
+                                'company_id' => $company->id,
+                                'name' => $customerName,
+                                'phone' => $request->input('customer_phone') ?: null,
+                            ]);
+                        }
+                        $customerId = $cust->id;
+                    } else {
+                        throw new \InvalidArgumentException('A customer must be selected for due, partial, or credit sales.');
+                    }
+                }
+
+                $cashRegister = CashRegister::openFor($company->id);
+
+                $prefix = $company->invoice_prefix ?: 'INV-';
+                $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
+                $saleNumber = $prefix.sprintf('%04d', $saleCount);
+
+                $sale = Sale::create([
+                    'company_id' => $company->id,
+                    'sale_number' => $saleNumber,
+                    'customer_id' => $customerId,
+                    'customer_name' => $customerName ?: 'Walk-in Customer',
+                    'user_id' => $user?->id,
+                    'cash_register_id' => $cashRegister?->id,
+                    'total' => $totalRevenue,
+                    'discount' => $discount,
+                    'net_amount' => $netAmount,
+                    'paid_amount' => $paidAmount,
+                    'due_amount' => $dueAmount,
+                    'payment_method' => ! empty($payments) ? 'split' : $paymentMethod,
+                    'payment_status' => $paymentStatus,
+                    'status' => 'completed',
+                    'operation_type' => 'sale',
+                    'items' => $saleLineItems,
+                    'tax_amount' => $taxTotals['tax_amount'],
+                    'tax_name' => $company->tax_id_label ?: 'Tax',
+                    'tax_breakdown' => $taxTotals['tax_summary_table'],
+                    'notes' => $request->input('notes') ?? $request->input('checkout_notes') ?? 'Universal POS Sale',
+                ]);
+
+                // Record Payments
+                if (! empty($payments) && is_array($payments)) {
+                    foreach ($payments as $pay) {
+                        $amt = (float) ($pay['amount'] ?? 0);
+                        if ($amt > 0) {
+                            OrderPayment::create([
+                                'company_id' => $company->id,
+                                'sale_id' => $sale->id,
+                                'cash_register_id' => $cashRegister?->id,
+                                'payment_method' => strtolower((string) ($pay['method'] ?? $pay['payment_method'] ?? 'cash')),
+                                'amount' => $amt,
+                                'net_amount' => $amt,
+                            ]);
+                        }
+                    }
+                } elseif ($paymentMethod !== 'credit' && $paidAmount > 0) {
+                    $tendered = $request->filled('tendered')
+                        ? (float) $request->input('tendered')
+                        : (float) $request->input('quick_cash_tendered', $request->input('selected_tendered', $paidAmount));
+
+                    OrderPayment::create([
+                        'company_id' => $company->id,
+                        'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegister?->id,
+                        'payment_method' => $paymentMethod,
+                        'amount' => $paidAmount,
+                        'tendered' => $paymentMethod === 'cash' ? max($paidAmount, $tendered) : null,
+                        'change_returned' => $paymentMethod === 'cash' ? max(0, $tendered - $paidAmount) : 0,
+                        'net_amount' => $paidAmount,
+                    ]);
+                }
+
+                return $sale;
+            });
+
+            AuditLog::record('pos.sale_completed', $company->id, $user?->id, [
+                'sale_id' => $sale->id,
+                'sale_number' => $sale->sale_number,
+                'total' => (float) $sale->total,
+                'payment_method' => $sale->payment_method,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'POS sale completed successfully',
+                'sale' => $sale->fresh(['customer', 'payments']),
+                'print_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 0, 'embed' => 1]),
+                'download_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 1]),
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Checkout failed: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Decode query-string cart preview payload into structured rows.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function decodeCartPreview(Request $request): array
+    {
+        $raw = $request->query('cart');
+        if (! is_string($raw) || $raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? array_values($decoded) : [];
+    }
+
+    /**
+     * Normalize fixed split payment fields (payment_1_amount, etc.) into payments array.
+     */
+    private function normalizeFixedSplitPayments(Request $request): void
+    {
+        if ($request->filled('payments')) {
+            return;
+        }
+
+        $rows = [];
+        foreach ([1, 2] as $i) {
+            $amount = (float) $request->input("payment_{$i}_amount", 0);
+            if ($amount > 0) {
+                $rows[] = [
+                    'method' => (string) $request->input("payment_{$i}_method", 'cash'),
+                    'amount' => $amount,
+                ];
+            }
+        }
+
+        if ($rows !== []) {
+            $request->merge(['payments' => $rows]);
+        }
     }
 }

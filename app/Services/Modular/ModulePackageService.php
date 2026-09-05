@@ -59,14 +59,20 @@ class ModulePackageService
                 throw new RuntimeException('Could not move extracted module into place.');
             }
 
+            $inheritsUi = $manifest['inherits_ui'] ?? null;
+            $features = $manifest['features'] ?? [];
+            if ($inheritsUi !== null) {
+                $features['inherits_ui'] = $inheritsUi;
+            }
+
             $module = SduiModule::updateOrCreate(
                 ['slug' => $manifest['key']],
                 [
                     'name' => $manifest['name'],
                     'description' => $manifest['description'] ?? null,
                     'icon' => $manifest['icon'] ?? 'widgets',
-                    'layout_type' => $manifest['layout_type'] ?? 'standard_grid',
-                    'features' => $manifest['features'] ?? [],
+                    'layout_type' => $manifest['layout_type'] ?? ($inheritsUi === 'universal_pos' ? 'universal_pos' : 'standard_grid'),
+                    'features' => $features,
                     'navigation' => $manifest['navigation'] ?? [],
                     'version' => $manifest['version'],
                     'author' => $manifest['author'] ?? null,
@@ -285,8 +291,12 @@ class ModulePackageService
             throw new InvalidArgumentException('module.json "key" must resolve to a non-empty slug.');
         }
 
+        $inheritsUi = $manifest['inherits_ui'] ?? null;
+
         if (in_array($key, self::RESERVED_KEYS, true) && ($existing === null || $existing->slug !== $key)) {
-            throw new InvalidArgumentException("Module key \"{$key}\" is reserved for a built-in module.");
+            if ($inheritsUi !== 'universal_pos') {
+                throw new InvalidArgumentException("Module key \"{$key}\" is reserved for a built-in module.");
+            }
         }
 
         $manifest['key'] = $key;
@@ -296,12 +306,30 @@ class ModulePackageService
             throw new InvalidArgumentException('module.json "navigation" must be an array of sections.');
         }
 
-        foreach ($navigation as $sectionIndex => $section) {
+        foreach ($navigation as $sectionIndex => &$section) {
+            if (is_array($section) && ! isset($section['key']) && isset($section['id'])) {
+                $section['key'] = (string) $section['id'];
+            }
             if (! is_array($section) || trim((string) ($section['key'] ?? '')) === '' || ! is_array($section['items'] ?? null)) {
                 throw new InvalidArgumentException("Invalid navigation section at index {$sectionIndex}: each section needs a non-empty \"key\" and an \"items\" array.");
             }
 
-            foreach ($section['items'] as $itemIndex => $item) {
+            foreach ($section['items'] as $itemIndex => &$item) {
+                if (is_array($item)) {
+                    if (! isset($item['key'])) {
+                        if (isset($item['id'])) {
+                            $item['key'] = (string) $item['id'];
+                        } elseif (! empty($item['title'])) {
+                            $item['key'] = Str::slug($item['title'], '_');
+                        } elseif (! empty($item['route'])) {
+                            $item['key'] = Str::slug(basename($item['route']), '_');
+                        }
+                    }
+                    if (! isset($item['target_endpoint']) && isset($item['route'])) {
+                        $item['target_endpoint'] = $item['route'];
+                    }
+                }
+
                 if (! is_array($item) || trim((string) ($item['key'] ?? '')) === '') {
                     throw new InvalidArgumentException("Invalid navigation item at section {$sectionIndex}, item {$itemIndex}: missing \"key\".");
                 }
@@ -311,7 +339,9 @@ class ModulePackageService
                     throw new InvalidArgumentException("Navigation item \"{$item['key']}\" needs a \"target_endpoint\" starting with /api/.");
                 }
             }
+            unset($item);
         }
+        unset($section);
 
         $manifest['navigation'] = $navigation;
     }

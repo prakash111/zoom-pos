@@ -77,6 +77,12 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::get('/tenant/views/{view}', [SduiViewController::class, 'show']);
     Route::get('/app/views/{view}', [SduiViewController::class, 'show']);
 
+    // Universal POS Checkout & Drawer Endpoints
+    Route::get('/tenant/pos/checkout-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
+    Route::post('/tenant/pos/checkout', [SaleApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
+    Route::get('/app/pos/checkout-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
+    Route::post('/app/pos/checkout', [SaleApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
+
     // Native mobile cash-register contract. These unversioned tenant URLs
     // are emitted by SchemaResponse and intentionally coexist with the
     // versioned /v1/pos endpoints used by desktop/offline clients.
@@ -207,6 +213,10 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/sync-sales', [PosSyncApiController::class, 'syncPush'])->middleware('tenant.api.permission:pos,create');
         Route::post('/sync-push', [PosSyncApiController::class, 'syncPush'])->middleware('tenant.api.permission:pos,create');
         Route::post('/sync-batch', [PosSyncApiController::class, 'syncBatch'])->middleware('tenant.api.permission:pos,create');
+        Route::get('/pos/checkout-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/pos/checkout', [SaleApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
+        Route::get('/checkout-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/checkout', [SaleApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
 
         // Desktop Sync Engine: cash register, sales targets, consignments,
         // service orders and payables — modules the wire format above never covered.

@@ -1768,19 +1768,7 @@ class SchemaResponse
 
     public static function restaurantPosView(Company $company): array
     {
-        return self::screen('Restaurant POS Terminal', [
-            self::card([
-                self::row([
-                    self::icon('restaurant', ['color' => '#4d7c0f', 'size' => 28]),
-                    self::column([
-                        self::text('Restaurant Point of Sale', 'title_medium', ['bold' => true]),
-                        self::text('Fast table billing, split checks, and dining room checkout terminal.', 'body_small', ['color' => '#64748b']),
-                    ]),
-                ]),
-                self::divider(),
-                self::badge('Restaurant POS Active', '#4d7c0f', 'subtle'),
-            ]),
-        ]);
+        return UniversalPosBuilder::restaurantPosScreen($company);
     }
 
     public static function diningHistoryView(Company $company): array
@@ -1843,127 +1831,24 @@ class SchemaResponse
 
     public static function salonPosView(Company $company): array
     {
-        return PosScreenBuilder::salonPosScreen($company);
+        return UniversalPosBuilder::salonPosScreen($company);
     }
 
     public static function retailPosView(Company $company): array
     {
-        $currency = $company->currency_symbol ?: '$';
-        $products = Product::withoutGlobalScope('company')
-            ->where('company_id', $company->id)
-            ->where('active', true)
-            ->limit(20)
-            ->get();
-
-        $productCards = [];
-        foreach ($products as $p) {
-            $productCards[] = self::card([
-                self::row([
-                    self::icon('inventory_2', ['color' => '#1d4ed8', 'size' => 22]),
-                    self::badge('In Stock', '#10b981', 'subtle'),
-                ], ['main_axis_alignment' => 'space_between']),
-                self::text($p->name, 'title_small', ['bold' => true]),
-                self::text('SKU: '.($p->sku ?: ($p->barcode ?: 'General')).' • Stock: '.(int) $p->current_stock, 'body_small', ['color' => '#64748b']),
-                self::row([
-                    self::text($currency.number_format((float) $p->sale_price, 2), 'title_medium', ['bold' => true, 'color' => '#059669']),
-                    self::badge($currency.number_format((float) $p->sale_price, 2), '#1d4ed8', 'subtle'),
-                ], ['main_axis_alignment' => 'space_between']),
-                self::buttonPrimary('Add to Cart', self::openModalAction("Add {$p->name}", [
-                    self::text("Adding {$p->name} to current register cart.", 'body_medium'),
-                    self::divider(),
-                    self::stepCounter('cart_qty', 'Quantity', 1, 1, max(1, (int) $p->current_stock)),
-                    self::buttonPrimary('Confirm Add to Cart', self::popAction(), 'add_shopping_cart'),
-                ]), 'add_shopping_cart'),
-            ]);
-        }
-
-        return self::screen('Retail Point of Sale', [
-            self::card([
-                self::row([
-                    self::column([
-                        self::textInput('search_product', 'Search Products or Scan Barcode', '', [
-                            'placeholder' => 'Enter item name, barcode, or SKU...',
-                        ]),
-                    ]),
-                    self::buttonOutlined('Scan', self::openModalAction('Barcode Scanner', [
-                        self::text('Scan Product Barcode', 'title_medium', ['bold' => true]),
-                        self::divider(),
-                        self::textInput('scanned_code', 'Barcode / UPC / EAN', '', ['placeholder' => 'Point scanner or enter barcode...']),
-                        self::buttonPrimary('Lookup & Add Item', self::popAction(), 'qr_code_scanner'),
-                    ]), 'qr_code_scanner'),
-                    self::buttonOutlined('Customer', self::openModalAction('Assign Customer', [
-                        self::text('Customer Information', 'title_medium', ['bold' => true]),
-                        self::divider(),
-                        self::textInput('cust_name', 'Customer Full Name', ''),
-                        self::textInput('cust_phone', 'Phone Number', ''),
-                        self::buttonPrimary('Assign Customer', self::popAction(), 'check'),
-                    ]), 'person_add'),
-                ], ['spacing' => 8]),
-                self::divider(),
-                self::wrap([
-                    self::badge('All Items', '#1d4ed8', 'solid'),
-                    self::badge('General', '#64748b', 'subtle'),
-                    self::badge('Beverages', '#64748b', 'subtle'),
-                    self::badge('Electronics', '#64748b', 'subtle'),
-                    self::badge('Grocery', '#64748b', 'subtle'),
-                ], ['spacing' => 6, 'run_spacing' => 6]),
-            ]),
-
-            self::card([
-                self::text('Product Catalog', 'title_medium', ['bold' => true]),
-                self::divider(),
-                ! empty($productCards)
-                    ? self::gridView($productCards, 2, ['spacing' => 10, 'run_spacing' => 10])
-                    : self::text('No active products in catalog. Add inventory items to begin selling.', 'body_medium', ['color' => '#64748b']),
-            ]),
-
-            self::card([
-                self::row([
-                    self::column([
-                        self::text('Cart: 0 items', 'label_medium', ['color' => '#64748b']),
-                        self::text($currency.'0.00', 'title_large', ['bold' => true, 'color' => '#059669']),
-                    ]),
-                    self::buttonPrimary('Open Cart / Checkout', self::openModalAction('Register Checkout & Settlement', [
-                        self::text('Order Summary & Payment', 'title_medium', ['bold' => true]),
-                        self::divider(),
-                        self::dropdownSelect('payment_method', 'Payment Method', [
-                            ['label' => 'Cash Payment', 'value' => 'cash'],
-                            ['label' => 'Debit / Credit Card', 'value' => 'card'],
-                            ['label' => 'UPI / QR Code', 'value' => 'upi'],
-                            ['label' => 'Customer Credit / Khata', 'value' => 'credit'],
-                            ['label' => 'Split Payment', 'value' => 'split'],
-                        ], 'cash'),
-                        self::textInput('customer_name', 'Customer Name', 'Walk-in Customer'),
-                        self::textInput('discount_amount', 'Discount Amount', '0.00'),
-                        self::divider(),
-                        self::buttonPrimary('Complete Checkout & Settle', self::formSubmitAction(
-                            '/api/tenant/pharmacy/checkout',
-                            'POST',
-                            'Sale completed and invoice generated.',
-                            reload: true
-                        ), 'point_of_sale'),
-                    ]), 'shopping_cart_checkout'),
-                ], ['main_axis_alignment' => 'space_between']),
-            ]),
-        ]);
+        return UniversalPosBuilder::retailPosScreen($company);
     }
 
     public static function repairPosView(Company $company): array
     {
-        return PosScreenBuilder::repairPosScreen($company);
+        return UniversalPosBuilder::repairPosScreen($company);
     }
 
     public static function posView(Company $company): array
     {
-        $mode = $company->operating_mode ?? 'retail';
+        $mode = $company->operating_mode ?? $company->pos_mode ?? 'retail';
 
-        return match ($mode) {
-            'pharmacy' => self::pharmacyPosView($company),
-            'restaurant' => self::restaurantPosView($company),
-            'repair_technician', 'repair' => self::repairPosView($company),
-            'service_booking' => self::salonPosView($company),
-            default => self::retailPosView($company),
-        };
+        return UniversalPosBuilder::posScreenForModule($mode, $company);
     }
 
     public static function salesView(Company $company): array
@@ -3408,6 +3293,11 @@ class SchemaResponse
             'devices', 'device-sessions', 'terminals' => self::devicesView($company),
             default => null,
         };
+
+        if ($schema === null && str_ends_with($normalized, '-pos')) {
+            $modKey = substr($normalized, 0, -4);
+            $schema = UniversalPosBuilder::posScreenForModule($modKey, $company);
+        }
 
         if ($schema === null) {
             $module = ModuleRegistry::find($normalized);
