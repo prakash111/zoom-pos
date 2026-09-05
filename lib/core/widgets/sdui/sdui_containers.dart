@@ -283,12 +283,6 @@ class SduiSideDrawerContainer extends StatelessWidget {
       (childrenByParent[valid ? candidate : null] ??= []).add(item);
     }
 
-    bool branchHasSelection(SduiNavItemSchema item) {
-      if (item.key == selectedKey) return true;
-      final children = childrenByParent[item.key] ?? const [];
-      return children.any(branchHasSelection);
-    }
-
     Widget buildNode(SduiNavItemSchema item, int depth) {
       final children = childrenByParent[item.key] ?? const [];
       if (children.isEmpty) {
@@ -309,7 +303,7 @@ class SduiSideDrawerContainer extends StatelessWidget {
             'sdui-drawer-branch-${section.key}-${item.key}'),
         tilePadding: EdgeInsets.only(left: 12.0 + (depth * 20.0), right: 12.0),
         childrenPadding: EdgeInsets.zero,
-        initiallyExpanded: branchHasSelection(item),
+        initiallyExpanded: false,
         leading: Icon(
           iconData,
           size: depth == 0 ? 20 : 18,

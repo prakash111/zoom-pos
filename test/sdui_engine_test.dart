@@ -465,6 +465,13 @@ void main() {
 
       expect(find.text('Store Settings'), findsOneWidget);
       expect(find.byType(ExpansionTile), findsOneWidget);
+      // Collapsed by default even though a descendant is the selected item —
+      // parent branches must never auto-expand on load.
+      expect(find.text('Store Operating Mode'), findsNothing);
+
+      await tester.tap(find.text('Store Settings'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Store Operating Mode'), findsOneWidget);
       expect(find.text('↳'), findsOneWidget);
     });
