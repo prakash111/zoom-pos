@@ -1060,26 +1060,15 @@ class UniversalPosBuilder
         $schema['search'] = [
             'placeholder' => $searchPlaceholder,
             'scanner_enabled' => true,
-            'full_width' => true,
-            'enable_barcode_scanner' => true,
         ];
-        $schema['categories'] = [
-            'display_type' => 'chips',
-            'items' => $categories,
-        ];
-        $schema['category_list'] = $categories;
+        $schema['categories'] = array_values($categories);
         $schema['catalog'] = [
             'layout_type' => 'standard_grid',
-            'display_mode' => 'grid',
-            'columns' => 2,
             'items' => $items,
         ];
         $schema['cart_bar'] = [
-            'floating' => true,
             'label_template' => 'View Cart · {count} items · {total}',
-            'checkout_endpoint' => $checkoutSheetEndpoint,
             'checkout_sheet_endpoint' => $checkoutSheetEndpoint,
-            'checkout_action' => SchemaResponse::openRemoteSheetAction($checkoutSheetEndpoint, 'Checkout & Settlement'),
         ];
 
         return $schema;

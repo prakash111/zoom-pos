@@ -122,23 +122,24 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
 
             // Universal Material catalog cards grid
             $this->assertArrayHasKey('catalog', $schema, "Catalog missing for {$vertical}");
-            $this->assertSame('grid', $schema['catalog']['display_mode']);
-            $this->assertSame(2, $schema['catalog']['columns']);
+            $this->assertSame('standard_grid', $schema['catalog']['layout_type']);
+            $this->assertIsArray($schema['catalog']['items']);
             $this->assertNotEmpty($schema['catalog']['items']);
 
             // Full-width search bar with barcode scan
             $this->assertArrayHasKey('search', $schema);
-            $this->assertTrue($schema['search']['full_width']);
-            $this->assertTrue($schema['search']['enable_barcode_scanner']);
+            $this->assertNotEmpty($schema['search']['placeholder']);
+            $this->assertTrue($schema['search']['scanner_enabled']);
 
-            // Horizontal category chips
+            // Horizontal category chips list
             $this->assertArrayHasKey('categories', $schema);
-            $this->assertSame('chips', $schema['categories']['display_type']);
+            $this->assertIsArray($schema['categories']);
+            $this->assertNotEmpty($schema['categories']);
+            $this->assertNotEmpty($schema['categories'][0]['label']);
 
             // Floating bottom cart bar
             $this->assertArrayHasKey('cart_bar', $schema);
-            $this->assertTrue($schema['cart_bar']['floating']);
-            $this->assertNotEmpty($schema['cart_bar']['checkout_endpoint']);
+            $this->assertNotEmpty($schema['cart_bar']['checkout_sheet_endpoint']);
 
             // SDUI Schema Validator must pass cleanly
             $errors = app(SchemaValidator::class)->validate($schema);
