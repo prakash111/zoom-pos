@@ -990,17 +990,33 @@ class UniversalPosBuilder
         ], ['border_radius' => 16]);
 
         if ($ticketFieldLabel !== null && ! empty($repairTicketOptions)) {
-            $ticketOptions = array_merge(
-                [['label' => 'Counter sale — no repair ticket', 'value' => '']],
-                array_map(fn (array $ticket) => [
-                    'label' => $ticket['label'],
-                    'value' => (string) $ticket['id'],
-                ], $repairTicketOptions)
-            );
-            $components[] = SchemaResponse::accordionGroup('Link Repair Intake Ticket', [
-                SchemaResponse::dropdownSelect('ticket_id', $ticketFieldLabel, $ticketOptions, (string) ($selectedTicketId ?? '')),
-                SchemaResponse::text('The selected ticket receives these parts and labor lines on checkout.', 'body_small', ['color' => '#64748b']),
-            ], ['initially_expanded' => $selectedTicket !== null]);
+            if ($previewIncludesTicket) {
+                $firstTicket = $repairTicketOptions[0] ?? null;
+                if ($firstTicket) {
+                    $components[] = SchemaResponse::card([
+                        SchemaResponse::row([
+                            SchemaResponse::icon('handyman', ['color' => '#0284c7', 'size' => 20]),
+                            SchemaResponse::column([
+                                SchemaResponse::text($firstTicket['label'], 'title_small', ['bold' => true]),
+                                SchemaResponse::text('Workbench Ticket Settlement', 'body_small', ['color' => '#64748b']),
+                            ]),
+                            SchemaResponse::badge('LINKED', '#0284c7', 'subtle'),
+                        ], ['main_axis_alignment' => 'space_between']),
+                    ], ['color' => '#f0f9ff', 'border_color' => '#bae6fd', 'padding' => 12, 'border_radius' => 12]);
+                }
+            } else {
+                $ticketOptions = array_merge(
+                    [['label' => 'Counter sale — no repair ticket', 'value' => '']],
+                    array_map(fn (array $ticket) => [
+                        'label' => $ticket['label'],
+                        'value' => (string) $ticket['id'],
+                    ], $repairTicketOptions)
+                );
+                $components[] = SchemaResponse::accordionGroup('Link Repair Intake Ticket', [
+                    SchemaResponse::dropdownSelect('ticket_id', $ticketFieldLabel, $ticketOptions, (string) ($selectedTicketId ?? '')),
+                    SchemaResponse::text('The selected ticket receives these parts and labor lines on checkout.', 'body_small', ['color' => '#64748b']),
+                ], ['initially_expanded' => $selectedTicket !== null]);
+            }
         }
 
         if ($collectPrescription) {
@@ -1058,41 +1074,50 @@ class UniversalPosBuilder
                     || ($method['value'] === 'upi' && $selectedPaymentMethod === 'transfer');
 
                 return $isSelected
-                    ? SchemaResponse::buttonPrimary($method['label'], $action, $method['icon'], ['full_width' => false, 'border_radius' => 20, 'background_color' => '#2563eb'])
+                    ? SchemaResponse::buttonPrimary($method['label'], $action, $method['icon'], ['full_width' => false, 'border_radius' => 20, 'background_color' => '#166534'])
                     : SchemaResponse::buttonOutlined($method['label'], $action, $method['icon'], ['full_width' => false, 'border_radius' => 20]);
             }, $paymentMethods)),
-            SchemaResponse::dropdownSelect('payment_method', 'Select Tender', $paymentMethods, $selectedPaymentMethod),
         ], ['border_radius' => 16]);
 
-        // Cash Tendered + CHANGE DUE TO CUSTOMER + Quick Cash Suggestions
-        $components[] = SchemaResponse::card([
-            SchemaResponse::textInput('tendered', 'Cash Tendered by Customer', number_format($selectedTendered, 2, '.', ''), [
-                'keyboard_type' => 'number',
-                'prefix_icon' => 'payments',
-            ]),
-            SchemaResponse::container([
+        if ($selectedPaymentMethod === 'credit') {
+            $components[] = SchemaResponse::card([
                 SchemaResponse::row([
+                    SchemaResponse::icon('schedule', ['color' => '#d97706', 'size' => 20]),
                     SchemaResponse::column([
-                        SchemaResponse::text('CHANGE DUE TO CUSTOMER', 'label_small', ['bold' => true, 'color' => '#166534']),
-                        SchemaResponse::text('Change Due to Customer', 'body_small', ['color' => '#15803d']),
+                        SchemaResponse::text('Store Credit / Khata Due', 'label_large', ['bold' => true, 'color' => '#d97706']),
+                        SchemaResponse::text('Account will be marked as Due / Khata balance. Billed to customer ledger.', 'body_small', ['color' => '#64748b']),
                     ]),
-                    SchemaResponse::text($currency.number_format($changeDue, 2), 'title_large', ['bold' => true, 'color' => '#166534']),
-                ], ['main_axis_alignment' => 'space_between']),
-            ], ['padding' => 12, 'color' => '#ecfdf5', 'border_color' => '#86efac', 'border_radius' => 10]),
-            SchemaResponse::wrap(array_map(function (array $suggestion) use ($selectedTendered, $refreshSheet) {
-                $action = SchemaResponse::openRemoteSheetAction($refreshSheet([
-                    'selected_tendered' => number_format($suggestion['amount'], 2, '.', ''),
-                ]), 'Order Cart');
+                ]),
+            ], ['color' => '#fffbeb', 'border_color' => '#fde68a', 'padding' => 12, 'border_radius' => 12]);
+        }
 
-                return abs($suggestion['amount'] - $selectedTendered) < 0.001
-                    ? SchemaResponse::buttonPrimary($suggestion['display'], $action, null, ['full_width' => false, 'border_radius' => 16, 'background_color' => '#166534'])
-                    : SchemaResponse::buttonOutlined($suggestion['display'], $action, null, ['full_width' => false, 'border_radius' => 16]);
-            }, $quickCash)),
-            SchemaResponse::dropdownSelect('quick_cash_tendered', 'Quick Cash Amount', array_map(
-                fn (array $suggestion) => ['label' => $suggestion['display'], 'value' => number_format($suggestion['amount'], 2, '.', '')],
-                $quickCash
-            ), number_format($selectedTendered, 2, '.', '')),
-        ], ['border_radius' => 16, 'border_color' => '#bbf7d0']);
+        // Cash Tendered + CHANGE DUE TO CUSTOMER + Quick Cash Suggestions (active when Cash is selected)
+        if ($selectedPaymentMethod === 'cash') {
+            $components[] = SchemaResponse::card([
+                SchemaResponse::textInput('tendered', 'Cash Tendered by Customer', number_format($selectedTendered, 2, '.', ''), [
+                    'keyboard_type' => 'number',
+                    'prefix_icon' => 'payments',
+                ]),
+                SchemaResponse::container([
+                    SchemaResponse::row([
+                        SchemaResponse::column([
+                            SchemaResponse::text('CHANGE DUE TO CUSTOMER', 'label_small', ['bold' => true, 'color' => '#166534']),
+                            SchemaResponse::text('Change Due to Customer', 'body_small', ['color' => '#15803d']),
+                        ]),
+                        SchemaResponse::text($currency.number_format($changeDue, 2), 'title_large', ['bold' => true, 'color' => '#166534']),
+                    ], ['main_axis_alignment' => 'space_between']),
+                ], ['padding' => 12, 'color' => '#ecfdf5', 'border_color' => '#86efac', 'border_radius' => 10]),
+                SchemaResponse::wrap(array_map(function (array $suggestion) use ($selectedTendered, $refreshSheet) {
+                    $action = SchemaResponse::openRemoteSheetAction($refreshSheet([
+                        'selected_tendered' => number_format($suggestion['amount'], 2, '.', ''),
+                    ]), 'Order Cart');
+
+                    return abs($suggestion['amount'] - $selectedTendered) < 0.001
+                        ? SchemaResponse::buttonPrimary($suggestion['display'], $action, null, ['full_width' => false, 'border_radius' => 16, 'background_color' => '#166534'])
+                        : SchemaResponse::buttonOutlined($suggestion['display'], $action, null, ['full_width' => false, 'border_radius' => 16]);
+                }, $quickCash)),
+            ], ['border_radius' => 16, 'border_color' => '#bbf7d0']);
+        }
 
         // Split Payment Section
         $components[] = SchemaResponse::accordionGroup('Split Payment', [
@@ -1196,22 +1221,32 @@ class UniversalPosBuilder
         return $endpoint.(str_contains($endpoint, '?') ? '&' : '?').http_build_query($query);
     }
 
-    /** @return list<array{label: string, amount: float, display: string}> */
     public static function quickCashSuggestions(float $total, string $currency): array
     {
-        $amounts = [
-            ['label' => 'Exact', 'amount' => $total],
-            ['label' => '+'.$currency.'5', 'amount' => $total + 5],
-            ['label' => '+'.$currency.'10', 'amount' => $total + 10],
-            ['label' => '+'.$currency.'20', 'amount' => $total + 20],
-            ['label' => 'Next Round '.$currency.'50', 'amount' => ceil(max($total, 0.01) / 50) * 50],
-        ];
+        if ($total <= 0) {
+            return [['label' => 'Exact', 'amount' => 0.0, 'display' => 'EXACT']];
+        }
 
-        return array_map(static fn (array $item) => [
-            'label' => $item['label'],
-            'amount' => round((float) $item['amount'], 2),
-            'display' => $item['label'].' · '.$currency.number_format((float) $item['amount'], 2),
-        ], $amounts);
+        $result = [round($total, 2)];
+        $steps = [1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 500.0];
+        foreach ($steps as $step) {
+            $rounded = ceil($total / $step) * $step;
+            if ($rounded > $total && ! in_array(round($rounded, 2), $result, true)) {
+                $result[] = round($rounded, 2);
+            }
+        }
+        sort($result);
+        $top5 = array_slice($result, 0, 5);
+
+        return array_map(static function (float $amount) use ($total, $currency) {
+            $isExact = abs($amount - $total) < 0.001;
+
+            return [
+                'label' => $isExact ? 'Exact' : $currency.number_format($amount, 2),
+                'amount' => round($amount, 2),
+                'display' => $isExact ? 'EXACT' : $currency.number_format($amount, 2),
+            ];
+        }, $top5);
     }
 
     /** @param  list<array<string, mixed>>  $categories */
