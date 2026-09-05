@@ -1648,19 +1648,7 @@ class SchemaResponse
 
     public static function serviceStylistsView(Company $company): array
     {
-        return self::screen('Stylists & Staff Assignments', [
-            self::card([
-                self::row([
-                    self::icon('badge', ['color' => '#7c3aed', 'size' => 28]),
-                    self::column([
-                        self::text('Specialists, Stylists & Staff Roster', 'title_medium', ['bold' => true]),
-                        self::text('Assign service providers, track availability, and manage commission tiers.', 'body_small', ['color' => '#64748b']),
-                    ]),
-                ]),
-                self::divider(),
-                self::badge('Staff Roster Connected', '#7c3aed', 'subtle'),
-            ]),
-        ]);
+        return PosScreenBuilder::specialistRosterScreen($company);
     }
 
     public static function restaurantPosView(Company $company): array
@@ -1716,113 +1704,7 @@ class SchemaResponse
 
     public static function salonPosView(Company $company): array
     {
-        $currency = $company->currency_symbol ?: '$';
-        $services = [
-            ['name' => 'Haircut & Styling', 'price' => 25.00, 'duration' => '30 mins', 'category' => 'Hair'],
-            ['name' => 'Beard Trim & Grooming', 'price' => 15.00, 'duration' => '20 mins', 'category' => 'Hair'],
-            ['name' => 'Hair Coloring & Highlights', 'price' => 65.00, 'duration' => '90 mins', 'category' => 'Color'],
-            ['name' => 'Deep Cleansing Facial', 'price' => 45.00, 'duration' => '45 mins', 'category' => 'Spa'],
-            ['name' => 'Manicure & Hand Massage', 'price' => 30.00, 'duration' => '40 mins', 'category' => 'Nails'],
-            ['name' => 'Pedicure & Foot Scrub', 'price' => 35.00, 'duration' => '45 mins', 'category' => 'Nails'],
-            ['name' => 'Full Body Aromatherapy Massage', 'price' => 80.00, 'duration' => '60 mins', 'category' => 'Spa'],
-            ['name' => 'Bridal Makeover Package', 'price' => 150.00, 'duration' => '120 mins', 'category' => 'Packages'],
-        ];
-
-        $serviceCards = [];
-        foreach ($services as $svc) {
-            $serviceCards[] = self::card([
-                self::row([
-                    self::icon('spa', ['color' => '#7c3aed', 'size' => 22]),
-                    self::badge($svc['duration'], '#8b5cf6', 'subtle'),
-                ], ['main_axis_alignment' => 'space_between']),
-                self::text($svc['name'], 'title_small', ['bold' => true]),
-                self::text("Duration: {$svc['duration']} • {$svc['category']}", 'body_small', ['color' => '#64748b']),
-                self::row([
-                    self::text($currency.number_format($svc['price'], 2), 'title_medium', ['bold' => true, 'color' => '#7c3aed']),
-                    self::badge($svc['category'], '#64748b', 'subtle'),
-                ], ['main_axis_alignment' => 'space_between']),
-                self::buttonPrimary('Book & Add', self::openModalAction("Book {$svc['name']}", [
-                    self::text("Add {$svc['name']} ({$currency}".number_format($svc['price'], 2).') to bill.', 'body_medium'),
-                    self::divider(),
-                    self::textInput('client_name', 'Client Full Name', 'Walk-in Client'),
-                    self::textInput('client_phone', 'Phone Number', ''),
-                    self::dropdownSelect('stylist_assigned', 'Assigned Stylist / Specialist', [
-                        ['label' => 'Any Available Specialist', 'value' => 'any'],
-                        ['label' => 'Senior Stylist Alex', 'value' => 'alex'],
-                        ['label' => 'Esthetician Sarah', 'value' => 'sarah'],
-                        ['label' => 'Therapist David', 'value' => 'david'],
-                    ], 'any'),
-                    self::textInput('appointment_time', 'Booking Time Slot', date('Y-m-d H:i')),
-                    self::buttonPrimary('Add Service to Cart', self::popAction(), 'add_shopping_cart'),
-                ]), 'add'),
-            ]);
-        }
-
-        return self::screen('Salon & Service POS', [
-            self::card([
-                self::row([
-                    self::column([
-                        self::textInput('search_service', 'Search Services or Treatment Packages', '', [
-                            'placeholder' => 'e.g. Haircut, Facial, Pedicure, Massage...',
-                        ]),
-                    ]),
-                    self::buttonOutlined('Client', self::openModalAction('Assign Client Details', [
-                        self::text('Client Details & Preferences', 'title_medium', ['bold' => true]),
-                        self::divider(),
-                        self::textInput('client_name', 'Client Name', ''),
-                        self::textInput('client_phone', 'Client Phone Number', ''),
-                        self::textInput('notes', 'Preferences / Allergies', ''),
-                        self::buttonPrimary('Confirm Client', self::popAction(), 'check'),
-                    ]), 'person_add'),
-                ], ['spacing' => 8]),
-                self::divider(),
-                self::wrap([
-                    self::badge('All Services', '#7c3aed', 'solid'),
-                    self::badge('Hair & Styling', '#64748b', 'subtle'),
-                    self::badge('Facial & Skin', '#64748b', 'subtle'),
-                    self::badge('Nails & Pedicure', '#64748b', 'subtle'),
-                    self::badge('Body Massage', '#64748b', 'subtle'),
-                    self::badge('Packages', '#64748b', 'subtle'),
-                ], ['spacing' => 6, 'run_spacing' => 6]),
-            ]),
-
-            self::card([
-                self::text('Available Services & Treatments', 'title_medium', ['bold' => true]),
-                self::text('Select beauty treatments or salon packages:', 'body_small', ['color' => '#64748b']),
-                self::divider(),
-                self::gridView($serviceCards, 2, ['spacing' => 10, 'run_spacing' => 10]),
-            ]),
-
-            self::card([
-                self::row([
-                    self::column([
-                        self::text('Service Cart: 0 items', 'label_medium', ['color' => '#64748b']),
-                        self::text($currency.'0.00', 'title_large', ['bold' => true, 'color' => '#7c3aed']),
-                    ]),
-                    self::buttonPrimary('Open Cart / Checkout', self::openModalAction('Service Checkout & Settlement', [
-                        self::text('Service Order & Settlement', 'title_medium', ['bold' => true]),
-                        self::divider(),
-                        self::dropdownSelect('payment_method', 'Payment Method', [
-                            ['label' => 'Cash Payment', 'value' => 'cash'],
-                            ['label' => 'Debit / Credit Card', 'value' => 'card'],
-                            ['label' => 'UPI / QR Code', 'value' => 'upi'],
-                            ['label' => 'Client Credit / Khata', 'value' => 'credit'],
-                            ['label' => 'Split Payment', 'value' => 'split'],
-                        ], 'cash'),
-                        self::textInput('client_name', 'Client Name', 'Walk-in Client'),
-                        self::textInput('discount_amount', 'Discount Amount', '0.00'),
-                        self::textInput('tip_amount', 'Stylist Tip Amount', '0.00'),
-                        self::divider(),
-                        self::buttonPrimary('Complete Checkout & Settle', self::formSubmitAction(
-                            '/api/tenant/pharmacy/checkout',
-                            'POST',
-                            'Service order settled and receipt generated.',
-                            reload: true
-                        ), 'point_of_sale'),
-                    ]), 'shopping_cart_checkout'),
-                ], ['main_axis_alignment' => 'space_between']),
-            ]),
-        ]);
+        return PosScreenBuilder::salonPosScreen($company);
     }
 
     public static function retailPosView(Company $company): array

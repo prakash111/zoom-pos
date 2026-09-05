@@ -39,7 +39,7 @@ class User extends Authenticatable implements AuthenticatableContract
 
     protected $fillable = [
         'company_id', 'name', 'login', 'email', 'password', 'role', 'locale', 'status',
-        'is_demo', 'shift',
+        'is_demo', 'shift', 'is_specialist',
         'commission_rate', 'commission_type',
         'invitation_code_hash', 'invitation_expires_at', 'email_verified_at',
     ];
@@ -65,6 +65,7 @@ class User extends Authenticatable implements AuthenticatableContract
         return [
             'password' => 'hashed',
             'is_demo' => 'boolean',
+            'is_specialist' => 'boolean',
             'commission_rate' => 'decimal:2',
             'invitation_expires_at' => 'datetime',
             'email_verified_at' => 'datetime',

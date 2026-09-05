@@ -5,6 +5,7 @@ namespace App\Services\Sdui;
 use App\Models\CashRegister;
 use App\Models\Company;
 use App\Models\Product;
+use App\Models\User;
 
 /**
  * Builds the universal `pos_screen` JSON contract (search + category pills +
@@ -140,6 +141,118 @@ class PosScreenBuilder
     }
 
     /**
+     * Real service (and retail add-on) catalog for Salon counter sales.
+     * Services are just Product rows with `duration_minutes` set (no
+     * separate Service model — see PosScreenBuilder class doc); anything
+     * without a duration renders with the usual stock badge instead, so a
+     * salon can also sell retail add-ons (shampoo, styling products)
+     * alongside services from the same catalog.
+     */
+    public static function salonPosScreen(Company $company): array
+    {
+        $products = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->limit(60)
+            ->get();
+
+        $categories = [['id' => null, 'label' => 'All']];
+        $seenCategories = [];
+        $items = [];
+
+        foreach ($products as $product) {
+            self::collectCategory($product, $categories, $seenCategories);
+
+            $duration = $product->duration_minutes !== null ? (int) $product->duration_minutes : null;
+            $stock = (int) $product->current_stock;
+            $inStock = $stock > 0;
+
+            $badge = $duration !== null
+                ? ['text' => "{$duration} mins", 'color' => '#8b5cf6']
+                : ['text' => $inStock ? "Stock: {$stock}" : 'Out of Stock', 'color' => $inStock ? '#10b981' : '#ef4444'];
+
+            $subtitle = $duration !== null
+                ? 'Service · '.($product->category_name ?: 'Treatment')
+                : 'Retail · '.($product->category_name ?: 'Add-on');
+
+            $items[] = [
+                'id' => $product->id,
+                'category_id' => $product->category_id,
+                'title' => $product->name,
+                'subtitle' => $subtitle,
+                'price' => (float) $product->sale_price,
+                'image_url' => $product->image_url,
+                'stock' => $stock,
+                'badge' => $badge,
+                'on_tap' => SchemaResponse::addToCartAction([
+                    'id' => $product->id,
+                    'batch_id' => null,
+                    'title' => $product->name,
+                    'subtitle' => $subtitle,
+                    'price' => (float) $product->sale_price,
+                    'quantity' => 1,
+                    'max_quantity' => max(1, $stock),
+                ]),
+            ];
+        }
+
+        return self::envelope(
+            title: 'Salon & Service POS',
+            company: $company,
+            searchPlaceholder: 'Search Services or Treatment Packages',
+            categories: $categories,
+            items: $items,
+            checkoutSheetEndpoint: '/api/tenant/salon/checkout-sheet',
+        );
+    }
+
+    /**
+     * Real "Specialists & Stylists" roster: every active staff member with
+     * a toggle to mark/unmark them as a bookable specialist
+     * (`users.is_specialist`). Replaces the old static placeholder card —
+     * no calendar/booking persistence, matching Salon's walk-in-only scope.
+     */
+    public static function specialistRosterScreen(Company $company): array
+    {
+        $staff = User::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', 'approved')
+            ->orderBy('name')
+            ->get();
+
+        $cards = [];
+        foreach ($staff as $user) {
+            $isSpecialist = (bool) $user->is_specialist;
+            $cards[] = SchemaResponse::card([
+                SchemaResponse::row([
+                    SchemaResponse::column([
+                        SchemaResponse::text($user->name, 'title_small', ['bold' => true]),
+                        SchemaResponse::text(User::ROLES[$user->role] ?? ucfirst($user->role), 'body_small', ['color' => '#64748b']),
+                    ]),
+                    $isSpecialist
+                        ? SchemaResponse::badge('Specialist', '#7c3aed', 'solid')
+                        : SchemaResponse::badge('Not Assigned', '#64748b', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                SchemaResponse::buttonOutlined(
+                    $isSpecialist ? 'Remove Specialist' : 'Mark as Specialist',
+                    SchemaResponse::apiPostAction(
+                        "/api/tenant/salon/specialists/{$user->id}/toggle",
+                        [],
+                        $isSpecialist ? 'Removed from specialist roster.' : 'Added to specialist roster.',
+                        reload: true
+                    ),
+                ),
+            ]);
+        }
+
+        if (empty($cards)) {
+            $cards[] = SchemaResponse::text('No staff members found. Invite staff from Settings → Users.', 'body_medium', ['color' => '#64748b']);
+        }
+
+        return SchemaResponse::screen('Specialists & Stylists', $cards);
+    }
+
+    /**
      * Batch-picker sheet for a single pharmacy product: lists active FEFO
      * batches (informational) and adds a single "Add to Dispensing Cart"
      * action pinned to the earliest-expiring batch — matches FEFO
@@ -225,7 +338,12 @@ class PosScreenBuilder
      * values map; checkout() normalizes them into prescription_details
      * itself (see normalizePrescriptionDetails()).
      *
+     * When $specialistOptions is non-empty (Salon only), also collects a
+     * specialist_id dropdown so the sale can record who performed the
+     * service.
+     *
      * @param  list<array<string, mixed>>  $cartPreview
+     * @param  list<array{id: mixed, name: string}>|null  $specialistOptions
      */
     public static function checkoutSheet(
         Company $company,
@@ -234,6 +352,7 @@ class PosScreenBuilder
         ?string $ticketFieldLabel = null,
         string $customerFieldLabel = 'Customer Name',
         bool $collectPrescription = false,
+        ?array $specialistOptions = null,
     ): array {
         $currency = $company->currency_symbol ?: '$';
 
@@ -277,6 +396,12 @@ class PosScreenBuilder
             $components[] = SchemaResponse::textInput('patient_name', 'Patient Full Name', '');
             $components[] = SchemaResponse::textInput('doctor_name', 'Prescribing Doctor Name', '');
             $components[] = SchemaResponse::textInput('doctor_registration_no', 'Doctor Registration # (Optional)', '');
+        }
+        if (! empty($specialistOptions)) {
+            $components[] = SchemaResponse::dropdownSelect('specialist_id', 'Assigned Specialist', array_map(
+                fn (array $s) => ['label' => $s['name'], 'value' => (string) $s['id']],
+                $specialistOptions
+            ), '');
         }
         $components[] = SchemaResponse::dropdownSelect('payment_method', 'Payment Method', [
             ['label' => 'Cash Payment', 'value' => 'cash'],

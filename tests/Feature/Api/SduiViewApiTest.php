@@ -410,7 +410,7 @@ class SduiViewApiTest extends TestCase
             'pharmacy-batches' => 'Batch & Expiry Manager',
             'pharmacy-prescriptions' => 'Prescriptions Queue',
             'service-calendar' => 'Service Booking Calendar',
-            'service-stylists' => 'Stylists & Staff Assignments',
+            'service-stylists' => 'Specialists & Stylists',
             'service-orders' => 'Service Catalog & Rates',
             'change-password' => 'Change Password',
         ];

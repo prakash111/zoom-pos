@@ -1,0 +1,223 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Company;
+use App\Models\Plan;
+use App\Models\Product;
+use App\Models\User;
+use App\Services\Sdui\SchemaValidator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Tests\TestCase;
+
+class SalonPosTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected Company $company;
+
+    protected User $admin;
+
+    protected string $token;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Plan::create([
+            'name' => 'enterprise',
+            'display_name' => 'Enterprise Plan',
+            'price' => 99.00,
+            'currency' => 'USD',
+            'billing_cycle' => 'monthly',
+            'duration_days' => 30,
+            'features' => ['pos' => true, 'offline' => true, 'inventory' => true],
+            'limits' => ['products' => 5000, 'users' => 20],
+            'active' => true,
+        ]);
+
+        $this->company = Company::create([
+            'name' => 'Glow & Grace Salon',
+            'trade_name' => 'Glow & Grace',
+            'slug' => 'glow-and-grace',
+            'email' => 'admin@glowandgrace.com',
+            'country' => 'US',
+            'currency' => 'USD',
+            'currency_symbol' => '$',
+            'plan_name' => 'enterprise',
+            'expires_at' => now()->addDays(30),
+            'licensed_modules' => ['retail', 'service_booking'],
+        ]);
+
+        $this->admin = User::factory()->create([
+            'company_id' => $this->company->id,
+            'email' => 'admin@glowandgrace.com',
+            'password' => Hash::make('secret123'),
+            'role' => 'admin',
+        ]);
+
+        $loginResponse = $this->postJson('/api/v1/pos/auth/login', [
+            'email' => 'admin@glowandgrace.com',
+            'password' => 'secret123',
+        ]);
+
+        $this->token = $loginResponse->json('token');
+    }
+
+    protected function authHeaders(): array
+    {
+        return [
+            'Authorization' => 'Bearer '.$this->token,
+            'Accept' => 'application/json',
+        ];
+    }
+
+    private function createService(array $overrides = []): Product
+    {
+        return Product::create(array_merge([
+            'company_id' => $this->company->id,
+            'name' => 'Haircut & Styling',
+            'code' => 'SVC-HAIRCUT',
+            'sale_price' => 25.00,
+            'current_stock' => 999,
+            'active' => true,
+            'duration_minutes' => 30,
+        ], $overrides));
+    }
+
+    private function createSpecialist(array $overrides = []): User
+    {
+        return User::create(array_merge([
+            'company_id' => $this->company->id,
+            'name' => 'Jane Stylist',
+            'login' => 'jane.stylist',
+            'email' => 'jane.stylist@example.test',
+            'password' => Hash::make('password123'),
+            'role' => User::ROLE_SALESPERSON,
+            'status' => 'approved',
+            'is_specialist' => true,
+        ], $overrides));
+    }
+
+    public function test_salon_pos_returns_the_universal_pos_screen_contract(): void
+    {
+        $this->createService();
+
+        $response = $this->getJson('/api/tenant/views/salon-pos', $this->authHeaders());
+        $response->assertOk()->assertJsonPath('success', true);
+
+        $schema = $response->json('schema');
+        $this->assertSame('pos_screen', $schema['type']);
+        $this->assertSame('/api/tenant/salon/checkout-sheet', $schema['cart_bar']['checkout_sheet_endpoint']);
+        $this->assertNotEmpty($schema['catalog']['items']);
+
+        $item = $schema['catalog']['items'][0];
+        $this->assertSame('30 mins', $item['badge']['text']);
+        $this->assertSame('add_to_cart', $item['on_tap']['type']);
+
+        $errors = app(SchemaValidator::class)->validate($schema);
+        $this->assertEmpty($errors);
+    }
+
+    public function test_salon_pos_shows_stock_badge_for_non_service_products(): void
+    {
+        $this->createService(['name' => 'Shampoo Retail Bottle', 'code' => 'RETAIL-SHAMPOO', 'duration_minutes' => null, 'current_stock' => 12]);
+
+        $response = $this->getJson('/api/tenant/views/salon-pos', $this->authHeaders());
+        $item = $response->json('schema.catalog.items.0');
+
+        $this->assertSame('Stock: 12', $item['badge']['text']);
+    }
+
+    public function test_service_stylists_view_shows_a_real_roster_and_reflects_toggles(): void
+    {
+        $specialist = $this->createSpecialist();
+        $nonSpecialist = $this->createSpecialist([
+            'name' => 'Bob Receptionist',
+            'login' => 'bob.reception',
+            'email' => 'bob.reception@example.test',
+            'is_specialist' => false,
+        ]);
+
+        $response = $this->getJson('/api/tenant/views/service-stylists', $this->authHeaders());
+        $response->assertOk();
+        $json = json_encode($response->json());
+
+        $this->assertStringContainsString('Jane Stylist', $json);
+        $this->assertStringContainsString('Bob Receptionist', $json);
+        $this->assertStringContainsString('Remove Specialist', $json);
+        $this->assertStringContainsString('Mark as Specialist', $json);
+    }
+
+    public function test_specialists_toggle_flips_the_flag_and_audit_logs(): void
+    {
+        $specialist = $this->createSpecialist(['is_specialist' => false]);
+
+        $response = $this->postJson("/api/tenant/salon/specialists/{$specialist->id}/toggle", [], $this->authHeaders());
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $this->assertTrue((bool) $response->json('user.is_specialist'));
+        $this->assertDatabaseHas('audit_logs', ['action' => 'salon.specialist_toggled']);
+
+        $again = $this->postJson("/api/tenant/salon/specialists/{$specialist->id}/toggle", [], $this->authHeaders());
+        $this->assertFalse((bool) $again->json('user.is_specialist'));
+    }
+
+    public function test_checkout_sheet_includes_specialist_dropdown_only_when_specialists_exist(): void
+    {
+        $withoutSpecialists = $this->getJson('/api/tenant/salon/checkout-sheet?cart=%5B%5D', $this->authHeaders());
+        $withoutSpecialists->assertOk();
+        $this->assertStringNotContainsString('specialist_id', json_encode($withoutSpecialists->json()));
+
+        $this->createSpecialist();
+        $cart = urlencode(json_encode([['title' => 'Haircut & Styling', 'qty' => 1, 'price' => 25.00]]));
+        $withSpecialists = $this->getJson("/api/tenant/salon/checkout-sheet?cart={$cart}", $this->authHeaders());
+        $withSpecialists->assertOk();
+        $json = json_encode($withSpecialists->json());
+        $this->assertStringContainsString('specialist_id', $json);
+        $this->assertStringContainsString('Jane Stylist', $json);
+
+        $errors = app(SchemaValidator::class)->validate($withSpecialists->json('schema'));
+        $this->assertEmpty($errors);
+    }
+
+    public function test_pos_checkout_creates_a_real_sale_and_records_the_specialist_in_notes(): void
+    {
+        $service = $this->createService();
+        $specialist = $this->createSpecialist();
+
+        $response = $this->postJson('/api/tenant/salon/pos-checkout', [
+            'items' => [['product_id' => $service->id, 'quantity' => 1]],
+            'specialist_id' => $specialist->id,
+            'payment_method' => 'cash',
+            'customer_name' => 'Alice Client',
+        ], $this->authHeaders());
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $this->assertSame(25.0, (float) $response->json('sale.total'));
+        $this->assertStringContainsString('Jane Stylist', $response->json('sale.notes'));
+
+        $service->refresh();
+        $this->assertSame(998.0, (float) $service->current_stock);
+    }
+
+    public function test_pos_checkout_accepts_two_fixed_split_payment_rows(): void
+    {
+        $service = $this->createService();
+
+        $response = $this->postJson('/api/tenant/salon/pos-checkout', [
+            'items' => [['product_id' => $service->id, 'quantity' => 1]],
+            'payment_method' => 'split',
+            'payment_1_method' => 'cash',
+            'payment_1_amount' => 15,
+            'payment_2_method' => 'card',
+            'payment_2_amount' => 10,
+        ], $this->authHeaders());
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $saleId = $response->json('sale.id');
+        $this->assertDatabaseHas('order_payments', ['sale_id' => $saleId, 'payment_method' => 'cash', 'amount' => 15]);
+        $this->assertDatabaseHas('order_payments', ['sale_id' => $saleId, 'payment_method' => 'card', 'amount' => 10]);
+    }
+}

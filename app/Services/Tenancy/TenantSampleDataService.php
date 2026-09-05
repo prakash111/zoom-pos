@@ -1226,6 +1226,7 @@ class TenantSampleDataService
                 'shift' => $sp['shift'],
                 'status' => 'approved',
                 'is_demo' => true,
+                'is_specialist' => true,
                 'email_verified_at' => now(),
             ]);
         }

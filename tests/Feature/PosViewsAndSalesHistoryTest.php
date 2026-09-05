@@ -98,7 +98,7 @@ class PosViewsAndSalesHistoryTest extends TestCase
             'active' => true,
         ]);
 
-        $views = ['pos', 'retail-pos', 'salon-pos'];
+        $views = ['pos', 'retail-pos'];
 
         foreach ($views as $view) {
             $response = $this->getJson("/api/tenant/views/{$view}", $this->authHeaders());
@@ -114,12 +114,12 @@ class PosViewsAndSalesHistoryTest extends TestCase
             $this->assertEmpty($errors, "Schema validation failed for view '{$view}': ".json_encode($errors));
         }
 
-        // pharmacy-pos and repair-pos return the newer `pos_screen` universal
-        // contract (see PosScreenBuilder) instead of a generic component
-        // tree — covered in detail by PharmacyAndRepairPosTest, asserted
-        // lightly here just to keep this "every POS view responds" smoke
-        // test complete.
-        foreach (['pharmacy-pos', 'repair-pos'] as $view) {
+        // pharmacy-pos, repair-pos, and salon-pos return the newer
+        // `pos_screen` universal contract (see PosScreenBuilder) instead of
+        // a generic component tree — covered in detail by
+        // PharmacyAndRepairPosTest/SalonPosTest, asserted lightly here just
+        // to keep this "every POS view responds" smoke test complete.
+        foreach (['pharmacy-pos', 'repair-pos', 'salon-pos'] as $view) {
             $response = $this->getJson("/api/tenant/views/{$view}", $this->authHeaders());
             $response->assertStatus(200);
             $response->assertJsonPath('success', true);

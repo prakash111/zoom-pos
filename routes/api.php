@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\ReportsApiController;
 use App\Http\Controllers\Api\V1\RestaurantApiController;
 use App\Http\Controllers\Api\V1\SaleApiController;
 use App\Http\Controllers\Api\V1\SalesTargetApiController;
+use App\Http\Controllers\Api\V1\SalonApiController;
 use App\Http\Controllers\Api\V1\SduiViewController;
 use App\Http\Controllers\Api\V1\ServiceOrderApiController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
@@ -126,6 +127,14 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
         Route::post('/tickets/{id}/settle', [RepairApiController::class, 'ticketsSettle'])->middleware('tenant.api.permission:pos,create');
         Route::get('/checkout-sheet', [RepairApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
         Route::post('/pos-checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
+    });
+
+    // Salon & Service POS Module Routes
+    Route::prefix('tenant/salon')->group(function () {
+        Route::get('/checkout-sheet', [SalonApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/pos-checkout', [SalonApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
+        Route::get('/specialists', [SalonApiController::class, 'specialistsIndex'])->middleware('tenant.api.permission:users,view');
+        Route::post('/specialists/{id}/toggle', [SalonApiController::class, 'specialistsToggle'])->middleware('tenant.api.permission:users,edit');
     });
 
     // One-Click Demo Data Purge
@@ -379,6 +388,14 @@ Route::prefix('v1/pos')->group(function () {
             Route::post('/tickets/{id}/settle', [RepairApiController::class, 'ticketsSettle'])->middleware('tenant.api.permission:pos,create');
             Route::get('/checkout-sheet', [RepairApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
             Route::post('/pos-checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
+        });
+
+        // Salon & Service POS Module Aliases
+        Route::prefix('salon')->group(function () {
+            Route::get('/checkout-sheet', [SalonApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
+            Route::post('/pos-checkout', [SalonApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
+            Route::get('/specialists', [SalonApiController::class, 'specialistsIndex'])->middleware('tenant.api.permission:users,view');
+            Route::post('/specialists/{id}/toggle', [SalonApiController::class, 'specialistsToggle'])->middleware('tenant.api.permission:users,edit');
         });
 
         // Sales Targets & Goals
