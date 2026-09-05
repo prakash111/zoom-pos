@@ -40,6 +40,9 @@ class DynamicSchemaParser {
         return _buildWrap(context, schema);
       case 'tabs':
         return _buildTabs(context, schema);
+      case 'stepper':
+      case 'wizard':
+        return _SduiStepper(schema: schema);
       case 'tree_builder':
       case 'navigation_builder':
         return NavMenuSettingsTab(
@@ -1901,6 +1904,225 @@ class _HsvColorSlider extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Multi-step form wizard. Renders one step's components at a time with a
+/// progress header and Back / Next / Submit controls. All steps share the
+/// page-global form scope (DynamicSchemaContext.formValues), so values entered
+/// on earlier steps survive navigating away and back, and the final Submit
+/// posts the entire accumulated form via [submit_action].
+class _SduiStepper extends StatefulWidget {
+  const _SduiStepper({required this.schema});
+
+  final Map<String, dynamic> schema;
+
+  @override
+  State<_SduiStepper> createState() => _SduiStepperState();
+}
+
+class _SduiStepperState extends State<_SduiStepper> {
+  int _current = 0;
+  bool _submitting = false;
+
+  List<Map<String, dynamic>> get _steps {
+    final raw = widget.schema['steps'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((s) => Map<String, dynamic>.from(s))
+        .toList();
+  }
+
+  /// Names of required input fields in [step] that are still empty.
+  List<String> _missingRequired(Map<String, dynamic> step, DynamicSchemaContext? ctx) {
+    final missing = <String>[];
+
+    void walk(dynamic node) {
+      if (node is List) {
+        for (final child in node) {
+          walk(child);
+        }
+        return;
+      }
+      if (node is! Map) return;
+      final map = Map<String, dynamic>.from(node);
+      final type = map['type']?.toString().toLowerCase().trim();
+      const inputTypes = {
+        'text_input',
+        'dropdown_select',
+        'date_time_picker',
+        'file_upload',
+      };
+      if (type != null &&
+          inputTypes.contains(type) &&
+          DynamicSchemaParser._isRequired(map)) {
+        final name = map['name']?.toString() ?? '';
+        final value = ctx?.formValues[name];
+        final isEmpty = value == null ||
+            (value is String && value.trim().isEmpty);
+        if (name.isNotEmpty && isEmpty) {
+          missing.add(map['label']?.toString() ?? name);
+        }
+      }
+      walk(map['components'] ?? map['children'] ?? map['child']);
+    }
+
+    walk(step['components'] ?? step['children'] ?? step['child']);
+    return missing;
+  }
+
+  Future<void> _next() async {
+    final ctx = DynamicSchemaContext.of(context);
+    final steps = _steps;
+    if (_current >= steps.length) return;
+
+    final missing = _missingRequired(steps[_current], ctx);
+    if (missing.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.tr('Please complete: ') + missing.join(', ')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+
+    if (_current < steps.length - 1) {
+      setState(() => _current++);
+      return;
+    }
+
+    // Last step -> submit the whole form.
+    final action = widget.schema['submit_action'];
+    if (action is Map) {
+      setState(() => _submitting = true);
+      try {
+        await ctx?.dispatchAction(Map<String, dynamic>.from(action));
+      } finally {
+        if (mounted) setState(() => _submitting = false);
+      }
+    }
+  }
+
+  void _back() {
+    if (_current > 0) setState(() => _current--);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final steps = _steps;
+    if (steps.isEmpty) return const SizedBox.shrink();
+
+    final current = _current.clamp(0, steps.length - 1);
+    final step = steps[current];
+    final isLast = current == steps.length - 1;
+    final title = context.tr(step['title']?.toString() ?? '');
+    final subtitle = step['subtitle'] == null
+        ? null
+        : context.tr(step['subtitle'].toString());
+
+    final submitLabel =
+        context.tr(widget.schema['submit_label']?.toString() ?? 'Submit');
+    final nextLabel =
+        context.tr(widget.schema['next_label']?.toString() ?? 'Next');
+    final backLabel =
+        context.tr(widget.schema['back_label']?.toString() ?? 'Back');
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Progress header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.tr('Step {current} of {total}', {
+                  'current': current + 1,
+                  'total': steps.length,
+                }),
+                style: theme.textTheme.labelMedium
+                    ?.copyWith(color: theme.colorScheme.primary),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  for (var i = 0; i < steps.length; i++)
+                    Expanded(
+                      child: Container(
+                        margin: EdgeInsets.only(right: i == steps.length - 1 ? 0 : 6),
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: i <= current
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              if (title.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(title,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+              ],
+              if (subtitle != null && subtitle.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              ],
+            ],
+          ),
+        ),
+
+        // Active step body. Keyed by index so field elements are rebuilt fresh
+        // from formValues when switching steps.
+        Column(
+          key: ValueKey<int>(current),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: DynamicSchemaParser.buildChildren(
+              context, step['components'] ?? step['children'] ?? const []),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Navigation controls
+        Row(
+          children: [
+            if (current > 0)
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _submitting ? null : _back,
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  label: Text(backLabel),
+                ),
+              ),
+            if (current > 0) const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _submitting ? null : _next,
+                icon: _submitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(isLast ? Icons.check : Icons.arrow_forward, size: 18),
+                label: Text(isLast ? submitLabel : nextLabel),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }

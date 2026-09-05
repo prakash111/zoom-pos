@@ -159,8 +159,11 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
       _formValues[name] = node['initial_value'];
     }
 
-    final children =
-        node['components'] ?? node['children'] ?? node['child'] ?? node['tabs'];
+    final children = node['components'] ??
+        node['children'] ??
+        node['child'] ??
+        node['tabs'] ??
+        node['steps'];
     if (children is List) {
       for (final child in children) {
         if (child is Map<String, dynamic>) {
