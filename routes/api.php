@@ -202,6 +202,22 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
         Route::match(['put', 'patch', 'post'], '/{id}', [CatalogAdminApiController::class, 'categoriesUpdate'])->middleware('tenant.api.permission:categories,edit');
         Route::delete('/{id}', [CatalogAdminApiController::class, 'categoriesDestroy'])->middleware('tenant.api.permission:categories,edit');
     });
+
+    // Centralized Customers & CRM (Mobile SDUI & API)
+    Route::prefix('tenant/customers')->group(function () {
+        Route::get('/', [PosSyncApiController::class, 'customersIndex'])->middleware('tenant.api.permission:customers,view');
+        Route::get('/search', [PosSyncApiController::class, 'customersSearch'])->middleware('tenant.api.permission:customers,view');
+        Route::post('/', [PosSyncApiController::class, 'customersStore'])->middleware('tenant.api.permission:customers,create');
+        Route::get('/{id}/ledger', [PosSyncApiController::class, 'customerLedger'])->middleware('tenant.api.permission:customers,view');
+        Route::post('/{id}/payment', [PosSyncApiController::class, 'customerRecordPayment'])->middleware('tenant.api.permission:finance,edit');
+    });
+    Route::prefix('app/customers')->group(function () {
+        Route::get('/', [PosSyncApiController::class, 'customersIndex'])->middleware('tenant.api.permission:customers,view');
+        Route::get('/search', [PosSyncApiController::class, 'customersSearch'])->middleware('tenant.api.permission:customers,view');
+        Route::post('/', [PosSyncApiController::class, 'customersStore'])->middleware('tenant.api.permission:customers,create');
+        Route::get('/{id}/ledger', [PosSyncApiController::class, 'customerLedger'])->middleware('tenant.api.permission:customers,view');
+        Route::post('/{id}/payment', [PosSyncApiController::class, 'customerRecordPayment'])->middleware('tenant.api.permission:finance,edit');
+    });
 });
 
 /*
@@ -258,6 +274,7 @@ Route::prefix('v1/pos')->group(function () {
 
         // Customer Ledger & Khata
         Route::get('/customers', [PosSyncApiController::class, 'customersIndex'])->middleware('tenant.api.permission:customers,view');
+        Route::get('/customers/search', [PosSyncApiController::class, 'customersSearch'])->middleware('tenant.api.permission:customers,view');
         Route::post('/customers', [PosSyncApiController::class, 'customersStore'])->middleware('tenant.api.permission:customers,create');
         Route::get('/customers/{id}/ledger', [PosSyncApiController::class, 'customerLedger'])->middleware('tenant.api.permission:customers,view');
         Route::post('/customers/{id}/payment', [PosSyncApiController::class, 'customerRecordPayment'])->middleware('tenant.api.permission:finance,edit');

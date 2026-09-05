@@ -307,6 +307,7 @@ class PermissionChecker
                     'quotes' => ['view', 'create'],
                     'service_orders' => ['view'],
                     'repair' => ['view', 'create', 'checkout'],
+                    'customers' => ['view', 'create'],
                     'products' => ['view'],
                     'cash_register' => ['view', 'create', 'edit', 'delete'],
                     'targets' => ['view'],
@@ -316,6 +317,7 @@ class PermissionChecker
             case 'technician':
                 return [
                     'repair' => ['view', 'diagnose'],
+                    'customers' => ['view'],
                     'pos' => ['view'],
                     'products' => ['view'],
                 ];

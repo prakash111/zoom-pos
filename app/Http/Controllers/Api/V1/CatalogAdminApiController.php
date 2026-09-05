@@ -13,6 +13,7 @@ use App\Models\Unit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -32,9 +33,10 @@ class CatalogAdminApiController extends Controller
     public function categoriesIndex(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
+        $hasSort = Schema::hasColumn('categories', 'sort_order');
         $categories = Category::withoutGlobalScope('company')
             ->where('company_id', $company->id)
-            ->orderBy('name')
+            ->when($hasSort, fn ($q) => $q->orderBy('sort_order')->orderBy('name'), fn ($q) => $q->orderBy('name'))
             ->get()
             ->map(fn (Category $c) => $this->presentCategory($c));
 
@@ -45,10 +47,12 @@ class CatalogAdminApiController extends Controller
     {
         return $this->saveSimple($request, Category::class, [
             'name' => ['required', 'string', 'max:255'],
+            'code' => ['nullable', 'string', 'max:50'],
             'type' => ['nullable', 'string', 'max:50'],
             'color' => ['nullable', 'string', 'max:16'],
             'description' => ['nullable', 'string', 'max:1000'],
             'metadata' => ['nullable'],
+            'sort_order' => ['nullable', 'integer'],
         ], fn (Category $c) => $this->presentCategory($c), 'category.saved');
     }
 
@@ -56,10 +60,12 @@ class CatalogAdminApiController extends Controller
     {
         return $this->saveSimple($request, Category::class, [
             'name' => ['required', 'string', 'max:255'],
+            'code' => ['nullable', 'string', 'max:50'],
             'type' => ['nullable', 'string', 'max:50'],
             'color' => ['nullable', 'string', 'max:16'],
             'description' => ['nullable', 'string', 'max:1000'],
             'metadata' => ['nullable'],
+            'sort_order' => ['nullable', 'integer'],
         ], fn (Category $c) => $this->presentCategory($c), 'category.saved', $id);
     }
 
@@ -194,6 +200,13 @@ class CatalogAdminApiController extends Controller
 
         $data = $validator->validated();
 
+        if ($modelClass === Category::class && $id === null) {
+            if (Schema::hasColumn('categories', 'sort_order') && ! isset($data['sort_order'])) {
+                $maxSort = Category::where('company_id', $company->id)->max('sort_order');
+                $data['sort_order'] = $maxSort !== null ? ((int) $maxSort + 1) : 1;
+            }
+        }
+
         if ($id !== null) {
             $record = $modelClass::withoutGlobalScope('company')
                 ->where('company_id', $company->id)
@@ -213,10 +226,13 @@ class CatalogAdminApiController extends Controller
 
         AuditLog::record($auditAction, $company->id, $user?->id, ['id' => $record->id]);
 
+        $presented = $present($record);
+
         return response()->json([
             'success' => true,
             'message' => 'Saved.',
-            'data' => $present($record),
+            'data' => $presented,
+            'category' => $presented,
         ], $id === null ? 201 : 200);
     }
 
@@ -299,10 +315,12 @@ class CatalogAdminApiController extends Controller
         return [
             'id' => (string) $c->id,
             'name' => $c->name,
+            'code' => $c->code ?? '',
             'type' => $c->type ?? 'retail',
             'color' => $c->color ?? '#4f46e5',
             'description' => $c->description ?? '',
             'metadata' => $c->metadata,
+            'sort_order' => (int) ($c->sort_order ?? 0),
             'active' => (bool) $c->active,
         ];
     }

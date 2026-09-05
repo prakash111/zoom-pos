@@ -26,6 +26,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -119,14 +120,14 @@ class RepairApiController extends Controller
         $this->authorizeAction($request, 'view');
         $company = $this->resolveCompany($request);
 
+        $hasSort = Schema::hasColumn('categories', 'sort_order');
         $categories = Category::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('active', true)
             ->where(function ($q) {
                 $q->where('type', 'device')->orWhereNull('type');
             })
-            ->orderBy('sort_order')
-            ->orderBy('name')
+            ->when($hasSort, fn ($q) => $q->orderBy('sort_order')->orderBy('name'), fn ($q) => $q->orderBy('name'))
             ->get();
 
         if ($categories->isEmpty()) {
@@ -134,7 +135,7 @@ class RepairApiController extends Controller
                 Category::firstOrCreate([
                     'company_id' => $company->id,
                     'name' => $preset['name'],
-                ], [
+                ], array_filter([
                     'tenant_id' => $company->id,
                     'type' => 'device',
                     'icon' => $preset['icon'] ?? 'devices',
@@ -145,10 +146,10 @@ class RepairApiController extends Controller
                         'checklist_items' => $preset['checklist_items'] ?? [],
                         'common_issues' => $preset['common_issues'] ?? [],
                     ],
-                    'sort_order' => $preset['sort_order'] ?? 0,
+                    'sort_order' => $hasSort ? ($preset['sort_order'] ?? 0) : null,
                     'active' => true,
                     'is_demo' => false,
-                ]);
+                ], fn ($val) => $val !== null));
             }
 
             $categories = Category::withoutGlobalScope('company')
@@ -157,7 +158,7 @@ class RepairApiController extends Controller
                 ->where(function ($q) {
                     $q->where('type', 'device')->orWhereNull('type');
                 })
-                ->orderBy('sort_order')
+                ->when($hasSort, fn ($q) => $q->orderBy('sort_order')->orderBy('name'), fn ($q) => $q->orderBy('name'))
                 ->get();
         }
 
@@ -179,6 +180,7 @@ class RepairApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:150',
+            'code' => 'nullable|string|max:50',
             'icon' => 'nullable|string|max:100',
             'identifier_type' => 'nullable|string|max:100',
             'brands' => 'nullable',
@@ -207,10 +209,15 @@ class RepairApiController extends Controller
         $checklistItems = $parseList($request->input('checklist_items'), ['Power On / Boot', 'Physical Housing Condition', 'Component Functionality']);
         $commonIssues = $parseList($request->input('common_issues'), []);
 
-        $category = Category::create([
+        $maxSort = Schema::hasColumn('categories', 'sort_order')
+            ? (Category::where('company_id', $company->id)->max('sort_order') + 1)
+            : null;
+
+        $categoryData = [
             'company_id' => $company->id,
             'tenant_id' => $company->id,
             'name' => $name,
+            'code' => $request->input('code'),
             'slug' => Str::slug($name),
             'type' => 'device',
             'icon' => $request->input('icon') ?: 'devices',
@@ -221,10 +228,15 @@ class RepairApiController extends Controller
                 'checklist_items' => $checklistItems,
                 'common_issues' => $commonIssues,
             ],
-            'sort_order' => (int) Category::where('company_id', $company->id)->max('sort_order') + 1,
             'active' => true,
             'is_demo' => false,
-        ]);
+        ];
+
+        if ($maxSort !== null) {
+            $categoryData['sort_order'] = (int) $maxSort;
+        }
+
+        $category = Category::create($categoryData);
 
         AuditLog::record('repair.category_created', $company->id, $user->id, [
             'category_id' => $category->id,
@@ -235,6 +247,7 @@ class RepairApiController extends Controller
             'success' => true,
             'message' => 'Device category created successfully.',
             'category' => $category,
+            'data' => $category,
         ], 201);
     }
 
@@ -279,6 +292,12 @@ class RepairApiController extends Controller
         }
         if ($request->has('is_active') || $request->has('active')) {
             $category->active = $request->boolean('is_active') || $request->boolean('active');
+        }
+        if ($request->has('code')) {
+            $category->code = $request->input('code');
+        }
+        if ($request->has('sort_order') && Schema::hasColumn('categories', 'sort_order')) {
+            $category->sort_order = (int) $request->input('sort_order');
         }
 
         if ($request->has('identifier_type')) {
@@ -419,9 +438,9 @@ class RepairApiController extends Controller
         $company = $this->resolveCompany($request);
 
         $validator = Validator::make($request->all(), [
-            'customer_name' => 'required|string|max:150',
+            'customer_name' => 'required_without:customer_id|nullable|string|max:150',
             'customer_phone' => 'nullable|string|max:50',
-            'customer_id' => 'nullable|integer',
+            'customer_id' => 'nullable',
             'category_id' => 'nullable|integer',
             'device_category_id' => 'nullable|integer',
             'brand' => 'nullable|string|max:100',
@@ -460,10 +479,23 @@ class RepairApiController extends Controller
 
         // Resolve or create Customer in core CRM table
         $customerId = $request->input('customer_id');
-        $customerName = trim($request->input('customer_name'));
+        $customerName = trim((string) $request->input('customer_name'));
         $customerPhone = trim((string) $request->input('customer_phone'));
 
-        if (! $customerId && $customerName !== '') {
+        if ($customerId) {
+            $existingCustomer = Customer::where('company_id', $company->id)
+                ->where(fn ($q) => $q->where('id', $customerId)->orWhere('external_id', $customerId))
+                ->first();
+            if ($existingCustomer) {
+                $customerId = $existingCustomer->id;
+                if ($customerName === '') {
+                    $customerName = $existingCustomer->name;
+                }
+                if ($customerPhone === '') {
+                    $customerPhone = (string) ($existingCustomer->phone ?? '');
+                }
+            }
+        } elseif ($customerName !== '') {
             $existingCustomer = Customer::where('company_id', $company->id)
                 ->where(function ($q) use ($customerName, $customerPhone) {
                     if ($customerPhone !== '') {
@@ -481,6 +513,7 @@ class RepairApiController extends Controller
                     'tenant_id' => $company->id,
                     'name' => $customerName,
                     'phone' => $customerPhone ?: null,
+                    'is_demo' => false,
                 ]);
                 $customerId = $createdCust->id;
             }

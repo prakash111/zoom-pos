@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Company;
+use App\Models\Customer;
 use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
 use App\Models\Plan;
@@ -1420,6 +1421,84 @@ class PharmacyAndRepairPosTest extends TestCase
         $output = Artisan::output();
         $this->assertStringContainsString('Scanning for repaired tickets', $output);
         $this->assertStringContainsString('Successfully sent pickup reminders', $output);
+    }
+
+    public function test_repair_intake_customer_crm_integration_and_sort_order_safety(): void
+    {
+        $validator = new SchemaValidator;
+
+        // 1. Quick Add Customer via standard core endpoint (/api/tenant/customers)
+        $custRes = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/customers', [
+            'name' => 'Bruce Wayne',
+            'phone' => '+15550001',
+            'email' => 'bruce@wayne.corp',
+            'address' => '1007 Mountain Drive, Gotham',
+        ]);
+        $custRes->assertSuccessful();
+        $customerServerId = $custRes->json('data.server_id') ?? $custRes->json('customer.server_id');
+        $this->assertNotNull($customerServerId);
+
+        // 2. Search Customer via CRM search endpoint (/api/tenant/customers/search)
+        $searchRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/customers/search?q=Bruce');
+        $searchRes->assertOk();
+        $searchList = $searchRes->json('data') ?? $searchRes->json('customers');
+        $this->assertNotEmpty($searchList);
+        $found = collect($searchList)->firstWhere('name', 'Bruce Wayne');
+        $this->assertNotNull($found);
+        $this->assertEquals('+15550001', $found['phone']);
+
+        // 3. Create Device Category without explicit sort_order — ensure no SQL 1054 crash
+        $catRes = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/categories', [
+            'name' => 'Smart Watches & Wearables',
+            'code' => 'DEV-WATCH-01',
+            'type' => 'device',
+            'description' => 'Wearable smart watches and wristbands',
+        ]);
+        $catRes->assertCreated();
+        $catId = $catRes->json('data.id');
+        $this->assertNotNull($catId);
+
+        $savedCat = Category::find($catId);
+        $this->assertNotNull($savedCat);
+        $this->assertEquals('device', $savedCat->type);
+        $this->assertGreaterThanOrEqual(1, $savedCat->sort_order);
+
+        // 4. Create Repair Ticket referencing ONLY customer_id (no manual customer_name provided)
+        $ticketRes = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/repair/tickets', [
+            'customer_id' => $customerServerId,
+            'device_category_id' => $catId,
+            'brand' => 'Apple',
+            'model' => 'Apple Watch Ultra 2',
+            'serial_or_imei' => 'SN-WATCH-001',
+            'issue_description' => 'Cracked sapphire glass and sensor unresponsive',
+            'priority' => 'urgent',
+            'estimated_cost' => 199.99,
+            'advance_paid' => 50.00,
+        ]);
+        $ticketRes->assertOk()
+            ->assertJsonPath('success', true);
+
+        $ticketId = $ticketRes->json('ticket.id');
+        $ticket = RepairTicket::find($ticketId);
+        $this->assertNotNull($ticket);
+        $this->assertEquals('Bruce Wayne', $ticket->customer_name);
+        $this->assertEquals('+15550001', $ticket->customer_phone);
+        $this->assertEquals($customerServerId, $ticket->customer_id);
+
+        // 5. Verify repairCreateTicketView SDUI Schema conforms to native standards:
+        // dropdownSelect customer_id, + Quick Add modal, and + Add Category modal
+        $viewRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/repair-create-ticket');
+        $viewRes->assertOk();
+        $schema = $viewRes->json('schema');
+        $this->assertEmpty($validator->validate($schema), 'Repair Intake schema must be strictly valid SDUI');
+
+        $schemaStr = json_encode($schema, JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('customer_id', $schemaStr);
+        $this->assertStringContainsString('Bruce Wayne', $schemaStr);
+        $this->assertStringContainsString('Register New Customer', $schemaStr);
+        $this->assertStringContainsString('/api/tenant/customers', $schemaStr);
+        $this->assertStringContainsString('Create Device Category', $schemaStr);
+        $this->assertStringContainsString('/api/tenant/categories', $schemaStr);
     }
 }
 

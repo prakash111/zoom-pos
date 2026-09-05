@@ -15,10 +15,12 @@ class Category extends Model
         'company_id',
         'external_id',
         'name',
+        'code',
         'type',
         'color',
         'description',
         'metadata',
+        'sort_order',
         'active',
         'is_demo',
     ];

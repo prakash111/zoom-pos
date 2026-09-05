@@ -1321,6 +1321,23 @@ class SchemaResponse
             $categoryBadges[] = self::badge($cat->name, $cat->color ?: '#0284c7', 'subtle');
         }
 
+        $customers = Customer::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->orderBy('name')
+            ->limit(100)
+            ->get();
+
+        $customerOptions = [
+            ['label' => '➕ Walk-in / New Customer (type below)', 'value' => ''],
+        ];
+        foreach ($customers as $c) {
+            $phonePart = $c->phone ? " ({$c->phone})" : '';
+            $customerOptions[] = [
+                'label' => "{$c->name}{$phonePart}",
+                'value' => (string) $c->id,
+            ];
+        }
+
         return self::screen('New Repair Ticket', [
             self::card([
                 self::row([
@@ -1336,29 +1353,54 @@ class SchemaResponse
             ]),
 
             self::card([
-                self::text('Customer Information', 'title_medium', ['bold' => true]),
-                self::textInput('customer_name', 'Customer Full Name', ''),
-                self::textInput('customer_phone', 'Contact Phone Number', ''),
+                self::row([
+                    self::column([
+                        self::text('Customer Information', 'title_medium', ['bold' => true]),
+                        self::text('Select existing client from CRM directory or register a new customer.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                    self::buttonOutlined('+ Quick Add', self::openModalAction('Register New Customer', [
+                        self::text('Register a new client in the core CRM database.', 'body_small', ['color' => '#64748b']),
+                        self::textInput('name', 'Customer Full Name *', ''),
+                        self::textInput('phone', 'Phone Number *', '', ['keyboard_type' => 'phone']),
+                        self::textInput('email', 'Email Address (Optional)', '', ['keyboard_type' => 'email']),
+                        self::textInput('address', 'Street / Billing Address (Optional)', ''),
+                        self::textInput('city', 'City (Optional)', ''),
+                        self::divider(),
+                        self::buttonPrimary('Save Customer', self::formSubmitAction(
+                            '/api/tenant/customers',
+                            'POST',
+                            'Customer registered successfully.',
+                            reload: true
+                        ), 'person_add'),
+                    ]), 'person_add', ['full_width' => false]),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::dropdownSelect('customer_id', 'Search & Select Existing Customer', $customerOptions, ''),
+                self::textInput('customer_name', 'Customer Full Name (Required if not selected above)', ''),
+                self::textInput('customer_phone', 'Contact Phone Number', '', ['keyboard_type' => 'phone']),
             ]),
 
             self::card([
                 self::row([
-                    self::text('Device Specifications', 'title_medium', ['bold' => true]),
+                    self::column([
+                        self::text('Device Specifications', 'title_medium', ['bold' => true]),
+                        self::text('Select hardware category and specify device brand and identifiers.', 'body_small', ['color' => '#64748b']),
+                    ]),
                     self::buttonOutlined('+ Add Category', self::openModalAction('Create Device Category', [
-                        self::text('Register a new hardware category with custom brands & checklist.', 'body_small', ['color' => '#64748b']),
-                        self::textInput('name', 'Category Name (e.g. Drone, Wearable)', ''),
-                        self::textInput('identifier_type', 'Hardware Identifier (e.g. IMEI, Serial, MAC)', 'Serial Number'),
-                        self::textInput('brands', 'Supported Brands (comma-separated)', 'Brand A, Brand B, Other'),
-                        self::textInput('checklist_items', 'Checklist Points (comma-separated)', 'Power On, Display, Battery, Charging Port'),
+                        self::text('Register a new category in core inventory categories.', 'body_small', ['color' => '#64748b']),
+                        self::textInput('name', 'Category Name * (e.g. Drone, Wearable)', ''),
+                        self::textInput('code', 'Category Code / SKU Prefix (Optional)', ''),
+                        self::textInput('description', 'Description (Optional)', ''),
+                        self::textInput('type', 'Category Type', 'device', ['read_only' => true]),
                         self::divider(),
                         self::buttonPrimary('Save Category', self::formSubmitAction(
-                            '/api/tenant/repair/categories',
+                            '/api/tenant/categories',
                             'POST',
                             'Device category created successfully.',
                             reload: true
                         ), 'add_circle'),
                     ]), 'add', ['full_width' => false]),
-                ]),
+                ], ['main_axis_alignment' => 'space_between']),
                 self::divider(),
                 self::dropdownSelect('device_category_id', 'Device Category', $categoryOptions, $firstCatId),
                 self::textInput('brand', 'Brand (e.g. Apple, Samsung, Dell, HP)', ''),
@@ -1716,10 +1758,10 @@ class SchemaResponse
 
     public static function repairCategoriesView(Company $company): array
     {
+        $hasSort = Schema::hasColumn('categories', 'sort_order');
         $categories = RepairDeviceCategory::withoutGlobalScope('company')
             ->where('company_id', $company->id)
-            ->orderBy('sort_order')
-            ->orderBy('name')
+            ->when($hasSort, fn ($q) => $q->orderBy('sort_order')->orderBy('name'), fn ($q) => $q->orderBy('name'))
             ->get();
 
         if ($categories->isEmpty()) {
@@ -1733,8 +1775,7 @@ class SchemaResponse
             }
             $categories = RepairDeviceCategory::withoutGlobalScope('company')
                 ->where('company_id', $company->id)
-                ->orderBy('sort_order')
-                ->orderBy('name')
+                ->when($hasSort, fn ($q) => $q->orderBy('sort_order')->orderBy('name'), fn ($q) => $q->orderBy('name'))
                 ->get();
         }
 

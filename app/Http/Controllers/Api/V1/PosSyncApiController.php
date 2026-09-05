@@ -2018,6 +2018,49 @@ class PosSyncApiController extends Controller
     }
 
     /**
+     * Search Customers by Name, Phone, Email, Document/GSTIN.
+     * GET /api/tenant/customers/search
+     * GET /api/v1/pos/customers/search
+     */
+    public function customersSearch(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $query = trim((string) ($request->input('q') ?: $request->input('query') ?: $request->input('search') ?: ''));
+
+        $customers = Customer::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->when($query !== '', function ($q) use ($query) {
+                $q->where(function ($sub) use ($query) {
+                    $sub->where('name', 'like', "%{$query}%")
+                        ->orWhere('phone', 'like', "%{$query}%")
+                        ->orWhere('email', 'like', "%{$query}%")
+                        ->orWhere('document', 'like', "%{$query}%")
+                        ->orWhere('tax_id', 'like', "%{$query}%")
+                        ->orWhere('gstin', 'like', "%{$query}%");
+                });
+            })
+            ->orderBy('name')
+            ->limit(50)
+            ->get()
+            ->map(fn (Customer $c) => [
+                'id' => (string) ($c->external_id ?: $c->id),
+                'server_id' => $c->id,
+                'name' => $c->name,
+                'phone' => $c->phone ?? '',
+                'email' => $c->email ?? '',
+                'document' => $c->document ?? $c->tax_id ?? '',
+                'balance_due' => (float) ($c->due_balance ?? 0),
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'count' => $customers->count(),
+            'customers' => $customers,
+        ]);
+    }
+
+    /**
      * 12. Customer Ledger: Create/Update Customer
      * POST /api/v1/pos/customers
      */
@@ -2082,19 +2125,22 @@ class PosSyncApiController extends Controller
             'phone' => $customer->phone,
         ]);
 
+        $payload = [
+            'id' => (string) ($customer->external_id ?: $customer->id),
+            'server_id' => $customer->id,
+            'name' => $customer->name,
+            'phone' => $customer->phone,
+            'email' => $customer->email,
+            'document' => $customer->document,
+            'balance_due' => $customer->total_due,
+            'loyalty_points' => (int) $customer->loyalty_points,
+        ];
+
         return response()->json([
             'success' => true,
             'message' => 'Customer saved successfully.',
-            'customer' => [
-                'id' => (string) ($customer->external_id ?: $customer->id),
-                'server_id' => $customer->id,
-                'name' => $customer->name,
-                'phone' => $customer->phone,
-                'email' => $customer->email,
-                'document' => $customer->document,
-                'balance_due' => $customer->total_due,
-                'loyalty_points' => (int) $customer->loyalty_points,
-            ],
+            'data' => $payload,
+            'customer' => $payload,
         ]);
     }
 

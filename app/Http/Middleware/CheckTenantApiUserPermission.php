@@ -16,12 +16,18 @@ class CheckTenantApiUserPermission
         // Integration API keys may be company-scoped. Desktop credentials are
         // user-bound and must obey exactly the same matrix as the web UI.
         $user = auth()->user();
-        if ($user && ! $this->permissions->allows($user, $module, $action)) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Forbidden',
-                'message' => "Your role cannot {$action} {$module}.",
-            ], 403);
+        if ($user) {
+            $allowed = $this->permissions->allows($user, $module, $action);
+            if (! $allowed && $module === 'categories' && $request->input('type') === 'device') {
+                $allowed = $this->permissions->allows($user, 'repair', $action);
+            }
+            if (! $allowed) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Forbidden',
+                    'message' => "Your role cannot {$action} {$module}.",
+                ], 403);
+            }
         }
 
         return $next($request);
