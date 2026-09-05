@@ -2037,7 +2037,7 @@ class _SduiStepperState extends State<_SduiStepper> {
       children: [
         // Progress header
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 12),
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2049,7 +2049,7 @@ class _SduiStepperState extends State<_SduiStepper> {
                 style: theme.textTheme.labelMedium
                     ?.copyWith(color: theme.colorScheme.primary),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   for (var i = 0; i < steps.length; i++)
@@ -2068,7 +2068,7 @@ class _SduiStepperState extends State<_SduiStepper> {
                 ],
               ),
               if (title.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
                 Text(title,
                     style: theme.textTheme.titleMedium
                         ?.copyWith(fontWeight: FontWeight.bold)),

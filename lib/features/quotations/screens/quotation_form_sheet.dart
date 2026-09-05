@@ -11,6 +11,7 @@ import '../../inventory/inventory_repository.dart';
 import '../../pos/screens/customer_picker_sheet.dart';
 import '../../taxes/taxes_repository.dart';
 import '../quotations_provider.dart';
+import '../quotations_repository.dart';
 import 'product_picker_sheet.dart';
 
 /// Bottom sheet for POST/PUT /quotations, used for both creating a new
@@ -38,6 +39,7 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
   late List<Map<String, dynamic>> _items;
   late final CustomersRepository _customersRepository;
   late final TaxesRepository _taxesRepository;
+  late final QuotationsRepository _quotationsRepository;
 
   CustomerModel? _selectedCustomer;
   String _fallbackCustomerName = '';
@@ -72,7 +74,9 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
 
     _customersRepository = CustomersRepository(context.read<ApiClient>());
     _taxesRepository = TaxesRepository(context.read<ApiClient>());
+    _quotationsRepository = QuotationsRepository(context.read<ApiClient>());
     _loadTaxRules();
+    if (!_isEditing) _applyStoreDefaults();
   }
 
   Future<void> _loadTaxRules() async {
@@ -83,6 +87,26 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
     } catch (_) {
       // Tax-rule override is a convenience on top of each product's own
       // tax_rate — silently skip it if the list can't be loaded.
+    }
+  }
+
+  /// Pre-fill Notes/Terms on a NEW quotation from the store's global
+  /// "Receipt Prefixes & Bank Terms" settings, without clobbering anything
+  /// the user has already started typing.
+  Future<void> _applyStoreDefaults() async {
+    try {
+      final defaults = await _quotationsRepository.fetchDefaults();
+      if (!mounted) return;
+      setState(() {
+        if (_termsController.text.trim().isEmpty && defaults.terms.isNotEmpty) {
+          _termsController.text = defaults.terms;
+        }
+        if (_notesController.text.trim().isEmpty && defaults.notes.isNotEmpty) {
+          _notesController.text = defaults.notes;
+        }
+      });
+    } catch (_) {
+      // Defaults are a convenience — the server also back-fills them on save.
     }
   }
 

@@ -101,6 +101,7 @@ class ApiEndpoints {
       '/subscription/plans/$plan/mercadopago/verify';
 
   static const String quotations = '/quotations';
+  static const String quotationDefaults = '/quotations/defaults';
   static String quotation(String id) => '/quotations/$id';
   static String quotationConvert(String id) => '/quotations/$id/convert';
 

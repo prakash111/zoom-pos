@@ -9,6 +9,18 @@ class QuotationsRepository {
 
   final ApiClient _client;
 
+  /// Pre-fill values for a brand-new quotation, sourced from the tenant's
+  /// "Receipt Prefixes & Bank Terms" settings.
+  Future<({String terms, String notes, String prefix})> fetchDefaults() async {
+    final response = await _client.get(ApiEndpoints.quotationDefaults);
+    final d = (response['defaults'] as Map<String, dynamic>? ?? {});
+    return (
+      terms: (d['terms'] ?? '').toString(),
+      notes: (d['notes'] ?? '').toString(),
+      prefix: (d['prefix'] ?? 'QUO-').toString(),
+    );
+  }
+
   Future<List<QuotationModel>> fetchQuotations({String? status, String? search}) async {
     final response = await _client.get(ApiEndpoints.quotations, query: {
       if (status != null && status.isNotEmpty) 'status': status,
