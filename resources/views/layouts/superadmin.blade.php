@@ -179,7 +179,7 @@
             $isTenants = request()->routeIs('superadmin.tenants.*');
             $isPlans = request()->routeIs('superadmin.plans.*') || request()->routeIs('superadmin.payment-gateways.*');
             $isCodes = request()->routeIs('superadmin.activation-codes.*');
-            $isSettings = request()->routeIs('superadmin.settings.*') || request()->routeIs('superadmin.smtp.*') || request()->routeIs('superadmin.branding.*') || request()->routeIs('superadmin.tax.*') || request()->routeIs('superadmin.backups.*') || request()->routeIs('superadmin.system.*') || request()->routeIs('superadmin.audit.*') || request()->routeIs('superadmin.pages.*') || request()->routeIs('superadmin.languages.*') || request()->routeIs('superadmin.menus.*');
+            $isSettings = request()->routeIs('superadmin.settings.*') || request()->routeIs('superadmin.smtp.*') || request()->routeIs('superadmin.branding.*') || request()->routeIs('superadmin.tax.*') || request()->routeIs('superadmin.backups.*') || request()->routeIs('superadmin.modules.*') || request()->routeIs('superadmin.system.*') || request()->routeIs('superadmin.audit.*') || request()->routeIs('superadmin.pages.*') || request()->routeIs('superadmin.languages.*') || request()->routeIs('superadmin.menus.*');
         @endphp
         
         <!-- ==========================================
@@ -905,6 +905,16 @@
                                 <div>
                                     <div class="font-bold">{{ __('Automated Backups') }}</div>
                                     <div class="text-[10px] text-slate-400 font-normal">{{ __('Database snapshots & S3 storage') }}</div>
+                                </div>
+                            </a>
+
+                            <a wire:navigate.hover href="{{ route('superadmin.modules.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                                <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
+                                    🧩
+                                </span>
+                                <div>
+                                    <div class="font-bold">{{ __('Modules') }}</div>
+                                    <div class="text-[10px] text-slate-400 font-normal">{{ __('Install ZIP-packaged business modules') }}</div>
                                 </div>
                             </a>
 

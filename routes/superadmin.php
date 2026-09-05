@@ -8,6 +8,7 @@ use App\Livewire\SuperAdmin\Branding;
 use App\Livewire\SuperAdmin\Dashboard;
 use App\Livewire\SuperAdmin\Languages;
 use App\Livewire\Superadmin\MenuBuilderComponent;
+use App\Livewire\SuperAdmin\Modules;
 use App\Livewire\SuperAdmin\Pages;
 use App\Livewire\SuperAdmin\PaymentGateways;
 use App\Livewire\SuperAdmin\Plans;
@@ -52,6 +53,7 @@ Route::prefix('superadmin')->name('superadmin.')->group(function () {
         Route::get('/tax', Tax\Index::class)->name('tax.index');
         Route::get('/languages', Languages\Index::class)->name('languages.index');
         Route::get('/backups', Backups\Index::class)->name('backups.index');
+        Route::get('/modules', Modules\Index::class)->name('modules.index');
         Route::get('/system', System\Index::class)->name('system.index');
         Route::get('/audit', AuditLogs\Index::class)->name('audit.index');
     });

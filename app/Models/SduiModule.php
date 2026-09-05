@@ -22,6 +22,12 @@ class SduiModule extends Model
         'is_active',
         'registration_allowed',
         'sort_order',
+        'version',
+        'author',
+        'min_system_version',
+        'source_type',
+        'package_path',
+        'installed_at',
     ];
 
     protected function casts(): array
@@ -34,6 +40,7 @@ class SduiModule extends Model
             'is_active' => 'boolean',
             'registration_allowed' => 'boolean',
             'sort_order' => 'integer',
+            'installed_at' => 'datetime',
         ];
     }
 

@@ -27,3 +27,5 @@ docker-compose.override.yml
 /mobile
 *.jks
 /read
+/modules/*
+!/modules/.gitkeep
