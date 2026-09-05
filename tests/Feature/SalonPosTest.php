@@ -208,6 +208,27 @@ class SalonPosTest extends TestCase
         $this->assertSame(998.0, (float) $service->current_stock);
     }
 
+    public function test_a_salon_sale_appears_in_the_central_sales_ledger_with_dispatch_actions(): void
+    {
+        $service = $this->createService();
+
+        $checkout = $this->postJson('/api/tenant/salon/pos-checkout', [
+            'items' => [['product_id' => $service->id, 'quantity' => 1]],
+            'payment_method' => 'cash',
+            'customer_name' => 'Alice Client',
+        ], $this->authHeaders());
+        $saleId = $checkout->json('sale.id');
+
+        $response = $this->getJson('/api/tenant/views/sales', $this->authHeaders());
+        $response->assertOk();
+        $content = $response->getContent();
+
+        $this->assertStringContainsString("\\/api\\/tenant\\/sales\\/{$saleId}\\/send-invoice", $content);
+        $this->assertStringContainsString('"channel":"whatsapp"', $content);
+        $this->assertStringContainsString('"channel":"sms"', $content);
+        $this->assertStringContainsString('"channel":"email"', $content);
+    }
+
     public function test_pos_checkout_accepts_two_fixed_split_payment_rows(): void
     {
         $service = $this->createService();

@@ -419,7 +419,11 @@ class SchemaResponse
         $action = [
             'type' => 'api_post',
             'endpoint' => $endpoint,
-            'payload' => $payload,
+            // An empty PHP array always json_encodes to `[]`, but the Flutter
+            // dispatcher casts payload straight to Map<String, dynamic> and
+            // throws on a JSON list — force `{}` so a no-argument action
+            // (e.g. "Print / PDF") never crashes on tap.
+            'payload' => $payload === [] ? (object) [] : $payload,
             'success_toast' => $successToast,
         ];
         if ($reload) {
