@@ -320,6 +320,7 @@ Route::prefix('v1/pos')->group(function () {
 
         // Quotations (Sale rows with operation_type=quotation)
         Route::get('/quotations', [QuotationApiController::class, 'index'])->middleware('tenant.api.permission:quotes,view');
+        Route::get('/quotations/defaults', [QuotationApiController::class, 'defaults'])->middleware('tenant.api.permission:quotes,view');
         Route::post('/quotations', [QuotationApiController::class, 'store'])->middleware('tenant.api.permission:quotes,create');
         Route::get('/quotations/{id}', [QuotationApiController::class, 'show'])->middleware('tenant.api.permission:quotes,view');
         Route::put('/quotations/{id}', [QuotationApiController::class, 'update'])->middleware('tenant.api.permission:quotes,edit');

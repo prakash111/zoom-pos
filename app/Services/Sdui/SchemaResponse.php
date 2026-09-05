@@ -149,11 +149,11 @@ class SchemaResponse
     // Display Primitives
     // =========================================================================
 
-    public static function text(string $text, string $style = 'body_medium', array $props = []): array
+    public static function text(?string $text, string $style = 'body_medium', array $props = []): array
     {
         return array_merge([
             'type' => 'text',
-            'text' => $text,
+            'text' => (string) ($text ?? ''),
             'style' => $style,
         ], $props);
     }
@@ -166,21 +166,21 @@ class SchemaResponse
         ], $props);
     }
 
-    public static function badge(string $label, string $color = '#10b981', string $style = 'subtle', array $props = []): array
+    public static function badge(?string $label, ?string $color = '#10b981', string $style = 'subtle', array $props = []): array
     {
         return array_merge([
             'type' => 'badge',
-            'label' => $label,
-            'color' => $color,
+            'label' => (string) ($label ?? ''),
+            'color' => $color ?: '#10b981',
             'badge_style' => $style,
         ], $props);
     }
 
-    public static function icon(string $icon, array $props = []): array
+    public static function icon(?string $icon, array $props = []): array
     {
         return array_merge([
             'type' => 'icon',
-            'icon' => $icon,
+            'icon' => (string) ($icon ?? 'widgets') ?: 'widgets',
         ], $props);
     }
 
@@ -1160,17 +1160,17 @@ class SchemaResponse
             return self::card([
                 self::row([
                     self::badge("#{$t->ticket_number}", '#0284c7', 'subtle'),
-                    self::badge(strtoupper(str_replace('_', ' ', $t->status)), $t->status_color, 'subtle'),
-                    self::badge($t->priority, $t->priority_color, 'subtle'),
+                    self::badge(strtoupper(str_replace('_', ' ', (string) ($t->status ?? 'received'))), $t->status_color, 'subtle'),
+                    self::badge((string) ($t->priority ?? 'normal'), $t->priority_color, 'subtle'),
                 ], ['main_axis_alignment' => 'space_between']),
                 self::row([
                     self::icon('handyman', ['color' => $t->status_color, 'size' => 20]),
-                    self::text("{$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
+                    self::text(trim("{$t->brand} {$t->model}") ?: 'Unspecified Device', 'title_medium', ['bold' => true]),
                 ]),
                 self::row([
                     self::icon('person', ['color' => '#64748b', 'size' => 16]),
-                    self::text($t->customer_name, 'body_small', ['bold' => true]),
-                    self::badge($t->customer_phone, '#475569', 'subtle'),
+                    self::text((string) ($t->customer_name ?: 'Walk-in Customer'), 'body_small', ['bold' => true]),
+                    self::badge((string) ($t->customer_phone ?: 'No phone on file'), '#475569', 'subtle'),
                 ]),
                 self::divider(),
                 self::card([
@@ -1367,15 +1367,17 @@ class SchemaResponse
         ];
 
         return self::screen('New Repair Ticket', [
-            self::card([
+            // Compact intro strip — no card chrome so the wizard sits close to
+            // the app bar (matches the standard 12/16px content inset).
+            self::container([
                 self::row([
-                    self::icon('add_task', ['color' => '#0284c7', 'size' => 24]),
+                    self::icon('add_task', ['color' => '#0284c7', 'size' => 20]),
                     self::column([
-                        self::text('Device Intake & Job Creation', 'title_medium', ['bold' => true]),
+                        self::text('Device Intake & Job Creation', 'label_large', ['bold' => true]),
                         self::text('Complete each step, then create the ticket & print the tag.', 'body_small', ['color' => '#64748b']),
                     ]),
                 ]),
-            ]),
+            ], ['padding' => [4, 0, 4, 8]]),
 
             self::stepper([
                 // Step 1 — Customer
@@ -1486,17 +1488,17 @@ class SchemaResponse
             $ticketCards[] = self::card([
                 self::row([
                     self::badge("#{$t->ticket_number}", '#0284c7', 'subtle'),
-                    self::badge(strtoupper(str_replace('_', ' ', $t->status)), $t->status_color, 'subtle'),
-                    self::badge($t->priority, $t->priority_color, 'subtle'),
+                    self::badge(strtoupper(str_replace('_', ' ', (string) ($t->status ?? 'received'))), $t->status_color, 'subtle'),
+                    self::badge((string) ($t->priority ?? 'normal'), $t->priority_color, 'subtle'),
                 ], ['main_axis_alignment' => 'space_between']),
                 self::row([
                     self::icon('receipt_long', ['color' => $t->status_color, 'size' => 20]),
-                    self::text("{$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
+                    self::text(trim("{$t->brand} {$t->model}") ?: 'Unspecified Device', 'title_medium', ['bold' => true]),
                 ]),
                 self::row([
                     self::icon('person', ['color' => '#64748b', 'size' => 16]),
-                    self::text($t->customer_name, 'body_small', ['bold' => true]),
-                    self::badge($t->customer_phone, '#475569', 'subtle'),
+                    self::text((string) ($t->customer_name ?: 'Walk-in Customer'), 'body_small', ['bold' => true]),
+                    self::badge((string) ($t->customer_phone ?: 'No phone on file'), '#475569', 'subtle'),
                 ]),
                 self::divider(),
                 self::card([
@@ -1563,7 +1565,7 @@ class SchemaResponse
                         self::text("#{$t->ticket_number} • {$t->brand} {$t->model}", 'title_medium', ['bold' => true]),
                         self::text("Category: {$t->device_type} | Serial/IMEI: ".($t->serial_or_imei ?: 'N/A'), 'body_small', ['color' => '#64748b']),
                     ]),
-                    self::badge(strtoupper($t->status), $t->status_color, 'subtle'),
+                    self::badge(strtoupper((string) ($t->status ?? 'received')), $t->status_color, 'subtle'),
                 ]),
                 self::divider(),
                 self::card([
@@ -1664,9 +1666,9 @@ class SchemaResponse
                     self::icon('handyman', ['color' => $ticket->status_color, 'size' => 28]),
                     self::column([
                         self::text("Ticket #{$ticket->ticket_number}", 'title_large', ['bold' => true]),
-                        self::text("{$ticket->brand} {$ticket->model} ({$ticket->device_type})", 'body_medium', ['color' => '#64748b']),
+                        self::text(trim("{$ticket->brand} {$ticket->model}").' ('.($ticket->device_type ?: 'Device').')', 'body_medium', ['color' => '#64748b']),
                     ]),
-                    self::badge(strtoupper($ticket->status), $ticket->status_color, 'subtle'),
+                    self::badge(strtoupper((string) ($ticket->status ?? 'received')), $ticket->status_color, 'subtle'),
                 ]),
                 self::divider(),
                 self::row([
@@ -1679,7 +1681,7 @@ class SchemaResponse
 
             self::card([
                 self::text('Reported Defect / Issue', 'label_large', ['bold' => true]),
-                self::text($ticket->issue_description, 'body_medium'),
+                self::text($ticket->issue_description ?: 'No issue description recorded.', 'body_medium'),
                 self::divider(),
                 self::text('Physical Condition & Housing Notes', 'label_large', ['bold' => true]),
                 self::text($ticket->physical_condition_notes ?: 'No pre-existing damages noted.', 'body_small', ['color' => '#64748b']),

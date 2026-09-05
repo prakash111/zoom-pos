@@ -1500,5 +1500,64 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertStringContainsString('Create Device Category', $schemaStr);
         $this->assertStringContainsString('/api/tenant/categories', $schemaStr);
     }
+
+    public function test_repair_workbench_and_register_render_for_tickets_with_null_fields(): void
+    {
+        // Reproduces the SchemaResponse::badge() null-label crash: an intake
+        // ticket with no customer phone (nullable column, no default).
+        RepairTicket::create([
+            'company_id' => $this->company->id,
+            'ticket_number' => 'REP-NULLFIELDS-1',
+            'customer_name' => null,
+            'customer_phone' => null,
+            'brand' => null,
+            'model' => null,
+            'problem_reported' => 'Device not powering on',
+        ]);
+
+        foreach (['repair-dashboard', 'repair-tickets', 'repair-my-jobs'] as $view) {
+            $res = $this->withHeaders($this->authHeaders())->getJson("/api/tenant/views/{$view}");
+            $res->assertOk()->assertJsonPath('success', true);
+        }
+    }
+
+    public function test_quotation_defaults_come_from_receipt_settings_and_prefix_is_applied(): void
+    {
+        $this->company->update([
+            'quotation_prefix' => 'QUO-',
+            'quote_terms' => 'Valid for 30 days.',
+            'bank_details' => 'Bank: Acme · IBAN 000',
+        ]);
+
+        $defaults = $this->withHeaders($this->authHeaders())->getJson('/api/v1/pos/quotations/defaults');
+        $defaults->assertOk()
+            ->assertJsonPath('defaults.terms', 'Valid for 30 days.')
+            ->assertJsonPath('defaults.notes', 'Bank: Acme · IBAN 000')
+            ->assertJsonPath('defaults.prefix', 'QUO-');
+
+        // A quote created without notes/terms inherits the store defaults, and
+        // the reference number uses the configured prefix (no "QUO--").
+        $prod = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Screen Assembly', 'sku' => 'SCR-Q1',
+            'sale_price' => 120.00, 'current_stock' => 3, 'active' => true,
+        ]);
+
+        $create = $this->withHeaders($this->authHeaders())->postJson('/api/v1/pos/quotations', [
+            'customer_name' => 'Walk-in',
+            'items' => [['name' => 'Screen Assembly', 'product_id' => $prod->id, 'price' => 120, 'quantity' => 1]],
+        ]);
+
+        $create->assertCreated()->assertJsonPath('success', true);
+        $number = $create->json('quotation.number') ?? $create->json('quotation.sale_number') ?? $create->json('quotation.quote_number');
+        $this->assertStringStartsWith('QUO-', (string) $number);
+        $this->assertStringNotContainsString('QUO--', (string) $number);
+
+        $quoteId = $create->json('quotation.id');
+        $show = $this->withHeaders($this->authHeaders())->getJson("/api/v1/pos/quotations/{$quoteId}");
+        $showStr = json_encode($show->json());
+        $this->assertStringContainsString('Valid for 30 days.', $showStr);
+        $this->assertStringContainsString('Bank: Acme', $showStr);
+    }
 }
 

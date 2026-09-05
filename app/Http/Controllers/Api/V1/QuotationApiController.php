@@ -66,6 +66,25 @@ class QuotationApiController extends Controller
         return response()->json(['success' => true, 'quotation' => $this->present($quote)]);
     }
 
+    /**
+     * GET /quotations/defaults — the pre-fill values a New Quotation form
+     * should adopt from the tenant's "Receipt Prefixes & Bank Terms" settings.
+     */
+    public function defaults(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        return response()->json([
+            'success' => true,
+            'defaults' => [
+                'prefix' => rtrim((string) ($company->quotation_prefix ?: 'QUO-'), '- ').'-',
+                'terms' => (string) ($company->quote_terms ?? ''),
+                'notes' => (string) ($company->bank_details ?? ''),
+                'next_number_preview' => $this->nextQuoteNumber($company),
+            ],
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
@@ -122,8 +141,10 @@ class QuotationApiController extends Controller
             'tax_breakdown' => $taxBreakdown,
             'status' => 'draft',
             'operation_type' => 'quotation',
-            'notes' => $data['notes'] ?? null,
-            'terms' => $data['terms'] ?? null,
+            // Fall back to the store's global quotation footnotes/terms when
+            // the form didn't send its own.
+            'notes' => ($data['notes'] ?? null) ?: ($company->bank_details ?: null),
+            'terms' => ($data['terms'] ?? null) ?: ($company->quote_terms ?: null),
             'due_date' => $data['valid_until'] ?? null,
             'items' => $items,
         ]);
@@ -441,9 +462,16 @@ class QuotationApiController extends Controller
 
     private function nextQuoteNumber(Company $company): string
     {
-        $prefix = $company->quotation_prefix ?: 'QUO';
+        // Honour the configured "Quotation Prefix" (e.g. "QUO-"), normalising a
+        // trailing separator so we never emit "QUO--0001".
+        $prefix = rtrim((string) ($company->quotation_prefix ?: 'QUO-'), '- ').'-';
 
-        return $prefix.'-'.strtoupper(Str::random(6));
+        $count = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('operation_type', 'quotation')
+            ->count();
+
+        return $prefix.str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
     }
 
     private function present(Sale $quote): array
