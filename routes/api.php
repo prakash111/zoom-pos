@@ -132,23 +132,27 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
 
     // Repair & Technician POS Module Routes
     Route::prefix('tenant/repair')->group(function () {
-        Route::get('/stats', [RepairApiController::class, 'stats'])->middleware('tenant.api.permission:pos,view');
-        Route::get('/categories', [RepairApiController::class, 'categoriesIndex'])->middleware('tenant.api.permission:pos,view');
-        Route::post('/categories', [RepairApiController::class, 'categoriesStore'])->middleware('tenant.api.permission:pos,create');
-        Route::match(['put', 'patch', 'post'], '/categories/{id}', [RepairApiController::class, 'categoriesUpdate'])->middleware('tenant.api.permission:pos,edit');
-        Route::delete('/categories/{id}', [RepairApiController::class, 'categoriesDestroy'])->middleware('tenant.api.permission:pos,edit');
-        Route::get('/tickets', [RepairApiController::class, 'ticketsIndex'])->middleware('tenant.api.permission:pos,view');
-        Route::post('/tickets', [RepairApiController::class, 'ticketsStore'])->middleware('tenant.api.permission:pos,create');
-        Route::get('/tickets/{id}', [RepairApiController::class, 'ticketsShow'])->middleware('tenant.api.permission:pos,view');
-        Route::post('/tickets/{id}/status', [RepairApiController::class, 'ticketsUpdateStatus'])->middleware('tenant.api.permission:pos,edit');
-        Route::post('/tickets/{id}/parts', [RepairApiController::class, 'ticketsAddPart'])->middleware('tenant.api.permission:pos,edit');
-        Route::delete('/tickets/{ticketId}/parts/{partId}', [RepairApiController::class, 'ticketsRemovePart'])->middleware('tenant.api.permission:pos,edit');
-        Route::post('/tickets/{id}/labor', [RepairApiController::class, 'ticketsSetLabor'])->middleware('tenant.api.permission:pos,edit');
-        Route::post('/tickets/{id}/settle', [RepairApiController::class, 'ticketsSettle'])->middleware('tenant.api.permission:pos,create');
-        Route::get('/tickets/{id}/checkout-sheet', [RepairApiController::class, 'ticketCheckoutSheet'])->middleware('tenant.api.permission:pos,view');
-        Route::get('/checkout-sheet', [RepairApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
-        Route::post('/pos-checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
-        Route::post('/checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
+        Route::get('/stats', [RepairApiController::class, 'stats'])->middleware('tenant.api.permission:repair,view');
+        Route::get('/categories', [RepairApiController::class, 'categoriesIndex'])->middleware('tenant.api.permission:repair,view');
+        Route::post('/categories', [RepairApiController::class, 'categoriesStore'])->middleware('tenant.api.permission:repair,create');
+        Route::match(['put', 'patch', 'post'], '/categories/{id}', [RepairApiController::class, 'categoriesUpdate'])->middleware('tenant.api.permission:repair,diagnose');
+        Route::delete('/categories/{id}', [RepairApiController::class, 'categoriesDestroy'])->middleware('tenant.api.permission:repair,delete');
+        Route::get('/tickets', [RepairApiController::class, 'ticketsIndex'])->middleware('tenant.api.permission:repair,view');
+        Route::post('/tickets', [RepairApiController::class, 'ticketsStore'])->middleware('tenant.api.permission:repair,create');
+        Route::get('/tickets/{id}', [RepairApiController::class, 'ticketsShow'])->middleware('tenant.api.permission:repair,view');
+        Route::delete('/tickets/{id}', [RepairApiController::class, 'ticketsDestroy'])->middleware('tenant.api.permission:repair,delete');
+        Route::post('/tickets/{id}/status', [RepairApiController::class, 'ticketsUpdateStatus'])->middleware('tenant.api.permission:repair,diagnose');
+        Route::post('/tickets/{id}/assign', [RepairApiController::class, 'ticketsAssign'])->middleware('tenant.api.permission:repair,assign');
+        Route::post('/tickets/{id}/parts', [RepairApiController::class, 'ticketsAddPart'])->middleware('tenant.api.permission:repair,diagnose');
+        Route::delete('/tickets/{ticketId}/parts/{partId}', [RepairApiController::class, 'ticketsRemovePart'])->middleware('tenant.api.permission:repair,diagnose');
+        Route::post('/tickets/{id}/labor', [RepairApiController::class, 'ticketsSetLabor'])->middleware('tenant.api.permission:repair,diagnose');
+        Route::post('/tickets/{id}/checklist', [RepairApiController::class, 'ticketsUpdateChecklist'])->middleware('tenant.api.permission:repair,diagnose');
+        Route::post('/tickets/{id}/settle', [RepairApiController::class, 'ticketsSettle'])->middleware('tenant.api.permission:repair,checkout');
+        Route::get('/tickets/{id}/checkout-sheet', [RepairApiController::class, 'ticketCheckoutSheet'])->middleware('tenant.api.permission:repair,view');
+        Route::get('/tickets/{id}/intake-sheet', [RepairApiController::class, 'ticketIntakeSheet'])->middleware('tenant.api.permission:repair,view');
+        Route::get('/checkout-sheet', [RepairApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:repair,view');
+        Route::post('/pos-checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:repair,checkout');
+        Route::post('/checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:repair,checkout');
     });
 
     // Salon & Service POS Module Routes
@@ -422,23 +426,27 @@ Route::prefix('v1/pos')->group(function () {
 
         // Repair & Technician POS Module Aliases
         Route::prefix('repair')->group(function () {
-            Route::get('/stats', [RepairApiController::class, 'stats'])->middleware('tenant.api.permission:pos,view');
-            Route::get('/categories', [RepairApiController::class, 'categoriesIndex'])->middleware('tenant.api.permission:pos,view');
-            Route::post('/categories', [RepairApiController::class, 'categoriesStore'])->middleware('tenant.api.permission:pos,create');
-            Route::match(['put', 'patch', 'post'], '/categories/{id}', [RepairApiController::class, 'categoriesUpdate'])->middleware('tenant.api.permission:pos,edit');
-            Route::delete('/categories/{id}', [RepairApiController::class, 'categoriesDestroy'])->middleware('tenant.api.permission:pos,edit');
-            Route::get('/tickets', [RepairApiController::class, 'ticketsIndex'])->middleware('tenant.api.permission:pos,view');
-            Route::post('/tickets', [RepairApiController::class, 'ticketsStore'])->middleware('tenant.api.permission:pos,create');
-            Route::get('/tickets/{id}', [RepairApiController::class, 'ticketsShow'])->middleware('tenant.api.permission:pos,view');
-            Route::post('/tickets/{id}/status', [RepairApiController::class, 'ticketsUpdateStatus'])->middleware('tenant.api.permission:pos,edit');
-            Route::post('/tickets/{id}/parts', [RepairApiController::class, 'ticketsAddPart'])->middleware('tenant.api.permission:pos,edit');
-            Route::delete('/tickets/{ticketId}/parts/{partId}', [RepairApiController::class, 'ticketsRemovePart'])->middleware('tenant.api.permission:pos,edit');
-            Route::post('/tickets/{id}/labor', [RepairApiController::class, 'ticketsSetLabor'])->middleware('tenant.api.permission:pos,edit');
-            Route::post('/tickets/{id}/settle', [RepairApiController::class, 'ticketsSettle'])->middleware('tenant.api.permission:pos,create');
-            Route::get('/tickets/{id}/checkout-sheet', [RepairApiController::class, 'ticketCheckoutSheet'])->middleware('tenant.api.permission:pos,view');
-            Route::get('/checkout-sheet', [RepairApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
-            Route::post('/pos-checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
-            Route::post('/checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:pos,create');
+            Route::get('/stats', [RepairApiController::class, 'stats'])->middleware('tenant.api.permission:repair,view');
+            Route::get('/categories', [RepairApiController::class, 'categoriesIndex'])->middleware('tenant.api.permission:repair,view');
+            Route::post('/categories', [RepairApiController::class, 'categoriesStore'])->middleware('tenant.api.permission:repair,create');
+            Route::match(['put', 'patch', 'post'], '/categories/{id}', [RepairApiController::class, 'categoriesUpdate'])->middleware('tenant.api.permission:repair,diagnose');
+            Route::delete('/categories/{id}', [RepairApiController::class, 'categoriesDestroy'])->middleware('tenant.api.permission:repair,delete');
+            Route::get('/tickets', [RepairApiController::class, 'ticketsIndex'])->middleware('tenant.api.permission:repair,view');
+            Route::post('/tickets', [RepairApiController::class, 'ticketsStore'])->middleware('tenant.api.permission:repair,create');
+            Route::get('/tickets/{id}', [RepairApiController::class, 'ticketsShow'])->middleware('tenant.api.permission:repair,view');
+            Route::delete('/tickets/{id}', [RepairApiController::class, 'ticketsDestroy'])->middleware('tenant.api.permission:repair,delete');
+            Route::post('/tickets/{id}/status', [RepairApiController::class, 'ticketsUpdateStatus'])->middleware('tenant.api.permission:repair,diagnose');
+            Route::post('/tickets/{id}/assign', [RepairApiController::class, 'ticketsAssign'])->middleware('tenant.api.permission:repair,assign');
+            Route::post('/tickets/{id}/parts', [RepairApiController::class, 'ticketsAddPart'])->middleware('tenant.api.permission:repair,diagnose');
+            Route::delete('/tickets/{ticketId}/parts/{partId}', [RepairApiController::class, 'ticketsRemovePart'])->middleware('tenant.api.permission:repair,diagnose');
+            Route::post('/tickets/{id}/labor', [RepairApiController::class, 'ticketsSetLabor'])->middleware('tenant.api.permission:repair,diagnose');
+            Route::post('/tickets/{id}/checklist', [RepairApiController::class, 'ticketsUpdateChecklist'])->middleware('tenant.api.permission:repair,diagnose');
+            Route::post('/tickets/{id}/settle', [RepairApiController::class, 'ticketsSettle'])->middleware('tenant.api.permission:repair,checkout');
+            Route::get('/tickets/{id}/checkout-sheet', [RepairApiController::class, 'ticketCheckoutSheet'])->middleware('tenant.api.permission:repair,view');
+            Route::get('/tickets/{id}/intake-sheet', [RepairApiController::class, 'ticketIntakeSheet'])->middleware('tenant.api.permission:repair,view');
+            Route::get('/checkout-sheet', [RepairApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:repair,view');
+            Route::post('/pos-checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:repair,checkout');
+            Route::post('/checkout', [RepairApiController::class, 'posCheckout'])->middleware('tenant.api.permission:repair,checkout');
         });
 
         // Salon & Service POS Module Aliases

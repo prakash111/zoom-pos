@@ -58,6 +58,54 @@ class FirebasePushService
         return 0;
     }
 
+    /**
+     * Send a high-priority FCM message to all active devices of a specific user.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function sendToUser(string $companyId, string $userId, array $data): int
+    {
+        $settings = PushNotificationSetting::current();
+
+        if (! $settings->enabled) {
+            return 0;
+        }
+
+        $devices = PushDevice::withoutGlobalScope('company')
+            ->where('company_id', $companyId)
+            ->where('user_id', $userId)
+            ->whereNull('revoked_at')
+            ->get();
+
+        if ($devices->isEmpty()) {
+            return 0;
+        }
+
+        $payload = collect($data)
+            ->mapWithKeys(fn ($value, $key) => [(string) $key => $this->stringValue($value)])
+            ->all();
+
+        $payload += [
+            'order_channel_id' => $settings->order_channel_id,
+            'order_channel_name' => $settings->order_channel_name,
+            'order_sound' => $settings->order_sound,
+            'invoice_channel_id' => $settings->invoice_channel_id,
+            'invoice_channel_name' => $settings->invoice_channel_name,
+            'invoice_sound' => $settings->invoice_sound,
+            'alarm_repeat_seconds' => (string) $settings->alarm_repeat_seconds,
+        ];
+
+        if ($settings->fcm_service_account_json && $settings->fcm_project_id) {
+            return $this->sendHttpV1($settings, $devices, $payload);
+        }
+
+        if ($settings->fcm_server_key) {
+            return $this->sendLegacy($settings, $devices, $payload);
+        }
+
+        return 0;
+    }
+
     private function sendHttpV1(PushNotificationSetting $settings, $devices, array $data): int
     {
         $accessToken = $this->accessToken($settings);

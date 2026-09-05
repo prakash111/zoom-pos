@@ -2,50 +2,42 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\BelongsToCompany;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
-class RepairTicketPart extends Model
+/**
+ * Legacy compatibility alias for RepairTicketItem.
+ */
+class RepairTicketPart extends RepairTicketItem
 {
-    use BelongsToCompany;
-
-    protected $fillable = [
-        'company_id',
-        'tenant_id',
-        'repair_ticket_id',
-        'product_id',
-        'part_name',
-        'quantity',
-        'unit_cost',
-        'unit_price',
-        'subtotal',
-        'billed_to_customer',
-    ];
-
-    protected function casts(): array
+    protected static function booted(): void
     {
-        return [
-            'quantity' => 'integer',
-            'unit_cost' => 'float',
-            'unit_price' => 'float',
-            'subtotal' => 'float',
-            'billed_to_customer' => 'boolean',
-        ];
+        static::addGlobalScope('spare_part', function ($builder) {
+            $builder->where('item_type', 'spare_part');
+        });
+
+        static::creating(function ($model) {
+            $model->item_type = 'spare_part';
+            if (empty($model->item_name) && ! empty($model->part_name)) {
+                $model->item_name = $model->part_name;
+            }
+        });
     }
 
-    public function company(): BelongsTo
+    public function getPartNameAttribute(): ?string
     {
-        return $this->belongsTo(Company::class);
+        return $this->item_name;
     }
 
-    public function repairTicket(): BelongsTo
+    public function setPartNameAttribute(?string $value): void
     {
-        return $this->belongsTo(RepairTicket::class);
+        $this->item_name = $value;
     }
 
-    public function product(): BelongsTo
+    public function getRepairTicketIdAttribute()
     {
-        return $this->belongsTo(Product::class);
+        return $this->ticket_id;
+    }
+
+    public function setRepairTicketIdAttribute($value): void
+    {
+        $this->ticket_id = $value;
     }
 }

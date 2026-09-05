@@ -2,63 +2,31 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\BelongsToCompany;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-
-class RepairDeviceCategory extends Model
+/**
+ * Compatibility model mapping legacy device categories directly to core Category table.
+ */
+class RepairDeviceCategory extends Category
 {
-    use BelongsToCompany;
+    protected $table = 'categories';
 
-    protected $fillable = [
-        'company_id',
-        'tenant_id',
-        'name',
-        'slug',
-        'icon',
-        'brands',
-        'checklist_items',
-        'identifier_type',
-        'common_issues',
-        'description',
-        'sort_order',
-        'is_active',
-        'is_demo',
-    ];
-
-    protected function casts(): array
+    protected static function booted(): void
     {
-        return [
-            'brands' => 'array',
-            'checklist_items' => 'array',
-            'common_issues' => 'array',
-            'sort_order' => 'integer',
-            'is_active' => 'boolean',
-            'is_demo' => 'boolean',
-        ];
+        static::addGlobalScope('device_type', function ($builder) {
+            $builder->where(function ($q) {
+                $q->where('type', 'device')->orWhereNull('type');
+            });
+        });
+
+        static::creating(function ($model) {
+            $model->type = 'device';
+        });
     }
 
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(Company::class);
-    }
-
-    public function tickets(): HasMany
-    {
-        return $this->hasMany(RepairTicket::class, 'device_category_id');
-    }
-
-    /**
-     * Default device categories with pre-configured brands and intake checklists.
-     *
-     * @return array<int, array<string, mixed>>
-     */
     public static function defaultPresets(): array
     {
         return [
             [
-                'name' => 'Smartphone',
+                'name' => 'Smartphones & Mobiles',
                 'slug' => 'smartphone',
                 'icon' => 'smartphone',
                 'identifier_type' => 'IMEI / Serial Number',
@@ -85,7 +53,7 @@ class RepairDeviceCategory extends Model
                 'sort_order' => 1,
             ],
             [
-                'name' => 'Laptop & Notebook',
+                'name' => 'Laptops & MacBooks',
                 'slug' => 'laptop-notebook',
                 'icon' => 'laptop',
                 'identifier_type' => 'Serial Number',
@@ -112,7 +80,7 @@ class RepairDeviceCategory extends Model
                 'sort_order' => 2,
             ],
             [
-                'name' => 'Tablet',
+                'name' => 'Tablets & iPads',
                 'slug' => 'tablet',
                 'icon' => 'tablet',
                 'identifier_type' => 'Serial / IMEI',
@@ -135,7 +103,7 @@ class RepairDeviceCategory extends Model
                 'sort_order' => 3,
             ],
             [
-                'name' => 'Home Appliance',
+                'name' => 'Home Appliances',
                 'slug' => 'home-appliance',
                 'icon' => 'kitchen',
                 'identifier_type' => 'Model / Serial Number',
@@ -159,7 +127,7 @@ class RepairDeviceCategory extends Model
                 'sort_order' => 4,
             ],
             [
-                'name' => 'Gaming Console',
+                'name' => 'Gaming Consoles',
                 'slug' => 'gaming-console',
                 'icon' => 'sports_esports',
                 'identifier_type' => 'Console Serial Number',
@@ -206,7 +174,7 @@ class RepairDeviceCategory extends Model
                 'sort_order' => 6,
             ],
             [
-                'name' => 'Drone & Aerial Equipment',
+                'name' => 'Drones & Aerial Equipment',
                 'slug' => 'drone-aerial',
                 'icon' => 'flight',
                 'identifier_type' => 'Aircraft Serial / Registration',

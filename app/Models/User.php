@@ -25,6 +25,8 @@ class User extends Authenticatable implements AuthenticatableContract
 
     public const ROLE_FINANCE = 'finance';
 
+    public const ROLE_TECHNICIAN = 'technician';
+
     public const ROLES = [
         self::ROLE_ADMINISTRATOR => 'Administrator',
         self::ROLE_MANAGER => 'Manager',
@@ -32,6 +34,7 @@ class User extends Authenticatable implements AuthenticatableContract
         self::ROLE_CASHIER => 'Cashier',
         self::ROLE_STOCK_CLERK => 'Stock clerk',
         self::ROLE_FINANCE => 'Finance',
+        self::ROLE_TECHNICIAN => 'Technician',
     ];
 
     /** Roles that bypass the permissions matrix entirely (see PermissionChecker). */

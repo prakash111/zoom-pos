@@ -25,6 +25,7 @@ class PermissionChecker
         'catalog' => 'Online Digital Catalog',
         'cash_register' => 'Cash Register & Drawer Management',
         'finance' => 'Finance & Expenses',
+        'repair' => 'Repair & Service Workbench',
         'reports' => 'Reports & Analytics',
         'targets' => 'Sales Targets & Goals',
         'settings' => 'Store Settings & SMTP',
@@ -78,6 +79,14 @@ class PermissionChecker
             'edit' => 'Update technical diagnosis, parts & labor',
             'delete' => 'Cancel / delete service orders',
             'export' => 'Print service tickets & receipts',
+        ],
+        'repair' => [
+            'view' => 'Access workbench and ticket lists',
+            'create' => 'Create intake tickets and accept advance deposits',
+            'diagnose' => 'Update inspection checklists, assign parts, and update labor fees',
+            'assign' => 'Assign or reassign tickets to specific technicians',
+            'checkout' => 'Settle tickets, apply payments, and mark as delivered',
+            'delete' => 'Void or delete tickets',
         ],
         'pos' => [
             'view' => 'Access Point of Sale terminal',
@@ -258,6 +267,7 @@ class PermissionChecker
                     'consignments' => ['view', 'create', 'reconcile', 'finalize_invoice', 'edit', 'delete', 'export'],
                     'quotes' => ['view', 'create', 'edit', 'delete', 'approve', 'convert_to_sale', 'export'],
                     'service_orders' => ['view', 'create', 'edit', 'delete', 'export'],
+                    'repair' => ['view', 'create', 'diagnose', 'assign', 'checkout', 'delete'],
                     'products' => ['view', 'create', 'edit', 'delete', 'export'],
                     'categories' => ['view', 'create', 'edit', 'delete'],
                     'units' => ['view', 'create', 'edit', 'delete'],
@@ -279,6 +289,7 @@ class PermissionChecker
                     'consignments' => ['view', 'create', 'reconcile', 'edit'],
                     'quotes' => ['view', 'create', 'edit', 'convert_to_sale', 'export'],
                     'service_orders' => ['view', 'create', 'edit'],
+                    'repair' => ['view', 'create'],
                     'products' => ['view'],
                     'categories' => ['view'],
                     'customers' => ['view', 'create', 'edit'],
@@ -295,9 +306,18 @@ class PermissionChecker
                     'consignments' => ['view'],
                     'quotes' => ['view', 'create'],
                     'service_orders' => ['view'],
+                    'repair' => ['view', 'create', 'checkout'],
                     'products' => ['view'],
                     'cash_register' => ['view', 'create', 'edit', 'delete'],
                     'targets' => ['view'],
+                ];
+
+            case User::ROLE_TECHNICIAN:
+            case 'technician':
+                return [
+                    'repair' => ['view', 'diagnose'],
+                    'pos' => ['view'],
+                    'products' => ['view'],
                 ];
 
             case User::ROLE_STOCK_CLERK:

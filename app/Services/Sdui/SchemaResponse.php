@@ -1072,17 +1072,17 @@ class SchemaResponse
             ->limit(60)
             ->get();
 
-        $activeCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'active')->count();
+        $activeCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->whereIn('status', ['received', 'active'])->count();
         $diagCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'diagnosing')->count();
         $partsCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'waiting_parts')->count();
         $inProgCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'in_progress')->count();
-        $repairedCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'repaired')->count();
+        $repairedCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->whereIn('status', ['ready', 'repaired'])->count();
         $deliveredCount = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', 'delivered')->count();
 
         $renderKanbanCard = function (RepairTicket $t, string $stage) {
             $actions = [];
 
-            if ($stage === 'active') {
+            if (in_array($stage, ['active', 'received'])) {
                 $actions[] = self::buttonOutlined('Start Diagnostics', self::apiPostAction(
                     "/api/tenant/repair/tickets/{$t->id}/status",
                     ['status' => 'diagnosing'],
@@ -1112,11 +1112,11 @@ class SchemaResponse
             } elseif ($stage === 'in_progress') {
                 $actions[] = self::buttonPrimary('Mark Repaired & Ready', self::apiPostAction(
                     "/api/tenant/repair/tickets/{$t->id}/status",
-                    ['status' => 'repaired'],
+                    ['status' => 'ready'],
                     'Marked as Repaired & Ready',
                     reload: true
                 ), 'task_alt', ['full_width' => false]);
-            } elseif ($stage === 'repaired') {
+            } elseif (in_array($stage, ['repaired', 'ready'])) {
                 $actions[] = self::buttonPrimary('Deliver & Settle', self::openRemoteSheetAction(
                     "/api/tenant/repair/tickets/{$t->id}/checkout-sheet",
                     "Deliver & Settle #{$t->ticket_number}"
@@ -1157,11 +1157,11 @@ class SchemaResponse
             ], ['padding' => 14, 'border_radius' => 14]);
         };
 
-        $stageActiveCards = $allTickets->where('status', 'active')->map(fn ($t) => $renderKanbanCard($t, 'active'))->values()->all();
+        $stageActiveCards = $allTickets->filter(fn ($t) => in_array($t->status, ['received', 'active']))->map(fn ($t) => $renderKanbanCard($t, 'received'))->values()->all();
         $stageDiagCards = $allTickets->where('status', 'diagnosing')->map(fn ($t) => $renderKanbanCard($t, 'diagnosing'))->values()->all();
         $stagePartsCards = $allTickets->where('status', 'waiting_parts')->map(fn ($t) => $renderKanbanCard($t, 'waiting_parts'))->values()->all();
         $stageInProgCards = $allTickets->where('status', 'in_progress')->map(fn ($t) => $renderKanbanCard($t, 'in_progress'))->values()->all();
-        $stageRepairedCards = $allTickets->where('status', 'repaired')->map(fn ($t) => $renderKanbanCard($t, 'repaired'))->values()->all();
+        $stageRepairedCards = $allTickets->filter(fn ($t) => in_array($t->status, ['ready', 'repaired']))->map(fn ($t) => $renderKanbanCard($t, 'ready'))->values()->all();
         $stageDeliveredCards = $allTickets->where('status', 'delivered')->map(fn ($t) => $renderKanbanCard($t, 'delivered'))->values()->all();
 
         return self::screen('Repair Workbench', [
@@ -1573,7 +1573,7 @@ class SchemaResponse
         $ticketId = request('ticket_id');
         $query = RepairTicket::withoutGlobalScope('company')
             ->where('company_id', $company->id)
-            ->with(['parts', 'checklists', 'technician:id,name']);
+            ->with(['parts', 'technician:id,name']);
 
         $ticket = $ticketId ? $query->find($ticketId) : $query->orderByDesc('created_at')->first();
 
@@ -1597,15 +1597,18 @@ class SchemaResponse
         }
 
         $checklistItems = [];
-        foreach ($ticket->checklists as $c) {
-            $statusColor = match ($c->status) {
+        $rawChecklist = (array) ($ticket->inspection_checklist ?? []);
+        foreach ($rawChecklist as $c) {
+            $itemName = is_array($c) ? ($c['item_name'] ?? $c['name'] ?? 'Checklist Item') : (string) $c;
+            $status = is_array($c) ? ($c['status'] ?? 'pending') : 'pending';
+            $statusColor = match ($status) {
                 'pass' => '#10b981',
                 'fail' => '#ef4444',
                 default => '#64748b',
             };
             $checklistItems[] = self::row([
-                self::text($c->item_name, 'body_small'),
-                self::badge(strtoupper($c->status), $statusColor, 'subtle'),
+                self::text($itemName, 'body_small'),
+                self::badge(strtoupper($status), $statusColor, 'subtle'),
             ]);
         }
 

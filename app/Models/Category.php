@@ -23,6 +23,15 @@ class Category extends Model
         'is_demo',
     ];
 
+    protected $appends = [
+        'slug',
+        'brands',
+        'checklist_items',
+        'brands_list',
+        'checklist_points',
+        'identifier_type',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -30,6 +39,21 @@ class Category extends Model
             'is_demo' => 'boolean',
             'metadata' => 'array',
         ];
+    }
+
+    public function getSlugAttribute(): string
+    {
+        return \Illuminate\Support\Str::slug($this->name ?? '');
+    }
+
+    public function getBrandsAttribute(): array
+    {
+        return $this->brands_list;
+    }
+
+    public function getChecklistItemsAttribute(): array
+    {
+        return $this->checklist_points;
     }
 
     public function scopeActive($query)

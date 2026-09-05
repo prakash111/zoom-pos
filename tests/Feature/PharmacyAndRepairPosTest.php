@@ -8,9 +8,9 @@ use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
 use App\Models\Plan;
 use App\Models\Product;
-use App\Models\RepairChecklist;
 use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
+use App\Models\RepairTicketItem;
 use App\Models\RepairTicketPart;
 use App\Models\Sale;
 use App\Models\User;
@@ -18,6 +18,7 @@ use App\Services\Sdui\SchemaValidator;
 use App\Services\Tenancy\TenantSampleDataService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -681,8 +682,8 @@ class PharmacyAndRepairPosTest extends TestCase
             'payment_method' => 'cash',
             'amount' => 40,
         ]);
-        $this->assertDatabaseHas('repair_ticket_parts', [
-            'repair_ticket_id' => $ticket->id,
+        $this->assertDatabaseHas('repair_ticket_items', [
+            'ticket_id' => $ticket->id,
             'product_id' => $part->id,
         ]);
 
@@ -858,7 +859,9 @@ class PharmacyAndRepairPosTest extends TestCase
             ->assertJsonPath('ticket.brand', 'Apple Watch');
 
         $ticketId = $ticketResponse->json('ticket.id');
-        $checklists = RepairChecklist::where('repair_ticket_id', $ticketId)->get();
+        $ticket = RepairTicket::find($ticketId);
+        $this->assertNotNull($ticket);
+        $checklists = collect($ticket->inspection_checklist);
         // Verifies intake checklist was auto-populated from category specifications
         $this->assertCount(4, $checklists);
         $this->assertTrue($checklists->pluck('item_name')->contains('Heart Rate Sensor'));
@@ -880,7 +883,7 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertGreaterThan(0, RepairDeviceCategory::withoutGlobalScope('company')->where('company_id', $this->company->id)->where('is_demo', true)->count());
         $this->assertGreaterThan(0, RepairTicket::withoutGlobalScope('company')->where('company_id', $this->company->id)->where('is_demo', true)->count());
         $this->assertGreaterThan(0, RepairTicketPart::withoutGlobalScope('company')->where('company_id', $this->company->id)->count());
-        $this->assertGreaterThan(0, RepairChecklist::withoutGlobalScope('company')->where('company_id', $this->company->id)->count());
+        $this->assertGreaterThan(0, RepairTicketItem::withoutGlobalScope('company')->where('company_id', $this->company->id)->count());
 
         // 3. Purge Demo Data
         $purgedCounts = $seeder->purgeDemoData($this->company);
@@ -1117,9 +1120,9 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertEquals('Next-Gen Gaming Consoles', $ticket->category?->name);
 
         // Verify checklist items were dynamically populated from the category specifications
-        $checklists = RepairChecklist::where('repair_ticket_id', $ticketId)->get();
-        $this->assertNotEmpty($checklists);
-        $checkNames = $checklists->pluck('item_name')->all();
+        $checklistItems = collect($ticket->inspection_checklist);
+        $this->assertNotEmpty($checklistItems);
+        $checkNames = $checklistItems->pluck('item_name')->all();
         $this->assertContains('4K HDMI 2.1 Output', $checkNames);
         $this->assertContains('Optical Blu-ray Drive', $checkNames);
 
@@ -1169,6 +1172,254 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertNotEmpty($settleRes->json('whatsapp_url'));
         $this->assertNotEmpty($settleRes->json('invoice_url'));
         $this->assertNotEmpty($settleRes->json('thermal_print_url'));
+    }
+
+    public function test_repair_rbac_permissions_enforcement(): void
+    {
+        // Create Cashier user
+        $cashier = User::factory()->create([
+            'company_id' => $this->company->id,
+            'email' => 'cashier@apexhealthtech.com',
+            'password' => Hash::make('secret123'),
+            'role' => 'cashier',
+        ]);
+        $cashierLogin = $this->postJson('/api/v1/pos/auth/login', [
+            'email' => 'cashier@apexhealthtech.com',
+            'password' => 'secret123',
+        ]);
+        $cashierToken = $cashierLogin->json('token');
+        $cashierHeaders = ['Authorization' => 'Bearer '.$cashierToken, 'Accept' => 'application/json'];
+
+        // Create Technician user
+        $technician = User::factory()->create([
+            'company_id' => $this->company->id,
+            'email' => 'tech@apexhealthtech.com',
+            'password' => Hash::make('secret123'),
+            'role' => 'technician',
+        ]);
+        $techLogin = $this->postJson('/api/v1/pos/auth/login', [
+            'email' => 'tech@apexhealthtech.com',
+            'password' => 'secret123',
+        ]);
+        $techToken = $techLogin->json('token');
+        $techHeaders = ['Authorization' => 'Bearer '.$techToken, 'Accept' => 'application/json'];
+
+        // 1. Cashier CAN create ticket
+        $cashierCreateRes = $this->withHeaders($cashierHeaders)->postJson('/api/tenant/repair/tickets', [
+            'customer_name' => 'RBAC Customer',
+            'customer_phone' => '+15551234',
+            'brand' => 'Google',
+            'model' => 'Pixel 8',
+            'issue_description' => 'Screen replacement needed',
+        ]);
+        $cashierCreateRes->assertOk()->assertJsonPath('success', true);
+        $ticketId = $cashierCreateRes->json('ticket.id');
+        $this->assertNotNull($ticketId);
+
+        // 2. Cashier CANNOT diagnose (add parts, update labor, edit checklist) -> 403
+        $cashierPartRes = $this->withHeaders($cashierHeaders)->postJson("/api/tenant/repair/tickets/{$ticketId}/parts", [
+            'part_name' => 'Pixel 8 OLED Display',
+            'quantity' => 1,
+            'unit_price' => 150.00,
+        ]);
+        $cashierPartRes->assertStatus(403);
+
+        $cashierLaborRes = $this->withHeaders($cashierHeaders)->postJson("/api/tenant/repair/tickets/{$ticketId}/labor", [
+            'labor_fee' => 45.00,
+        ]);
+        $cashierLaborRes->assertStatus(403);
+
+        $cashierChecklistRes = $this->withHeaders($cashierHeaders)->postJson("/api/tenant/repair/tickets/{$ticketId}/checklist", [
+            'checklist' => [['item' => 'Display', 'status' => 'fail']],
+        ]);
+        $cashierChecklistRes->assertStatus(403);
+
+        // Cashier CANNOT delete ticket -> 403
+        $cashierDeleteRes = $this->withHeaders($cashierHeaders)->deleteJson("/api/tenant/repair/tickets/{$ticketId}");
+        $cashierDeleteRes->assertStatus(403);
+
+        // 3. Technician CAN view tickets, diagnose, add parts, set labor, update checklist
+        $techViewRes = $this->withHeaders($techHeaders)->getJson('/api/tenant/repair/tickets');
+        $techViewRes->assertOk()->assertJsonPath('success', true);
+
+        $techPartRes = $this->withHeaders($techHeaders)->postJson("/api/tenant/repair/tickets/{$ticketId}/parts", [
+            'part_name' => 'Pixel 8 OLED Display',
+            'quantity' => 1,
+            'unit_price' => 150.00,
+        ]);
+        $techPartRes->assertOk()->assertJsonPath('success', true);
+
+        $techLaborRes = $this->withHeaders($techHeaders)->postJson("/api/tenant/repair/tickets/{$ticketId}/labor", [
+            'labor_fee' => 45.00,
+        ]);
+        $techLaborRes->assertOk()->assertJsonPath('success', true);
+
+        $techChecklistRes = $this->withHeaders($techHeaders)->postJson("/api/tenant/repair/tickets/{$ticketId}/checklist", [
+            'checklist' => [['item' => 'Display', 'status' => 'pass']],
+        ]);
+        $techChecklistRes->assertOk()->assertJsonPath('success', true);
+
+        // 4. Technician CANNOT checkout / settle tickets or delete tickets -> 403
+        $techSettleRes = $this->withHeaders($techHeaders)->postJson("/api/tenant/repair/tickets/{$ticketId}/settle", [
+            'payment_method' => 'cash',
+        ]);
+        $techSettleRes->assertStatus(403);
+
+        $techPosCheckoutRes = $this->withHeaders($techHeaders)->postJson('/api/tenant/repair/pos-checkout', [
+            'ticket_id' => $ticketId,
+            'payment_method' => 'cash',
+        ]);
+        $techPosCheckoutRes->assertStatus(403);
+
+        $techDeleteRes = $this->withHeaders($techHeaders)->deleteJson("/api/tenant/repair/tickets/{$ticketId}");
+        $techDeleteRes->assertStatus(403);
+
+        // 5. Cashier CAN checkout & settle the ticket
+        $cashierSettleRes = $this->withHeaders($cashierHeaders)->postJson("/api/tenant/repair/tickets/{$ticketId}/settle", [
+            'payment_method' => 'cash',
+            'paid_amount' => 195.00,
+        ]);
+        $cashierSettleRes->assertOk()->assertJsonPath('success', true);
+
+        // 6. Admin CAN delete ticket
+        $dummyTicket = RepairTicket::create([
+            'company_id' => $this->company->id,
+            'ticket_number' => 'REP-DEL-001',
+            'customer_name' => 'Delete Me',
+            'device_type' => 'Phone',
+            'brand' => 'Nokia',
+            'model' => '3310',
+            'problem_reported' => 'Keypad broken',
+        ]);
+        $adminDeleteRes = $this->withHeaders($this->authHeaders())->deleteJson("/api/tenant/repair/tickets/{$dummyTicket->id}");
+        $adminDeleteRes->assertOk()->assertJsonPath('success', true);
+        $this->assertNull(RepairTicket::find($dummyTicket->id));
+    }
+
+    public function test_repair_inventory_stock_deduction_and_restoration_lifecycle(): void
+    {
+        $sparePart = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Samsung S23 Ultra Battery Original',
+            'code' => 'BAT-S23-ULTRA',
+            'sale_price' => 75.00,
+            'cost_price' => 35.00,
+            'current_stock' => 10,
+            'active' => true,
+        ]);
+
+        // 1. Create ticket
+        $ticketRes = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/repair/tickets', [
+            'customer_name' => 'Stock Test Customer',
+            'brand' => 'Samsung',
+            'model' => 'Galaxy S23 Ultra',
+            'problem_reported' => 'Battery draining fast',
+        ]);
+        $ticketRes->assertOk();
+        $ticketId = $ticketRes->json('ticket.id');
+
+        // 2. Add 2 units of spare part -> stock decremented to 8
+        $partRes = $this->withHeaders($this->authHeaders())->postJson("/api/tenant/repair/tickets/{$ticketId}/parts", [
+            'product_id' => $sparePart->id,
+            'part_name' => 'Samsung S23 Ultra Battery Original',
+            'quantity' => 2,
+            'unit_price' => 75.00,
+        ]);
+        $partRes->assertOk();
+        $partItemId = $partRes->json('item.id');
+        $this->assertEquals(8, $sparePart->fresh()->current_stock);
+
+        // 3. Remove spare part -> stock restored to 10
+        $deletePartRes = $this->withHeaders($this->authHeaders())->deleteJson("/api/tenant/repair/tickets/{$ticketId}/parts/{$partItemId}");
+        $deletePartRes->assertOk();
+        $this->assertEquals(10, $sparePart->fresh()->current_stock);
+
+        // 4. Add 3 units -> stock decremented to 7
+        $partRes2 = $this->withHeaders($this->authHeaders())->postJson("/api/tenant/repair/tickets/{$ticketId}/parts", [
+            'product_id' => $sparePart->id,
+            'part_name' => 'Samsung S23 Ultra Battery Original',
+            'quantity' => 3,
+            'unit_price' => 75.00,
+        ]);
+        $partRes2->assertOk();
+        $this->assertEquals(7, $sparePart->fresh()->current_stock);
+
+        // 5. Cancel ticket -> stock restored to 10
+        $cancelRes = $this->withHeaders($this->authHeaders())->postJson("/api/tenant/repair/tickets/{$ticketId}/status", [
+            'status' => 'cancelled',
+            'notes' => 'Customer opted not to repair',
+        ]);
+        $cancelRes->assertOk();
+        $this->assertEquals(10, $sparePart->fresh()->current_stock);
+
+        // 6. Reopen/create another ticket and add parts, then delete ticket -> stock restored
+        $ticket2 = RepairTicket::create([
+            'company_id' => $this->company->id,
+            'ticket_number' => 'REP-STOCK-DEL',
+            'customer_name' => 'Jane Stock',
+            'device_type' => 'Phone',
+            'brand' => 'Samsung',
+            'model' => 'S23',
+            'problem_reported' => 'Battery replacement',
+        ]);
+        $partRes3 = $this->withHeaders($this->authHeaders())->postJson("/api/tenant/repair/tickets/{$ticket2->id}/parts", [
+            'product_id' => $sparePart->id,
+            'part_name' => 'Samsung S23 Ultra Battery Original',
+            'quantity' => 4,
+            'unit_price' => 75.00,
+        ]);
+        $partRes3->assertOk();
+        $this->assertEquals(6, $sparePart->fresh()->current_stock);
+
+        $deleteTicketRes = $this->withHeaders($this->authHeaders())->deleteJson("/api/tenant/repair/tickets/{$ticket2->id}");
+        $deleteTicketRes->assertOk();
+        $this->assertEquals(10, $sparePart->fresh()->current_stock);
+    }
+
+    public function test_repair_notifications_reminders_command_and_intake_sheet(): void
+    {
+        // 1. Ticket intake returns notification URLs
+        $ticketRes = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/repair/tickets', [
+            'customer_name' => 'Sarah Connor',
+            'customer_phone' => '+15554321',
+            'brand' => 'HP',
+            'model' => 'Spectre x360',
+            'issue_description' => 'Hinge broken and fan noisy',
+            'priority' => 'high',
+        ]);
+        $ticketRes->assertOk();
+        $ticketId = $ticketRes->json('ticket.id');
+        $this->assertNotEmpty($ticketRes->json('tracking_url'));
+        $this->assertNotEmpty($ticketRes->json('whatsapp_url'));
+        $this->assertNotEmpty($ticketRes->json('intake_sheet_url'));
+
+        // 2. Intake sheet printable HTML
+        $intakeSheetRes = $this->withHeaders($this->authHeaders())->get("/api/tenant/repair/tickets/{$ticketId}/intake-sheet");
+        $intakeSheetRes->assertOk();
+        $sheetHtml = $intakeSheetRes->getContent();
+        $this->assertStringContainsString('HP', $sheetHtml);
+        $this->assertStringContainsString('Spectre x360', $sheetHtml);
+        $this->assertStringContainsString('Sarah Connor', $sheetHtml);
+        $this->assertStringContainsString('Hinge broken', $sheetHtml);
+
+        // 3. Mark ticket ready
+        $statusRes = $this->withHeaders($this->authHeaders())->postJson("/api/tenant/repair/tickets/{$ticketId}/status", [
+            'status' => 'ready',
+            'notes' => 'Hinge repaired and fan lubricated',
+        ]);
+        $statusRes->assertOk();
+        $this->assertEquals('ready', $statusRes->json('ticket.status'));
+
+        // 4. Overdue ticket (> 48 hours) reminder command
+        $ticket = RepairTicket::find($ticketId);
+        $ticket->updated_at = now()->subHours(50);
+        $ticket->save();
+
+        $exitCode = Artisan::call('repair:send-reminders', ['--hours' => 48]);
+        $this->assertEquals(0, $exitCode);
+        $output = Artisan::output();
+        $this->assertStringContainsString('Scanning for repaired tickets', $output);
+        $this->assertStringContainsString('Successfully sent pickup reminders', $output);
     }
 }
 

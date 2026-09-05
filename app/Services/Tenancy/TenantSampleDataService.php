@@ -12,9 +12,9 @@ use App\Models\KitchenTicket;
 use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
 use App\Models\Product;
-use App\Models\RepairChecklist;
 use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
+use App\Models\RepairTicketItem;
 use App\Models\RepairTicketPart;
 use App\Models\Sale;
 use App\Models\SalonAppointment;
@@ -25,6 +25,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class TenantSampleDataService
 {
@@ -947,15 +948,26 @@ class TenantSampleDataService
         // 4. Device Categories & Hardware Specifications
         $deviceCategories = [];
         foreach (RepairDeviceCategory::defaultPresets() as $preset) {
-            $cat = RepairDeviceCategory::withoutGlobalScopes()->firstOrCreate([
+            $cat = Category::withoutGlobalScopes()->firstOrCreate([
                 'company_id' => $companyId,
-                'slug' => $preset['slug'],
-            ], array_merge($preset, [
+                'name' => $preset['name'],
+            ], [
                 'tenant_id' => $companyId,
-                'is_active' => true,
+                'slug' => Str::slug($preset['name']),
+                'type' => 'device',
+                'icon' => $preset['icon'],
+                'description' => $preset['description'] ?? null,
+                'metadata' => [
+                    'identifier_type' => $preset['identifier_type'] ?? 'Serial / IMEI',
+                    'brands' => $preset['brands'] ?? [],
+                    'checklist_items' => $preset['checklist_items'] ?? [],
+                    'common_issues' => $preset['common_issues'] ?? [],
+                ],
+                'sort_order' => $preset['sort_order'] ?? 1,
+                'active' => true,
                 'is_demo' => true,
-            ]));
-            $deviceCategories[$preset['slug']] = $cat;
+            ]);
+            $deviceCategories[$preset['name']] = $cat;
         }
 
         // 5. Sample Repair Tickets in Different Lifecycle Stages
@@ -968,66 +980,57 @@ class TenantSampleDataService
             'customer_id' => $cust1->id,
             'customer_name' => $cust1->name,
             'customer_phone' => $cust1->phone,
-            'device_category_id' => $deviceCategories['smartphone']->id ?? null,
-            'device_type' => 'Smartphone',
+            'category_id' => $deviceCategories['Smartphones & Mobiles']->id ?? null,
             'brand' => 'Apple',
             'model' => 'iPhone 14 Pro',
-            'serial_or_imei' => '359281094827164',
-            'passcode_or_pattern' => '198402',
-            'issue_description' => 'Shattered front screen after drop; display flickers with vertical green line.',
+            'serial_number_or_imei' => '359281094827164',
+            'passcode_pattern' => '198402',
+            'problem_reported' => 'Shattered front screen after drop; display flickers with vertical green line.',
             'physical_condition_notes' => 'Minor scuffs on stainless steel bezel; back glass pristine.',
-            'status' => 'active',
+            'status' => 'received',
             'priority' => 'high',
-            'technician_id' => $admin?->id,
+            'assigned_technician_id' => $admin?->id,
             'estimated_cost' => 190.00,
-            'advance_paid' => 50.00,
-            'labor_fee' => 30.00,
-            'parts_cost' => 160.00,
-            'total_amount' => 190.00,
+            'advance_deposit' => 50.00,
+            'advance_payment_method' => 'cash',
+            'inspection_checklist' => [
+                'power_on' => true,
+                'display' => false,
+            ],
             'intake_at' => now()->subHours(3),
             'is_demo' => true,
         ]);
 
-        RepairChecklist::withoutGlobalScopes()->firstOrCreate([
-            'company_id' => $companyId,
-            'repair_ticket_id' => $ticket1->id,
-            'item_name' => 'Power On / Boot',
-        ], [
-            'tenant_id' => $companyId,
-            'type' => 'intake',
-            'status' => 'pass',
-            'verified_by' => $admin?->id,
-            'verified_at' => now()->subHours(3),
-        ]);
-
-        RepairChecklist::withoutGlobalScopes()->firstOrCreate([
-            'company_id' => $companyId,
-            'repair_ticket_id' => $ticket1->id,
-            'item_name' => 'Display & Touchscreen',
-        ], [
-            'tenant_id' => $companyId,
-            'type' => 'intake',
-            'status' => 'fail',
-            'technician_notes' => 'Digitizer glass shattered; OLED panel damaged.',
-            'verified_by' => $admin?->id,
-            'verified_at' => now()->subHours(3),
-        ]);
-
         if (isset($createdProducts['REP-SCR-001'])) {
-            RepairTicketPart::withoutGlobalScopes()->firstOrCreate([
+            RepairTicketItem::withoutGlobalScopes()->firstOrCreate([
                 'company_id' => $companyId,
-                'repair_ticket_id' => $ticket1->id,
-                'part_name' => 'iPhone 14 Pro OLED Display Assembly (OEM Quality)',
+                'ticket_id' => $ticket1->id,
+                'item_name' => 'iPhone 14 Pro OLED Display Assembly (OEM Quality)',
             ], [
                 'tenant_id' => $companyId,
                 'product_id' => $createdProducts['REP-SCR-001']->id,
+                'item_type' => 'spare_part',
                 'quantity' => 1,
-                'unit_cost' => 65.00,
                 'unit_price' => 160.00,
                 'subtotal' => 160.00,
+                'total' => 160.00,
                 'billed_to_customer' => true,
             ]);
         }
+
+        RepairTicketItem::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'ticket_id' => $ticket1->id,
+            'item_name' => 'Diagnostic & Screen Replacement Labor',
+        ], [
+            'tenant_id' => $companyId,
+            'item_type' => 'service_labor',
+            'quantity' => 1,
+            'unit_price' => 30.00,
+            'subtotal' => 30.00,
+            'total' => 30.00,
+            'billed_to_customer' => true,
+        ]);
 
         // Ticket 2: In Progress
         $ticket2 = RepairTicket::withoutGlobalScopes()->firstOrCreate([
@@ -1038,41 +1041,57 @@ class TenantSampleDataService
             'customer_id' => $cust2->id,
             'customer_name' => $cust2->name,
             'customer_phone' => $cust2->phone,
-            'device_category_id' => $deviceCategories['smartphone']->id ?? null,
-            'device_type' => 'Smartphone',
+            'category_id' => $deviceCategories['Smartphones & Mobiles']->id ?? null,
             'brand' => 'Samsung',
             'model' => 'Galaxy S23 Ultra',
-            'serial_or_imei' => 'R5CW301827Z',
-            'passcode_or_pattern' => 'Pattern: L-shape',
-            'issue_description' => 'Battery draining from 100% to 15% in 2 hours; device gets warm near charging port.',
+            'serial_number_or_imei' => 'R5CW301827Z',
+            'passcode_pattern' => 'Pattern: L-shape',
+            'problem_reported' => 'Battery draining from 100% to 15% in 2 hours; device gets warm near charging port.',
             'physical_condition_notes' => 'Clean condition, screen protector installed.',
             'status' => 'in_progress',
             'priority' => 'normal',
-            'technician_id' => $admin?->id,
+            'assigned_technician_id' => $admin?->id,
             'estimated_cost' => 95.00,
-            'advance_paid' => 30.00,
-            'labor_fee' => 40.00,
-            'parts_cost' => 55.00,
-            'total_amount' => 95.00,
+            'advance_deposit' => 30.00,
+            'advance_payment_method' => 'cash',
+            'inspection_checklist' => [
+                'power_on' => true,
+                'battery_health' => '71%',
+            ],
             'intake_at' => now()->subDays(1),
             'is_demo' => true,
         ]);
 
         if (isset($createdProducts['REP-BAT-001'])) {
-            RepairTicketPart::withoutGlobalScopes()->firstOrCreate([
+            RepairTicketItem::withoutGlobalScopes()->firstOrCreate([
                 'company_id' => $companyId,
-                'repair_ticket_id' => $ticket2->id,
-                'part_name' => 'Samsung Galaxy S23 Ultra Replacement Battery 5000mAh',
+                'ticket_id' => $ticket2->id,
+                'item_name' => 'Samsung Galaxy S23 Ultra Replacement Battery 5000mAh',
             ], [
                 'tenant_id' => $companyId,
                 'product_id' => $createdProducts['REP-BAT-001']->id,
+                'item_type' => 'spare_part',
                 'quantity' => 1,
-                'unit_cost' => 18.50,
                 'unit_price' => 55.00,
                 'subtotal' => 55.00,
+                'total' => 55.00,
                 'billed_to_customer' => true,
             ]);
         }
+
+        RepairTicketItem::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'ticket_id' => $ticket2->id,
+            'item_name' => 'Battery Calibration & Replacement Labor',
+        ], [
+            'tenant_id' => $companyId,
+            'item_type' => 'service_labor',
+            'quantity' => 1,
+            'unit_price' => 40.00,
+            'subtotal' => 40.00,
+            'total' => 40.00,
+            'billed_to_customer' => true,
+        ]);
 
         // Ticket 3: Repaired & Ready for Pickup
         $ticket3 = RepairTicket::withoutGlobalScopes()->firstOrCreate([
@@ -1083,25 +1102,54 @@ class TenantSampleDataService
             'customer_id' => $cust1->id,
             'customer_name' => $cust1->name,
             'customer_phone' => $cust1->phone,
-            'device_category_id' => $deviceCategories['laptop-notebook']->id ?? null,
-            'device_type' => 'Laptop',
+            'category_id' => $deviceCategories['Laptops & MacBooks']->id ?? null,
             'brand' => 'Dell',
             'model' => 'XPS 15 9520',
-            'serial_or_imei' => 'DELL-SN-8921A',
-            'passcode_or_pattern' => 'Windows Hello Pin: 4091',
-            'issue_description' => 'Thermal overheating shutdown under load. Thermal paste dried out.',
+            'serial_number_or_imei' => 'DELL-SN-8921A',
+            'passcode_pattern' => 'Windows Hello Pin: 4091',
+            'problem_reported' => 'Thermal overheating shutdown under load. Thermal paste dried out.',
             'physical_condition_notes' => 'Missing two bottom rubber feet.',
-            'status' => 'repaired',
+            'status' => 'ready',
             'priority' => 'normal',
-            'technician_id' => $admin?->id,
+            'assigned_technician_id' => $admin?->id,
             'estimated_cost' => 65.00,
-            'advance_paid' => 20.00,
-            'labor_fee' => 50.00,
-            'parts_cost' => 15.00,
-            'total_amount' => 65.00,
+            'advance_deposit' => 20.00,
+            'advance_payment_method' => 'card',
+            'inspection_checklist' => [
+                'power_on' => true,
+                'thermal_test' => 'pass',
+            ],
             'intake_at' => now()->subDays(2),
             'completed_at' => now()->subHours(2),
             'is_demo' => true,
+        ]);
+
+        RepairTicketItem::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'ticket_id' => $ticket3->id,
+            'item_name' => 'High-Performance Thermal Paste Compound',
+        ], [
+            'tenant_id' => $companyId,
+            'item_type' => 'spare_part',
+            'quantity' => 1,
+            'unit_price' => 15.00,
+            'subtotal' => 15.00,
+            'total' => 15.00,
+            'billed_to_customer' => true,
+        ]);
+
+        RepairTicketItem::withoutGlobalScopes()->firstOrCreate([
+            'company_id' => $companyId,
+            'ticket_id' => $ticket3->id,
+            'item_name' => 'Internal Dust Clean & Heatsink Repasting',
+        ], [
+            'tenant_id' => $companyId,
+            'item_type' => 'service_labor',
+            'quantity' => 1,
+            'unit_price' => 50.00,
+            'subtotal' => 50.00,
+            'total' => 50.00,
+            'billed_to_customer' => true,
         ]);
 
         $this->seedTaxRuleForCountry($company);
@@ -1402,14 +1450,19 @@ class TenantSampleDataService
                 ->where('is_demo', true)
                 ->delete();
 
-            // 3. Repair Tickets & Parts (before customers/products)
+            // 3. Repair Tickets & Items (before customers/products)
+            $counts['repair_ticket_items'] = RepairTicketItem::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->delete();
+
             $counts['repair_tickets'] = RepairTicket::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('is_demo', true)
                 ->delete();
 
-            $counts['repair_device_categories'] = RepairDeviceCategory::withoutGlobalScopes()
+            $counts['repair_device_categories'] = Category::withoutGlobalScopes()
                 ->where('company_id', $companyId)
+                ->where('type', 'device')
                 ->where('is_demo', true)
                 ->delete();
 
