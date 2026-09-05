@@ -73,7 +73,7 @@ class UniversalPosBuilder
         }
 
         return self::envelope(
-            title: 'Retail Point of Sale',
+            title: 'Retail',
             company: $company,
             searchPlaceholder: 'Search by Product Name, SKU, or Barcode',
             categories: $categories,
@@ -158,9 +158,9 @@ class UniversalPosBuilder
         }
 
         return self::envelope(
-            title: 'Pharmacy Counter POS',
+            title: 'Pharmacy',
             company: $company,
-            searchPlaceholder: 'Search Generic Formula, Brand Name, or Barcode',
+            searchPlaceholder: 'Search by Product Name, SKU, or Barcode',
             categories: $categories,
             items: $items,
             checkoutSheetEndpoint: '/api/tenant/pharmacy/checkout-sheet',
@@ -225,9 +225,9 @@ class UniversalPosBuilder
         }
 
         return self::envelope(
-            title: 'Repair Counter & Parts POS',
+            title: 'Repair',
             company: $company,
-            searchPlaceholder: 'Search Spare Parts, Hardware Modules, or Labor Fees',
+            searchPlaceholder: 'Search by Product Name, SKU, or Barcode',
             categories: $categories,
             items: $items,
             checkoutSheetEndpoint: $checkoutEndpoint,
@@ -295,9 +295,9 @@ class UniversalPosBuilder
         }
 
         return self::envelope(
-            title: 'Salon & Service POS',
+            title: 'Salon',
             company: $company,
-            searchPlaceholder: 'Search Services or Treatment Packages',
+            searchPlaceholder: 'Search by Product Name, SKU, or Barcode',
             categories: $categories,
             items: $items,
             checkoutSheetEndpoint: $checkoutEndpoint,
@@ -718,30 +718,30 @@ class UniversalPosBuilder
         $components = [
             SchemaResponse::card([
                 SchemaResponse::row([
-                    SchemaResponse::column([
-                        SchemaResponse::text('Order Summary', 'title_medium', ['bold' => true]),
-                        SchemaResponse::text($currency.number_format($subtotal, 2).' running subtotal', 'body_small', ['color' => '#64748b']),
+                    SchemaResponse::row([
+                        SchemaResponse::text('Order Cart', 'title_large', ['bold' => true]),
+                        SchemaResponse::badge("{$itemCount} items", '#2563eb', 'subtle'),
                     ]),
-                    SchemaResponse::badge("{$itemCount} line items", '#166534', 'solid'),
+                    SchemaResponse::badge('Clear Cart', '#ef4444', 'subtle'),
                 ], ['main_axis_alignment' => 'space_between']),
                 SchemaResponse::divider(),
                 ...$summaryRows,
-            ], ['border_radius' => 16, 'border_color' => '#d1fae5']),
+            ], ['border_radius' => 16, 'border_color' => '#e2e8f0']),
         ];
 
         if (empty($summaryRows)) {
             $components[] = SchemaResponse::text('Your cart is empty. Add items before checking out.', 'body_medium', ['color' => '#64748b']);
         }
 
-        // Top Action Pills: Add Customer, Hold, Note, Discount, Split Payment
+        // Action Pills row: Add Customer, Hold, Note, Discount, Split Payment, Amount Paid
         $components[] = SchemaResponse::card([
-            SchemaResponse::text('Customer & Order Actions', 'label_large', ['bold' => true]),
             SchemaResponse::wrap([
-                SchemaResponse::badge('Add Customer', '#2563eb', 'subtle'),
-                SchemaResponse::badge('Hold', '#d97706', 'subtle'),
-                SchemaResponse::badge('Note', '#475569', 'subtle'),
-                SchemaResponse::badge('Discount', '#7c3aed', 'subtle'),
-                SchemaResponse::badge('Split Payment', '#059669', 'subtle'),
+                SchemaResponse::badge('+ Add Customer', '#2563eb', 'subtle'),
+                SchemaResponse::badge('⏱ Hold', '#d97706', 'subtle'),
+                SchemaResponse::badge('📝 Note', '#475569', 'subtle'),
+                SchemaResponse::badge('% Discount', '#7c3aed', 'subtle'),
+                SchemaResponse::badge('➗ Split Payment', '#059669', 'subtle'),
+                SchemaResponse::badge($currency.' Amount Paid', '#0284c7', 'subtle'),
             ]),
             SchemaResponse::accordionGroup('Customer, Note & Discount', [
                 SchemaResponse::textInput('customer_name', $customerFieldLabel, $defaultCustomerName ?: 'Walk-in Customer'),
@@ -780,7 +780,7 @@ class UniversalPosBuilder
                         'Load '.$rx['label'],
                         SchemaResponse::openRemoteSheetAction(
                             "/api/tenant/pharmacy/prescriptions/{$rx['id']}/checkout-sheet",
-                            'Prescription Checkout'
+                            'Order Cart'
                         ),
                         'receipt_long',
                         ['full_width' => false]
@@ -807,57 +807,53 @@ class UniversalPosBuilder
             ], ['initially_expanded' => false]);
         }
 
-        // Payment Method Selector: Rounded toggle buttons (Cash, Card, Transfer)
+        // Payment Method Selector
         $components[] = SchemaResponse::card([
             SchemaResponse::text('Payment Method', 'label_large', ['bold' => true]),
             SchemaResponse::wrap(array_map(function (array $method) use ($selectedPaymentMethod, $refreshSheet) {
                 $action = SchemaResponse::openRemoteSheetAction($refreshSheet([
                     'selected_payment_method' => $method['value'],
-                ]), 'Checkout & Settlement');
+                ]), 'Order Cart');
 
                 $isSelected = ($method['value'] === $selectedPaymentMethod)
                     || ($method['value'] === 'transfer' && $selectedPaymentMethod === 'upi')
                     || ($method['value'] === 'upi' && $selectedPaymentMethod === 'transfer');
 
                 return $isSelected
-                    ? SchemaResponse::buttonPrimary($method['label'], $action, $method['icon'], ['full_width' => false, 'border_radius' => 20])
+                    ? SchemaResponse::buttonPrimary($method['label'], $action, $method['icon'], ['full_width' => false, 'border_radius' => 20, 'background_color' => '#2563eb'])
                     : SchemaResponse::buttonOutlined($method['label'], $action, $method['icon'], ['full_width' => false, 'border_radius' => 20]);
             }, $paymentMethods)),
             SchemaResponse::dropdownSelect('payment_method', 'Select Tender', $paymentMethods, $selectedPaymentMethod),
         ], ['border_radius' => 16]);
 
-        // Quick Cash Tendered Block + Green Change Due Box
+        // Cash Tendered + CHANGE DUE TO CUSTOMER + Quick Cash Suggestions
         $components[] = SchemaResponse::card([
-            SchemaResponse::row([
-                SchemaResponse::column([
-                    SchemaResponse::text('Quick Cash Tendered', 'label_large', ['bold' => true]),
-                    SchemaResponse::text('Tap a suggested amount or enter cash received.', 'body_small', ['color' => '#64748b']),
-                ]),
-                SchemaResponse::badge('CASH', '#166534', 'subtle'),
-            ], ['main_axis_alignment' => 'space_between']),
+            SchemaResponse::textInput('tendered', 'Cash Tendered by Customer', number_format($selectedTendered, 2, '.', ''), [
+                'keyboard_type' => 'number',
+                'prefix_icon' => 'payments',
+            ]),
+            SchemaResponse::container([
+                SchemaResponse::row([
+                    SchemaResponse::column([
+                        SchemaResponse::text('CHANGE DUE TO CUSTOMER', 'label_small', ['bold' => true, 'color' => '#166534']),
+                        SchemaResponse::text('Change Due to Customer', 'body_small', ['color' => '#15803d']),
+                    ]),
+                    SchemaResponse::text($currency.number_format($changeDue, 2), 'title_large', ['bold' => true, 'color' => '#166534']),
+                ], ['main_axis_alignment' => 'space_between']),
+            ], ['padding' => 12, 'color' => '#ecfdf5', 'border_color' => '#86efac', 'border_radius' => 10]),
             SchemaResponse::wrap(array_map(function (array $suggestion) use ($selectedTendered, $refreshSheet) {
                 $action = SchemaResponse::openRemoteSheetAction($refreshSheet([
                     'selected_tendered' => number_format($suggestion['amount'], 2, '.', ''),
-                ]), 'Checkout & Settlement');
+                ]), 'Order Cart');
 
                 return abs($suggestion['amount'] - $selectedTendered) < 0.001
-                    ? SchemaResponse::buttonPrimary($suggestion['display'], $action, null, ['full_width' => false, 'border_radius' => 16])
+                    ? SchemaResponse::buttonPrimary($suggestion['display'], $action, null, ['full_width' => false, 'border_radius' => 16, 'background_color' => '#166534'])
                     : SchemaResponse::buttonOutlined($suggestion['display'], $action, null, ['full_width' => false, 'border_radius' => 16]);
             }, $quickCash)),
             SchemaResponse::dropdownSelect('quick_cash_tendered', 'Quick Cash Amount', array_map(
                 fn (array $suggestion) => ['label' => $suggestion['display'], 'value' => number_format($suggestion['amount'], 2, '.', '')],
                 $quickCash
             ), number_format($selectedTendered, 2, '.', '')),
-            SchemaResponse::textInput('tendered', 'Custom Cash Tendered (Optional)', '', ['keyboard_type' => 'number']),
-            SchemaResponse::container([
-                SchemaResponse::row([
-                    SchemaResponse::column([
-                        SchemaResponse::text('Change Due to Customer', 'label_large', ['bold' => true, 'color' => '#166534']),
-                        SchemaResponse::text('Updates from the selected or entered tender amount', 'body_small', ['color' => '#15803d']),
-                    ]),
-                    SchemaResponse::text($currency.number_format($changeDue, 2), 'title_large', ['bold' => true, 'color' => '#166534']),
-                ], ['main_axis_alignment' => 'space_between']),
-            ], ['padding' => 12, 'color' => '#ecfdf5', 'border_color' => '#86efac', 'border_radius' => 12]),
         ], ['border_radius' => 16, 'border_color' => '#bbf7d0']);
 
         // Split Payment Section
@@ -912,7 +908,7 @@ class UniversalPosBuilder
             reload: true
         ), 'payments', ['background_color' => '#166534', 'border_radius' => 14]);
 
-        $schema = self::sheet('Checkout & Settlement', $components);
+        $schema = self::sheet('Order Cart', $components);
         $schema['type'] = 'sheet';
         $schema['presentation'] = 'native_pos_checkout_drawer';
         $schema['module'] = $module;

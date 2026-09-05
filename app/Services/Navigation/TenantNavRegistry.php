@@ -538,9 +538,9 @@ class TenantNavRegistry
                 'label' => 'Pharmacy Counter POS',
                 'title' => 'Pharmacy Counter POS',
                 'icon' => 'local_pharmacy',
-                'component' => 'pharmacy_pos',
+                'component' => 'pos',
                 'permission' => 'pos',
-                'target_endpoint' => '/api/tenant/views/pharmacy-pos',
+                'target_endpoint' => '/api/tenant/views/pos',
             ],
             [
                 'key' => 'sales',
@@ -612,9 +612,9 @@ class TenantNavRegistry
                 'label' => 'Repair POS & Checkout',
                 'title' => 'Repair POS & Checkout',
                 'icon' => 'point_of_sale',
-                'component' => 'repair_pos',
+                'component' => 'pos',
                 'permission' => 'pos',
-                'target_endpoint' => '/api/tenant/views/repair-pos',
+                'target_endpoint' => '/api/tenant/views/pos',
             ],
             [
                 'key' => 'sales',
@@ -713,9 +713,9 @@ class TenantNavRegistry
                 'label' => 'Salon POS & Checkout',
                 'title' => 'Salon POS & Checkout',
                 'icon' => 'spa',
-                'component' => 'salon_pos',
+                'component' => 'pos',
                 'permission' => 'pos',
-                'target_endpoint' => '/api/tenant/views/salon-pos',
+                'target_endpoint' => '/api/tenant/views/pos',
             ],
             [
                 'key' => 'sales',
@@ -1246,7 +1246,7 @@ class TenantNavRegistry
                 'label' => 'Dispensary & Counter',
                 'color' => '#059669',
                 'items' => [
-                    ['key' => 'pharmacy_pos', 'label' => 'Pharmacy Counter POS', 'icon' => 'local_pharmacy', 'component' => 'pharmacy_pos', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/pharmacy-pos'],
+                    ['key' => 'pharmacy_pos', 'label' => 'Pharmacy Counter POS', 'icon' => 'local_pharmacy', 'component' => 'pos', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/pos'],
                     ['key' => 'sales', 'label' => 'Dispensed Prescriptions', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales', 'target_endpoint' => '/api/tenant/views/sales'],
                     ['key' => 'quotations', 'label' => 'Quotations & Estimates', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes', 'target_endpoint' => '/api/tenant/views/quotations'],
                     ['key' => 'customers', 'label' => 'Patients & Doctors', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'target_endpoint' => '/api/tenant/views/customers'],
@@ -1288,7 +1288,7 @@ class TenantNavRegistry
                 'label' => 'Appointments & Service',
                 'color' => '#7c3aed',
                 'items' => [
-                    ['key' => 'salon_pos', 'label' => 'Service POS & Checkout', 'icon' => 'spa', 'component' => 'salon_pos', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/salon-pos'],
+                    ['key' => 'salon_pos', 'label' => 'Service POS & Checkout', 'icon' => 'spa', 'component' => 'pos', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/pos'],
                     ['key' => 'sales', 'label' => 'Sales & Invoices History', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales', 'target_endpoint' => '/api/tenant/views/sales'],
                     ['key' => 'quotations', 'label' => 'Quotations & Estimates', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes', 'target_endpoint' => '/api/tenant/views/quotations'],
                     ['key' => 'customers', 'label' => 'Clients & Memberships', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'target_endpoint' => '/api/tenant/views/customers'],
@@ -1327,7 +1327,7 @@ class TenantNavRegistry
                 'label' => 'Repair & Workbench',
                 'color' => '#0284c7',
                 'items' => [
-                    ['key' => 'repair_pos', 'label' => 'Repair POS & Checkout', 'icon' => 'point_of_sale', 'component' => 'repair_pos', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/repair-pos'],
+                    ['key' => 'repair_pos', 'label' => 'Repair POS & Checkout', 'icon' => 'point_of_sale', 'component' => 'pos', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/pos'],
                     ['key' => 'sales', 'label' => 'Sales & Invoices History', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales', 'target_endpoint' => '/api/tenant/views/sales'],
                     ['key' => 'quotations', 'label' => 'Quotations & Estimates', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes', 'target_endpoint' => '/api/tenant/views/quotations'],
                     ['key' => 'customers', 'label' => 'Customers & CRM', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'target_endpoint' => '/api/tenant/views/customers'],
