@@ -90,6 +90,106 @@ class SalonApiController extends Controller
         return response()->json(['success' => true, 'schema' => $schema]);
     }
 
+    /**
+     * Specialist picker sheet (component tree) for a single salon service.
+     * Rendered by UniversalPosScreen when a service catalog item is tapped.
+     * GET /api/tenant/salon/specialist-sheet
+     */
+    public function specialistSheet(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $productId = (int) $request->query('product_id');
+
+        if ($productId <= 0) {
+            return response()->json(['success' => false, 'error' => 'product_id is required.'], 422);
+        }
+
+        $service = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->findOrFail($productId);
+
+        $currency = $company->currency_symbol ?: '$';
+        $duration = (int) ($service->duration_minutes ?: 30);
+        $price = (float) $service->sale_price;
+
+        $specialists = User::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('is_specialist', true)
+            ->where('status', 'approved')
+            ->orderBy('name')
+            ->get();
+
+        $components = [
+            \App\Services\Sdui\SchemaResponse::row([
+                \App\Services\Sdui\SchemaResponse::icon('spa', ['color' => '#7c3aed', 'size' => 28]),
+                \App\Services\Sdui\SchemaResponse::column([
+                    \App\Services\Sdui\SchemaResponse::text($service->name, 'title_medium', ['bold' => true]),
+                    \App\Services\Sdui\SchemaResponse::text("Duration: {$duration} mins · Rate: {$currency}".number_format($price, 2), 'body_small', ['color' => '#64748b']),
+                ]),
+            ]),
+            \App\Services\Sdui\SchemaResponse::divider(),
+            \App\Services\Sdui\SchemaResponse::text('Select Stylist / Specialist for this Service:', 'label_large', ['bold' => true]),
+        ];
+
+        // 1. Any Available Stylist option
+        $components[] = \App\Services\Sdui\SchemaResponse::card([
+            \App\Services\Sdui\SchemaResponse::row([
+                \App\Services\Sdui\SchemaResponse::icon('groups', ['color' => '#0284c7', 'size' => 24]),
+                \App\Services\Sdui\SchemaResponse::column([
+                    \App\Services\Sdui\SchemaResponse::text('Any Available Specialist', 'title_small', ['bold' => true]),
+                    \App\Services\Sdui\SchemaResponse::text('Assign automatically at service time', 'body_small', ['color' => '#64748b']),
+                ]),
+                \App\Services\Sdui\SchemaResponse::badge('Flexible', '#0284c7', 'subtle'),
+            ], ['main_axis_alignment' => 'space_between']),
+            \App\Services\Sdui\SchemaResponse::buttonPrimary('Select Any Available', \App\Services\Sdui\SchemaResponse::addToCartAction([
+                'id' => $service->id,
+                'batch_id' => null,
+                'title' => $service->name,
+                'subtitle' => "Service · {$duration}m (Any Specialist)",
+                'price' => $price,
+                'quantity' => 1,
+                'max_quantity' => 99,
+                'duration_minutes' => $duration,
+                'service_type' => 'service',
+            ]), 'add_shopping_cart'),
+        ]);
+
+        // 2. Individual Specialists
+        foreach ($specialists as $staff) {
+            $components[] = \App\Services\Sdui\SchemaResponse::card([
+                \App\Services\Sdui\SchemaResponse::row([
+                    \App\Services\Sdui\SchemaResponse::icon('person', ['color' => '#7c3aed', 'size' => 24]),
+                    \App\Services\Sdui\SchemaResponse::column([
+                        \App\Services\Sdui\SchemaResponse::text($staff->name, 'title_small', ['bold' => true]),
+                        \App\Services\Sdui\SchemaResponse::text(User::ROLES[$staff->role] ?? 'Stylist / Technician', 'body_small', ['color' => '#64748b']),
+                    ]),
+                    \App\Services\Sdui\SchemaResponse::badge('Available', '#10b981', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                \App\Services\Sdui\SchemaResponse::buttonPrimary("Assign {$staff->name}", \App\Services\Sdui\SchemaResponse::addToCartAction([
+                    'id' => $service->id,
+                    'batch_id' => null,
+                    'title' => $service->name,
+                    'subtitle' => "Stylist: {$staff->name} · {$duration}m",
+                    'price' => $price,
+                    'quantity' => 1,
+                    'max_quantity' => 99,
+                    'specialist_id' => $staff->id,
+                    'specialist_name' => $staff->name,
+                    'duration_minutes' => $duration,
+                    'service_type' => 'service',
+                ]), 'person_add'),
+            ]);
+        }
+
+        $schema = \App\Services\Sdui\SchemaResponse::sheet("Select Stylist — {$service->name}", $components);
+        $errors = app(SchemaValidator::class)->validate($schema);
+        if ($errors !== []) {
+            return response()->json(['success' => false, 'error' => 'Invalid SDUI schema.', 'details' => ['schema' => $errors]], 500);
+        }
+
+        return response()->json(['success' => true, 'schema' => $schema]);
+    }
+
     /** List the tenant's real appointment book for a date or date range. */
     public function appointmentsIndex(Request $request): JsonResponse
     {
@@ -130,6 +230,9 @@ class SalonApiController extends Controller
             'appointment_date' => 'required|date',
             'appointment_time' => 'required|date_format:H:i',
             'notes' => 'nullable|string|max:1000',
+            'advance_deposit' => 'nullable|numeric|min:0',
+            'advance_paid' => 'nullable|numeric|min:0',
+            'deposit_payment_method' => 'nullable|string|max:50',
         ]);
 
         if ($validator->fails()) {
@@ -176,6 +279,7 @@ class SalonApiController extends Controller
             ->where('company_id', $company->id)
             ->whereDate('starts_at', $startsAt->toDateString())
             ->count() + 1;
+        $advancePaid = (float) $request->input('advance_deposit', $request->input('advance_paid', 0));
         $appointment = SalonAppointment::create([
             'company_id' => $company->id,
             'tenant_id' => $company->id,
@@ -189,6 +293,8 @@ class SalonApiController extends Controller
             'ends_at' => $endsAt,
             'status' => 'scheduled',
             'notes' => $request->input('notes'),
+            'advance_paid' => $advancePaid,
+            'deposit_payment_method' => $request->input('deposit_payment_method', 'cash'),
         ]);
 
         AuditLog::record('salon.appointment_created', $company->id, $this->resolveUser($request, $company)?->id, [
@@ -388,12 +494,15 @@ class SalonApiController extends Controller
                 $netAmount = (float) $taxTotals['total'];
                 $totalRevenue = (float) $taxTotals['total'];
                 $paymentMethod = strtolower((string) $request->input('payment_method', $request->input('selected_payment_method', 'cash')));
+                $advanceApplied = $appointment ? min((float) ($appointment->advance_paid ?? 0), $netAmount) : 0.0;
+                $balanceToCollect = max(0, round($netAmount - $advanceApplied, 2));
                 $payments = $request->input('payments');
-                $paidAmount = $paymentMethod === 'credit'
+                $collectedNow = $paymentMethod === 'credit'
                     ? 0.0
                     : (! empty($payments) && is_array($payments)
-                        ? min($netAmount, collect($payments)->sum(fn ($payment) => max(0, (float) ($payment['amount'] ?? 0))))
-                        : $netAmount);
+                        ? min($balanceToCollect, collect($payments)->sum(fn ($payment) => max(0, (float) ($payment['amount'] ?? 0))))
+                        : $balanceToCollect);
+                $paidAmount = min($netAmount, $advanceApplied + $collectedNow);
                 $dueAmount = max(0, round($netAmount - $paidAmount, 2));
                 $paymentStatus = $dueAmount <= 0 ? 'paid' : ($paidAmount > 0 ? 'partial' : 'pending');
                 $cashRegister = CashRegister::openFor($company->id);
@@ -430,6 +539,18 @@ class SalonApiController extends Controller
                         : ($request->input('notes') ?? 'Salon Counter Sale'),
                 ]);
 
+                if ($advanceApplied > 0) {
+                    OrderPayment::create([
+                        'company_id' => $company->id,
+                        'sale_id' => $sale->id,
+                        'cash_register_id' => $cashRegister?->id,
+                        'payment_method' => 'advance_deposit',
+                        'amount' => $advanceApplied,
+                        'net_amount' => $advanceApplied,
+                        'notes' => "Advance deposit applied from Appointment #{$appointment->id}",
+                    ]);
+                }
+
                 if (! empty($payments) && is_array($payments)) {
                     foreach ($payments as $pay) {
                         $amt = (float) ($pay['amount'] ?? 0);
@@ -444,19 +565,19 @@ class SalonApiController extends Controller
                             ]);
                         }
                     }
-                } elseif ($paymentMethod !== 'credit' && $paidAmount > 0) {
+                } elseif ($paymentMethod !== 'credit' && $collectedNow > 0) {
                     $tendered = $request->filled('tendered')
                         ? (float) $request->input('tendered')
-                        : (float) $request->input('quick_cash_tendered', $request->input('selected_tendered', $paidAmount));
+                        : (float) $request->input('quick_cash_tendered', $request->input('selected_tendered', $collectedNow));
                     OrderPayment::create([
                         'company_id' => $company->id,
                         'sale_id' => $sale->id,
                         'cash_register_id' => $cashRegister?->id,
                         'payment_method' => $paymentMethod,
-                        'amount' => $paidAmount,
-                        'tendered' => $paymentMethod === 'cash' ? max($paidAmount, $tendered) : null,
-                        'change_returned' => $paymentMethod === 'cash' ? max(0, $tendered - $paidAmount) : 0,
-                        'net_amount' => $paidAmount,
+                        'amount' => $collectedNow,
+                        'tendered' => $paymentMethod === 'cash' ? max($collectedNow, $tendered) : null,
+                        'change_returned' => $paymentMethod === 'cash' ? max(0, $tendered - $collectedNow) : 0,
+                        'net_amount' => $collectedNow,
                     ]);
                 }
 
@@ -473,10 +594,15 @@ class SalonApiController extends Controller
                 'specialist_id' => $specialistId,
             ]);
 
+            $whatsappUrl = app(\App\Services\Invoice\InvoiceDeliveryService::class)->generateInvoiceWhatsAppUrl($sale, $request->input('customer_phone'));
+
             return response()->json([
                 'success' => true,
                 'message' => 'Salon counter sale completed successfully',
                 'sale' => $sale,
+                'whatsapp_url' => $whatsappUrl,
+                'invoice_url' => "/tenant/sales/{$sale->id}/invoice",
+                'thermal_print_url' => "/tenant/sales/{$sale->id}/receipt/print",
             ]);
         } catch (\InvalidArgumentException $e) {
             return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
@@ -556,6 +682,8 @@ class SalonApiController extends Controller
             'status' => $appointment->status,
             'notes' => $appointment->notes,
             'sale_id' => $appointment->sale_id,
+            'advance_paid' => (float) ($appointment->advance_paid ?? 0),
+            'deposit_payment_method' => $appointment->deposit_payment_method,
         ];
     }
 

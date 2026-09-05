@@ -6,6 +6,7 @@ use App\Models\CashRegister;
 use App\Models\Company;
 use App\Models\Product;
 use App\Models\RepairTicket;
+use App\Models\Sale;
 use App\Models\SalonAppointment;
 use App\Models\User;
 use App\Services\TaxCalculationService;
@@ -283,6 +284,8 @@ class UniversalPosBuilder
                     'price' => (float) $product->sale_price,
                     'quantity' => 1,
                     'max_quantity' => max(1, $stock),
+                    'duration_minutes' => $duration,
+                    'service_type' => $duration !== null ? 'service' : 'retail_add_on',
                 ]),
             ];
         }
@@ -438,15 +441,69 @@ class UniversalPosBuilder
      */
     public static function specialistRosterScreen(Company $company): array
     {
+        $currency = $company->currency_symbol ?: '$';
         $staff = User::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('status', 'approved')
             ->orderBy('name')
             ->get();
 
-        $cards = [];
+        $hasAppointments = Schema::hasTable('salon_appointments');
+        $allAppointments = $hasAppointments
+            ? SalonAppointment::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->with('service')
+                ->get()
+            : collect();
+
+        $allSales = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', 'completed')
+            ->get(['id', 'items']);
+
+        $activeSpecialistsCount = 0;
+        $totalBookedMinutes = 0;
+        $totalCompletedServices = 0;
+        $totalCommissionEarned = 0.0;
+
+        $staffData = [];
         foreach ($staff as $user) {
             $isSpecialist = (bool) $user->is_specialist;
+            if ($isSpecialist) {
+                $activeSpecialistsCount++;
+            }
+
+            $userAppointments = $allAppointments->where('specialist_id', $user->id);
+            $bookedMins = $userAppointments->whereIn('status', ['scheduled', 'checked_in', 'completed'])->sum(fn ($apt) => (int) ($apt->service?->duration_minutes ?: 30));
+            $completedJobs = $userAppointments->where('status', 'completed')->count();
+            $totalBookedMinutes += $bookedMins;
+            $totalCompletedServices += $completedJobs;
+
+            $commissionEarned = 0.0;
+            foreach ($allSales as $sale) {
+                $items = (array) ($sale->items ?? []);
+                foreach ($items as $item) {
+                    if (is_array($item) && isset($item['specialist_id']) && (string) $item['specialist_id'] === (string) $user->id) {
+                        $commissionEarned += (float) ($item['commission_amount'] ?? 0);
+                    }
+                }
+            }
+            $totalCommissionEarned += $commissionEarned;
+
+            $staffData[] = [
+                'user' => $user,
+                'is_specialist' => $isSpecialist,
+                'booked_hours' => round($bookedMins / 60, 1),
+                'completed_jobs' => $completedJobs,
+                'commission_earned' => $commissionEarned,
+            ];
+        }
+
+        $cards = [];
+        foreach ($staffData as $data) {
+            $user = $data['user'];
+            $isSpecialist = $data['is_specialist'];
+
             $cards[] = SchemaResponse::card([
                 SchemaResponse::row([
                     SchemaResponse::column([
@@ -454,9 +511,25 @@ class UniversalPosBuilder
                         SchemaResponse::text(User::ROLES[$user->role] ?? ucfirst($user->role), 'body_small', ['color' => '#64748b']),
                     ]),
                     $isSpecialist
-                        ? SchemaResponse::badge('Specialist', '#7c3aed', 'solid')
-                        : SchemaResponse::badge('Not Assigned', '#64748b', 'subtle'),
+                        ? SchemaResponse::badge('Active Specialist', '#7c3aed', 'solid')
+                        : SchemaResponse::badge('Staff Member', '#64748b', 'subtle'),
                 ], ['main_axis_alignment' => 'space_between']),
+                SchemaResponse::divider(),
+                SchemaResponse::row([
+                    SchemaResponse::column([
+                        SchemaResponse::text('Booked Hours', 'body_small', ['color' => '#64748b']),
+                        SchemaResponse::text("{$data['booked_hours']} hrs", 'label_large', ['bold' => true]),
+                    ]),
+                    SchemaResponse::column([
+                        SchemaResponse::text('Completed', 'body_small', ['color' => '#64748b']),
+                        SchemaResponse::text((string) $data['completed_jobs'].' jobs', 'label_large', ['bold' => true, 'color' => '#10b981']),
+                    ]),
+                    SchemaResponse::column([
+                        SchemaResponse::text('Live Commission', 'body_small', ['color' => '#64748b']),
+                        SchemaResponse::text($currency.number_format($data['commission_earned'], 2), 'label_large', ['bold' => true, 'color' => '#7c3aed']),
+                    ]),
+                ], ['main_axis_alignment' => 'space_between']),
+                SchemaResponse::divider(),
                 SchemaResponse::buttonOutlined(
                     $isSpecialist ? 'Remove Specialist' : 'Mark as Specialist',
                     SchemaResponse::apiPostAction(
@@ -465,6 +538,7 @@ class UniversalPosBuilder
                         $isSpecialist ? 'Removed from specialist roster.' : 'Added to specialist roster.',
                         reload: true
                     ),
+                    $isSpecialist ? 'person_remove' : 'person_add'
                 ),
             ]);
         }
@@ -473,7 +547,62 @@ class UniversalPosBuilder
             $cards[] = SchemaResponse::text('No staff members found. Invite staff from Settings → Users.', 'body_medium', ['color' => '#64748b']);
         }
 
-        return SchemaResponse::screen('Specialists & Stylists', $cards);
+        return SchemaResponse::screen('Specialists & Stylists', [
+            SchemaResponse::card([
+                SchemaResponse::row([
+                    SchemaResponse::icon('badge', ['color' => '#7c3aed', 'size' => 28]),
+                    SchemaResponse::column([
+                        SchemaResponse::text('Specialist & Stylist Roster', 'title_medium', ['bold' => true]),
+                        SchemaResponse::text('Manage service specialists, roster statuses, booked hours, and live commission tallies.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                SchemaResponse::divider(),
+                SchemaResponse::wrap([
+                    SchemaResponse::badge("Active Specialists: {$activeSpecialistsCount}", '#7c3aed', 'subtle'),
+                    SchemaResponse::badge('Total Booked: '.round($totalBookedMinutes / 60, 1).' hrs', '#0284c7', 'subtle'),
+                    SchemaResponse::badge("Completed: {$totalCompletedServices} jobs", '#10b981', 'subtle'),
+                    SchemaResponse::badge('Commission: '.$currency.number_format($totalCommissionEarned, 2), '#10b981', 'subtle'),
+                ]),
+            ]),
+            SchemaResponse::gridView([
+                SchemaResponse::card([
+                    SchemaResponse::row([
+                        SchemaResponse::icon('groups', ['color' => '#7c3aed', 'size' => 22]),
+                        SchemaResponse::text((string) $activeSpecialistsCount, 'headline_small', ['bold' => true, 'color' => '#7c3aed']),
+                    ]),
+                    SchemaResponse::text('Active Specialists', 'label_large', ['bold' => true]),
+                    SchemaResponse::text('Approved salon stylists', 'body_small', ['color' => '#64748b']),
+                ]),
+                SchemaResponse::card([
+                    SchemaResponse::row([
+                        SchemaResponse::icon('schedule', ['color' => '#0284c7', 'size' => 22]),
+                        SchemaResponse::text(round($totalBookedMinutes / 60, 1).'h', 'headline_small', ['bold' => true, 'color' => '#0284c7']),
+                    ]),
+                    SchemaResponse::text('Booked Hours', 'label_large', ['bold' => true]),
+                    SchemaResponse::text('Reserved client appointments', 'body_small', ['color' => '#64748b']),
+                ]),
+                SchemaResponse::card([
+                    SchemaResponse::row([
+                        SchemaResponse::icon('task_alt', ['color' => '#10b981', 'size' => 22]),
+                        SchemaResponse::text((string) $totalCompletedServices, 'headline_small', ['bold' => true, 'color' => '#10b981']),
+                    ]),
+                    SchemaResponse::text('Completed Services', 'label_large', ['bold' => true]),
+                    SchemaResponse::text('Finished & settled jobs', 'body_small', ['color' => '#64748b']),
+                ]),
+                SchemaResponse::card([
+                    SchemaResponse::row([
+                        SchemaResponse::icon('payments', ['color' => '#166534', 'size' => 22]),
+                        SchemaResponse::text($currency.number_format($totalCommissionEarned, 2), 'headline_small', ['bold' => true, 'color' => '#166534']),
+                    ]),
+                    SchemaResponse::text('Commission Accrued', 'label_large', ['bold' => true]),
+                    SchemaResponse::text('Attributed to specialists', 'body_small', ['color' => '#64748b']),
+                ]),
+            ], 2),
+            SchemaResponse::card([
+                SchemaResponse::text('Specialist Team Roster', 'title_medium', ['bold' => true]),
+                SchemaResponse::column($cards),
+            ]),
+        ]);
     }
 
     /**
@@ -508,36 +637,58 @@ class UniversalPosBuilder
         }
 
         foreach ($batches as $b) {
-            $expLabel = $b->days_until_expiry < 0
-                ? 'EXPIRED'
-                : ($b->days_until_expiry <= 90 ? "EXPIRING ({$b->days_until_expiry}d)" : "SAFE ({$b->days_until_expiry}d)");
+            $days = $b->days_until_expiry;
+            $isExpired = $days < 0;
+            $expLabel = $isExpired
+                ? 'EXPIRED LOT'
+                : ($days <= 90 ? "EXPIRING ({$days}d)" : "SAFE ({$days}d)");
+            $badgeColor = $isExpired ? '#ef4444' : ($days <= 90 ? '#f59e0b' : '#10b981');
+            $price = (float) ($b->selling_price > 0 ? $b->selling_price : $product->sale_price);
 
-            $components[] = SchemaResponse::card([
+            $cardRows = [
                 SchemaResponse::row([
-                    SchemaResponse::icon('inventory_2', ['color' => $b->expiry_color, 'size' => 20]),
+                    SchemaResponse::icon('inventory_2', ['color' => $badgeColor, 'size' => 20]),
                     SchemaResponse::column([
                         SchemaResponse::text("Batch #{$b->batch_number}", 'title_small', ['bold' => true]),
-                        SchemaResponse::text("Expiry Date: {$b->expiry_date?->format('Y-m-d')} · Available Units: {$b->stock_qty}", 'body_small', ['color' => '#64748b']),
+                        SchemaResponse::text("Expiry: {$b->expiry_date?->format('Y-m-d')} · Available Units: {$b->stock_qty}", 'body_small', ['color' => '#64748b']),
                     ]),
-                    SchemaResponse::badge($expLabel, $b->expiry_color, 'subtle'),
-                    SchemaResponse::text($currency.number_format((float) ($b->selling_price > 0 ? $b->selling_price : $product->sale_price), 2), 'label_large', ['bold' => true, 'color' => '#059669']),
-                ]),
-            ]);
+                    SchemaResponse::badge($expLabel, $badgeColor, 'subtle'),
+                    SchemaResponse::text($currency.number_format($price, 2), 'label_large', ['bold' => true, 'color' => '#059669']),
+                ], ['main_axis_alignment' => 'space_between']),
+            ];
+
+            if ($isExpired) {
+                $cardRows[] = SchemaResponse::badge('Dispensing Blocked — Lot Expired', '#ef4444', 'solid');
+            } elseif ($b->stock_qty <= 0) {
+                $cardRows[] = SchemaResponse::badge('Out of Stock', '#64748b', 'subtle');
+            } else {
+                $cardRows[] = SchemaResponse::buttonPrimary("Select & Add Lot #{$b->batch_number}", SchemaResponse::addToCartAction([
+                    'id' => $product->id,
+                    'batch_id' => $b->id,
+                    'title' => $product->name,
+                    'subtitle' => "Lot #{$b->batch_number} · Exp: {$b->expiry_date?->format('Y-m-d')}",
+                    'price' => $price,
+                    'quantity' => 1,
+                    'max_quantity' => max(1, (int) $b->stock_qty),
+                ]), 'add_shopping_cart');
+            }
+
+            $components[] = SchemaResponse::card($cardRows);
         }
 
         $components[] = SchemaResponse::divider();
 
-        $primaryBatch = $batches->first(fn ($batch) => $batch->days_until_expiry >= 0);
+        $primaryBatch = $batches->first(fn ($batch) => $batch->days_until_expiry >= 0 && $batch->stock_qty > 0);
         if (! $primaryBatch) {
             $components[] = SchemaResponse::container([
-                SchemaResponse::text('All remaining lots are expired. Dispensing is blocked.', 'body_medium', ['bold' => true, 'color' => '#b91c1c']),
+                SchemaResponse::text('All remaining lots are expired or out of stock. Dispensing is blocked.', 'body_medium', ['bold' => true, 'color' => '#b91c1c']),
             ], ['padding' => 12, 'color' => '#fef2f2', 'border_color' => '#fecaca', 'border_radius' => 12]);
 
             return self::sheet("Select FEFO Batch — {$product->name}", $components);
         }
 
-        $components[] = SchemaResponse::stepCounter('dispense_qty', 'Dispense Quantity', 1, 1, max(1, (int) $primaryBatch->stock_qty));
-        $components[] = SchemaResponse::buttonPrimary('Add to Dispensing Cart', SchemaResponse::addToCartAction([
+        $components[] = SchemaResponse::stepCounter('dispense_qty', 'Quick Dispense FEFO Quantity', 1, 1, max(1, (int) $primaryBatch->stock_qty));
+        $components[] = SchemaResponse::buttonPrimary('Add Recommended FEFO Lot to Cart', SchemaResponse::addToCartAction([
             'id' => $product->id,
             'batch_id' => $primaryBatch->id,
             'title' => $product->name,
@@ -577,6 +728,77 @@ class UniversalPosBuilder
         ?string $defaultCustomerName = null,
     ): array {
         $currency = $company->currency_symbol ?: '$';
+
+        $selectedTicket = null;
+        if ($module === 'repair' && $selectedTicketId) {
+            $selectedTicket = RepairTicket::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->with('parts')
+                ->find($selectedTicketId);
+        }
+
+        $selectedAppointment = null;
+        $appointmentId = request('appointment_id');
+        if ($module === 'salon' && $appointmentId && Schema::hasTable('salon_appointments')) {
+            $selectedAppointment = SalonAppointment::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->with(['service', 'specialist'])
+                ->find($appointmentId);
+        }
+
+        if ($selectedAppointment) {
+            $defaultCustomerName = $defaultCustomerName ?: $selectedAppointment->customer_name;
+            $defaultSpecialistId = $defaultSpecialistId ?: $selectedAppointment->specialist_id;
+            if (empty($cartPreview) && $selectedAppointment->service) {
+                $cartPreview = [[
+                    'id' => $selectedAppointment->product_id,
+                    'title' => $selectedAppointment->service->name,
+                    'subtitle' => 'Stylist: '.($selectedAppointment->specialist?->name ?? 'Unassigned')." · {$selectedAppointment->service->duration_minutes}m",
+                    'price' => (float) $selectedAppointment->service->sale_price,
+                    'quantity' => 1,
+                    'qty' => 1,
+                ]];
+            }
+        }
+
+        if ($selectedTicket && empty($cartPreview)) {
+            $previewIncludesTicket = true;
+            $ticketLines = [];
+            foreach ($selectedTicket->parts->where('billed_to_customer', true) as $part) {
+                $ticketLines[] = [
+                    'id' => $part->product_id,
+                    'title' => "Part: {$part->part_name}",
+                    'subtitle' => 'Repair Replacement Part',
+                    'price' => (float) $part->unit_price,
+                    'quantity' => (int) $part->quantity,
+                    'qty' => (int) $part->quantity,
+                ];
+            }
+            if ((float) $selectedTicket->labor_fee > 0) {
+                $ticketLines[] = [
+                    'id' => null,
+                    'title' => "Labor Fee ({$selectedTicket->device_type})",
+                    'subtitle' => 'Diagnostic & bench labor',
+                    'price' => (float) $selectedTicket->labor_fee,
+                    'quantity' => 1,
+                    'qty' => 1,
+                ];
+            }
+            if ($ticketLines === [] && (float) $selectedTicket->total_amount > 0) {
+                $ticketLines[] = [
+                    'id' => null,
+                    'title' => "Repair Service: {$selectedTicket->brand} {$selectedTicket->model}",
+                    'subtitle' => 'Ticket #'.$selectedTicket->ticket_number,
+                    'price' => (float) $selectedTicket->total_amount,
+                    'quantity' => 1,
+                    'qty' => 1,
+                ];
+            }
+            $cartPreview = $ticketLines;
+        }
+
+        $advancePaid = (float) ($selectedTicket?->advance_paid ?? $selectedAppointment?->advance_paid ?? 0);
+        $existingTicketTotal = (float) ($selectedTicket?->total_amount ?? 0);
 
         $subtotal = 0.0;
         $itemCount = 0;
@@ -641,15 +863,6 @@ class UniversalPosBuilder
         }, $cartPreview);
         $previewTotals = app(TaxCalculationService::class)->calculateCartTotals($taxPreviewItems, $company);
 
-        $selectedTicket = null;
-        if ($module === 'repair' && $selectedTicketId) {
-            $selectedTicket = RepairTicket::withoutGlobalScope('company')
-                ->where('company_id', $company->id)
-                ->with('parts')
-                ->find($selectedTicketId);
-        }
-        $advancePaid = (float) ($selectedTicket?->advance_paid ?? 0);
-        $existingTicketTotal = (float) ($selectedTicket?->total_amount ?? 0);
         if ($selectedTicket && ! $previewIncludesTicket) {
             $existingTaxItems = $selectedTicket->parts
                 ->where('billed_to_customer', true)

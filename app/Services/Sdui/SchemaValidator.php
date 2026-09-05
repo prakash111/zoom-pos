@@ -136,7 +136,7 @@ class SchemaValidator
 
         if ($type === 'form_submit') {
             $method = strtoupper((string) ($action['method'] ?? 'POST'));
-            if (! in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
+            if (! in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
                 $errors[] = "{$path}.method: unsupported form method [{$method}]";
             }
         }
@@ -150,6 +150,10 @@ class SchemaValidator
         if ($type === 'open_remote_sheet'
             && ! str_starts_with(trim((string) ($action['sheet_endpoint'] ?? '')), '/api/')) {
             $errors[] = "{$path}.sheet_endpoint: must be a same-origin /api/ path";
+        }
+
+        if ($type === 'open_url' && trim((string) ($action['url'] ?? '')) === '') {
+            $errors[] = "{$path}.url: is required for [open_url]";
         }
     }
 }

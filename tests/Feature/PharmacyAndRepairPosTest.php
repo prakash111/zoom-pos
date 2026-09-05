@@ -896,4 +896,118 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertEquals(0, RepairDeviceCategory::withoutGlobalScope('company')->where('company_id', $this->company->id)->where('is_demo', true)->count());
         $this->assertEquals(0, RepairTicket::withoutGlobalScope('company')->where('company_id', $this->company->id)->where('is_demo', true)->count());
     }
+
+    public function test_sdui_views_operational_depth_and_post_sale_contracts(): void
+    {
+        // 1. Setup sample batch and prescription
+        $med = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Amoxicillin 500mg',
+            'code' => 'TEST-AMX-500',
+            'sale_price' => 15.00,
+            'cost_price' => 8.00,
+            'current_stock' => 50,
+            'active' => true,
+        ]);
+        $batch = PharmacyBatch::create([
+            'company_id' => $this->company->id,
+            'product_id' => $med->id,
+            'batch_number' => 'AMX-2026-TEST',
+            'manufacturing_date' => now()->subMonths(2),
+            'expiry_date' => now()->addDays(20), // Critical <= 30 days
+            'cost_price' => 8.00,
+            'selling_price' => 15.00,
+            'stock_qty' => 50,
+            'alert_days_before_expiry' => 90,
+        ]);
+        $rx = PharmacyPrescription::create([
+            'company_id' => $this->company->id,
+            'prescription_number' => 'RX-TEST-009',
+            'patient_name' => 'Alice Patient',
+            'patient_phone' => '1234567890',
+            'doctor_name' => 'Dr. Robert Smith',
+            'doctor_registration_no' => 'DOC-99881',
+            'prescription_date' => now()->toDateString(),
+            'status' => 'pending',
+            'diagnosis' => 'Bacterial Infection',
+            'notes' => 'Amoxicillin 500mg TDS for 5 days',
+            'medicines' => [['name' => 'Amoxicillin 500mg', 'quantity' => 15]],
+        ]);
+
+        // 2. Test pharmacy-batches view
+        $batchViewRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/pharmacy-batches');
+        $batchViewRes->assertOk();
+        $batchViewJson = json_encode($batchViewRes->json());
+        $this->assertStringContainsString('Expiring in 30 Days', $batchViewJson);
+        $this->assertStringContainsString('Print Barcode', $batchViewJson);
+        $this->assertStringContainsString('Audit Stock', $batchViewJson);
+
+        // 3. Test pharmacy-prescriptions view with status filter
+        $rxViewRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/pharmacy-prescriptions?status=pending');
+        $rxViewRes->assertOk();
+        $rxViewJson = json_encode($rxViewRes->json());
+        $this->assertStringContainsString('Alice Patient', $rxViewJson);
+        $this->assertStringContainsString('Load Prescription into POS', $rxViewJson);
+
+        // 4. Test repair-create-ticket view includes check_battery
+        $createTicketRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/repair-create-ticket');
+        $createTicketRes->assertOk();
+        $createTicketJson = json_encode($createTicketRes->json());
+        $this->assertStringContainsString('check_battery', $createTicketJson);
+        $this->assertStringContainsString('Battery Health & State', $createTicketJson);
+
+        // 5. Test repair-dashboard view includes 6-stage Kanban
+        $ticket = RepairTicket::create([
+            'company_id' => $this->company->id,
+            'ticket_number' => 'REP-KANBAN-01',
+            'customer_name' => 'John DeviceOwner',
+            'customer_phone' => '9876543210',
+            'brand' => 'Apple',
+            'model' => 'iPhone 13',
+            'device_type' => 'Smartphone',
+            'issue_description' => 'Broken screen & low battery',
+            'status' => 'repaired',
+            'labor_fee' => 35.00,
+            'parts_cost' => 45.00,
+            'total_amount' => 80.00,
+            'advance_paid' => 20.00,
+        ]);
+
+        $dashRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/repair-dashboard');
+        $dashRes->assertOk();
+        $dashContent = $dashRes->getContent();
+        $this->assertStringContainsString('6-Stage Workbench Kanban', $dashContent);
+        $this->assertStringContainsString('Received', $dashContent);
+        $this->assertStringContainsString('5. Repaired & Ready for Pickup', $dashContent);
+        $this->assertStringContainsString('Deliver & Settle', $dashContent);
+
+        // 6. Test repair ticket settlement returns post-sale URLs
+        $settleRes = $this->withHeaders($this->authHeaders())->postJson("/api/tenant/repair/tickets/{$ticket->id}/settle", [
+            'payment_method' => 'cash',
+            'tendered' => 15.00,
+        ]);
+        $settleRes->assertOk()->assertJsonPath('success', true);
+        $this->assertNotEmpty($settleRes->json('whatsapp_url'));
+        $this->assertNotEmpty($settleRes->json('invoice_url'));
+        $this->assertNotEmpty($settleRes->json('thermal_print_url'));
+        $this->assertEquals(35.00, (float) $settleRes->json('sale.paid_amount')); // 35 labor - 20 advance = 15 due; total sale = 35 paid
+
+        // 7. Test repair pos checkout returns post-sale URLs
+        $posRes = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/repair/checkout', [
+            'items' => [
+                [
+                    'product_id' => $med->id,
+                    'quantity' => 1,
+                    'unit_price' => 25.00,
+                ],
+            ],
+            'customer_phone' => '9876543210',
+            'payment_method' => 'cash',
+            'tendered' => 25.00,
+        ]);
+        $posRes->assertOk()->assertJsonPath('success', true);
+        $this->assertNotEmpty($posRes->json('whatsapp_url'));
+        $this->assertNotEmpty($posRes->json('invoice_url'));
+        $this->assertNotEmpty($posRes->json('thermal_print_url'));
+    }
 }

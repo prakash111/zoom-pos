@@ -528,24 +528,47 @@ class RepairApiController extends Controller
                     ]);
                 }
             } else {
-                $checklistNames = ! empty($category?->checklist_items) ? $category->checklist_items : [
-                    'Power On / Boot',
-                    'Display / Touchscreen',
-                    'Front & Rear Cameras',
-                    'Speakers & Microphone',
-                    'Charging Port & Battery',
-                    'Housing / Glass Scratches',
+                $checkMap = [
+                    'Power On / Boot Up State' => $request->input('check_power'),
+                    'Display & Touchscreen' => $request->input('check_display'),
+                    'Front & Rear Cameras' => $request->input('check_cameras'),
+                    'Charging & USB Ports' => $request->input('check_charging'),
+                    'Audio, Mic & Speakers' => $request->input('check_speakers'),
+                    'Battery Health & State' => $request->input('check_battery'),
                 ];
 
-                foreach ($checklistNames as $itemName) {
-                    RepairChecklist::create([
-                        'company_id' => $company->id,
-                        'tenant_id' => $company->id,
-                        'repair_ticket_id' => $ticket->id,
-                        'item_name' => is_string($itemName) ? $itemName : ($itemName['item_name'] ?? 'Diagnostic Check'),
-                        'type' => 'intake',
-                        'status' => 'pass',
-                    ]);
+                $hasCheckInputs = count(array_filter($checkMap)) > 0;
+                if ($hasCheckInputs) {
+                    foreach ($checkMap as $name => $val) {
+                        RepairChecklist::create([
+                            'company_id' => $company->id,
+                            'tenant_id' => $company->id,
+                            'repair_ticket_id' => $ticket->id,
+                            'item_name' => $name,
+                            'type' => 'intake',
+                            'status' => in_array($val, ['pass', 'fail', 'not_tested'], true) ? $val : 'pass',
+                        ]);
+                    }
+                } else {
+                    $checklistNames = ! empty($category?->checklist_items) ? $category->checklist_items : [
+                        'Power On / Boot Up State',
+                        'Display & Touchscreen',
+                        'Front & Rear Cameras',
+                        'Charging & USB Ports',
+                        'Audio, Mic & Speakers',
+                        'Battery Health & State',
+                    ];
+
+                    foreach ($checklistNames as $itemName) {
+                        RepairChecklist::create([
+                            'company_id' => $company->id,
+                            'tenant_id' => $company->id,
+                            'repair_ticket_id' => $ticket->id,
+                            'item_name' => is_string($itemName) ? $itemName : ($itemName['item_name'] ?? 'Diagnostic Check'),
+                            'type' => 'intake',
+                            'status' => 'pass',
+                        ]);
+                    }
                 }
             }
 
@@ -966,11 +989,17 @@ class RepairApiController extends Controller
             'total' => (float) $sale->total,
         ]);
 
+        $phone = $request->input('customer_phone') ?: $ticket->customer_phone;
+        $whatsappUrl = app(\App\Services\Invoice\InvoiceDeliveryService::class)->generateInvoiceWhatsAppUrl($sale, $phone);
+
         return response()->json([
             'success' => true,
             'message' => "Repair ticket #{$ticket->ticket_number} settled and converted to POS Sale #{$sale->sale_number}.",
             'sale' => $sale,
             'ticket' => $ticket->fresh(['parts', 'checklists', 'finalSale']),
+            'whatsapp_url' => $whatsappUrl,
+            'invoice_url' => "/tenant/sales/{$sale->id}/invoice",
+            'thermal_print_url' => "/tenant/sales/{$sale->id}/receipt/print",
         ]);
     }
 
@@ -1319,10 +1348,16 @@ class RepairApiController extends Controller
                 'ticket_id' => $ticketId,
             ]);
 
+            $phone = $request->input('customer_phone') ?: ($ticket?->customer_phone ?? null);
+            $whatsappUrl = app(\App\Services\Invoice\InvoiceDeliveryService::class)->generateInvoiceWhatsAppUrl($sale, $phone);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Repair counter sale completed successfully',
                 'sale' => $sale,
+                'whatsapp_url' => $whatsappUrl,
+                'invoice_url' => "/tenant/sales/{$sale->id}/invoice",
+                'thermal_print_url' => "/tenant/sales/{$sale->id}/receipt/print",
             ]);
         } catch (\InvalidArgumentException $e) {
             return response()->json(['success' => false, 'error' => $e->getMessage()], 422);

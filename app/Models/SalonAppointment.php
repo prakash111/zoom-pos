@@ -24,6 +24,8 @@ class SalonAppointment extends Model
         'status',
         'notes',
         'sale_id',
+        'advance_paid',
+        'deposit_payment_method',
         'is_demo',
     ];
 
@@ -32,8 +34,14 @@ class SalonAppointment extends Model
         return [
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
+            'advance_paid' => 'decimal:2',
             'is_demo' => 'boolean',
         ];
+    }
+
+    public function getAdvanceDepositAttribute(): float
+    {
+        return (float) ($this->attributes['advance_paid'] ?? 0);
     }
 
     public function company(): BelongsTo

@@ -399,11 +399,17 @@ class PharmacyApiController extends Controller
                 'total' => (float) $result['sale']->total,
             ]);
 
+            $sale = $result['sale'];
+            $whatsappUrl = app(\App\Services\Invoice\InvoiceDeliveryService::class)->generateInvoiceWhatsAppUrl($sale, $request->input('customer_phone'));
+
             return response()->json([
                 'success' => true,
                 'message' => 'Pharmacy checkout completed successfully',
-                'sale' => $result['sale'],
+                'sale' => $sale,
                 'prescription' => $result['prescription'],
+                'whatsapp_url' => $whatsappUrl,
+                'invoice_url' => "/tenant/sales/{$sale->id}/invoice",
+                'thermal_print_url' => "/tenant/sales/{$sale->id}/receipt/print",
             ]);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
@@ -416,6 +422,38 @@ class PharmacyApiController extends Controller
                 'error' => 'Checkout failed: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Generate barcode printable data for a specific medicine batch.
+     * GET /api/tenant/pharmacy/batches/{id}/barcode
+     */
+    public function batchBarcode(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $batch = PharmacyBatch::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with('product')
+            ->findOrFail($id);
+
+        $currency = $company->currency_symbol ?: '$';
+        $barcodeValue = $batch->product?->barcode ?: $batch->batch_number;
+
+        return response()->json([
+            'success' => true,
+            'batch' => [
+                'id' => $batch->id,
+                'batch_number' => $batch->batch_number,
+                'product_name' => $batch->product?->name ?? 'Medicine',
+                'generic_name' => $batch->product?->generic_name ?? '',
+                'mfg_date' => $batch->manufacturing_date?->format('Y-m-d'),
+                'exp_date' => $batch->expiry_date?->format('Y-m-d'),
+                'mrp' => $currency.number_format((float) ($batch->selling_price > 0 ? $batch->selling_price : $batch->product?->sale_price), 2),
+                'barcode' => $barcodeValue,
+                'barcode_svg' => "https://barcodeapi.org/api/auto/{$barcodeValue}",
+            ],
+            'print_url' => "/tenant/products/{$batch->product_id}/barcode",
+        ]);
     }
 
     /**

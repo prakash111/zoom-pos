@@ -316,4 +316,66 @@ class SalonPosTest extends TestCase
             'change_returned' => 5,
         ]);
     }
+
+    public function test_calendar_booking_with_advance_deposit_and_settlement_parity(): void
+    {
+        $service = $this->createService(['sale_price' => 50.00]);
+        $specialist = $this->createSpecialist();
+        $date = now()->addDays(2)->toDateString();
+
+        // 1. Book appointment with advance deposit
+        $bookRes = $this->postJson('/api/tenant/salon/appointments', [
+            'service_id' => $service->id,
+            'specialist_id' => $specialist->id,
+            'customer_name' => 'Advance Deposit Client',
+            'customer_phone' => '5551234567',
+            'appointment_date' => $date,
+            'appointment_time' => '11:00',
+            'advance_paid' => 15.00,
+            'deposit_payment_method' => 'card',
+        ], $this->authHeaders());
+
+        $bookRes->assertCreated()->assertJsonPath('success', true);
+        $appointmentId = $bookRes->json('appointment.id');
+        $this->assertEquals(15.00, (float) $bookRes->json('appointment.advance_paid'));
+
+        // 2. Check service-calendar view displays advance badge and checkout action
+        $calendarRes = $this->getJson("/api/tenant/views/service-calendar?date={$date}", $this->authHeaders());
+        $calendarRes->assertOk();
+        $calContent = $calendarRes->getContent();
+        $this->assertStringContainsString('Advance: $15.00', $calContent);
+        $this->assertStringContainsString('Settle', $calContent);
+        $this->assertStringContainsString('Checkout', $calContent);
+        $this->assertStringContainsString('advance_paid', $calContent);
+        $this->assertStringContainsString('deposit_payment_method', $calContent);
+
+        // 3. Checkout with appointment_id: 50 total - 15 advance = 35 balance due
+        $checkoutRes = $this->postJson('/api/tenant/salon/checkout', [
+            'items' => [['product_id' => $service->id, 'quantity' => 1]],
+            'appointment_id' => $appointmentId,
+            'payment_method' => 'cash',
+            'tendered' => 35.00,
+        ], $this->authHeaders());
+
+        $checkoutRes->assertOk()->assertJsonPath('success', true);
+        $this->assertNotEmpty($checkoutRes->json('whatsapp_url'));
+        $this->assertNotEmpty($checkoutRes->json('invoice_url'));
+        $this->assertNotEmpty($checkoutRes->json('thermal_print_url'));
+        $this->assertEquals(50.00, (float) $checkoutRes->json('sale.total'));
+        $this->assertEquals(50.00, (float) $checkoutRes->json('sale.paid_amount'));
+        $this->assertEquals(0.00, (float) $checkoutRes->json('sale.due_amount'));
+
+        // Verify order payment records: advance deposit of 15 + cash payment of 35
+        $saleId = $checkoutRes->json('sale.id');
+        $this->assertDatabaseHas('order_payments', [
+            'sale_id' => $saleId,
+            'payment_method' => 'advance_deposit',
+            'amount' => 15.00,
+        ]);
+        $this->assertDatabaseHas('order_payments', [
+            'sale_id' => $saleId,
+            'payment_method' => 'cash',
+            'amount' => 35.00,
+        ]);
+    }
 }
