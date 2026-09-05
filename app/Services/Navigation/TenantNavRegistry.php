@@ -1374,6 +1374,7 @@ class TenantNavRegistry
                 ...$tabs,
                 ['key' => 'languages', 'label' => 'Languages & Translations', 'title' => 'Languages & Translations', 'icon' => 'translate', 'component' => 'languages', 'type' => 'link', 'permission' => 'settings'],
                 ['key' => 'staff', 'label' => 'Users & Permissions', 'title' => 'Users & Permissions', 'icon' => 'badge', 'component' => 'staff', 'type' => 'link', 'permission' => 'users'],
+                ['key' => 'roles', 'label' => 'Roles & Access Levels', 'title' => 'Roles & Access Levels', 'icon' => 'admin_panel_settings', 'component' => 'roles', 'type' => 'link', 'permission' => 'users', 'target_endpoint' => '/api/tenant/views/roles'],
                 ['key' => 'devices', 'label' => 'Terminals & Devices', 'title' => 'Terminals & Devices', 'icon' => 'devices_other', 'component' => 'devices', 'type' => 'link', 'permission' => null],
                 ['key' => 'change_password', 'label' => 'Change Password', 'title' => 'Change Password', 'icon' => 'tune', 'component' => 'change_password', 'type' => 'link', 'permission' => null, 'target_endpoint' => '/api/tenant/views/change-password'],
             ],

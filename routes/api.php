@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\LanguageApiController;
 use App\Http\Controllers\Api\V1\PayablesApiController;
 use App\Http\Controllers\Api\V1\PermissionApiController;
 use App\Http\Controllers\Api\V1\PharmacyApiController;
+use App\Http\Controllers\Api\V1\RoleApiController;
 use App\Http\Controllers\Api\V1\PosDesktopSyncController;
 use App\Http\Controllers\Api\V1\PosSyncApiController;
 use App\Http\Controllers\Api\V1\PushDeviceApiController;
@@ -82,6 +83,13 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::post('/tenant/pos/checkout', [SaleApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
     Route::get('/app/pos/checkout-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
     Route::post('/app/pos/checkout', [SaleApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
+
+    // Custom Roles & Granular Permissions — unversioned tenant URLs emitted by
+    // the SDUI "Manage Roles" screen (mirrors the /v1/pos/roles endpoints).
+    Route::get('/tenant/roles', [RoleApiController::class, 'index'])->middleware('tenant.api.permission:users,view');
+    Route::post('/tenant/roles', [RoleApiController::class, 'store'])->middleware('tenant.api.permission:users,create');
+    Route::match(['put', 'patch'], '/tenant/roles/{id}', [RoleApiController::class, 'update'])->middleware('tenant.api.permission:users,edit');
+    Route::delete('/tenant/roles/{id}', [RoleApiController::class, 'destroy'])->middleware('tenant.api.permission:users,edit');
 
     // Native mobile cash-register contract. These unversioned tenant URLs
     // are emitted by SchemaResponse and intentionally coexist with the
@@ -494,6 +502,12 @@ Route::prefix('v1/pos')->group(function () {
         Route::delete('/users/{id}', [UserApiController::class, 'destroy'])->middleware('tenant.api.permission:users,edit');
         Route::get('/users/{id}/permissions', [PermissionApiController::class, 'show'])->middleware('tenant.api.permission:users,view');
         Route::put('/users/{id}/permissions', [PermissionApiController::class, 'update'])->middleware('tenant.api.permission:users,edit');
+
+        // Custom Roles & Granular Permissions
+        Route::get('/roles', [RoleApiController::class, 'index'])->middleware('tenant.api.permission:users,view');
+        Route::post('/roles', [RoleApiController::class, 'store'])->middleware('tenant.api.permission:users,create');
+        Route::match(['put', 'patch'], '/roles/{id}', [RoleApiController::class, 'update'])->middleware('tenant.api.permission:users,edit');
+        Route::delete('/roles/{id}', [RoleApiController::class, 'destroy'])->middleware('tenant.api.permission:users,edit');
 
         // Online Catalog
         Route::get('/catalog', [CatalogApiController::class, 'index'])->middleware('tenant.api.permission:catalog,view');

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Company;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\Invoice\InvoiceDeliveryService;
 use Illuminate\Http\JsonResponse;
@@ -39,7 +40,37 @@ class UserApiController extends Controller
 
         $users = $query->orderBy('name')->get()->map(fn (User $u) => $this->present($u));
 
-        return response()->json(['success' => true, 'roles' => User::ROLES, 'users' => $users]);
+        return response()->json([
+            'success' => true,
+            'roles' => $this->assignableRoleMap($company),
+            'users' => $users,
+        ]);
+    }
+
+    /**
+     * Built-in roles + this tenant's custom roles, as slug => display name.
+     * Drives the staff invite / change-role dropdowns.
+     *
+     * @return array<string, string>
+     */
+    private function assignableRoleMap(Company $company): array
+    {
+        $map = User::ROLES;
+
+        try {
+            Role::query()
+                ->where('company_id', $company->id)
+                ->where('is_system', false)
+                ->orderBy('name')
+                ->get(['slug', 'name'])
+                ->each(function (Role $role) use (&$map) {
+                    $map[$role->slug] = $role->name;
+                });
+        } catch (\Throwable $e) {
+            // roles table not migrated yet — fall back to built-ins only.
+        }
+
+        return $map;
     }
 
     public function invite(Request $request): JsonResponse
@@ -47,7 +78,7 @@ class UserApiController extends Controller
         $company = $this->resolveCompany($request);
         $admin = $this->resolveUser($request, $company);
 
-        $allowedRoles = array_merge(array_keys(User::ROLES), ['operador']);
+        $allowedRoles = array_merge(array_keys($this->assignableRoleMap($company)), ['operador']);
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email'],
@@ -151,7 +182,7 @@ class UserApiController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'role' => ['required', 'in:'.implode(',', array_keys(User::ROLES))],
+            'role' => ['required', 'in:'.implode(',', array_keys($this->assignableRoleMap($company)))],
         ]);
         if ($validator->fails()) {
             return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
@@ -246,6 +277,34 @@ class UserApiController extends Controller
         return User::withoutGlobalScope('company')->where('company_id', $company->id)->where('id', $id)->first();
     }
 
+    /** @var array<string, string>|null memoised custom-role slug => name for this request */
+    private ?array $customRoleLabels = null;
+
+    private function customRoleLabel(?string $slug): ?string
+    {
+        if ($slug === null || $slug === '') {
+            return null;
+        }
+
+        if ($this->customRoleLabels === null) {
+            $this->customRoleLabels = [];
+            try {
+                $companyId = app()->bound('tenant.company_id') ? app('tenant.company_id') : null;
+                if ($companyId !== null) {
+                    Role::query()
+                        ->where('company_id', $companyId)
+                        ->where('is_system', false)
+                        ->get(['slug', 'name'])
+                        ->each(fn (Role $r) => $this->customRoleLabels[$r->slug] = $r->name);
+                }
+            } catch (\Throwable $e) {
+                // roles table absent — leave empty.
+            }
+        }
+
+        return $this->customRoleLabels[$slug] ?? null;
+    }
+
     private function present(User $u): array
     {
         return [
@@ -253,7 +312,9 @@ class UserApiController extends Controller
             'name' => $u->name,
             'email' => $u->email,
             'role' => $u->role,
-            'role_label' => User::ROLES[$u->role] ?? $u->role,
+            'role_label' => User::ROLES[$u->role]
+                ?? $this->customRoleLabel($u->role)
+                ?? Str::headline((string) $u->role),
             'status' => $u->status,
             'commission_rate' => (float) ($u->commission_rate ?? 0),
             'commission_type' => $u->commission_type ?: 'percentage',

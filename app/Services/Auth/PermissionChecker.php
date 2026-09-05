@@ -3,6 +3,7 @@
 namespace App\Services\Auth;
 
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 
 /**
@@ -222,19 +223,42 @@ class PermissionChecker
             return false;
         }
 
-        return $this->roleDefaultAllows($user->role, $module, $action);
+        return $this->roleDefaultAllows($user->role, $module, $action, $user->company_id);
     }
 
-    public function roleDefaultAllows(?string $role, string $module, string $action): bool
+    /** @var array<string, array<string, list<string>>|null> */
+    private static array $roleMapCache = [];
+
+    public function roleDefaultAllows(?string $role, string $module, string $action, ?string $companyId = null): bool
     {
         $role = strtolower($role ?? '');
         if (in_array($role, User::PRIVILEGED_ROLES, true)) {
             return true;
         }
 
-        $defaults = self::getRoleDefaults($role);
+        // A stored role row (built-in system role OR a tenant's custom role)
+        // takes precedence; the hardcoded presets remain the fallback for a
+        // fresh install whose roles table has not been seeded yet.
+        $cacheKey = ($companyId ?? '-').'|'.$role;
+        if (! array_key_exists($cacheKey, self::$roleMapCache)) {
+            try {
+                self::$roleMapCache[$cacheKey] = Role::permissionMapFor($companyId, $role);
+            } catch (\Throwable $e) {
+                self::$roleMapCache[$cacheKey] = null;
+            }
+        }
 
-        return in_array($action, $defaults[$module] ?? [], true);
+        $map = self::$roleMapCache[$cacheKey] ?? self::getRoleDefaults($role);
+
+        return in_array($action, $map[$module] ?? [], true);
+    }
+
+    /**
+     * Forget the per-request custom-role cache (call after mutating roles).
+     */
+    public static function flushRoleCache(): void
+    {
+        self::$roleMapCache = [];
     }
 
     /**

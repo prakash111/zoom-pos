@@ -13,12 +13,14 @@ use App\Models\PharmacyPrescription;
 use App\Models\Product;
 use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
+use App\Models\Role;
 use App\Models\Sale;
 use App\Models\SalonAppointment;
 use App\Models\SduiScreen;
 use App\Models\TenantApiKey;
 use App\Models\TenantSession;
 use App\Models\User;
+use App\Services\Auth\PermissionChecker;
 use App\Services\Localization\PlatformRegionalService;
 use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\TenantNavigationConfigService;
@@ -2880,6 +2882,97 @@ class SchemaResponse
         ]);
     }
 
+    /**
+     * Custom role creation & granular permissions. Lists the built-in system
+     * roles and the tenant's custom roles, then a grouped-permission form that
+     * POSTs a new role to /api/tenant/roles.
+     */
+    public static function rolesView(Company $company): array
+    {
+        $roles = Role::query()
+            ->forTenant($company->id)
+            ->orderBy('is_system', 'desc')
+            ->orderBy('name')
+            ->get();
+
+        $roleCards = [];
+        foreach ($roles as $role) {
+            $map = Role::permissionMapFor($company->id, $role->slug) ?? [];
+            $grantCount = 0;
+            foreach ($map as $moduleActions) {
+                $grantCount += is_array($moduleActions) ? count($moduleActions) : 0;
+            }
+
+            $badges = [
+                self::badge($role->is_system ? 'System' : 'Custom', $role->is_system ? '#475569' : '#0284c7', 'subtle'),
+                self::badge("{$grantCount} permissions", '#0f766e', 'subtle'),
+            ];
+
+            $rowComponents = [
+                self::row([
+                    self::text($role->name, 'title_small', ['bold' => true]),
+                    self::wrap($badges),
+                ], ['main_axis_alignment' => 'space_between']),
+            ];
+            if (! empty($role->description)) {
+                $rowComponents[] = self::text($role->description, 'body_small', ['color' => '#64748b']);
+            }
+            if (! $role->is_system) {
+                $rowComponents[] = self::buttonDanger(
+                    'Delete Role',
+                    self::formSubmitAction("/api/tenant/roles/{$role->id}", 'DELETE', 'Role deleted.', reload: true),
+                    'delete',
+                    ['full_width' => false]
+                );
+            }
+
+            $roleCards[] = self::card($rowComponents, ['padding' => 12, 'border_radius' => 12]);
+        }
+
+        // Grouped permission toggles — one collapsed accordion per module.
+        $permissionGroups = [];
+        foreach (PermissionChecker::MODULES as $moduleSlug => $moduleLabel) {
+            $checks = [];
+            foreach (PermissionChecker::getActionsForModule($moduleSlug) as $actionSlug => $actionLabel) {
+                $checks[] = self::checkbox("perm__{$moduleSlug}__{$actionSlug}", $actionLabel, false);
+            }
+            $permissionGroups[] = self::accordionGroup($moduleLabel, $checks, ['initially_expanded' => false]);
+        }
+
+        return self::screen('Manage Roles', [
+            self::card([
+                self::row([
+                    self::icon('admin_panel_settings', ['color' => '#0284c7', 'size' => 24]),
+                    self::column([
+                        self::text('Custom Roles & Granular Permissions', 'title_medium', ['bold' => true]),
+                        self::text('Build a role from module-level permissions, then assign it to staff from the invite screen.', 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+            ]),
+
+            self::accordionGroup('Existing Roles ('.count($roleCards).')', ! empty($roleCards) ? $roleCards : [
+                self::text('No roles defined yet.', 'body_small', ['color' => '#64748b']),
+            ], ['initially_expanded' => true]),
+
+            self::card([
+                self::text('Create a New Role', 'title_medium', ['bold' => true]),
+                self::textInput('name', 'Role Name (e.g. Senior Technician, Floor Supervisor)', '', ['required' => true]),
+                self::textInput('description', 'Description (optional)', '', ['max_lines' => 2]),
+                self::divider(),
+                self::text('Permissions', 'label_large', ['bold' => true]),
+                self::text('Tap a group to expand its actions. Leave a group untouched to grant nothing there.', 'body_small', ['color' => '#64748b']),
+                ...$permissionGroups,
+                self::divider(),
+                self::buttonPrimary('Create Role', self::formSubmitAction(
+                    '/api/tenant/roles',
+                    'POST',
+                    'Role created successfully.',
+                    reload: true
+                ), 'add_moderator'),
+            ]),
+        ]);
+    }
+
     public static function receiptsView(Company $company): array
     {
         return self::screen('Receipt Prefixes & Bank Terms', [
@@ -3532,6 +3625,10 @@ class SchemaResponse
             return 'users.view';
         }
 
+        if (in_array($normalized, ['roles', 'roles-create', 'manage-roles', 'staff', 'staff-access', 'users'], true)) {
+            return 'users.view';
+        }
+
         return 'pos.view';
     }
 
@@ -3611,6 +3708,7 @@ class SchemaResponse
             'service-stylists', 'stylists' => self::serviceStylistsView($company),
             'service-orders' => self::serviceOrdersView($company),
             'change-password', 'password' => self::changePasswordView($company),
+            'roles', 'roles-create', 'manage-roles' => self::rolesView($company),
             'pos', 'point-of-sale' => self::posView($company),
             'retail-pos' => self::retailPosView($company),
             'salon-pos', 'service-pos', 'spa-pos' => self::salonPosView($company),
