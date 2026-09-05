@@ -595,12 +595,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         (childrenByParent[section.parentByKey[tile.key]] ??= []).add(tile);
       }
 
-      bool branchContainsSelection(_FeatureTile tile) {
-        if (indexByKey[tile.key] == _dockIndex) return true;
-        return (childrenByParent[tile.key] ?? const <_FeatureTile>[])
-            .any(branchContainsSelection);
-      }
-
       Widget buildBranch(_FeatureTile tile, int depth) {
         final nested = childrenByParent[tile.key] ?? const <_FeatureTile>[];
         final index = indexByKey[tile.key]!;
@@ -671,7 +665,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Icon(tile.icon, size: depth == 0 ? 24 : 20),
             ],
           ),
-          initiallyExpanded: branchContainsSelection(tile),
+          initiallyExpanded: true,
           maintainState: true,
           shape: const Border(),
           collapsedShape: const Border(),
