@@ -111,6 +111,16 @@ class SduiIconRegistry {
     'category': Icons.category_outlined,
     'circle': Icons.circle_outlined,
     'store': Icons.storefront_outlined,
+    'mark_email_read': Icons.mark_email_read_outlined,
+    'mail_lock': Icons.mail_lock_outlined,
+    'facebook': Icons.facebook,
+    'google': Icons.g_mobiledata,
+    'rocket_launch': Icons.rocket_launch_outlined,
+    'today': Icons.today_outlined,
+    'chevron_left': Icons.chevron_left,
+    'chevron_right': Icons.chevron_right,
+    'add': Icons.add,
+    'login': Icons.login,
   };
 
   /// Direct icon lookup alias matching `SduiIconRegistry.get(...)`.

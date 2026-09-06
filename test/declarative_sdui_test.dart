@@ -416,6 +416,52 @@ void main() {
 
       expect(dispatched, 0, reason: 'change-due math must never hit dispatch');
     });
+
+    testWidgets('customer_selector renders lookup UI and binds customer details',
+        (tester) async {
+      final formValues = <String, dynamic>{};
+      final schema = {
+        'type': 'customer_selector',
+        'name': 'customer_id',
+        'label': 'Client / Customer Lookup',
+        'search_endpoint': '/api/tenant/customers/search',
+        'fields': {
+          'name_field': 'customer_name',
+          'phone_field': 'customer_phone',
+        },
+        'name_label': 'Client Full Name *',
+        'phone_label': 'Client Phone Number *',
+        'initial_name': 'Sarah Connor',
+        'initial_phone': '+1 555 123 4567',
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: formValues,
+              setFormValue: (k, v) => formValues[k] = v,
+              dispatchAction: (_) async {},
+              child: Builder(
+                builder: (ctx) =>
+                    DynamicSchemaParser.buildComponent(ctx, schema),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Client / Customer Lookup'), findsOneWidget);
+      expect(find.text('Client Full Name *'), findsOneWidget);
+      expect(find.text('Client Phone Number *'), findsOneWidget);
+      expect(find.text('Search CRM customer by name or phone...'), findsOneWidget);
+      expect(find.text('Sarah Connor'), findsOneWidget);
+      expect(find.text('+1 555 123 4567'), findsOneWidget);
+
+      expect(formValues['customer_name'], 'Sarah Connor');
+      expect(formValues['customer_phone'], '+1 555 123 4567');
+    });
   });
 
   group('Declarative SDUI Schema Parser - Lists, Tables & Stepper', () {

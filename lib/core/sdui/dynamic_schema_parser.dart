@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -79,6 +81,8 @@ class DynamicSchemaParser {
         return _buildFileUpload(context, schema);
       case 'cash_tendered_field':
         return _CashTenderedField(schema: schema);
+      case 'customer_selector':
+        return _CustomerSelector(schema: schema);
 
       // Lists & Tables
       case 'line_item_tile':
@@ -2453,5 +2457,329 @@ class _CashTenderedFieldState extends State<_CashTenderedField> {
             onPressed: () => _commit(amt, writeField: true),
             child: Text(label),
           );
+  }
+}
+
+class _CustomerSelector extends StatefulWidget {
+  const _CustomerSelector({required this.schema});
+
+  final Map<String, dynamic> schema;
+
+  @override
+  State<_CustomerSelector> createState() => _CustomerSelectorState();
+}
+
+class _CustomerSelectorState extends State<_CustomerSelector> {
+  final _searchController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+
+  Timer? _debounce;
+  bool _searching = false;
+  List<Map<String, dynamic>> _searchResults = [];
+  Map<String, dynamic>? _selectedCustomer;
+
+  String get _idFieldName => widget.schema['name']?.toString() ?? 'customer_id';
+  String get _nameFieldName {
+    final fields = widget.schema['fields'] as Map<String, dynamic>?;
+    return fields?['name_field']?.toString() ?? 'customer_name';
+  }
+
+  String get _phoneFieldName {
+    final fields = widget.schema['fields'] as Map<String, dynamic>?;
+    return fields?['phone_field']?.toString() ?? 'customer_phone';
+  }
+
+  String get _searchEndpoint =>
+      widget.schema['search_endpoint']?.toString() ??
+      '/api/tenant/customers/search';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final sdui = DynamicSchemaContext.of(context);
+      if (sdui != null) {
+        final existingName = sdui.formValues[_nameFieldName]?.toString() ??
+            widget.schema['initial_name']?.toString() ??
+            '';
+        final existingPhone = sdui.formValues[_phoneFieldName]?.toString() ??
+            widget.schema['initial_phone']?.toString() ??
+            '';
+        if (existingName.isNotEmpty) {
+          _nameController.text = existingName;
+          sdui.setFormValue(_nameFieldName, existingName);
+        }
+        if (existingPhone.isNotEmpty) {
+          _phoneController.text = existingPhone;
+          sdui.setFormValue(_phoneFieldName, existingPhone);
+        }
+        final existingId = sdui.formValues[_idFieldName]?.toString() ??
+            widget.schema['initial_value']?.toString() ??
+            '';
+        if (existingId.isNotEmpty) {
+          sdui.setFormValue(_idFieldName, existingId);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    _debounce?.cancel();
+    final q = query.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _searching = false;
+        _searchResults = [];
+      });
+      return;
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
+      final sdui = DynamicSchemaContext.of(context);
+      final client = sdui?.apiClient;
+      if (client == null) return;
+
+      setState(() => _searching = true);
+      try {
+        final res =
+            await client.getAbsolute(_searchEndpoint, query: {'query': q});
+        final rawList = res['customers'] as List<dynamic>? ?? const [];
+        if (mounted) {
+          setState(() {
+            _searching = false;
+            _searchResults =
+                rawList.whereType<Map<String, dynamic>>().toList();
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _searching = false;
+            _searchResults = [];
+          });
+        }
+      }
+    });
+  }
+
+  void _selectCustomer(Map<String, dynamic> cust) {
+    final sdui = DynamicSchemaContext.of(context);
+    final id =
+        cust['server_id']?.toString() ?? cust['id']?.toString() ?? '';
+    final name = cust['name']?.toString() ?? '';
+    final phone = cust['phone']?.toString() ?? '';
+
+    setState(() {
+      _selectedCustomer = cust;
+      _searchResults = [];
+      _searchController.clear();
+      _nameController.text = name;
+      _phoneController.text = phone;
+    });
+
+    sdui?.setFormValue(_idFieldName, id);
+    sdui?.setFormValue(_nameFieldName, name);
+    sdui?.setFormValue(_phoneFieldName, phone);
+  }
+
+  void _clearSelectedCustomer() {
+    final sdui = DynamicSchemaContext.of(context);
+    setState(() {
+      _selectedCustomer = null;
+    });
+    sdui?.setFormValue(_idFieldName, '');
+  }
+
+  void _onNameChanged(String val) {
+    final sdui = DynamicSchemaContext.of(context);
+    sdui?.setFormValue(_nameFieldName, val);
+  }
+
+  void _onPhoneChanged(String val) {
+    final sdui = DynamicSchemaContext.of(context);
+    sdui?.setFormValue(_phoneFieldName, val);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = widget.schema['label']?.toString() ?? 'Client / Customer';
+    final nameLabel =
+        widget.schema['name_label']?.toString() ?? 'Client Full Name *';
+    final phoneLabel =
+        widget.schema['phone_label']?.toString() ?? 'Client Phone Number *';
+    final isRequired = widget.schema['required'] == true;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.person_search_outlined,
+                  size: 20, color: Color(0xFF15803D)),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const Spacer(),
+              if (_selectedCustomer != null)
+                Chip(
+                  avatar: const Icon(Icons.check_circle,
+                      size: 16, color: Color(0xFF15803D)),
+                  label: Text(
+                    'CRM #${_selectedCustomer!['server_id'] ?? _selectedCustomer!['id']}',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF15803D),
+                        fontWeight: FontWeight.bold),
+                  ),
+                  backgroundColor: const Color(0xFFDCFCE7),
+                  deleteIcon: const Icon(Icons.close, size: 14),
+                  onDeleted: _clearSelectedCustomer,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _searchController,
+            onChanged: _onSearchChanged,
+            decoration: InputDecoration(
+              hintText: 'Search CRM customer by name or phone...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _searching
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: Padding(
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : (_searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            _onSearchChanged('');
+                          },
+                        )
+                      : null),
+              border: const OutlineInputBorder(),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            ),
+          ),
+          if (_searchResults.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0x14000000),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _searchResults.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, i) {
+                  final cust = _searchResults[i];
+                  final cName = cust['name']?.toString() ?? 'Unnamed';
+                  final cPhone = cust['phone']?.toString() ?? '';
+                  final due = (cust['balance_due'] as num?)?.toDouble() ?? 0.0;
+
+                  return ListTile(
+                    dense: true,
+                    leading: const CircleAvatar(
+                      radius: 14,
+                      backgroundColor: Color(0xFFDCFCE7),
+                      child:
+                          Icon(Icons.person, size: 16, color: Color(0xFF15803D)),
+                    ),
+                    title: Text(cName,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 13)),
+                    subtitle: cPhone.isNotEmpty
+                        ? Text(cPhone, style: const TextStyle(fontSize: 12))
+                        : null,
+                    trailing: due > 0
+                        ? Text('Due: \$${due.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                color: Colors.red,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold))
+                        : const Icon(Icons.arrow_forward_ios, size: 12),
+                    onTap: () => _selectCustomer(cust),
+                  );
+                },
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _nameController,
+            onChanged: _onNameChanged,
+            validator: (v) {
+              if (isRequired && (v == null || v.trim().isEmpty)) {
+                return 'Client name is required';
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              labelText: nameLabel,
+              border: const OutlineInputBorder(),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              prefixIcon: const Icon(Icons.badge_outlined, size: 20),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _phoneController,
+            onChanged: _onPhoneChanged,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              labelText: phoneLabel,
+              border: const OutlineInputBorder(),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../features/pos/screens/invoice_actions_sheet.dart';
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
+import '../config/app_config.dart';
 import '../config/bootstrap_cache.dart';
 import '../services/thermal/thermal_printer_service.dart' show ReceiptLine;
 import 'dynamic_schema_context.dart';
@@ -246,7 +247,17 @@ class SduiActionDispatcher {
       case 'open_url':
         final rawUrl = action['url']?.toString() ?? '';
         if (rawUrl.isNotEmpty) {
-          final uri = Uri.tryParse(rawUrl);
+          String fullUrl = rawUrl;
+          if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+            final client = resolveApiClient();
+            String? base;
+            if (client != null) {
+              base = await client.currentBaseUrl();
+            }
+            base ??= AppConfig.defaultBaseUrl;
+            fullUrl = '${base.replaceAll(RegExp(r'/+$'), '')}/${rawUrl.replaceAll(RegExp(r'^/+'), '')}';
+          }
+          final uri = Uri.tryParse(fullUrl);
           if (uri != null) {
             try {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
