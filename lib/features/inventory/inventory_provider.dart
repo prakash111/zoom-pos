@@ -125,6 +125,10 @@ class InventoryProvider extends ChangeNotifier {
         ));
   }
 
+  Future<bool> deleteProduct(String productId) {
+    return _runAction(() => _repository.deleteProduct(productId));
+  }
+
   Future<bool> _runAction(Future<void> Function() action) async {
     isSaving = true;
     actionError = null;

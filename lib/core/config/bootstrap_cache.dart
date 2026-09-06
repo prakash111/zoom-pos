@@ -107,10 +107,12 @@ class BootstrapCache extends ChangeNotifier {
   static const _menuCacheKey = 'zoom_pos.bootstrap.menu';
   static const _uiSchemaCacheKey = 'zoom_pos.bootstrap.ui_schema';
   static const _themeCacheKey = 'zoom_pos.bootstrap.theme';
+  static const _labelsCacheKey = 'zoom_pos.bootstrap.navigation_labels';
 
   TenantSchema? tenant;
   Map<String, ModuleSchema> modules = {};
   List<SduiNavSectionSchema> menuStructure = [];
+  Map<String, String> navigationLabels = {};
   SduiUiSchema uiSchema = const SduiUiSchema();
   NavConfig navConfig = const NavConfig();
   Map<String, dynamic> config = {};
@@ -161,6 +163,23 @@ class BootstrapCache extends ChangeNotifier {
       return const [];
     }
     return _defaultFallbackSections();
+  }
+
+  /// Looks up custom navigation label configured by tenant, or falls back to default.
+  String resolveNavigationLabel(String key, String fallback) {
+    if (navigationLabels.isEmpty) return fallback;
+    final trimmed = navigationLabels[key]?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) return trimmed;
+
+    final snake = key.replaceAll('-', '_');
+    final trimmedSnake = navigationLabels[snake]?.trim();
+    if (trimmedSnake != null && trimmedSnake.isNotEmpty) return trimmedSnake;
+
+    final kebab = key.replaceAll('_', '-');
+    final trimmedKebab = navigationLabels[kebab]?.trim();
+    if (trimmedKebab != null && trimmedKebab.isNotEmpty) return trimmedKebab;
+
+    return fallback;
   }
 
   SduiStatusSchema? statusFor(String domain, String statusKey) {
@@ -277,6 +296,18 @@ class BootstrapCache extends ChangeNotifier {
           globalThemeProvider?.syncFromBootstrap(theme);
         } catch (error, stackTrace) {
           _logParseFailure('cached theme', error, stackTrace);
+        }
+      }
+
+      final labelsRaw = prefs.getString(_labelsCacheKey);
+      if (labelsRaw != null) {
+        try {
+          final decoded = jsonDecode(labelsRaw);
+          if (decoded is Map) {
+            navigationLabels = decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
+          }
+        } catch (error, stackTrace) {
+          _logParseFailure('cached navigation labels', error, stackTrace);
         }
       }
     } catch (error, stackTrace) {
@@ -400,6 +431,13 @@ class BootstrapCache extends ChangeNotifier {
         } catch (error, stackTrace) {
           _logParseFailure('server theme', error, stackTrace);
         }
+      }
+
+      final navLabels = response['navigation_labels'] ??
+          (response['tenant'] is Map ? response['tenant']['navigation_labels'] : null);
+      if (navLabels is Map) {
+        navigationLabels = navLabels.map((k, v) => MapEntry(k.toString(), v.toString()));
+        await prefs.setString(_labelsCacheKey, jsonEncode(navigationLabels));
       }
     } catch (error, stackTrace) {
       if (menuStructure.isEmpty) {

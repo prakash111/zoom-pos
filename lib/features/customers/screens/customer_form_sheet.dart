@@ -24,6 +24,7 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
   late final TextEditingController _addressController;
   late final TextEditingController _cityController;
   late final TextEditingController _stateController;
+  final List<MapEntry<TextEditingController, TextEditingController>> _customFieldControllers = [];
 
   bool get _isEditing => widget.customer != null;
 
@@ -38,6 +39,15 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
     _addressController = TextEditingController(text: customer?.address ?? '');
     _cityController = TextEditingController(text: customer?.city ?? '');
     _stateController = TextEditingController(text: customer?.state ?? '');
+
+    if (customer?.customFields != null && customer!.customFields.isNotEmpty) {
+      customer.customFields.forEach((k, v) {
+        _customFieldControllers.add(MapEntry(
+          TextEditingController(text: k),
+          TextEditingController(text: v?.toString() ?? ''),
+        ));
+      });
+    }
   }
 
   @override
@@ -49,11 +59,24 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
     _addressController.dispose();
     _cityController.dispose();
     _stateController.dispose();
+    for (final entry in _customFieldControllers) {
+      entry.key.dispose();
+      entry.value.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final customFields = <String, dynamic>{};
+    for (final entry in _customFieldControllers) {
+      final k = entry.key.text.trim();
+      final v = entry.value.text.trim();
+      if (k.isNotEmpty && v.isNotEmpty) {
+        customFields[k] = v;
+      }
+    }
 
     final customers = context.read<CustomersProvider>();
     final saved = await customers.saveCustomer(
@@ -65,6 +88,7 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
       address: _addressController.text.trim(),
       city: _cityController.text.trim(),
       state: _stateController.text.trim(),
+      customFields: customFields.isNotEmpty ? customFields : null,
     );
 
     if (!mounted) return;
@@ -150,6 +174,84 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Custom Fields',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _customFieldControllers.add(MapEntry(
+                              TextEditingController(),
+                              TextEditingController(),
+                            ));
+                          });
+                        },
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add Field'),
+                      ),
+                    ],
+                  ),
+                  if (_customFieldControllers.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        'No custom fields added yet (e.g., GSTIN, Alternate Phone, Birthday).',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      ),
+                    ),
+                  ..._customFieldControllers.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final row = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 4,
+                            child: TextFormField(
+                              controller: row.key,
+                              decoration: const InputDecoration(
+                                labelText: 'Field Name',
+                                hintText: 'e.g. GSTIN',
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 5,
+                            child: TextFormField(
+                              controller: row.value,
+                              decoration: const InputDecoration(
+                                labelText: 'Value',
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20, color: Colors.grey),
+                            onPressed: () {
+                              setState(() {
+                                final removed = _customFieldControllers.removeAt(index);
+                                removed.key.dispose();
+                                removed.value.dispose();
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: customers.isSaving ? null : _submit,

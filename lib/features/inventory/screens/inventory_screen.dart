@@ -180,9 +180,48 @@ class _InventoryScreenBodyState extends State<_InventoryScreenBody> {
               formatter: formatter,
               onTap: () => _openProductForm(context, product: product),
               onAdjustStock: () => _openAdjustStock(context, product),
+              onDelete: () => _deleteProduct(context, product),
             );
           },
         );
+    }
+  }
+
+  Future<void> _deleteProduct(BuildContext context, ProductModel product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete ${product.name}?'),
+        content: const Text(
+          'This will archive/remove the item from the active POS catalog. Past sales references will not be affected.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    if (!context.mounted) return;
+    final inventory = context.read<InventoryProvider>();
+    final success = await inventory.deleteProduct(product.id);
+    if (!context.mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Product deleted successfully.')),
+      );
+    } else if (inventory.actionError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(inventory.actionError!)),
+      );
     }
   }
 }
@@ -193,12 +232,14 @@ class _ProductTile extends StatelessWidget {
     required this.formatter,
     required this.onTap,
     required this.onAdjustStock,
+    required this.onDelete,
   });
 
   final ProductModel product;
   final CurrencyFormatter formatter;
   final VoidCallback onTap;
   final VoidCallback onAdjustStock;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -263,7 +304,54 @@ class _ProductTile extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+                  const SizedBox(height: 4),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onSelected: (action) {
+                      if (action == 'edit') {
+                        onTap();
+                      } else if (action == 'adjust') {
+                        onAdjustStock();
+                      } else if (action == 'delete') {
+                        onDelete();
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit Product'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'adjust',
+                        child: Row(
+                          children: [
+                            Icon(Icons.tune_outlined, size: 18),
+                            SizedBox(width: 8),
+                            Text('Adjust Stock'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete / Archive', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ],

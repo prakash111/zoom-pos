@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/service_order_model.dart';
+import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
+import '../../pos/screens/invoice_actions_sheet.dart';
 import '../service_orders_repository.dart';
 import 'service_order_form_sheet.dart';
 
@@ -68,10 +70,93 @@ class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
     }
   }
 
+  void _openInvoiceActions({Map<String, dynamic>? envelope}) {
+    final postData = envelope ?? _order.postSaleSheet?['data'];
+    InvoiceActionsData data;
+
+    if (postData is Map<String, dynamic>) {
+      final lines = <ReceiptLine>[];
+      final rawLines = postData['lines'];
+      if (rawLines is List) {
+        for (final l in rawLines) {
+          if (l is Map) {
+            lines.add(ReceiptLine(
+              name: (l['name'] ?? 'Item').toString(),
+              quantity: ((l['quantity'] as num?) ?? 1).toDouble(),
+              unitPrice: ((l['unit_price'] as num?) ?? 0).toDouble(),
+              lineTotal: ((l['line_total'] as num?) ?? 0).toDouble(),
+            ));
+          }
+        }
+      }
+
+      data = InvoiceActionsData(
+        documentType: 'invoice',
+        documentId: (postData['sale_id'] ?? _order.saleId ?? _order.id).toString(),
+        documentNumber: (postData['invoice_number'] ?? _order.invoiceNumber ?? 'SO-${_order.orderNumber}').toString(),
+        companyName: (postData['company_name'] ?? 'Service Center').toString(),
+        lines: lines,
+        subtotal: ((postData['subtotal'] as num?) ?? (_order.partsTotal + _order.laborCost)).toDouble(),
+        discount: ((postData['discount'] as num?) ?? _order.discount).toDouble(),
+        tax: ((postData['tax'] as num?) ?? _order.taxAmount).toDouble(),
+        total: ((postData['total'] as num?) ?? _order.totalAmount).toDouble(),
+        customerName: postData['customer_name']?.toString() ?? _order.customerName,
+        customerPhone: postData['customer_phone']?.toString() ?? _order.customerPhone,
+        customerEmail: postData['customer_email']?.toString() ?? _order.customerEmail,
+        currencySymbol: postData['currency_symbol']?.toString() ?? '\$',
+        taxRate: ((postData['tax_rate'] as num?) ?? _order.taxRate).toDouble(),
+      );
+    } else {
+      final lines = <ReceiptLine>[];
+      for (final p in _order.partsUsed) {
+        final q = ((p['quantity'] as num?) ?? 1).toDouble();
+        final u = ((p['unit_price'] as num?) ?? 0).toDouble();
+        lines.add(ReceiptLine(
+          name: (p['name'] ?? 'Part').toString(),
+          quantity: q,
+          unitPrice: u,
+          lineTotal: q * u,
+        ));
+      }
+      if (_order.laborCost > 0) {
+        lines.add(ReceiptLine(
+          name: 'Labor Charges',
+          quantity: 1,
+          unitPrice: _order.laborCost,
+          lineTotal: _order.laborCost,
+        ));
+      }
+
+      data = InvoiceActionsData(
+        documentType: 'invoice',
+        documentId: _order.saleId ?? _order.id,
+        documentNumber: _order.invoiceNumber ?? 'SO-${_order.orderNumber}',
+        companyName: 'Service Center',
+        lines: lines,
+        subtotal: _order.partsTotal + _order.laborCost,
+        discount: _order.discount,
+        tax: _order.taxAmount,
+        total: _order.totalAmount,
+        customerName: _order.customerName,
+        customerPhone: _order.customerPhone,
+        customerEmail: _order.customerEmail,
+        currencySymbol: '\$',
+        taxRate: _order.taxRate,
+      );
+    }
+
+    showInvoiceActionsSheet(context, data);
+  }
+
   Future<void> _changeStatus(String status) async {
     try {
       final updated = await widget.repository.updateStatus(_order.id, status);
-      if (mounted) setState(() => _order = updated);
+      if (mounted) {
+        setState(() => _order = updated);
+        if (status == 'delivered_settled' || updated.showPostSaleSheet) {
+          _openInvoiceActions(envelope: updated.postSaleSheet?['data']);
+        }
+      }
     } on ApiException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
@@ -128,6 +213,56 @@ class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
                       padding: const EdgeInsets.all(16),
                       children: [
                         _StatusTimeline(status: _order.status),
+                        if (_order.status == 'delivered_settled') ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.green.shade200),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle, color: Colors.green.shade700, size: 28),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Delivered & Settled',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green.shade900,
+                                        ),
+                                      ),
+                                      Text(
+                                        _order.invoiceNumber != null
+                                            ? 'Linked to Invoice #${_order.invoiceNumber}'
+                                            : 'Payment settled and invoice generated',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.green.shade800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () => _openInvoiceActions(),
+                                  icon: const Icon(Icons.share, size: 16),
+                                  label: const Text('Invoice'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green.shade700,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         _SectionCard(
                           title: 'Customer',
@@ -148,6 +283,17 @@ class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
                             if (_order.serialNumber.isNotEmpty) _InfoRow('Serial Number', _order.serialNumber),
                           ],
                         ),
+                        if (_order.extraAttributes.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          _SectionCard(
+                            title: 'Specifications',
+                            icon: Icons.tune_outlined,
+                            children: [
+                              for (final entry in _order.extraAttributes.entries)
+                                _InfoRow(entry.key, entry.value?.toString() ?? '—', emphasize: true),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 12),
                         _SectionCard(
                           title: 'Diagnosis',
@@ -200,6 +346,15 @@ class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
                             _InfoRow('Parts Total', widget.formatter.format(_order.partsTotal)),
                             _InfoRow('Labor Cost', widget.formatter.format(_order.laborCost)),
                             if (_order.discount > 0) _InfoRow('Discount', '-${widget.formatter.format(_order.discount)}'),
+                            if (_order.taxAmount > 0 || _order.taxRate > 0)
+                              _InfoRow(
+                                _order.isTaxInclusive
+                                    ? 'Tax (${_order.taxRate.toStringAsFixed(0)}% incl.)'
+                                    : 'Tax (${_order.taxRate.toStringAsFixed(0)}%)',
+                                _order.isTaxInclusive
+                                    ? widget.formatter.format(_order.taxAmount)
+                                    : '+${widget.formatter.format(_order.taxAmount)}',
+                              ),
                             const Divider(height: 16),
                             _InfoRow(
                               'Total Amount',

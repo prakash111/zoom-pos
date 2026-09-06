@@ -40,6 +40,7 @@ class _ServiceOrderFormSheetState extends State<ServiceOrderFormSheet> {
   late final TextEditingController _discountController;
   late final TextEditingController _notesController;
   late List<Map<String, dynamic>> _parts;
+  final List<MapEntry<TextEditingController, TextEditingController>> _extraAttrControllers = [];
   late String _status;
   late String _priority;
   bool _isSaving = false;
@@ -64,6 +65,15 @@ class _ServiceOrderFormSheetState extends State<ServiceOrderFormSheet> {
     _parts = order?.partsUsed.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
     _status = order?.status ?? 'received';
     _priority = order?.priority ?? 'normal';
+
+    if (order?.extraAttributes != null && order!.extraAttributes.isNotEmpty) {
+      order.extraAttributes.forEach((k, v) {
+        _extraAttrControllers.add(MapEntry(
+          TextEditingController(text: k),
+          TextEditingController(text: v?.toString() ?? ''),
+        ));
+      });
+    }
   }
 
   @override
@@ -73,6 +83,10 @@ class _ServiceOrderFormSheetState extends State<ServiceOrderFormSheet> {
       _serialController, _defectController, _diagnosisController, _laborController, _discountController, _notesController,
     ]) {
       c.dispose();
+    }
+    for (final entry in _extraAttrControllers) {
+      entry.key.dispose();
+      entry.value.dispose();
     }
     super.dispose();
   }
@@ -126,6 +140,15 @@ class _ServiceOrderFormSheetState extends State<ServiceOrderFormSheet> {
       _error = null;
     });
 
+    final extraAttrs = <String, dynamic>{};
+    for (final entry in _extraAttrControllers) {
+      final k = entry.key.text.trim();
+      final v = entry.value.text.trim();
+      if (k.isNotEmpty && v.isNotEmpty) {
+        extraAttrs[k] = v;
+      }
+    }
+
     try {
       await widget.repository.saveOrder(
         id: widget.order?.id,
@@ -143,6 +166,7 @@ class _ServiceOrderFormSheetState extends State<ServiceOrderFormSheet> {
         status: _status,
         priority: _priority,
         notes: _notesController.text.trim(),
+        extraAttributes: extraAttrs.isNotEmpty ? extraAttrs : null,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -199,6 +223,85 @@ class _ServiceOrderFormSheetState extends State<ServiceOrderFormSheet> {
                     const SizedBox(width: 12),
                     Expanded(child: TextFormField(controller: _serialController, decoration: const InputDecoration(labelText: 'Serial number'))),
                   ]),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Additional Details / Custom Specifications',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _extraAttrControllers.add(MapEntry(
+                              TextEditingController(),
+                              TextEditingController(),
+                            ));
+                          });
+                        },
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add Field'),
+                      ),
+                    ],
+                  ),
+                  if (_extraAttrControllers.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        'No custom specifications added (e.g., IMEI, Color, Screen Condition).',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      ),
+                    ),
+                  ..._extraAttrControllers.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final row = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 4,
+                            child: TextFormField(
+                              controller: row.key,
+                              decoration: const InputDecoration(
+                                labelText: 'Attribute',
+                                hintText: 'e.g. IMEI',
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 5,
+                            child: TextFormField(
+                              controller: row.value,
+                              decoration: const InputDecoration(
+                                labelText: 'Value',
+                                hintText: 'e.g. 356894002918231',
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20, color: Colors.grey),
+                            onPressed: () {
+                              setState(() {
+                                final removed = _extraAttrControllers.removeAt(index);
+                                removed.key.dispose();
+                                removed.value.dispose();
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _defectController,

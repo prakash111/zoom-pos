@@ -155,4 +155,8 @@ class InventoryRepository {
       if (reason != null && reason.isNotEmpty) 'reason': reason,
     });
   }
+
+  Future<void> deleteProduct(String id) {
+    return _client.delete(ApiEndpoints.inventoryDeleteProduct(id));
+  }
 }

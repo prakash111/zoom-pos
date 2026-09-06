@@ -49,6 +49,7 @@ class CustomersRepository {
     String? address,
     String? city,
     String? state,
+    Map<String, dynamic>? customFields,
   }) async {
     final response = await _client.post(ApiEndpoints.customers, data: {
       if (externalId != null) 'external_id': externalId,
@@ -59,6 +60,7 @@ class CustomersRepository {
       if (address != null && address.isNotEmpty) 'address': address,
       if (city != null && city.isNotEmpty) 'city': city,
       if (state != null && state.isNotEmpty) 'state': state,
+      if (customFields != null) 'custom_fields': customFields,
     });
     return CustomerModel.fromJson(response['customer'] as Map<String, dynamic>);
   }

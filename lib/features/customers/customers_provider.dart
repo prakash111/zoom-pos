@@ -60,6 +60,7 @@ class CustomersProvider extends ChangeNotifier {
     String? address,
     String? city,
     String? state,
+    Map<String, dynamic>? customFields,
   }) async {
     isSaving = true;
     actionError = null;
@@ -75,6 +76,7 @@ class CustomersProvider extends ChangeNotifier {
         address: address,
         city: city,
         state: state,
+        customFields: customFields,
       );
       await loadCustomers();
       isSaving = false;

@@ -122,7 +122,10 @@ List<_NavSection> _serverDrivenSections() {
 
             tiles.add(_FeatureTile(
               item.key,
-              (l10n) => l10n.text(item.title, fallback: item.title),
+              (l10n) => BootstrapCache.instance.resolveNavigationLabel(
+                item.key,
+                l10n.text(item.title, fallback: item.title),
+              ),
               SduiIconRegistry.resolve(item.icon),
               SduiComponentRegistry.instance.resolve(
                 item.component ?? item.key,
@@ -159,7 +162,10 @@ List<_NavSection> _serverDrivenSections() {
 
       result.add(_NavSection(
         section.key,
-        (l10n) => l10n.text(section.title, fallback: section.title),
+        (l10n) => BootstrapCache.instance.resolveNavigationLabel(
+          section.key,
+          l10n.text(section.title, fallback: section.title),
+        ),
         tiles,
         headerColor: section.color != null
             ? SduiIconRegistry.parseColor(section.color)
@@ -578,7 +584,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children.add(Padding(
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
           child: Text(
-            section.header!(l10n).toUpperCase(),
+            bootstrap.resolveNavigationLabel(section.key, section.header!(l10n)).toUpperCase(),
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
@@ -626,7 +632,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
             title: Text(
-              tile.titleOf(l10n),
+              bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
               style: TextStyle(
                 fontSize: depth > 0 ? 13 : 14,
                 fontWeight: _dockIndex == index
@@ -672,7 +678,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           shape: const Border(),
           collapsedShape: const Border(),
           title: Text(
-            tile.titleOf(l10n),
+            bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
             style: TextStyle(
               fontWeight:
                   _dockIndex == index ? FontWeight.w700 : FontWeight.normal,

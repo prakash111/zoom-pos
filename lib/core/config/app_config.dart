@@ -55,6 +55,7 @@ class ApiEndpoints {
   static const String aiImageGenerate = '/ai-image/generate';
   static const String inventoryImport = '/inventory/import';
   static const String inventoryAdjustStock = '/inventory/adjust';
+  static String inventoryDeleteProduct(String id) => '/inventory/product/$id';
 
   static const String customers = '/customers';
   static String customerLedger(String id) => '/customers/$id/ledger';
@@ -186,6 +187,7 @@ class ApiEndpoints {
 
   static const String appBootstrap = '/app/bootstrap';
   static const String settingsNavConfig = '/settings/nav-config';
+  static const String navigationLabels = '/settings/navigation-labels';
 
   static const String restaurantFloors = '/restaurant/floors';
   static String restaurantFloor(String id) => '/restaurant/floors/$id';

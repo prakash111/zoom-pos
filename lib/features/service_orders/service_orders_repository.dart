@@ -48,6 +48,7 @@ class ServiceOrdersRepository {
     String? warrantyTerms,
     String? technicianId,
     String? notes,
+    Map<String, dynamic>? extraAttributes,
   }) async {
     final data = {
       if (customerId != null) 'customer_id': customerId,
@@ -68,6 +69,7 @@ class ServiceOrdersRepository {
       if (warrantyTerms != null && warrantyTerms.isNotEmpty) 'warranty_terms': warrantyTerms,
       if (technicianId != null) 'technician_id': technicianId,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
+      if (extraAttributes != null && extraAttributes.isNotEmpty) 'extra_attributes': extraAttributes,
     };
 
     final response = id == null

@@ -45,6 +45,15 @@ class ServiceOrderModel {
     required this.warrantyTerms,
     required this.technicianId,
     required this.notes,
+    this.extraAttributes = const {},
+    this.taxAmount = 0,
+    this.taxRate = 0,
+    this.isTaxInclusive = false,
+    this.taxBreakdown = const {},
+    this.saleId,
+    this.invoiceNumber,
+    this.showPostSaleSheet = false,
+    this.postSaleSheet,
   });
 
   factory ServiceOrderModel.fromJson(Map<String, dynamic> json) {
@@ -76,6 +85,21 @@ class ServiceOrderModel {
       warrantyTerms: json['warranty_terms'] as String? ?? '',
       technicianId: json['technician_id']?.toString(),
       notes: json['notes'] as String?,
+      extraAttributes: json['extra_attributes'] is Map
+          ? Map<String, dynamic>.from(json['extra_attributes'] as Map)
+          : const {},
+      taxAmount: (json['tax_amount'] as num?)?.toDouble() ?? 0,
+      taxRate: (json['tax_rate'] as num?)?.toDouble() ?? 0,
+      isTaxInclusive: (json['is_tax_inclusive'] as bool?) ?? false,
+      taxBreakdown: json['tax_breakdown'] is Map
+          ? Map<String, dynamic>.from(json['tax_breakdown'] as Map)
+          : const {},
+      saleId: json['sale_id']?.toString(),
+      invoiceNumber: json['invoice_number'] as String?,
+      showPostSaleSheet: (json['show_post_sale_sheet'] as bool?) ?? false,
+      postSaleSheet: json['post_sale_sheet'] is Map
+          ? Map<String, dynamic>.from(json['post_sale_sheet'] as Map)
+          : null,
     );
   }
 
@@ -102,4 +126,13 @@ class ServiceOrderModel {
   final String warrantyTerms;
   final String? technicianId;
   final String? notes;
+  final Map<String, dynamic> extraAttributes;
+  final double taxAmount;
+  final double taxRate;
+  final bool isTaxInclusive;
+  final Map<String, dynamic> taxBreakdown;
+  final String? saleId;
+  final String? invoiceNumber;
+  final bool showPostSaleSheet;
+  final Map<String, dynamic>? postSaleSheet;
 }

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
-import '../../../core/models/category_model.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/utils/image_url.dart';
 import '../../../core/widgets/error_view.dart';

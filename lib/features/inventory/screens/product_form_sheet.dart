@@ -235,6 +235,44 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
     return '$prefix-$number';
   }
 
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete ${widget.product!.name}?'),
+        content: const Text(
+          'This will archive/remove the item from the active POS catalog. Past sales references will not be affected.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final inventory = context.read<InventoryProvider>();
+    final success = await inventory.deleteProduct(widget.product!.id);
+    if (!mounted) return;
+    if (success) {
+      Navigator.of(context).pop(true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Product deleted successfully.')),
+      );
+    } else if (inventory.actionError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(inventory.actionError!)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final inventory = context.watch<InventoryProvider>();
@@ -487,6 +525,17 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
                           )
                         : Text(_isEditing ? 'Save changes' : 'Create product'),
                   ),
+                  if (_isEditing) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: inventory.isSaving ? null : _confirmDelete,
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      label: const Text('Delete / Archive Product', style: TextStyle(color: Colors.red)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.red.shade300),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

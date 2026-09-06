@@ -10,6 +10,7 @@ class CustomerModel {
     required this.state,
     required this.balanceDue,
     required this.loyaltyPoints,
+    this.customFields = const {},
   });
 
   factory CustomerModel.fromJson(Map<String, dynamic> json) {
@@ -24,6 +25,9 @@ class CustomerModel {
       state: json['state'] as String? ?? '',
       balanceDue: (json['balance_due'] as num?)?.toDouble() ?? 0,
       loyaltyPoints: (json['loyalty_points'] as num?)?.toInt() ?? 0,
+      customFields: json['custom_fields'] is Map
+          ? Map<String, dynamic>.from(json['custom_fields'] as Map)
+          : const {},
     );
   }
 
@@ -37,6 +41,7 @@ class CustomerModel {
   final String state;
   final double balanceDue;
   final int loyaltyPoints;
+  final Map<String, dynamic> customFields;
 
   bool get hasBalanceDue => balanceDue > 0;
 
@@ -52,6 +57,7 @@ class CustomerModel {
       'state': state,
       'balance_due': balanceDue,
       'loyalty_points': loyaltyPoints,
+      'custom_fields': customFields,
     };
   }
 }
