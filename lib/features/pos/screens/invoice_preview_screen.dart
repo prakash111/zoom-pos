@@ -1,11 +1,15 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../settings/screens/printer_settings_screen.dart';
 import '../cart_item.dart';
 
 /// The page formats the preview can be rendered as. The two roll sizes are
@@ -111,6 +115,11 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
 
   Future<Uint8List> _build(PdfPageFormat _) => _buildReceiptPdf(widget.data, _format);
 
+  static bool get _supportsThermalPrint =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
   Future<void> _print() async {
     final bytes = await _build(_format.pdfFormat);
     if (!mounted) return;
@@ -123,6 +132,104 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
     await Printing.sharePdf(
       bytes: bytes,
       filename: '${widget.data.documentType.toLowerCase()}-preview.pdf',
+    );
+  }
+
+  Future<void> _printThermal() async {
+    final data = widget.data;
+    final service = ThermalPrinterService();
+    if (await service.savedDeviceAddress() == null) {
+      if (!mounted) return;
+      await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()));
+      return;
+    }
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(content: Text('Printing…')));
+    final ok = await service.printReceipt(
+      companyName: data.companyName,
+      documentLabel: '${data.documentType} Preview',
+      lines: [
+        for (final item in data.items)
+          ReceiptLine(
+            name: item.product.name,
+            quantity: item.quantity,
+            unitPrice: item.product.salePrice,
+            lineTotal: item.lineTotal,
+          ),
+      ],
+      subtotal: data.subtotal,
+      discount: data.discount,
+      tax: data.taxTotal,
+      total: data.grandTotal,
+      customerName: data.customerName,
+      currencySymbol: data.currencySymbol,
+      taxId: data.taxId,
+      taxLabel: data.taxLabel,
+      isIndia: data.isIndia,
+      paidAmount: data.paidAmount,
+      dueAmount: data.dueAmount,
+    );
+    messenger.showSnackBar(SnackBar(
+        content:
+            Text(ok ? 'Sent to printer.' : 'Could not reach the printer.')));
+  }
+
+  /// The same unified bottom-sheet popup used after a sale is finalized —
+  /// print / thermal / share all live inside it instead of as loose buttons.
+  Future<void> _openActionsSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                '${widget.data.documentType} Preview',
+                style: Theme.of(sheetCtx)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('Preview & Print'),
+              subtitle: const Text('View the PDF, print, or share the file'),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _print();
+              },
+            ),
+            if (_supportsThermalPrint)
+              ListTile(
+                leading: const Icon(Icons.print_outlined),
+                title: const Text('Print on receipt printer'),
+                subtitle: const Text('Bluetooth thermal printer'),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  _printThermal();
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.ios_share),
+              title: const Text('Share as PDF file'),
+              subtitle: const Text('Send the invoice PDF via any app'),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _export();
+              },
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
+      ),
     );
   }
 
@@ -176,24 +283,13 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _print,
-                          icon: const Icon(Icons.print_outlined),
-                          label: const Text('Print Receipt'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _export,
-                          icon: const Icon(Icons.picture_as_pdf_outlined),
-                          label: const Text('Export PDF'),
-                        ),
-                      ),
-                    ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _openActionsSheet,
+                      icon: const Icon(Icons.print_outlined),
+                      label: const Text('Print / Share'),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Row(
