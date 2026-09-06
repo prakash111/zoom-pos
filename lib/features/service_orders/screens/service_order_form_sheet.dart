@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/customer_model.dart';
+import '../../../core/models/product_model.dart';
 import '../../../core/models/service_order_model.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../customers/customers_repository.dart';
@@ -101,11 +102,15 @@ class _ServiceOrderFormSheetState extends State<ServiceOrderFormSheet> {
   }
 
   Future<void> _addPart() async {
-    final product = await showModalBottomSheet(
+    final product = await showModalBottomSheet<ProductModel>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => ProductPickerSheet(inventoryRepository: InventoryRepository(context.read<ApiClient>())),
+      builder: (_) => ProductPickerSheet(
+        inventoryRepository: InventoryRepository(context.read<ApiClient>()),
+        partsOnly: true,
+        title: 'Select Spare Part',
+      ),
     );
     if (product == null) return;
     setState(() {

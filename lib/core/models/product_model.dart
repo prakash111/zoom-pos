@@ -16,6 +16,8 @@ class ProductModel {
     required this.taxRate,
     required this.active,
     required this.isLowStock,
+    this.durationMinutes,
+    this.categoryType,
     this.variants = const [],
     this.modifiers = const [],
     this.spiceLevels = const [],
@@ -39,6 +41,8 @@ class ProductModel {
       taxRate: (json['tax_rate'] as num?)?.toDouble() ?? 0,
       active: json['active'] as bool? ?? true,
       isLowStock: json['is_low_stock'] as bool? ?? false,
+      durationMinutes: (json['duration_minutes'] as num?)?.toInt(),
+      categoryType: json['category_type'] as String?,
       variants: _parseOptions(json['variants']),
       modifiers: _parseOptions(json['modifiers']),
       spiceLevels: _parseOptions(json['spice_levels']),
@@ -66,11 +70,24 @@ class ProductModel {
   final double taxRate;
   final bool active;
   final bool isLowStock;
+  final int? durationMinutes;
+  final String? categoryType;
   final List<Map<String, dynamic>> variants;
   final List<Map<String, dynamic>> modifiers;
   final List<Map<String, dynamic>> spiceLevels;
 
   bool get isOutOfStock => currentStock <= 0;
+
+  bool get isService {
+    if (unit == 'service') return true;
+    if (durationMinutes != null && durationMinutes! > 0) return true;
+    if (categoryType == 'salon' || categoryType == 'service') return true;
+    final cat = categoryName.toLowerCase();
+    if (cat.contains('hair') || cat.contains('styling') || cat.contains('facial') || cat.contains('spa') || cat.contains('massage')) {
+      return true;
+    }
+    return false;
+  }
 
   /// Whether this product needs the customization sheet (portion/style,
   /// add-ons, or spice level) before it can be added to a restaurant order,
@@ -90,6 +107,8 @@ class ProductModel {
       'unit': unit,
       'category_id': categoryId,
       'category_name': categoryName,
+      'category_type': categoryType,
+      'duration_minutes': durationMinutes,
       'brand_name': brandName,
       'image_url': imageUrl,
       'tax_rate': taxRate,
