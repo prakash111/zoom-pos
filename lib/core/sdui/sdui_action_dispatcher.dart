@@ -76,7 +76,8 @@ class SduiActionDispatcher {
     return client.requestAbsolute(endpoint, method: method, data: data);
   }
 
-  Future<void> dispatch(BuildContext context, Map<String, dynamic> action) async {
+  Future<void> dispatch(
+      BuildContext context, Map<String, dynamic> action) async {
     if (onBeforeDispatch != null && await onBeforeDispatch!(context, action)) {
       return;
     }
@@ -125,7 +126,18 @@ class SduiActionDispatcher {
         }
 
         try {
-          final res = await _request(endpoint, method: method, data: formValues);
+          final submitData = <String, dynamic>{};
+          final rawPayload = action['payload'];
+          if (rawPayload is Map) {
+            submitData.addAll(Map<String, dynamic>.from(rawPayload));
+          }
+          // Live form values take precedence over server defaults. This lets
+          // checkout sheets inject immutable line-item defaults while still
+          // respecting customer/payment/staff changes made in the drawer.
+          submitData.addAll(formValues);
+
+          final res =
+              await _request(endpoint, method: method, data: submitData);
           final message = res['message']?.toString() ?? successToast;
           final rawTheme = res['theme'];
           if (rawTheme is Map) {
@@ -335,7 +347,8 @@ class SduiActionDispatcher {
       } else if (raw is Map) {
         sheetSchema = Map<String, dynamic>.from(raw);
       } else {
-        throw const FormatException('The server did not return a sheet schema.');
+        throw const FormatException(
+            'The server did not return a sheet schema.');
       }
     } catch (e) {
       showToast(e is ApiException ? e.message : 'Failed to load sheet: $e',
@@ -350,7 +363,8 @@ class SduiActionDispatcher {
     // [_showComponentSheet] directly.
     unawaited(_showComponentSheet(
       context,
-      title: sheetSchema['title']?.toString() ?? action['title']?.toString() ?? '',
+      title:
+          sheetSchema['title']?.toString() ?? action['title']?.toString() ?? '',
       components: sheetSchema['components'] as List<dynamic>? ?? const [],
       client: client,
       sourceEndpoint: sheetEndpoint,
@@ -412,8 +426,7 @@ class SduiActionDispatcher {
       builder: (modalCtx) => StatefulBuilder(
         builder: (modalCtx, setSheetState) {
           Future<void> reloadInPlace(String endpoint) async {
-            final body =
-                await _fetchSheetBody(_withFormValueQuery(endpoint));
+            final body = await _fetchSheetBody(_withFormValueQuery(endpoint));
             if (body == null || !modalCtx.mounted) return;
             setSheetState(() {
               currentComponents =
@@ -427,8 +440,7 @@ class SduiActionDispatcher {
             formValues: formValues,
             setFormValue: setFormValue,
             dispatchAction: (modalAction) async {
-              final t =
-                  modalAction['type']?.toString().toLowerCase().trim();
+              final t = modalAction['type']?.toString().toLowerCase().trim();
 
               // A pop/back inside a sheet closes THAT sheet only — it must
               // never bubble to the page underneath.
@@ -474,25 +486,23 @@ class SduiActionDispatcher {
                   await _showComponentSheet(
                     modalCtx,
                     title: modalAction['title']?.toString() ?? '',
-                    components: modalAction['components'] as List<dynamic>? ??
-                        const [],
+                    components:
+                        modalAction['components'] as List<dynamic>? ?? const [],
                     client: client,
                   );
                 } else if (t == 'open_remote_sheet') {
                   final childEp =
                       modalAction['sheet_endpoint']?.toString() ?? '';
-                  final childBody = childEp.isEmpty
-                      ? null
-                      : await _fetchSheetBody(childEp);
+                  final childBody =
+                      childEp.isEmpty ? null : await _fetchSheetBody(childEp);
                   if (childBody != null && modalCtx.mounted) {
                     await _showComponentSheet(
                       modalCtx,
                       title: childBody['title']?.toString() ??
                           modalAction['title']?.toString() ??
                           '',
-                      components:
-                          (childBody['components'] as List<dynamic>?) ??
-                              const [],
+                      components: (childBody['components'] as List<dynamic>?) ??
+                          const [],
                       client: client,
                       sourceEndpoint: childEp,
                     );
@@ -542,8 +552,7 @@ class SduiActionDispatcher {
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Text(currentTitle,
                                 style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16)),
+                                    fontWeight: FontWeight.bold, fontSize: 16)),
                           ),
                         for (final c in currentComponents)
                           if (c is Map)

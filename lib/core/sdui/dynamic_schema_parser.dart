@@ -331,6 +331,7 @@ class DynamicSchemaParser {
 
     bool isExpanded(Map<String, dynamic> child) =>
         child['expanded'] == true || child['flex'] is num;
+    bool isFixed(Map<String, dynamic> child) => child['flexible'] == false;
 
     // `space_between` / `center` / `end` only mean something when the Row is
     // allowed to fill its parent, and an `expanded` child needs bounded width
@@ -340,9 +341,8 @@ class DynamicSchemaParser {
     final anyExpanded = children.any(isExpanded);
 
     return Row(
-      mainAxisSize: (hasMainAxis || anyExpanded)
-          ? MainAxisSize.max
-          : MainAxisSize.min,
+      mainAxisSize:
+          (hasMainAxis || anyExpanded) ? MainAxisSize.max : MainAxisSize.min,
       crossAxisAlignment: _parseCrossAxis(schema['cross_axis_alignment']),
       mainAxisAlignment: _parseMainAxis(schema['main_axis_alignment']),
       children: [
@@ -352,6 +352,8 @@ class DynamicSchemaParser {
               flex: (children[i]['flex'] as num?)?.toInt() ?? 1,
               child: buildComponent(context, children[i]),
             )
+          else if (isFixed(children[i]))
+            buildComponent(context, children[i])
           else
             Flexible(child: buildComponent(context, children[i])),
           if (spacing != null && i < children.length - 1)
@@ -579,10 +581,23 @@ class DynamicSchemaParser {
         : Colors.blue;
     final isSolid = schema['badge_style'] == 'solid';
 
-    return SduiStatusBadge(
+    final badge = SduiStatusBadge(
       label: label,
       color: color,
       isSolid: isSolid,
+    );
+    final maxWidth = _parseDouble(schema['max_width']);
+    if (maxWidth == null) {
+      return badge;
+    }
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerRight,
+        child: badge,
+      ),
     );
   }
 
@@ -1102,8 +1117,8 @@ class DynamicSchemaParser {
         disabledBackgroundColor: bgColor.withValues(alpha: 0.4),
         disabledForegroundColor: fgColor.withValues(alpha: 0.8),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(radius)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
       ),
       onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
     );
@@ -1144,8 +1159,8 @@ class DynamicSchemaParser {
         foregroundColor: accent,
         side: BorderSide(color: accent.withValues(alpha: 0.6)),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(radius)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
       ),
       onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
     );
@@ -1987,7 +2002,8 @@ class _SduiStepperState extends State<_SduiStepper> {
   }
 
   /// Names of required input fields in [step] that are still empty.
-  List<String> _missingRequired(Map<String, dynamic> step, DynamicSchemaContext? ctx) {
+  List<String> _missingRequired(
+      Map<String, dynamic> step, DynamicSchemaContext? ctx) {
     final missing = <String>[];
 
     void walk(dynamic node) {
@@ -2011,8 +2027,8 @@ class _SduiStepperState extends State<_SduiStepper> {
           DynamicSchemaParser._isRequired(map)) {
         final name = map['name']?.toString() ?? '';
         final value = ctx?.formValues[name];
-        final isEmpty = value == null ||
-            (value is String && value.trim().isEmpty);
+        final isEmpty =
+            value == null || (value is String && value.trim().isEmpty);
         if (name.isNotEmpty && isEmpty) {
           missing.add(map['label']?.toString() ?? name);
         }
@@ -2106,7 +2122,8 @@ class _SduiStepperState extends State<_SduiStepper> {
                   for (var i = 0; i < steps.length; i++)
                     Expanded(
                       child: Container(
-                        margin: EdgeInsets.only(right: i == steps.length - 1 ? 0 : 6),
+                        margin: EdgeInsets.only(
+                            right: i == steps.length - 1 ? 0 : 6),
                         height: 4,
                         decoration: BoxDecoration(
                           color: i <= current
@@ -2166,7 +2183,8 @@ class _SduiStepperState extends State<_SduiStepper> {
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2))
-                    : Icon(isLast ? Icons.check : Icons.arrow_forward, size: 18),
+                    : Icon(isLast ? Icons.check : Icons.arrow_forward,
+                        size: 18),
                 label: Text(isLast ? submitLabel : nextLabel),
               ),
             ),
@@ -2201,8 +2219,7 @@ class _CashTenderedFieldState extends State<_CashTenderedField> {
 
   static double _num(dynamic v) {
     if (v is num) return v.toDouble();
-    return double.tryParse(
-            '${v ?? ''}'.replaceAll(RegExp(r'[^0-9.\-]'), '')) ??
+    return double.tryParse('${v ?? ''}'.replaceAll(RegExp(r'[^0-9.\-]'), '')) ??
         0.0;
   }
 
@@ -2246,11 +2263,10 @@ class _CashTenderedFieldState extends State<_CashTenderedField> {
 
   @override
   Widget build(BuildContext context) {
-    final label = context.tr(
-        widget.schema['label']?.toString() ?? 'Cash Tendered by Customer');
-    final chips = ((widget.schema['quick_cash'] as List?) ?? const [])
-        .map(_num)
-        .toList();
+    final label = context
+        .tr(widget.schema['label']?.toString() ?? 'Cash Tendered by Customer');
+    final chips =
+        ((widget.schema['quick_cash'] as List?) ?? const []).map(_num).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2259,8 +2275,7 @@ class _CashTenderedFieldState extends State<_CashTenderedField> {
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: TextField(
             controller: _controller,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
               labelText: label,
               prefixIcon: const Icon(Icons.payments_outlined),
@@ -2295,8 +2310,7 @@ class _CashTenderedFieldState extends State<_CashTenderedField> {
                     ),
                     Text(
                       'Change Due to Customer',
-                      style:
-                          TextStyle(fontSize: 12, color: Color(0xFF15803D)),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF15803D)),
                     ),
                   ],
                 ),

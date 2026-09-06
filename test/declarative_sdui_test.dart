@@ -137,6 +137,79 @@ void main() {
       // Chip hugs the right edge (within padding), never floats mid-row.
       expect(rowRight - chipRight, lessThan(24));
     });
+
+    testWidgets(
+        'compact timeline keeps fixed time and stacked badges in bounds',
+        (tester) async {
+      final schema = {
+        'type': 'row',
+        'spacing': 8,
+        'cross_axis_alignment': 'start',
+        'components': [
+          {
+            'type': 'container',
+            'width': 64,
+            'flexible': false,
+            'components': [
+              {'type': 'text', 'text': '9:00 AM'},
+            ],
+          },
+          {
+            'type': 'column',
+            'expanded': true,
+            'components': [
+              {
+                'type': 'text',
+                'text': 'Beard Trim & Hot Towel',
+                'max_lines': 2,
+              },
+              {'type': 'text', 'text': 'Staff: Elena Rostova'},
+            ],
+          },
+          {
+            'type': 'column',
+            'flexible': false,
+            'spacing': 4,
+            'cross_axis_alignment': 'end',
+            'components': [
+              {
+                'type': 'badge',
+                'label': 'IN CHAIR',
+                'color': '#0284c7',
+                'max_width': 124,
+              },
+              {
+                'type': 'badge',
+                'label': 'Advance: \$500.00',
+                'color': '#059669',
+                'max_width': 124,
+              },
+            ],
+          },
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 288,
+                child: Builder(
+                  builder: (ctx) =>
+                      DynamicSchemaParser.buildComponent(ctx, schema),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('IN CHAIR'), findsOneWidget);
+      expect(find.text('Advance: \$500.00'), findsOneWidget);
+      expect(find.byType(Expanded), findsOneWidget);
+    });
   });
 
   group('Declarative SDUI Schema Parser - Display Elements', () {
@@ -576,7 +649,8 @@ void main() {
       expect(dispatchedAction!['method'], 'DELETE');
     });
 
-    testWidgets('button_primary renders in system forest green', (tester) async {
+    testWidgets('button_primary renders in system forest green',
+        (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(colorSchemeSeed: const Color(0xFF2563EB)),

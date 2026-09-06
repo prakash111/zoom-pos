@@ -17,8 +17,10 @@ void main() {
 
     test('merges repeated adds of the same product+batch into one line', () {
       final cart = LocalCart();
-      cart.add(id: 1, batchId: 9, title: 'Amoxicillin', unitPrice: 10, quantity: 1);
-      cart.add(id: 1, batchId: 9, title: 'Amoxicillin', unitPrice: 10, quantity: 2);
+      cart.add(
+          id: 1, batchId: 9, title: 'Amoxicillin', unitPrice: 10, quantity: 1);
+      cart.add(
+          id: 1, batchId: 9, title: 'Amoxicillin', unitPrice: 10, quantity: 2);
 
       expect(cart.lines, hasLength(1));
       expect(cart.lines.first.quantity, 3);
@@ -27,15 +29,22 @@ void main() {
 
     test('keeps different batches of the same product as separate lines', () {
       final cart = LocalCart();
-      cart.add(id: 1, batchId: 9, title: 'Amoxicillin', unitPrice: 10, quantity: 1);
-      cart.add(id: 1, batchId: 10, title: 'Amoxicillin', unitPrice: 10, quantity: 1);
+      cart.add(
+          id: 1, batchId: 9, title: 'Amoxicillin', unitPrice: 10, quantity: 1);
+      cart.add(
+          id: 1, batchId: 10, title: 'Amoxicillin', unitPrice: 10, quantity: 1);
 
       expect(cart.lines, hasLength(2));
     });
 
     test('clamps quantity to maxQuantity on add and update', () {
       final cart = LocalCart();
-      cart.add(id: 1, title: 'Limited Stock', unitPrice: 5, quantity: 3, maxQuantity: 2);
+      cart.add(
+          id: 1,
+          title: 'Limited Stock',
+          unitPrice: 5,
+          quantity: 3,
+          maxQuantity: 2);
       expect(cart.lines.first.quantity, 2);
 
       final key = cart.lines.first.lineKey;
@@ -54,10 +63,20 @@ void main() {
 
     test('toApiItems maps to product_id/batch_id/quantity/unit_price', () {
       final cart = LocalCart();
-      cart.add(id: 501, batchId: 9001, title: 'Amoxicillin', unitPrice: 12.5, quantity: 2);
+      cart.add(
+          id: 501,
+          batchId: 9001,
+          title: 'Amoxicillin',
+          unitPrice: 12.5,
+          quantity: 2);
 
       expect(cart.toApiItems(), [
-        {'product_id': 501, 'batch_id': 9001, 'quantity': 2, 'unit_price': 12.5},
+        {
+          'product_id': 501,
+          'batch_id': 9001,
+          'quantity': 2,
+          'unit_price': 12.5
+        },
       ]);
     });
 
@@ -88,9 +107,15 @@ void main() {
         'banner': {
           'message': 'No cash register is open.',
           'icon': 'info_outline',
-          'action': {'type': 'navigate', 'endpoint': '/api/tenant/views/cash-register'},
+          'action': {
+            'type': 'navigate',
+            'endpoint': '/api/tenant/views/cash-register'
+          },
         },
-        'search': {'placeholder': 'Search medicines...', 'scanner_enabled': true},
+        'search': {
+          'placeholder': 'Search medicines...',
+          'scanner_enabled': true
+        },
         'categories': [
           {'id': null, 'label': 'All'},
           {'id': 12, 'label': 'Antibiotics'},
@@ -106,7 +131,11 @@ void main() {
               'price': 12.5,
               'stock': 30,
               'badge': {'text': 'Rx', 'color': '#f59e0b'},
-              'on_tap': {'type': 'open_remote_sheet', 'sheet_endpoint': '/api/tenant/pharmacy/batch-sheet?product_id=501'},
+              'on_tap': {
+                'type': 'open_remote_sheet',
+                'sheet_endpoint':
+                    '/api/tenant/pharmacy/batch-sheet?product_id=501'
+              },
             },
           ],
         },
@@ -126,7 +155,8 @@ void main() {
       expect(model.items, hasLength(1));
       expect(model.items.first.badge?.text, 'Rx');
       expect(model.items.first.onTap['type'], 'open_remote_sheet');
-      expect(model.checkoutSheetEndpoint, '/api/tenant/pharmacy/checkout-sheet');
+      expect(
+          model.checkoutSheetEndpoint, '/api/tenant/pharmacy/checkout-sheet');
     });
 
     test('banner is null when the message is missing or empty', () {
@@ -141,10 +171,12 @@ void main() {
     });
 
     test('item.isOutOfStock reflects a zero or missing stock value', () {
-      final item = PosCatalogItem.fromJson({'id': 1, 'title': 'X', 'price': 1, 'stock': 0});
+      final item = PosCatalogItem.fromJson(
+          {'id': 1, 'title': 'X', 'price': 1, 'stock': 0});
       expect(item.isOutOfStock, isTrue);
 
-      final unlimited = PosCatalogItem.fromJson({'id': 2, 'title': 'Labor Fee', 'price': 20});
+      final unlimited =
+          PosCatalogItem.fromJson({'id': 2, 'title': 'Labor Fee', 'price': 20});
       expect(unlimited.isOutOfStock, isFalse);
     });
   });
@@ -160,7 +192,8 @@ void main() {
 
     SduiActionDispatcher buildDispatcher({
       SduiRequestExecutor? requestExecutor,
-      Future<bool> Function(BuildContext, Map<String, dynamic>)? onBeforeDispatch,
+      Future<bool> Function(BuildContext, Map<String, dynamic>)?
+          onBeforeDispatch,
     }) {
       return SduiActionDispatcher(
         resolveApiClient: () => null,
@@ -174,7 +207,8 @@ void main() {
       );
     }
 
-    testWidgets('onBeforeDispatch intercepts add_to_cart without any network call',
+    testWidgets(
+        'onBeforeDispatch intercepts add_to_cart without any network call',
         (tester) async {
       var networkCalled = false;
       Map<String, dynamic>? interceptedAction;
@@ -193,7 +227,8 @@ void main() {
         },
       );
 
-      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: SizedBox())));
+      await tester
+          .pumpWidget(const MaterialApp(home: Scaffold(body: SizedBox())));
       final context = tester.element(find.byType(Scaffold));
 
       await dispatcher.dispatch(context, {
@@ -205,7 +240,48 @@ void main() {
       expect(networkCalled, isFalse);
     });
 
-    testWidgets('open_remote_sheet fetches the endpoint and renders its components',
+    testWidgets('form_submit includes server-provided checkout items',
+        (tester) async {
+      Map<String, dynamic>? submittedData;
+      final dispatcher = buildDispatcher(
+        requestExecutor: (endpoint, {required method, data}) async {
+          submittedData = Map<String, dynamic>.from(data ?? const {});
+          return {'success': true};
+        },
+      );
+      formValues['payment_method'] = 'cash';
+
+      await tester
+          .pumpWidget(const MaterialApp(home: Scaffold(body: SizedBox())));
+      final context = tester.element(find.byType(Scaffold));
+
+      await dispatcher.dispatch(context, {
+        'type': 'form_submit',
+        'endpoint': '/api/tenant/salon/pos-checkout',
+        'method': 'POST',
+        'payload': {
+          'appointment_id': 42,
+          'items': [
+            {
+              'id': 1,
+              'type': 'service',
+              'name': 'Beard Trim & Hot Towel',
+              'price': 15.0,
+              'quantity': 1,
+              'staff_id': 999,
+            },
+          ],
+        },
+      });
+
+      expect(submittedData, containsPair('appointment_id', 42));
+      expect(submittedData, containsPair('payment_method', 'cash'));
+      expect(submittedData?['items'], isA<List<dynamic>>());
+      expect(submittedData?['items'][0]['name'], 'Beard Trim & Hot Towel');
+    });
+
+    testWidgets(
+        'open_remote_sheet fetches the endpoint and renders its components',
         (tester) async {
       String? requestedEndpoint;
 
@@ -223,7 +299,8 @@ void main() {
         },
       );
 
-      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: SizedBox())));
+      await tester
+          .pumpWidget(const MaterialApp(home: Scaffold(body: SizedBox())));
       final context = tester.element(find.byType(Scaffold));
 
       await dispatcher.dispatch(context, {
@@ -232,12 +309,14 @@ void main() {
       });
       await tester.pumpAndSettle();
 
-      expect(requestedEndpoint, '/api/tenant/pharmacy/batch-sheet?product_id=501');
+      expect(
+          requestedEndpoint, '/api/tenant/pharmacy/batch-sheet?product_id=501');
       expect(find.text('Select FEFO Batch'), findsOneWidget);
       expect(find.text('Batch #A1'), findsOneWidget);
     });
 
-    testWidgets('add_to_cart nested inside an open_remote_sheet button is intercepted too',
+    testWidgets(
+        'add_to_cart nested inside an open_remote_sheet button is intercepted too',
         (tester) async {
       Map<String, dynamic>? interceptedAction;
 
@@ -251,7 +330,12 @@ void main() {
                 'label': 'Add to Dispensing Cart',
                 'action': {
                   'type': 'add_to_cart',
-                  'item': {'id': 501, 'batch_id': 9001, 'title': 'Amoxicillin', 'price': 12.5},
+                  'item': {
+                    'id': 501,
+                    'batch_id': 9001,
+                    'title': 'Amoxicillin',
+                    'price': 12.5
+                  },
                 },
               },
             ],
@@ -266,7 +350,8 @@ void main() {
         },
       );
 
-      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: SizedBox())));
+      await tester
+          .pumpWidget(const MaterialApp(home: Scaffold(body: SizedBox())));
       final context = tester.element(find.byType(Scaffold));
 
       await dispatcher.dispatch(context, {
