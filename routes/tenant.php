@@ -8,6 +8,7 @@ use App\Http\Controllers\Tenant\InvoiceController;
 use App\Http\Controllers\Tenant\NavigationMenuController;
 use App\Http\Controllers\Tenant\PwaManifestController;
 use App\Http\Controllers\Tenant\QuotationController;
+use App\Http\Controllers\Tenant\RepairPortalController;
 use App\Http\Controllers\Tenant\Restaurant\KotController;
 use App\Http\Controllers\Tenant\Restaurant\TableOrderController;
 use App\Http\Controllers\Tenant\SubscriptionInvoiceController;
@@ -212,3 +213,7 @@ Route::get('/c/{id}', [CatalogViewController::class, 'show'])
 // Public shareable document links (for customers clicking from WhatsApp or Email).
 Route::get('/i/{sale_number}', [InvoiceController::class, 'publicShow'])->name('sales.public');
 Route::get('/q/{quote_number}', [QuotationController::class, 'publicShow'])->name('quotes.public');
+
+// Public, login-free repair-ticket tracking page — linked from the intake
+// "Track progress: …" SMS / WhatsApp message.
+Route::get('/portal/repair/{ticket_number}', [RepairPortalController::class, 'track'])->name('repair.portal.track');

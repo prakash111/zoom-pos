@@ -53,7 +53,7 @@ class RepairNotificationService
         $phone = $ticket->customer?->phone ?: $ticket->customer_phone;
 
         $currency = $company?->currency_symbol ?: '$';
-        $trackingUrl = url("/portal/repair/{$ticket->ticket_number}");
+        $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
         $intakeSheetUrl = url("/api/tenant/repair/tickets/{$ticket->id}/intake-sheet");
 
         $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? ''));

@@ -1426,9 +1426,23 @@ class PharmacyAndRepairPosTest extends TestCase
         ]);
         $ticketRes->assertOk();
         $ticketId = $ticketRes->json('ticket.id');
-        $this->assertNotEmpty($ticketRes->json('tracking_url'));
+        $trackingUrl = $ticketRes->json('tracking_url');
+        $this->assertNotEmpty($trackingUrl);
+        $this->assertStringContainsString('/portal/repair/', $trackingUrl);
         $this->assertNotEmpty($ticketRes->json('whatsapp_url'));
         $this->assertNotEmpty($ticketRes->json('intake_sheet_url'));
+
+        // The customer-facing tracking link resolves (no 404) and shows status,
+        // never the passcode / IMEI.
+        $ticketNumber = $ticketRes->json('ticket.ticket_number');
+        $portal = $this->get('/portal/repair/'.$ticketNumber);
+        $portal->assertOk();
+        $portal->assertSee($ticketNumber);
+        $portal->assertSee('Spectre x360');
+        $portal->assertSee('Repair status tracking');
+        $portal->assertDontSee('passcode', false);
+        $portal->assertDontSee('IMEI', false);
+        $this->get('/portal/repair/REP-DOES-NOT-EXIST')->assertNotFound();
 
         // 2. Intake sheet printable HTML
         $intakeSheetRes = $this->withHeaders($this->authHeaders())->get("/api/tenant/repair/tickets/{$ticketId}/intake-sheet");
