@@ -317,6 +317,144 @@ class SalonPosTest extends TestCase
         ]);
     }
 
+    public function test_appointment_checkout_injects_items_and_uses_the_linked_crm_customer(): void
+    {
+        $service = $this->createService([
+            'name' => 'Beard Trim & Hot Towel',
+            'sale_price' => 15.00,
+        ]);
+        $specialist = $this->createSpecialist();
+        $date = now()->addDays(3)->toDateString();
+
+        $booking = $this->postJson('/api/tenant/salon/appointments', [
+            'service_id' => $service->id,
+            'specialist_id' => $specialist->id,
+            'customer_name' => 'Timeline Client',
+            'customer_phone' => '+1 555 000 9911',
+            'appointment_date' => $date,
+            'appointment_time' => '09:00',
+            'advance_paid' => 500,
+        ], $this->authHeaders());
+
+        $booking->assertCreated();
+        $appointmentId = $booking->json('appointment.id');
+        $customerId = $booking->json('appointment.customer_id');
+        $this->assertNotNull($customerId);
+        $this->assertDatabaseHas('customers', [
+            'id' => $customerId,
+            'company_id' => $this->company->id,
+            'name' => 'Timeline Client',
+            'phone' => '+1 555 000 9911',
+        ]);
+
+        $sheet = $this->getJson("/api/tenant/salon/checkout-sheet?appointment_id={$appointmentId}", $this->authHeaders());
+        $sheet->assertOk()
+            ->assertJsonPath('schema.booking_context.customer_id', $customerId)
+            ->assertJsonPath('schema.booking_context.customer_name', 'Timeline Client')
+            ->assertJsonPath('schema.order_summary.line_item_count', 1)
+            ->assertJsonPath('schema.order_summary.grand_total', 0);
+
+        $findButton = function (array $nodes, string $label) use (&$findButton): ?array {
+            foreach ($nodes as $node) {
+                if (! is_array($node)) {
+                    continue;
+                }
+                if (($node['label'] ?? null) === $label) {
+                    return $node;
+                }
+                $children = $node['components'] ?? $node['children'] ?? null;
+                if (is_array($children) && ($found = $findButton($children, $label))) {
+                    return $found;
+                }
+            }
+
+            return null;
+        };
+        $completeSale = $findButton($sheet->json('schema.components'), 'Complete Sale · $0.00');
+        $this->assertNotNull($completeSale);
+        $this->assertSame($appointmentId, $completeSale['action']['payload']['appointment_id']);
+        $this->assertSame($service->id, $completeSale['action']['payload']['items'][0]['product_id']);
+        $this->assertSame('service', $completeSale['action']['payload']['items'][0]['type']);
+        $this->assertSame($specialist->id, $completeSale['action']['payload']['items'][0]['staff_id']);
+        $this->assertStringContainsString('CRM LINKED', $sheet->getContent());
+
+        // Deliberately omit items/customer fields to reproduce the timeline
+        // serializer path. The controller must resolve all of them from the
+        // tenant-scoped appointment before validating.
+        $checkout = $this->postJson('/api/tenant/salon/pos-checkout', [
+            'appointment_id' => $appointmentId,
+            'payment_method' => 'cash',
+        ], $this->authHeaders());
+
+        $checkout->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('sale.customer_id', $customerId)
+            ->assertJsonPath('sale.customer_name', 'Timeline Client')
+            ->assertJsonPath('sale.items.0.product_id', $service->id)
+            ->assertJsonPath('sale.items.0.name', 'Beard Trim & Hot Towel')
+            ->assertJsonPath('sale.items.0.specialist_id', $specialist->id)
+            ->assertJsonPath('post_sale_sheet.action', 'show_post_sale_sheet');
+        $this->assertEquals(15, (float) $checkout->json('sale.paid_amount'));
+        $this->assertEquals(0, (float) $checkout->json('sale.due_amount'));
+    }
+
+    public function test_salon_checkout_accepts_core_pos_item_aliases(): void
+    {
+        $service = $this->createService();
+        $specialist = $this->createSpecialist();
+
+        $response = $this->postJson('/api/tenant/salon/pos-checkout', [
+            'items' => [[
+                'id' => $service->id,
+                'type' => 'service',
+                'name' => $service->name,
+                'price' => 25,
+                'quantity' => 1,
+                'staff_id' => $specialist->id,
+            ]],
+            'payment_method' => 'cash',
+        ], $this->authHeaders());
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('sale.items.0.product_id', $service->id)
+            ->assertJsonPath('sale.items.0.specialist_id', $specialist->id);
+    }
+
+    public function test_calendar_timeline_uses_fixed_flexible_and_stacked_status_columns(): void
+    {
+        $service = $this->createService(['name' => 'Beard Trim & Hot Towel']);
+        $specialist = $this->createSpecialist(['name' => 'Elena Rostova']);
+        $date = now()->addDays(4)->toDateString();
+        SalonAppointment::create([
+            'company_id' => $this->company->id,
+            'appointment_number' => 'APT-LAYOUT-001',
+            'customer_name' => 'Layout Client',
+            'product_id' => $service->id,
+            'specialist_id' => $specialist->id,
+            'starts_at' => now()->addDays(4)->setTime(9, 0),
+            'ends_at' => now()->addDays(4)->setTime(9, 30),
+            'status' => 'in_progress',
+            'advance_paid' => 500,
+        ]);
+
+        $response = $this->getJson("/api/tenant/views/service-calendar?date={$date}", $this->authHeaders());
+        $response->assertOk();
+
+        $timelineRow = $response->json('schema.components.2.components.1.components.0.components.0');
+        $this->assertSame('row', $timelineRow['type']);
+        $this->assertSame(64, $timelineRow['components'][0]['width']);
+        $this->assertFalse($timelineRow['components'][0]['flexible']);
+        $this->assertTrue($timelineRow['components'][1]['expanded']);
+        $this->assertFalse($timelineRow['components'][2]['flexible']);
+        $this->assertSame('end', $timelineRow['components'][2]['cross_axis_alignment']);
+        $this->assertSame(4, $timelineRow['components'][2]['spacing']);
+        $this->assertSame('IN CHAIR', $timelineRow['components'][2]['components'][0]['label']);
+        $this->assertSame(124, $timelineRow['components'][2]['components'][0]['max_width']);
+        $this->assertSame('Advance: $500.00', $timelineRow['components'][2]['components'][1]['label']);
+        $this->assertSame(124, $timelineRow['components'][2]['components'][1]['max_width']);
+    }
+
     public function test_calendar_booking_with_advance_deposit_and_settlement_parity(): void
     {
         $service = $this->createService(['sale_price' => 50.00]);

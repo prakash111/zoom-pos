@@ -573,7 +573,7 @@ class SchemaResponse
         ];
     }
 
-    public static function formSubmitAction(string $endpoint, string $method = 'POST', string $successToast = 'Settings saved successfully', bool $navigateBack = false, bool $reload = false): array
+    public static function formSubmitAction(string $endpoint, string $method = 'POST', string $successToast = 'Settings saved successfully', bool $navigateBack = false, bool $reload = false, ?array $payload = null): array
     {
         $action = [
             'type' => 'form_submit',
@@ -584,6 +584,9 @@ class SchemaResponse
         ];
         if ($reload) {
             $action['reload'] = true;
+        }
+        if ($payload !== null) {
+            $action['payload'] = $payload;
         }
 
         return $action;
@@ -2201,10 +2204,11 @@ class SchemaResponse
                 'cancelled', 'no_show' => '#ef4444',
                 default => '#7c3aed',
             };
-            $floorStatus = match (true) {
-                $appointment->status === 'scheduled' => 'WAITING',
-                in_array($appointment->status, ['checked_in', 'in_progress'], true) => 'IN CHAIR / IN PROGRESS',
-                $appointment->status === 'completed' && ! $appointment->sale_id => 'COMPLETED / UNPAID',
+            $floorStatus = match ($appointment->status) {
+                'scheduled' => 'WAITING',
+                'checked_in' => 'CHECKED IN',
+                'in_progress' => 'IN CHAIR',
+                'completed' => $appointment->sale_id ? 'COMPLETED' : 'COMPLETED / UNPAID',
                 default => strtoupper(str_replace('_', ' ', $appointment->status)),
             };
             $actions = [];
@@ -2227,22 +2231,25 @@ class SchemaResponse
             $appointmentCards[] = self::card([
                 self::row([
                     self::container([
-                        self::text($localStart->format('g:i'), 'title_large', ['bold' => true, 'color' => '#7c3aed']),
-                        self::text($localStart->format('A'), 'body_small', ['color' => '#64748b']),
-                    ], ['padding' => 8, 'color' => '#f5f3ff', 'border_radius' => 10]),
+                        self::column([
+                            self::text($localStart->format('g:i'), 'title_medium', ['bold' => true, 'color' => '#7c3aed', 'max_lines' => 1]),
+                            self::text($localStart->format('A'), 'body_small', ['color' => '#64748b', 'max_lines' => 1]),
+                        ], ['cross_axis_alignment' => 'center']),
+                    ], ['width' => 64, 'flexible' => false, 'padding' => 8, 'color' => '#f5f3ff', 'border_radius' => 10]),
                     self::column([
-                        self::text($appointment->service?->name ?? 'Salon Service', 'title_medium', ['bold' => true]),
-                        self::text("{$appointment->customer_name} · ".($appointment->specialist?->name ?? 'Unassigned'), 'body_small', ['color' => '#64748b']),
-                        self::text($localStart->format('g:i A').' – '.$localEnd->format('g:i A'), 'body_small', ['color' => '#94a3b8']),
-                    ]),
+                        self::text($appointment->service?->name ?? 'Salon Service', 'title_medium', ['bold' => true, 'max_lines' => 2]),
+                        self::text('Client: '.$appointment->customer_name, 'body_small', ['color' => '#475569', 'max_lines' => 2]),
+                        self::text('Staff: '.($appointment->specialist?->name ?? 'Unassigned'), 'body_small', ['color' => '#64748b', 'max_lines' => 2]),
+                        self::text('Duration: '.$localStart->format('g:i A').' – '.$localEnd->format('g:i A'), 'body_small', ['color' => '#94a3b8', 'max_lines' => 2]),
+                    ], ['expanded' => true, 'spacing' => 2]),
                     self::column([
-                        self::badge($floorStatus, $statusColor, 'subtle'),
-                        ...($appointment->chair_label ? [self::badge('Chair: '.$appointment->chair_label, '#475569', 'subtle')] : []),
+                        self::badge($floorStatus, $statusColor, 'subtle', ['max_width' => 124]),
+                        ...($appointment->chair_label ? [self::badge('Chair: '.$appointment->chair_label, '#475569', 'subtle', ['max_width' => 124])] : []),
                         ...((float) $appointment->advance_paid > 0 ? [
-                            self::badge("Advance: {$currency}".number_format((float) $appointment->advance_paid, 2), '#059669', 'subtle'),
+                            self::badge("Advance: {$currency}".number_format((float) $appointment->advance_paid, 2), '#059669', 'subtle', ['max_width' => 124]),
                         ] : []),
-                    ]),
-                ], ['main_axis_alignment' => 'space_between']),
+                    ], ['flexible' => false, 'cross_axis_alignment' => 'end', 'spacing' => 4]),
+                ], ['spacing' => 8, 'cross_axis_alignment' => 'start']),
                 ! empty($actions) ? self::wrap($actions) : self::badge('Appointment closed', $statusColor, 'subtle'),
             ]);
         }

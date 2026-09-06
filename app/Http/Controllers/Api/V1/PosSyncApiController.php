@@ -1613,11 +1613,39 @@ class PosSyncApiController extends Controller
             ->first();
         $defaultTaxRate = $defaultTaxRule ? (float) $defaultTaxRule->rate : 0.0;
 
-        $products = Product::query()
+        $productsQuery = Product::query()
             ->withoutGlobalScope('company')
             ->where('company_id', $company->id)
-            ->with(['category', 'brand'])
-            ->orderBy('name')
+            ->with(['category', 'brand']);
+
+        if ($request->boolean('parts_only') || $request->query('type') === 'parts' || $request->query('department') === 'parts') {
+            $productsQuery->spareParts();
+        } elseif ($request->boolean('exclude_services') || $request->query('type') === 'physical') {
+            $productsQuery->where(function ($q) {
+                $q->where('unit', '!=', 'service')
+                    ->orWhereNull('unit');
+            })->where(function ($q) {
+                $q->whereNull('duration_minutes')
+                    ->orWhere('duration_minutes', '<=', 0);
+            });
+        } elseif ($catType = $request->query('category_type')) {
+            $productsQuery->whereHas('category', fn ($q) => $q->where('type', $catType));
+        }
+
+        if ($catId = $request->query('category_id')) {
+            $productsQuery->where('category_id', $catId);
+        }
+
+        if ($dept = $request->query('department')) {
+            if ($dept !== 'parts') {
+                $productsQuery->where(function ($q) use ($dept) {
+                    $q->where('category_name', $dept)
+                        ->orWhereHas('category', fn ($cq) => $cq->where('name', $dept)->orWhere('type', $dept));
+                });
+            }
+        }
+
+        $products = $productsQuery->orderBy('name')
             ->get()
             ->map(function (Product $p) use ($defaultTaxRate) {
                 return [
@@ -1634,6 +1662,9 @@ class PosSyncApiController extends Controller
                     'unit' => $p->unit ?? 'pcs',
                     'category_id' => $p->category_id ? (string) $p->category_id : null,
                     'category_name' => $p->category_name ?? $p->category?->name ?? 'General',
+                    'category_type' => $p->category?->type ?? 'retail',
+                    'duration_minutes' => $p->duration_minutes ? (int) $p->duration_minutes : null,
+                    'is_service' => $p->isService(),
                     'brand_name' => $p->brand_name ?? $p->brand?->name ?? '',
                     'image_url' => $p->getImageUrlOrDefault(),
                     'tax_rate' => $p->tax_rate !== null && (float) $p->tax_rate > 0 ? (float) $p->tax_rate : $defaultTaxRate,
@@ -1645,11 +1676,19 @@ class PosSyncApiController extends Controller
                 ];
             });
 
-        $categories = Category::query()
+        $categoriesQuery = Category::query()
             ->withoutGlobalScope('company')
             ->where('company_id', $company->id)
-            ->orderBy('name')
-            ->get(['id', 'name', 'color']);
+            ->orderBy('name');
+
+        if ($request->boolean('parts_only') || $request->query('type') === 'parts' || $request->query('department') === 'parts') {
+            $categoriesQuery->whereNotIn('type', ['salon', 'service'])
+                ->whereNotIn('name', ['Hair & Styling', 'Facials & Skincare', 'Spa & Body Treatments']);
+        } elseif ($catType = $request->query('category_type')) {
+            $categoriesQuery->where('type', $catType);
+        }
+
+        $categories = $categoriesQuery->get(['id', 'name', 'color', 'type']);
 
         $brands = Brand::query()
             ->withoutGlobalScope('company')

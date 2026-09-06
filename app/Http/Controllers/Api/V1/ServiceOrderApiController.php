@@ -73,6 +73,44 @@ class ServiceOrderApiController extends Controller
         return $this->save($request);
     }
 
+    public function partsIndex(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $query = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->spareParts();
+
+        if ($search = $request->query('search')) {
+            $t = "%{$search}%";
+            $query->where(function ($q) use ($t) {
+                $q->where('name', 'like', $t)
+                    ->orWhere('code', 'like', $t)
+                    ->orWhere('sku', 'like', $t)
+                    ->orWhere('barcode', 'like', $t);
+            });
+        }
+
+        $parts = $query->orderBy('name')->limit(100)->get()->map(function (Product $p) {
+            return [
+                'id' => (string) ($p->external_id ?: $p->id),
+                'server_id' => $p->id,
+                'name' => $p->name,
+                'sku' => $p->sku ?: $p->code ?: '',
+                'sale_price' => (float) ($p->sale_price ?? 0),
+                'cost_price' => (float) ($p->cost_price ?? 0),
+                'current_stock' => (float) ($p->current_stock ?? 0),
+                'unit' => $p->unit ?? 'pcs',
+                'category_id' => $p->category_id ? (string) $p->category_id : null,
+                'category_name' => $p->category_name ?? $p->category?->name ?? 'Spare Parts',
+                'image_url' => $p->getImageUrlOrDefault(),
+            ];
+        });
+
+        return response()->json(['success' => true, 'parts' => $parts]);
+    }
+
     public function update(Request $request, string $id): JsonResponse
     {
         return $this->save($request, $id);
@@ -138,8 +176,11 @@ class ServiceOrderApiController extends Controller
         $discount = (float) ($data['discount'] ?? 0);
         $totalAmount = max(0, round($partsTotal + $laborCost - $discount, 2));
 
+        $customerId = isset($data['customer_id']) && $data['customer_id'] !== '' ? (string) $data['customer_id'] : null;
+        $technicianId = isset($data['technician_id']) && $data['technician_id'] !== '' ? (string) $data['technician_id'] : null;
+
         $payload = [
-            'customer_id' => $data['customer_id'] ?? null,
+            'customer_id' => $customerId,
             'customer_name' => $data['customer_name'],
             'customer_phone' => $data['customer_phone'] ?? null,
             'customer_email' => $data['customer_email'] ?? null,
@@ -157,7 +198,7 @@ class ServiceOrderApiController extends Controller
             'priority' => $data['priority'],
             'warranty_period' => $data['warranty_period'] ?? '90 days',
             'warranty_terms' => $data['warranty_terms'] ?? null,
-            'technician_id' => $data['technician_id'] ?? null,
+            'technician_id' => $technicianId,
             'notes' => $data['notes'] ?? null,
         ];
 

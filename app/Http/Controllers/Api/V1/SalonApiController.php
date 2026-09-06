@@ -53,9 +53,30 @@ class SalonApiController extends Controller
         $appointment = $request->integer('appointment_id') && Schema::hasTable('salon_appointments')
             ? SalonAppointment::withoutGlobalScope('company')
                 ->where('company_id', $company->id)
-                ->with(['service', 'specialist'])
+                ->with(['service', 'specialist', 'customer'])
                 ->find($request->integer('appointment_id'))
             : null;
+
+        // Backfill bookings created by older clients before appointment CRM
+        // linkage was mandatory. This also guarantees that every timeline
+        // checkout can render a real assigned-customer card.
+        if ($appointment && ! $appointment->customer && trim((string) $appointment->customer_name) !== '') {
+            $customer = Customer::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where(function ($query) use ($appointment) {
+                    $appointment->customer_phone
+                        ? $query->where('phone', $appointment->customer_phone)
+                        : $query->where('name', $appointment->customer_name);
+                })
+                ->first();
+            $customer ??= Customer::create([
+                'company_id' => $company->id,
+                'name' => $appointment->customer_name,
+                'phone' => $appointment->customer_phone,
+            ]);
+            $appointment->update(['customer_id' => $customer->id]);
+            $appointment->setRelation('customer', $customer);
+        }
 
         $specialists = User::withoutGlobalScope('company')
             ->where('company_id', $company->id)
@@ -77,7 +98,9 @@ class SalonApiController extends Controller
             $schema['booking_context'] = [
                 'appointment_id' => $appointment->id,
                 'appointment_number' => $appointment->appointment_number,
+                'customer_id' => $appointment->customer_id,
                 'customer_name' => $appointment->customer_name,
+                'customer_phone' => $appointment->customer_phone,
                 'service_id' => $appointment->product_id,
                 'service_name' => $appointment->service?->name,
                 'specialist_id' => $appointment->specialist_id,
@@ -400,6 +423,70 @@ class SalonApiController extends Controller
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
+        $appointment = null;
+        if ($request->filled('appointment_id')) {
+            $appointment = SalonAppointment::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->with(['service', 'customer'])
+                ->find($request->integer('appointment_id'));
+
+            if (! $appointment) {
+                return response()->json(['success' => false, 'error' => 'Appointment not found.'], 404);
+            }
+        }
+
+        // Appointment drawers can be opened from a generic SDUI timeline,
+        // where the service is rendered from server data rather than added to
+        // the native LocalCart. Always restore that booked service into the
+        // canonical POS items array before validation. The explicit payload
+        // emitted by UniversalPosBuilder is the primary path; this is the
+        // authoritative server fallback for installed/older clients.
+        if ($appointment && empty($request->input('items'))) {
+            if (! $appointment->service) {
+                return response()->json(['success' => false, 'error' => 'The booked service is no longer available.'], 422);
+            }
+
+            $request->merge([
+                'items' => [[
+                    'product_id' => $appointment->product_id,
+                    'item_id' => $appointment->product_id,
+                    'id' => $appointment->product_id,
+                    'type' => 'service',
+                    'name' => $appointment->service->name,
+                    'unit_price' => (float) $appointment->service->sale_price,
+                    'price' => (float) $appointment->service->sale_price,
+                    'quantity' => 1,
+                    'staff_id' => $appointment->specialist_id,
+                ]],
+                'customer_id' => $request->input('customer_id') ?: $appointment->customer_id,
+                'customer_name' => $request->input('customer_name') ?: $appointment->customer_name,
+                'customer_phone' => $request->input('customer_phone') ?: $appointment->customer_phone,
+            ]);
+        }
+
+        // Accept both the native POS names and the public/core POS aliases
+        // (id/item_id, price, staff_id) while keeping one validator and one
+        // settlement implementation downstream.
+        $normalizedItems = collect((array) $request->input('items', []))
+            ->map(function ($item, int $index) use ($request) {
+                if (! is_array($item)) {
+                    return $item;
+                }
+
+                $staffId = $item['staff_id'] ?? $item['specialist_id'] ?? null;
+                if ($staffId && ! $request->filled("line_specialist_{$index}")) {
+                    $request->merge(["line_specialist_{$index}" => $staffId]);
+                }
+
+                return array_merge($item, [
+                    'product_id' => $item['product_id'] ?? $item['item_id'] ?? $item['id'] ?? null,
+                    'quantity' => $item['quantity'] ?? $item['qty'] ?? 1,
+                    'unit_price' => $item['unit_price'] ?? $item['price'] ?? null,
+                ]);
+            })
+            ->all();
+        $request->merge(['items' => $normalizedItems]);
+
         $this->normalizeFixedSplitPayments($request);
 
         $validator = Validator::make($request->all(), [
@@ -423,11 +510,6 @@ class SalonApiController extends Controller
         }
 
         $items = $request->input('items', []);
-        $appointment = $request->filled('appointment_id')
-            ? SalonAppointment::withoutGlobalScope('company')
-                ->where('company_id', $company->id)
-                ->find($request->integer('appointment_id'))
-            : null;
         $specialistId = $request->input('specialist_id') ?: $appointment?->specialist_id;
 
         try {
@@ -640,7 +722,11 @@ class SalonApiController extends Controller
                 }
 
                 if ($appointment) {
-                    $appointment->update(['status' => 'completed', 'sale_id' => $sale->id]);
+                    $appointment->update([
+                        'status' => 'completed',
+                        'sale_id' => $sale->id,
+                        'customer_id' => $customerId ?: $appointment->customer_id,
+                    ]);
                 }
 
                 return $sale;

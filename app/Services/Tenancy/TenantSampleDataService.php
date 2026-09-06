@@ -75,6 +75,7 @@ class TenantSampleDataService
             ], [
                 'color' => $c['color'],
                 'description' => $c['description'],
+                'type' => 'retail',
                 'active' => true,
                 'is_demo' => true,
             ]);
@@ -373,6 +374,7 @@ class TenantSampleDataService
             ], [
                 'color' => $c['color'],
                 'description' => $c['description'],
+                'type' => 'restaurant',
                 'active' => true,
                 'is_demo' => true,
             ]);
@@ -542,6 +544,7 @@ class TenantSampleDataService
             ], [
                 'color' => $c['color'],
                 'description' => $c['description'],
+                'type' => 'pharmacy',
                 'active' => true,
                 'is_demo' => true,
             ]);
@@ -854,6 +857,7 @@ class TenantSampleDataService
             ], [
                 'color' => $c['color'],
                 'description' => $c['description'],
+                'type' => 'repair',
                 'active' => true,
                 'is_demo' => true,
             ]);
@@ -1177,6 +1181,7 @@ class TenantSampleDataService
             ], [
                 'color' => $c['color'],
                 'description' => $c['description'],
+                'type' => 'salon',
                 'active' => true,
                 'is_demo' => true,
             ]);

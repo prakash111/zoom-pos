@@ -214,6 +214,7 @@ class UniversalPosBuilder
         $products = Product::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('active', true)
+            ->spareParts()
             ->limit(60)
             ->get();
 
@@ -224,6 +225,8 @@ class UniversalPosBuilder
         $dbCategories = Category::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('active', true)
+            ->whereNotIn('type', ['salon', 'service'])
+            ->whereNotIn('name', ['Hair & Styling', 'Facials & Skincare', 'Spa & Body Treatments'])
             ->orderBy('name')
             ->get();
 
@@ -820,7 +823,7 @@ class UniversalPosBuilder
         if ($module === 'salon' && $appointmentId && Schema::hasTable('salon_appointments')) {
             $selectedAppointment = SalonAppointment::withoutGlobalScope('company')
                 ->where('company_id', $company->id)
-                ->with(['service', 'specialist'])
+                ->with(['service', 'specialist', 'customer'])
                 ->find($appointmentId);
         }
 
@@ -1016,6 +1019,38 @@ class UniversalPosBuilder
             'selected_payment_method' => $selectedPaymentMethod,
             'selected_tendered' => number_format($selectedTendered, 2, '.', ''),
         ]);
+        $submitPayload = null;
+        if ($module === 'salon' && $selectedAppointment) {
+            $appointmentItems = array_values(array_filter(array_map(
+                static function (array $line) use ($selectedAppointment): ?array {
+                    $productId = $line['product_id'] ?? $line['item_id'] ?? $line['id'] ?? null;
+                    if (! $productId) {
+                        return null;
+                    }
+
+                    $quantity = max(1, (float) ($line['quantity'] ?? $line['qty'] ?? 1));
+                    $price = max(0, (float) ($line['unit_price'] ?? $line['price'] ?? 0));
+
+                    return [
+                        'id' => $productId,
+                        'item_id' => $productId,
+                        'product_id' => $productId,
+                        'type' => (string) ($line['service_type'] ?? 'service'),
+                        'name' => (string) ($line['name'] ?? $line['title'] ?? 'Salon Service'),
+                        'price' => $price,
+                        'unit_price' => $price,
+                        'quantity' => $quantity,
+                        'staff_id' => $line['staff_id'] ?? $line['specialist_id'] ?? $selectedAppointment->specialist_id,
+                    ];
+                },
+                $cartPreview
+            )));
+
+            $submitPayload = [
+                'appointment_id' => $selectedAppointment->id,
+                'items' => $appointmentItems,
+            ];
+        }
 
         $components = [
             SchemaResponse::card([
@@ -1060,11 +1095,12 @@ class UniversalPosBuilder
             ];
         }
 
+        $linkedCustomer = $selectedCustomer ?: $selectedAppointment?->customer;
         $addCustomerModal = [
             SchemaResponse::text('Search an existing customer or type a walk-in name below.', 'body_small', ['color' => '#64748b']),
-            SchemaResponse::dropdownSelect('customer_id', 'Existing Customer', $customerOptions, ''),
+            SchemaResponse::dropdownSelect('customer_id', 'Existing Customer', $customerOptions, (string) ($linkedCustomer?->id ?? '')),
             SchemaResponse::textInput('customer_name', $customerFieldLabel, $defaultCustomerName ?: ''),
-            SchemaResponse::textInput('customer_phone', 'Phone (walk-in)', '', ['keyboard_type' => 'phone']),
+            SchemaResponse::textInput('customer_phone', 'Phone (walk-in)', $linkedCustomer?->phone ?: $selectedAppointment?->customer_phone ?: '', ['keyboard_type' => 'phone']),
             $doneButton('Attach Customer'),
         ];
 
@@ -1112,14 +1148,28 @@ class UniversalPosBuilder
 
         $components[] = SchemaResponse::card([
             SchemaResponse::wrap([
-                SchemaResponse::buttonOutlined('+ Add Customer', $pillModal('Add Customer', $addCustomerModal), 'person_add', ['full_width' => false, 'border_radius' => 20]),
+                SchemaResponse::buttonOutlined($linkedCustomer ? 'Change Customer' : '+ Add Customer', $pillModal('Add Customer', $addCustomerModal), 'person_add', ['full_width' => false, 'border_radius' => 20]),
                 SchemaResponse::buttonOutlined('Hold', SchemaResponse::formSubmitAction('/api/tenant/pos/hold-order', 'POST', 'Order held — resume it from Held Orders.', navigateBack: true), 'pause_circle', ['full_width' => false, 'border_radius' => 20]),
                 SchemaResponse::buttonOutlined('Note', $pillModal('Order Note', $noteModal), 'edit_note', ['full_width' => false, 'border_radius' => 20]),
                 SchemaResponse::buttonOutlined('Discount', $pillModal('Apply Discount', $discountModal), 'percent', ['full_width' => false, 'border_radius' => 20]),
                 SchemaResponse::buttonOutlined('Split Payment', $pillModal('Split Payment', $splitPaymentModal), 'call_split', ['full_width' => false, 'border_radius' => 20]),
             ]),
-            // Customer name stays pinned inline so it always flows onto the receipt.
-            SchemaResponse::textInput('customer_name', $customerFieldLabel, $defaultCustomerName ?: 'Walk-in Customer'),
+            ...($linkedCustomer ? [
+                SchemaResponse::container([
+                    SchemaResponse::row([
+                        SchemaResponse::icon('person', ['color' => '#166534', 'size' => 22]),
+                        SchemaResponse::column([
+                            SchemaResponse::text($defaultCustomerName ?: $linkedCustomer->name, 'label_large', ['bold' => true]),
+                            SchemaResponse::text($linkedCustomer->phone ?: $selectedAppointment?->customer_phone ?: 'No phone supplied', 'body_small', ['color' => '#64748b']),
+                        ], ['expanded' => true]),
+                        SchemaResponse::badge('CRM LINKED', '#166534', 'subtle'),
+                    ], ['spacing' => 8, 'cross_axis_alignment' => 'center']),
+                ], ['padding' => 10, 'margin' => ['top' => 8], 'color' => '#f0fdf4', 'border_color' => '#bbf7d0', 'border_radius' => 10]),
+            ] : [
+                // Walk-ins retain the editable inline field; booked clients
+                // are shown above as their attached CRM record instead.
+                SchemaResponse::textInput('customer_name', $customerFieldLabel, $defaultCustomerName ?: 'Walk-in Customer'),
+            ]),
         ], ['border_radius' => 16]);
 
         if ($ticketFieldLabel !== null && ! empty($repairTicketOptions)) {
@@ -1266,7 +1316,8 @@ class UniversalPosBuilder
             $submitEndpoint,
             'POST',
             'Payment collected and sale completed successfully.',
-            reload: true
+            reload: true,
+            payload: $submitPayload,
         ), 'payments', ['background_color' => '#166534', 'border_radius' => 14]);
 
         $schema = self::sheet('Order Cart', $components);

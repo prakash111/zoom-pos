@@ -33,7 +33,7 @@ class Index extends Component
 
     public ?int $editingOrderId = null;
 
-    public ?int $customerId = null;
+    public ?string $customerId = null;
 
     public string $customerName = '';
 
@@ -114,11 +114,14 @@ class Index extends Component
         $this->showModal = true;
     }
 
-    public function selectCustomer(int $id): void
+    public function selectCustomer($id): void
     {
-        $c = Customer::find($id);
+        $c = is_numeric($id) ? Customer::find($id) : null;
+        if (! $c) {
+            $c = Customer::where('external_id', (string) $id)->first();
+        }
         if ($c) {
-            $this->customerId = $c->id;
+            $this->customerId = (string) ($c->external_id ?: $c->id);
             $this->customerName = $c->name;
             $this->customerPhone = (string) ($c->phone ?? '');
             $this->customerEmail = (string) ($c->email ?? '');
@@ -206,7 +209,12 @@ class Index extends Component
 
     public function getSelectedCustomerProperty(): ?Customer
     {
-        return $this->customerId ? Customer::find($this->customerId) : null;
+        if (! $this->customerId) {
+            return null;
+        }
+
+        return (is_numeric($this->customerId) ? Customer::find($this->customerId) : null)
+            ?? Customer::where('external_id', (string) $this->customerId)->first();
     }
 
     public function getGrandTotalProperty(): float
@@ -333,7 +341,7 @@ class Index extends Component
         $order = ServiceOrder::findOrFail($id);
         $this->editingOrderId = $order->id;
         $this->isEditing = true;
-        $this->customerId = $order->customer_id;
+        $this->customerId = $order->customer_id ? (string) $order->customer_id : null;
         $this->customerName = $order->customer_name;
         $this->customerPhone = (string) ($order->customer_phone ?? '');
         $this->customerEmail = (string) ($order->customer_email ?? '');
@@ -441,6 +449,7 @@ class Index extends Component
         $searchedProducts = [];
         if (strlen($this->partSearch) >= 2) {
             $searchedProducts = Product::where('company_id', $companyId)
+                ->spareParts()
                 ->where(function ($q) {
                     $t = '%' . $this->partSearch . '%';
                     $q->where('name', 'like', $t)

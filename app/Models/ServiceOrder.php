@@ -118,7 +118,26 @@ class ServiceOrder extends Model
 
     public function customer(): BelongsTo
     {
-        return $this->belongsTo(Customer::class);
+        if (is_string($this->customer_id) && ! is_numeric($this->customer_id)) {
+            return $this->belongsTo(Customer::class, 'customer_id', 'external_id');
+        }
+
+        return $this->belongsTo(Customer::class, 'customer_id', 'id');
+    }
+
+    public function getCustomerRecordAttribute(): ?Customer
+    {
+        if (! $this->customer_id) {
+            return null;
+        }
+
+        return Customer::withoutGlobalScope('company')
+            ->where('company_id', $this->company_id)
+            ->where(function ($q) {
+                $q->where('id', $this->customer_id)
+                    ->orWhere('external_id', (string) $this->customer_id);
+            })
+            ->first();
     }
 
     public function technician(): BelongsTo

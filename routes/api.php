@@ -427,6 +427,7 @@ Route::prefix('v1/pos')->group(function () {
 
         // Service Orders (Repairs / Warranty)
         Route::get('/service-orders', [ServiceOrderApiController::class, 'index'])->middleware('tenant.api.permission:service_orders,view');
+        Route::get('/service-orders/parts', [ServiceOrderApiController::class, 'partsIndex'])->middleware('tenant.api.permission:service_orders,view');
         Route::post('/service-orders', [ServiceOrderApiController::class, 'store'])->middleware('tenant.api.permission:service_orders,create');
         Route::get('/service-orders/{id}', [ServiceOrderApiController::class, 'show'])->middleware('tenant.api.permission:service_orders,view');
         Route::put('/service-orders/{id}', [ServiceOrderApiController::class, 'update'])->middleware('tenant.api.permission:service_orders,edit');

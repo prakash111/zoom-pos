@@ -71,6 +71,44 @@ class Product extends Model
         return $this->hasMany(RepairTicketPart::class);
     }
 
+    public function isService(): bool
+    {
+        if ($this->unit === 'service') {
+            return true;
+        }
+
+        if ($this->duration_minutes !== null && (int) $this->duration_minutes > 0) {
+            return true;
+        }
+
+        if ($this->category && in_array($this->category->type, ['salon', 'service'], true)) {
+            return true;
+        }
+
+        $catName = strtolower($this->category_name ?? $this->category?->name ?? '');
+        if (str_contains($catName, 'hair') || str_contains($catName, 'styling') || str_contains($catName, 'facial') || str_contains($catName, 'spa')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function scopeSpareParts($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('unit', '!=', 'service')
+                ->orWhereNull('unit');
+        })
+        ->where(function ($q) {
+            $q->whereNull('duration_minutes')
+                ->orWhere('duration_minutes', '<=', 0);
+        })
+        ->whereDoesntHave('category', function ($cq) {
+            $cq->whereIn('type', ['salon', 'service'])
+                ->orWhereIn('name', ['Hair & Styling', 'Facials & Skincare', 'Spa & Body Treatments']);
+        });
+    }
+
     public function getImageUrlOrDefault(): string
     {
         if (! empty($this->image_url)) {
