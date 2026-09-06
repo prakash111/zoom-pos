@@ -16,14 +16,13 @@ use App\Models\RepairTicketItem;
 use App\Models\Sale;
 use App\Models\User;
 use App\Services\Auth\PermissionChecker;
+use App\Services\Documents\DocumentNumberService;
 use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\Pos\Adapters\RepairCartAdapter;
+use App\Services\Pos\UniversalPosBuilder;
 use App\Services\Repair\RepairNotificationService;
-use App\Services\Sdui\PosScreenBuilder;
 use App\Services\Sdui\SchemaResponse;
-use App\Services\Sdui\SchemaValidator;
-use App\Services\Sdui\UniversalPosBuilder;
 use App\Services\TaxCalculationService;
-use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -484,6 +483,7 @@ class RepairApiController extends Controller
             'technician_id' => 'nullable|string',
             'assigned_technician_id' => 'nullable|string',
             'estimated_cost' => 'nullable|numeric|min:0',
+            'diagnostic_fee' => 'nullable|numeric|min:0',
             'advance_deposit' => 'nullable|numeric|min:0',
             'advance_paid' => 'nullable|numeric|min:0',
             'advance_payment_method' => 'nullable|string',
@@ -553,19 +553,7 @@ class RepairApiController extends Controller
             $customerName = 'Walk-in Customer';
         }
 
-        // Generate unique sequential ticket number: REP-YYYY-XXXX
-        $year = date('Y');
-        $lastTicket = RepairTicket::withoutGlobalScope('company')
-            ->where('company_id', $company->id)
-            ->where('ticket_number', 'like', "REP-{$year}-%")
-            ->orderByDesc('id')
-            ->first();
-
-        $nextNum = 1;
-        if ($lastTicket && preg_match('/REP-\d{4}-(\d+)/', $lastTicket->ticket_number, $matches)) {
-            $nextNum = (int) $matches[1] + 1;
-        }
-        $ticketNumber = sprintf('REP-%s-%04d', $year, $nextNum);
+        $ticketNumber = app(DocumentNumberService::class)->next($company, 'repair');
 
         return DB::transaction(function () use (
             $company, $user, $request, $ticketNumber, $customerId, $customerName, $customerPhone,
@@ -576,7 +564,7 @@ class RepairApiController extends Controller
                 $category = Category::withoutGlobalScopes()->find($categoryId);
                 if ($category) {
                     $points = $category->checklist_points;
-                    if (!empty($points)) {
+                    if (! empty($points)) {
                         $checklist = array_map(function ($point) {
                             return [
                                 'item_name' => is_array($point) ? ($point['item_name'] ?? $point['name'] ?? '') : (string) $point,
@@ -588,6 +576,8 @@ class RepairApiController extends Controller
                 }
             }
 
+            $estimatedCost = (float) ($request->input('estimated_cost') ?? 0.00);
+            $diagnosticFee = (float) ($request->input('diagnostic_fee') ?? 0.00);
             $ticket = RepairTicket::create([
                 'company_id' => $company->id,
                 'tenant_id' => $company->id,
@@ -606,7 +596,9 @@ class RepairApiController extends Controller
                 'assigned_technician_id' => $technicianId ?: null,
                 'status' => RepairTicket::STATUS_RECEIVED,
                 'priority' => $request->input('priority') ?: RepairTicket::PRIORITY_NORMAL,
-                'estimated_cost' => (float) ($request->input('estimated_cost') ?? 0.00),
+                'estimated_cost' => $estimatedCost,
+                'diagnostic_fee' => $diagnosticFee,
+                'total_amount' => round($estimatedCost + $diagnosticFee, 2),
                 'advance_deposit' => $advanceDeposit,
                 'advance_payment_method' => $advanceMethod,
                 'inspection_checklist' => $checklist,
@@ -617,7 +609,7 @@ class RepairApiController extends Controller
 
             // If advance deposit was paid, create an initial sale transaction / drawer record
             if ($advanceDeposit > 0) {
-                $saleNumber = 'ADV-'.$ticket->ticket_number;
+                $saleNumber = app(DocumentNumberService::class)->next($company, 'invoice');
                 $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? ''));
                 $advanceLineName = 'Advance Deposit — Repair Ticket #'.$ticket->ticket_number
                     .($device !== '' ? " ({$device})" : '');
@@ -633,6 +625,8 @@ class RepairApiController extends Controller
                     'payment_status' => 'paid',
                     'payment_method' => $advanceMethod ?: 'cash',
                     'operation_type' => 'sale',
+                    'module_type' => 'repair',
+                    'reference_ticket_id' => $ticket->id,
                     'subtotal' => $advanceDeposit,
                     'total' => $advanceDeposit,
                     'net_amount' => $advanceDeposit,
@@ -674,6 +668,16 @@ class RepairApiController extends Controller
                 $subtotal = round($qty * $price, 2);
                 $productId = ! empty($itemRow['product_id']) ? (int) $itemRow['product_id'] : null;
                 $type = ($itemRow['item_type'] ?? '') === 'service_labor' ? 'service_labor' : 'spare_part';
+                $product = null;
+                if ($productId && $type === 'spare_part') {
+                    $product = Product::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->lockForUpdate()
+                        ->find($productId);
+                    if (! $product || (float) $product->current_stock < $qty) {
+                        throw new \InvalidArgumentException('Insufficient central inventory for the requested replacement part.');
+                    }
+                }
 
                 RepairTicketItem::create([
                     'company_id' => $company->id,
@@ -692,9 +696,8 @@ class RepairApiController extends Controller
 
                 // Deduct stock for spare parts from core products
                 if ($productId && $type === 'spare_part') {
-                    $product = Product::where('company_id', $company->id)->find($productId);
                     if ($product) {
-                        $product->decrement('current_stock', $qty);
+                        $product->decrementStock($qty, "Reserved for Repair Ticket #{$ticket->ticket_number}");
                     }
                 }
             }
@@ -777,6 +780,9 @@ class RepairApiController extends Controller
         } elseif ($newStatus === 'repaired') {
             $newStatus = RepairTicket::STATUS_READY;
         }
+        if (! array_key_exists($newStatus, RepairTicket::STATUSES)) {
+            return response()->json(['success' => false, 'error' => 'Invalid repair status.'], 422);
+        }
 
         $oldStatus = $ticket->status;
         $ticket->status = $newStatus;
@@ -803,10 +809,10 @@ class RepairApiController extends Controller
 
         $ticket->save();
 
-        // Multi-channel alert when moving to Ready for Pickup
+        // One-tap multi-channel customer alert for every real transition.
         $notificationResult = null;
-        if ($newStatus === RepairTicket::STATUS_READY && $oldStatus !== RepairTicket::STATUS_READY) {
-            $notificationResult = $this->notificationService->notifyStatusReadyForPickup($ticket);
+        if ($newStatus !== $oldStatus) {
+            $notificationResult = $this->notificationService->notifyStatusTransition($ticket->fresh(['company', 'customer']), $oldStatus, $newStatus);
         }
 
         AuditLog::record('repair.status_updated', $company->id, $user->id, [
@@ -908,7 +914,22 @@ class RepairApiController extends Controller
         $unitPrice = max(0.0, (float) ($request->input('unit_price') ?? $request->input('price') ?? ($product?->sale_price ?? 0)));
         $subtotal = round($quantity * $unitPrice, 2);
 
+        if ($product && (float) $product->current_stock < $quantity) {
+            return response()->json(['success' => false, 'error' => "Insufficient stock for {$product->name}."], 422);
+        }
+
         $item = DB::transaction(function () use ($company, $ticket, $product, $name, $quantity, $unitPrice, $subtotal, $request) {
+            $lockedProduct = null;
+            if ($product) {
+                $lockedProduct = Product::withoutGlobalScope('company')
+                    ->where('company_id', $company->id)
+                    ->lockForUpdate()
+                    ->find($product->id);
+                if (! $lockedProduct || (float) $lockedProduct->current_stock < $quantity) {
+                    throw new \InvalidArgumentException("Insufficient stock for {$product->name}.");
+                }
+            }
+
             $created = RepairTicketItem::create([
                 'company_id' => $company->id,
                 'tenant_id' => $company->id,
@@ -925,8 +946,8 @@ class RepairApiController extends Controller
             ]);
 
             // Deduct stock from central inventory
-            if ($product) {
-                $product->decrement('current_stock', $quantity);
+            if ($lockedProduct) {
+                $lockedProduct->decrementStock($quantity, "Reserved for Repair Ticket #{$ticket->ticket_number}");
             }
 
             return $created;
@@ -1184,11 +1205,12 @@ class RepairApiController extends Controller
                     ];
                 }
 
-                if ($saleLineItems === []) {
-                    $fallback = max(0, (float) ($ticket->estimated_cost ?: $ticket->total_amount));
+                if ($saleLineItems === [] && (float) $ticket->estimated_cost > 0) {
+                    $fallback = (float) $ticket->estimated_cost;
                     $saleLineItems[] = [
                         'product_id' => null,
                         'name' => trim("Repair Service — {$ticket->brand} {$ticket->model}"),
+                        'line_type' => 'service_labor',
                         'quantity' => 1,
                         'unit_price' => $fallback,
                         'price' => $fallback,
@@ -1196,9 +1218,33 @@ class RepairApiController extends Controller
                     ];
                 }
 
+                if ((float) $ticket->diagnostic_fee > 0) {
+                    $saleLineItems[] = [
+                        'product_id' => null,
+                        'name' => 'Upfront Diagnostic Fee',
+                        'line_type' => 'diagnostic_fee',
+                        'quantity' => 1,
+                        'unit_price' => (float) $ticket->diagnostic_fee,
+                        'price' => (float) $ticket->diagnostic_fee,
+                        'total' => (float) $ticket->diagnostic_fee,
+                    ];
+                }
+
+                if ($saleLineItems === []) {
+                    $saleLineItems[] = [
+                        'product_id' => null,
+                        'name' => trim("Repair Service — {$ticket->brand} {$ticket->model}"),
+                        'line_type' => 'service_labor',
+                        'quantity' => 1,
+                        'unit_price' => 0,
+                        'price' => 0,
+                        'total' => 0,
+                    ];
+                }
+
                 // Universal tax engine — computed from the tenant's global tax settings.
                 // Honour flat OR percentage discounts from the universal Discount modal.
-                $discount = \App\Http\Controllers\Api\V1\SaleApiController::resolveDiscountAmount(
+                $discount = SaleApiController::resolveDiscountAmount(
                     $request,
                     (float) array_sum(array_column($saleLineItems, 'total'))
                 );
@@ -1230,9 +1276,7 @@ class RepairApiController extends Controller
 
                 $cashRegister = CashRegister::openFor($company->id);
 
-                $prefix = $company->invoice_prefix ?: 'INV-';
-                $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
-                $saleNumber = $prefix.sprintf('%04d', $saleCount);
+                $saleNumber = app(DocumentNumberService::class)->next($company, 'invoice');
 
                 $sale = Sale::create([
                     'company_id' => $company->id,
@@ -1250,6 +1294,8 @@ class RepairApiController extends Controller
                     'payment_status' => $paymentStatus,
                     'status' => 'completed',
                     'operation_type' => 'sale',
+                    'module_type' => 'repair',
+                    'reference_ticket_id' => $ticket->id,
                     'items' => $saleLineItems,
                     'tax_amount' => $taxTotals['tax_amount'],
                     'tax_name' => $company->tax_id_label ?: 'Tax',
@@ -1377,28 +1423,7 @@ class RepairApiController extends Controller
             return response()->json(['success' => false, 'error' => 'Repair ticket not found.'], 404);
         }
 
-        $items = [];
-        foreach ($ticket->items as $item) {
-            $items[] = [
-                'id' => $item->product_id,
-                'title' => $item->item_name,
-                'price' => (float) $item->unit_price,
-                'quantity' => (float) $item->quantity,
-                'qty' => (float) $item->quantity,
-            ];
-        }
-
-        $schema = UniversalPosBuilder::checkoutSheet(
-            company: $company,
-            formSubmitEndpoint: "/api/tenant/repair/tickets/{$ticket->id}/settle",
-            cartPreview: $items,
-            ticketFieldLabel: 'Repair Ticket',
-            customerFieldLabel: 'Customer Name',
-            module: 'repair',
-            selectedTicketId: $ticket->id,
-            previewIncludesTicket: true,
-            defaultCustomerName: $ticket->customer_name ?: $ticket->customer?->name,
-        );
+        $schema = UniversalPosBuilder::buildCartSheet(new RepairCartAdapter($company, $ticket));
 
         return response()->json(['success' => true, 'schema' => $schema]);
     }
@@ -1425,14 +1450,7 @@ class RepairApiController extends Controller
             ];
         }
 
-        $schema = UniversalPosBuilder::checkoutSheet(
-            company: $company,
-            formSubmitEndpoint: '/api/tenant/repair/checkout',
-            cartPreview: $cartPreview,
-            ticketFieldLabel: 'Repair Ticket',
-            customerFieldLabel: 'Customer Name',
-            module: 'repair',
-        );
+        $schema = UniversalPosBuilder::buildCartSheet(new RepairCartAdapter($company, lineItems: $cartPreview));
 
         return response()->json(['success' => true, 'schema' => $schema]);
     }
@@ -1484,7 +1502,13 @@ class RepairApiController extends Controller
                     $price = (float) ($it['unit_price'] ?? $it['price'] ?? 0);
                     $prod = null;
                     if ($productId) {
-                        $prod = Product::where('company_id', $company->id)->find($productId);
+                        $prod = Product::withoutGlobalScope('company')
+                            ->where('company_id', $company->id)
+                            ->lockForUpdate()
+                            ->find($productId);
+                        if (! $prod || (float) $prod->current_stock < $qty) {
+                            throw new \InvalidArgumentException('Insufficient central inventory for the requested repair part.');
+                        }
                         if ($price <= 0 && $prod) {
                             $price = (float) $prod->sale_price;
                         }
@@ -1504,7 +1528,7 @@ class RepairApiController extends Controller
 
                     // Central inventory binding — decrement core product stock.
                     if ($prod) {
-                        $prod->decrement('current_stock', $qty);
+                        $prod->decrementStock($qty, $ticket ? "Reserved for Repair Ticket #{$ticket->ticket_number}" : 'Repair counter sale');
                     }
 
                     // Mirror the counter sale onto the linked ticket for a full audit trail.
@@ -1539,6 +1563,17 @@ class RepairApiController extends Controller
                             'unit_price' => $unitPrice,
                             'price' => $unitPrice,
                             'total' => round($qty * $unitPrice, 2),
+                        ];
+                    }
+                    if ((float) $ticket->diagnostic_fee > 0) {
+                        $ticketLines[] = [
+                            'product_id' => null,
+                            'name' => 'Upfront Diagnostic Fee',
+                            'line_type' => 'diagnostic_fee',
+                            'quantity' => 1,
+                            'unit_price' => (float) $ticket->diagnostic_fee,
+                            'price' => (float) $ticket->diagnostic_fee,
+                            'total' => (float) $ticket->diagnostic_fee,
                         ];
                     }
                     if ($ticketLines !== []) {
@@ -1580,9 +1615,7 @@ class RepairApiController extends Controller
                 $customerName = trim((string) $request->input('customer_name'))
                     ?: ($ticket?->customer_name ?: 'Walk-in Customer');
 
-                $prefix = $company->invoice_prefix ?: 'INV-';
-                $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
-                $saleNumber = $prefix.sprintf('%04d', $saleCount);
+                $saleNumber = app(DocumentNumberService::class)->next($company, 'invoice');
 
                 $sale = Sale::create([
                     'company_id' => $company->id,
@@ -1600,6 +1633,8 @@ class RepairApiController extends Controller
                     'payment_status' => $paymentStatus,
                     'status' => 'completed',
                     'operation_type' => 'sale',
+                    'module_type' => 'repair',
+                    'reference_ticket_id' => $ticket?->id,
                     'items' => $saleLineItems,
                     'tax_amount' => $taxTotals['tax_amount'],
                     'tax_name' => $company->tax_id_label ?: 'Tax',

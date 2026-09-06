@@ -41,6 +41,55 @@ class RepairNotificationService
     }
 
     /**
+     * One shared customer notification for every operational status change.
+     * Ready-for-pickup retains its richer balance/push notification payload.
+     *
+     * @return array{whatsapp_url: string, sms_text: string, status: string, dispatched_channels?: int, balance_due?: float}
+     */
+    public function notifyStatusTransition(RepairTicket $ticket, string $oldStatus, string $newStatus): array
+    {
+        if ($newStatus === RepairTicket::STATUS_READY) {
+            return array_merge(
+                ['status' => $newStatus],
+                $this->notifyStatusReadyForPickup($ticket),
+            );
+        }
+
+        $company = $ticket->company ?? Company::find($ticket->company_id);
+        $customerName = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Valued Customer');
+        $phone = $ticket->customer?->phone ?: $ticket->customer_phone;
+        $statusLabel = RepairTicket::STATUSES[$newStatus] ?? ucwords(str_replace('_', ' ', $newStatus));
+        $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'device';
+        $smsText = "Hello {$customerName}, your {$device} repair (Ticket #{$ticket->ticket_number}) is now: {$statusLabel}.";
+        $whatsappUrl = self::whatsAppUrl($smsText, $phone);
+
+        $dispatched = 0;
+        try {
+            $dispatched = $this->channelDispatcher->dispatchEvent($ticket->company_id, 'repair.status_changed', [
+                'ticket_id' => $ticket->id,
+                'ticket_number' => $ticket->ticket_number,
+                'customer_name' => $customerName,
+                'customer_phone' => $phone,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+                'status_label' => $statusLabel,
+                'device' => $device,
+                'sms_text' => $smsText,
+                'whatsapp_url' => $whatsappUrl,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("Failed to dispatch repair.status_changed: {$e->getMessage()}");
+        }
+
+        return [
+            'status' => $newStatus,
+            'whatsapp_url' => $whatsappUrl,
+            'sms_text' => $smsText,
+            'dispatched_channels' => $dispatched,
+        ];
+    }
+
+    /**
      * Dispatches notification when a new intake ticket is created.
      * Generates customer tracking link, WhatsApp URL, SMS text, and internal notification.
      *
@@ -184,7 +233,7 @@ class RepairNotificationService
         $isUrgent = $ticket->priority === RepairTicket::PRIORITY_URGENT || $ticket->priority === 'urgent';
 
         $title = ($isUrgent ? '🚨 [URGENT] ' : '')."Repair Assigned: #{$ticket->ticket_number}";
-        $body = "Device: {$device} | Priority: ".strtoupper($ticket->priority)." | Problem: ".substr($ticket->problem_reported, 0, 80);
+        $body = "Device: {$device} | Priority: ".strtoupper($ticket->priority).' | Problem: '.substr($ticket->problem_reported, 0, 80);
 
         $sent = 0;
         try {

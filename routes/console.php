@@ -11,3 +11,7 @@ Artisan::command('inspire', function () {
 Schedule::command('notifications:dispatch-scheduled')
     ->everyMinute()
     ->withoutOverlapping();
+
+Schedule::command('notifications:dispatch-vertical')
+    ->everyMinute()
+    ->withoutOverlapping();

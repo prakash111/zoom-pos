@@ -21,6 +21,7 @@ use App\Models\TenantApiKey;
 use App\Models\TenantSession;
 use App\Models\User;
 use App\Services\Auth\PermissionChecker;
+use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Localization\PlatformRegionalService;
 use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\TenantNavigationConfigService;
@@ -520,7 +521,7 @@ class SchemaResponse
      * native `show_post_sale_sheet` action (Preview & Print, Bluetooth
      * thermal, WhatsApp, Email). No 2x2 outline grid, no signed web URLs.
      *
-     * @return array<string, mixed>  a ready-to-prepend `card` component
+     * @return array<string, mixed> a ready-to-prepend `card` component
      */
     public static function postSaleActionSheet(Sale $sale, ?string $whatsAppUrl = null): array
     {
@@ -609,10 +610,10 @@ class SchemaResponse
 
     /**
      * @param  array<string, mixed>  $props  extra action flags, e.g.
-     *   ['keep_parent_sheet' => true] so the SDUI client stacks this modal
-     *   OVER the sheet that opened it instead of dismissing it, and
-     *   ['refresh_in_place' => true, 'refresh_endpoint' => '/api/...'] so the
-     *   parent sheet re-fetches itself in place once the modal closes.
+     *                                       ['keep_parent_sheet' => true] so the SDUI client stacks this modal
+     *                                       OVER the sheet that opened it instead of dismissing it, and
+     *                                       ['refresh_in_place' => true, 'refresh_endpoint' => '/api/...'] so the
+     *                                       parent sheet re-fetches itself in place once the modal closes.
      */
     public static function openModalAction(string $title, array $components, array $props = []): array
     {
@@ -647,10 +648,10 @@ class SchemaResponse
      */
     /**
      * @param  array<string, mixed>  $props  extra action flags — most notably
-     *   ['refresh_in_place' => true], which tells the SDUI client to re-fetch
-     *   $sheetEndpoint and rebuild the CURRENT sheet's body in place (no
-     *   dismiss, no parent-page reload, keyboard & scroll preserved) instead
-     *   of popping and re-opening a fresh sheet.
+     *                                       ['refresh_in_place' => true], which tells the SDUI client to re-fetch
+     *                                       $sheetEndpoint and rebuild the CURRENT sheet's body in place (no
+     *                                       dismiss, no parent-page reload, keyboard & scroll preserved) instead
+     *                                       of popping and re-opening a fresh sheet.
      */
     public static function openRemoteSheetAction(string $sheetEndpoint, string $title = '', array $props = []): array
     {
@@ -1021,7 +1022,7 @@ class SchemaResponse
                     self::text("Stock: {$b->stock_qty} units", 'label_large', ['bold' => true]),
                     self::text('Cost: '.number_format((float) $b->cost_price, 2), 'body_small'),
                     self::text('MRP: '.number_format((float) $b->selling_price, 2), 'body_small', ['color' => '#059669', 'bold' => true]),
-                    self::text("Exp: {$b->expiry_date?->format('Y-m-d')}", 'body_small', ['color' => '#64748b']),
+                    self::text("Exp: {$b->expiry_date?->format('Y-m-d')} · Rack: ".($b->rack_location ?: 'Unassigned'), 'body_small', ['color' => '#64748b']),
                 ]),
                 self::divider(),
                 self::row([
@@ -1127,6 +1128,7 @@ class SchemaResponse
             self::accordionGroup('Register New Medicine Batch', [
                 self::dropdownSelect('product_id', 'Select Medicine / Drug', $productOptions),
                 self::textInput('batch_number', 'Batch Number (e.g. BTH-2026-908)', ''),
+                self::textInput('rack_location', 'Rack / Shelf Location', ''),
                 self::dateTimePicker('manufacturing_date', 'Manufacturing Date', mode: 'date'),
                 self::dateTimePicker('expiry_date', 'Expiry Date (FEFO Sorted)', mode: 'date'),
                 self::textInput('cost_price', 'Cost Price (Per Unit)', '0.00'),
@@ -1250,11 +1252,21 @@ class SchemaResponse
             self::accordionGroup('New Prescription Intake', [
                 self::textInput('patient_name', 'Patient Full Name', ''),
                 self::textInput('patient_phone', 'Patient Contact Phone #', ''),
+                self::textInput('age', 'Age (Optional)', '', ['keyboard_type' => 'number']),
+                self::dropdownSelect('gender', 'Gender (Optional)', [
+                    ['label' => 'Not specified', 'value' => ''],
+                    ['label' => 'Female', 'value' => 'female'],
+                    ['label' => 'Male', 'value' => 'male'],
+                    ['label' => 'Other', 'value' => 'other'],
+                ], ''),
+                self::textInput('allergies', 'Known Allergies (Optional)', ''),
                 self::textInput('doctor_name', 'Prescribing Doctor Name', ''),
                 self::textInput('doctor_registration_no', 'Doctor Registration / License #', ''),
                 self::dateTimePicker('prescription_date', 'Prescription Date', mode: 'date'),
                 self::textInput('diagnosis', 'Diagnosis / Clinical Indications', ''),
                 self::textInput('notes', 'Prescribed Medicines, Dosages & Frequency', ''),
+                self::textInput('dosage_duration_days', 'Days Supply / Dosage Duration', '30', ['keyboard_type' => 'number']),
+                self::textInput('rx_image_url', 'Scanned Rx Image URL (Optional)', ''),
                 self::divider(),
                 self::buttonPrimary('Save to Prescription Queue', self::formSubmitAction(
                     '/api/tenant/pharmacy/prescriptions',
@@ -1437,7 +1449,6 @@ class SchemaResponse
                 self::text('Workshop Operations & Navigation', 'label_large', ['bold' => true]),
                 self::divider(),
                 self::lineItemTile('New Intake Ticket', 'Check in a device, record specs & print tag', 'add_task', self::navigateAction('/api/tenant/views/repair-create-ticket', title: 'New Repair Ticket')),
-                self::lineItemTile('Parts & Labor POS Counter', 'Sell spare parts, bill diagnostic/repair labor, and settle tickets', 'point_of_sale', self::navigateAction('/api/tenant/views/repair-pos', title: 'Repair Counter POS')),
                 self::lineItemTile('Repair Ticket Register', 'Complete register of all customer tickets & status', 'receipt_long', self::navigateAction('/api/tenant/views/repair-tickets', title: 'Repair Ticket Register')),
                 self::lineItemTile('My Assigned Jobs', 'Technician workbench for active diagnostics & status', 'engineering', self::navigateAction('/api/tenant/views/repair-my-jobs', title: 'Assigned Jobs')),
                 self::lineItemTile('Inventory & Device Categories', 'Centralized product, hardware, and parts classification', 'sell', self::navigateAction('/api/tenant/views/categories', title: 'Categories')),
@@ -1633,6 +1644,7 @@ class SchemaResponse
                             ['label' => 'Urgent / Express Service', 'value' => 'urgent'],
                         ], 'normal'),
                         self::textInput('estimated_cost', 'Estimated Repair Cost', '0.00', ['keyboard_type' => 'number']),
+                        self::textInput('diagnostic_fee', 'Upfront Diagnostic Fee', '0.00', ['keyboard_type' => 'number']),
                         self::textInput('advance_paid', 'Advance Deposit Paid', '0.00', ['keyboard_type' => 'number']),
                     ],
                 ],
@@ -1695,15 +1707,10 @@ class SchemaResponse
                     self::text('Due: '.number_format((float) $t->balance_due, 2), 'label_large', ['color' => $t->balance_due > 0 ? '#dc2626' : '#10b981', 'bold' => true]),
                 ], ['main_axis_alignment' => 'space_between']),
                 self::divider(),
-                self::wrap([
-                    self::buttonPrimary('Open Workbench', self::navigateAction("/api/tenant/views/repair-detail?ticket_id={$t->id}", title: "Workbench #{$t->ticket_number}"), 'build', ['full_width' => false]),
-                    ...($t->status !== 'delivered' && $t->status !== 'cancelled' ? [
-                        self::buttonOutlined('Checkout Repair', self::navigateAction(
-                            "/api/tenant/views/repair-pos?ticket_id={$t->id}",
-                            title: "Checkout Repair #{$t->ticket_number}"
-                        ), 'point_of_sale', ['full_width' => false]),
-                    ] : []),
-                ]),
+                // One dedicated action per card: the Workbench owns parts,
+                // labor and settlement via its own "Open Parts & Labor
+                // Checkout" drawer. No separate repair-checkout catalog.
+                self::buttonPrimary('Open Workbench', self::navigateAction("/api/tenant/views/repair-detail?ticket_id={$t->id}", title: "Workbench #{$t->ticket_number}"), 'build'),
             ], ['padding' => 14, 'border_radius' => 14]);
         }
 
@@ -1852,7 +1859,7 @@ class SchemaResponse
         if ($ticket->status === RepairTicket::STATUS_DELIVERED && $ticket->finalSale) {
             $waUrl = null;
             try {
-                $waUrl = app(\App\Services\Invoice\InvoiceDeliveryService::class)
+                $waUrl = app(InvoiceDeliveryService::class)
                     ->generateInvoiceWhatsAppUrl($ticket->finalSale);
             } catch (\Throwable) {
                 // A missing WhatsApp config must not hide the rest of the sheet.
@@ -1921,6 +1928,10 @@ class SchemaResponse
                     self::text('Parts Subtotal:', 'body_medium'),
                     self::text(number_format((float) $ticket->parts_cost, 2), 'body_medium', ['bold' => true]),
                 ]),
+                ...((float) $ticket->diagnostic_fee > 0 ? [self::row([
+                    self::text('Diagnostic Fee:', 'body_medium'),
+                    self::text(number_format((float) $ticket->diagnostic_fee, 2), 'body_medium', ['bold' => true]),
+                ])] : []),
                 self::divider(),
                 self::row([
                     self::text('Total Ticket Bill:', 'title_medium', ['bold' => true]),
@@ -1940,7 +1951,7 @@ class SchemaResponse
                     "/api/tenant/repair/tickets/{$ticket->id}/labor",
                     'POST',
                     'Labor fee updated.',
-                    reload: true
+                    reload: false
                 ), 'build'),
             ]),
 
@@ -2190,6 +2201,12 @@ class SchemaResponse
                 'cancelled', 'no_show' => '#ef4444',
                 default => '#7c3aed',
             };
+            $floorStatus = match (true) {
+                $appointment->status === 'scheduled' => 'WAITING',
+                in_array($appointment->status, ['checked_in', 'in_progress'], true) => 'IN CHAIR / IN PROGRESS',
+                $appointment->status === 'completed' && ! $appointment->sale_id => 'COMPLETED / UNPAID',
+                default => strtoupper(str_replace('_', ' ', $appointment->status)),
+            };
             $actions = [];
             if ($appointment->status === 'scheduled') {
                 $actions[] = self::buttonOutlined('Check In', self::apiPostAction(
@@ -2199,12 +2216,9 @@ class SchemaResponse
                     reload: true
                 ), 'how_to_reg');
             }
-            if (in_array($appointment->status, ['scheduled', 'checked_in'], true)) {
-                $actions[] = self::buttonPrimary('Open in POS', self::navigateAction(
-                    "/api/tenant/views/salon-pos?appointment_id={$appointment->id}",
-                    title: 'Salon & Service POS'
-                ), 'point_of_sale');
-                $actions[] = self::buttonOutlined('Settle / Checkout', self::openRemoteSheetAction(
+            if (in_array($appointment->status, ['scheduled', 'checked_in', 'in_progress'], true)
+                || ($appointment->status === 'completed' && ! $appointment->sale_id)) {
+                $actions[] = self::buttonPrimary('Settle Bill / Checkout', self::openRemoteSheetAction(
                     "/api/tenant/salon/checkout-sheet?appointment_id={$appointment->id}",
                     "Settle Appointment #{$appointment->id}"
                 ), 'payments');
@@ -2222,7 +2236,8 @@ class SchemaResponse
                         self::text($localStart->format('g:i A').' – '.$localEnd->format('g:i A'), 'body_small', ['color' => '#94a3b8']),
                     ]),
                     self::column([
-                        self::badge(strtoupper(str_replace('_', ' ', $appointment->status)), $statusColor, 'subtle'),
+                        self::badge($floorStatus, $statusColor, 'subtle'),
+                        ...($appointment->chair_label ? [self::badge('Chair: '.$appointment->chair_label, '#475569', 'subtle')] : []),
                         ...((float) $appointment->advance_paid > 0 ? [
                             self::badge("Advance: {$currency}".number_format((float) $appointment->advance_paid, 2), '#059669', 'subtle'),
                         ] : []),
@@ -3184,6 +3199,9 @@ class SchemaResponse
                 self::divider(),
                 self::textInput('invoice_prefix', 'Invoice Prefix', $company->invoice_prefix ?? 'INV-'),
                 self::textInput('quotation_prefix', 'Quotation Prefix', $company->quotation_prefix ?? 'QUO-'),
+                self::textInput('repair_prefix', 'Repair Ticket Prefix', $company->repair_prefix ?? 'REP-'),
+                self::textInput('prescription_prefix', 'Prescription / Rx Prefix', $company->prescription_prefix ?? 'RX-'),
+                self::textInput('salon_prefix', 'Salon Booking Prefix', $company->salon_prefix ?? 'SAL-'),
             ]),
             self::card([
                 self::text('Receipt Footnotes & Terms', 'title_medium', ['bold' => true]),

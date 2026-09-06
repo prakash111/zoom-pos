@@ -28,6 +28,10 @@ class PharmacyPrescription extends Model
         'dispensed_by_user_id',
         'sale_id',
         'is_demo',
+        'rx_image_url',
+        'dosage_duration_days',
+        'refill_reminder_at',
+        'refill_reminder_sent_at',
     ];
 
     protected function casts(): array
@@ -37,6 +41,9 @@ class PharmacyPrescription extends Model
             'medicines' => 'array',
             'dispensed_at' => 'datetime',
             'is_demo' => 'boolean',
+            'dosage_duration_days' => 'integer',
+            'refill_reminder_at' => 'datetime',
+            'refill_reminder_sent_at' => 'datetime',
         ];
     }
 

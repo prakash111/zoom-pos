@@ -2001,6 +2001,11 @@ class PosSyncApiController extends Controller
                     'address' => $c->address ?? '',
                     'city' => $c->city ?? '',
                     'state' => $c->state ?? '',
+                    'age' => $c->age,
+                    'gender' => $c->gender,
+                    'allergies' => $c->allergies,
+                    'prescribing_doctor' => $c->prescribing_doctor,
+                    'doctor_registration_no' => $c->doctor_registration_no,
                 ];
             });
 
@@ -2051,6 +2056,11 @@ class PosSyncApiController extends Controller
                 'email' => $c->email ?? '',
                 'document' => $c->document ?? $c->tax_id ?? '',
                 'balance_due' => (float) ($c->due_balance ?? 0),
+                'age' => $c->age,
+                'gender' => $c->gender,
+                'allergies' => $c->allergies,
+                'prescribing_doctor' => $c->prescribing_doctor,
+                'doctor_registration_no' => $c->doctor_registration_no,
             ]);
 
         return response()->json([
@@ -2078,6 +2088,11 @@ class PosSyncApiController extends Controller
             'city' => ['nullable', 'string', 'max:100'],
             'state' => ['nullable', 'string', 'max:100'],
             'external_id' => ['nullable', 'string'],
+            'age' => ['nullable', 'integer', 'min:0', 'max:150'],
+            'gender' => ['nullable', 'string', 'max:30'],
+            'allergies' => ['nullable', 'string', 'max:2000'],
+            'prescribing_doctor' => ['nullable', 'string', 'max:150'],
+            'doctor_registration_no' => ['nullable', 'string', 'max:100'],
         ]);
 
         if ($validator->fails()) {
@@ -2111,6 +2126,11 @@ class PosSyncApiController extends Controller
             'address' => $request->input('address'),
             'city' => $request->input('city'),
             'state' => $request->input('state'),
+            'age' => $request->input('age'),
+            'gender' => $request->input('gender'),
+            'allergies' => $request->input('allergies'),
+            'prescribing_doctor' => $request->input('prescribing_doctor'),
+            'doctor_registration_no' => $request->input('doctor_registration_no'),
         ];
 
         if ($customer) {
@@ -2134,6 +2154,11 @@ class PosSyncApiController extends Controller
             'document' => $customer->document,
             'balance_due' => $customer->total_due,
             'loyalty_points' => (int) $customer->loyalty_points,
+            'age' => $customer->age,
+            'gender' => $customer->gender,
+            'allergies' => $customer->allergies,
+            'prescribing_doctor' => $customer->prescribing_doctor,
+            'doctor_registration_no' => $customer->doctor_registration_no,
         ];
 
         return response()->json([

@@ -15,11 +15,17 @@ class RepairTicket extends Model
     protected $table = 'repair_tickets';
 
     public const STATUS_RECEIVED = 'received';
+
     public const STATUS_DIAGNOSING = 'diagnosing';
+
     public const STATUS_WAITING_PARTS = 'waiting_parts';
+
     public const STATUS_IN_PROGRESS = 'in_progress';
+
     public const STATUS_READY = 'ready';
+
     public const STATUS_DELIVERED = 'delivered';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     public const STATUSES = [
@@ -33,12 +39,17 @@ class RepairTicket extends Model
     ];
 
     public const PRIORITY_LOW = 'low';
+
     public const PRIORITY_NORMAL = 'normal';
+
     public const PRIORITY_HIGH = 'high';
+
     public const PRIORITY_URGENT = 'urgent';
 
     public ?float $initial_labor_fee = null;
+
     public ?float $temp_parts_cost = null;
+
     public ?float $temp_total_amount = null;
 
     protected $fillable = [
@@ -60,6 +71,7 @@ class RepairTicket extends Model
         'status',
         'priority',
         'estimated_cost',
+        'diagnostic_fee',
         'advance_deposit',
         'advance_payment_method',
         'advance_sale_id',
@@ -102,6 +114,7 @@ class RepairTicket extends Model
     {
         return [
             'estimated_cost' => 'decimal:2',
+            'diagnostic_fee' => 'decimal:2',
             'advance_deposit' => 'decimal:2',
             'inspection_checklist' => 'array',
             'expected_delivery_at' => 'datetime',
@@ -211,13 +224,26 @@ class RepairTicket extends Model
 
     public function getTotalAmountAttribute(): float
     {
-        $total = round((float) $this->items()->sum('total'), 2);
-        if ($total > 0) {
-            return $total;
+        $diagnosticFee = round((float) ($this->attributes['diagnostic_fee'] ?? 0), 2);
+        $itemTotal = round((float) $this->items()->sum('total'), 2);
+        if ($itemTotal > 0) {
+            return round($itemTotal + $diagnosticFee, 2);
         }
         $fallback = round($this->parts_cost + $this->labor_fee, 2);
+        if ($fallback > 0) {
+            return round($fallback + $diagnosticFee, 2);
+        }
 
-        return $fallback > 0 ? $fallback : round((float) ($this->attributes['total_amount'] ?? 0), 2);
+        // A fresh intake ticket has no parts or labor lines yet, but the
+        // creation form still captures a commercial estimate. Treat that as
+        // the baseline ticket bill so the register and workbench never show a
+        // 0.00 total while an advance deposit sits against the ticket.
+        $estimate = round((float) $this->estimated_cost + $diagnosticFee, 2);
+        if ($estimate > 0) {
+            return $estimate;
+        }
+
+        return round(max($diagnosticFee, (float) ($this->attributes['total_amount'] ?? 0)), 2);
     }
 
     public function getBalanceDueAttribute(): float
@@ -226,6 +252,18 @@ class RepairTicket extends Model
         $deposit = (float) $this->advance_deposit;
 
         return max(0, round($total - $deposit, 2));
+    }
+
+    public function syncStoredTotal(): void
+    {
+        $itemTotal = round((float) $this->items()->sum('total'), 2);
+        $diagnostic = (float) ($this->attributes['diagnostic_fee'] ?? 0);
+        $calculated = $itemTotal > 0
+            ? $itemTotal + $diagnostic
+            : (float) $this->estimated_cost + $diagnostic;
+
+        $this->attributes['total_amount'] = round(max(0, $calculated), 2);
+        $this->saveQuietly();
     }
 
     public function getStatusColorAttribute(): string
@@ -280,6 +318,7 @@ class RepairTicket extends Model
     public function setTotalAmountAttribute($value): void
     {
         $this->temp_total_amount = (float) $value;
+        $this->attributes['total_amount'] = (float) $value;
     }
 
     public function getSerialOrImeiAttribute(): ?string

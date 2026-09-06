@@ -11,6 +11,7 @@ class RepairTicketItem extends Model
     use BelongsToCompany;
 
     public const TYPE_SPARE_PART = 'spare_part';
+
     public const TYPE_SERVICE_LABOR = 'service_labor';
 
     protected $table = 'repair_ticket_items';
@@ -41,6 +42,16 @@ class RepairTicketItem extends Model
             'total' => 'decimal:2',
             'billed_to_customer' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        $sync = static function (RepairTicketItem $item): void {
+            RepairTicket::withoutGlobalScope('company')->find($item->ticket_id)?->syncStoredTotal();
+        };
+
+        static::saved($sync);
+        static::deleted($sync);
     }
 
     public function ticket(): BelongsTo

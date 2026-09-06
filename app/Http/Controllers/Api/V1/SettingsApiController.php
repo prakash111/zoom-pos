@@ -7,12 +7,17 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\Configuration;
+use App\Models\CustomNotificationChannel;
+use App\Models\OrderPayment;
 use App\Models\PaymentMethod;
 use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\Localization\PlatformRegionalService;
+use App\Services\Notifications\CustomChannelDispatcherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 /**
  * Mobile REST surface for the tenant-owned Profile, Receipts, Financial and
@@ -26,6 +31,7 @@ class SettingsApiController extends Controller
     public function index(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
+
         return response()->json([
             'success' => true,
             'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
@@ -278,6 +284,9 @@ class SettingsApiController extends Controller
         $validator = Validator::make($request->all(), [
             'invoice_prefix' => ['nullable', 'string', 'max:20'],
             'quotation_prefix' => ['nullable', 'string', 'max:20'],
+            'repair_prefix' => ['nullable', 'string', 'max:20'],
+            'prescription_prefix' => ['nullable', 'string', 'max:20'],
+            'salon_prefix' => ['nullable', 'string', 'max:20'],
             'invoice_terms' => ['nullable', 'string', 'max:4000'],
             'quote_terms' => ['nullable', 'string', 'max:4000'],
             'bank_details' => ['nullable', 'string', 'max:2000'],
@@ -325,7 +334,7 @@ class SettingsApiController extends Controller
         $data = $validator->validated();
         $data['currency'] = strtoupper($data['currency']);
         if (empty($data['currency_symbol'])) {
-            $currDetails = \App\Services\Localization\PlatformRegionalService::getCurrencyDetails($data['currency']);
+            $currDetails = PlatformRegionalService::getCurrencyDetails($data['currency']);
             $data['currency_symbol'] = $currDetails['symbol'];
             if (! isset($data['currency_decimals'])) {
                 $data['currency_decimals'] = $currDetails['decimals'];
@@ -519,7 +528,7 @@ class SettingsApiController extends Controller
         }
 
         $data = $validator->validated();
-        $data['code'] = ($data['code'] ?? null) ?: \Illuminate\Support\Str::slug($data['name'], '_');
+        $data['code'] = ($data['code'] ?? null) ?: Str::slug($data['name'], '_');
 
         if ($id !== null) {
             $pm = PaymentMethod::where('company_id', $company->id)->find($id);
@@ -575,7 +584,7 @@ class SettingsApiController extends Controller
             // Company::resolveTimezone().
             'timezone' => $company->timezone ?? '',
             'resolved_timezone' => $company->resolveTimezone(),
-            'default_timezone_for_country' => \App\Models\Company::defaultTimezoneForCountry($company->country),
+            'default_timezone_for_country' => Company::defaultTimezoneForCountry($company->country),
             'logo_url' => $company->getLogoUrl(),
             'favicon_url' => $company->getFaviconUrl(),
             'drawer_cover_url' => $company->getDrawerCoverUrl(),
@@ -589,6 +598,9 @@ class SettingsApiController extends Controller
         return [
             'invoice_prefix' => $company->invoice_prefix ?? '',
             'quotation_prefix' => $company->quotation_prefix ?? '',
+            'repair_prefix' => $company->repair_prefix ?: 'REP-',
+            'prescription_prefix' => $company->prescription_prefix ?: 'RX-',
+            'salon_prefix' => $company->salon_prefix ?: 'SAL-',
             'invoice_terms' => $company->invoice_terms ?? '',
             'quote_terms' => $company->quote_terms ?? '',
             'bank_details' => $company->bank_details ?? '',
@@ -714,7 +726,7 @@ class SettingsApiController extends Controller
 
         $matches = array_values(array_unique(array_filter([$pm->code, $pm->name])));
 
-        $query = \App\Models\OrderPayment::withoutGlobalScope('company')
+        $query = OrderPayment::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->with('sale.customer')
             ->whereIn('payment_method', $matches);
@@ -729,7 +741,7 @@ class SettingsApiController extends Controller
         return [$company, $pm, $query->orderByDesc('created_at')->get()];
     }
 
-    private function presentLedgerRow(\App\Models\OrderPayment $payment): array
+    private function presentLedgerRow(OrderPayment $payment): array
     {
         $sale = $payment->sale;
 
@@ -750,7 +762,7 @@ class SettingsApiController extends Controller
     public function notificationChannelsIndex(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
-        $channels = \App\Models\CustomNotificationChannel::where('company_id', $company->id)->orderBy('name')->get();
+        $channels = CustomNotificationChannel::where('company_id', $company->id)->orderBy('name')->get();
 
         return response()->json(['success' => true, 'channels' => $channels->map(fn ($c) => $this->presentChannel($c))->all()]);
     }
@@ -768,7 +780,7 @@ class SettingsApiController extends Controller
     public function notificationChannelsDestroy(Request $request, string $id): JsonResponse
     {
         $company = $this->resolveCompany($request);
-        $channel = \App\Models\CustomNotificationChannel::where('company_id', $company->id)->find($id);
+        $channel = CustomNotificationChannel::where('company_id', $company->id)->find($id);
         if (! $channel) {
             return response()->json(['success' => false, 'error' => 'Notification channel not found.'], 404);
         }
@@ -812,13 +824,13 @@ class SettingsApiController extends Controller
         $data['is_active'] = $data['is_active'] ?? true;
 
         if ($id !== null) {
-            $channel = \App\Models\CustomNotificationChannel::where('company_id', $company->id)->find($id);
+            $channel = CustomNotificationChannel::where('company_id', $company->id)->find($id);
             if (! $channel) {
                 return response()->json(['success' => false, 'error' => 'Notification channel not found.'], 404);
             }
             $channel->update($data);
         } else {
-            $channel = \App\Models\CustomNotificationChannel::create(array_merge($data, ['company_id' => $company->id]));
+            $channel = CustomNotificationChannel::create(array_merge($data, ['company_id' => $company->id]));
         }
 
         return response()->json([
@@ -830,7 +842,7 @@ class SettingsApiController extends Controller
 
     public function testNotificationChannel(
         Request $request,
-        \App\Services\Notifications\CustomChannelDispatcherService $dispatcher
+        CustomChannelDispatcherService $dispatcher
     ): JsonResponse {
         $company = $this->resolveCompany($request);
 
@@ -838,7 +850,7 @@ class SettingsApiController extends Controller
         $channel = null;
 
         if (! empty($channelId)) {
-            $channel = \App\Models\CustomNotificationChannel::where('company_id', $company->id)->find($channelId);
+            $channel = CustomNotificationChannel::where('company_id', $company->id)->find($channelId);
             if (! $channel) {
                 return response()->json(['success' => false, 'error' => 'Notification channel not found.'], 404);
             }
@@ -861,7 +873,7 @@ class SettingsApiController extends Controller
                 ], 422);
             }
 
-            $channel = new \App\Models\CustomNotificationChannel([
+            $channel = new CustomNotificationChannel([
                 'company_id' => $company->id,
                 'name' => 'Test Channel',
                 'url' => $request->input('url'),
@@ -895,7 +907,7 @@ class SettingsApiController extends Controller
         ], $result['success'] ? 200 : 422);
     }
 
-    private function presentChannel(\App\Models\CustomNotificationChannel $channel): array
+    private function presentChannel(CustomNotificationChannel $channel): array
     {
         return [
             'id' => (string) $channel->id,

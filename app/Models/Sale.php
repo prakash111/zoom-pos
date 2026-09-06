@@ -21,6 +21,7 @@ class Sale extends Model
         'payment_terms', 'terms', 'commission_rate', 'commission_type', 'commission_amount',
         'merchant_fee_percentage', 'merchant_fee_amount',
         'tax_amount', 'tax_name', 'tax_rate', 'tax_breakdown',
+        'module_type', 'reference_ticket_id', 'doctor_name', 'stylist_ids',
         'einvoice_status', 'einvoice_irn', 'einvoice_qr', 'einvoice_signed_payload',
     ];
 
@@ -48,6 +49,8 @@ class Sale extends Model
             'due_reminder_dismissed_at' => 'datetime',
             'commission_rate' => 'decimal:2',
             'commission_amount' => 'decimal:2',
+            'reference_ticket_id' => 'integer',
+            'stylist_ids' => 'array',
         ];
     }
 
@@ -79,6 +82,11 @@ class Sale extends Model
     public function payments()
     {
         return $this->hasMany(OrderPayment::class, 'sale_id')->orderByDesc('created_at');
+    }
+
+    public function saleItems()
+    {
+        return $this->hasMany(SaleItem::class);
     }
 
     public function cashRegister()

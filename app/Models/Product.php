@@ -15,7 +15,7 @@ class Product extends Model
         'company_id', 'external_id', 'code', 'sku', 'barcode', 'name', 'image_url', 'category_id', 'category_name',
         'brand_id', 'brand_name', 'unit', 'cost_price', 'sale_price', 'variants', 'modifiers', 'spice_levels', 'profit_margin',
         'current_stock', 'minimum_stock', 'active', 'is_demo', 'batch_number', 'mfg_date', 'expiry_date',
-        'requires_prescription', 'narcotic_schedule', 'generic_name', 'composition', 'duration_minutes', 'hsn_code', 'sac_code', 'tax_rate',
+        'requires_prescription', 'narcotic_schedule', 'generic_name', 'composition', 'duration_minutes', 'follow_up_days', 'hsn_code', 'sac_code', 'tax_rate',
         'taxable', 'tax_exempt', 'zero_rate', 'reverse_charge',
     ];
 
@@ -26,6 +26,7 @@ class Product extends Model
             'is_demo' => 'boolean',
             'requires_prescription' => 'boolean',
             'duration_minutes' => 'integer',
+            'follow_up_days' => 'integer',
             'mfg_date' => 'date',
             'expiry_date' => 'date',
             'taxable' => 'boolean',

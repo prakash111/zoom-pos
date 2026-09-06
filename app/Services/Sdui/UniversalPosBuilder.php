@@ -11,6 +11,7 @@ use App\Models\RepairTicket;
 use App\Models\Sale;
 use App\Models\SalonAppointment;
 use App\Models\User;
+use App\Services\Pos\SduiPosAdapterInterface;
 use App\Services\TaxCalculationService;
 use Illuminate\Support\Facades\Schema;
 
@@ -30,6 +31,41 @@ use Illuminate\Support\Facades\Schema;
  */
 class UniversalPosBuilder
 {
+    /**
+     * Build the shared native cart drawer from a vertical-domain adapter.
+     *
+     * This is the sole extension point for Repair, Pharmacy, Salon, and
+     * future work queues. Adapters cannot replace tax, CRM, payment, or
+     * post-sale behavior; they may only provide lines and domain context.
+     */
+    public static function buildCartSheet(SduiPosAdapterInterface $adapter): array
+    {
+        $context = $adapter->getModuleContext();
+        $company = $context['company'] ?? null;
+        if (! $company instanceof Company) {
+            throw new \InvalidArgumentException('A POS adapter must provide its Company in module context.');
+        }
+
+        return static::checkoutSheet(
+            company: $company,
+            formSubmitEndpoint: (string) ($context['form_submit_endpoint'] ?? '/api/tenant/pos/checkout'),
+            cartPreview: $adapter->getLineItems(),
+            ticketFieldLabel: $context['ticket_field_label'] ?? null,
+            customerFieldLabel: (string) ($context['customer_field_label'] ?? 'Customer Name'),
+            collectPrescription: (bool) ($context['collect_prescription'] ?? false),
+            specialistOptions: $context['specialist_options'] ?? null,
+            module: (string) ($context['module'] ?? 'retail'),
+            prescriptionOptions: $context['prescription_options'] ?? null,
+            repairTicketOptions: $context['repair_ticket_options'] ?? null,
+            selectedTicketId: $context['selected_ticket_id'] ?? null,
+            previewIncludesTicket: (bool) ($context['preview_includes_ticket'] ?? false),
+            defaultSpecialistId: $context['default_specialist_id'] ?? null,
+            defaultCustomerName: $context['default_customer_name'] ?? null,
+            prepaidDeposit: $adapter->getPrepaidDeposit(),
+            selectedCustomer: $adapter->getCustomer(),
+        );
+    }
+
     /**
      * Retail POS Screen.
      */
@@ -275,6 +311,11 @@ class UniversalPosBuilder
         $categories = [['id' => null, 'label' => 'All']];
         $seenCategories = [];
         $items = [];
+        $hasSpecialists = User::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('is_specialist', true)
+            ->where('status', 'approved')
+            ->exists();
 
         foreach ($products as $product) {
             self::collectCategory($product, $categories, $seenCategories);
@@ -302,17 +343,22 @@ class UniversalPosBuilder
                 'badge' => $badge,
                 'duration_minutes' => $duration,
                 'service_type' => $duration !== null ? 'service' : 'retail_add_on',
-                'on_tap' => SchemaResponse::addToCartAction([
-                    'id' => $product->id,
-                    'batch_id' => null,
-                    'title' => $product->name,
-                    'subtitle' => $subtitle,
-                    'price' => (float) $product->sale_price,
-                    'quantity' => 1,
-                    'max_quantity' => max(1, $stock),
-                    'duration_minutes' => $duration,
-                    'service_type' => $duration !== null ? 'service' : 'retail_add_on',
-                ]),
+                'on_tap' => $duration !== null && $hasSpecialists
+                    ? SchemaResponse::openRemoteSheetAction(
+                        "/api/tenant/salon/specialist-sheet?product_id={$product->id}",
+                        "Assign Stylist — {$product->name}",
+                    )
+                    : SchemaResponse::addToCartAction([
+                        'id' => $product->id,
+                        'batch_id' => null,
+                        'title' => $product->name,
+                        'subtitle' => $subtitle,
+                        'price' => (float) $product->sale_price,
+                        'quantity' => 1,
+                        'max_quantity' => max(1, $stock),
+                        'duration_minutes' => $duration,
+                        'service_type' => $duration !== null ? 'service' : 'retail_add_on',
+                    ]),
             ];
         }
 
@@ -752,8 +798,14 @@ class UniversalPosBuilder
         bool $previewIncludesTicket = false,
         int|string|null $defaultSpecialistId = null,
         ?string $defaultCustomerName = null,
+        ?float $prepaidDeposit = null,
+        ?Customer $selectedCustomer = null,
     ): array {
         $currency = $company->currency_symbol ?: '$';
+
+        if ($selectedCustomer) {
+            $defaultCustomerName = $defaultCustomerName ?: $selectedCustomer->name;
+        }
 
         $selectedTicket = null;
         if ($module === 'repair' && $selectedTicketId) {
@@ -826,7 +878,7 @@ class UniversalPosBuilder
         // Prepaid credit against this ticket: prefer the collected `advance_paid`,
         // fall back to the quoted `advance_deposit` so the deposit still nets off
         // the balance even on tickets where only the deposit column was set.
-        $advancePaid = (float) (
+        $advancePaid = $prepaidDeposit ?? (float) (
             ($selectedTicket?->advance_paid ?: $selectedTicket?->advance_deposit)
             ?? $selectedAppointment?->advance_paid
             ?? 0
@@ -882,10 +934,13 @@ class UniversalPosBuilder
 
         $taxPreviewItems = array_map(function (array $line) use ($company) {
             $title = (string) ($line['title'] ?? $line['name'] ?? 'Item');
-            $product = Product::withoutGlobalScope('company')
-                ->where('company_id', $company->id)
-                ->where('name', $title)
-                ->first(['id']);
+            $productId = $line['product_id'] ?? $line['id'] ?? null;
+            $product = $productId
+                ? Product::withoutGlobalScope('company')->where('company_id', $company->id)->find($productId, ['id'])
+                : Product::withoutGlobalScope('company')
+                    ->where('company_id', $company->id)
+                    ->where('name', $title)
+                    ->first(['id']);
 
             return [
                 'product_id' => $product?->id,
@@ -1188,15 +1243,15 @@ class UniversalPosBuilder
                 SchemaResponse::text($currency.number_format($taxAmount, 2), 'body_medium', ['bold' => true]),
             ], ['main_axis_alignment' => 'space_between']),
         ];
-        if ($module === 'repair') {
+        if ($advancePaid > 0) {
             $totalRows[] = SchemaResponse::row([
-                SchemaResponse::text('Advance Deposit Paid', 'body_medium', ['color' => '#15803d']),
+                SchemaResponse::text($module === 'repair' ? 'Advance Deposit Paid' : 'Prepaid Deposit / Package Credit', 'body_medium', ['color' => '#15803d']),
                 SchemaResponse::text('-'.$currency.number_format($advancePaid, 2), 'body_medium', ['bold' => true, 'color' => '#15803d']),
             ], ['main_axis_alignment' => 'space_between']);
         }
         $totalRows[] = SchemaResponse::divider();
         $totalRows[] = SchemaResponse::row([
-            SchemaResponse::text($module === 'repair' ? 'Balance Due' : 'Grand Total', 'title_medium', ['bold' => true]),
+            SchemaResponse::text(in_array($module, ['repair', 'salon'], true) && $advancePaid > 0 ? 'Balance Due' : 'Grand Total', 'title_medium', ['bold' => true]),
             SchemaResponse::text($currency.number_format($grandTotal, 2), 'title_large', ['bold' => true, 'color' => '#166534']),
         ], ['main_axis_alignment' => 'space_between']);
         $components[] = SchemaResponse::container($totalRows, [

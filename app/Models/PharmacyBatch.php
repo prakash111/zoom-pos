@@ -11,6 +11,8 @@ class PharmacyBatch extends Model
 {
     use BelongsToCompany;
 
+    protected $table = 'pharmacy_batches';
+
     protected $fillable = [
         'company_id',
         'tenant_id',
@@ -24,12 +26,18 @@ class PharmacyBatch extends Model
         'alert_days_before_expiry',
         'is_active',
         'is_demo',
+        'rack_location',
+        // Adapter aliases used by the domain-neutral ProductBatch contract.
+        'stock_quantity',
+        'unit_cost',
     ];
 
     protected $appends = [
         'days_until_expiry',
         'expiry_status',
         'expiry_color',
+        'stock_quantity',
+        'unit_cost',
     ];
 
     protected function casts(): array
@@ -54,6 +62,26 @@ class PharmacyBatch extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function getStockQuantityAttribute(): int
+    {
+        return (int) $this->stock_qty;
+    }
+
+    public function setStockQuantityAttribute(int|float|string $value): void
+    {
+        $this->attributes['stock_qty'] = (int) $value;
+    }
+
+    public function getUnitCostAttribute(): float
+    {
+        return (float) $this->cost_price;
+    }
+
+    public function setUnitCostAttribute(int|float|string $value): void
+    {
+        $this->attributes['cost_price'] = (float) $value;
     }
 
     public function getDaysUntilExpiryAttribute(): int

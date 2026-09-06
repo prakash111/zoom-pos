@@ -6,13 +6,20 @@ use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\CashRegister;
+use App\Models\Customer;
 use App\Models\OrderPayment;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SalonAppointment;
 use App\Models\User;
 use App\Services\CommissionService;
+use App\Services\Documents\DocumentNumberService;
+use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\Notifications\VerticalReminderService;
+use App\Services\Pos\Adapters\SalonCartAdapter;
+use App\Services\Pos\UniversalPosBuilder;
 use App\Services\Sdui\PosScreenBuilder;
+use App\Services\Sdui\SchemaResponse;
 use App\Services\Sdui\SchemaValidator;
 use App\Services\TaxCalculationService;
 use Carbon\Carbon;
@@ -59,16 +66,12 @@ class SalonApiController extends Controller
             ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])
             ->all();
 
-        $schema = PosScreenBuilder::checkoutSheet(
+        $schema = UniversalPosBuilder::buildCartSheet(new SalonCartAdapter(
             $company,
-            '/api/tenant/salon/pos-checkout'.($appointment ? '?appointment_id='.$appointment->id : ''),
             $cartPreview,
-            customerFieldLabel: 'Client Name',
-            specialistOptions: $specialists,
-            module: 'salon',
-            defaultSpecialistId: $appointment?->specialist_id,
-            defaultCustomerName: $appointment?->customer_name,
-        );
+            $appointment,
+            ['specialist_options' => $specialists],
+        ));
 
         if ($appointment) {
             $schema['booking_context'] = [
@@ -120,28 +123,28 @@ class SalonApiController extends Controller
             ->get();
 
         $components = [
-            \App\Services\Sdui\SchemaResponse::row([
-                \App\Services\Sdui\SchemaResponse::icon('spa', ['color' => '#7c3aed', 'size' => 28]),
-                \App\Services\Sdui\SchemaResponse::column([
-                    \App\Services\Sdui\SchemaResponse::text($service->name, 'title_medium', ['bold' => true]),
-                    \App\Services\Sdui\SchemaResponse::text("Duration: {$duration} mins · Rate: {$currency}".number_format($price, 2), 'body_small', ['color' => '#64748b']),
+            SchemaResponse::row([
+                SchemaResponse::icon('spa', ['color' => '#7c3aed', 'size' => 28]),
+                SchemaResponse::column([
+                    SchemaResponse::text($service->name, 'title_medium', ['bold' => true]),
+                    SchemaResponse::text("Duration: {$duration} mins · Rate: {$currency}".number_format($price, 2), 'body_small', ['color' => '#64748b']),
                 ]),
             ]),
-            \App\Services\Sdui\SchemaResponse::divider(),
-            \App\Services\Sdui\SchemaResponse::text('Select Stylist / Specialist for this Service:', 'label_large', ['bold' => true]),
+            SchemaResponse::divider(),
+            SchemaResponse::text('Select Stylist / Specialist for this Service:', 'label_large', ['bold' => true]),
         ];
 
         // 1. Any Available Stylist option
-        $components[] = \App\Services\Sdui\SchemaResponse::card([
-            \App\Services\Sdui\SchemaResponse::row([
-                \App\Services\Sdui\SchemaResponse::icon('groups', ['color' => '#0284c7', 'size' => 24]),
-                \App\Services\Sdui\SchemaResponse::column([
-                    \App\Services\Sdui\SchemaResponse::text('Any Available Specialist', 'title_small', ['bold' => true]),
-                    \App\Services\Sdui\SchemaResponse::text('Assign automatically at service time', 'body_small', ['color' => '#64748b']),
+        $components[] = SchemaResponse::card([
+            SchemaResponse::row([
+                SchemaResponse::icon('groups', ['color' => '#0284c7', 'size' => 24]),
+                SchemaResponse::column([
+                    SchemaResponse::text('Any Available Specialist', 'title_small', ['bold' => true]),
+                    SchemaResponse::text('Assign automatically at service time', 'body_small', ['color' => '#64748b']),
                 ]),
-                \App\Services\Sdui\SchemaResponse::badge('Flexible', '#0284c7', 'subtle'),
+                SchemaResponse::badge('Flexible', '#0284c7', 'subtle'),
             ], ['main_axis_alignment' => 'space_between']),
-            \App\Services\Sdui\SchemaResponse::buttonPrimary('Select Any Available', \App\Services\Sdui\SchemaResponse::addToCartAction([
+            SchemaResponse::buttonPrimary('Select Any Available', SchemaResponse::addToCartAction([
                 'id' => $service->id,
                 'batch_id' => null,
                 'title' => $service->name,
@@ -156,16 +159,16 @@ class SalonApiController extends Controller
 
         // 2. Individual Specialists
         foreach ($specialists as $staff) {
-            $components[] = \App\Services\Sdui\SchemaResponse::card([
-                \App\Services\Sdui\SchemaResponse::row([
-                    \App\Services\Sdui\SchemaResponse::icon('person', ['color' => '#7c3aed', 'size' => 24]),
-                    \App\Services\Sdui\SchemaResponse::column([
-                        \App\Services\Sdui\SchemaResponse::text($staff->name, 'title_small', ['bold' => true]),
-                        \App\Services\Sdui\SchemaResponse::text(User::ROLES[$staff->role] ?? 'Stylist / Technician', 'body_small', ['color' => '#64748b']),
+            $components[] = SchemaResponse::card([
+                SchemaResponse::row([
+                    SchemaResponse::icon('person', ['color' => '#7c3aed', 'size' => 24]),
+                    SchemaResponse::column([
+                        SchemaResponse::text($staff->name, 'title_small', ['bold' => true]),
+                        SchemaResponse::text(User::ROLES[$staff->role] ?? 'Stylist / Technician', 'body_small', ['color' => '#64748b']),
                     ]),
-                    \App\Services\Sdui\SchemaResponse::badge('Available', '#10b981', 'subtle'),
+                    SchemaResponse::badge('Available', '#10b981', 'subtle'),
                 ], ['main_axis_alignment' => 'space_between']),
-                \App\Services\Sdui\SchemaResponse::buttonPrimary("Assign {$staff->name}", \App\Services\Sdui\SchemaResponse::addToCartAction([
+                SchemaResponse::buttonPrimary("Assign {$staff->name}", SchemaResponse::addToCartAction([
                     'id' => $service->id,
                     'batch_id' => null,
                     'title' => $service->name,
@@ -181,7 +184,7 @@ class SalonApiController extends Controller
             ]);
         }
 
-        $schema = \App\Services\Sdui\SchemaResponse::sheet("Select Stylist — {$service->name}", $components);
+        $schema = SchemaResponse::sheet("Select Stylist — {$service->name}", $components);
         $errors = app(SchemaValidator::class)->validate($schema);
         if ($errors !== []) {
             return response()->json(['success' => false, 'error' => 'Invalid SDUI schema.', 'details' => ['schema' => $errors]], 500);
@@ -227,12 +230,14 @@ class SalonApiController extends Controller
             'specialist_id' => 'required|string',
             'customer_name' => 'required|string|max:150',
             'customer_phone' => 'nullable|string|max:50',
+            'customer_id' => 'nullable|integer',
             'appointment_date' => 'required|date',
             'appointment_time' => 'required|date_format:H:i',
             'notes' => 'nullable|string|max:1000',
             'advance_deposit' => 'nullable|numeric|min:0',
             'advance_paid' => 'nullable|numeric|min:0',
             'deposit_payment_method' => 'nullable|string|max:50',
+            'chair_label' => 'nullable|string|max:80',
         ]);
 
         if ($validator->fails()) {
@@ -275,16 +280,33 @@ class SalonApiController extends Controller
             return response()->json(['success' => false, 'error' => 'That specialist already has an appointment in this time slot.'], 422);
         }
 
-        $dailyCount = SalonAppointment::withoutGlobalScope('company')
-            ->where('company_id', $company->id)
-            ->whereDate('starts_at', $startsAt->toDateString())
-            ->count() + 1;
         $advancePaid = (float) $request->input('advance_deposit', $request->input('advance_paid', 0));
+        $customer = null;
+        if ($request->filled('customer_id')) {
+            $customer = Customer::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->find($request->integer('customer_id'));
+        }
+        if (! $customer) {
+            $customer = Customer::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where(function ($query) use ($request) {
+                    $request->filled('customer_phone')
+                        ? $query->where('phone', $request->input('customer_phone'))
+                        : $query->where('name', $request->input('customer_name'));
+                })
+                ->first();
+        }
+        $customer ??= Customer::create([
+            'company_id' => $company->id,
+            'name' => $request->input('customer_name'),
+            'phone' => $request->input('customer_phone'),
+        ]);
         $appointment = SalonAppointment::create([
             'company_id' => $company->id,
             'tenant_id' => $company->id,
-            'appointment_number' => 'APT-'.$startsAt->format('Ymd').'-'.sprintf('%04d', $dailyCount),
-            'customer_id' => $request->input('customer_id'),
+            'appointment_number' => app(DocumentNumberService::class)->next($company, 'salon', $startsAt),
+            'customer_id' => $customer->id,
             'customer_name' => $request->input('customer_name'),
             'customer_phone' => $request->input('customer_phone'),
             'product_id' => $service->id,
@@ -295,6 +317,7 @@ class SalonApiController extends Controller
             'notes' => $request->input('notes'),
             'advance_paid' => $advancePaid,
             'deposit_payment_method' => $request->input('deposit_payment_method', 'cash'),
+            'chair_label' => $request->input('chair_label'),
         ]);
 
         AuditLog::record('salon.appointment_created', $company->id, $this->resolveUser($request, $company)?->id, [
@@ -352,7 +375,7 @@ class SalonApiController extends Controller
     {
         $company = $this->resolveCompany($request);
         $validator = Validator::make($request->all(), [
-            'status' => 'required|in:scheduled,checked_in,completed,cancelled,no_show',
+            'status' => 'required|in:scheduled,checked_in,in_progress,completed,cancelled,no_show',
         ]);
         if ($validator->fails()) {
             return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
@@ -391,6 +414,8 @@ class SalonApiController extends Controller
             'discount' => 'nullable|numeric',
             'tendered' => 'nullable|numeric|min:0',
             'quick_cash_tendered' => 'nullable|numeric|min:0',
+            'follow_up_days' => 'nullable|integer|min:1|max:3650',
+            'follow_up_message' => 'nullable|string|max:1000',
         ]);
 
         if ($validator->fails()) {
@@ -426,10 +451,15 @@ class SalonApiController extends Controller
 
                     $product = Product::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
+                        ->lockForUpdate()
                         ->find($productId);
 
                     if (! $product) {
                         throw new \InvalidArgumentException("Service or product with ID {$productId} not found.");
+                    }
+
+                    if ((float) $product->current_stock < $qty) {
+                        throw new \InvalidArgumentException("Insufficient stock for {$product->name}.");
                     }
 
                     $product->decrementStock($qty, 'Salon Counter POS sale');
@@ -484,6 +514,8 @@ class SalonApiController extends Controller
                         'commission_rate' => $commissionRate,
                         'commission_type' => $commissionType,
                         'commission_amount' => $lineCommission,
+                        'follow_up_days' => $product->follow_up_days,
+                        'line_type' => $product->duration_minutes ? 'service' : 'product',
                     ];
                 }
 
@@ -494,10 +526,14 @@ class SalonApiController extends Controller
                 $netAmount = (float) $taxTotals['total'];
                 $totalRevenue = (float) $taxTotals['total'];
                 $paymentMethod = strtolower((string) $request->input('payment_method', $request->input('selected_payment_method', 'cash')));
+                if ($paymentMethod === 'upi') {
+                    $paymentMethod = 'transfer';
+                }
+                $isCredit = in_array($paymentMethod, ['credit', 'khata', 'due'], true);
                 $advanceApplied = $appointment ? min((float) ($appointment->advance_paid ?? 0), $netAmount) : 0.0;
                 $balanceToCollect = max(0, round($netAmount - $advanceApplied, 2));
                 $payments = $request->input('payments');
-                $collectedNow = $paymentMethod === 'credit'
+                $collectedNow = $isCredit
                     ? 0.0
                     : (! empty($payments) && is_array($payments)
                         ? min($balanceToCollect, collect($payments)->sum(fn ($payment) => max(0, (float) ($payment['amount'] ?? 0))))
@@ -507,15 +543,34 @@ class SalonApiController extends Controller
                 $paymentStatus = $dueAmount <= 0 ? 'paid' : ($paidAmount > 0 ? 'partial' : 'pending');
                 $cashRegister = CashRegister::openFor($company->id);
 
-                $prefix = $company->invoice_prefix ?: 'INV-';
-                $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
-                $saleNumber = $prefix.sprintf('%04d', $saleCount);
+                $saleNumber = app(DocumentNumberService::class)->next($company, 'invoice');
+                $stylistIds = collect($saleLineItems)->pluck('specialist_id')->filter()->unique()->values()->all();
+                $customerId = $request->input('customer_id') ?: $appointment?->customer_id;
+                $customerName = trim((string) ($request->input('customer_name') ?: ($appointment?->customer_name ?? '')));
+                if ($customerId && ! Customer::withoutGlobalScope('company')->where('company_id', $company->id)->whereKey($customerId)->exists()) {
+                    $customerId = null;
+                }
+                if (! $customerId && $customerName !== '' && $customerName !== 'Walk-in Customer') {
+                    $customer = Customer::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where(function ($query) use ($request, $customerName, $appointment) {
+                            $phone = $request->input('customer_phone') ?: $appointment?->customer_phone;
+                            $phone ? $query->where('phone', $phone) : $query->where('name', $customerName);
+                        })
+                        ->first();
+                    $customer ??= Customer::create([
+                        'company_id' => $company->id,
+                        'name' => $customerName,
+                        'phone' => $request->input('customer_phone') ?: $appointment?->customer_phone,
+                    ]);
+                    $customerId = $customer->id;
+                }
 
                 $sale = Sale::create([
                     'company_id' => $company->id,
                     'sale_number' => $saleNumber,
-                    'customer_id' => $request->input('customer_id'),
-                    'customer_name' => $request->input('customer_name') ?: ($appointment?->customer_name ?? 'Walk-in Customer'),
+                    'customer_id' => $customerId,
+                    'customer_name' => $customerName ?: 'Walk-in Customer',
                     'user_id' => $user?->id,
                     'cash_register_id' => $cashRegister?->id,
                     'total' => $totalRevenue,
@@ -527,6 +582,9 @@ class SalonApiController extends Controller
                     'payment_status' => $paymentStatus,
                     'status' => 'completed',
                     'operation_type' => 'sale',
+                    'module_type' => 'salon',
+                    'reference_ticket_id' => $appointment?->id,
+                    'stylist_ids' => $stylistIds,
                     'items' => $saleLineItems,
                     'tax_amount' => $taxTotals['tax_amount'],
                     'tax_name' => $company->tax_id_label ?: 'Tax',
@@ -565,7 +623,7 @@ class SalonApiController extends Controller
                             ]);
                         }
                     }
-                } elseif ($paymentMethod !== 'credit' && $collectedNow > 0) {
+                } elseif (! $isCredit && $collectedNow > 0) {
                     $tendered = $request->filled('tendered')
                         ? (float) $request->input('tendered')
                         : (float) $request->input('quick_cash_tendered', $request->input('selected_tendered', $collectedNow));
@@ -594,7 +652,15 @@ class SalonApiController extends Controller
                 'specialist_id' => $specialistId,
             ]);
 
-            $whatsappUrl = app(\App\Services\Invoice\InvoiceDeliveryService::class)->generateInvoiceWhatsAppUrl($sale, $request->input('customer_phone'));
+            $whatsappUrl = app(InvoiceDeliveryService::class)->generateInvoiceWhatsAppUrl($sale, $request->input('customer_phone'));
+            app(VerticalReminderService::class)->scheduleSalonFollowUp(
+                $sale->loadMissing('customer'),
+                (array) $sale->items,
+                $appointment,
+                $request->input('customer_phone'),
+                $request->integer('follow_up_days') ?: null,
+                $request->input('follow_up_message'),
+            );
 
             return response()->json([
                 'success' => true,
@@ -602,7 +668,7 @@ class SalonApiController extends Controller
                 'sale' => $sale,
                 // In-app Post-Sale Action Sheet — no auto-launch keys.
                 'invoice_number' => $sale->sale_number,
-                'post_sale_sheet' => \App\Services\Sdui\SchemaResponse::postSaleActionResponse($sale->fresh(['customer', 'company', 'payments']), $whatsappUrl),
+                'post_sale_sheet' => SchemaResponse::postSaleActionResponse($sale->fresh(['customer', 'company', 'payments']), $whatsappUrl),
                 'whatsapp_share_url' => $whatsappUrl,
             ]);
         } catch (\InvalidArgumentException $e) {

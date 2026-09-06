@@ -6,12 +6,19 @@ use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\CashRegister;
+use App\Models\Customer;
 use App\Models\OrderPayment;
 use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Services\Documents\DocumentNumberService;
+use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\Notifications\VerticalReminderService;
+use App\Services\Pos\Adapters\PharmacyCartAdapter;
+use App\Services\Pos\UniversalPosBuilder;
 use App\Services\Sdui\PosScreenBuilder;
+use App\Services\Sdui\SchemaResponse;
 use App\Services\Sdui\SchemaValidator;
 use App\Services\TaxCalculationService;
 use Carbon\Carbon;
@@ -78,6 +85,8 @@ class PharmacyApiController extends Controller
                     'cost_price' => (float) $batch->cost_price,
                     'selling_price' => (float) ($batch->selling_price > 0 ? $batch->selling_price : $batch->product->sale_price),
                     'stock_qty' => (int) $batch->stock_qty,
+                    'stock_quantity' => (int) $batch->stock_qty,
+                    'rack_location' => $batch->rack_location,
                     'is_expired' => $days < 0,
                     'is_near_expiry' => $status === 'near_expiry',
                     'is_selectable' => $days >= 0 && $batch->stock_qty > 0,
@@ -161,6 +170,11 @@ class PharmacyApiController extends Controller
             'prescription_details' => 'nullable|array',
             'prescription_details.patient_name' => 'nullable|string',
             'prescription_details.doctor_name' => 'nullable|string',
+            'prescription_details.doctor_registration_no' => 'nullable|string|max:100',
+            'prescription_details.age' => 'nullable|integer|min:0|max:150',
+            'prescription_details.gender' => 'nullable|string|max:30',
+            'prescription_details.allergies' => 'nullable|string|max:2000',
+            'dosage_duration_days' => 'nullable|integer|min:1|max:3650',
             'payment_method' => 'nullable|string',
             'payments' => 'nullable|array',
             'total' => 'nullable|numeric',
@@ -193,10 +207,14 @@ class PharmacyApiController extends Controller
 
                     $product = Product::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
+                        ->lockForUpdate()
                         ->find($productId);
 
                     if (! $product) {
                         throw new \InvalidArgumentException("Medicine with ID {$productId} not found.");
+                    }
+                    if ((float) $product->current_stock < $qty) {
+                        throw new \InvalidArgumentException("Insufficient stock for {$product->name}.");
                     }
 
                     if ($product->requires_prescription || filled($product->narcotic_schedule)) {
@@ -210,6 +228,8 @@ class PharmacyApiController extends Controller
                         $batch = PharmacyBatch::withoutGlobalScope('company')
                             ->where('company_id', $company->id)
                             ->where('product_id', $product->id)
+                            ->where('is_active', true)
+                            ->lockForUpdate()
                             ->find($itemData['batch_id']);
                     }
 
@@ -221,7 +241,16 @@ class PharmacyApiController extends Controller
                             ->where('stock_qty', '>=', $qty)
                             ->where('expiry_date', '>=', Carbon::today())
                             ->orderBy('expiry_date', 'asc')
+                            ->lockForUpdate()
                             ->first();
+                    }
+
+                    $tracksBatches = PharmacyBatch::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where('product_id', $product->id)
+                        ->exists();
+                    if ($tracksBatches && ! $batch) {
+                        throw new \InvalidArgumentException("No unexpired batch with sufficient stock is available for {$product->name}.");
                     }
 
                     if ($batch) {
@@ -253,6 +282,9 @@ class PharmacyApiController extends Controller
                         'batch_id' => $batch?->id,
                         'batch_number' => $batch?->batch_number,
                         'expiry_date' => $batch?->expiry_date?->format('Y-m-d'),
+                        'rack_location' => $batch?->rack_location,
+                        'dosage_notes' => $itemData['dosage_notes'] ?? $itemData['dosage'] ?? null,
+                        'days_supply' => $itemData['days_supply'] ?? $itemData['duration_days'] ?? null,
                         'requires_prescription' => (bool) $product->requires_prescription,
                         'narcotic_schedule' => $product->narcotic_schedule,
                         'quantity' => $qty,
@@ -274,16 +306,10 @@ class PharmacyApiController extends Controller
                             throw new \InvalidArgumentException('The selected prescription is unavailable or has already been dispensed.');
                         }
                     } elseif (! empty($prescriptionDetails['patient_name']) && ! empty($prescriptionDetails['doctor_name'])) {
-                        $prescriptionPrefix = 'RX-'.date('Ymd').'-';
-                        $rxCount = PharmacyPrescription::withoutGlobalScope('company')
-                            ->where('company_id', $company->id)
-                            ->whereDate('created_at', Carbon::today())
-                            ->count() + 1;
-
                         $prescription = PharmacyPrescription::create([
                             'company_id' => $company->id,
                             'tenant_id' => $company->id,
-                            'prescription_number' => $prescriptionPrefix.sprintf('%04d', $rxCount),
+                            'prescription_number' => app(DocumentNumberService::class)->next($company, 'prescription'),
                             'customer_id' => $request->input('customer_id'),
                             'patient_name' => $prescriptionDetails['patient_name'],
                             'patient_phone' => $prescriptionDetails['patient_phone'] ?? $request->input('customer_phone'),
@@ -292,6 +318,7 @@ class PharmacyApiController extends Controller
                             'prescription_date' => Carbon::today(),
                             'diagnosis' => $prescriptionDetails['diagnosis'] ?? 'POS Dispensing',
                             'medicines' => $saleLineItems,
+                            'dosage_duration_days' => $request->integer('dosage_duration_days') ?: null,
                             'status' => 'dispensed',
                             'dispensed_at' => now(),
                             'dispensed_by_user_id' => $user?->id,
@@ -309,8 +336,12 @@ class PharmacyApiController extends Controller
                 $netAmount = (float) $taxTotals['total'];
                 $totalRevenue = (float) $taxTotals['total'];
                 $paymentMethod = strtolower((string) $request->input('payment_method', $request->input('selected_payment_method', 'cash')));
+                if ($paymentMethod === 'upi') {
+                    $paymentMethod = 'transfer';
+                }
+                $isCredit = in_array($paymentMethod, ['credit', 'khata', 'due'], true);
                 $payments = $request->input('payments');
-                $paidAmount = $paymentMethod === 'credit'
+                $paidAmount = $isCredit
                     ? 0.0
                     : (! empty($payments) && is_array($payments)
                         ? min($netAmount, collect($payments)->sum(fn ($payment) => max(0, (float) ($payment['amount'] ?? 0))))
@@ -319,16 +350,27 @@ class PharmacyApiController extends Controller
                 $paymentStatus = $dueAmount <= 0 ? 'paid' : ($paidAmount > 0 ? 'partial' : 'pending');
                 $cashRegister = CashRegister::openFor($company->id);
 
+                $patientName = trim((string) ($request->input('customer_name') ?: $prescription?->patient_name ?: ($prescriptionDetails['patient_name'] ?? '')));
+                $patientPhone = trim((string) ($request->input('customer_phone') ?: $prescription?->patient_phone ?: ($prescriptionDetails['patient_phone'] ?? '')));
+                $customer = $this->resolvePatientCustomer($company->id, $request->input('customer_id') ?: $prescription?->customer_id, $patientName, $patientPhone, [
+                    'age' => $prescriptionDetails['age'] ?? $request->input('age'),
+                    'gender' => $prescriptionDetails['gender'] ?? $request->input('gender'),
+                    'allergies' => $prescriptionDetails['allergies'] ?? $request->input('allergies'),
+                    'prescribing_doctor' => $prescription?->doctor_name ?: ($prescriptionDetails['doctor_name'] ?? $request->input('doctor_name')),
+                    'doctor_registration_no' => $prescription?->doctor_registration_no ?: ($prescriptionDetails['doctor_registration_no'] ?? $request->input('doctor_registration_no')),
+                ]);
+                if ($prescription && $customer && ! $prescription->customer_id) {
+                    $prescription->update(['customer_id' => $customer->id]);
+                }
+
                 // Generate Sale
-                $prefix = $company->invoice_prefix ?: 'INV-';
-                $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
-                $saleNumber = $prefix.sprintf('%04d', $saleCount);
+                $saleNumber = app(DocumentNumberService::class)->next($company, 'invoice');
 
                 $sale = Sale::create([
                     'company_id' => $company->id,
                     'sale_number' => $saleNumber,
-                    'customer_id' => $request->input('customer_id'),
-                    'customer_name' => $request->input('customer_name') ?? $prescription?->patient_name ?? 'Walk-in Customer',
+                    'customer_id' => $customer?->id,
+                    'customer_name' => $customer?->name ?: ($patientName ?: 'Walk-in Customer'),
                     'user_id' => $user?->id,
                     'cash_register_id' => $cashRegister?->id,
                     'total' => $totalRevenue,
@@ -340,6 +382,9 @@ class PharmacyApiController extends Controller
                     'payment_status' => $paymentStatus,
                     'status' => 'completed',
                     'operation_type' => 'sale',
+                    'module_type' => 'pharmacy',
+                    'reference_ticket_id' => $prescription?->id,
+                    'doctor_name' => $prescription?->doctor_name ?: ($prescriptionDetails['doctor_name'] ?? $request->input('doctor_name')),
                     'items' => $saleLineItems,
                     'tax_amount' => $taxTotals['tax_amount'],
                     'tax_name' => $company->tax_id_label ?: 'Tax',
@@ -362,7 +407,7 @@ class PharmacyApiController extends Controller
                             ]);
                         }
                     }
-                } elseif ($paymentMethod !== 'credit' && $paidAmount > 0) {
+                } elseif (! $isCredit && $paidAmount > 0) {
                     $tendered = $request->filled('tendered')
                         ? (float) $request->input('tendered')
                         : (float) $request->input('quick_cash_tendered', $request->input('selected_tendered', $paidAmount));
@@ -400,16 +445,22 @@ class PharmacyApiController extends Controller
             ]);
 
             $sale = $result['sale'];
-            $whatsappUrl = app(\App\Services\Invoice\InvoiceDeliveryService::class)->generateInvoiceWhatsAppUrl($sale, $request->input('customer_phone'));
+            $prescription = $result['prescription'];
+            if ($prescription) {
+                $daysSupply = $request->integer('dosage_duration_days')
+                    ?: (int) collect((array) $prescription->medicines)->max(fn ($line) => (int) ($line['days_supply'] ?? $line['duration_days'] ?? 0));
+                app(VerticalReminderService::class)->schedulePharmacyRefill($prescription->fresh(), $sale, $daysSupply ?: null);
+            }
+            $whatsappUrl = app(InvoiceDeliveryService::class)->generateInvoiceWhatsAppUrl($sale, $request->input('customer_phone'));
 
             return response()->json([
                 'success' => true,
                 'message' => 'Pharmacy checkout completed successfully',
                 'sale' => $sale,
-                'prescription' => $result['prescription'],
+                'prescription' => $prescription?->fresh(),
                 // In-app Post-Sale Action Sheet — no auto-launch keys.
                 'invoice_number' => $sale->sale_number,
-                'post_sale_sheet' => \App\Services\Sdui\SchemaResponse::postSaleActionResponse($sale->fresh(['customer', 'company', 'payments']), $whatsappUrl),
+                'post_sale_sheet' => SchemaResponse::postSaleActionResponse($sale->fresh(['customer', 'company', 'payments']), $whatsappUrl),
                 'whatsapp_share_url' => $whatsappUrl,
             ]);
         } catch (\InvalidArgumentException $e) {
@@ -445,6 +496,7 @@ class PharmacyApiController extends Controller
             'batch' => [
                 'id' => $batch->id,
                 'batch_number' => $batch->batch_number,
+                'rack_location' => $batch->rack_location,
                 'product_name' => $batch->product?->name ?? 'Medicine',
                 'generic_name' => $batch->product?->generic_name ?? '',
                 'mfg_date' => $batch->manufacturing_date?->format('Y-m-d'),
@@ -502,6 +554,7 @@ class PharmacyApiController extends Controller
             'product_name' => $b->product?->name ?? 'Unknown',
             'generic_name' => $b->product?->generic_name ?? '',
             'batch_number' => $b->batch_number,
+            'rack_location' => $b->rack_location,
             'manufacturing_date' => $b->manufacturing_date?->format('Y-m-d'),
             'expiry_date' => $b->expiry_date?->format('Y-m-d'),
             'days_until_expiry' => $b->days_until_expiry,
@@ -532,6 +585,7 @@ class PharmacyApiController extends Controller
         $validator = Validator::make($request->all(), [
             'product_id' => 'required|integer',
             'batch_number' => 'required|string|max:100',
+            'rack_location' => 'nullable|string|max:100',
             'manufacturing_date' => 'nullable|date',
             'expiry_date' => 'required|date',
             'cost_price' => 'nullable|numeric|min:0',
@@ -561,6 +615,7 @@ class PharmacyApiController extends Controller
                 'tenant_id' => $company->id,
                 'product_id' => $product->id,
                 'batch_number' => trim($request->input('batch_number')),
+                'rack_location' => $request->input('rack_location'),
                 'manufacturing_date' => $request->input('manufacturing_date'),
                 'expiry_date' => $request->input('expiry_date'),
                 'cost_price' => $request->input('cost_price', $product->cost_price ?? 0),
@@ -776,23 +831,37 @@ class PharmacyApiController extends Controller
             'diagnosis' => 'nullable|string',
             'medicines' => 'nullable|array',
             'notes' => 'nullable|string',
+            'customer_id' => 'nullable|integer',
+            'age' => 'nullable|integer|min:0|max:150',
+            'gender' => 'nullable|string|max:30',
+            'allergies' => 'nullable|string|max:2000',
+            'rx_image_url' => 'nullable|string|max:4000',
+            'dosage_duration_days' => 'nullable|integer|min:1|max:3650',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
         }
 
-        $prescriptionPrefix = 'RX-'.date('Ymd').'-';
-        $count = PharmacyPrescription::withoutGlobalScope('company')
-            ->where('company_id', $company->id)
-            ->whereDate('created_at', Carbon::today())
-            ->count() + 1;
+        $customer = $this->resolvePatientCustomer(
+            $company->id,
+            $request->input('customer_id'),
+            trim((string) $request->input('patient_name')),
+            trim((string) $request->input('patient_phone')),
+            [
+                'age' => $request->input('age'),
+                'gender' => $request->input('gender'),
+                'allergies' => $request->input('allergies'),
+                'prescribing_doctor' => trim((string) $request->input('doctor_name')),
+                'doctor_registration_no' => $request->input('doctor_registration_no'),
+            ],
+        );
 
         $prescription = PharmacyPrescription::create([
             'company_id' => $company->id,
             'tenant_id' => $company->id,
-            'prescription_number' => $prescriptionPrefix.sprintf('%04d', $count),
-            'customer_id' => $request->input('customer_id'),
+            'prescription_number' => app(DocumentNumberService::class)->next($company, 'prescription'),
+            'customer_id' => $customer?->id,
             'patient_name' => trim($request->input('patient_name')),
             'patient_phone' => $request->input('patient_phone'),
             'doctor_name' => trim($request->input('doctor_name')),
@@ -801,6 +870,8 @@ class PharmacyApiController extends Controller
             'diagnosis' => $request->input('diagnosis'),
             'medicines' => $request->input('medicines'),
             'notes' => $request->input('notes'),
+            'rx_image_url' => $request->input('rx_image_url'),
+            'dosage_duration_days' => $request->integer('dosage_duration_days') ?: null,
             'status' => 'pending',
         ]);
 
@@ -865,19 +936,18 @@ class PharmacyApiController extends Controller
         }
 
         [$items, $preview, $unmatched] = $this->resolvePrescriptionCart($company->id, (array) $prescription->medicines);
-        $schema = PosScreenBuilder::checkoutSheet(
+        $schema = UniversalPosBuilder::buildCartSheet(new PharmacyCartAdapter(
             $company,
-            "/api/tenant/pharmacy/prescriptions/{$prescription->id}/checkout",
             $preview,
-            customerFieldLabel: 'Patient Name',
-            collectPrescription: true,
-            module: 'pharmacy',
-            prescriptionOptions: [[
-                'id' => $prescription->id,
-                'label' => "{$prescription->prescription_number} · {$prescription->patient_name} · Dr {$prescription->doctor_name}",
-            ]],
-            defaultCustomerName: $prescription->patient_name,
-        );
+            $prescription->loadMissing('customer'),
+            [
+                'customer_field_label' => 'Patient Name',
+                'prescription_options' => [[
+                    'id' => $prescription->id,
+                    'label' => "{$prescription->prescription_number} · {$prescription->patient_name} · Dr {$prescription->doctor_name}",
+                ]],
+            ],
+        ));
         $schema['prescription_context'] = [
             'id' => $prescription->id,
             'number' => $prescription->prescription_number,
@@ -969,15 +1039,11 @@ class PharmacyApiController extends Controller
             ])
             ->all();
 
-        $schema = PosScreenBuilder::checkoutSheet(
+        $schema = UniversalPosBuilder::buildCartSheet(new PharmacyCartAdapter(
             $company,
-            '/api/tenant/pharmacy/checkout',
             $cartPreview,
-            customerFieldLabel: 'Customer / Patient Name',
-            collectPrescription: true,
-            module: 'pharmacy',
-            prescriptionOptions: $prescriptions,
-        );
+            context: ['prescription_options' => $prescriptions],
+        ));
 
         $errors = app(SchemaValidator::class)->validate($schema);
         if ($errors !== []) {
@@ -1058,6 +1124,8 @@ class PharmacyApiController extends Controller
                 'batch_id' => $batch?->id,
                 'quantity' => $qty,
                 'unit_price' => $price,
+                'dosage_notes' => $medicine['dosage_notes'] ?? $medicine['dosage'] ?? null,
+                'days_supply' => $medicine['days_supply'] ?? $medicine['duration_days'] ?? null,
             ];
             $preview[] = [
                 'title' => $product->name,
@@ -1128,7 +1196,61 @@ class PharmacyApiController extends Controller
                 'doctor_name' => $doctorName,
                 'doctor_registration_no' => $request->input('doctor_registration_no'),
                 'diagnosis' => $request->input('diagnosis'),
+                'age' => $request->input('age'),
+                'gender' => $request->input('gender'),
+                'allergies' => $request->input('allergies'),
             ],
         ]);
+    }
+
+    /** @param array<string, mixed> $metadata */
+    private function resolvePatientCustomer(
+        string $companyId,
+        mixed $customerId,
+        string $name,
+        string $phone,
+        array $metadata = [],
+    ): ?Customer {
+        $customer = null;
+        if ($customerId) {
+            $customer = Customer::withoutGlobalScope('company')
+                ->where('company_id', $companyId)
+                ->find($customerId);
+        }
+
+        if (! $customer && ($name !== '' || $phone !== '')) {
+            $customer = Customer::withoutGlobalScope('company')
+                ->where('company_id', $companyId)
+                ->where(function ($query) use ($name, $phone) {
+                    $phone !== '' ? $query->where('phone', $phone) : $query->where('name', $name);
+                })
+                ->first();
+        }
+
+        $attributes = array_filter([
+            'age' => $metadata['age'] ?? null,
+            'gender' => $metadata['gender'] ?? null,
+            'allergies' => $metadata['allergies'] ?? null,
+            'prescribing_doctor' => $metadata['prescribing_doctor'] ?? null,
+            'doctor_registration_no' => $metadata['doctor_registration_no'] ?? null,
+        ], fn ($value) => $value !== null && $value !== '');
+
+        if ($customer) {
+            if ($attributes !== []) {
+                $customer->update($attributes);
+            }
+
+            return $customer->fresh();
+        }
+
+        if ($name === '') {
+            return null;
+        }
+
+        return Customer::create(array_merge([
+            'company_id' => $companyId,
+            'name' => $name,
+            'phone' => $phone ?: null,
+        ], $attributes));
     }
 }
