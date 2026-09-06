@@ -7,6 +7,8 @@ import '../../../core/models/service_order_model.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
+import '../../../core/config/bootstrap_cache.dart';
+import '../../../core/sdui/screens/dynamic_schema_page.dart';
 import '../../auth/auth_provider.dart';
 import '../service_orders_repository.dart';
 import 'service_order_details_screen.dart';
@@ -87,6 +89,18 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final mode = BootstrapCache.instance.activeMode.toLowerCase().trim();
+    final isRepairMode = mode.contains('repair') ||
+        mode.contains('auto') ||
+        mode.contains('tech') ||
+        mode.contains('service_order');
+    if (!isRepairMode) {
+      return const DynamicSchemaPage(
+        endpoint: '/api/tenant/views/service-catalog',
+        initialTitle: 'Service Catalog & Rates',
+      );
+    }
+
     final company = context.watch<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
 

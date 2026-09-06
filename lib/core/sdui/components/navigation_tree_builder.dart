@@ -885,7 +885,21 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     final content = Column(
       mainAxisSize:
           embeddedInSduiScrollView ? MainAxisSize.min : MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!embeddedInSduiScrollView)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: const [
+                _IndentLegend(label: 'Main Menu', offset: '0 px'),
+                _IndentLegend(label: 'Sub-Menu', offset: '30 px'),
+                _IndentLegend(label: 'Sub-Sub-Menu', offset: '60 px'),
+              ],
+            ),
+          ),
         if (embeddedInSduiScrollView)
           sectionList
         else
@@ -922,6 +936,28 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     }
 
     return content;
+  }
+}
+
+class _IndentLegend extends StatelessWidget {
+  const _IndentLegend({required this.label, required this.offset});
+
+  final String label;
+  final String offset;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Text('$label · $offset',
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+      ),
+    );
   }
 }
 

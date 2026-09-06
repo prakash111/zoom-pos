@@ -70,6 +70,12 @@ class SduiIconRegistry {
     'monetization_on': Icons.monetization_on_outlined,
     'api': Icons.api_outlined,
     'menu_open': Icons.menu_open_outlined,
+    'lock': Icons.lock_outline,
+    'lock_reset': Icons.lock_reset_outlined,
+    'password': Icons.password_outlined,
+    'format_list_bulleted': Icons.format_list_bulleted_outlined,
+    'add_circle': Icons.add_circle_outline,
+    'add_circle_outline': Icons.add_circle_outline,
 
     // Action pills & dialogs
     'pause_circle': Icons.pause_circle_outline,

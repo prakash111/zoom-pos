@@ -331,7 +331,11 @@ class DynamicSchemaParser {
 
     bool isExpanded(Map<String, dynamic> child) =>
         child['expanded'] == true || child['flex'] is num;
-    bool isFixed(Map<String, dynamic> child) => child['flexible'] == false;
+    bool isFixed(Map<String, dynamic> child) =>
+        child['flexible'] == false ||
+        child['expanded'] == false ||
+        child['type'] == 'icon' ||
+        child['type'] == 'badge';
 
     // `space_between` / `center` / `end` only mean something when the Row is
     // allowed to fill its parent, and an `expanded` child needs bounded width
@@ -1094,7 +1098,9 @@ class DynamicSchemaParser {
     final label = context.tr(schema['label']?.toString() ?? 'Submit');
     final iconName = schema['icon']?.toString();
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
-    final isFullWidth = schema['full_width'] != false;
+    final isDense = schema['dense'] == true || schema['size'] == 'small';
+    final isFullWidth = schema['full_width'] == true ||
+        (schema['full_width'] == null && schema['expanded'] != true && !isDense);
     final enabled = schema['enabled'] != false;
     final bgColor = schema['background_color'] != null
         ? SduiIconRegistry.parseColor(schema['background_color'].toString(),
@@ -1105,30 +1111,57 @@ class DynamicSchemaParser {
             fallback: Colors.white)
         : Colors.white;
     final radius = _parseDouble(schema['border_radius']) ?? 10.0;
+    final iconSize = _parseDouble(schema['icon_size']) ?? (isDense ? 16.0 : 20.0);
 
-    Widget btn = ElevatedButton.icon(
-      icon: iconName != null
-          ? Icon(SduiIconRegistry.resolve(iconName))
-          : const SizedBox.shrink(),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: bgColor,
-        foregroundColor: fgColor,
-        disabledBackgroundColor: bgColor.withValues(alpha: 0.4),
-        disabledForegroundColor: fgColor.withValues(alpha: 0.8),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+    final btnPadding = _parseEdgeInsets(schema['padding'],
+        fallback: isDense
+            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+            : const EdgeInsets.symmetric(horizontal: 18, vertical: 12));
+
+    final labelWidget = Text(
+      label,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontSize: isDense ? 13 : 14,
+        fontWeight: FontWeight.w600,
       ),
-      onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
     );
+
+    final buttonStyle = ElevatedButton.styleFrom(
+      backgroundColor: bgColor,
+      foregroundColor: fgColor,
+      disabledBackgroundColor: bgColor.withValues(alpha: 0.4),
+      disabledForegroundColor: fgColor.withValues(alpha: 0.8),
+      padding: btnPadding,
+      visualDensity: isDense ? VisualDensity.compact : VisualDensity.standard,
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+    );
+
+    Widget btn = (iconName != null && iconName.isNotEmpty)
+        ? ElevatedButton.icon(
+            icon: Icon(SduiIconRegistry.resolve(iconName), size: iconSize),
+            label: labelWidget,
+            style: buttonStyle,
+            onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
+          )
+        : ElevatedButton(
+            style: buttonStyle,
+            onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
+            child: labelWidget,
+          );
 
     if (isFullWidth) {
       btn = SizedBox(width: double.infinity, child: btn);
     }
 
+    final verticalPadding =
+        _parseDouble(schema['vertical_padding']) ?? (isDense ? 2.0 : 6.0);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: verticalPadding),
       child: btn,
     );
   }
@@ -1139,7 +1172,9 @@ class DynamicSchemaParser {
     final label = context.tr(schema['label']?.toString() ?? '');
     final iconName = schema['icon']?.toString();
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
-    final isFullWidth = schema['full_width'] != false;
+    final isDense = schema['dense'] == true || schema['size'] == 'small';
+    final isFullWidth = schema['full_width'] == true ||
+        (schema['full_width'] == null && schema['expanded'] != true && !isDense);
     final enabled = schema['enabled'] != false;
     final accent = schema['color'] != null
         ? SduiIconRegistry.parseColor(schema['color'].toString(),
@@ -1149,28 +1184,55 @@ class DynamicSchemaParser {
                 fallback: _outlinedButtonGreen)
             : _outlinedButtonGreen);
     final radius = _parseDouble(schema['border_radius']) ?? 10.0;
+    final iconSize = _parseDouble(schema['icon_size']) ?? (isDense ? 16.0 : 20.0);
 
-    Widget btn = OutlinedButton.icon(
-      icon: iconName != null
-          ? Icon(SduiIconRegistry.resolve(iconName))
-          : const SizedBox.shrink(),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: accent,
-        side: BorderSide(color: accent.withValues(alpha: 0.6)),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+    final btnPadding = _parseEdgeInsets(schema['padding'],
+        fallback: isDense
+            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+            : const EdgeInsets.symmetric(horizontal: 18, vertical: 12));
+
+    final labelWidget = Text(
+      label,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontSize: isDense ? 13 : 14,
+        fontWeight: FontWeight.w600,
       ),
-      onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
     );
+
+    final buttonStyle = OutlinedButton.styleFrom(
+      foregroundColor: accent,
+      side: BorderSide(color: accent.withValues(alpha: 0.6)),
+      padding: btnPadding,
+      visualDensity: isDense ? VisualDensity.compact : VisualDensity.standard,
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+    );
+
+    Widget btn = (iconName != null && iconName.isNotEmpty)
+        ? OutlinedButton.icon(
+            icon: Icon(SduiIconRegistry.resolve(iconName), size: iconSize),
+            label: labelWidget,
+            style: buttonStyle,
+            onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
+          )
+        : OutlinedButton(
+            style: buttonStyle,
+            onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
+            child: labelWidget,
+          );
 
     if (isFullWidth) {
       btn = SizedBox(width: double.infinity, child: btn);
     }
 
+    final verticalPadding =
+        _parseDouble(schema['vertical_padding']) ?? (isDense ? 2.0 : 4.0);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: EdgeInsets.symmetric(vertical: verticalPadding),
       child: btn,
     );
   }
@@ -1181,8 +1243,11 @@ class DynamicSchemaParser {
     final label = context.tr(schema['label']?.toString() ?? 'Delete');
     final iconName = schema['icon']?.toString();
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
-    final isFullWidth = schema['full_width'] != false;
+    final isDense = schema['dense'] == true || schema['size'] == 'small';
+    final isFullWidth = schema['full_width'] == true ||
+        (schema['full_width'] == null && schema['expanded'] != true && !isDense);
     final enabled = schema['enabled'] != false;
+    final iconSize = _parseDouble(schema['icon_size']) ?? (isDense ? 16.0 : 20.0);
 
     Future<void> handlePress() async {
       final confirmMessage = action['confirm_message']?.toString() ??
@@ -1214,26 +1279,52 @@ class DynamicSchemaParser {
       sduiContext?.dispatchAction(action);
     }
 
-    Widget btn = ElevatedButton.icon(
-      icon: iconName != null
-          ? Icon(SduiIconRegistry.resolve(iconName))
-          : const SizedBox.shrink(),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.red.shade600,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    final btnPadding = _parseEdgeInsets(schema['padding'],
+        fallback: isDense
+            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+            : const EdgeInsets.symmetric(horizontal: 18, vertical: 12));
+
+    final labelWidget = Text(
+      label,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontSize: isDense ? 13 : 14,
+        fontWeight: FontWeight.w600,
       ),
-      onPressed: enabled ? handlePress : null,
     );
+
+    final buttonStyle = ElevatedButton.styleFrom(
+      backgroundColor: Colors.red.shade600,
+      foregroundColor: Colors.white,
+      padding: btnPadding,
+      visualDensity: isDense ? VisualDensity.compact : VisualDensity.standard,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    );
+
+    Widget btn = (iconName != null && iconName.isNotEmpty)
+        ? ElevatedButton.icon(
+            icon: Icon(SduiIconRegistry.resolve(iconName), size: iconSize),
+            label: labelWidget,
+            style: buttonStyle,
+            onPressed: enabled ? handlePress : null,
+          )
+        : ElevatedButton(
+            style: buttonStyle,
+            onPressed: enabled ? handlePress : null,
+            child: labelWidget,
+          );
 
     if (isFullWidth) {
       btn = SizedBox(width: double.infinity, child: btn);
     }
 
+    final verticalPadding =
+        _parseDouble(schema['vertical_padding']) ?? (isDense ? 2.0 : 6.0);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: verticalPadding),
       child: btn,
     );
   }

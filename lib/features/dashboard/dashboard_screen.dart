@@ -702,16 +702,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
-    children.add(const Divider());
-    children.add(ListTile(
-      leading: const Icon(Icons.lock_reset_outlined),
-      title: Text(l10n.changePassword),
-      onTap: () {
-        Navigator.of(context).pop();
-        Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
-      },
-    ));
+    final hasChangePassword = navSections.any(
+      (sec) => sec.tiles.any((t) => t.key == 'change_password' || t.key == 'change-password'),
+    );
+
+    if (!hasChangePassword) {
+      children.add(const Divider());
+      children.add(ListTile(
+        leading: const Icon(Icons.lock_reset_outlined),
+        title: Text(l10n.changePassword),
+        onTap: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+        },
+      ));
+    }
 
     final drawerGradient = bootstrap.theme.drawerGradient;
 

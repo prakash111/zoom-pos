@@ -17,6 +17,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../taxes/screens/taxes_screen.dart';
 import '../settings_repository.dart';
 import '../../../core/sdui/components/navigation_tree_builder.dart';
+import '../../../core/sdui/screens/dynamic_schema_page.dart';
 import 'payment_methods_screen.dart';
 import 'printer_settings_screen.dart';
 
@@ -112,6 +113,22 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen>
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.settingsTitle),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: 'Custom Form Labels',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const DynamicSchemaPage(
+                    endpoint: '/api/tenant/views/settings-form-labels',
+                    initialTitle: 'Custom Form Labels',
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
         bottom: TabBar(
             controller: _tabController,
             isScrollable: true,

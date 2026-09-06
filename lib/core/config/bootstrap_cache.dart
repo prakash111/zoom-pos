@@ -108,11 +108,13 @@ class BootstrapCache extends ChangeNotifier {
   static const _uiSchemaCacheKey = 'zoom_pos.bootstrap.ui_schema';
   static const _themeCacheKey = 'zoom_pos.bootstrap.theme';
   static const _labelsCacheKey = 'zoom_pos.bootstrap.navigation_labels';
+  static const _formLabelsCacheKey = 'zoom_pos.bootstrap.form_field_customizations';
 
   TenantSchema? tenant;
   Map<String, ModuleSchema> modules = {};
   List<SduiNavSectionSchema> menuStructure = [];
   Map<String, String> navigationLabels = {};
+  Map<String, dynamic> formFieldCustomizations = {};
   SduiUiSchema uiSchema = const SduiUiSchema();
   NavConfig navConfig = const NavConfig();
   Map<String, dynamic> config = {};
@@ -179,6 +181,18 @@ class BootstrapCache extends ChangeNotifier {
     final trimmedKebab = navigationLabels[kebab]?.trim();
     if (trimmedKebab != null && trimmedKebab.isNotEmpty) return trimmedKebab;
 
+    return fallback;
+  }
+
+  /// Looks up custom form field label configured by tenant, or falls back to default.
+  String resolveFormFieldLabel(String form, String field, String fallback) {
+    final formMap = formFieldCustomizations[form];
+    if (formMap is Map) {
+      final val = formMap[field]?.toString().trim();
+      if (val != null && val.isNotEmpty) {
+        return val;
+      }
+    }
     return fallback;
   }
 
@@ -310,6 +324,18 @@ class BootstrapCache extends ChangeNotifier {
           _logParseFailure('cached navigation labels', error, stackTrace);
         }
       }
+
+      final formLabelsRaw = prefs.getString(_formLabelsCacheKey);
+      if (formLabelsRaw != null) {
+        try {
+          final decoded = jsonDecode(formLabelsRaw);
+          if (decoded is Map) {
+            formFieldCustomizations = Map<String, dynamic>.from(decoded);
+          }
+        } catch (error, stackTrace) {
+          _logParseFailure('cached form field customizations', error, stackTrace);
+        }
+      }
     } catch (error, stackTrace) {
       _logParseFailure('bootstrap disk cache', error, stackTrace);
     } finally {
@@ -438,6 +464,13 @@ class BootstrapCache extends ChangeNotifier {
       if (navLabels is Map) {
         navigationLabels = navLabels.map((k, v) => MapEntry(k.toString(), v.toString()));
         await prefs.setString(_labelsCacheKey, jsonEncode(navigationLabels));
+      }
+
+      final formCustomizations = response['form_field_customizations'] ??
+          (response['tenant'] is Map ? response['tenant']['form_field_customizations'] : null);
+      if (formCustomizations is Map) {
+        formFieldCustomizations = Map<String, dynamic>.from(formCustomizations);
+        await prefs.setString(_formLabelsCacheKey, jsonEncode(formFieldCustomizations));
       }
     } catch (error, stackTrace) {
       if (menuStructure.isEmpty) {

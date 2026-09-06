@@ -21,6 +21,7 @@ import '../../features/restaurant/screens/restaurant_tables_screen.dart';
 import '../../features/sales/screens/sales_screen.dart';
 import '../../features/sales_targets/screens/sales_targets_screen.dart';
 import '../../features/service_orders/screens/service_orders_screen.dart';
+import '../../features/settings/screens/change_password_screen.dart';
 import 'components/navigation_tree_builder.dart';
 import '../../features/settings/screens/tenant_settings_screen.dart';
 import '../../features/staff/screens/staff_screen.dart';
@@ -36,6 +37,21 @@ class SduiComponentRegistry {
   SduiComponentRegistry._();
 
   static final SduiComponentRegistry instance = SduiComponentRegistry._();
+
+  static Widget _resolveServiceOrdersScreen() {
+    final mode = BootstrapCache.instance.activeMode.toLowerCase().trim();
+    final isRepairMode = mode.contains('repair') ||
+        mode.contains('auto') ||
+        mode.contains('tech') ||
+        mode.contains('service_order');
+    if (!isRepairMode) {
+      return const DynamicSchemaPage(
+        endpoint: '/api/tenant/views/service-catalog',
+        initialTitle: 'Service Catalog & Rates',
+      );
+    }
+    return const ServiceOrdersScreen();
+  }
 
   final Map<String, WidgetBuilder> _registry = {
     // POS & Terminals
@@ -62,7 +78,10 @@ class SduiComponentRegistry {
     'cash_register': (_) => const CashRegisterScreen(),
     'quotations': (_) => const QuotationsScreen(),
     'consignments': (_) => const ConsignmentsScreen(),
-    'service_orders': (_) => const ServiceOrdersScreen(),
+    'service_orders': (_) => _resolveServiceOrdersScreen(),
+    'service-orders': (_) => _resolveServiceOrdersScreen(),
+    'change_password': (_) => const ChangePasswordScreen(),
+    'change-password': (_) => const ChangePasswordScreen(),
     'customers': (_) => const CustomersScreen(),
 
     // Financial
@@ -101,6 +120,50 @@ class SduiComponentRegistry {
     'languages': (_) => const LanguagesScreen(),
     'staff': (_) => const StaffScreen(),
     'devices': (_) => const DevicesScreen(),
+    'service_catalog': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/service-catalog',
+          initialTitle: 'Service Catalog & Rates',
+        ),
+    'service-catalog': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/service-catalog',
+          initialTitle: 'Service Catalog & Rates',
+        ),
+    'service_rates': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/service-catalog',
+          initialTitle: 'Service Catalog & Rates',
+        ),
+    'service-rates': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/service-catalog',
+          initialTitle: 'Service Catalog & Rates',
+        ),
+    'service_create': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/service-create',
+          initialTitle: 'Add New Service',
+        ),
+    'service-create': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/service-create',
+          initialTitle: 'Add New Service',
+        ),
+    'add_service': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/service-create',
+          initialTitle: 'Add New Service',
+        ),
+    'add-service': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/service-create',
+          initialTitle: 'Add New Service',
+        ),
+    'service_calendar': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/service-calendar',
+          initialTitle: 'Service Booking Calendar',
+        ),
+    'form_labels': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/settings-form-labels',
+          initialTitle: 'Custom Form Labels',
+        ),
+    'settings_form_labels': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/settings-form-labels',
+          initialTitle: 'Custom Form Labels',
+        ),
     'dynamic_page': (_) => const DynamicSchemaPage(),
   };
 
