@@ -25,6 +25,20 @@ class SduiViewController extends Controller
      */
     public function show(Request $request, string $view, PermissionChecker $permissions): JsonResponse
     {
+        $norm = strtolower(trim(str_replace(['_', ' '], '-', $view)));
+        if (in_array($norm, ['verify-otp', 'otp-verify', 'verify-email', 'login', 'auth-login', 'register-store', 'register-tenant', 'auth-register', 'signup'], true)) {
+            $company = null;
+            try {
+                $company = $this->resolveCompany($request);
+            } catch (\Throwable $e) {
+                $company = \App\Models\Company::query()->first() ?? new \App\Models\Company([
+                    'name' => config('app.name', 'ZoomNearby POS'),
+                    'currency_symbol' => '$',
+                ]);
+            }
+            return SchemaResponse::renderView($view, $company);
+        }
+
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
         $storedScreen = SchemaResponse::storedScreen($view);

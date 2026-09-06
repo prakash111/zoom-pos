@@ -49,13 +49,13 @@ class SchemaResponse
         'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker', 'file_upload',
         'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
         'button_outlined', 'button_danger', 'fab', 'action_sheet_trigger', 'navigation_builder', 'tree_builder',
-        'wrap', 'cash_tendered_field',
+        'wrap', 'cash_tendered_field', 'customer_selector',
     ];
 
     public const INPUT_TYPES = [
         'text_input', 'dropdown_select', 'checkbox', 'toggle_switch',
         'date_time_picker', 'color_picker', 'file_upload', 'step_counter',
-        'cash_tendered_field',
+        'cash_tendered_field', 'customer_selector',
     ];
 
     public const ACTION_COMPONENT_TYPES = [
@@ -314,6 +314,23 @@ class SchemaResponse
             'field_name' => $name,
             'select_label' => 'Choose File',
             'remove_label' => 'Remove',
+        ], $props);
+    }
+
+    public static function customerSelector(
+        string $name = 'customer_id',
+        string $label = 'Client / Customer Lookup',
+        string $searchEndpoint = '/api/tenant/customers/search',
+        array $fields = ['name_field' => 'customer_name', 'phone_field' => 'customer_phone'],
+        array $props = []
+    ): array {
+        return array_merge([
+            'type' => 'customer_selector',
+            'name' => $name,
+            'label' => $label,
+            'search_endpoint' => $searchEndpoint,
+            'fields' => $fields,
+            'placeholder' => 'Search existing client by name, phone or email...',
         ], $props);
     }
 
@@ -2170,15 +2187,28 @@ class SchemaResponse
     public static function serviceCalendarView(Company $company): array
     {
         $timezone = $company->resolveTimezone();
-        $selectedDate = request('date', now($timezone)->toDateString());
+        $selectedDate = request('date', request('appointment_date', now($timezone)->toDateString()));
         $day = Carbon::parse($selectedDate, $timezone);
+        $selectedDateStr = $day->toDateString();
+
+        $todayStr = now($timezone)->toDateString();
+        $yesterdayStr = now($timezone)->subDay()->toDateString();
+        $tomorrowStr = now($timezone)->addDay()->toDateString();
+
+        $isToday = $selectedDateStr === $todayStr;
+        $isYesterday = $selectedDateStr === $yesterdayStr;
+        $isTomorrow = $selectedDateStr === $tomorrowStr;
+
         // The calendar is an optional enhancement to the counter POS. During
         // a rolling deploy the appointments table may briefly lag behind the
         // application code; render an empty calendar instead of a 500/blank
         // screen until migrations have caught up.
         $appointments = Schema::hasTable('salon_appointments')
             ? SalonAppointment::withoutGlobalScope('company')
-                ->where('company_id', $company->id)
+                ->where(function ($q) use ($company) {
+                    $q->where('company_id', $company->id)
+                        ->orWhere('tenant_id', $company->id);
+                })
                 ->whereBetween('starts_at', [$day->copy()->startOfDay()->utc(), $day->copy()->endOfDay()->utc()])
                 ->with(['service:id,name,duration_minutes,sale_price', 'specialist:id,name'])
                 ->orderBy('starts_at')
@@ -2279,9 +2309,27 @@ class SchemaResponse
                     self::icon('calendar_month', ['color' => '#7c3aed', 'size' => 28], ['flexible' => false]),
                     self::column([
                         self::text('Service Appointments Calendar', 'title_medium', ['bold' => true]),
-                        self::text("{$day->format('l, M j')} · {$timezone} · technician time-slot booking", 'body_small', ['color' => '#64748b']),
+                        self::text("{$day->format('l, M j, Y')} · {$timezone} · technician time-slot booking", 'body_small', ['color' => '#64748b']),
                     ], ['expanded' => true, 'spacing' => 2]),
                 ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+                self::divider(),
+                self::row([
+                    self::buttonOutlined('◀ Yesterday', self::navigateAction("/api/tenant/views/salon-calendar?date={$yesterdayStr}", title: 'Service Booking Calendar'), 'chevron_left', [
+                        'expanded' => true,
+                        'dense' => true,
+                        'background_color' => $isYesterday ? '#ede9fe' : null,
+                    ]),
+                    self::buttonOutlined('Today', self::navigateAction("/api/tenant/views/salon-calendar?date={$todayStr}", title: 'Service Booking Calendar'), 'today', [
+                        'expanded' => true,
+                        'dense' => true,
+                        'background_color' => $isToday ? '#ede9fe' : null,
+                    ]),
+                    self::buttonOutlined('Tomorrow ▶', self::navigateAction("/api/tenant/views/salon-calendar?date={$tomorrowStr}", title: 'Service Booking Calendar'), 'chevron_right', [
+                        'expanded' => true,
+                        'dense' => true,
+                        'background_color' => $isTomorrow ? '#ede9fe' : null,
+                    ]),
+                ], ['spacing' => 8]),
                 self::divider(),
                 self::wrap([
                     self::badge('Appointments: '.$appointments->count(), '#7c3aed', 'subtle'),
@@ -2301,12 +2349,15 @@ class SchemaResponse
             ]),
             self::card([
                 self::row([
-                    self::text('Daily Appointment Timeline', 'title_medium', ['bold' => true]),
+                    self::column([
+                        self::text('Daily Appointment Timeline', 'title_medium', ['bold' => true]),
+                        self::text("Viewing: {$day->format('l, F j, Y')}", 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
                     self::badge("{$appointments->count()} Bookings", '#7c3aed', 'subtle'),
                 ], ['main_axis_alignment' => 'space_between', 'cross_axis_alignment' => 'center']),
                 self::divider(),
                 self::column($appointmentCards ?: [
-                    self::text('No appointments booked for this date. Tap "+ Book New Appointment" above to reserve a specialist.', 'body_medium', ['color' => '#64748b']),
+                    self::text("No appointments booked for {$day->format('l, M j')}. Tap \"+ Book New Appointment\" above to reserve a specialist.", 'body_medium', ['color' => '#64748b']),
                 ]),
             ]),
         ]);
@@ -2392,15 +2443,20 @@ class SchemaResponse
                     self::dropdownSelect('specialist_id', $specialistLabel, $specialistOptions, $specialistOptions[0]['value'] ?? ''),
                     self::dateTimePicker('appointment_date', $dateLabel, $day->toDateString(), 'date'),
                     self::dropdownSelect('appointment_time', $timeLabel, $timeOptions, '09:00'),
-                    self::textInput('customer_name', $nameLabel, '', [
-                        'required' => true,
-                        'placeholder' => 'Enter client full name...',
-                    ]),
-                    self::textInput('customer_phone', $phoneLabel, '', [
-                        'required' => true,
-                        'keyboard_type' => 'phone',
-                        'placeholder' => 'e.g. +1 (555) 019-2834',
-                    ]),
+                    self::customerSelector(
+                        'customer_id',
+                        'Client / Customer Lookup',
+                        '/api/tenant/customers/search',
+                        [
+                            'name_field' => 'customer_name',
+                            'phone_field' => 'customer_phone',
+                        ],
+                        [
+                            'name_label' => $nameLabel,
+                            'phone_label' => $phoneLabel,
+                            'required' => true,
+                        ]
+                    ),
                     self::textInput('advance_paid', $depositLabel, '0.00', [
                         'keyboard_type' => 'decimal',
                         'placeholder' => '0.00',
@@ -4089,6 +4145,151 @@ class SchemaResponse
         return $screens;
     }
 
+    public static function verifyOtpView(Company $company): array
+    {
+        $defaultEmail = (string) request('email', '');
+
+        return self::screen('Verify Email OTP', [
+            self::card([
+                self::row([
+                    self::icon('mark_email_read', ['color' => '#15803d', 'size' => 32], ['flexible' => false]),
+                    self::column([
+                        self::text('Verify Your Email', 'title_medium', ['bold' => true]),
+                        self::text('Please enter the 6-digit verification code sent to your registered email address.', 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 12, 'cross_axis_alignment' => 'center']),
+            ]),
+            self::card([
+                self::column([
+                    self::text('Account Activation', 'title_medium', ['bold' => true]),
+                    self::divider(),
+                    self::textInput('email', 'Registered Email Address', $defaultEmail, [
+                        'required' => true,
+                        'keyboard_type' => 'email',
+                        'placeholder' => 'name@example.com',
+                    ]),
+                    self::textInput('otp', '6-Digit Verification Code', '', [
+                        'required' => true,
+                        'keyboard_type' => 'number',
+                        'placeholder' => 'Enter 6-digit OTP (e.g. 123456)',
+                    ]),
+                    self::divider(),
+                    self::buttonPrimary('Verify & Activate Account', self::formSubmitAction(
+                        '/api/auth/verify-email-otp',
+                        'POST',
+                        'Email verified successfully! Welcome to your POS.',
+                        navigateBack: false,
+                        redirectRoute: '/api/tenant/views/dashboard'
+                    ), 'verified', ['background_color' => '#15803d']),
+                    self::buttonOutlined('Resend Verification Code', self::apiPostAction(
+                        '/api/auth/resend-otp',
+                        ['email' => $defaultEmail],
+                        'A new verification code has been sent.'
+                    ), 'refresh', ['dense' => true]),
+                ], ['spacing' => 12]),
+            ]),
+        ]);
+    }
+
+    public static function loginView(Company $company): array
+    {
+        $brandName = $company->name ?: config('app.name', 'ZoomNearby POS');
+
+        return self::screen("Sign In - {$brandName}", [
+            self::card([
+                self::column([
+                    self::row([
+                        self::icon('storefront', ['color' => '#15803d', 'size' => 32], ['flexible' => false]),
+                        self::column([
+                            self::text($brandName, 'title_large', ['bold' => true]),
+                            self::text('Universal Cloud POS & Retail Terminal', 'body_small', ['color' => '#64748b']),
+                        ], ['expanded' => true, 'spacing' => 2]),
+                    ], ['spacing' => 12, 'cross_axis_alignment' => 'center']),
+                    self::divider(),
+                    self::textInput('email', 'Email Address / Username', '', [
+                        'required' => true,
+                        'keyboard_type' => 'email',
+                        'placeholder' => 'admin@example.com',
+                    ]),
+                    self::textInput('password', 'Password', '', [
+                        'required' => true,
+                        'obscure_text' => true,
+                        'placeholder' => 'Enter your password...',
+                    ]),
+                    self::divider(),
+                    self::buttonPrimary('Sign In', self::formSubmitAction(
+                        '/api/v1/pos/login',
+                        'POST',
+                        'Login successful!',
+                        navigateBack: false,
+                        redirectRoute: '/api/tenant/views/dashboard'
+                    ), 'login', ['background_color' => '#15803d']),
+                    self::divider(),
+                    self::text('Or sign in with social account:', 'label_medium', ['color' => '#64748b']),
+                    self::row([
+                        self::buttonOutlined('Google', self::openUrlAction('/auth/google/redirect'), 'google', ['expanded' => true]),
+                        self::buttonOutlined('Facebook', self::openUrlAction('/auth/facebook/redirect'), 'facebook', ['expanded' => true]),
+                    ], ['spacing' => 10]),
+                ], ['spacing' => 12]),
+            ]),
+        ]);
+    }
+
+    public static function registerView(Company $company): array
+    {
+        $brandName = $company->name ?: config('app.name', 'ZoomNearby POS');
+
+        return self::screen("Register Store - {$brandName}", [
+            self::card([
+                self::column([
+                    self::row([
+                        self::icon('add_business', ['color' => '#15803d', 'size' => 32], ['flexible' => false]),
+                        self::column([
+                            self::text('Open Your Cloud Store', 'title_large', ['bold' => true]),
+                            self::text('Register a new store and manage inventory, bookings, and sales.', 'body_small', ['color' => '#64748b']),
+                        ], ['expanded' => true, 'spacing' => 2]),
+                    ], ['spacing' => 12, 'cross_axis_alignment' => 'center']),
+                    self::divider(),
+                    self::textInput('store_name', 'Store / Business Name *', '', [
+                        'required' => true,
+                        'placeholder' => 'My Store or Salon',
+                    ]),
+                    self::textInput('name', 'Owner / Administrator Name *', '', [
+                        'required' => true,
+                        'placeholder' => 'Full Name',
+                    ]),
+                    self::textInput('email', 'Email Address *', '', [
+                        'required' => true,
+                        'keyboard_type' => 'email',
+                        'placeholder' => 'owner@example.com',
+                    ]),
+                    self::textInput('password', 'Password *', '', [
+                        'required' => true,
+                        'obscure_text' => true,
+                        'placeholder' => 'Create a strong password...',
+                    ]),
+                    self::textInput('phone', 'Contact Phone', '', [
+                        'keyboard_type' => 'phone',
+                        'placeholder' => '+1 (555) 000-0000',
+                    ]),
+                    self::divider(),
+                    self::buttonPrimary('Register & Get Started', self::formSubmitAction(
+                        '/api/auth/register',
+                        'POST',
+                        'Registration initiated successfully.',
+                        navigateBack: false
+                    ), 'rocket_launch', ['background_color' => '#15803d']),
+                    self::divider(),
+                    self::text('Or register with social account:', 'label_medium', ['color' => '#64748b']),
+                    self::row([
+                        self::buttonOutlined('Google', self::openUrlAction('/auth/google/redirect'), 'google', ['expanded' => true]),
+                        self::buttonOutlined('Facebook', self::openUrlAction('/auth/facebook/redirect'), 'facebook', ['expanded' => true]),
+                    ], ['spacing' => 10]),
+                ], ['spacing' => 12]),
+            ]),
+        ]);
+    }
+
     public static function normalizeViewKey(string $viewKey): string
     {
         return strtolower(trim(str_replace(['_', 'views/'], ['-', ''], $viewKey)));
@@ -4114,7 +4315,7 @@ class SchemaResponse
         }
 
         $normalized = self::normalizeViewKey($viewKey);
-        if (in_array($normalized, ['change-password', 'password', 'devices', 'device-sessions', 'terminals'], true)) {
+        if (in_array($normalized, ['change-password', 'password', 'devices', 'device-sessions', 'terminals', 'verify-otp', 'otp-verify', 'verify-email', 'login', 'auth-login', 'register-store', 'register-tenant', 'auth-register', 'signup'], true)) {
             return null;
         }
 
@@ -4254,6 +4455,9 @@ class SchemaResponse
             'cash-register', 'cash_register', 'register' => self::cashRegisterView($company),
             'devices', 'device-sessions', 'terminals' => self::devicesView($company),
             'categories', 'product-categories', 'inventory-categories' => self::categoriesView($company),
+            'verify-otp', 'otp-verify', 'verify-email' => self::verifyOtpView($company),
+            'login', 'auth-login' => self::loginView($company),
+            'register-store', 'register-tenant', 'tenant-register', 'auth-register', 'signup' => self::registerView($company),
             default => null,
         };
 

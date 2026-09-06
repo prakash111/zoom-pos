@@ -385,6 +385,55 @@ class PosSyncApiController extends Controller
             $company = $result['company'];
             $user = $result['user'];
 
+            $branding = PlatformBranding::current();
+            $smtpConfigured = ! empty($branding?->smtp_host);
+            $otpRequired = ($branding?->otp_registration_enabled ?? false) || ($smtpConfigured && ($branding?->otp_registration_enabled !== false));
+
+            if ($otpRequired) {
+                $otp = (string) random_int(100000, 999999);
+                $expiresAt = now()->addMinutes(10);
+
+                $user->update([
+                    'verification_code' => Hash::make($otp),
+                    'verification_code_expires_at' => $expiresAt,
+                    'status' => 'pending',
+                    'email_verified_at' => null,
+                ]);
+
+                if (Schema::hasTable('email_verifications')) {
+                    DB::table('email_verifications')->insert([
+                        'email' => strtolower(trim($user->email)),
+                        'otp_hash' => Hash::make($otp),
+                        'expires_at' => $expiresAt,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                try {
+                    app(AuthApiController::class)->sendOtpEmail($user->email, $otp, $branding);
+                } catch (\Throwable $e) {
+                    Log::warning("Failed to send OTP verification email to {$user->email}: " . $e->getMessage());
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'success' => true,
+                    'action' => 'navigate',
+                    'route' => '/api/tenant/views/verify-otp',
+                    'message' => 'Enter the 6-digit code sent to your email.',
+                    'arguments' => [
+                        'email' => $user->email,
+                        'message' => 'Enter the 6-digit code sent to your email.',
+                    ],
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                    ],
+                ], 200);
+            }
+
             $apiKey = TenantApiKey::create([
                 'company_id' => $company->id,
                 'user_id' => $user->id,

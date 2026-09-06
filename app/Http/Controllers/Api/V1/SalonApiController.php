@@ -223,12 +223,20 @@ class SalonApiController extends Controller
     {
         $company = $this->resolveCompany($request);
         $timezone = $company->resolveTimezone();
-        $from = Carbon::parse((string) $request->query('from', $request->query('date', 'today')), $timezone)->startOfDay()->utc();
-        $to = Carbon::parse((string) $request->query('to', $request->query('date', 'today')), $timezone)->endOfDay()->utc();
+        $selectedDate = (string) ($request->query('date') ?: $request->query('from') ?: Carbon::today($timezone)->toDateString());
+        $day = Carbon::parse($selectedDate, $timezone);
+        $from = $day->copy()->startOfDay()->utc();
+        $to = $day->copy()->endOfDay()->utc();
 
         $query = SalonAppointment::withoutGlobalScope('company')
-            ->where('company_id', $company->id)
-            ->whereBetween('starts_at', [$from, $to])
+            ->where(function ($q) use ($company) {
+                $q->where('company_id', $company->id)
+                  ->orWhere('tenant_id', $company->id);
+            })
+            ->where(function ($q) use ($from, $to, $selectedDate) {
+                $q->whereBetween('starts_at', [$from, $to])
+                  ->orWhereDate('starts_at', $selectedDate);
+            })
             ->with(['service:id,name,duration_minutes,sale_price', 'specialist:id,name'])
             ->orderBy('starts_at');
 
@@ -242,14 +250,50 @@ class SalonApiController extends Controller
         return response()->json([
             'success' => true,
             'timezone' => $timezone,
+            'selected_date' => $selectedDate,
             'appointments' => $query->get()->map(fn (SalonAppointment $appointment) => $this->presentAppointment($appointment, $timezone)),
         ]);
+    }
+
+    /** Alias matching getAppointments() requirement */
+    public function getAppointments(Request $request): JsonResponse
+    {
+        return $this->appointmentsIndex($request);
     }
 
     /** Create a conflict-checked service booking for a specialist time slot. */
     public function appointmentsStore(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
+
+        // Normalize aliases: client_name -> customer_name, client_phone -> customer_phone, client_id -> customer_id
+        $normalized = [];
+        if (! $request->filled('customer_id') && $request->filled('client_id')) {
+            $normalized['customer_id'] = $request->input('client_id');
+        }
+        if (! $request->filled('customer_name') && $request->filled('client_name')) {
+            $normalized['customer_name'] = $request->input('client_name');
+        }
+        if (! $request->filled('customer_phone') && $request->filled('client_phone')) {
+            $normalized['customer_phone'] = $request->input('client_phone');
+        }
+
+        $customerId = $normalized['customer_id'] ?? $request->input('customer_id');
+        if (! empty($customerId) && (! $request->filled('customer_name') && empty($normalized['customer_name']))) {
+            $existingCust = Customer::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->find($customerId);
+            if ($existingCust) {
+                $normalized['customer_name'] = $existingCust->name;
+                if (! $request->filled('customer_phone') && empty($normalized['customer_phone'])) {
+                    $normalized['customer_phone'] = $existingCust->phone;
+                }
+            }
+        }
+        if (! empty($normalized)) {
+            $request->merge($normalized);
+        }
+
         $validator = Validator::make($request->all(), [
             'service_id' => 'required|integer',
             'specialist_id' => 'required|string',
@@ -287,11 +331,12 @@ class SalonApiController extends Controller
             return response()->json(['success' => false, 'error' => 'Selected stylist or specialist is unavailable.'], 422);
         }
 
+        $timezone = $company->resolveTimezone();
         $durationMinutes = (int) ($service->duration_minutes ?: 30);
         $startsAt = Carbon::createFromFormat(
             'Y-m-d H:i',
             $request->input('appointment_date').' '.$request->input('appointment_time'),
-            $company->resolveTimezone()
+            $timezone
         )->utc();
         $endsAt = $startsAt->copy()->addMinutes($durationMinutes);
 
@@ -363,12 +408,14 @@ class SalonApiController extends Controller
             'starts_at' => $startsAt->toIso8601String(),
         ]);
 
+        $appointmentDateStr = $startsAt->copy()->setTimezone($timezone)->toDateString();
+
         return response()->json([
             'success' => true,
             'message' => 'Appointment booked successfully.',
             'action' => 'toast_and_navigate',
-            'route' => '/api/tenant/views/salon-calendar',
-            'appointment' => $this->presentAppointment($appointment->load(['service', 'specialist']), $company->resolveTimezone()),
+            'route' => "/api/tenant/views/salon-calendar?date={$appointmentDateStr}",
+            'appointment' => $this->presentAppointment($appointment->load(['service', 'specialist']), $timezone),
         ], 201);
     }
 

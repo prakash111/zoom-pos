@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\V1\AiImageApiController;
 use App\Http\Controllers\Api\V1\AppBootstrapController;
+use App\Http\Controllers\Api\V1\AuthApiController;
+use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\Api\V1\CashRegisterApiController;
 use App\Http\Controllers\Api\V1\CatalogAdminApiController;
 use App\Http\Controllers\Api\V1\CatalogApiController;
@@ -63,6 +65,17 @@ Route::post('/tenant/profile/change-password', [PasswordResetController::class, 
 
 // Unauthenticated Dynamic Store Registration Metadata
 Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
+
+// Authentication, Registration, Email OTP & Social Auth
+Route::post('/auth/register', [AuthApiController::class, 'register']);
+Route::post('/register', [AuthApiController::class, 'register']);
+Route::post('/auth/verify-email-otp', [AuthApiController::class, 'verifyEmailOtp']);
+Route::post('/api/auth/verify-email-otp', [AuthApiController::class, 'verifyEmailOtp']);
+Route::post('/auth/resend-otp', [AuthApiController::class, 'resendOtp']);
+Route::get('/auth/{provider}/redirect', [SocialAuthController::class, 'redirect']);
+Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback']);
+Route::post('/auth/{provider}/mobile-token', [SocialAuthController::class, 'mobileToken']);
+Route::post('/api/auth/{provider}/mobile-token', [SocialAuthController::class, 'mobileToken']);
 
 // Signed, login-free invoice PDF — opened by the native Post-Sale Action
 // Sheet's "Preview & Print" row. The URL signature is the authorization, so
@@ -286,8 +299,13 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
 Route::prefix('v1/pos')->group(function () {
     // Public Tenant Auth & Registration Endpoints for Standalone / Dual-Mode Desktop Client
     Route::post('/auth/login', [PosSyncApiController::class, 'login']);
-    Route::post('/auth/register', [PosSyncApiController::class, 'register']);
-    Route::post('/register', [PosSyncApiController::class, 'register']);
+    Route::post('/auth/register', [AuthApiController::class, 'register']);
+    Route::post('/register', [AuthApiController::class, 'register']);
+    Route::post('/auth/verify-email-otp', [AuthApiController::class, 'verifyEmailOtp']);
+    Route::post('/auth/resend-otp', [AuthApiController::class, 'resendOtp']);
+    Route::get('/auth/{provider}/redirect', [SocialAuthController::class, 'redirect']);
+    Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback']);
+    Route::post('/auth/{provider}/mobile-token', [SocialAuthController::class, 'mobileToken']);
     Route::get('/auth/registration-config', [PosSyncApiController::class, 'registrationConfig']);
     Route::get('/auth/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
     Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);

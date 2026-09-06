@@ -21,6 +21,11 @@ class AuthenticateTenantApi
             ?? $request->input('token');
 
         if (! $token) {
+            $viewParam = strtolower(trim((string) $request->route('view')));
+            if ($viewParam !== '' && in_array($viewParam, ['verify-otp', 'otp-verify', 'verify-email', 'login', 'auth-login', 'register-store', 'register-tenant', 'auth-register', 'signup'], true)) {
+                return $next($request);
+            }
+
             return response()->json([
                 'success' => false,
                 'error' => 'Unauthenticated',
