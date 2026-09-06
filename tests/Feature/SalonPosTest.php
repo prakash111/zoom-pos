@@ -181,7 +181,7 @@ class SalonPosTest extends TestCase
         $this->assertStringContainsString('Jane Stylist', $json);
         $this->assertStringContainsString('line_specialist_0', $json);
         $this->assertSame('native_pos_checkout_drawer', $withSpecialists->json('schema.presentation'));
-        $this->assertCount(4, $withSpecialists->json('schema.payment_methods'));
+        $this->assertSame(['cash', 'card', 'transfer'], array_column($withSpecialists->json('schema.payment_methods'), 'value'));
         $this->assertCount(5, $withSpecialists->json('schema.quick_cash.suggestions'));
 
         $errors = app(SchemaValidator::class)->validate($withSpecialists->json('schema'));

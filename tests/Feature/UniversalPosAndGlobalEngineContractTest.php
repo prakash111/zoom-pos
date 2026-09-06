@@ -165,20 +165,21 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
         $this->assertContains('discount', $schema['customer_actions']);
         $this->assertContains('split_payment', $schema['customer_actions']);
 
-        // Payment method selector
+        // Payment method selector — exactly the three standard toggles, no Khata/credit
         $methods = array_column($schema['payment_methods'], 'value');
-        $this->assertContains('cash', $methods);
-        $this->assertContains('card', $methods);
-        $this->assertContains('transfer', $methods);
+        $this->assertSame(['cash', 'card', 'transfer'], $methods);
+        $this->assertNotContains('credit', $methods);
 
         // Quick cash suggestions & change due box
         $this->assertArrayHasKey('quick_cash', $schema);
         $this->assertNotEmpty($schema['quick_cash']['suggestions']);
         $this->assertSame('Change Due to Customer', $schema['quick_cash']['change_due_label']);
 
-        // Settlement breakdown
+        // Settlement breakdown — button reads "Complete Sale · {total}", forest green
         $this->assertArrayHasKey('bottom_bar', $schema);
-        $this->assertSame('Complete Sale / Collect Payment', $schema['bottom_bar']['primary_action_label']);
+        $this->assertStringStartsWith('Complete Sale · ', $schema['bottom_bar']['primary_action_label']);
+        $this->assertStringNotContainsString('Collect Payment', $schema['bottom_bar']['primary_action_label']);
+        $this->assertSame('#166534', $schema['bottom_bar']['primary_color']);
     }
 
     public function test_universal_checkout_records_sale_inventory_and_payments(): void

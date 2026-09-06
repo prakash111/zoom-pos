@@ -822,7 +822,14 @@ class UniversalPosBuilder
             $cartPreview = $ticketLines;
         }
 
-        $advancePaid = (float) ($selectedTicket?->advance_paid ?? $selectedAppointment?->advance_paid ?? 0);
+        // Prepaid credit against this ticket: prefer the collected `advance_paid`,
+        // fall back to the quoted `advance_deposit` so the deposit still nets off
+        // the balance even on tickets where only the deposit column was set.
+        $advancePaid = (float) (
+            ($selectedTicket?->advance_paid ?: $selectedTicket?->advance_deposit)
+            ?? $selectedAppointment?->advance_paid
+            ?? 0
+        );
         $existingTicketTotal = (float) ($selectedTicket?->total_amount ?? 0);
 
         $subtotal = 0.0;
@@ -923,11 +930,12 @@ class UniversalPosBuilder
         $grandTotal = max(0, round($billingSubtotal + $taxAmount - $advancePaid, 2));
 
         $quickCash = self::quickCashSuggestions($grandTotal, $currency);
+        // Universal Cart Contract: exactly three standard payment toggles across
+        // every module — Cash, Card, Transfer. No custom per-module additions.
         $paymentMethods = [
             ['label' => 'Cash', 'value' => 'cash', 'icon' => 'payments'],
             ['label' => 'Card', 'value' => 'card', 'icon' => 'credit_card'],
             ['label' => 'Transfer', 'value' => 'transfer', 'icon' => 'account_balance'],
-            ['label' => 'Store Credit / Khata Due', 'value' => 'credit', 'icon' => 'schedule'],
         ];
         $allowedPaymentMethods = array_column($paymentMethods, 'value');
         $rawMethod = strtolower((string) request('selected_payment_method', request('payment_method', 'cash')));
@@ -981,12 +989,11 @@ class UniversalPosBuilder
                 SchemaResponse::badge('➗ Split Payment', '#059669', 'subtle'),
                 SchemaResponse::badge($currency.' Amount Paid', '#0284c7', 'subtle'),
             ]),
-            SchemaResponse::accordionGroup('Customer, Note & Discount', [
-                SchemaResponse::textInput('customer_name', $customerFieldLabel, $defaultCustomerName ?: 'Walk-in Customer'),
-                SchemaResponse::textInput('customer_phone', 'Phone (Optional)', '', ['keyboard_type' => 'phone']),
-                SchemaResponse::textInput('notes', 'Order Note (Optional)', '', ['max_lines' => 2]),
-                SchemaResponse::textInput('discount', 'Discount Amount', '0.00', ['keyboard_type' => 'number']),
-            ], ['initially_expanded' => false]),
+            // Universal Cart Contract: the action pills above ARE the customer /
+            // note / discount surface — no separate "Customer, Note & Discount"
+            // accordion. Only the customer name stays inline so it flows onto the
+            // printed receipt; phone / note / discount fall back to server defaults.
+            SchemaResponse::textInput('customer_name', $customerFieldLabel, $defaultCustomerName ?: 'Walk-in Customer'),
         ], ['border_radius' => 16]);
 
         if ($ticketFieldLabel !== null && ! empty($repairTicketOptions)) {
@@ -1079,18 +1086,6 @@ class UniversalPosBuilder
             }, $paymentMethods)),
         ], ['border_radius' => 16]);
 
-        if ($selectedPaymentMethod === 'credit') {
-            $components[] = SchemaResponse::card([
-                SchemaResponse::row([
-                    SchemaResponse::icon('schedule', ['color' => '#d97706', 'size' => 20]),
-                    SchemaResponse::column([
-                        SchemaResponse::text('Store Credit / Khata Due', 'label_large', ['bold' => true, 'color' => '#d97706']),
-                        SchemaResponse::text('Account will be marked as Due / Khata balance. Billed to customer ledger.', 'body_small', ['color' => '#64748b']),
-                    ]),
-                ]),
-            ], ['color' => '#fffbeb', 'border_color' => '#fde68a', 'padding' => 12, 'border_radius' => 12]);
-        }
-
         // Cash Tendered + CHANGE DUE TO CUSTOMER + Quick Cash Suggestions (active when Cash is selected)
         if ($selectedPaymentMethod === 'cash') {
             $components[] = SchemaResponse::card([
@@ -1164,7 +1159,8 @@ class UniversalPosBuilder
             'border_radius' => 14,
         ]);
 
-        $components[] = SchemaResponse::buttonPrimary('Complete Sale / Collect Payment', SchemaResponse::formSubmitAction(
+        $completeSaleLabel = 'Complete Sale · '.$currency.number_format($grandTotal, 2);
+        $components[] = SchemaResponse::buttonPrimary($completeSaleLabel, SchemaResponse::formSubmitAction(
             $submitEndpoint,
             'POST',
             'Payment collected and sale completed successfully.',
@@ -1208,7 +1204,7 @@ class UniversalPosBuilder
             'tax' => $taxAmount,
             'advance_paid' => round($advancePaid, 2),
             'grand_total' => $grandTotal,
-            'primary_action_label' => 'Complete Sale / Collect Payment',
+            'primary_action_label' => $completeSaleLabel,
             'primary_color' => '#166534',
         ];
 

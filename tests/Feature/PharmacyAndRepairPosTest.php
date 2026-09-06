@@ -598,7 +598,7 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertSame('native_pos_checkout_drawer', $checkoutSchema['presentation']);
         $this->assertSame('pharmacy', $checkoutSchema['module']);
         $this->assertSame(10.0, (float) $checkoutSchema['order_summary']['grand_total']);
-        $this->assertCount(4, $checkoutSchema['payment_methods']);
+        $this->assertSame(['cash', 'card', 'transfer'], array_column($checkoutSchema['payment_methods'], 'value'));
         $this->assertCount(5, $checkoutSchema['quick_cash']['suggestions']);
         $this->assertStringContainsString('Attach Doctor & Rx Details', json_encode($checkoutSchema));
         $this->assertEmpty($validator->validate($checkoutSchema));
@@ -1147,7 +1147,10 @@ class PharmacyAndRepairPosTest extends TestCase
         $counterDrawerRes->assertOk()
             ->assertJsonPath('success', true);
         $counterDrawerStr = json_encode($counterDrawerRes->json('schema'), JSON_UNESCAPED_SLASHES);
-        $this->assertStringContainsString('Store Credit / Khata Due', $counterDrawerStr);
+        // Universal Cart Contract: only Cash / Card / Transfer — no Khata/credit toggle
+        $this->assertStringNotContainsString('Store Credit / Khata Due', $counterDrawerStr);
+        $this->assertStringNotContainsString('Customer, Note & Discount', $counterDrawerStr);
+        $this->assertSame(['cash', 'card', 'transfer'], array_column($counterDrawerRes->json('schema.payment_methods'), 'value'));
         $this->assertStringContainsString('CHANGE DUE TO CUSTOMER', $counterDrawerStr);
 
         // 9. Universal POS Checkout Drawer for Ticket Settlement
@@ -1161,8 +1164,9 @@ class PharmacyAndRepairPosTest extends TestCase
 
         $drawerSchemaStr = json_encode($drawerSchema, JSON_UNESCAPED_SLASHES);
         $this->assertStringContainsString('Advance Deposit Paid', $drawerSchemaStr);
-        $this->assertStringContainsString('Store Credit / Khata Due', $drawerSchemaStr);
+        $this->assertStringNotContainsString('Store Credit / Khata Due', $drawerSchemaStr);
         $this->assertStringContainsString('CHANGE DUE TO CUSTOMER', $drawerSchemaStr);
+        $this->assertStringStartsWith('Complete Sale · ', $drawerSchema['bottom_bar']['primary_action_label']);
 
         // 9. Settle repair ticket and verify unified post-sale dispatch
         $settleRes = $this->withHeaders($this->authHeaders())->postJson("/api/tenant/repair/tickets/{$ticketId}/settle", [
