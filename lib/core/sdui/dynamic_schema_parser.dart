@@ -327,13 +327,31 @@ class DynamicSchemaParser {
     final children = _extractChildren(schema);
     final spacing = _parseDouble(schema['spacing']);
 
+    bool isExpanded(Map<String, dynamic> child) =>
+        child['expanded'] == true || child['flex'] is num;
+
+    // `space_between` / `center` / `end` only mean something when the Row is
+    // allowed to fill its parent, and an `expanded` child needs bounded width
+    // to lay out — so widen the Row for either. A plain content Row (no
+    // alignment, no expanded child) keeps hugging its children as before.
+    final hasMainAxis = schema['main_axis_alignment'] != null;
+    final anyExpanded = children.any(isExpanded);
+
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: (hasMainAxis || anyExpanded)
+          ? MainAxisSize.max
+          : MainAxisSize.min,
       crossAxisAlignment: _parseCrossAxis(schema['cross_axis_alignment']),
       mainAxisAlignment: _parseMainAxis(schema['main_axis_alignment']),
       children: [
         for (var i = 0; i < children.length; i++) ...[
-          Flexible(child: buildComponent(context, children[i])),
+          if (isExpanded(children[i]))
+            Expanded(
+              flex: (children[i]['flex'] as num?)?.toInt() ?? 1,
+              child: buildComponent(context, children[i]),
+            )
+          else
+            Flexible(child: buildComponent(context, children[i])),
           if (spacing != null && i < children.length - 1)
             SizedBox(width: spacing),
         ],
@@ -1047,6 +1065,12 @@ class DynamicSchemaParser {
   // Actions
   // ===========================================================================
 
+  /// System-standard forest green for every SDUI primary button, so the
+  /// action colour never drifts to the tenant's Material seed (navy/slate).
+  /// A schema `background_color` still wins when the server sets one.
+  static const Color _primaryButtonGreen = Color(0xFF166534);
+  static const Color _outlinedButtonGreen = Color(0xFF15803D);
+
   static Widget _buildButtonPrimary(
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
@@ -1055,6 +1079,15 @@ class DynamicSchemaParser {
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
     final isFullWidth = schema['full_width'] != false;
     final enabled = schema['enabled'] != false;
+    final bgColor = schema['background_color'] != null
+        ? SduiIconRegistry.parseColor(schema['background_color'].toString(),
+            fallback: _primaryButtonGreen)
+        : _primaryButtonGreen;
+    final fgColor = schema['foreground_color'] != null
+        ? SduiIconRegistry.parseColor(schema['foreground_color'].toString(),
+            fallback: Colors.white)
+        : Colors.white;
+    final radius = _parseDouble(schema['border_radius']) ?? 10.0;
 
     Widget btn = ElevatedButton.icon(
       icon: iconName != null
@@ -1062,8 +1095,13 @@ class DynamicSchemaParser {
           : const SizedBox.shrink(),
       label: Text(label),
       style: ElevatedButton.styleFrom(
+        backgroundColor: bgColor,
+        foregroundColor: fgColor,
+        disabledBackgroundColor: bgColor.withValues(alpha: 0.4),
+        disabledForegroundColor: fgColor.withValues(alpha: 0.8),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius)),
       ),
       onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
     );
@@ -1086,6 +1124,14 @@ class DynamicSchemaParser {
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
     final isFullWidth = schema['full_width'] != false;
     final enabled = schema['enabled'] != false;
+    final accent = schema['color'] != null
+        ? SduiIconRegistry.parseColor(schema['color'].toString(),
+            fallback: _outlinedButtonGreen)
+        : (schema['border_color'] != null
+            ? SduiIconRegistry.parseColor(schema['border_color'].toString(),
+                fallback: _outlinedButtonGreen)
+            : _outlinedButtonGreen);
+    final radius = _parseDouble(schema['border_radius']) ?? 10.0;
 
     Widget btn = OutlinedButton.icon(
       icon: iconName != null
@@ -1093,8 +1139,11 @@ class DynamicSchemaParser {
           : const SizedBox.shrink(),
       label: Text(label),
       style: OutlinedButton.styleFrom(
+        foregroundColor: accent,
+        side: BorderSide(color: accent.withValues(alpha: 0.6)),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius)),
       ),
       onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
     );

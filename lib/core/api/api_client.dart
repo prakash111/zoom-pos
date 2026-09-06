@@ -115,6 +115,28 @@ class ApiClient {
     }
   }
 
+  /// Like [getBytes], but for binary endpoints outside the `/api/v1/pos`
+  /// prefix (e.g. `/api/tenant/invoices/{id}/pdf-stream`, the raw PDF the
+  /// native Post-Sale Action Sheet's "Preview & Print" row renders). The same
+  /// bearer token is attached; [AuthenticateTenantApi] accepts it on both
+  /// route groups.
+  Future<List<int>> getBytesAbsolute(String path,
+      {Map<String, dynamic>? query}) async {
+    await _prepare();
+    try {
+      final base = await currentBaseUrl();
+      final url = path.startsWith('http') ? path : '$base$path';
+      final response = await _dio.get<List<int>>(
+        url,
+        queryParameters: query,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      return response.data ?? const [];
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
   Future<Map<String, dynamic>> post(String path, {Map<String, dynamic>? data}) {
     return _send(() => _dio.post(path, data: data));
   }

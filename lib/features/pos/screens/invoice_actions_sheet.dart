@@ -37,6 +37,7 @@ class InvoiceActionsData {
     this.taxRate = 0,
     this.paidAmount,
     this.dueAmount = 0,
+    this.pdfPathOverride,
   });
 
   final String documentType; // 'invoice' | 'quotation'
@@ -64,9 +65,24 @@ class InvoiceActionsData {
   final double? paidAmount;
   final double dueAmount;
 
-  String get _pdfPath => documentType == 'quotation'
-      ? ApiEndpoints.quotationPdf(documentId)
-      : ApiEndpoints.salePdf(documentId);
+  /// When set, the exact API path "Preview & Print" fetches the PDF bytes
+  /// from — used by the SDUI `show_post_sale_sheet` action, which points at
+  /// the token-authed `/api/tenant/invoices/{id}/pdf-stream` route rather
+  /// than the `/api/v1/pos` sale/quotation PDF endpoints.
+  final String? pdfPathOverride;
+
+  String get _pdfPath {
+    if ((pdfPathOverride ?? '').isNotEmpty) return pdfPathOverride!;
+    return documentType == 'quotation'
+        ? ApiEndpoints.quotationPdf(documentId)
+        : ApiEndpoints.salePdf(documentId);
+  }
+
+  /// A [_pdfPath] outside the `/api/v1/pos` prefix must be fetched with
+  /// [ApiClient.getBytesAbsolute]; the sale/quotation defaults use
+  /// [ApiClient.getBytes].
+  bool get _pdfPathIsAbsolute =>
+      _pdfPath.startsWith('/api/') || _pdfPath.startsWith('http');
 }
 
 bool get _supportsThermalPrint =>
@@ -322,8 +338,11 @@ class _InvoicePreviewScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(data.documentNumber)),
       body: PdfPreview(
-        build: (format) async =>
-            Uint8List.fromList(await apiClient.getBytes(data._pdfPath)),
+        build: (format) async => Uint8List.fromList(
+          data._pdfPathIsAbsolute
+              ? await apiClient.getBytesAbsolute(data._pdfPath)
+              : await apiClient.getBytes(data._pdfPath),
+        ),
         allowPrinting: true,
         // The package's own share button hands off straight to the OS share
         // sheet with just the raw PDF bytes — no WhatsApp/email/thermal/

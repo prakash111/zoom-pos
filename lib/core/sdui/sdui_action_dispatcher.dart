@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../features/pos/screens/invoice_actions_sheet.dart';
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../config/bootstrap_cache.dart';
+import '../services/thermal/thermal_printer_service.dart' show ReceiptLine;
 import 'dynamic_schema_context.dart';
 import 'dynamic_schema_parser.dart';
 import 'screens/dynamic_schema_page.dart';
@@ -140,10 +142,13 @@ class SduiActionDispatcher {
             }
           }
           showToast(message);
-          if (navigateBack && context.mounted) {
-            Navigator.of(context).pop();
-          } else if (action['reload'] == true) {
+          if (action['reload'] == true) {
             onReload();
+          }
+          if (context.mounted && _isPostSaleSheetResponse(res)) {
+            await _showPostSaleSheet(context, res['post_sale_sheet']['data']);
+          } else if (navigateBack && context.mounted) {
+            Navigator.of(context).pop();
           }
         } catch (e) {
           showToast(e is ApiException ? e.message : 'Submission failed: $e',
@@ -179,6 +184,9 @@ class SduiActionDispatcher {
           if (action['reload'] == true) {
             onReload();
           }
+          if (context.mounted && _isPostSaleSheetResponse(res)) {
+            await _showPostSaleSheet(context, res['post_sale_sheet']['data']);
+          }
         } catch (e) {
           showToast(e is ApiException ? e.message : 'Action failed: $e',
               isError: true);
@@ -197,6 +205,10 @@ class SduiActionDispatcher {
             }
           }
         }
+        break;
+
+      case 'show_post_sale_sheet':
+        await _showPostSaleSheet(context, action['data']);
         break;
 
       case 'open_modal':
@@ -220,6 +232,83 @@ class SduiActionDispatcher {
       default:
         break;
     }
+  }
+
+  /// True when a form_submit / api_post response carries the native
+  /// `show_post_sale_sheet` envelope every checkout / settle endpoint now
+  /// returns under `post_sale_sheet` — instead of a web receipt URL the
+  /// client would launch in an external browser.
+  static bool _isPostSaleSheetResponse(Map<String, dynamic> res) {
+    final sheet = res['post_sale_sheet'];
+    return sheet is Map &&
+        sheet['action']?.toString() == 'show_post_sale_sheet' &&
+        sheet['data'] is Map;
+  }
+
+  /// Opens the polished native invoice actions sheet (Preview & Print /
+  /// Bluetooth thermal / Share via WhatsApp / Send via Email) from a
+  /// server `show_post_sale_sheet` data payload. Every option resolves
+  /// in-app — "Preview & Print" streams the token-authed PDF, WhatsApp is a
+  /// deep link, email/SMS post to the send-invoice endpoint.
+  Future<void> _showPostSaleSheet(BuildContext context, dynamic rawData) async {
+    final data = rawData is Map
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
+
+    double toDouble(dynamic v) {
+      if (v is num) return v.toDouble();
+      return double.tryParse('${v ?? ''}') ?? 0.0;
+    }
+
+    String? nonEmpty(dynamic v) {
+      final s = (v ?? '').toString().trim();
+      return s.isEmpty ? null : s;
+    }
+
+    final lines = <ReceiptLine>[];
+    final rawLines = data['lines'];
+    if (rawLines is List) {
+      for (final l in rawLines) {
+        if (l is Map) {
+          final qty = l['quantity'] == null ? 1.0 : toDouble(l['quantity']);
+          lines.add(ReceiptLine(
+            name: (l['name'] ?? 'Item').toString(),
+            quantity: qty,
+            unitPrice: toDouble(l['unit_price']),
+            lineTotal: l['line_total'] == null
+                ? qty * toDouble(l['unit_price'])
+                : toDouble(l['line_total']),
+          ));
+        }
+      }
+    }
+
+    final invoiceData = InvoiceActionsData(
+      documentType: 'invoice',
+      documentId: (data['sale_id'] ?? '').toString(),
+      documentNumber: (data['invoice_number'] ?? '').toString(),
+      companyName: (data['company_name'] ?? '').toString(),
+      customerName: nonEmpty(data['customer_name']),
+      customerPhone: nonEmpty(data['customer_phone']),
+      customerEmail: nonEmpty(data['customer_email']),
+      currencySymbol: (data['currency_symbol'] ?? '\$').toString(),
+      subtotal: toDouble(data['subtotal']),
+      discount: toDouble(data['discount']),
+      tax: toDouble(data['tax']),
+      total: toDouble(data['total']),
+      taxId: nonEmpty(data['tax_id']),
+      taxLabel: (data['tax_label'] ?? 'Tax').toString(),
+      isIndia: data['is_india'] == true,
+      taxRate: toDouble(data['tax_rate']),
+      paidAmount:
+          data['paid_amount'] == null ? null : toDouble(data['paid_amount']),
+      dueAmount: toDouble(data['due_amount']),
+      lines: lines,
+      pdfPathOverride: nonEmpty(data['pdf_endpoint']),
+    );
+
+    if (!context.mounted) return;
+    await showInvoiceActionsSheet(context, invoiceData);
   }
 
   Future<void> _openRemoteSheet(

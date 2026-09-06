@@ -96,6 +96,47 @@ void main() {
       expect(find.text('Grid Item 2'), findsOneWidget);
       expect(find.byType(Wrap), findsOneWidget);
     });
+
+    testWidgets('row aligns an expanded label against a trailing status chip',
+        (tester) async {
+      // The intake diagnostic checklist row: a long label must take the free
+      // width (Expanded) and the PENDING chip must sit hard against the right
+      // edge instead of wrapping mid-row.
+      final schema = {
+        'type': 'row',
+        'main_axis_alignment': 'space_between',
+        'cross_axis_alignment': 'center',
+        'components': [
+          {
+            'type': 'text',
+            'text': 'Rear camera glass and housing gasket inspection',
+            'expanded': true,
+            'max_lines': 2,
+          },
+          {'type': 'badge', 'label': 'PENDING', 'color': '#64748b'},
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, schema),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(Expanded), findsOneWidget);
+      expect(find.text('PENDING'), findsOneWidget);
+
+      final rowSize = tester.getSize(find.byType(Row).first);
+      final chipRight = tester.getBottomRight(find.text('PENDING')).dx;
+      final rowRight = tester.getBottomRight(find.byType(Row).first).dx;
+      expect(rowSize.width, greaterThan(200));
+      // Chip hugs the right edge (within padding), never floats mid-row.
+      expect(rowRight - chipRight, lessThan(24));
+    });
   });
 
   group('Declarative SDUI Schema Parser - Display Elements', () {
@@ -480,6 +521,36 @@ void main() {
       expect(dispatchedAction, isNotNull);
       expect(dispatchedAction!['endpoint'], '/api/tenant/demo-data');
       expect(dispatchedAction!['method'], 'DELETE');
+    });
+
+    testWidgets('button_primary renders in system forest green', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(colorSchemeSeed: const Color(0xFF2563EB)),
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: const {},
+              setFormValue: (_, __) {},
+              dispatchAction: (_) async {},
+              child: Builder(
+                builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, {
+                  'type': 'button_primary',
+                  'label': 'Invoice & Receipt Options',
+                  'icon': 'receipt_long',
+                  'action': {
+                    'type': 'show_post_sale_sheet',
+                    'data': {'invoice_number': 'INV-0028'},
+                  },
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+      final bg = button.style?.backgroundColor?.resolve(<WidgetState>{});
+      expect(bg, const Color(0xFF166534));
     });
   });
 }
