@@ -48,12 +48,13 @@ class SchemaResponse
         'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker', 'file_upload',
         'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
         'button_outlined', 'button_danger', 'fab', 'action_sheet_trigger', 'navigation_builder', 'tree_builder',
-        'wrap',
+        'wrap', 'cash_tendered_field',
     ];
 
     public const INPUT_TYPES = [
         'text_input', 'dropdown_select', 'checkbox', 'toggle_switch',
         'date_time_picker', 'color_picker', 'file_upload', 'step_counter',
+        'cash_tendered_field',
     ];
 
     public const ACTION_COMPONENT_TYPES = [
@@ -202,6 +203,28 @@ class SchemaResponse
             'name' => $name,
             'label' => $label,
             'initial_value' => (string) ($initialValue ?? ''),
+        ], $props);
+    }
+
+    /**
+     * A self-contained cash-tendered input that computes CHANGE DUE and
+     * handles quick-cash chips entirely on the client — no network round
+     * trip, no sheet reload. Writes the tendered amount into `$name` so the
+     * checkout submit picks it up.
+     *
+     * @param  list<float|int>  $quickCash  suggested tender amounts
+     * @param  array<string, mixed>  $props
+     */
+    public static function cashTenderedField(string $name, float $total, string $currency, float $initial, array $quickCash = [], array $props = []): array
+    {
+        return array_merge([
+            'type' => 'cash_tendered_field',
+            'name' => $name,
+            'label' => 'Cash Tendered by Customer',
+            'total' => round($total, 2),
+            'currency' => $currency,
+            'initial_value' => number_format($initial, 2, '.', ''),
+            'quick_cash' => array_values(array_map(static fn ($v) => round((float) $v, 2), $quickCash)),
         ], $props);
     }
 
@@ -584,13 +607,20 @@ class SchemaResponse
         return $action;
     }
 
-    public static function openModalAction(string $title, array $components): array
+    /**
+     * @param  array<string, mixed>  $props  extra action flags, e.g.
+     *   ['keep_parent_sheet' => true] so the SDUI client stacks this modal
+     *   OVER the sheet that opened it instead of dismissing it, and
+     *   ['refresh_in_place' => true, 'refresh_endpoint' => '/api/...'] so the
+     *   parent sheet re-fetches itself in place once the modal closes.
+     */
+    public static function openModalAction(string $title, array $components, array $props = []): array
     {
-        return [
+        return array_merge([
             'type' => 'open_modal',
             'title' => $title,
             'components' => $components,
-        ];
+        ], $props);
     }
 
     /**
@@ -615,13 +645,20 @@ class SchemaResponse
      * when the sheet's content depends on live server data (e.g. a
      * product's current batches) rather than being known up front.
      */
-    public static function openRemoteSheetAction(string $sheetEndpoint, string $title = ''): array
+    /**
+     * @param  array<string, mixed>  $props  extra action flags — most notably
+     *   ['refresh_in_place' => true], which tells the SDUI client to re-fetch
+     *   $sheetEndpoint and rebuild the CURRENT sheet's body in place (no
+     *   dismiss, no parent-page reload, keyboard & scroll preserved) instead
+     *   of popping and re-opening a fresh sheet.
+     */
+    public static function openRemoteSheetAction(string $sheetEndpoint, string $title = '', array $props = []): array
     {
-        return [
+        return array_merge([
             'type' => 'open_remote_sheet',
             'sheet_endpoint' => $sheetEndpoint,
             'title' => $title,
-        ];
+        ], $props);
     }
 
     public static function popAction(): array

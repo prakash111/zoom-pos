@@ -193,6 +193,29 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
         $this->assertSame('form_submit', $pillsByKey['hold']['action']);
         $this->assertSame('/api/tenant/pos/hold-order', $pillsByKey['hold']['endpoint']);
         $this->assertSame('open_modal', $pillsByKey['discount']['action']);
+
+        // Cart chips must NOT tear down the drawer: every open_modal pill keeps
+        // the parent sheet alive and refreshes it in place once dismissed.
+        foreach (['Add Customer', 'Order Note', 'Apply Discount', 'Split Payment'] as $modalTitle) {
+            $needle = '"type":"open_modal","title":"'.$modalTitle.'"';
+            $this->assertStringContainsString($needle, $schemaStr);
+        }
+        $this->assertStringNotContainsString('"keep_parent_sheet":false', $schemaStr);
+        $addCustomerPos = strpos($schemaStr, '"type":"open_modal","title":"Add Customer"');
+        $this->assertStringContainsString(
+            'keep_parent_sheet', substr($schemaStr, $addCustomerPos, 900),
+            'Add Customer modal must stack over the cart, not replace it'
+        );
+        $this->assertStringContainsString('"refresh_in_place":true', $schemaStr);
+
+        // Change due is computed on-device — the schema ships the widget, not
+        // a server-rendered "CHANGE DUE TO CUSTOMER" string.
+        $this->assertStringContainsString('"type":"cash_tendered_field"', $schemaStr);
+        $this->assertStringNotContainsString('CHANGE DUE TO CUSTOMER', $schemaStr);
+        $this->assertTrue($pillsByKey['add_customer']['keep_parent_sheet'] ?? false);
+
+        // The whole drawer, including the new component, is valid SDUI.
+        $this->assertEmpty(app(SchemaValidator::class)->validate($schema));
     }
 
     public function test_settlement_stays_in_app_with_a_valid_post_sale_sheet_and_login_free_pdf(): void

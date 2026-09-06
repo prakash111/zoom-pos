@@ -1042,23 +1042,26 @@ class UniversalPosBuilder
             $doneButton('Apply Split'),
         ];
 
-        $amountPaidModal = [
-            SchemaResponse::textInput('tendered', 'Cash Tendered by Customer', number_format($selectedTendered, 2, '.', ''), [
-                'keyboard_type' => 'number',
-                'prefix_icon' => 'payments',
-            ]),
-            SchemaResponse::text('Reopen the cart after saving to see the updated change due.', 'body_small', ['color' => '#64748b']),
-            $doneButton('Save Amount'),
-        ];
+        // "Amount Paid" is no longer a modal — the inline cash_tendered_field
+        // below computes change due live, on-device.
+
+        // Every pill modal stacks OVER the Order Cart (keep_parent_sheet) and,
+        // once dismissed, the cart re-fetches itself in place (refresh_in_place
+        // → refresh_endpoint) so its totals reflect the change — the cart is
+        // never torn down and the workbench never resurfaces underneath.
+        $pillModal = static fn (string $title, array $body): array => SchemaResponse::openModalAction($title, $body, [
+            'keep_parent_sheet' => true,
+            'refresh_in_place' => true,
+            'refresh_endpoint' => $refreshSheet([]),
+        ]);
 
         $components[] = SchemaResponse::card([
             SchemaResponse::wrap([
-                SchemaResponse::buttonOutlined('+ Add Customer', SchemaResponse::openModalAction('Add Customer', $addCustomerModal), 'person_add', ['full_width' => false, 'border_radius' => 20]),
+                SchemaResponse::buttonOutlined('+ Add Customer', $pillModal('Add Customer', $addCustomerModal), 'person_add', ['full_width' => false, 'border_radius' => 20]),
                 SchemaResponse::buttonOutlined('Hold', SchemaResponse::formSubmitAction('/api/tenant/pos/hold-order', 'POST', 'Order held — resume it from Held Orders.', navigateBack: true), 'pause_circle', ['full_width' => false, 'border_radius' => 20]),
-                SchemaResponse::buttonOutlined('Note', SchemaResponse::openModalAction('Order Note', $noteModal), 'edit_note', ['full_width' => false, 'border_radius' => 20]),
-                SchemaResponse::buttonOutlined('Discount', SchemaResponse::openModalAction('Apply Discount', $discountModal), 'percent', ['full_width' => false, 'border_radius' => 20]),
-                SchemaResponse::buttonOutlined('Split Payment', SchemaResponse::openModalAction('Split Payment', $splitPaymentModal), 'call_split', ['full_width' => false, 'border_radius' => 20]),
-                SchemaResponse::buttonOutlined($currency.' Amount Paid', SchemaResponse::openModalAction('Amount Paid', $amountPaidModal), 'payments', ['full_width' => false, 'border_radius' => 20]),
+                SchemaResponse::buttonOutlined('Note', $pillModal('Order Note', $noteModal), 'edit_note', ['full_width' => false, 'border_radius' => 20]),
+                SchemaResponse::buttonOutlined('Discount', $pillModal('Apply Discount', $discountModal), 'percent', ['full_width' => false, 'border_radius' => 20]),
+                SchemaResponse::buttonOutlined('Split Payment', $pillModal('Split Payment', $splitPaymentModal), 'call_split', ['full_width' => false, 'border_radius' => 20]),
             ]),
             // Customer name stays pinned inline so it always flows onto the receipt.
             SchemaResponse::textInput('customer_name', $customerFieldLabel, $defaultCustomerName ?: 'Walk-in Customer'),
@@ -1136,13 +1139,15 @@ class UniversalPosBuilder
             ], ['initially_expanded' => false]);
         }
 
-        // Payment Method Selector
+        // Payment Method Selector — switching methods re-fetches the sheet in
+        // place (refresh_in_place), so the cash card below appears/disappears
+        // without the drawer dismissing or the workbench flashing behind it.
         $components[] = SchemaResponse::card([
             SchemaResponse::text('Payment Method', 'label_large', ['bold' => true]),
             SchemaResponse::wrap(array_map(function (array $method) use ($selectedPaymentMethod, $refreshSheet) {
                 $action = SchemaResponse::openRemoteSheetAction($refreshSheet([
                     'selected_payment_method' => $method['value'],
-                ]), 'Order Cart');
+                ]), 'Order Cart', ['refresh_in_place' => true]);
 
                 $isSelected = ($method['value'] === $selectedPaymentMethod)
                     || ($method['value'] === 'transfer' && $selectedPaymentMethod === 'upi')
@@ -1154,31 +1159,19 @@ class UniversalPosBuilder
             }, $paymentMethods)),
         ], ['border_radius' => 16]);
 
-        // Cash Tendered + CHANGE DUE TO CUSTOMER + Quick Cash Suggestions (active when Cash is selected)
+        // Cash Tendered + CHANGE DUE TO CUSTOMER + Quick Cash (active when Cash
+        // is selected). One self-contained widget: the input's onChanged and
+        // the quick-cash chips recompute CHANGE DUE on-device — no network
+        // round trip, no sheet reload per keystroke.
         if ($selectedPaymentMethod === 'cash') {
             $components[] = SchemaResponse::card([
-                SchemaResponse::textInput('tendered', 'Cash Tendered by Customer', number_format($selectedTendered, 2, '.', ''), [
-                    'keyboard_type' => 'number',
-                    'prefix_icon' => 'payments',
-                ]),
-                SchemaResponse::container([
-                    SchemaResponse::row([
-                        SchemaResponse::column([
-                            SchemaResponse::text('CHANGE DUE TO CUSTOMER', 'label_small', ['bold' => true, 'color' => '#166534']),
-                            SchemaResponse::text('Change Due to Customer', 'body_small', ['color' => '#15803d']),
-                        ]),
-                        SchemaResponse::text($currency.number_format($changeDue, 2), 'title_large', ['bold' => true, 'color' => '#166534']),
-                    ], ['main_axis_alignment' => 'space_between']),
-                ], ['padding' => 12, 'color' => '#ecfdf5', 'border_color' => '#86efac', 'border_radius' => 10]),
-                SchemaResponse::wrap(array_map(function (array $suggestion) use ($selectedTendered, $refreshSheet) {
-                    $action = SchemaResponse::openRemoteSheetAction($refreshSheet([
-                        'selected_tendered' => number_format($suggestion['amount'], 2, '.', ''),
-                    ]), 'Order Cart');
-
-                    return abs($suggestion['amount'] - $selectedTendered) < 0.001
-                        ? SchemaResponse::buttonPrimary($suggestion['display'], $action, null, ['full_width' => false, 'border_radius' => 16, 'background_color' => '#166534'])
-                        : SchemaResponse::buttonOutlined($suggestion['display'], $action, null, ['full_width' => false, 'border_radius' => 16]);
-                }, $quickCash)),
+                SchemaResponse::cashTenderedField(
+                    'tendered',
+                    $grandTotal,
+                    $currency,
+                    $selectedTendered,
+                    array_column($quickCash, 'amount'),
+                ),
             ], ['border_radius' => 16, 'border_color' => '#bbf7d0']);
         }
 
@@ -1234,14 +1227,13 @@ class UniversalPosBuilder
             'grand_total' => $grandTotal,
             'currency_symbol' => $currency,
         ];
-        $schema['customer_actions'] = ['add_customer', 'hold', 'note', 'discount', 'split_payment', 'amount_paid'];
+        $schema['customer_actions'] = ['add_customer', 'hold', 'note', 'discount', 'split_payment'];
         $schema['action_pills'] = [
-            ['label' => 'Add Customer', 'key' => 'add_customer', 'color' => '#2563eb', 'action' => 'open_modal'],
+            ['label' => 'Add Customer', 'key' => 'add_customer', 'color' => '#2563eb', 'action' => 'open_modal', 'keep_parent_sheet' => true],
             ['label' => 'Hold', 'key' => 'hold', 'color' => '#d97706', 'action' => 'form_submit', 'endpoint' => '/api/tenant/pos/hold-order'],
-            ['label' => 'Note', 'key' => 'note', 'color' => '#475569', 'action' => 'open_modal'],
-            ['label' => 'Discount', 'key' => 'discount', 'color' => '#7c3aed', 'action' => 'open_modal'],
-            ['label' => 'Split Payment', 'key' => 'split_payment', 'color' => '#059669', 'action' => 'open_modal'],
-            ['label' => 'Amount Paid', 'key' => 'amount_paid', 'color' => '#0284c7', 'action' => 'open_modal'],
+            ['label' => 'Note', 'key' => 'note', 'color' => '#475569', 'action' => 'open_modal', 'keep_parent_sheet' => true],
+            ['label' => 'Discount', 'key' => 'discount', 'color' => '#7c3aed', 'action' => 'open_modal', 'keep_parent_sheet' => true],
+            ['label' => 'Split Payment', 'key' => 'split_payment', 'color' => '#059669', 'action' => 'open_modal', 'keep_parent_sheet' => true],
         ];
         $schema['payment_methods'] = $paymentMethods;
         $schema['quick_cash'] = [

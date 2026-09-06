@@ -1160,7 +1160,11 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertStringNotContainsString('Store Credit / Khata Due', $counterDrawerStr);
         $this->assertStringNotContainsString('Customer, Note & Discount', $counterDrawerStr);
         $this->assertSame(['cash', 'card', 'transfer'], array_column($counterDrawerRes->json('schema.payment_methods'), 'value'));
-        $this->assertStringContainsString('CHANGE DUE TO CUSTOMER', $counterDrawerStr);
+        // Change due is now computed on-device by the cash_tendered_field widget.
+        $this->assertStringContainsString('"type":"cash_tendered_field"', $counterDrawerStr);
+        // Cart action chips stay OVER the drawer and refresh it in place.
+        $this->assertStringContainsString('"keep_parent_sheet":true', $counterDrawerStr);
+        $this->assertStringContainsString('"refresh_in_place":true', $counterDrawerStr);
 
         // 9. Universal POS Checkout Drawer for Ticket Settlement
         $ticketDrawerRes = $this->withHeaders($this->authHeaders())->getJson("/api/tenant/repair/tickets/{$ticketId}/checkout-sheet");
@@ -1174,7 +1178,7 @@ class PharmacyAndRepairPosTest extends TestCase
         $drawerSchemaStr = json_encode($drawerSchema, JSON_UNESCAPED_SLASHES);
         $this->assertStringContainsString('Advance Deposit Paid', $drawerSchemaStr);
         $this->assertStringNotContainsString('Store Credit / Khata Due', $drawerSchemaStr);
-        $this->assertStringContainsString('CHANGE DUE TO CUSTOMER', $drawerSchemaStr);
+        $this->assertStringContainsString('"type":"cash_tendered_field"', $drawerSchemaStr);
         $this->assertStringStartsWith('Complete Sale · ', $drawerSchema['bottom_bar']['primary_action_label']);
 
         // 9. Settle repair ticket and verify unified post-sale dispatch
