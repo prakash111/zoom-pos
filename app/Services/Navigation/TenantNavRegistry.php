@@ -14,6 +14,143 @@ use Illuminate\Support\Facades\Log;
 class TenantNavRegistry
 {
     /**
+     * Resolve all normalized active and licensed modes for a tenant.
+     *
+     * @return list<string>
+     */
+    public static function resolveTenantModes(mixed $tenant): array
+    {
+        if ($tenant instanceof Company) {
+            $modes = (array) ($tenant->licensed_modules ?: []);
+            if ($tenant->operating_mode) {
+                $modes[] = $tenant->operating_mode;
+            }
+            if ($tenant->pos_mode) {
+                $modes[] = $tenant->pos_mode;
+            }
+        } elseif (is_object($tenant)) {
+            $modes = (array) ($tenant->licensed_modules ?? []);
+            if (isset($tenant->operating_mode)) {
+                $modes[] = $tenant->operating_mode;
+            }
+            if (isset($tenant->pos_mode)) {
+                $modes[] = $tenant->pos_mode;
+            }
+        } elseif (is_string($tenant) && trim($tenant) !== '') {
+            $modes = [trim($tenant)];
+        } else {
+            $modes = ['retail'];
+        }
+
+        $normalized = [];
+        foreach ($modes as $item) {
+            if (is_string($item)) {
+                $norm = strtolower(trim($item));
+                $norm = match ($norm) {
+                    'general', 'general_retail' => 'retail',
+                    'food_restaurant' => 'restaurant',
+                    'repair', 'repairs', 'technician', 'repair_technician' => 'repair_technician',
+                    default => $norm,
+                };
+                if ($norm !== '') {
+                    $normalized[] = $norm;
+                }
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    /**
+     * Enforce strict domain boundaries across navigation menus.
+     * Repair equipment tickets (#SO-...) must only exist in repair/technician modes.
+     * Salon, spa, wellness, and general retail must never render repair service orders.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @return list<array<string, mixed>>
+     */
+    public static function filterDomainMismatches(array $sections, mixed $tenant): array
+    {
+        $modes = self::resolveTenantModes($tenant);
+        $isRepair = false;
+        foreach ($modes as $m) {
+            if (in_array($m, ['repair', 'repairs', 'repair_technician', 'automotive', 'electronics_service'], true)) {
+                $isRepair = true;
+                break;
+            }
+        }
+
+        $isSalon = false;
+        foreach ($modes as $m) {
+            if (in_array($m, ['salon', 'spa', 'wellness', 'service_booking', 'beauty'], true)) {
+                $isSalon = true;
+                break;
+            }
+        }
+
+        $filterItems = function (array $items) use (&$filterItems, $isRepair, $isSalon): array {
+            $filtered = [];
+            foreach ($items as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                $key = strtolower(trim((string) ($item['key'] ?? $item['id'] ?? '')));
+                $component = strtolower(trim((string) ($item['component'] ?? '')));
+                $target = strtolower(trim((string) ($item['target_endpoint'] ?? '')));
+                $title = strtolower(trim((string) ($item['title'] ?? $item['label'] ?? '')));
+
+                // Service orders (equipment/warranty repair tickets) are strictly gated to repair workbenches
+                if (! $isRepair) {
+                    if (in_array($key, ['service_orders', 'new_service_order', 'repair_orders'], true)
+                        || in_array($component, ['service_orders'], true)
+                        || ($target === '/api/v1/pos/service-orders')
+                        || ($title === 'service orders' && ! str_contains($target, 'service-catalog'))
+                        || $title === 'new service order') {
+                        continue;
+                    }
+                }
+
+                // In salon/spa modes, strip any repair tickets or equipment intake
+                if ($isSalon) {
+                    if (in_array($key, ['service_orders', 'repair_tickets', 'repair_create_ticket', 'repair_dashboard', 'repair_my_jobs', 'repair_detail'], true)
+                        || in_array($component, ['service_orders', 'repair_tickets', 'repair_create_ticket', 'repair_dashboard'], true)
+                        || in_array($title, ['service orders', 'repair ticket register', 'new intake ticket', 'repair workbench'], true)) {
+                        continue;
+                    }
+                }
+
+                if (! empty($item['children']) && is_array($item['children'])) {
+                    $item['children'] = $filterItems($item['children']);
+                }
+
+                $filtered[] = $item;
+            }
+
+            return array_values($filtered);
+        };
+
+        $result = [];
+        foreach ($sections as $section) {
+            if (! is_array($section)) {
+                continue;
+            }
+            $secKey = strtolower(trim((string) ($section['key'] ?? $section['id'] ?? '')));
+            if ($isSalon && in_array($secKey, ['repair_operations', 'repair_service', 'spare_parts_inventory'], true)) {
+                continue;
+            }
+            if (isset($section['items']) && is_array($section['items'])) {
+                $section['items'] = $filterItems($section['items']);
+            }
+            if (empty($section['items']) && ! in_array($secKey, ['administration', 'settings'], true)) {
+                continue;
+            }
+            $result[] = $section;
+        }
+
+        return array_values($result);
+    }
+
+    /**
      * Return guaranteed non-empty navigation sections for a tenant or mode,
      * maintaining a clean modular hierarchy at first load with licensed verticals
      * grouped in strict sequence and Administration anchored at the bottom.
@@ -35,14 +172,17 @@ class TenantNavRegistry
             $custom = self::buildCustomNavTree($tenant);
             if (! empty($custom)) {
                 $sections = array_values(array_map([self::class, 'normalizeSection'], $custom));
+                $sections = self::filterDomainMismatches($sections, $tenant);
                 return self::applyNavigationLabels($sections, $labels);
             }
         } elseif (is_object($tenant) && ! empty($tenant->navigation_menu_customization)) {
             $sections = array_values(array_map([self::class, 'normalizeSection'], (array) $tenant->navigation_menu_customization));
+            $sections = self::filterDomainMismatches($sections, $tenant);
             return self::applyNavigationLabels($sections, $labels);
         }
 
         $sections = self::getBaseNavSectionsForTenant($tenant);
+        $sections = self::filterDomainMismatches($sections, $tenant);
         return self::applyNavigationLabels($sections, $labels);
     }
 
@@ -218,7 +358,7 @@ class TenantNavRegistry
         // 8. Administration & Settings (Strictly at the bottom)
         $sections[] = self::getAdministrationSection();
 
-        return array_values($sections);
+        return self::filterDomainMismatches(array_values($sections), $tenant);
     }
 
     /**
@@ -753,13 +893,22 @@ class TenantNavRegistry
                 'target_endpoint' => '/api/tenant/views/service-stylists',
             ],
             [
-                'key' => 'service_orders',
+                'key' => 'service_catalog',
                 'label' => 'Service Catalog & Rates',
                 'title' => 'Service Catalog & Rates',
-                'icon' => 'spa',
-                'component' => 'service_orders',
+                'icon' => 'format_list_bulleted',
+                'component' => 'service_catalog',
                 'permission' => 'service_orders',
-                'target_endpoint' => '/api/tenant/views/service-orders',
+                'target_endpoint' => '/api/tenant/views/service-catalog',
+            ],
+            [
+                'key' => 'service_create',
+                'label' => 'Add New Service',
+                'title' => 'Add New Service',
+                'icon' => 'add_circle_outline',
+                'component' => 'service_create',
+                'permission' => 'service_orders',
+                'target_endpoint' => '/api/tenant/views/service-create',
             ],
         ];
     }
@@ -918,7 +1067,9 @@ class TenantNavRegistry
             $sections = self::retailSections();
         }
 
-        return array_values(array_map([self::class, 'normalizeSection'], $sections));
+        $normalized = array_values(array_map([self::class, 'normalizeSection'], $sections));
+
+        return self::filterDomainMismatches($normalized, $isRestaurantOrMode);
     }
 
     /**
@@ -1223,7 +1374,6 @@ class TenantNavRegistry
                     ['key' => 'sales', 'label' => 'Sales & Invoices', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales'],
                     ['key' => 'quotations', 'label' => 'Quotations & Proposals', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes'],
                     ['key' => 'consignments', 'label' => 'Consignments', 'icon' => 'local_shipping', 'component' => 'consignments', 'permission' => 'consignments'],
-                    ['key' => 'service_orders', 'label' => 'Service Orders', 'icon' => 'handyman', 'component' => 'service_orders', 'permission' => 'service_orders'],
                     ['key' => 'customers', 'label' => 'Customers & CRM', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers'],
                 ],
             ],
@@ -1362,7 +1512,7 @@ class TenantNavRegistry
                     ['key' => 'quotations', 'label' => 'Quotations & Estimates', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes', 'target_endpoint' => '/api/tenant/views/quotations'],
                     ['key' => 'customers', 'label' => 'Clients & Memberships', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'target_endpoint' => '/api/tenant/views/customers'],
                     ['key' => 'cash_register', 'label' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register', 'target_endpoint' => '/api/tenant/views/cash-register'],
-                    ['key' => 'service_orders', 'label' => 'Appointments & Bookings', 'icon' => 'event_available', 'component' => 'service_orders', 'permission' => 'service_orders', 'target_endpoint' => '/api/tenant/views/service-orders'],
+                    ['key' => 'service_calendar', 'label' => 'Appointments & Bookings', 'icon' => 'event_available', 'component' => 'service_calendar', 'permission' => 'service_orders', 'target_endpoint' => '/api/tenant/views/service-calendar'],
                 ],
             ],
             [
@@ -1371,6 +1521,8 @@ class TenantNavRegistry
                 'color' => '#d97706',
                 'items' => [
                     ['key' => 'inventory', 'label' => 'Products & Supplies', 'icon' => 'inventory_2', 'component' => 'inventory', 'permission' => 'products', 'target_endpoint' => '/api/tenant/views/inventory'],
+                    ['key' => 'service_catalog', 'label' => 'Service Catalog & Rates', 'icon' => 'format_list_bulleted', 'component' => 'service_catalog', 'permission' => 'service_orders', 'target_endpoint' => '/api/tenant/views/service-catalog'],
+                    ['key' => 'service_create', 'label' => 'Add New Service', 'icon' => 'add_circle_outline', 'component' => 'service_create', 'permission' => 'service_orders', 'target_endpoint' => '/api/tenant/views/service-create'],
                     ['key' => 'staff', 'label' => 'Specialists & Stylists', 'icon' => 'badge', 'component' => 'staff', 'permission' => 'users', 'target_endpoint' => '/api/tenant/views/service-stylists'],
                 ],
             ],
@@ -1458,7 +1610,7 @@ class TenantNavRegistry
                 ['key' => 'staff', 'label' => 'Users & Permissions', 'title' => 'Users & Permissions', 'icon' => 'badge', 'component' => 'staff', 'type' => 'link', 'permission' => 'users'],
                 ['key' => 'roles', 'label' => 'Roles & Access Levels', 'title' => 'Roles & Access Levels', 'icon' => 'admin_panel_settings', 'component' => 'roles', 'type' => 'link', 'permission' => 'users', 'target_endpoint' => '/api/tenant/views/roles'],
                 ['key' => 'devices', 'label' => 'Terminals & Devices', 'title' => 'Terminals & Devices', 'icon' => 'devices_other', 'component' => 'devices', 'type' => 'link', 'permission' => null],
-                ['key' => 'change_password', 'label' => 'Change Password', 'title' => 'Change Password', 'icon' => 'tune', 'component' => 'change_password', 'type' => 'link', 'permission' => null, 'target_endpoint' => '/api/tenant/views/change-password'],
+                ['key' => 'change_password', 'label' => 'Change Password', 'title' => 'Change Password', 'icon' => 'lock_reset', 'component' => 'change_password', 'type' => 'link', 'permission' => null, 'target_endpoint' => '/api/tenant/views/change-password'],
             ],
         ];
     }

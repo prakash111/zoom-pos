@@ -481,6 +481,7 @@ class PosSyncApiController extends Controller
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
                 'navigation_labels' => $company->navigation_labels ?? new \stdClass(),
+                'form_field_customizations' => $company->form_field_customizations ?? new \stdClass(),
             ],
         ]);
     }

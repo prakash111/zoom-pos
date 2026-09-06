@@ -16,6 +16,7 @@ use App\Models\Reminder;
 use App\Models\Sale;
 use App\Models\ServiceOrder;
 use App\Models\User;
+use App\Services\Navigation\TenantNavRegistry;
 use App\Services\TaxService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,9 +32,43 @@ class ServiceOrderApiController extends Controller
 {
     use ResolvesTenantSyncContext;
 
+    private function guardAgainstSalonMode(Company $company): ?JsonResponse
+    {
+        $modes = TenantNavRegistry::resolveTenantModes($company);
+        $isRepair = false;
+        foreach ($modes as $m) {
+            if (in_array($m, ['repair', 'repairs', 'repair_technician', 'automotive', 'electronics_service'], true)) {
+                $isRepair = true;
+                break;
+            }
+        }
+
+        $isSalon = false;
+        foreach ($modes as $m) {
+            if (in_array($m, ['salon', 'spa', 'wellness', 'service_booking', 'beauty'], true)) {
+                $isSalon = true;
+                break;
+            }
+        }
+
+        if (! $isRepair && $isSalon) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Service orders (equipment repair) are not available in Salon & Spa mode.',
+                'counts' => ['all' => 0],
+                'service_orders' => [],
+            ], 403);
+        }
+
+        return null;
+    }
+
     public function index(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
+        if ($blocked = $this->guardAgainstSalonMode($company)) {
+            return $blocked;
+        }
 
         $query = ServiceOrder::withoutGlobalScope('company')->where('company_id', $company->id);
 
@@ -69,6 +104,9 @@ class ServiceOrderApiController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $company = $this->resolveCompany($request);
+        if ($blocked = $this->guardAgainstSalonMode($company)) {
+            return $blocked;
+        }
         $order = $this->findOrder($company, $id);
 
         if (! $order) {
@@ -86,6 +124,9 @@ class ServiceOrderApiController extends Controller
     public function partsIndex(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
+        if ($blocked = $this->guardAgainstSalonMode($company)) {
+            return $blocked;
+        }
 
         $query = Product::withoutGlobalScope('company')
             ->where('company_id', $company->id)
@@ -129,6 +170,9 @@ class ServiceOrderApiController extends Controller
     private function save(Request $request, ?string $id = null): JsonResponse
     {
         $company = $this->resolveCompany($request);
+        if ($blocked = $this->guardAgainstSalonMode($company)) {
+            return $blocked;
+        }
         $user = $this->resolveUser($request, $company);
 
         $validator = Validator::make($request->all(), [

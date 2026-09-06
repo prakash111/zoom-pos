@@ -14,8 +14,8 @@ class Product extends Model
     use TracksSyncState;
 
     protected $fillable = [
-        'company_id', 'external_id', 'code', 'sku', 'barcode', 'name', 'image_url', 'category_id', 'category_name',
-        'brand_id', 'brand_name', 'unit', 'cost_price', 'sale_price', 'variants', 'modifiers', 'spice_levels', 'profit_margin',
+        'company_id', 'external_id', 'code', 'sku', 'barcode', 'name', 'image_url', 'category_id', 'category_name', 'category_type',
+        'brand_id', 'brand_name', 'unit', 'type', 'cost_price', 'sale_price', 'price', 'variants', 'modifiers', 'spice_levels', 'profit_margin',
         'current_stock', 'minimum_stock', 'active', 'is_demo', 'batch_number', 'mfg_date', 'expiry_date',
         'requires_prescription', 'narcotic_schedule', 'generic_name', 'composition', 'duration_minutes', 'follow_up_days', 'hsn_code', 'sac_code', 'tax_rate',
         'taxable', 'tax_exempt', 'zero_rate', 'reverse_charge',
@@ -37,12 +37,34 @@ class Product extends Model
             'reverse_charge' => 'boolean',
             'cost_price' => 'decimal:2',
             'sale_price' => 'decimal:2',
+            'price' => 'decimal:2',
             'current_stock' => 'decimal:3',
             'minimum_stock' => 'decimal:3',
             'variants' => 'array',
             'modifiers' => 'array',
             'spice_levels' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Product $product) {
+            if ($product->isDirty('sale_price') && ! $product->isDirty('price')) {
+                $product->price = $product->sale_price;
+            } elseif ($product->isDirty('price') && ! $product->isDirty('sale_price')) {
+                $product->sale_price = $product->price;
+            } elseif ($product->sale_price !== null && $product->price === null) {
+                $product->price = $product->sale_price;
+            } elseif ($product->price !== null && $product->sale_price === null) {
+                $product->sale_price = $product->price;
+            }
+
+            if ($product->unit === 'service' || ($product->duration_minutes !== null && (int) $product->duration_minutes > 0)) {
+                if (empty($product->type) || $product->type === 'product') {
+                    $product->type = 'service';
+                }
+            }
+        });
     }
 
     public function category()
@@ -109,6 +131,26 @@ class Product extends Model
             $cq->whereIn('type', ['salon', 'service'])
                 ->orWhereIn('name', ['Hair & Styling', 'Facials & Skincare', 'Spa & Body Treatments']);
         });
+    }
+
+    public function scopeServices($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('type', 'service')
+                ->orWhere('unit', 'service')
+                ->orWhereNotNull('duration_minutes');
+        });
+    }
+
+    public function getPriceAttribute(): float
+    {
+        return (float) ($this->attributes['price'] ?? $this->attributes['sale_price'] ?? 0);
+    }
+
+    public function setPriceAttribute($value): void
+    {
+        $this->attributes['price'] = $value;
+        $this->attributes['sale_price'] = $value;
     }
 
     public function getImageUrlOrDefault(): string

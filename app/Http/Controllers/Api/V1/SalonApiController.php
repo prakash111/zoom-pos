@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\CashRegister;
+use App\Models\Category;
 use App\Models\Customer;
 use App\Models\OrderPayment;
 use App\Models\Product;
@@ -28,6 +29,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 /**
  * Salon & Service counter-sale POS: real service/retail catalog (see
@@ -261,6 +263,7 @@ class SalonApiController extends Controller
             'advance_paid' => 'nullable|numeric|min:0',
             'deposit_payment_method' => 'nullable|string|max:50',
             'chair_label' => 'nullable|string|max:80',
+            'custom_fields' => 'nullable',
         ]);
 
         if ($validator->fails()) {
@@ -277,19 +280,20 @@ class SalonApiController extends Controller
             ->where('status', 'approved')
             ->find($request->input('specialist_id'));
 
-        if (! $service || ! $service->duration_minutes) {
+        if (! $service) {
             return response()->json(['success' => false, 'error' => 'Selected salon service is unavailable.'], 422);
         }
         if (! $specialist) {
             return response()->json(['success' => false, 'error' => 'Selected stylist or specialist is unavailable.'], 422);
         }
 
+        $durationMinutes = (int) ($service->duration_minutes ?: 30);
         $startsAt = Carbon::createFromFormat(
             'Y-m-d H:i',
             $request->input('appointment_date').' '.$request->input('appointment_time'),
             $company->resolveTimezone()
         )->utc();
-        $endsAt = $startsAt->copy()->addMinutes((int) $service->duration_minutes);
+        $endsAt = $startsAt->copy()->addMinutes($durationMinutes);
 
         $hasConflict = SalonAppointment::withoutGlobalScope('company')
             ->where('company_id', $company->id)
@@ -325,6 +329,15 @@ class SalonApiController extends Controller
             'name' => $request->input('customer_name'),
             'phone' => $request->input('customer_phone'),
         ]);
+
+        $customFields = $request->input('custom_fields');
+        if (is_string($customFields)) {
+            $decoded = json_decode($customFields, true);
+            $customFields = is_array($decoded) ? $decoded : [];
+        } elseif (! is_array($customFields)) {
+            $customFields = [];
+        }
+
         $appointment = SalonAppointment::create([
             'company_id' => $company->id,
             'tenant_id' => $company->id,
@@ -341,6 +354,7 @@ class SalonApiController extends Controller
             'advance_paid' => $advancePaid,
             'deposit_payment_method' => $request->input('deposit_payment_method', 'cash'),
             'chair_label' => $request->input('chair_label'),
+            'custom_fields' => $customFields,
         ]);
 
         AuditLog::record('salon.appointment_created', $company->id, $this->resolveUser($request, $company)?->id, [
@@ -817,6 +831,221 @@ class SalonApiController extends Controller
         ]);
     }
 
+    /**
+     * Plain JSON service catalog for salon/services.
+     * GET /api/tenant/salon/services
+     */
+    public function servicesIndex(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $services = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->where(function ($q) {
+                $q->where('type', 'service')
+                    ->orWhere('duration_minutes', '>', 0)
+                    ->orWhere('category_type', 'salon');
+            })
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'services' => $services,
+        ]);
+    }
+
+    /**
+     * Create a new salon service product.
+     * POST /api/tenant/salon/services
+     */
+    public function servicesStore(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:150',
+            'price' => 'nullable|numeric|min:0',
+            'sale_price' => 'nullable|numeric|min:0',
+            'duration_minutes' => 'nullable|integer|min:1|max:1440',
+            'description' => 'nullable|string|max:1000',
+            'category_id' => 'nullable',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
+        }
+
+        $rate = (float) $request->input('price', $request->input('sale_price', 0));
+        $duration = (int) ($request->input('duration_minutes', 30) ?: 30);
+        $rawCategory = $request->input('category_id');
+        $categoryId = (! empty($rawCategory) && is_numeric($rawCategory)) ? (int) $rawCategory : null;
+
+        $service = Product::create([
+            'company_id' => $company->id,
+            'tenant_id' => $company->id,
+            'name' => $request->input('name'),
+            'sku' => 'SRV-'.strtoupper(Str::random(6)),
+            'barcode' => 'SRV-'.strtoupper(Str::random(8)),
+            'type' => 'service',
+            'category_type' => 'salon',
+            'price' => $rate,
+            'sale_price' => $rate,
+            'purchase_price' => 0,
+            'duration_minutes' => $duration,
+            'description' => $request->input('description'),
+            'category_id' => $categoryId,
+            'active' => true,
+            'manage_stock' => false,
+            'stock' => 999999,
+            'unit' => 'service',
+        ]);
+
+        AuditLog::record('salon.service_created', $company->id, $user?->id, [
+            'product_id' => $service->id,
+            'name' => $service->name,
+            'price' => $rate,
+            'duration_minutes' => $duration,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Service created successfully.',
+            'service' => $service,
+        ], 201);
+    }
+
+    /**
+     * SDUI Edit Sheet schema for a salon service.
+     * GET /api/tenant/salon/services/{id}/edit-sheet
+     */
+    public function servicesEditSheet(Request $request, int|string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $service = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->findOrFail((int) $id);
+
+        $currency = $company->currency_symbol ?: '$';
+
+        $sheet = SchemaResponse::screen("Edit {$service->name}", [
+            SchemaResponse::card([
+                SchemaResponse::row([
+                    SchemaResponse::icon('spa', ['color' => '#7c3aed', 'size' => 28]),
+                    SchemaResponse::column([
+                        SchemaResponse::text("Modify Service Rate & Duration", 'title_medium', ['bold' => true]),
+                        SchemaResponse::text("Update the service name, duration in minutes, and base pricing.", 'body_small', ['color' => '#64748b']),
+                    ]),
+                ]),
+                SchemaResponse::divider(),
+                SchemaResponse::textInput('name', 'Service Name', $service->name),
+                SchemaResponse::textInput('price', "Price / Rate ({$currency})", number_format((float) ($service->price ?: $service->sale_price), 2, '.', ''), ['keyboard_type' => 'decimal']),
+                SchemaResponse::textInput('duration_minutes', 'Duration (Minutes)', (string) ($service->duration_minutes ?: 30), ['keyboard_type' => 'number']),
+                SchemaResponse::textInput('description', 'Description', (string) ($service->description ?? ''), ['max_lines' => 2]),
+                SchemaResponse::buttonPrimary('Save Changes', SchemaResponse::formSubmitAction(
+                    "/api/tenant/salon/services/{$service->id}",
+                    'POST',
+                    'Service updated successfully.',
+                    navigateBack: true,
+                    reload: true
+                ), 'save'),
+            ]),
+        ]);
+
+        return response()->json($sheet);
+    }
+
+    /**
+     * Update an existing salon service product.
+     * POST/PUT /api/tenant/salon/services/{id}
+     */
+    public function servicesUpdate(Request $request, int|string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $service = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->findOrFail((int) $id);
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'nullable|string|max:150',
+            'price' => 'nullable|numeric|min:0',
+            'sale_price' => 'nullable|numeric|min:0',
+            'duration_minutes' => 'nullable|integer|min:1|max:1440',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
+        }
+
+        $updates = [];
+        if ($request->filled('name')) {
+            $updates['name'] = $request->input('name');
+        }
+        if ($request->filled('price') || $request->filled('sale_price')) {
+            $rate = (float) $request->input('price', $request->input('sale_price'));
+            $updates['price'] = $rate;
+            $updates['sale_price'] = $rate;
+        }
+        if ($request->filled('duration_minutes')) {
+            $updates['duration_minutes'] = (int) $request->input('duration_minutes');
+        }
+        if ($request->has('description')) {
+            $updates['description'] = $request->input('description');
+        }
+        if ($request->has('category_id')) {
+            $rawCat = $request->input('category_id');
+            $updates['category_id'] = (! empty($rawCat) && is_numeric($rawCat)) ? (int) $rawCat : null;
+        }
+
+        $updates['type'] = 'service';
+        $updates['category_type'] = 'salon';
+
+        $service->update($updates);
+
+        AuditLog::record('salon.service_updated', $company->id, $user?->id, [
+            'product_id' => $service->id,
+            'updates' => $updates,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Service updated successfully.',
+            'service' => $service->fresh(),
+        ]);
+    }
+
+    /**
+     * Delete / deactivate a salon service product.
+     * DELETE /api/tenant/salon/services/{id}
+     */
+    public function servicesDestroy(Request $request, int|string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $service = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->findOrFail((int) $id);
+
+        $service->update(['active' => false]);
+
+        AuditLog::record('salon.service_deleted', $company->id, $user?->id, [
+            'product_id' => $service->id,
+            'name' => $service->name,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Service removed from catalog.',
+        ]);
+    }
+
     private function presentAppointment(SalonAppointment $appointment, string $timezone): array
     {
         return [
@@ -834,6 +1063,7 @@ class SalonApiController extends Controller
             'ends_at' => $appointment->ends_at?->copy()->setTimezone($timezone)->toIso8601String(),
             'status' => $appointment->status,
             'notes' => $appointment->notes,
+            'custom_fields' => $appointment->custom_fields ?? [],
             'sale_id' => $appointment->sale_id,
             'advance_paid' => (float) ($appointment->advance_paid ?? 0),
             'deposit_payment_method' => $appointment->deposit_payment_method,

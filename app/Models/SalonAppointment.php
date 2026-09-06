@@ -28,6 +28,7 @@ class SalonAppointment extends Model
         'deposit_payment_method',
         'chair_label',
         'service_items',
+        'custom_fields',
         'is_demo',
     ];
 
@@ -39,6 +40,7 @@ class SalonAppointment extends Model
             'advance_paid' => 'decimal:2',
             'is_demo' => 'boolean',
             'service_items' => 'array',
+            'custom_fields' => 'array',
         ];
     }
 

@@ -1625,10 +1625,10 @@ class SchemaResponse
                             ), 'add_circle'),
                         ]), 'add'),
                         self::dropdownSelect('device_category_id', 'Device Category *', $categoryOptions, $firstCatId, ['required' => true]),
-                        self::textInput('brand', 'Brand (e.g. Apple, Samsung, Dell, HP)', ''),
-                        self::textInput('model', 'Model Name / Number (e.g. iPhone 14 Pro, Galaxy S23)', ''),
-                        self::textInput('serial_or_imei', 'Serial Number or IMEI (Optional)', ''),
-                        self::textInput('passcode_or_pattern', 'Device Screen Lock Passcode / Pattern', ''),
+                        self::textInput('brand', $company->resolveFormFieldLabel('repair_intake', 'brand', 'Brand (e.g. Apple, Samsung, Dell, HP)'), ''),
+                        self::textInput('model', $company->resolveFormFieldLabel('repair_intake', 'model', 'Model Name / Number (e.g. iPhone 14 Pro, Galaxy S23)'), ''),
+                        self::textInput('serial_or_imei', $company->resolveFormFieldLabel('repair_intake', 'serial_or_imei', 'Serial Number or IMEI (Optional)'), ''),
+                        self::textInput('passcode_or_pattern', $company->resolveFormFieldLabel('repair_intake', 'passcode_or_pattern', 'Device Screen Lock Passcode / Pattern'), ''),
                         self::wrap($categoryBadges),
                     ],
                 ],
@@ -2183,9 +2183,13 @@ class SchemaResponse
         $services = Product::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('active', true)
-            ->whereNotNull('duration_minutes')
+            ->where(function ($q) {
+                $q->where('type', 'service')
+                    ->orWhere('duration_minutes', '>', 0)
+                    ->orWhere('category_type', 'salon');
+            })
             ->orderBy('name')
-            ->get(['id', 'name', 'duration_minutes', 'sale_price']);
+            ->get(['id', 'name', 'duration_minutes', 'price', 'sale_price']);
         $specialists = User::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('is_specialist', true)
@@ -2228,6 +2232,16 @@ class SchemaResponse
                 ), 'payments');
             }
 
+            $customBadges = [];
+            if (! empty($appointment->custom_fields) && is_array($appointment->custom_fields)) {
+                foreach ($appointment->custom_fields as $cfKey => $cfVal) {
+                    if (is_scalar($cfVal) && (string) $cfVal !== '') {
+                        $label = ucwords(str_replace('_', ' ', (string) $cfKey));
+                        $customBadges[] = self::badge("{$label}: {$cfVal}", '#6366f1', 'subtle', ['max_width' => 140]);
+                    }
+                }
+            }
+
             $appointmentCards[] = self::card([
                 self::row([
                     self::container([
@@ -2248,16 +2262,22 @@ class SchemaResponse
                         ...((float) $appointment->advance_paid > 0 ? [
                             self::badge("Advance: {$currency}".number_format((float) $appointment->advance_paid, 2), '#059669', 'subtle', ['max_width' => 124]),
                         ] : []),
+                        ...$customBadges,
                     ], ['flexible' => false, 'cross_axis_alignment' => 'end', 'spacing' => 4]),
                 ], ['spacing' => 8, 'cross_axis_alignment' => 'start']),
                 ! empty($actions) ? self::wrap($actions) : self::badge('Appointment closed', $statusColor, 'subtle'),
             ]);
         }
 
-        $serviceOptions = $services->map(fn (Product $service) => [
-            'label' => "{$service->name} · {$service->duration_minutes} min · {$currency}".number_format((float) $service->sale_price, 2),
-            'value' => (string) $service->id,
-        ])->all();
+        $serviceOptions = $services->map(function (Product $service) use ($currency) {
+            $duration = (int) ($service->duration_minutes ?: 30);
+            $rate = (float) ($service->price ?: $service->sale_price);
+
+            return [
+                'label' => "{$service->name} · {$duration} min · {$currency}".number_format($rate, 2),
+                'value' => (string) $service->id,
+            ];
+        })->all();
         $specialistOptions = $specialists->map(fn ($specialist) => [
             'label' => $specialist->name,
             'value' => (string) $specialist->id,
@@ -2267,6 +2287,15 @@ class SchemaResponse
             $time = sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
             $timeOptions[] = ['label' => Carbon::createFromFormat('H:i', $time)->format('g:i A'), 'value' => $time];
         }
+
+        $serviceLabel = $company->resolveFormFieldLabel('service_booking', 'service', 'Service & Duration');
+        $specialistLabel = $company->resolveFormFieldLabel('service_booking', 'specialist', 'Stylist / Specialist');
+        $dateLabel = $company->resolveFormFieldLabel('service_booking', 'appointment_date', 'Appointment Date');
+        $timeLabel = $company->resolveFormFieldLabel('service_booking', 'appointment_time', 'Start Time');
+        $nameLabel = $company->resolveFormFieldLabel('service_booking', 'client_name', 'Client Name');
+        $phoneLabel = $company->resolveFormFieldLabel('service_booking', 'client_phone', 'Client Phone');
+        $depositLabel = $company->resolveFormFieldLabel('service_booking', 'advance_deposit', 'Advance Deposit Amount (Optional)');
+        $notesLabel = $company->resolveFormFieldLabel('service_booking', 'booking_notes', 'Booking Notes');
 
         return self::screen('Service Booking Calendar', [
             self::card([
@@ -2282,23 +2311,25 @@ class SchemaResponse
                     self::badge('Appointments: '.$appointments->count(), '#7c3aed', 'subtle'),
                     self::badge('Checked In: '.$appointments->where('status', 'checked_in')->count(), '#0284c7', 'subtle'),
                     self::badge('Available Specialists: '.$specialists->count(), '#10b981', 'subtle'),
+                    self::buttonOutlined('Manage Rates & Services', self::navigateAction('/api/tenant/views/service-orders', title: 'Service Catalog & Rates'), 'format_list_bulleted'),
+                    self::buttonOutlined('Customize Form Labels', self::navigateAction('/api/tenant/views/settings-form-labels', title: 'Form Labels'), 'tune'),
                 ]),
             ]),
             self::accordionGroup('Book Appointment / Reserve Time Slot', [
-                self::dropdownSelect('service_id', 'Service & Duration', $serviceOptions),
-                self::dropdownSelect('specialist_id', 'Stylist / Specialist', $specialistOptions),
-                self::dateTimePicker('appointment_date', 'Appointment Date', $day->toDateString(), 'date'),
-                self::dropdownSelect('appointment_time', 'Start Time', $timeOptions, '09:00'),
-                self::textInput('customer_name', 'Client Name', ''),
-                self::textInput('customer_phone', 'Client Phone', '', ['keyboard_type' => 'phone']),
-                self::textInput('advance_paid', 'Advance Deposit Amount (Optional)', '0.00', ['keyboard_type' => 'decimal']),
+                self::dropdownSelect('service_id', $serviceLabel, $serviceOptions),
+                self::dropdownSelect('specialist_id', $specialistLabel, $specialistOptions),
+                self::dateTimePicker('appointment_date', $dateLabel, $day->toDateString(), 'date'),
+                self::dropdownSelect('appointment_time', $timeLabel, $timeOptions, '09:00'),
+                self::textInput('customer_name', $nameLabel, ''),
+                self::textInput('customer_phone', $phoneLabel, '', ['keyboard_type' => 'phone']),
+                self::textInput('advance_paid', $depositLabel, '0.00', ['keyboard_type' => 'decimal']),
                 self::dropdownSelect('deposit_payment_method', 'Advance Deposit Payment Method', [
                     ['label' => 'Cash', 'value' => 'cash'],
                     ['label' => 'Card', 'value' => 'card'],
                     ['label' => 'UPI / QR', 'value' => 'upi'],
                     ['label' => 'Bank Transfer', 'value' => 'bank_transfer'],
                 ], 'cash'),
-                self::textInput('notes', 'Booking Notes', '', ['max_lines' => 2]),
+                self::textInput('notes', $notesLabel, '', ['max_lines' => 2]),
                 self::buttonPrimary('Confirm Appointment', self::formSubmitAction(
                     '/api/tenant/salon/appointments',
                     'POST',
@@ -2342,44 +2373,238 @@ class SchemaResponse
         ]);
     }
 
+    public static function serviceCatalogRatesView(Company $company): array
+    {
+        return self::serviceOrdersView($company);
+    }
+
     public static function serviceOrdersView(Company $company): array
     {
         $currency = $company->currency_symbol ?: '$';
         $services = Product::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('active', true)
-            ->whereNotNull('duration_minutes')
+            ->where(function ($q) {
+                $q->where('type', 'service')
+                    ->orWhere('duration_minutes', '>', 0)
+                    ->orWhere('category_type', 'salon');
+            })
             ->orderBy('name')
             ->get();
-        $cards = $services->map(fn (Product $service) => self::card([
-            self::row([
-                self::icon('spa', ['color' => '#7c3aed', 'size' => 24]),
-                self::badge("{$service->duration_minutes} min", '#7c3aed', 'subtle'),
-            ], ['main_axis_alignment' => 'space_between']),
-            self::text($service->name, 'title_medium', ['bold' => true]),
-            self::text($service->description ?: 'Professional salon service', 'body_small', ['color' => '#64748b']),
-            self::row([
-                self::text($currency.number_format((float) $service->sale_price, 2), 'title_medium', ['bold' => true, 'color' => '#166534']),
-                self::buttonPrimary('Sell / Book', self::navigateAction('/api/tenant/views/salon-pos', title: 'Salon & Service POS'), 'add_shopping_cart'),
-            ], ['main_axis_alignment' => 'space_between']),
-        ]))->all();
+
+        $serviceCards = $services->map(function (Product $service) use ($currency) {
+            $duration = (int) ($service->duration_minutes ?: 30);
+            $rate = (float) ($service->price ?: $service->sale_price);
+
+            return self::card([
+                self::row([
+                    self::icon('spa', ['color' => '#7c3aed', 'size' => 24], ['flexible' => false]),
+                    self::column([
+                        self::text($service->name, 'title_medium', ['bold' => true, 'max_lines' => 2]),
+                        self::text($service->description ?: 'Professional service offering', 'body_small', ['color' => '#64748b', 'max_lines' => 2]),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                    self::column([
+                        self::badge("{$duration} min", '#7c3aed', 'subtle'),
+                        self::text("{$currency}".number_format($rate, 2), 'title_large', ['bold' => true, 'color' => '#166534']),
+                    ], ['flexible' => false, 'cross_axis_alignment' => 'end', 'spacing' => 4]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'start']),
+                self::divider(),
+                self::row([
+                    self::buttonOutlined('Edit Rate', self::openRemoteSheetAction(
+                        "/api/tenant/salon/services/{$service->id}/edit-sheet",
+                        "Edit {$service->name}"
+                    ), 'edit', ['expanded' => true, 'dense' => true, 'color' => '#7c3aed']),
+                    self::buttonDanger('Remove', self::apiPostAction(
+                        "/api/tenant/salon/services/{$service->id}/delete",
+                        [],
+                        'Service removed.',
+                        reload: true
+                    ), 'delete_outline', ['expanded' => true, 'dense' => true]),
+                ], ['spacing' => 10]),
+            ], ['padding' => 14, 'border_radius' => 12]);
+        })->all();
 
         return self::screen('Service Catalog & Rates', [
             self::card([
                 self::row([
-                    self::icon('spa', ['color' => '#7c3aed', 'size' => 28]),
+                    self::icon('spa', ['color' => '#7c3aed', 'size' => 28], ['flexible' => false]),
                     self::column([
-                        self::text('Service Catalog & Appointment Bookings', 'title_medium', ['bold' => true]),
-                        self::text('Service packages, durations, tiered pricing, and active bookings.', 'body_small', ['color' => '#64748b']),
+                        self::text('Service Catalog & Pricing Rates', 'title_medium', ['bold' => true]),
+                        self::text('Define service offerings, standard durations in minutes, and hourly / flat rates.', 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+                self::divider(),
+                self::wrap([
+                    self::badge('Services Configured: '.$services->count(), '#7c3aed', 'subtle'),
+                    self::badge('Duration-based scheduling active', '#10b981', 'subtle'),
+                ]),
+                self::divider(),
+                self::row([
+                    self::buttonPrimary('+ Add New Service', self::navigateAction('/api/tenant/views/service-create', title: 'Add New Service'), 'add', ['expanded' => true]),
+                    self::buttonOutlined('Open Calendar', self::navigateAction('/api/tenant/views/service-calendar', title: 'Service Calendar'), 'calendar_month', ['expanded' => true]),
+                ], ['spacing' => 10]),
+            ]),
+
+            self::card([
+                self::text('Active Services in Catalog', 'title_medium', ['bold' => true]),
+                self::text('All services configured here appear instantly in the appointment calendar and POS registers.', 'body_small', ['color' => '#64748b']),
+            ]),
+
+            self::column($serviceCards ?: [
+                self::card([
+                    self::column([
+                        self::text('No services configured yet.', 'title_medium', ['bold' => true, 'color' => '#64748b']),
+                        self::text('Click "+ Add New Service" above to add your first service to the catalog.', 'body_small', ['color' => '#64748b']),
+                        self::buttonPrimary('+ Add New Service', self::navigateAction('/api/tenant/views/service-create', title: 'Add New Service'), 'add', ['full_width' => false]),
+                    ], ['spacing' => 8, 'cross_axis_alignment' => 'center']),
+                ]),
+            ], ['spacing' => 10]),
+        ]);
+    }
+
+    public static function serviceCreateView(Company $company): array
+    {
+        $currency = $company->currency_symbol ?: '$';
+
+        $categories = Category::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        $categoryOptions = [
+            ['label' => 'General Service / Uncategorized', 'value' => ''],
+        ];
+        foreach ($categories as $cat) {
+            $categoryOptions[] = [
+                'label' => $cat->name,
+                'value' => (string) $cat->id,
+            ];
+        }
+
+        return self::screen('Add New Service', [
+            self::card([
+                self::row([
+                    self::icon('playlist_add', ['color' => '#166534', 'size' => 28], ['flexible' => false]),
+                    self::column([
+                        self::text('Register New Service', 'title_medium', ['bold' => true]),
+                        self::text('Add a bookable service or treatment to your catalog with standard duration and pricing.', 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+            ]),
+
+            self::card([
+                self::column([
+                    self::text('Service Details', 'title_medium', ['bold' => true]),
+                    self::divider(),
+                    self::textInput('name', 'Service Name *', '', [
+                        'placeholder' => 'e.g. Haircut & Styling, Deep Tissue Massage, Beard Grooming',
+                        'required' => true,
+                    ]),
+                    self::textInput('price', "Price / Labor Rate * ({$currency})", '0.00', [
+                        'keyboard_type' => 'decimal',
+                        'placeholder' => '0.00',
+                        'required' => true,
+                    ]),
+                    self::textInput('duration_minutes', 'Standard Duration (Minutes) *', '30', [
+                        'keyboard_type' => 'number',
+                        'placeholder' => '30',
+                        'required' => true,
+                    ]),
+                    self::dropdownSelect('category_id', 'Category / Department', $categoryOptions, ''),
+                    self::textInput('description', 'Service Description / Inclusions (Optional)', '', [
+                        'max_lines' => 3,
+                        'placeholder' => 'Describe what is included in this service offering...',
+                    ]),
+                    self::divider(),
+                    self::buttonPrimary('Save & Add to Catalog', self::formSubmitAction(
+                        '/api/tenant/salon/services',
+                        'POST',
+                        'Service added to catalog successfully.',
+                        navigateBack: true,
+                        reload: true
+                    ), 'check_circle', ['color' => '#166534']),
+                    self::buttonOutlined('View Service Catalog', self::navigateAction(
+                        '/api/tenant/views/service-catalog',
+                        title: 'Service Catalog & Rates'
+                    ), 'format_list_bulleted'),
+                ], ['spacing' => 12]),
+            ]),
+        ]);
+    }
+
+    public static function formLabelsView(Company $company): array
+    {
+        $customizations = $company->form_field_customizations ?? [];
+        if (! is_array($customizations)) {
+            $customizations = [];
+        }
+
+        $booking = $company->getFormFieldLabels('service_booking');
+        $repair = $company->getFormFieldLabels('repair_intake');
+        $customer = $company->getFormFieldLabels('customer');
+
+        return self::screen('Form Field Customizations', [
+            self::card([
+                self::row([
+                    self::icon('tune', ['color' => '#7c3aed', 'size' => 28]),
+                    self::column([
+                        self::text('Custom Form Labels & Fields', 'title_medium', ['bold' => true]),
+                        self::text('Rename field placeholders and labels to tailor forms to your business vertical (Salon, HVAC, Auto, Retail).', 'body_small', ['color' => '#64748b']),
                     ]),
                 ]),
                 self::divider(),
                 self::wrap([
-                    self::badge('Services: '.$services->count(), '#7c3aed', 'subtle'),
-                    self::badge('Duration-based scheduling active', '#10b981', 'subtle'),
+                    self::badge('Service Booking', '#7c3aed', 'subtle'),
+                    self::badge('Repair Intake', '#0284c7', 'subtle'),
+                    self::badge('Customer CRM', '#10b981', 'subtle'),
                 ]),
             ]),
-            self::gridView($cards ?: [self::text('No timed services configured yet.', 'body_medium', ['color' => '#64748b'])], 2),
+
+            self::accordionGroup('Service & Salon Booking Form Labels', [
+                self::text('Labels displayed on the Service Booking Calendar & appointment sheets.', 'body_small', ['color' => '#64748b']),
+                self::textInput('service_booking[service]', 'Service Selector Label', $booking['service'] ?? 'Service & Duration'),
+                self::textInput('service_booking[specialist]', 'Stylist / Specialist Label', $booking['specialist'] ?? 'Stylist / Specialist'),
+                self::textInput('service_booking[client_name]', 'Client Name Field Label', $booking['client_name'] ?? 'Client Name'),
+                self::textInput('service_booking[client_phone]', 'Client Phone Field Label', $booking['client_phone'] ?? 'Client Phone'),
+                self::textInput('service_booking[appointment_date]', 'Appointment Date Label', $booking['appointment_date'] ?? 'Appointment Date'),
+                self::textInput('service_booking[appointment_time]', 'Start Time Label', $booking['appointment_time'] ?? 'Start Time'),
+                self::textInput('service_booking[advance_deposit]', 'Advance Deposit Label', $booking['advance_deposit'] ?? 'Advance Deposit Amount (Optional)'),
+                self::textInput('service_booking[booking_notes]', 'Booking Notes Label', $booking['booking_notes'] ?? 'Booking Notes'),
+                self::buttonPrimary('Save Booking Labels', self::formSubmitAction(
+                    '/api/tenant/settings/form-labels',
+                    'POST',
+                    'Booking labels updated successfully.',
+                    reload: true
+                ), 'save'),
+            ], ['initially_expanded' => true]),
+
+            self::accordionGroup('Repair & Service Intake Form Labels', [
+                self::text('Labels displayed on Repair Intake and Device Job creation screens.', 'body_small', ['color' => '#64748b']),
+                self::textInput('repair_intake[brand]', 'Brand Field Label', $repair['brand'] ?? 'Brand (e.g. Apple, Samsung, Dell, HP)'),
+                self::textInput('repair_intake[model]', 'Model Field Label', $repair['model'] ?? 'Model Name / Number (e.g. iPhone 14 Pro, Galaxy S23)'),
+                self::textInput('repair_intake[serial_or_imei]', 'Serial / Identifier Field Label', $repair['serial_or_imei'] ?? 'Serial Number or IMEI (Optional)'),
+                self::textInput('repair_intake[passcode_or_pattern]', 'Passcode / Security Note Label', $repair['passcode_or_pattern'] ?? 'Device Screen Lock Passcode / Pattern'),
+                self::buttonPrimary('Save Repair Labels', self::formSubmitAction(
+                    '/api/tenant/settings/form-labels',
+                    'POST',
+                    'Repair labels updated successfully.',
+                    reload: true
+                ), 'save'),
+            ]),
+
+            self::accordionGroup('Customer & CRM Form Labels', [
+                self::text('Labels displayed on Customer creation and CRM modal dialogs.', 'body_small', ['color' => '#64748b']),
+                self::textInput('customer[name]', 'Customer Name Label', $customer['name'] ?? 'Customer Full Name'),
+                self::textInput('customer[phone]', 'Customer Phone Label', $customer['phone'] ?? 'Contact Phone Number'),
+                self::buttonPrimary('Save Customer Labels', self::formSubmitAction(
+                    '/api/tenant/settings/form-labels',
+                    'POST',
+                    'Customer labels updated successfully.',
+                    reload: true
+                ), 'save'),
+            ]),
         ]);
     }
 
@@ -3844,7 +4069,7 @@ class SchemaResponse
             return 'pos.view';
         }
 
-        if (in_array($normalized, ['service-calendar', 'service-orders'], true)) {
+        if (in_array($normalized, ['service-calendar', 'service-orders', 'service-catalog', 'service-rates', 'service-create', 'add-service'], true)) {
             return 'service_orders.view';
         }
 
@@ -3915,6 +4140,7 @@ class SchemaResponse
             'settings-taxes', 'taxes' => self::taxesView($company),
             'settings-api', 'api', 'api-integrations' => self::apiView($company),
             'settings-navigation', 'navigation', 'navigation-menu' => self::navigationView($company),
+            'settings-form-labels', 'form-labels', 'custom-form-fields' => self::formLabelsView($company),
             'settings-notifications', 'notifications', 'custom-notifications' => self::notificationsView($company),
             'settings-advanced', 'advanced', 'danger-zone' => self::advancedView($company),
             'restaurant-tables', 'tables', 'floor-plan' => self::restaurantTablesView($company),
@@ -3933,7 +4159,8 @@ class SchemaResponse
             'repair-pos' => self::repairPosView($company),
             'service-calendar', 'calendar' => self::serviceCalendarView($company),
             'service-stylists', 'stylists' => self::serviceStylistsView($company),
-            'service-orders' => self::serviceOrdersView($company),
+            'service-orders', 'service-catalog', 'service-rates' => self::serviceCatalogRatesView($company),
+            'service-create', 'add-service' => self::serviceCreateView($company),
             'change-password', 'password' => self::changePasswordView($company),
             'roles', 'roles-create', 'manage-roles' => self::rolesView($company),
             'pos', 'point-of-sale' => self::posView($company),

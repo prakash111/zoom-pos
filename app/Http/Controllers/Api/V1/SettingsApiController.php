@@ -964,4 +964,77 @@ class SettingsApiController extends Controller
             'navigation_labels' => $company->fresh()->navigation_labels ?? (object) [],
         ]);
     }
+
+    public function getFormLabels(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $form = $request->query('form') ?: $request->query('form_key');
+
+        if ($form) {
+            return response()->json([
+                'success' => true,
+                'form' => $form,
+                'labels' => $company->getFormFieldLabels($form),
+                'form_field_customizations' => $company->form_field_customizations ?? (object) [],
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'form_field_customizations' => $company->form_field_customizations ?? (object) [],
+        ]);
+    }
+
+    public function updateFormLabels(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $form = $request->input('form') ?: $request->input('form_key') ?: 'service_booking';
+        $incomingLabels = $request->input('labels');
+        $currentCustomizations = $company->form_field_customizations ?? [];
+        if (! is_array($currentCustomizations)) {
+            $currentCustomizations = [];
+        }
+
+        if (is_array($incomingLabels)) {
+            $currentCustomizations[$form] = array_merge(
+                (array) ($currentCustomizations[$form] ?? []),
+                $incomingLabels
+            );
+        } elseif ($request->has('form_field_customizations') && is_array($request->input('form_field_customizations'))) {
+            $currentCustomizations = array_merge($currentCustomizations, $request->input('form_field_customizations'));
+        } else {
+            $hasNested = false;
+            foreach ($request->except(['_token', 'api_key', 'token']) as $k => $v) {
+                if (is_array($v) && in_array($k, ['service_booking', 'repair_intake', 'customer', 'invoice', 'checkout'], true)) {
+                    $currentCustomizations[$k] = array_merge((array) ($currentCustomizations[$k] ?? []), $v);
+                    $hasNested = true;
+                }
+            }
+            if (! $hasNested) {
+                $sanitized = [];
+                foreach ($request->except(['_token', 'api_key', 'token', 'form', 'form_key']) as $k => $v) {
+                    if (is_string($k)) {
+                        $sanitized[trim($k)] = $v;
+                    }
+                }
+                $currentCustomizations[$form] = array_merge(
+                    (array) ($currentCustomizations[$form] ?? []),
+                    $sanitized
+                );
+            }
+        }
+
+        $company->update(['form_field_customizations' => $currentCustomizations]);
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'form_labels', 'form' => $form]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Form labels updated successfully.',
+            'form' => $form,
+            'labels' => $company->fresh()->getFormFieldLabels($form),
+            'form_field_customizations' => $company->fresh()->form_field_customizations ?? (object) [],
+        ]);
+    }
 }

@@ -32,7 +32,7 @@ class Company extends Model
         'email', 'phone', 'website', 'address', 'city', 'state', 'postal_code', 'country', 'currency',
         'language', 'default_locale', 'timezone', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'accent_color', 'drawer_bg', 'drawer_gradient_enabled', 'drawer_gradient_start', 'drawer_gradient_end', 'drawer_gradient_direction', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'licensed_modules', 'nav_config', 'receipt_format', 'status', 'is_seeding_complete', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
         'max_users', 'max_devices', 'pricing_mode', 'tax_api_mode', 'tax_api_key', 'tax_api_endpoint',
-        'navigation_menu_customization', 'navigation_labels',
+        'navigation_menu_customization', 'navigation_labels', 'form_field_customizations',
         'invoice_prefix', 'quotation_prefix', 'repair_prefix', 'prescription_prefix', 'salon_prefix', 'tax_settings', 'invoice_terms', 'quote_terms', 'bank_details',
         'currency_symbol', 'currency_decimals', 'currency_symbol_position', 'other_currencies',
         'default_commission_rate', 'default_commission_type',
@@ -57,11 +57,45 @@ class Company extends Model
             'nav_config' => 'array',
             'navigation_menu_customization' => 'array',
             'navigation_labels' => 'array',
+            'form_field_customizations' => 'array',
             'default_commission_rate' => 'decimal:2',
             'card_fee_debit' => 'decimal:2',
             'card_fee_credit_1x' => 'decimal:2',
             'card_fee_credit_installments' => 'array',
         ];
+    }
+
+    /**
+     * Return custom form field labels for a specific form schema.
+     */
+    public function getFormFieldLabels(string $formKey): array
+    {
+        $custom = $this->form_field_customizations ?? [];
+        if (is_string($custom)) {
+            $custom = json_decode($custom, true) ?: [];
+        }
+
+        return (array) ($custom[$formKey] ?? []);
+    }
+
+    /**
+     * Resolve a single form field label with aliases and fallback.
+     */
+    public function resolveFormFieldLabel(string $formKey, string $fieldKey, string $default): string
+    {
+        $labels = $this->getFormFieldLabels($formKey);
+        $candidateKeys = [
+            $fieldKey,
+            str_replace('-', '_', $fieldKey),
+            str_replace('_', '-', $fieldKey),
+        ];
+        foreach ($candidateKeys as $k) {
+            if (! empty($labels[$k]) && is_string($labels[$k])) {
+                return $labels[$k];
+            }
+        }
+
+        return $default;
     }
 
     /**

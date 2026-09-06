@@ -412,6 +412,8 @@ class SduiViewApiTest extends TestCase
             'service-calendar' => 'Service Booking Calendar',
             'service-stylists' => 'Specialists & Stylists',
             'service-orders' => 'Service Catalog & Rates',
+            'service-catalog' => 'Service Catalog & Rates',
+            'service-create' => 'Add New Service',
             'change-password' => 'Change Password',
         ];
 

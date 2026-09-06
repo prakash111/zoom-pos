@@ -417,7 +417,9 @@ class AppBootstrapApiTest extends TestCase
         $serviceItems = collect($menu['salon_bookings']['items'])->pluck('key')->all();
         $this->assertContains('service_calendar', $serviceItems);
         $this->assertContains('service_stylists', $serviceItems);
-        $this->assertContains('service_orders', $serviceItems);
+        $this->assertContains('service_catalog', $serviceItems);
+        $this->assertContains('service_create', $serviceItems);
+        $this->assertNotContains('service_orders', $serviceItems);
     }
 }
 

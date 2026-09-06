@@ -185,6 +185,12 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
         Route::post('/appointments/{id}/status', [SalonApiController::class, 'appointmentsUpdateStatus'])->middleware('tenant.api.permission:service_orders,edit');
         Route::get('/specialists', [SalonApiController::class, 'specialistsIndex'])->middleware('tenant.api.permission:users,view');
         Route::post('/specialists/{id}/toggle', [SalonApiController::class, 'specialistsToggle'])->middleware('tenant.api.permission:users,edit');
+        Route::get('/services', [SalonApiController::class, 'servicesIndex'])->middleware('tenant.api.permission:service_orders,view');
+        Route::post('/services', [SalonApiController::class, 'servicesStore'])->middleware('tenant.api.permission:service_orders,create');
+        Route::get('/services/{id}/edit-sheet', [SalonApiController::class, 'servicesEditSheet'])->middleware('tenant.api.permission:service_orders,view');
+        Route::match(['post', 'put'], '/services/{id}', [SalonApiController::class, 'servicesUpdate'])->middleware('tenant.api.permission:service_orders,edit');
+        Route::delete('/services/{id}', [SalonApiController::class, 'servicesDestroy'])->middleware('tenant.api.permission:service_orders,edit');
+        Route::post('/services/{id}/delete', [SalonApiController::class, 'servicesDestroy'])->middleware('tenant.api.permission:service_orders,edit');
     });
 
     // One-Click Demo Data Purge
@@ -196,6 +202,13 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::post('/tenant/settings/navigation-labels', [SettingsApiController::class, 'updateNavigationLabels'])->middleware('tenant.api.permission:settings,edit');
     Route::get('/app/settings/navigation-labels', [SettingsApiController::class, 'getNavigationLabels'])->middleware('tenant.api.permission:settings,view');
     Route::post('/app/settings/navigation-labels', [SettingsApiController::class, 'updateNavigationLabels'])->middleware('tenant.api.permission:settings,edit');
+
+    // Form Field Labels & Dynamic Custom Fields
+    Route::get('/tenant/settings/form-labels', [SettingsApiController::class, 'getFormLabels'])->middleware('tenant.api.permission:settings,view');
+    Route::post('/tenant/settings/form-labels', [SettingsApiController::class, 'updateFormLabels'])->middleware('tenant.api.permission:settings,edit');
+    Route::get('/app/settings/form-labels', [SettingsApiController::class, 'getFormLabels'])->middleware('tenant.api.permission:settings,view');
+    Route::post('/app/settings/form-labels', [SettingsApiController::class, 'updateFormLabels'])->middleware('tenant.api.permission:settings,edit');
+
     Route::delete('/tenant/products/{id}', [PosSyncApiController::class, 'inventoryDestroyProduct'])->middleware('tenant.api.permission:products,edit');
     Route::delete('/app/products/{id}', [PosSyncApiController::class, 'inventoryDestroyProduct'])->middleware('tenant.api.permission:products,edit');
 
@@ -343,6 +356,8 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/taxes/{id}/set-default', [PosSyncApiController::class, 'taxRulesSetDefault'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/settings/navigation-labels', [SettingsApiController::class, 'getNavigationLabels'])->middleware('tenant.api.permission:settings,view');
         Route::post('/settings/navigation-labels', [SettingsApiController::class, 'updateNavigationLabels'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/settings/form-labels', [SettingsApiController::class, 'getFormLabels'])->middleware('tenant.api.permission:settings,view');
+        Route::post('/settings/form-labels', [SettingsApiController::class, 'updateFormLabels'])->middleware('tenant.api.permission:settings,edit');
 
         // Subscription & Billing
         Route::get('/subscription', [PosSyncApiController::class, 'subscription']);
@@ -523,6 +538,12 @@ Route::prefix('v1/pos')->group(function () {
             Route::post('/appointments/{id}/status', [SalonApiController::class, 'appointmentsUpdateStatus'])->middleware('tenant.api.permission:service_orders,edit');
             Route::get('/specialists', [SalonApiController::class, 'specialistsIndex'])->middleware('tenant.api.permission:users,view');
             Route::post('/specialists/{id}/toggle', [SalonApiController::class, 'specialistsToggle'])->middleware('tenant.api.permission:users,edit');
+            Route::get('/services', [SalonApiController::class, 'servicesIndex'])->middleware('tenant.api.permission:service_orders,view');
+            Route::post('/services', [SalonApiController::class, 'servicesStore'])->middleware('tenant.api.permission:service_orders,create');
+            Route::get('/services/{id}/edit-sheet', [SalonApiController::class, 'servicesEditSheet'])->middleware('tenant.api.permission:service_orders,view');
+            Route::match(['post', 'put'], '/services/{id}', [SalonApiController::class, 'servicesUpdate'])->middleware('tenant.api.permission:service_orders,edit');
+            Route::delete('/services/{id}', [SalonApiController::class, 'servicesDestroy'])->middleware('tenant.api.permission:service_orders,edit');
+            Route::post('/services/{id}/delete', [SalonApiController::class, 'servicesDestroy'])->middleware('tenant.api.permission:service_orders,edit');
         });
 
         // Sales Targets & Goals
