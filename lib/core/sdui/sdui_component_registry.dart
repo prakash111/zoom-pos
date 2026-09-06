@@ -27,7 +27,9 @@ import '../../features/settings/screens/tenant_settings_screen.dart';
 import '../../features/staff/screens/staff_screen.dart';
 import '../../features/subscription/screens/subscription_screen.dart';
 import '../../features/taxes/screens/taxes_screen.dart';
+import '../../features/auth/screens/login_screen.dart';
 import '../config/bootstrap_cache.dart';
+import '../widgets/barcode_scanner_screen.dart';
 import '../widgets/coming_soon_screen.dart';
 import 'screens/dynamic_module_screen.dart';
 import 'screens/dynamic_schema_page.dart';
@@ -120,52 +122,50 @@ class SduiComponentRegistry {
     'languages': (_) => const LanguagesScreen(),
     'staff': (_) => const StaffScreen(),
     'devices': (_) => const DevicesScreen(),
-    'service_catalog': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/views/service-catalog',
-          initialTitle: 'Service Catalog & Rates',
-        ),
-    'service-catalog': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/views/service-catalog',
-          initialTitle: 'Service Catalog & Rates',
-        ),
-    'service_rates': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/views/service-catalog',
-          initialTitle: 'Service Catalog & Rates',
-        ),
-    'service-rates': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/views/service-catalog',
-          initialTitle: 'Service Catalog & Rates',
-        ),
-    'service_create': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/views/service-create',
-          initialTitle: 'Add New Service',
-        ),
-    'service-create': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/views/service-create',
-          initialTitle: 'Add New Service',
-        ),
-    'add_service': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/views/service-create',
-          initialTitle: 'Add New Service',
-        ),
-    'add-service': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/views/service-create',
-          initialTitle: 'Add New Service',
-        ),
-    'service_calendar': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/views/service-calendar',
-          initialTitle: 'Service Booking Calendar',
-        ),
-    'form_labels': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/views/settings-form-labels',
-          initialTitle: 'Custom Form Labels',
-        ),
-    'settings_form_labels': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/views/settings-form-labels',
-          initialTitle: 'Custom Form Labels',
-        ),
     'dynamic_page': (_) => const DynamicSchemaPage(),
   };
+
+  /// Universal Dynamic SDUI Route Resolver.
+  /// Resolves any route to a screen widget. Reserved local overrides (login,
+  /// barcode_scanner) and pre-registered native screens are resolved locally;
+  /// every other menu route universally falls back to [DynamicSchemaPage] to
+  /// load its schema dynamically from the server without requiring client code changes.
+  static Widget resolveRoute(String route, {Map<String, dynamic>? arguments}) {
+    final clean = route.trim();
+    final key = clean.toLowerCase();
+
+    // 1. Reserved local overrides (authentication, raw camera/hardware scanners)
+    switch (key) {
+      case 'login':
+        return const LoginScreen();
+      case 'barcode_scanner':
+      case 'scanner':
+        return const BarcodeScannerScreen();
+    }
+
+    // Pre-registered native screens when invoked by route key (not an explicit API endpoint)
+    if (!clean.startsWith('/api/') && instance.has(key)) {
+      final builder = instance._registry[key];
+      if (builder != null) {
+        return Builder(builder: builder);
+      }
+    }
+
+    // 2. UNIVERSAL FALLBACK: Every other menu route loads dynamically from the server endpoint
+    final title = arguments?['title']?.toString() ??
+        arguments?['label']?.toString() ??
+        '';
+    final endpoint = clean.startsWith('/api/')
+        ? clean
+        : '/api/tenant/views/${clean.replaceAll('_', '-')}';
+
+    return DynamicSchemaPage(
+      endpoint: endpoint,
+      initialTitle: title,
+      title: title,
+      arguments: arguments,
+    );
+  }
 
   /// Register or override a component builder at runtime.
   void register(String componentKey, WidgetBuilder builder) {
@@ -194,6 +194,12 @@ class SduiComponentRegistry {
       return (_) => DynamicSchemaPage(
             endpoint: targetEndpoint.trim(),
             initialTitle: title ?? componentKey,
+            title: title ?? componentKey,
+            arguments: {
+              'id': componentKey,
+              'title': title ?? componentKey,
+              'route': targetEndpoint.trim(),
+            },
           );
     }
 
@@ -215,10 +221,20 @@ class SduiComponentRegistry {
           );
     }
 
-    // Route all unfamiliar paths to DynamicSchemaPage so new pages render purely from JSON
+    // Route all unfamiliar paths universally to DynamicSchemaPage so new pages render purely from JSON
+    final clean = key!;
+    final endpoint = clean.startsWith('/api/')
+        ? clean
+        : '/api/tenant/views/${clean.replaceAll('_', '-')}';
     return (_) => DynamicSchemaPage(
-          endpoint: '/api/tenant/views/${key!.replaceAll('_', '-')}',
-          initialTitle: componentKey,
+          endpoint: endpoint,
+          initialTitle: title ?? componentKey,
+          title: title ?? componentKey,
+          arguments: {
+            'id': componentKey,
+            'title': title ?? componentKey,
+            'route': endpoint,
+          },
         );
   }
 }

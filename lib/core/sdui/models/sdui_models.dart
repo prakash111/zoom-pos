@@ -150,6 +150,7 @@ class SduiNavItemSchema {
 
   String? get effectiveParentId => parentId ?? parent;
   bool get isAccordion => type == 'accordion' || children.isNotEmpty;
+  String? get route => targetEndpoint;
 
   factory SduiNavItemSchema.fromJson(Map<String, dynamic> json) {
     final rawParent =
@@ -197,7 +198,7 @@ class SduiNavItemSchema {
       type: json['type']?.toString() ??
           (parsedChildren.isNotEmpty ? 'accordion' : 'link'),
       targetEndpoint:
-          json['target_endpoint']?.toString() ?? json['endpoint']?.toString(),
+          json['target_endpoint']?.toString() ?? json['endpoint']?.toString() ?? json['route']?.toString(),
       children: parsedChildren,
     );
   }

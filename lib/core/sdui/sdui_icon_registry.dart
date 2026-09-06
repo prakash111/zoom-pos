@@ -35,6 +35,10 @@ class SduiIconRegistry {
     'cut': Icons.content_cut_outlined,
     'event_available': Icons.event_available_outlined,
     'schedule': Icons.schedule_outlined,
+    'calendar_month': Icons.calendar_month_outlined,
+    'add_task': Icons.add_task_outlined,
+    'edit_calendar': Icons.edit_calendar_outlined,
+    'bookmark_add': Icons.bookmark_add_outlined,
 
     // Financial
     'savings': Icons.savings_outlined,
@@ -105,7 +109,13 @@ class SduiIconRegistry {
     'done_all': Icons.done_all,
     'widgets': Icons.widgets_outlined,
     'category': Icons.category_outlined,
+    'circle': Icons.circle_outlined,
+    'store': Icons.storefront_outlined,
   };
+
+  /// Direct icon lookup alias matching `SduiIconRegistry.get(...)`.
+  static IconData get(String? iconName, {IconData fallback = Icons.widgets_outlined}) =>
+      resolve(iconName, fallback: fallback);
 
   /// Resolves an icon name from server payload to an [IconData].
   static IconData resolve(String? iconName, {IconData fallback = Icons.widgets_outlined}) {

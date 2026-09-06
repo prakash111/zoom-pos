@@ -10,7 +10,7 @@ import '../config/bootstrap_cache.dart';
 import '../services/thermal/thermal_printer_service.dart' show ReceiptLine;
 import 'dynamic_schema_context.dart';
 import 'dynamic_schema_parser.dart';
-import 'screens/dynamic_schema_page.dart';
+import 'sdui_component_registry.dart';
 
 typedef SduiRequestExecutor = Future<Map<String, dynamic>> Function(
   String endpoint, {
@@ -88,22 +88,40 @@ class SduiActionDispatcher {
     switch (type) {
       case 'navigate':
         final endpoint = action['endpoint']?.toString() ??
-            action['target_endpoint']?.toString();
-        final title = action['title']?.toString();
+            action['target_endpoint']?.toString() ??
+            action['route']?.toString();
 
         if (endpoint != null && endpoint.isNotEmpty) {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => DynamicSchemaPage(
-                endpoint: endpoint,
-                initialTitle: title,
-                apiClient: client,
-                requestExecutor: requestExecutor,
+              builder: (_) => SduiComponentRegistry.resolveRoute(
+                endpoint,
+                arguments: action,
               ),
             ),
           );
         } else {
           showToast('Navigation action is missing an endpoint.', isError: true);
+        }
+        break;
+
+      case 'toast_and_navigate':
+        final message = action['message']?.toString() ??
+            action['success_toast']?.toString() ??
+            'Success';
+        showToast(message);
+        final route = action['route']?.toString() ??
+            action['endpoint']?.toString() ??
+            action['target_endpoint']?.toString();
+        if (route != null && route.isNotEmpty && context.mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => SduiComponentRegistry.resolveRoute(
+                route,
+                arguments: action,
+              ),
+            ),
+          );
         }
         break;
 
@@ -159,8 +177,26 @@ class SduiActionDispatcher {
           if (action['reload'] == true) {
             onReload();
           }
+          final resAction = res['action']?.toString();
+          final redirectRoute = res['route']?.toString() ??
+              res['redirect_route']?.toString() ??
+              action['redirect_route']?.toString() ??
+              action['route']?.toString();
+
           if (context.mounted && _isPostSaleSheetResponse(res)) {
             await _showPostSaleSheet(context, res['post_sale_sheet']['data']);
+          } else if (resAction == 'toast_and_navigate' ||
+              (redirectRoute != null && redirectRoute.isNotEmpty)) {
+            if (context.mounted && redirectRoute != null && redirectRoute.isNotEmpty) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => SduiComponentRegistry.resolveRoute(
+                    redirectRoute,
+                    arguments: res,
+                  ),
+                ),
+              );
+            }
           } else if (navigateBack && context.mounted) {
             Navigator.of(context).pop();
           }

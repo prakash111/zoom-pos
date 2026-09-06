@@ -25,15 +25,18 @@ class DynamicSchemaPage extends StatefulWidget {
     super.key,
     this.endpoint,
     this.schema,
-    this.initialTitle,
+    String? initialTitle,
+    String? title,
+    this.arguments,
     this.apiClient,
     this.requestExecutor,
     this.embedded = false,
-  });
+  }) : initialTitle = initialTitle ?? title;
 
   final String? endpoint;
   final Map<String, dynamic>? schema;
   final String? initialTitle;
+  final Map<String, dynamic>? arguments;
   final ApiClient? apiClient;
   final DynamicSchemaRequest? requestExecutor;
   final bool embedded;
