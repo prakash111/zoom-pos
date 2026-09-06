@@ -290,6 +290,59 @@ void main() {
       expect(formValues['primary_color'], matches(RegExp(r'^#[0-9A-F]{6}$')));
       expect(find.byType(TextField), findsNothing);
     });
+
+    testWidgets(
+        'cash_tendered_field computes CHANGE DUE live, on-device, no round trip',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(500, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final formValues = <String, dynamic>{};
+      var dispatched = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: formValues,
+              setFormValue: (key, value) => formValues[key] = value,
+              dispatchAction: (_) async => dispatched++,
+              child: Builder(
+                builder: (context) => DynamicSchemaParser.buildComponent(
+                  context,
+                  {
+                    'type': 'cash_tendered_field',
+                    'name': 'tendered',
+                    'total': 7215.95,
+                    'currency': r'$',
+                    'initial_value': '7215.95',
+                    'quick_cash': [7215.95, 7216.00, 7220.00],
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Starts at exact tender -> no change due.
+      expect(find.text(r'$0.00'), findsOneWidget);
+      expect(formValues['tendered'], '7215.95');
+
+      // Typing recomputes CHANGE DUE with zero network calls.
+      await tester.enterText(find.byType(TextField), '7300');
+      await tester.pump();
+      expect(find.text(r'$84.05'), findsOneWidget);
+      expect(formValues['tendered'], '7300.00');
+
+      // A quick-cash chip sets the field and recomputes locally.
+      await tester.tap(find.text(r'$7220.00'));
+      await tester.pump();
+      expect(find.text(r'$4.05'), findsOneWidget);
+      expect(formValues['tendered'], '7220.00');
+
+      expect(dispatched, 0, reason: 'change-due math must never hit dispatch');
+    });
   });
 
   group('Declarative SDUI Schema Parser - Lists, Tables & Stepper', () {

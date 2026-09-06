@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -212,12 +214,14 @@ class SduiActionDispatcher {
         break;
 
       case 'open_modal':
-        _showComponentSheet(
+        // Fire-and-forget: dispatch() returns once the sheet is shown, not
+        // when it is dismissed (the sheet future resolves on dismiss).
+        unawaited(_showComponentSheet(
           context,
           title: action['title']?.toString() ?? '',
           components: action['components'] as List<dynamic>? ?? const [],
           client: client,
-        );
+        ));
         break;
 
       case 'open_remote_sheet':
@@ -325,7 +329,7 @@ class SduiActionDispatcher {
     Map<String, dynamic> sheetSchema;
     try {
       final res = await _request(sheetEndpoint, method: 'GET');
-      final raw = res['schema'] ?? res;
+      final raw = res['schema'] ?? res['cart_sheet'] ?? res;
       if (raw is Map<String, dynamic>) {
         sheetSchema = raw;
       } else if (raw is Map) {
@@ -341,82 +345,220 @@ class SduiActionDispatcher {
 
     if (!context.mounted) return;
 
-    _showComponentSheet(
+    // Fire-and-forget: this returns after the sheet is shown; callers that
+    // need to wait for dismissal (the keep_parent_sheet flow) await
+    // [_showComponentSheet] directly.
+    unawaited(_showComponentSheet(
       context,
       title: sheetSchema['title']?.toString() ?? action['title']?.toString() ?? '',
       components: sheetSchema['components'] as List<dynamic>? ?? const [],
       client: client,
-    );
+      sourceEndpoint: sheetEndpoint,
+    ));
   }
 
-  void _showComponentSheet(
+  /// Re-fetches [endpoint] and returns its `{title, components}` — used by an
+  /// open sheet to rebuild its own body in place (see `refresh_in_place`).
+  Future<Map<String, dynamic>?> _fetchSheetBody(String endpoint) async {
+    try {
+      final res = await _request(endpoint, method: 'GET');
+      final rawTheme = res['theme'];
+      if (rawTheme is Map) {
+        await BootstrapCache.instance
+            .applyThemeJson(Map<String, dynamic>.from(rawTheme));
+      }
+      final raw = res['schema'] ?? res['cart_sheet'] ?? res;
+      if (raw is Map) return Map<String, dynamic>.from(raw);
+    } catch (e) {
+      showToast(e is ApiException ? e.message : 'Failed to refresh: $e',
+          isError: true);
+    }
+    return null;
+  }
+
+  /// Appends the current scalar form values as query params so a
+  /// `refresh_in_place` GET can preview modal-entered state (customer,
+  /// discount, notes, split amounts). Lists/maps (e.g. `items`) are skipped.
+  String _withFormValueQuery(String endpoint) {
+    final params = <String, String>{};
+    formValues.forEach((key, value) {
+      if (value == null || value is List || value is Map) return;
+      params[key] = '$value';
+    });
+    if (params.isEmpty) return endpoint;
+    final sep = endpoint.contains('?') ? '&' : '?';
+    final query = params.entries
+        .map((e) =>
+            '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}')
+        .join('&');
+    return '$endpoint$sep$query';
+  }
+
+  Future<void> _showComponentSheet(
     BuildContext context, {
     required String title,
     required List<dynamic> components,
     required ApiClient? client,
+    String? sourceEndpoint,
   }) {
     final sheetFormKey = GlobalKey<FormState>();
+    var currentTitle = title;
+    var currentComponents = components;
+    var currentSource = sourceEndpoint;
 
-    showModalBottomSheet(
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (modalCtx) => DynamicSchemaContext(
-        formValues: formValues,
-        setFormValue: setFormValue,
-        dispatchAction: (modalAction) async {
-          if (modalAction['type']?.toString() == 'form_submit' &&
-              !(sheetFormKey.currentState?.validate() ?? true)) {
-            showToast('Please correct the highlighted fields.', isError: true);
-            return;
+      builder: (modalCtx) => StatefulBuilder(
+        builder: (modalCtx, setSheetState) {
+          Future<void> reloadInPlace(String endpoint) async {
+            final body =
+                await _fetchSheetBody(_withFormValueQuery(endpoint));
+            if (body == null || !modalCtx.mounted) return;
+            setSheetState(() {
+              currentComponents =
+                  (body['components'] as List<dynamic>?) ?? currentComponents;
+              currentTitle = body['title']?.toString() ?? currentTitle;
+              currentSource = endpoint;
+            });
           }
-          if (Navigator.of(modalCtx).canPop()) {
-            Navigator.of(modalCtx).pop();
-          }
-          await dispatch(context, modalAction);
-        },
-        apiClient: client,
-        child: SafeArea(
-          child: Form(
-            key: sheetFormKey,
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                16 + MediaQuery.viewInsetsOf(modalCtx).bottom,
-              ),
-              // A fresh Builder is required here: components must be built
-              // with a context that is a DESCENDANT of the DynamicSchemaContext
-              // above, so DynamicSchemaContext.of(context) can actually find
-              // it. Building them directly with `modalCtx` (the context the
-              // showModalBottomSheet builder callback itself received) would
-              // look for an ancestor from a point that sits ABOVE where this
-              // DynamicSchemaContext is being inserted, so it would never be
-              // found — every button/input inside the sheet would silently
-              // fail to dispatch actions or record form values.
-              child: Builder(
-                builder: (innerContext) => Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (title.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Text(title,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                    for (final c in components)
-                      if (c is Map)
-                        DynamicSchemaParser.buildComponent(
-                          innerContext,
-                          Map<String, dynamic>.from(c),
-                        ),
-                  ],
+
+          return DynamicSchemaContext(
+            formValues: formValues,
+            setFormValue: setFormValue,
+            dispatchAction: (modalAction) async {
+              final t =
+                  modalAction['type']?.toString().toLowerCase().trim();
+
+              // A pop/back inside a sheet closes THAT sheet only — it must
+              // never bubble to the page underneath.
+              if (t == 'pop' || t == 'navigate_back') {
+                if (Navigator.of(modalCtx).canPop()) {
+                  Navigator.of(modalCtx).pop();
+                }
+                return;
+              }
+
+              if (t == 'form_submit' &&
+                  !(sheetFormKey.currentState?.validate() ?? true)) {
+                showToast('Please correct the highlighted fields.',
+                    isError: true);
+                return;
+              }
+
+              // (1) Rebuild this sheet's body in place — no dismiss, no
+              //     parent-page reload, keyboard & scroll preserved.
+              if (modalAction['refresh_in_place'] == true &&
+                  (t == 'open_remote_sheet' ||
+                      t == 'navigate' ||
+                      t == 'refresh_sheet')) {
+                final ep = (modalAction['sheet_endpoint'] ??
+                        modalAction['endpoint'] ??
+                        currentSource)
+                    ?.toString();
+                if (ep != null && ep.isNotEmpty) {
+                  await reloadInPlace(ep);
+                  return;
+                }
+              }
+
+              // (2) Stack a child overlay OVER this sheet, keeping it alive;
+              //     refresh this sheet once the child closes if asked.
+              if (modalAction['keep_parent_sheet'] == true &&
+                  (t == 'open_modal' ||
+                      t == 'open_remote_sheet' ||
+                      t == 'show_post_sale_sheet')) {
+                if (t == 'open_modal') {
+                  // Await the child sheet's dismissal (the sheet future
+                  // resolves on pop) so the parent can refresh afterward.
+                  await _showComponentSheet(
+                    modalCtx,
+                    title: modalAction['title']?.toString() ?? '',
+                    components: modalAction['components'] as List<dynamic>? ??
+                        const [],
+                    client: client,
+                  );
+                } else if (t == 'open_remote_sheet') {
+                  final childEp =
+                      modalAction['sheet_endpoint']?.toString() ?? '';
+                  final childBody = childEp.isEmpty
+                      ? null
+                      : await _fetchSheetBody(childEp);
+                  if (childBody != null && modalCtx.mounted) {
+                    await _showComponentSheet(
+                      modalCtx,
+                      title: childBody['title']?.toString() ??
+                          modalAction['title']?.toString() ??
+                          '',
+                      components:
+                          (childBody['components'] as List<dynamic>?) ??
+                              const [],
+                      client: client,
+                      sourceEndpoint: childEp,
+                    );
+                  }
+                } else {
+                  await dispatch(modalCtx, modalAction);
+                }
+                final refreshEp = (modalAction['refresh_endpoint'] ??
+                        (modalAction['refresh_in_place'] == true
+                            ? currentSource
+                            : null))
+                    ?.toString();
+                if (refreshEp != null && refreshEp.isNotEmpty) {
+                  await reloadInPlace(refreshEp);
+                }
+                return;
+              }
+
+              // (legacy) pop this sheet, then dispatch on the parent —
+              // unchanged for every sheet that doesn't opt into the flags.
+              if (Navigator.of(modalCtx).canPop()) {
+                Navigator.of(modalCtx).pop();
+              }
+              await dispatch(context, modalAction);
+            },
+            apiClient: client,
+            child: SafeArea(
+              child: Form(
+                key: sheetFormKey,
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    16 + MediaQuery.viewInsetsOf(modalCtx).bottom,
+                  ),
+                  // A fresh Builder is required here: components must be built
+                  // with a context that is a DESCENDANT of the
+                  // DynamicSchemaContext above, so
+                  // DynamicSchemaContext.of(context) can actually find it.
+                  child: Builder(
+                    builder: (innerContext) => Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (currentTitle.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Text(currentTitle,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16)),
+                          ),
+                        for (final c in currentComponents)
+                          if (c is Map)
+                            DynamicSchemaParser.buildComponent(
+                              innerContext,
+                              Map<String, dynamic>.from(c),
+                            ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

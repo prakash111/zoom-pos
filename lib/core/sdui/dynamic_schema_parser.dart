@@ -77,6 +77,8 @@ class DynamicSchemaParser {
         return _buildColorPicker(context, schema);
       case 'file_upload':
         return _buildFileUpload(context, schema);
+      case 'cash_tendered_field':
+        return _CashTenderedField(schema: schema);
 
       // Lists & Tables
       case 'line_item_tile':
@@ -2173,5 +2175,178 @@ class _SduiStepperState extends State<_SduiStepper> {
         const SizedBox(height: 8),
       ],
     );
+  }
+}
+
+/// Self-contained "Cash Tendered by Customer" field for the SDUI checkout
+/// drawer. The input's onChanged and the quick-cash chips recompute
+/// CHANGE DUE TO CUSTOMER entirely on-device — no network round trip and no
+/// sheet reload per keystroke — and mirror the tendered amount into the
+/// shared SDUI form values so the checkout submit picks it up.
+class _CashTenderedField extends StatefulWidget {
+  const _CashTenderedField({required this.schema});
+
+  final Map<String, dynamic> schema;
+
+  @override
+  State<_CashTenderedField> createState() => _CashTenderedFieldState();
+}
+
+class _CashTenderedFieldState extends State<_CashTenderedField> {
+  late final TextEditingController _controller;
+  late final String _name;
+  late final double _total;
+  late final String _currency;
+  double _tendered = 0;
+
+  static double _num(dynamic v) {
+    if (v is num) return v.toDouble();
+    return double.tryParse(
+            '${v ?? ''}'.replaceAll(RegExp(r'[^0-9.\-]'), '')) ??
+        0.0;
+  }
+
+  double get _changeDue => _tendered > _total ? _tendered - _total : 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = widget.schema['name']?.toString() ?? 'tendered';
+    _total = _num(widget.schema['total']);
+    _currency = widget.schema['currency']?.toString() ?? r'$';
+    final initial = widget.schema['initial_value']?.toString() ?? '';
+    _controller = TextEditingController(text: initial);
+    _tendered = _num(initial);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        DynamicSchemaContext.of(context)
+            ?.setFormValue(_name, _tendered.toStringAsFixed(2));
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _commit(double value, {bool writeField = false}) {
+    DynamicSchemaContext.of(context)
+        ?.setFormValue(_name, value.toStringAsFixed(2));
+    setState(() {
+      _tendered = value;
+      if (writeField) {
+        _controller.text = value.toStringAsFixed(2);
+        _controller.selection =
+            TextSelection.collapsed(offset: _controller.text.length);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = context.tr(
+        widget.schema['label']?.toString() ?? 'Cash Tendered by Customer');
+    final chips = ((widget.schema['quick_cash'] as List?) ?? const [])
+        .map(_num)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: TextField(
+            controller: _controller,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: label,
+              prefixIcon: const Icon(Icons.payments_outlined),
+              border: const OutlineInputBorder(),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            ),
+            onChanged: (val) => _commit(_num(val)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFECFDF5),
+            border: Border.all(color: const Color(0xFF86EFAC)),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'CHANGE DUE TO CUSTOMER',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                          color: Color(0xFF166534)),
+                    ),
+                    Text(
+                      'Change Due to Customer',
+                      style:
+                          TextStyle(fontSize: 12, color: Color(0xFF15803D)),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '$_currency${_changeDue.toStringAsFixed(2)}',
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                    color: Color(0xFF166534)),
+              ),
+            ],
+          ),
+        ),
+        if (chips.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [for (final amt in chips) _quickChip(amt)],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _quickChip(double amt) {
+    final selected = (amt - _tendered).abs() < 0.001;
+    final isExact = (amt - _total).abs() < 0.001;
+    final label = isExact ? 'EXACT' : '$_currency${amt.toStringAsFixed(2)}';
+    final shape =
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16));
+    return selected
+        ? ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF166534),
+              foregroundColor: Colors.white,
+              shape: shape,
+            ),
+            onPressed: () => _commit(amt, writeField: true),
+            child: Text(label),
+          )
+        : OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF15803D),
+              side: const BorderSide(color: Color(0x9915803D)),
+              shape: shape,
+            ),
+            onPressed: () => _commit(amt, writeField: true),
+            child: Text(label),
+          );
   }
 }
