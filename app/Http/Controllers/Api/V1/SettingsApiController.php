@@ -926,4 +926,42 @@ class SettingsApiController extends Controller
             'is_active' => (bool) $channel->is_active,
         ];
     }
+
+    public function getNavigationLabels(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        return response()->json([
+            'success' => true,
+            'navigation_labels' => $company->navigation_labels ?? (object) [],
+        ]);
+    }
+
+    public function updateNavigationLabels(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $labels = $request->input('navigation_labels') ?? $request->input('labels') ?? $request->all();
+        if (! is_array($labels)) {
+            $labels = [];
+        }
+
+        $sanitized = [];
+        foreach ($labels as $k => $v) {
+            if (is_string($k) && ! in_array($k, ['_token', 'api_key', 'token'], true)) {
+                $sanitized[trim($k)] = is_string($v) ? trim($v) : (string) $v;
+            }
+        }
+
+        $company->update(['navigation_labels' => $sanitized]);
+
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'navigation_labels']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Navigation labels updated successfully.',
+            'navigation_labels' => $company->fresh()->navigation_labels ?? (object) [],
+        ]);
+    }
 }

@@ -71,6 +71,15 @@ class ServiceOrder extends Model
         'urgent' => ['label' => 'Urgent', 'color' => 'rose'],
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (ServiceOrder $order) {
+            if (empty($order->order_number) && ! empty($order->company_id)) {
+                $order->order_number = static::generateOrderNumber($order->company_id);
+            }
+        });
+    }
+
     protected $fillable = [
         'company_id',
         'external_id',
@@ -99,6 +108,12 @@ class ServiceOrder extends Model
         'delivered_at',
         'technician_id',
         'notes',
+        'extra_attributes',
+        'tax_amount',
+        'tax_rate',
+        'is_tax_inclusive',
+        'tax_breakdown',
+        'sale_id',
     ];
 
     protected function casts(): array
@@ -110,10 +125,20 @@ class ServiceOrder extends Model
             'labor_cost' => 'decimal:2',
             'discount' => 'decimal:2',
             'total_amount' => 'decimal:2',
+            'tax_amount' => 'decimal:2',
+            'tax_rate' => 'decimal:2',
+            'is_tax_inclusive' => 'boolean',
+            'tax_breakdown' => 'array',
+            'extra_attributes' => 'array',
             'received_at' => 'datetime',
             'completed_at' => 'datetime',
             'delivered_at' => 'datetime',
         ];
+    }
+
+    public function sale(): BelongsTo
+    {
+        return $this->belongsTo(Sale::class);
     }
 
     public function customer(): BelongsTo

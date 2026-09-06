@@ -16,6 +16,7 @@ class Customer extends Model
         'address', 'city', 'state', 'loyalty_points', 'due_balance', 'state_code', 'gstin', 'taxpayer_type', 'tax_id_label',
         'tax_id', 'is_tax_exempt', 'is_demo',
         'age', 'gender', 'allergies', 'prescribing_doctor', 'doctor_registration_no',
+        'custom_fields',
     ];
 
     protected $casts = [
@@ -23,6 +24,7 @@ class Customer extends Model
         'is_demo' => 'boolean',
         'due_balance' => 'decimal:2',
         'age' => 'integer',
+        'custom_fields' => 'array',
     ];
 
     public function sales()

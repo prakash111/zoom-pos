@@ -23,17 +23,27 @@ class TenantNavRegistry
      */
     public static function getEffectiveNavForTenant(mixed $tenant): array
     {
+        $labels = [];
+        if ($tenant instanceof Company && is_array($tenant->navigation_labels)) {
+            $labels = $tenant->navigation_labels;
+        } elseif (is_object($tenant) && isset($tenant->navigation_labels) && is_array($tenant->navigation_labels)) {
+            $labels = $tenant->navigation_labels;
+        }
+
         // If tenant already rearranged menus via drag-and-drop, serve their custom layout
         if ($tenant instanceof Company) {
             $custom = self::buildCustomNavTree($tenant);
             if (! empty($custom)) {
-                return array_values(array_map([self::class, 'normalizeSection'], $custom));
+                $sections = array_values(array_map([self::class, 'normalizeSection'], $custom));
+                return self::applyNavigationLabels($sections, $labels);
             }
         } elseif (is_object($tenant) && ! empty($tenant->navigation_menu_customization)) {
-            return array_values(array_map([self::class, 'normalizeSection'], (array) $tenant->navigation_menu_customization));
+            $sections = array_values(array_map([self::class, 'normalizeSection'], (array) $tenant->navigation_menu_customization));
+            return self::applyNavigationLabels($sections, $labels);
         }
 
-        return self::getBaseNavSectionsForTenant($tenant);
+        $sections = self::getBaseNavSectionsForTenant($tenant);
+        return self::applyNavigationLabels($sections, $labels);
     }
 
     /**
@@ -919,6 +929,78 @@ class TenantNavRegistry
     public static function menuStructureForMode(string $mode): array
     {
         return self::getEffectiveNavForTenant($mode);
+    }
+
+    /**
+     * Overrides section and item display titles if tenant customized them in navigation_labels.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @param  array<string, string>  $labels
+     * @return list<array<string, mixed>>
+     */
+    public static function applyNavigationLabels(array $sections, array $labels): array
+    {
+        if (empty($labels)) {
+            return $sections;
+        }
+
+        $resolveLabel = function (string ...$candidates) use ($labels): ?string {
+            foreach ($candidates as $cand) {
+                if ($cand !== '') {
+                    if (! empty($labels[$cand])) {
+                        return (string) $labels[$cand];
+                    }
+                    $k1 = str_replace('-', '_', $cand);
+                    if (! empty($labels[$k1])) {
+                        return (string) $labels[$k1];
+                    }
+                    $k2 = str_replace('_', '-', $cand);
+                    if (! empty($labels[$k2])) {
+                        return (string) $labels[$k2];
+                    }
+                }
+            }
+
+            return null;
+        };
+
+        $applyToItem = function (array $item) use (&$applyToItem, $resolveLabel): array {
+            $key = (string) ($item['key'] ?? $item['id'] ?? '');
+            $component = (string) ($item['component'] ?? '');
+            $labelSlug = \Illuminate\Support\Str::snake(strtolower($item['label'] ?? ''));
+            $candidates = [$key, $component, $labelSlug];
+            if ($key === 'repair_dashboard' || $key === 'repair_workbench') {
+                $candidates[] = 'repair_workbench';
+                $candidates[] = 'repair_dashboard';
+            }
+            $custom = $resolveLabel(...$candidates);
+            if ($custom !== null) {
+                $item['title'] = $custom;
+                $item['label'] = $custom;
+            }
+            if (! empty($item['children']) && is_array($item['children'])) {
+                $item['children'] = array_map($applyToItem, $item['children']);
+            }
+
+            return $item;
+        };
+
+        return array_values(array_map(function ($section) use ($resolveLabel, $applyToItem) {
+            if (! is_array($section)) {
+                return $section;
+            }
+            $key = (string) ($section['key'] ?? $section['id'] ?? '');
+            $custom = $resolveLabel($key);
+            if ($custom !== null) {
+                $section['title'] = $custom;
+                $section['label'] = $custom;
+            }
+            if (! empty($section['items']) && is_array($section['items'])) {
+                $section['items'] = array_map($applyToItem, $section['items']);
+            }
+
+            return $section;
+        }, $sections));
     }
 
     /**

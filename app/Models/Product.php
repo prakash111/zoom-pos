@@ -5,10 +5,12 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\TracksSyncState;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
     use BelongsToCompany;
+    use SoftDeletes;
     use TracksSyncState;
 
     protected $fillable = [

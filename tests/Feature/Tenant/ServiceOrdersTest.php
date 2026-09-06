@@ -7,9 +7,12 @@ use App\Models\Category;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Product;
+use App\Models\Reminder;
+use App\Models\Sale;
 use App\Models\ServiceOrder;
 use App\Models\TenantApiKey;
 use App\Models\User;
+use App\Services\Navigation\TenantNavRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -351,5 +354,185 @@ class ServiceOrdersTest extends TestCase
             ->set('partSearch', 'Facial')
             ->assertDontSee('Shave & Facial Deluxe')
             ->assertSee('Facial Shield Part');
+    }
+
+    public function test_tenant_navigation_labels_can_be_updated_and_alters_nav_tree(): void
+    {
+        $this->company->update([
+            'licensed_modules' => ['repair_technician', 'retail'],
+        ]);
+
+        $response = $this->withToken($this->apiKey->token)
+            ->postJson('/api/tenant/settings/navigation-labels', [
+                'labels' => [
+                    'repair_workbench' => 'HVAC / Service Desk',
+                ],
+            ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'navigation_labels' => [
+                    'repair_workbench' => 'HVAC / Service Desk',
+                ],
+            ]);
+
+        $this->company->refresh();
+        $this->assertEquals(['repair_workbench' => 'HVAC / Service Desk'], $this->company->navigation_labels);
+
+        $getRes = $this->withToken($this->apiKey->token)
+            ->getJson('/api/tenant/settings/navigation-labels');
+        $getRes->assertOk()
+            ->assertJsonPath('navigation_labels.repair_workbench', 'HVAC / Service Desk');
+
+        // Test TenantNavRegistry applies this label
+        $sections = TenantNavRegistry::getEffectiveNavForTenant($this->company);
+        $found = false;
+        foreach ($sections as $section) {
+            foreach ($section['items'] ?? [] as $item) {
+                if (in_array(($item['key'] ?? ''), ['repair_workbench', 'repair_dashboard'], true)) {
+                    $this->assertEquals('HVAC / Service Desk', $item['title']);
+                    $found = true;
+                }
+            }
+        }
+        $this->assertTrue($found, 'Expected repair_workbench/repair_dashboard to have custom title applied');
+    }
+
+    public function test_customer_custom_fields_persisted_via_pos_api(): void
+    {
+        $response = $this->withToken($this->apiKey->token)
+            ->postJson('/api/v1/pos/customers', [
+                'name' => 'Custom Field Customer',
+                'phone' => '9876543210',
+                'email' => 'custom@test.com',
+                'custom_fields' => [
+                    'GSTIN' => '27AAPFU0939F1ZV',
+                    'Alternate Phone' => '9876500000',
+                ],
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('customer.custom_fields.GSTIN', '27AAPFU0939F1ZV');
+
+        $customer = Customer::where('name', 'Custom Field Customer')->first();
+        $this->assertNotNull($customer);
+        $this->assertEquals('27AAPFU0939F1ZV', $customer->custom_fields['GSTIN'] ?? null);
+
+        // Fetch index and verify custom_fields returned
+        $indexRes = $this->withToken($this->apiKey->token)
+            ->getJson('/api/v1/pos/customers');
+        $indexRes->assertOk();
+        $matched = collect($indexRes->json('customers'))->firstWhere('server_id', $customer->id);
+        $this->assertNotNull($matched);
+        $this->assertEquals('27AAPFU0939F1ZV', $matched['custom_fields']['GSTIN'] ?? null);
+    }
+
+    public function test_service_order_custom_specifications_and_tax_calculation(): void
+    {
+        $part = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'AC Capacitor',
+            'sale_price' => 50.00,
+            'active' => true,
+        ]);
+
+        $response = $this->withToken($this->apiKey->token)
+            ->postJson('/api/v1/pos/service-orders', [
+                'customer_id' => (string) $this->customer->id,
+                'customer_name' => $this->customer->name,
+                'equipment_name' => 'Split AC Outdoor Unit',
+                'reported_defect' => 'Fan not spinning',
+                'parts_used' => [
+                    [
+                        'product_id' => $part->id,
+                        'name' => $part->name,
+                        'quantity' => 1,
+                        'unit_price' => 50.00,
+                    ],
+                ],
+                'labor_cost' => 50.00,
+                'discount' => 0.00,
+                'extra_attributes' => [
+                    'IMEI / Serial' => 'AC-998877',
+                    'Gas Level' => '40 PSI',
+                ],
+            ]);
+
+        $response->assertSuccessful()
+            ->assertJsonPath('service_order.extra_attributes.Gas Level', '40 PSI');
+
+        $order = ServiceOrder::where('company_id', $this->company->id)->latest('id')->first();
+        $this->assertNotNull($order);
+        $this->assertEquals('40 PSI', $order->extra_attributes['Gas Level'] ?? null);
+        $this->assertGreaterThan(0, (float) $order->total_amount);
+        $this->assertArrayHasKey('tax_amount', $response->json('service_order'));
+    }
+
+    public function test_product_soft_delete_and_exclusion_from_pos_sync(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Deletable Gadget',
+            'sale_price' => 29.99,
+            'active' => true,
+        ]);
+
+        $deleteRes = $this->withToken($this->apiKey->token)
+            ->deleteJson("/api/v1/pos/inventory/product/{$product->id}");
+
+        $deleteRes->assertOk()
+            ->assertJson(['success' => true]);
+
+        $product->refresh();
+        $this->assertNotNull($product->deleted_at);
+        $this->assertFalse($product->active);
+
+        // Catalog sync must not include soft-deleted product
+        $syncRes = $this->withToken($this->apiKey->token)
+            ->getJson('/api/v1/pos/sync-catalog');
+        $syncRes->assertOk();
+        $catalogProductIds = collect($syncRes->json('products'))->pluck('server_id')->all();
+        $this->assertNotContains($product->id, $catalogProductIds);
+    }
+
+    public function test_delivery_settlement_creates_sale_reminder_and_post_sale_sheet(): void
+    {
+        $order = ServiceOrder::create([
+            'company_id' => $this->company->id,
+            'customer_id' => $this->customer->id,
+            'customer_name' => $this->customer->name,
+            'equipment_name' => 'Laptop',
+            'reported_defect' => 'Screen flicker',
+            'labor_cost' => 80.00,
+            'total_amount' => 80.00,
+            'status' => 'ready_for_pickup',
+            'priority' => 'normal',
+        ]);
+
+        $response = $this->withToken($this->apiKey->token)
+            ->postJson("/api/v1/pos/service-orders/{$order->id}/status", [
+                'status' => 'delivered_settled',
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('service_order.status', 'delivered_settled')
+            ->assertJsonPath('show_post_sale_sheet', true);
+
+        $order->refresh();
+        $this->assertNotNull($order->sale_id);
+
+        $sale = Sale::find($order->sale_id);
+        $this->assertNotNull($sale);
+        $this->assertEquals(80.00, (float) $sale->total_amount);
+
+        // Follow-up reminder scheduled
+        $reminder = Reminder::where('company_id', $this->company->id)
+            ->where('customer_id', $this->customer->id)
+            ->first();
+        $this->assertNotNull($reminder);
+        $this->assertEquals('warranty_follow_up', $reminder->type);
+        $this->assertNotNull($reminder->due_date);
     }
 }

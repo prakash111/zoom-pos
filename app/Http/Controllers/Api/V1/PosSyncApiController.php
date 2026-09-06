@@ -480,6 +480,7 @@ class PosSyncApiController extends Controller
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
+                'navigation_labels' => $company->navigation_labels ?? new \stdClass(),
             ],
         ]);
     }
@@ -1833,6 +1834,45 @@ class PosSyncApiController extends Controller
     }
 
     /**
+     * 9c. Inventory Management: Delete / Soft-Delete / Archive Product
+     * DELETE /api/v1/pos/inventory/product/{id}
+     * DELETE /api/tenant/products/{id}
+     */
+    public function inventoryDestroyProduct(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $product = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where(function ($q) use ($id) {
+                $q->where('id', $id)->orWhere('external_id', $id);
+            })
+            ->first();
+
+        if (! $product) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Product not found.',
+            ], 404);
+        }
+
+        $product->update(['active' => false]);
+        $product->delete();
+
+        AuditLog::record('inventory.product_deleted', $company->id, $user?->id, [
+            'product_id' => $product->id,
+            'name' => $product->name,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product deleted successfully.',
+            'product_id' => (string) ($product->external_id ?: $product->id),
+        ]);
+    }
+
+    /**
      * 9b. Inventory Management: Upload Product Image
      * POST /api/v1/pos/inventory/product/{id}/image
      */
@@ -2045,6 +2085,7 @@ class PosSyncApiController extends Controller
                     'allergies' => $c->allergies,
                     'prescribing_doctor' => $c->prescribing_doctor,
                     'doctor_registration_no' => $c->doctor_registration_no,
+                    'custom_fields' => $c->custom_fields ?? (object) [],
                 ];
             });
 
@@ -2100,6 +2141,7 @@ class PosSyncApiController extends Controller
                 'allergies' => $c->allergies,
                 'prescribing_doctor' => $c->prescribing_doctor,
                 'doctor_registration_no' => $c->doctor_registration_no,
+                'custom_fields' => $c->custom_fields ?? (object) [],
             ]);
 
         return response()->json([
@@ -2132,6 +2174,7 @@ class PosSyncApiController extends Controller
             'allergies' => ['nullable', 'string', 'max:2000'],
             'prescribing_doctor' => ['nullable', 'string', 'max:150'],
             'doctor_registration_no' => ['nullable', 'string', 'max:100'],
+            'custom_fields' => ['nullable'],
         ]);
 
         if ($validator->fails()) {
@@ -2170,6 +2213,7 @@ class PosSyncApiController extends Controller
             'allergies' => $request->input('allergies'),
             'prescribing_doctor' => $request->input('prescribing_doctor'),
             'doctor_registration_no' => $request->input('doctor_registration_no'),
+            'custom_fields' => is_array($request->input('custom_fields')) ? $request->input('custom_fields') : (is_string($request->input('custom_fields')) ? json_decode($request->input('custom_fields'), true) : null),
         ];
 
         if ($customer) {
@@ -2198,6 +2242,7 @@ class PosSyncApiController extends Controller
             'allergies' => $customer->allergies,
             'prescribing_doctor' => $customer->prescribing_doctor,
             'doctor_registration_no' => $customer->doctor_registration_no,
+            'custom_fields' => $customer->custom_fields ?? (object) [],
         ];
 
         return response()->json([

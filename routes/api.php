@@ -191,6 +191,14 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::delete('/tenant/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
     Route::delete('/app/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
 
+    // Navigation Labels & Custom Display Names
+    Route::get('/tenant/settings/navigation-labels', [SettingsApiController::class, 'getNavigationLabels'])->middleware('tenant.api.permission:settings,view');
+    Route::post('/tenant/settings/navigation-labels', [SettingsApiController::class, 'updateNavigationLabels'])->middleware('tenant.api.permission:settings,edit');
+    Route::get('/app/settings/navigation-labels', [SettingsApiController::class, 'getNavigationLabels'])->middleware('tenant.api.permission:settings,view');
+    Route::post('/app/settings/navigation-labels', [SettingsApiController::class, 'updateNavigationLabels'])->middleware('tenant.api.permission:settings,edit');
+    Route::delete('/tenant/products/{id}', [PosSyncApiController::class, 'inventoryDestroyProduct'])->middleware('tenant.api.permission:products,edit');
+    Route::delete('/app/products/{id}', [PosSyncApiController::class, 'inventoryDestroyProduct'])->middleware('tenant.api.permission:products,edit');
+
     // Server-Driven UI Declarative Form Submissions
     Route::match(['post', 'put'], '/tenant/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
     Route::match(['post', 'put'], '/app/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
@@ -297,6 +305,9 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/inventory/product/{id}/image', [PosSyncApiController::class, 'inventoryUploadProductImage'])->middleware('tenant.api.permission:products,edit');
         Route::post('/inventory/import', [PosSyncApiController::class, 'inventoryBulkImport'])->middleware('tenant.api.permission:products,create');
         Route::post('/inventory/adjust', [PosSyncApiController::class, 'inventoryAdjustStock'])->middleware('tenant.api.permission:products,edit');
+        Route::delete('/inventory/product/{id}', [PosSyncApiController::class, 'inventoryDestroyProduct'])->middleware('tenant.api.permission:products,edit');
+        Route::delete('/inventory/products/{id}', [PosSyncApiController::class, 'inventoryDestroyProduct'])->middleware('tenant.api.permission:products,edit');
+        Route::delete('/products/{id}', [PosSyncApiController::class, 'inventoryDestroyProduct'])->middleware('tenant.api.permission:products,edit');
 
         // AI Product Image Generation (mobile parity for the web "Generate with AI" button)
         Route::get('/ai-image/availability', [AiImageApiController::class, 'availability'])->middleware('tenant.api.permission:products,view');
@@ -330,6 +341,8 @@ Route::prefix('v1/pos')->group(function () {
         Route::put('/taxes/{id}', [PosSyncApiController::class, 'taxRulesUpdate'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/taxes/{id}', [PosSyncApiController::class, 'taxRulesDestroy'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/taxes/{id}/set-default', [PosSyncApiController::class, 'taxRulesSetDefault'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/settings/navigation-labels', [SettingsApiController::class, 'getNavigationLabels'])->middleware('tenant.api.permission:settings,view');
+        Route::post('/settings/navigation-labels', [SettingsApiController::class, 'updateNavigationLabels'])->middleware('tenant.api.permission:settings,edit');
 
         // Subscription & Billing
         Route::get('/subscription', [PosSyncApiController::class, 'subscription']);
