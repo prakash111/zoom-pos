@@ -1196,7 +1196,11 @@ class RepairApiController extends Controller
                 }
 
                 // Universal tax engine — computed from the tenant's global tax settings.
-                $discount = (float) $request->input('discount', $request->input('discount_amount', 0));
+                // Honour flat OR percentage discounts from the universal Discount modal.
+                $discount = \App\Http\Controllers\Api\V1\SaleApiController::resolveDiscountAmount(
+                    $request,
+                    (float) array_sum(array_column($saleLineItems, 'total'))
+                );
                 $taxTotals = app(TaxCalculationService::class)->calculateCartTotals($saleLineItems, $company, null, $discount);
                 $saleLineItems = $taxTotals['items'];
                 $discount = (float) $taxTotals['discount'];

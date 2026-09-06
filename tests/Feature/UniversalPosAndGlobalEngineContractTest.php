@@ -180,6 +180,86 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
         $this->assertStringStartsWith('Complete Sale · ', $schema['bottom_bar']['primary_action_label']);
         $this->assertStringNotContainsString('Collect Payment', $schema['bottom_bar']['primary_action_label']);
         $this->assertSame('#166534', $schema['bottom_bar']['primary_color']);
+
+        // Every action pill is a real handler — never a decorative badge.
+        $schemaStr = json_encode($schema, JSON_UNESCAPED_SLASHES);
+        $this->assertStringNotContainsString('"label":"+ Add Customer","color"', $schemaStr, 'Add Customer must be a button, not a badge');
+        $this->assertStringContainsString('"type":"open_modal"', $schemaStr);
+        $this->assertStringContainsString('/api/tenant/pos/hold-order', $schemaStr);
+        $this->assertStringContainsString('discount_type', $schemaStr);
+        // The metadata block advertises the wired handlers.
+        $pillsByKey = collect($schema['action_pills'])->keyBy('key');
+        $this->assertSame('form_submit', $pillsByKey['hold']['action']);
+        $this->assertSame('/api/tenant/pos/hold-order', $pillsByKey['hold']['endpoint']);
+        $this->assertSame('open_modal', $pillsByKey['discount']['action']);
+    }
+
+    public function test_hold_order_parks_the_cart_without_touching_sales_or_stock(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Held Widget',
+            'code' => 'HELD-01',
+            'sale_price' => 40.00,
+            'current_stock' => 12,
+            'active' => true,
+        ]);
+
+        $response = $this->postJson('/api/tenant/pos/hold-order', [
+            'items' => [
+                ['product_id' => $product->id, 'name' => 'Held Widget', 'quantity' => 3, 'unit_price' => 40.00],
+            ],
+            'customer_name' => 'Layaway Larry',
+            'notes' => 'Customer will collect tomorrow',
+        ], $this->authHeaders());
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $holdId = $response->json('hold_id');
+
+        $held = Sale::withoutGlobalScope('company')->find($holdId);
+        $this->assertSame('on_hold', $held->status);
+        $this->assertSame('hold', $held->operation_type);
+        $this->assertEqualsWithDelta(120.00, (float) $held->net_amount, 0.01);
+
+        // Stock untouched — nothing was actually sold.
+        $this->assertSame(12.0, (float) $product->fresh()->current_stock);
+        // Stays out of completed sales.
+        $this->assertSame(0, Sale::withoutGlobalScope('company')
+            ->where('company_id', $this->company->id)
+            ->where('status', 'completed')
+            ->count());
+    }
+
+    public function test_percentage_discount_from_the_discount_modal_is_resolved_against_subtotal(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Discountable Kit',
+            'code' => 'DISC-01',
+            'sale_price' => 200.00,
+            'current_stock' => 10,
+            'active' => true,
+        ]);
+        CashRegister::create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->admin->id,
+            'opened_at' => now(),
+            'opening_balance' => 0,
+            'status' => 'open',
+        ]);
+
+        $response = $this->postJson('/api/tenant/pos/checkout', [
+            'items' => [['product_id' => $product->id, 'quantity' => 2, 'unit_price' => 200.00]],
+            'payment_method' => 'cash',
+            'discount' => 10,
+            'discount_type' => 'percent',
+        ], $this->authHeaders());
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $saleId = $response->json('sale.id') ?? $response->json('sale_id') ?? $response->json('id');
+        $sale = Sale::withoutGlobalScope('company')->find($saleId);
+        // 10% of the 400.00 subtotal == 40.00 off, not a flat 10.00.
+        $this->assertEqualsWithDelta(40.00, (float) $sale->discount, 0.01);
     }
 
     public function test_universal_checkout_records_sale_inventory_and_payments(): void

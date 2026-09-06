@@ -359,7 +359,7 @@ class SaleApiController extends Controller
                     ];
                 }
 
-                $discount = (float) ($request->input('discount', $request->input('discount_amount', 0)));
+                $discount = self::resolveDiscountAmount($request, (float) array_sum(array_column($saleLineItems, 'total')));
                 $taxTotals = app(TaxCalculationService::class)->calculateCartTotals($saleLineItems, $company, null, $discount);
                 $saleLineItems = $taxTotals['items'];
                 $discount = (float) $taxTotals['discount'];
@@ -509,6 +509,89 @@ class SaleApiController extends Controller
                 'error' => 'Checkout failed: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Park the active cart so it can be resumed later.
+     * POST /api/tenant/pos/hold-order
+     *
+     * Called by the "Hold" action pill in the universal checkout drawer. It
+     * accepts whatever the drawer currently holds (line items are optional —
+     * a repair-ticket settlement has none of its own) and stores it as a
+     * non-completed sale with status "on_hold", so it stays out of sales
+     * reports and cash totals until it is picked back up.
+     */
+    public function holdOrder(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $rawItems = $request->input('items');
+        $items = is_array($rawItems) ? array_values($rawItems) : [];
+
+        $lineItems = [];
+        $subtotal = 0.0;
+        foreach ($items as $row) {
+            $qty = max(0.0, (float) ($row['quantity'] ?? $row['qty'] ?? 0));
+            $price = max(0.0, (float) ($row['unit_price'] ?? $row['price'] ?? 0));
+            $lineTotal = round($qty * $price, 2);
+            $subtotal += $lineTotal;
+            $lineItems[] = [
+                'product_id' => $row['product_id'] ?? $row['id'] ?? null,
+                'name' => (string) ($row['name'] ?? $row['title'] ?? 'Item'),
+                'quantity' => $qty ?: 1,
+                'unit_price' => $price,
+                'price' => $price,
+                'total' => $lineTotal,
+            ];
+        }
+
+        $prefix = $company->invoice_prefix ?: 'INV-';
+        $seq = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1;
+
+        $sale = Sale::create([
+            'company_id' => $company->id,
+            'sale_number' => $prefix.'HOLD-'.sprintf('%04d', $seq),
+            'customer_id' => $request->filled('customer_id') ? $request->input('customer_id') : null,
+            'customer_name' => trim((string) $request->input('customer_name')) ?: 'Walk-in Customer',
+            'user_id' => $user?->id,
+            'total' => round($subtotal, 2),
+            'discount' => (float) $request->input('discount', 0),
+            'net_amount' => round($subtotal, 2),
+            'paid_amount' => 0,
+            'due_amount' => round($subtotal, 2),
+            'payment_method' => null,
+            'payment_status' => 'pending',
+            'status' => 'on_hold',
+            'operation_type' => 'hold',
+            'items' => $lineItems,
+            'notes' => $request->input('notes') ?: 'Held from universal checkout drawer',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order held. Resume it from Held Orders.',
+            'hold_id' => $sale->id,
+            'hold_number' => $sale->sale_number,
+        ]);
+    }
+
+    /**
+     * Resolve the effective flat discount from a request that may carry
+     * either a flat amount or a percentage (discount_type = flat|percent).
+     */
+    public static function resolveDiscountAmount(Request $request, float $subtotal): float
+    {
+        $value = (float) $request->input('discount', $request->input('discount_amount', 0));
+        if ($value <= 0) {
+            return 0.0;
+        }
+
+        if (strtolower((string) $request->input('discount_type', 'flat')) === 'percent') {
+            return round($subtotal * min($value, 100) / 100, 2);
+        }
+
+        return $value;
     }
 
     /**

@@ -80,9 +80,12 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
 
     // Universal POS Checkout & Drawer Endpoints
     Route::get('/tenant/pos/checkout-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
+    Route::get('/tenant/pos/cart-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
     Route::post('/tenant/pos/checkout', [SaleApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
+    Route::post('/tenant/pos/hold-order', [SaleApiController::class, 'holdOrder'])->middleware('tenant.api.permission:pos,create');
     Route::get('/app/pos/checkout-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
     Route::post('/app/pos/checkout', [SaleApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
+    Route::post('/app/pos/hold-order', [SaleApiController::class, 'holdOrder'])->middleware('tenant.api.permission:pos,create');
 
     // Custom Roles & Granular Permissions — unversioned tenant URLs emitted by
     // the SDUI "Manage Roles" screen (mirrors the /v1/pos/roles endpoints).
@@ -260,7 +263,9 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/sync-push', [PosSyncApiController::class, 'syncPush'])->middleware('tenant.api.permission:pos,create');
         Route::post('/sync-batch', [PosSyncApiController::class, 'syncBatch'])->middleware('tenant.api.permission:pos,create');
         Route::get('/pos/checkout-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
+        Route::get('/pos/cart-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
         Route::post('/pos/checkout', [SaleApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
+        Route::post('/pos/hold-order', [SaleApiController::class, 'holdOrder'])->middleware('tenant.api.permission:pos,create');
         Route::get('/checkout-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
         Route::post('/checkout', [SaleApiController::class, 'checkout'])->middleware('tenant.api.permission:pos,create');
 

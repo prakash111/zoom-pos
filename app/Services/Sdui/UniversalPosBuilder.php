@@ -5,6 +5,7 @@ namespace App\Services\Sdui;
 use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Company;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\RepairTicket;
 use App\Models\Sale;
@@ -979,20 +980,87 @@ class UniversalPosBuilder
             $components[] = SchemaResponse::text('Your cart is empty. Add items before checking out.', 'body_medium', ['color' => '#64748b']);
         }
 
-        // Action Pills row: Add Customer, Hold, Note, Discount, Split Payment, Amount Paid
+        // Action Pills row: Add Customer, Hold, Note, Discount, Split Payment, Amount Paid.
+        // Every pill is a real button wired to a core global handler — never a
+        // decorative badge. Note / Discount / Split / Amount Paid write straight
+        // into the shared page form values, so "Complete Sale" carries them.
+        $doneButton = static fn (string $label): array => SchemaResponse::buttonPrimary(
+            $label,
+            SchemaResponse::popAction(),
+            'check',
+            ['background_color' => '#166534', 'border_radius' => 12]
+        );
+
+        $customerOptions = [['label' => 'Walk-in Customer', 'value' => '']];
+        foreach (
+            Customer::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->orderByDesc('id')
+                ->limit(50)
+                ->get(['id', 'name', 'phone']) as $cust
+        ) {
+            $customerOptions[] = [
+                'label' => $cust->name.($cust->phone ? " · {$cust->phone}" : ''),
+                'value' => (string) $cust->id,
+            ];
+        }
+
+        $addCustomerModal = [
+            SchemaResponse::text('Search an existing customer or type a walk-in name below.', 'body_small', ['color' => '#64748b']),
+            SchemaResponse::dropdownSelect('customer_id', 'Existing Customer', $customerOptions, ''),
+            SchemaResponse::textInput('customer_name', $customerFieldLabel, $defaultCustomerName ?: ''),
+            SchemaResponse::textInput('customer_phone', 'Phone (walk-in)', '', ['keyboard_type' => 'phone']),
+            $doneButton('Attach Customer'),
+        ];
+
+        $noteModal = [
+            SchemaResponse::textInput('notes', 'Note / special instructions for the invoice', '', ['max_lines' => 4]),
+            $doneButton('Save Note'),
+        ];
+
+        $discountModal = [
+            SchemaResponse::dropdownSelect('discount_type', 'Discount Type', [
+                ['label' => 'Flat amount ('.$currency.')', 'value' => 'flat'],
+                ['label' => 'Percentage (%)', 'value' => 'percent'],
+            ], 'flat'),
+            SchemaResponse::textInput('discount', 'Discount Value', '0', ['keyboard_type' => 'number']),
+            SchemaResponse::text('Flat = '.$currency.' off the cart subtotal. Percentage = % of the subtotal.', 'body_small', ['color' => '#64748b']),
+            $doneButton('Apply Discount'),
+        ];
+
+        $splitMethodOptions = [
+            ['label' => 'Cash', 'value' => 'cash'],
+            ['label' => 'Card', 'value' => 'card'],
+            ['label' => 'Transfer', 'value' => 'transfer'],
+        ];
+        $splitPaymentModal = [
+            SchemaResponse::text('Split the balance across two tenders. Leave blank to pay in full with the method selected on the cart.', 'body_small', ['color' => '#64748b']),
+            SchemaResponse::dropdownSelect('payment_1_method', 'Payment 1 Method', $splitMethodOptions, 'cash'),
+            SchemaResponse::textInput('payment_1_amount', 'Payment 1 Amount', '', ['keyboard_type' => 'number']),
+            SchemaResponse::dropdownSelect('payment_2_method', 'Payment 2 Method', $splitMethodOptions, 'card'),
+            SchemaResponse::textInput('payment_2_amount', 'Payment 2 Amount', '', ['keyboard_type' => 'number']),
+            $doneButton('Apply Split'),
+        ];
+
+        $amountPaidModal = [
+            SchemaResponse::textInput('tendered', 'Cash Tendered by Customer', number_format($selectedTendered, 2, '.', ''), [
+                'keyboard_type' => 'number',
+                'prefix_icon' => 'payments',
+            ]),
+            SchemaResponse::text('Reopen the cart after saving to see the updated change due.', 'body_small', ['color' => '#64748b']),
+            $doneButton('Save Amount'),
+        ];
+
         $components[] = SchemaResponse::card([
             SchemaResponse::wrap([
-                SchemaResponse::badge('+ Add Customer', '#2563eb', 'subtle'),
-                SchemaResponse::badge('⏱ Hold', '#d97706', 'subtle'),
-                SchemaResponse::badge('📝 Note', '#475569', 'subtle'),
-                SchemaResponse::badge('% Discount', '#7c3aed', 'subtle'),
-                SchemaResponse::badge('➗ Split Payment', '#059669', 'subtle'),
-                SchemaResponse::badge($currency.' Amount Paid', '#0284c7', 'subtle'),
+                SchemaResponse::buttonOutlined('+ Add Customer', SchemaResponse::openModalAction('Add Customer', $addCustomerModal), 'person_add', ['full_width' => false, 'border_radius' => 20]),
+                SchemaResponse::buttonOutlined('Hold', SchemaResponse::formSubmitAction('/api/tenant/pos/hold-order', 'POST', 'Order held — resume it from Held Orders.', navigateBack: true), 'pause_circle', ['full_width' => false, 'border_radius' => 20]),
+                SchemaResponse::buttonOutlined('Note', SchemaResponse::openModalAction('Order Note', $noteModal), 'edit_note', ['full_width' => false, 'border_radius' => 20]),
+                SchemaResponse::buttonOutlined('Discount', SchemaResponse::openModalAction('Apply Discount', $discountModal), 'percent', ['full_width' => false, 'border_radius' => 20]),
+                SchemaResponse::buttonOutlined('Split Payment', SchemaResponse::openModalAction('Split Payment', $splitPaymentModal), 'call_split', ['full_width' => false, 'border_radius' => 20]),
+                SchemaResponse::buttonOutlined($currency.' Amount Paid', SchemaResponse::openModalAction('Amount Paid', $amountPaidModal), 'payments', ['full_width' => false, 'border_radius' => 20]),
             ]),
-            // Universal Cart Contract: the action pills above ARE the customer /
-            // note / discount surface — no separate "Customer, Note & Discount"
-            // accordion. Only the customer name stays inline so it flows onto the
-            // printed receipt; phone / note / discount fall back to server defaults.
+            // Customer name stays pinned inline so it always flows onto the receipt.
             SchemaResponse::textInput('customer_name', $customerFieldLabel, $defaultCustomerName ?: 'Walk-in Customer'),
         ], ['border_radius' => 16]);
 
@@ -1114,21 +1182,7 @@ class UniversalPosBuilder
             ], ['border_radius' => 16, 'border_color' => '#bbf7d0']);
         }
 
-        // Split Payment Section
-        $components[] = SchemaResponse::accordionGroup('Split Payment', [
-            SchemaResponse::dropdownSelect('payment_1_method', 'Payment 1 Method', [
-                ['label' => 'Cash', 'value' => 'cash'],
-                ['label' => 'Card', 'value' => 'card'],
-                ['label' => 'Transfer', 'value' => 'transfer'],
-            ], 'cash'),
-            SchemaResponse::textInput('payment_1_amount', 'Payment 1 Amount', '', ['keyboard_type' => 'number']),
-            SchemaResponse::dropdownSelect('payment_2_method', 'Payment 2 Method', [
-                ['label' => 'Cash', 'value' => 'cash'],
-                ['label' => 'Card', 'value' => 'card'],
-                ['label' => 'Transfer', 'value' => 'transfer'],
-            ], 'card'),
-            SchemaResponse::textInput('payment_2_amount', 'Payment 2 Amount', '', ['keyboard_type' => 'number']),
-        ], ['initially_expanded' => false]);
+        // (Split Payment now lives in the "Split Payment" action-pill modal above.)
 
         // Settlement Footer
         $totalRows = [
@@ -1180,13 +1234,14 @@ class UniversalPosBuilder
             'grand_total' => $grandTotal,
             'currency_symbol' => $currency,
         ];
-        $schema['customer_actions'] = ['add_customer', 'hold', 'note', 'discount', 'split_payment'];
+        $schema['customer_actions'] = ['add_customer', 'hold', 'note', 'discount', 'split_payment', 'amount_paid'];
         $schema['action_pills'] = [
-            ['label' => 'Add Customer', 'key' => 'add_customer', 'color' => '#2563eb'],
-            ['label' => 'Hold', 'key' => 'hold', 'color' => '#d97706'],
-            ['label' => 'Note', 'key' => 'note', 'color' => '#475569'],
-            ['label' => 'Discount', 'key' => 'discount', 'color' => '#7c3aed'],
-            ['label' => 'Split Payment', 'key' => 'split_payment', 'color' => '#059669'],
+            ['label' => 'Add Customer', 'key' => 'add_customer', 'color' => '#2563eb', 'action' => 'open_modal'],
+            ['label' => 'Hold', 'key' => 'hold', 'color' => '#d97706', 'action' => 'form_submit', 'endpoint' => '/api/tenant/pos/hold-order'],
+            ['label' => 'Note', 'key' => 'note', 'color' => '#475569', 'action' => 'open_modal'],
+            ['label' => 'Discount', 'key' => 'discount', 'color' => '#7c3aed', 'action' => 'open_modal'],
+            ['label' => 'Split Payment', 'key' => 'split_payment', 'color' => '#059669', 'action' => 'open_modal'],
+            ['label' => 'Amount Paid', 'key' => 'amount_paid', 'color' => '#0284c7', 'action' => 'open_modal'],
         ];
         $schema['payment_methods'] = $paymentMethods;
         $schema['quick_cash'] = [
