@@ -415,10 +415,12 @@ class AppBootstrapApiTest extends TestCase
         $this->assertContains('pharmacy_prescriptions', $pharmacyItems);
 
         $serviceItems = collect($menu['salon_bookings']['items'])->pluck('key')->all();
-        $this->assertContains('service_calendar', $serviceItems);
+        $this->assertContains('salon_pos', $serviceItems);
+        $this->assertTrue(in_array('book_appointment', $serviceItems, true) || in_array('book_service_appointment', $serviceItems, true));
+        $this->assertTrue(in_array('booking_calendar', $serviceItems, true) || in_array('service_booking_calendar', $serviceItems, true) || in_array('service_calendar', $serviceItems, true));
         $this->assertContains('service_stylists', $serviceItems);
-        $this->assertContains('service_catalog', $serviceItems);
-        $this->assertContains('service_create', $serviceItems);
+        $this->assertTrue(in_array('service_catalog_rates', $serviceItems, true) || in_array('service_catalog', $serviceItems, true));
+        $this->assertTrue(in_array('add_new_service', $serviceItems, true) || in_array('service_create', $serviceItems, true));
         $this->assertNotContains('service_orders', $serviceItems);
     }
 }

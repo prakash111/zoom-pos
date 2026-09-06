@@ -1509,7 +1509,7 @@ class TenantSampleDataService
             $counts['products'] = Product::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('is_demo', true)
-                ->delete();
+                ->forceDelete();
 
             $counts['categories'] = Category::withoutGlobalScopes()
                 ->where('company_id', $companyId)

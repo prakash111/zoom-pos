@@ -441,7 +441,7 @@ class SalonPosTest extends TestCase
         $response = $this->getJson("/api/tenant/views/service-calendar?date={$date}", $this->authHeaders());
         $response->assertOk();
 
-        $timelineRow = $response->json('schema.components.2.components.1.components.0.components.0');
+        $timelineRow = $response->json('schema.components.1.components.2.components.0.components.0');
         $this->assertSame('row', $timelineRow['type']);
         $this->assertSame(64, $timelineRow['components'][0]['width']);
         $this->assertFalse($timelineRow['components'][0]['flexible']);
@@ -484,8 +484,13 @@ class SalonPosTest extends TestCase
         $this->assertStringContainsString('Advance: $15.00', $calContent);
         $this->assertStringContainsString('Settle', $calContent);
         $this->assertStringContainsString('Checkout', $calContent);
-        $this->assertStringContainsString('advance_paid', $calContent);
-        $this->assertStringContainsString('deposit_payment_method', $calContent);
+
+        // Verify dedicated booking create view contains advance deposit inputs
+        $bookingViewRes = $this->getJson('/api/tenant/views/salon-booking-create', $this->authHeaders());
+        $bookingViewRes->assertOk();
+        $bookingViewContent = $bookingViewRes->getContent();
+        $this->assertStringContainsString('advance_paid', $bookingViewContent);
+        $this->assertStringContainsString('deposit_payment_method', $bookingViewContent);
 
         // 3. Checkout with appointment_id: 50 total - 15 advance = 35 balance due
         $checkoutRes = $this->postJson('/api/tenant/salon/checkout', [

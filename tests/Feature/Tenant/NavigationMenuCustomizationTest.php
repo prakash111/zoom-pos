@@ -109,4 +109,28 @@ class NavigationMenuCustomizationTest extends TestCase
 
         $this->assertNull(\App\Models\Tenant::find($company->id)->navigation_menu_customization);
     }
+
+    public function test_dynamic_sdui_drawer_navigation_endpoint_returns_valid_tree(): void
+    {
+        [$company, $user] = $this->actingAsTenantAdmin();
+
+        $apiKey = \App\Models\TenantApiKey::create([
+            'company_id' => $company->id,
+            'name' => 'Test Key',
+            'token' => 'zk_live_' . bin2hex(random_bytes(16)),
+            'permissions' => ['*'],
+        ]);
+
+        $response = $this->withToken($apiKey->token)->getJson('/api/tenant/navigation/drawer');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'success',
+                'sections',
+                'navigation',
+            ]);
+
+        $this->assertNotEmpty($response->json('sections'));
+    }
 }

@@ -573,7 +573,7 @@ class SchemaResponse
         ];
     }
 
-    public static function formSubmitAction(string $endpoint, string $method = 'POST', string $successToast = 'Settings saved successfully', bool $navigateBack = false, bool $reload = false, ?array $payload = null): array
+    public static function formSubmitAction(string $endpoint, string $method = 'POST', string $successToast = 'Settings saved successfully', bool $navigateBack = false, bool $reload = false, ?array $payload = null, ?string $redirectRoute = null): array
     {
         $action = [
             'type' => 'form_submit',
@@ -587,6 +587,10 @@ class SchemaResponse
         }
         if ($payload !== null) {
             $action['payload'] = $payload;
+        }
+        if ($redirectRoute !== null) {
+            $action['redirect_route'] = $redirectRoute;
+            $action['route'] = $redirectRoute;
         }
 
         return $action;
@@ -2269,6 +2273,71 @@ class SchemaResponse
             ]);
         }
 
+        return self::screen('Service Booking Calendar', [
+            self::card([
+                self::row([
+                    self::icon('calendar_month', ['color' => '#7c3aed', 'size' => 28], ['flexible' => false]),
+                    self::column([
+                        self::text('Service Appointments Calendar', 'title_medium', ['bold' => true]),
+                        self::text("{$day->format('l, M j')} · {$timezone} · technician time-slot booking", 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+                self::divider(),
+                self::wrap([
+                    self::badge('Appointments: '.$appointments->count(), '#7c3aed', 'subtle'),
+                    self::badge('Checked In: '.$appointments->where('status', 'checked_in')->count(), '#0284c7', 'subtle'),
+                    self::badge('Available Specialists: '.$specialists->count(), '#10b981', 'subtle'),
+                ]),
+                self::divider(),
+                self::row([
+                    self::buttonPrimary('+ Book New Appointment', self::navigateAction('/api/tenant/views/salon-booking-create', title: 'Book Appointment'), 'add', ['expanded' => true, 'background_color' => '#15803d']),
+                    self::buttonOutlined('Manage Rates & Services', self::navigateAction('/api/tenant/views/service-catalog', title: 'Service Catalog & Rates'), 'format_list_bulleted', ['expanded' => true]),
+                ], ['spacing' => 10]),
+                self::divider(),
+                self::row([
+                    self::buttonOutlined('Customize Form Labels', self::navigateAction('/api/tenant/views/settings-form-labels', title: 'Form Labels'), 'tune', ['expanded' => true, 'dense' => true]),
+                    self::buttonOutlined('Specialists Roster', self::navigateAction('/api/tenant/views/service-stylists', title: 'Stylists & Staff Assignments'), 'badge', ['expanded' => true, 'dense' => true]),
+                ], ['spacing' => 10]),
+            ]),
+            self::card([
+                self::row([
+                    self::text('Daily Appointment Timeline', 'title_medium', ['bold' => true]),
+                    self::badge("{$appointments->count()} Bookings", '#7c3aed', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between', 'cross_axis_alignment' => 'center']),
+                self::divider(),
+                self::column($appointmentCards ?: [
+                    self::text('No appointments booked for this date. Tap "+ Book New Appointment" above to reserve a specialist.', 'body_medium', ['color' => '#64748b']),
+                ]),
+            ]),
+        ]);
+    }
+
+    public static function salonBookingCreateView(Company $company): array
+    {
+        $timezone = $company->resolveTimezone();
+        $selectedDate = request('date', now($timezone)->toDateString());
+        $day = Carbon::parse($selectedDate, $timezone);
+
+        $services = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->where(function ($q) {
+                $q->where('type', 'service')
+                    ->orWhere('duration_minutes', '>', 0)
+                    ->orWhere('category_type', 'salon');
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'duration_minutes', 'price', 'sale_price']);
+
+        $specialists = User::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('is_specialist', true)
+            ->where('status', 'approved')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $currency = $company->currency_symbol ?: '$';
+
         $serviceOptions = $services->map(function (Product $service) use ($currency) {
             $duration = (int) ($service->duration_minutes ?: 30);
             $rate = (float) ($service->price ?: $service->sale_price);
@@ -2278,70 +2347,83 @@ class SchemaResponse
                 'value' => (string) $service->id,
             ];
         })->all();
+
         $specialistOptions = $specialists->map(fn ($specialist) => [
             'label' => $specialist->name,
             'value' => (string) $specialist->id,
         ])->all();
+
         $timeOptions = [];
         for ($minutes = 9 * 60; $minutes < 20 * 60; $minutes += 30) {
             $time = sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
             $timeOptions[] = ['label' => Carbon::createFromFormat('H:i', $time)->format('g:i A'), 'value' => $time];
         }
 
-        $serviceLabel = $company->resolveFormFieldLabel('service_booking', 'service', 'Service & Duration');
-        $specialistLabel = $company->resolveFormFieldLabel('service_booking', 'specialist', 'Stylist / Specialist');
-        $dateLabel = $company->resolveFormFieldLabel('service_booking', 'appointment_date', 'Appointment Date');
-        $timeLabel = $company->resolveFormFieldLabel('service_booking', 'appointment_time', 'Start Time');
-        $nameLabel = $company->resolveFormFieldLabel('service_booking', 'client_name', 'Client Name');
-        $phoneLabel = $company->resolveFormFieldLabel('service_booking', 'client_phone', 'Client Phone');
+        $serviceLabel = $company->resolveFormFieldLabel('service_booking', 'service', 'Service & Duration *');
+        $specialistLabel = $company->resolveFormFieldLabel('service_booking', 'specialist', 'Stylist / Specialist *');
+        $dateLabel = $company->resolveFormFieldLabel('service_booking', 'appointment_date', 'Appointment Date *');
+        $timeLabel = $company->resolveFormFieldLabel('service_booking', 'appointment_time', 'Start Time *');
+        $nameLabel = $company->resolveFormFieldLabel('service_booking', 'client_name', 'Client Name *');
+        $phoneLabel = $company->resolveFormFieldLabel('service_booking', 'client_phone', 'Client Phone *');
         $depositLabel = $company->resolveFormFieldLabel('service_booking', 'advance_deposit', 'Advance Deposit Amount (Optional)');
-        $notesLabel = $company->resolveFormFieldLabel('service_booking', 'booking_notes', 'Booking Notes');
+        $notesLabel = $company->resolveFormFieldLabel('service_booking', 'booking_notes', 'Booking Notes (Optional)');
 
-        return self::screen('Service Booking Calendar', [
+        return self::screen('Book Appointment', [
             self::card([
                 self::row([
-                    self::icon('event_available', ['color' => '#7c3aed', 'size' => 28]),
+                    self::icon('add_task', ['color' => '#15803d', 'size' => 28], ['flexible' => false]),
                     self::column([
-                        self::text('Service Appointments Calendar', 'title_medium', ['bold' => true]),
-                        self::text("{$day->format('l, M j')} · {$timezone} · technician time-slot booking", 'body_small', ['color' => '#64748b']),
-                    ]),
-                ]),
+                        self::text('Book Service / Appointment', 'title_medium', ['bold' => true]),
+                        self::text('Schedule a client appointment with assigned specialist, time slot, and optional advance deposit.', 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
                 self::divider(),
-                self::wrap([
-                    self::badge('Appointments: '.$appointments->count(), '#7c3aed', 'subtle'),
-                    self::badge('Checked In: '.$appointments->where('status', 'checked_in')->count(), '#0284c7', 'subtle'),
-                    self::badge('Available Specialists: '.$specialists->count(), '#10b981', 'subtle'),
-                    self::buttonOutlined('Manage Rates & Services', self::navigateAction('/api/tenant/views/service-orders', title: 'Service Catalog & Rates'), 'format_list_bulleted'),
-                    self::buttonOutlined('Customize Form Labels', self::navigateAction('/api/tenant/views/settings-form-labels', title: 'Form Labels'), 'tune'),
-                ]),
+                self::row([
+                    self::buttonOutlined('Open Calendar', self::navigateAction('/api/tenant/views/salon-calendar', title: 'Service Booking Calendar'), 'calendar_month', ['expanded' => true]),
+                    self::buttonOutlined('Service Catalog & Rates', self::navigateAction('/api/tenant/views/service-catalog', title: 'Service Catalog & Rates'), 'format_list_bulleted', ['expanded' => true]),
+                ], ['spacing' => 10]),
             ]),
-            self::accordionGroup('Book Appointment / Reserve Time Slot', [
-                self::dropdownSelect('service_id', $serviceLabel, $serviceOptions),
-                self::dropdownSelect('specialist_id', $specialistLabel, $specialistOptions),
-                self::dateTimePicker('appointment_date', $dateLabel, $day->toDateString(), 'date'),
-                self::dropdownSelect('appointment_time', $timeLabel, $timeOptions, '09:00'),
-                self::textInput('customer_name', $nameLabel, ''),
-                self::textInput('customer_phone', $phoneLabel, '', ['keyboard_type' => 'phone']),
-                self::textInput('advance_paid', $depositLabel, '0.00', ['keyboard_type' => 'decimal']),
-                self::dropdownSelect('deposit_payment_method', 'Advance Deposit Payment Method', [
-                    ['label' => 'Cash', 'value' => 'cash'],
-                    ['label' => 'Card', 'value' => 'card'],
-                    ['label' => 'UPI / QR', 'value' => 'upi'],
-                    ['label' => 'Bank Transfer', 'value' => 'bank_transfer'],
-                ], 'cash'),
-                self::textInput('notes', $notesLabel, '', ['max_lines' => 2]),
-                self::buttonPrimary('Confirm Appointment', self::formSubmitAction(
-                    '/api/tenant/salon/appointments',
-                    'POST',
-                    'Appointment booked successfully.',
-                    reload: true
-                ), 'event_available'),
-            ], ['initially_expanded' => $appointments->isEmpty()]),
+
             self::card([
-                self::text('Daily Appointment Timeline', 'title_medium', ['bold' => true]),
-                self::column($appointmentCards ?: [
-                    self::text('No appointments booked for this date. Use the booking panel above to reserve a specialist.', 'body_medium', ['color' => '#64748b']),
-                ]),
+                self::column([
+                    self::text('Reservation Details', 'title_medium', ['bold' => true]),
+                    self::divider(),
+                    self::dropdownSelect('service_id', $serviceLabel, $serviceOptions, $serviceOptions[0]['value'] ?? ''),
+                    self::dropdownSelect('specialist_id', $specialistLabel, $specialistOptions, $specialistOptions[0]['value'] ?? ''),
+                    self::dateTimePicker('appointment_date', $dateLabel, $day->toDateString(), 'date'),
+                    self::dropdownSelect('appointment_time', $timeLabel, $timeOptions, '09:00'),
+                    self::textInput('customer_name', $nameLabel, '', [
+                        'required' => true,
+                        'placeholder' => 'Enter client full name...',
+                    ]),
+                    self::textInput('customer_phone', $phoneLabel, '', [
+                        'required' => true,
+                        'keyboard_type' => 'phone',
+                        'placeholder' => 'e.g. +1 (555) 019-2834',
+                    ]),
+                    self::textInput('advance_paid', $depositLabel, '0.00', [
+                        'keyboard_type' => 'decimal',
+                        'placeholder' => '0.00',
+                    ]),
+                    self::dropdownSelect('deposit_payment_method', 'Advance Deposit Payment Method', [
+                        ['label' => 'Cash', 'value' => 'cash'],
+                        ['label' => 'Card', 'value' => 'card'],
+                        ['label' => 'UPI / QR', 'value' => 'upi'],
+                        ['label' => 'Bank Transfer', 'value' => 'bank_transfer'],
+                    ], 'cash'),
+                    self::textInput('notes', $notesLabel, '', [
+                        'max_lines' => 3,
+                        'placeholder' => 'Any special requests or instructions...',
+                    ]),
+                    self::divider(),
+                    self::buttonPrimary('Confirm Appointment', self::formSubmitAction(
+                        '/api/tenant/salon/appointments',
+                        'POST',
+                        'Appointment booked successfully.',
+                        navigateBack: false,
+                        redirectRoute: '/api/tenant/views/salon-calendar'
+                    ), 'add_task', ['background_color' => '#15803d']),
+                ], ['spacing' => 12]),
             ]),
         ]);
     }
@@ -4156,11 +4238,11 @@ class SchemaResponse
             'repair-my-jobs' => self::repairMyJobsView($company),
             'repair-detail' => self::repairDetailView($company),
             'repair-categories' => self::repairCategoriesView($company),
-            'repair-pos' => self::repairPosView($company),
-            'service-calendar', 'calendar' => self::serviceCalendarView($company),
+            'salon-calendar', 'booking-calendar', 'service-calendar', 'service-booking-calendar', 'calendar' => self::serviceCalendarView($company),
+            'salon-booking-create', 'service-booking-create', 'book-service-appointment', 'book-appointment', 'salon-booking' => self::salonBookingCreateView($company),
             'service-stylists', 'stylists' => self::serviceStylistsView($company),
-            'service-orders', 'service-catalog', 'service-rates' => self::serviceCatalogRatesView($company),
-            'service-create', 'add-service' => self::serviceCreateView($company),
+            'service-orders', 'service-catalog', 'service-rates', 'service-catalog-rates' => self::serviceCatalogRatesView($company),
+            'service-create', 'add-service', 'add-new-service' => self::serviceCreateView($company),
             'change-password', 'password' => self::changePasswordView($company),
             'roles', 'roles-create', 'manage-roles' => self::rolesView($company),
             'pos', 'point-of-sale' => self::posView($company),

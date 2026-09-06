@@ -965,6 +965,19 @@ class SettingsApiController extends Controller
         ]);
     }
 
+    public function getDrawerNavigation(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+        $sections = \App\Services\Navigation\MenuService::getDrawerTree($company, $user);
+
+        return response()->json([
+            'success' => true,
+            'sections' => $sections,
+            'navigation' => $sections,
+        ]);
+    }
+
     public function getFormLabels(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);

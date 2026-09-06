@@ -203,6 +203,12 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::get('/app/settings/navigation-labels', [SettingsApiController::class, 'getNavigationLabels'])->middleware('tenant.api.permission:settings,view');
     Route::post('/app/settings/navigation-labels', [SettingsApiController::class, 'updateNavigationLabels'])->middleware('tenant.api.permission:settings,edit');
 
+    // Dynamic SDUI Navigation Drawer Tree
+    Route::get('/tenant/navigation/drawer', [SettingsApiController::class, 'getDrawerNavigation']);
+    Route::get('/app/navigation/drawer', [SettingsApiController::class, 'getDrawerNavigation']);
+    Route::get('/tenant/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+    Route::get('/app/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+
     // Form Field Labels & Dynamic Custom Fields
     Route::get('/tenant/settings/form-labels', [SettingsApiController::class, 'getFormLabels'])->middleware('tenant.api.permission:settings,view');
     Route::post('/tenant/settings/form-labels', [SettingsApiController::class, 'updateFormLabels'])->middleware('tenant.api.permission:settings,edit');
@@ -356,6 +362,8 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/taxes/{id}/set-default', [PosSyncApiController::class, 'taxRulesSetDefault'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/settings/navigation-labels', [SettingsApiController::class, 'getNavigationLabels'])->middleware('tenant.api.permission:settings,view');
         Route::post('/settings/navigation-labels', [SettingsApiController::class, 'updateNavigationLabels'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/navigation/drawer', [SettingsApiController::class, 'getDrawerNavigation']);
+        Route::get('/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
         Route::get('/settings/form-labels', [SettingsApiController::class, 'getFormLabels'])->middleware('tenant.api.permission:settings,view');
         Route::post('/settings/form-labels', [SettingsApiController::class, 'updateFormLabels'])->middleware('tenant.api.permission:settings,edit');
 

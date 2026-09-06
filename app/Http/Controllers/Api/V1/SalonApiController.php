@@ -366,6 +366,8 @@ class SalonApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Appointment booked successfully.',
+            'action' => 'toast_and_navigate',
+            'route' => '/api/tenant/views/salon-calendar',
             'appointment' => $this->presentAppointment($appointment->load(['service', 'specialist']), $company->resolveTimezone()),
         ], 201);
     }

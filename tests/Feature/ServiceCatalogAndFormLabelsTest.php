@@ -171,14 +171,18 @@ class ServiceCatalogAndFormLabelsTest extends TestCase
         $this->assertSame('Master Stylist', $refreshed->resolveFormFieldLabel('service_booking', 'specialist', 'Stylist / Specialist'));
         $this->assertSame('Guest Name', $refreshed->resolveFormFieldLabel('service_booking', 'client_name', 'Client Name'));
 
-        // 3. Verify in service calendar SDUI schema
-        $calendarRes = $this->getJson('/api/tenant/views/service-calendar', $this->authHeaders());
-        $calendarRes->assertOk();
-        $content = $calendarRes->getContent();
+        // 3. Verify in dedicated salon booking create SDUI schema and calendar
+        $bookingRes = $this->getJson('/api/tenant/views/salon-booking-create', $this->authHeaders());
+        $bookingRes->assertOk();
+        $content = $bookingRes->getContent();
         $this->assertStringContainsString('Select Hair Package', $content);
         $this->assertStringContainsString('Master Stylist', $content);
         $this->assertStringContainsString('Guest Name', $content);
         $this->assertStringContainsString('Special Styling Requests', $content);
+
+        $calendarRes = $this->getJson('/api/tenant/views/service-calendar', $this->authHeaders());
+        $calendarRes->assertOk();
+        $this->assertStringContainsString('+ Book New Appointment', $calendarRes->getContent());
 
         // 4. Verify settings-form-labels SDUI schema view
         $labelsViewRes = $this->getJson('/api/tenant/views/settings-form-labels', $this->authHeaders());
@@ -300,8 +304,9 @@ class ServiceCatalogAndFormLabelsTest extends TestCase
         $this->assertNotContains('repair_create_ticket', $allKeys);
 
         // Dedicated service catalog items MUST be present
-        $this->assertContains('service_catalog', $allKeys);
-        $this->assertContains('service_create', $allKeys);
+        $this->assertTrue(in_array('service_catalog_rates', $allKeys, true) || in_array('service_catalog', $allKeys, true));
+        $this->assertTrue(in_array('add_new_service', $allKeys, true) || in_array('service_create', $allKeys, true));
+        $this->assertTrue(in_array('book_appointment', $allKeys, true) || in_array('book_service_appointment', $allKeys, true));
 
         // Exactly one change_password item exists across entire navigation with lock_reset icon
         $changePasswordItems = [];
