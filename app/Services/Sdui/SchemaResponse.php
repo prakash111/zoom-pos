@@ -389,24 +389,48 @@ class SchemaResponse
     }
 
     /**
-     * Native Post-Sale Action Sheet — rendered inside the app the moment a
-     * settlement completes, so the cashier never gets bounced to an external
-     * browser / web login. Mirrors the retail invoice_actions_sheet: PDF
-     * preview, WhatsApp share, email, SMS. Every option resolves in-app:
-     *  - PDF        → a signed, login-free URL (route `receipt.signed.pdf`)
-     *  - WhatsApp   → wa.me / api.whatsapp.com deep link (opens WhatsApp)
-     *  - Email/SMS  → an inline modal that POSTs to /sales/{id}/deliver
+     * Native Post-Sale Action Sheet — a single compact card rendered the
+     * moment a settlement completes, matching the core POS design language:
+     * a surface-variant container (12px radius), an invoice / timestamp /
+     * status strip, a financial pill row, and a balanced 2x2 grid of
+     * uniform outline actions.
      *
-     * Returned as a ready-to-prepend `card` component plus an
-     * `action_sheet_trigger` bundling the same options as a bottom sheet.
+     * Every action resolves without dropping session state:
+     *  - Print / PDF & Thermal → a signed, login-free receipt URL
+     *    (route `receipt.signed.pdf`; the signature is the authorization, so
+     *    it renders straight to the PDF viewer — no web /login, no blank page)
+     *  - WhatsApp → wa.me / api.whatsapp.com deep link (opens WhatsApp)
+     *  - SMS      → an in-app modal that POSTs to /sales/{id}/send-invoice
      *
-     * @return array<string, mixed>
+     * @return array<string, mixed>  a ready-to-prepend `card` component
      */
     public static function postSaleActionSheet(Sale $sale, ?string $whatsAppUrl = null): array
     {
+        $sale->loadMissing(['payments', 'company', 'customer']);
         $currency = $sale->company?->currency_symbol ?: '';
-        $pdfUrl = URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]);
 
+        $pdfUrl = URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]);
+        $thermalUrl = URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id, 'format' => '58mm']);
+
+        $total = round((float) $sale->net_amount, 2);
+        $advance = 0.0;
+        try {
+            $advance = round((float) $sale->payments->where('payment_method', 'advance_deposit')->sum('amount'), 2);
+        } catch (\Throwable) {
+            // payments relation unavailable — advance strip simply reads 0.00
+        }
+        $balancePaid = max(0, round($total - $advance, 2));
+        $settledAt = optional($sale->created_at)->format('d M Y · g:i A') ?: '';
+
+        $smsModal = self::openModalAction('Text Invoice #'.$sale->sale_number, [
+            self::textInput('recipient', 'Customer mobile number', (string) ($sale->customer?->phone ?? '')),
+            self::buttonPrimary('Send SMS', self::formSubmitAction(
+                "/api/tenant/sales/{$sale->id}/send-invoice?channel=sms",
+                'POST',
+                'Receipt link texted to the customer.',
+                navigateBack: true
+            ), 'sms', ['background_color' => '#166534', 'border_radius' => 10]),
+        ]);
         $emailModal = self::openModalAction('Email Invoice #'.$sale->sale_number, [
             self::textInput('recipient', 'Customer email address', (string) ($sale->customer?->email ?? '')),
             self::buttonPrimary('Send Invoice', self::formSubmitAction(
@@ -414,47 +438,35 @@ class SchemaResponse
                 'POST',
                 'Invoice emailed to the customer.',
                 navigateBack: true
-            ), 'send', ['background_color' => '#166534', 'border_radius' => 12]),
-        ]);
-        $smsModal = self::openModalAction('Text Invoice #'.$sale->sale_number, [
-            self::textInput('recipient', 'Customer mobile number', (string) ($sale->customer?->phone ?? $sale->customer_name)),
-            self::buttonPrimary('Send SMS', self::formSubmitAction(
-                "/api/tenant/sales/{$sale->id}/send-invoice?channel=sms",
-                'POST',
-                'Receipt link texted to the customer.',
-                navigateBack: true
-            ), 'sms', ['background_color' => '#166534', 'border_radius' => 12]),
+            ), 'send', ['background_color' => '#166534', 'border_radius' => 10]),
         ]);
 
-        $options = [
-            ['label' => 'Preview & Print PDF', 'icon' => 'picture_as_pdf', 'action' => self::openUrlAction($pdfUrl)],
-        ];
-        if ($whatsAppUrl) {
-            $options[] = ['label' => 'Share via WhatsApp', 'icon' => 'chat', 'action' => self::openUrlAction($whatsAppUrl)];
-        }
-        $options[] = ['label' => 'Send via Email', 'icon' => 'mail', 'action' => $emailModal];
-        $options[] = ['label' => 'Text a receipt link (SMS)', 'icon' => 'sms', 'action' => $smsModal];
+        $shareButton = $whatsAppUrl
+            ? self::buttonOutlined('WhatsApp', self::openUrlAction($whatsAppUrl), 'chat', ['border_radius' => 10])
+            : self::buttonOutlined('Email', $emailModal, 'mail', ['border_radius' => 10]);
 
-        $rows = [];
-        foreach ($options as $opt) {
-            $rows[] = self::buttonOutlined($opt['label'], $opt['action'], $opt['icon'], ['border_radius' => 12]);
-        }
+        $actionGrid = self::gridView([
+            self::buttonOutlined('Print / PDF', self::openUrlAction($pdfUrl), 'picture_as_pdf', ['border_radius' => 10]),
+            self::buttonOutlined('Thermal', self::openUrlAction($thermalUrl), 'print', ['border_radius' => 10]),
+            $shareButton,
+            self::buttonOutlined('SMS', $smsModal, 'sms', ['border_radius' => 10]),
+        ], 2, ['spacing' => 8, 'run_spacing' => 8]);
 
-        return self::card(array_merge([
+        return self::card([
             self::row([
-                self::icon('receipt_long', ['color' => '#166534', 'size' => 24]),
-                self::column([
-                    self::text('Sale Complete · Invoice #'.$sale->sale_number, 'title_medium', ['bold' => true]),
-                    self::text(
-                        'Total '.$currency.number_format((float) $sale->net_amount, 2).' · '.($sale->customer_name ?: 'Walk-in Customer'),
-                        'body_small',
-                        ['color' => '#64748b']
-                    ),
-                ]),
+                self::badge('#'.$sale->sale_number, '#1d4ed8', 'subtle'),
+                self::text($settledAt, 'label_small', ['color' => '#64748b']),
+                self::badge('PAID · DELIVERED', '#15803d', 'subtle'),
+            ], ['main_axis_alignment' => 'space_between']),
+            self::divider(),
+            self::wrap([
+                self::badge('Total '.$currency.number_format($total, 2), '#475569', 'subtle'),
+                self::badge('Advance -'.$currency.number_format($advance, 2), '#15803d', 'subtle'),
+                self::badge('Balance Paid '.$currency.number_format($balancePaid, 2), '#166534', 'subtle'),
             ]),
             self::divider(),
-            self::actionSheetTrigger('Invoice & Receipt Options', $options, 'more_vert', ['sheet_title' => 'Invoice #'.$sale->sale_number]),
-        ], $rows), ['color' => '#f0fdf4', 'border_color' => '#86efac', 'border_radius' => 16]);
+            $actionGrid,
+        ], ['color' => '#f1f5f9', 'border_color' => '#e2e8f0', 'border_radius' => 12, 'elevation' => 0]);
     }
 
     // =========================================================================

@@ -1193,9 +1193,11 @@ class PharmacyAndRepairPosTest extends TestCase
             ->getJson("/api/tenant/views/repair-detail?ticket_id={$ticketId}");
         $afterView->assertOk();
         $afterStr = json_encode($afterView->json('schema'), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        $this->assertStringContainsString('Sale Complete', $afterStr);
-        $this->assertStringContainsString('Invoice #'.$settleRes->json('invoice_number'), $afterStr);
-        $this->assertStringContainsString('Preview & Print PDF', $afterStr);
+        $this->assertStringContainsString('PAID', $afterStr);
+        $this->assertStringContainsString('#'.$settleRes->json('invoice_number'), $afterStr);
+        $this->assertStringContainsString('Print / PDF', $afterStr);
+        $this->assertStringContainsString('grid_view', $afterStr);
+        $this->assertStringContainsString('Balance Paid', $afterStr);
         $this->assertEmpty($validator->validate($afterView->json('schema')));
     }
 

@@ -228,8 +228,15 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
         $this->assertIsArray($sheet);
         $this->assertEmpty(app(SchemaValidator::class)->validate($sheet));
         $sheetStr = json_encode($sheet, JSON_UNESCAPED_SLASHES);
-        $this->assertStringContainsString('Preview & Print PDF', $sheetStr);
-        $this->assertStringContainsString('action_sheet_trigger', $sheetStr);
+        // Compact 2x2 native action grid, no vertical bulky stack.
+        $this->assertStringContainsString('"type":"grid_view"', $sheetStr);
+        $this->assertStringContainsString('"cross_axis_count":2', $sheetStr);
+        $this->assertStringContainsString('Print / PDF', $sheetStr);
+        $this->assertStringContainsString('Thermal', $sheetStr);
+        $this->assertStringContainsString('Balance Paid', $sheetStr);
+        $this->assertStringNotContainsString('open_pdf', $sheetStr);
+        // No external-web-page launches — only signed API paths, wa.me, or in-app modals.
+        $this->assertStringNotContainsString('tenant.sales.pdf', $sheetStr);
 
         // The receipt link is signed and renders a PDF with NO auth header at all.
         $pdfUrl = $response->json('receipt_pdf_url');
