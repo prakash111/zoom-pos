@@ -28,6 +28,7 @@ use App\Services\Navigation\TenantNavRegistry;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 
 /**
  * Centralized Server-Driven UI (SDUI) Schema Response Builder.
@@ -385,6 +386,75 @@ class SchemaResponse
             'icon' => $icon,
             'options' => $options,
         ], $props);
+    }
+
+    /**
+     * Native Post-Sale Action Sheet — rendered inside the app the moment a
+     * settlement completes, so the cashier never gets bounced to an external
+     * browser / web login. Mirrors the retail invoice_actions_sheet: PDF
+     * preview, WhatsApp share, email, SMS. Every option resolves in-app:
+     *  - PDF        → a signed, login-free URL (route `receipt.signed.pdf`)
+     *  - WhatsApp   → wa.me / api.whatsapp.com deep link (opens WhatsApp)
+     *  - Email/SMS  → an inline modal that POSTs to /sales/{id}/deliver
+     *
+     * Returned as a ready-to-prepend `card` component plus an
+     * `action_sheet_trigger` bundling the same options as a bottom sheet.
+     *
+     * @return array<string, mixed>
+     */
+    public static function postSaleActionSheet(Sale $sale, ?string $whatsAppUrl = null): array
+    {
+        $currency = $sale->company?->currency_symbol ?: '';
+        $pdfUrl = URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]);
+
+        $emailModal = self::openModalAction('Email Invoice #'.$sale->sale_number, [
+            self::textInput('recipient', 'Customer email address', (string) ($sale->customer?->email ?? '')),
+            self::buttonPrimary('Send Invoice', self::formSubmitAction(
+                "/api/tenant/sales/{$sale->id}/send-invoice?channel=email",
+                'POST',
+                'Invoice emailed to the customer.',
+                navigateBack: true
+            ), 'send', ['background_color' => '#166534', 'border_radius' => 12]),
+        ]);
+        $smsModal = self::openModalAction('Text Invoice #'.$sale->sale_number, [
+            self::textInput('recipient', 'Customer mobile number', (string) ($sale->customer?->phone ?? $sale->customer_name)),
+            self::buttonPrimary('Send SMS', self::formSubmitAction(
+                "/api/tenant/sales/{$sale->id}/send-invoice?channel=sms",
+                'POST',
+                'Receipt link texted to the customer.',
+                navigateBack: true
+            ), 'sms', ['background_color' => '#166534', 'border_radius' => 12]),
+        ]);
+
+        $options = [
+            ['label' => 'Preview & Print PDF', 'icon' => 'picture_as_pdf', 'action' => self::openUrlAction($pdfUrl)],
+        ];
+        if ($whatsAppUrl) {
+            $options[] = ['label' => 'Share via WhatsApp', 'icon' => 'chat', 'action' => self::openUrlAction($whatsAppUrl)];
+        }
+        $options[] = ['label' => 'Send via Email', 'icon' => 'mail', 'action' => $emailModal];
+        $options[] = ['label' => 'Text a receipt link (SMS)', 'icon' => 'sms', 'action' => $smsModal];
+
+        $rows = [];
+        foreach ($options as $opt) {
+            $rows[] = self::buttonOutlined($opt['label'], $opt['action'], $opt['icon'], ['border_radius' => 12]);
+        }
+
+        return self::card(array_merge([
+            self::row([
+                self::icon('receipt_long', ['color' => '#166534', 'size' => 24]),
+                self::column([
+                    self::text('Sale Complete · Invoice #'.$sale->sale_number, 'title_medium', ['bold' => true]),
+                    self::text(
+                        'Total '.$currency.number_format((float) $sale->net_amount, 2).' · '.($sale->customer_name ?: 'Walk-in Customer'),
+                        'body_small',
+                        ['color' => '#64748b']
+                    ),
+                ]),
+            ]),
+            self::divider(),
+            self::actionSheetTrigger('Invoice & Receipt Options', $options, 'more_vert', ['sheet_title' => 'Invoice #'.$sale->sale_number]),
+        ], $rows), ['color' => '#f0fdf4', 'border_color' => '#86efac', 'border_radius' => 16]);
     }
 
     // =========================================================================
@@ -1621,7 +1691,7 @@ class SchemaResponse
         $ticketId = request('ticket_id');
         $query = RepairTicket::withoutGlobalScope('company')
             ->where('company_id', $company->id)
-            ->with(['parts', 'technician:id,name']);
+            ->with(['parts', 'technician:id,name', 'finalSale.customer', 'finalSale.company']);
 
         $ticket = $ticketId ? $query->find($ticketId) : $query->orderByDesc('created_at')->first();
 
@@ -1660,7 +1730,22 @@ class SchemaResponse
             ]);
         }
 
-        return self::screen("Workbench: #{$ticket->ticket_number}", [
+        // Once the ticket is settled & handed over, lead with the native
+        // Post-Sale Action Sheet so the cashier can print / share the invoice
+        // without the app ever bouncing out to a browser login.
+        $postSale = [];
+        if ($ticket->status === RepairTicket::STATUS_DELIVERED && $ticket->finalSale) {
+            $waUrl = null;
+            try {
+                $waUrl = app(\App\Services\Invoice\InvoiceDeliveryService::class)
+                    ->generateInvoiceWhatsAppUrl($ticket->finalSale);
+            } catch (\Throwable) {
+                // A missing WhatsApp config must not hide the rest of the sheet.
+            }
+            $postSale[] = self::postSaleActionSheet($ticket->finalSale, $waUrl);
+        }
+
+        return self::screen("Workbench: #{$ticket->ticket_number}", array_merge($postSale, [
             self::card([
                 self::row([
                     self::icon('handyman', ['color' => $ticket->status_color, 'size' => 28]),
@@ -1759,7 +1844,7 @@ class SchemaResponse
                     "Checkout Repair #{$ticket->ticket_number}"
                 ), 'point_of_sale'),
             ]),
-        ]);
+        ]));
     }
 
     public static function repairCategoriesView(Company $company): array

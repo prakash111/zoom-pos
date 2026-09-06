@@ -600,9 +600,11 @@ class SalonApiController extends Controller
                 'success' => true,
                 'message' => 'Salon counter sale completed successfully',
                 'sale' => $sale,
-                'whatsapp_url' => $whatsappUrl,
-                'invoice_url' => "/tenant/sales/{$sale->id}/invoice",
-                'thermal_print_url' => "/tenant/sales/{$sale->id}/receipt/print",
+                // In-app Post-Sale Action Sheet — no auto-launch keys.
+                'invoice_number' => $sale->sale_number,
+                'post_sale_sheet' => \App\Services\Sdui\SchemaResponse::postSaleActionSheet($sale->fresh(['customer', 'company']), $whatsappUrl),
+                'receipt_pdf_url' => \Illuminate\Support\Facades\URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]),
+                'whatsapp_share_url' => $whatsappUrl,
             ]);
         } catch (\InvalidArgumentException $e) {
             return response()->json(['success' => false, 'error' => $e->getMessage()], 422);

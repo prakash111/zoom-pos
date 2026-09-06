@@ -194,6 +194,55 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
         $this->assertSame('open_modal', $pillsByKey['discount']['action']);
     }
 
+    public function test_settlement_stays_in_app_with_a_valid_post_sale_sheet_and_login_free_pdf(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Post-Sale Widget',
+            'code' => 'PS-01',
+            'sale_price' => 60.00,
+            'current_stock' => 10,
+            'active' => true,
+        ]);
+        CashRegister::create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->admin->id,
+            'opened_at' => now(),
+            'opening_balance' => 0,
+            'status' => 'open',
+        ]);
+
+        $response = $this->postJson('/api/tenant/pos/checkout', [
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 60.00]],
+            'payment_method' => 'cash',
+        ], $this->authHeaders());
+        $response->assertOk()->assertJsonPath('success', true);
+
+        // No key the SDUI client would auto-launch in an external browser.
+        $this->assertNull($response->json('url'));
+        $this->assertNull($response->json('print_url'));
+        $this->assertNull($response->json('whatsapp_url'));
+
+        // The post-sale sheet is a valid SDUI component tree.
+        $sheet = $response->json('post_sale_sheet');
+        $this->assertIsArray($sheet);
+        $this->assertEmpty(app(SchemaValidator::class)->validate($sheet));
+        $sheetStr = json_encode($sheet, JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('Preview & Print PDF', $sheetStr);
+        $this->assertStringContainsString('action_sheet_trigger', $sheetStr);
+
+        // The receipt link is signed and renders a PDF with NO auth header at all.
+        $pdfUrl = $response->json('receipt_pdf_url');
+        $this->assertStringContainsString('signature=', (string) $pdfUrl);
+        $path = str_replace(config('app.url'), '', $pdfUrl);
+        $pdf = $this->get($path); // deliberately unauthenticated
+        $pdf->assertOk();
+        $this->assertSame('application/pdf', $pdf->headers->get('content-type'));
+
+        // A tampered signature is rejected.
+        $this->get($path.'x')->assertStatus(403);
+    }
+
     public function test_hold_order_parks_the_cart_without_touching_sales_or_stock(): void
     {
         $product = Product::create([
@@ -320,9 +369,14 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
         $this->assertSame('120.00', number_format((float) $payment->tendered, 2, '.', ''));
         $this->assertSame('20.00', number_format((float) $payment->change_returned, 2, '.', ''));
 
-        // Verify Invoice PDF links
-        $this->assertNotEmpty($response->json('print_url'));
-        $this->assertNotEmpty($response->json('download_url'));
+        // Settlement returns a signed, login-free receipt link and the in-app
+        // post-sale sheet — never a top-level url/print_url the client would
+        // auto-open in an external browser.
+        $this->assertNull($response->json('url'));
+        $this->assertNull($response->json('print_url'));
+        $this->assertNotEmpty($response->json('receipt_pdf_url'));
+        $this->assertStringContainsString('signature=', (string) $response->json('receipt_pdf_url'));
+        $this->assertNotEmpty($response->json('post_sale_sheet'));
     }
 
     public function test_universal_checkout_supports_split_payments_and_khata_due_tracking(): void

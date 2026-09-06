@@ -407,9 +407,11 @@ class PharmacyApiController extends Controller
                 'message' => 'Pharmacy checkout completed successfully',
                 'sale' => $sale,
                 'prescription' => $result['prescription'],
-                'whatsapp_url' => $whatsappUrl,
-                'invoice_url' => "/tenant/sales/{$sale->id}/invoice",
-                'thermal_print_url' => "/tenant/sales/{$sale->id}/receipt/print",
+                // In-app Post-Sale Action Sheet — no auto-launch keys.
+                'invoice_number' => $sale->sale_number,
+                'post_sale_sheet' => \App\Services\Sdui\SchemaResponse::postSaleActionSheet($sale->fresh(['customer', 'company']), $whatsappUrl),
+                'receipt_pdf_url' => \Illuminate\Support\Facades\URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]),
+                'whatsapp_share_url' => $whatsappUrl,
             ]);
         } catch (\InvalidArgumentException $e) {
             return response()->json([

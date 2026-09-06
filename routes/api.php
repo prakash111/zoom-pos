@@ -64,6 +64,13 @@ Route::post('/tenant/profile/change-password', [PasswordResetController::class, 
 // Unauthenticated Dynamic Store Registration Metadata
 Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
 
+// Signed, login-free invoice PDF — opened by the native Post-Sale Action
+// Sheet's "Preview & Print" row. The URL signature is the authorization, so
+// it renders in the device browser without a web session (no /login bounce).
+Route::get('/tenant/receipt/{sale}/pdf', [\App\Http\Controllers\Tenant\InvoiceController::class, 'signedPdf'])
+    ->middleware('signed')
+    ->name('receipt.signed.pdf');
+
 // Inbound Two-Way E-Commerce Webhook Receiver (Shopify / WooCommerce / Generic)
 Route::post('/v1/integrations/webhooks/{tenant_uuid}/orders', [EcommerceWebhookController::class, 'handleOrders']);
 Route::post('/integrations/webhooks/{tenant_uuid}/orders', [EcommerceWebhookController::class, 'handleOrders']);

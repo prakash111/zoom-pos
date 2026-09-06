@@ -14,6 +14,34 @@ use Illuminate\Http\Request;
 class InvoiceController extends Controller
 {
     /**
+     * Login-free invoice PDF, authorized purely by a valid URL signature
+     * (see route `receipt.signed.pdf`). Used by the mobile Post-Sale Action
+     * Sheet so "Preview & Print" opens the PDF in the device browser without
+     * bouncing through the web /login screen.
+     */
+    public function signedPdf(Request $request, string $sale)
+    {
+        $model = Sale::withoutGlobalScopes()
+            ->with(['payments' => fn ($q) => $q->withoutGlobalScope('company')])
+            ->where(function ($q) use ($sale) {
+                $q->where('id', $sale)->orWhere('sale_number', $sale)->orWhere('external_id', $sale);
+            })
+            ->first();
+
+        abort_if($model === null, 404, 'Invoice not found.');
+
+        $pdf = app(InvoiceDeliveryService::class)->generateInvoicePdf($model, $request->query('format'));
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="Invoice-'.$model->sale_number.'.pdf"',
+            'Content-Length' => strlen($pdf),
+            'Cache-Control' => 'no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+        ]);
+    }
+
+    /**
      * Show printable/PDF template or download PDF for sale invoice.
      */
     public function pdf(Request $request, Sale $sale)

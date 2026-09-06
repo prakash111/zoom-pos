@@ -991,9 +991,14 @@ class PharmacyAndRepairPosTest extends TestCase
             'tendered' => 15.00,
         ]);
         $settleRes->assertOk()->assertJsonPath('success', true);
-        $this->assertNotEmpty($settleRes->json('whatsapp_url'));
-        $this->assertNotEmpty($settleRes->json('invoice_url'));
-        $this->assertNotEmpty($settleRes->json('thermal_print_url'));
+        // Settlement must NOT auto-redirect the app to an external browser:
+        // no top-level url / print_url / whatsapp_url keys.
+        $this->assertNull($settleRes->json('url'));
+        $this->assertNull($settleRes->json('print_url'));
+        $this->assertNull($settleRes->json('whatsapp_url'));
+        $this->assertNotEmpty($settleRes->json('receipt_pdf_url'));
+        $this->assertNotEmpty($settleRes->json('whatsapp_share_url'));
+        $this->assertNotEmpty($settleRes->json('post_sale_sheet'));
         $this->assertEquals(35.00, (float) $settleRes->json('sale.paid_amount')); // 35 labor - 20 advance = 15 due; total sale = 35 paid
 
         // 7. Test repair pos checkout returns post-sale URLs
@@ -1010,9 +1015,11 @@ class PharmacyAndRepairPosTest extends TestCase
             'tendered' => 25.00,
         ]);
         $posRes->assertOk()->assertJsonPath('success', true);
-        $this->assertNotEmpty($posRes->json('whatsapp_url'));
-        $this->assertNotEmpty($posRes->json('invoice_url'));
-        $this->assertNotEmpty($posRes->json('thermal_print_url'));
+        $this->assertNull($posRes->json('url'));
+        $this->assertNull($posRes->json('print_url'));
+        $this->assertNull($posRes->json('whatsapp_url'));
+        $this->assertNotEmpty($posRes->json('receipt_pdf_url'));
+        $this->assertNotEmpty($posRes->json('post_sale_sheet'));
     }
 
     public function test_repair_device_categories_merged_into_inventory_and_universal_pos_contract(): void
@@ -1174,9 +1181,22 @@ class PharmacyAndRepairPosTest extends TestCase
             'tendered' => 100.00,
         ]);
         $settleRes->assertOk()->assertJsonPath('success', true);
-        $this->assertNotEmpty($settleRes->json('whatsapp_url'));
-        $this->assertNotEmpty($settleRes->json('invoice_url'));
-        $this->assertNotEmpty($settleRes->json('thermal_print_url'));
+        $this->assertNull($settleRes->json('url'), 'settlement must not carry an auto-launch url');
+        $this->assertNull($settleRes->json('print_url'));
+        $this->assertNull($settleRes->json('whatsapp_url'));
+        $this->assertNotEmpty($settleRes->json('post_sale_sheet'));
+        $this->assertNotEmpty($settleRes->json('receipt_pdf_url'));
+        $this->assertStringContainsString('/api/tenant/receipt/', (string) $settleRes->json('receipt_pdf_url'));
+
+        // 10. Reloading the workbench view now leads with the Post-Sale Action Sheet.
+        $afterView = $this->withHeaders($this->authHeaders())
+            ->getJson("/api/tenant/views/repair-detail?ticket_id={$ticketId}");
+        $afterView->assertOk();
+        $afterStr = json_encode($afterView->json('schema'), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $this->assertStringContainsString('Sale Complete', $afterStr);
+        $this->assertStringContainsString('Invoice #'.$settleRes->json('invoice_number'), $afterStr);
+        $this->assertStringContainsString('Preview & Print PDF', $afterStr);
+        $this->assertEmpty($validator->validate($afterView->json('schema')));
     }
 
     public function test_repair_rbac_permissions_enforcement(): void

@@ -358,9 +358,12 @@ class SalonPosTest extends TestCase
         ], $this->authHeaders());
 
         $checkoutRes->assertOk()->assertJsonPath('success', true);
-        $this->assertNotEmpty($checkoutRes->json('whatsapp_url'));
-        $this->assertNotEmpty($checkoutRes->json('invoice_url'));
-        $this->assertNotEmpty($checkoutRes->json('thermal_print_url'));
+        // No auto-launch keys — settlement stays inside the app.
+        $this->assertNull($checkoutRes->json('url'));
+        $this->assertNull($checkoutRes->json('print_url'));
+        $this->assertNull($checkoutRes->json('whatsapp_url'));
+        $this->assertNotEmpty($checkoutRes->json('receipt_pdf_url'));
+        $this->assertNotEmpty($checkoutRes->json('post_sale_sheet'));
         $this->assertEquals(50.00, (float) $checkoutRes->json('sale.total'));
         $this->assertEquals(50.00, (float) $checkoutRes->json('sale.paid_amount'));
         $this->assertEquals(0.00, (float) $checkoutRes->json('sale.due_amount'));

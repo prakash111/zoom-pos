@@ -19,8 +19,10 @@ use App\Services\Auth\PermissionChecker;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Repair\RepairNotificationService;
 use App\Services\Sdui\PosScreenBuilder;
+use App\Services\Sdui\SchemaResponse;
 use App\Services\Sdui\SchemaValidator;
 use App\Services\Sdui\UniversalPosBuilder;
+use Illuminate\Support\Facades\URL;
 use App\Services\TaxCalculationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -1341,12 +1343,15 @@ class RepairApiController extends Controller
                 'advance_applied' => $result['advance_applied'],
                 'balance_collected' => $result['balance_collected'],
                 'due_amount' => $result['due_amount'],
-                'whatsapp_url' => $whatsappUrl,
-                'invoice_url' => "/tenant/sales/{$sale->id}/invoice",
-                'thermal_print_url' => "/tenant/sales/{$sale->id}/receipt/print",
-                'print_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 0, 'embed' => 1]),
-                'download_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 1]),
-                'pdf_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 1]),
+                // Post-sale invoice options are surfaced by the Post-Sale Action
+                // Sheet (reload of the workbench view), never auto-launched — so
+                // NO top-level `url` / `print_url` / `whatsapp_url` keys here,
+                // which the SDUI client would otherwise open in an external
+                // browser (and bounce to the web login page).
+                'invoice_number' => $sale->sale_number,
+                'post_sale_sheet' => SchemaResponse::postSaleActionSheet($sale->fresh(['customer', 'company']), $whatsappUrl),
+                'receipt_pdf_url' => URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]),
+                'whatsapp_share_url' => $whatsappUrl,
                 'sms_text' => "Invoice #{$sale->sale_number} settled. Total: {$currency}".number_format($result['net_amount'], 2),
             ]);
         } catch (\InvalidArgumentException $e) {
@@ -1680,12 +1685,11 @@ class RepairApiController extends Controller
                 'sale' => $sale->fresh(['customer', 'payments']),
                 'net_amount' => $result['net_amount'],
                 'due_amount' => $result['due_amount'],
-                'whatsapp_url' => $whatsappUrl,
-                'invoice_url' => "/tenant/sales/{$sale->id}/invoice",
-                'thermal_print_url' => "/tenant/sales/{$sale->id}/receipt/print",
-                'print_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 0, 'embed' => 1]),
-                'download_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 1]),
-                'pdf_url' => route('tenant.sales.pdf', ['sale' => $sale->id, 'download' => 1]),
+                // In-app Post-Sale Action Sheet only — no auto-launch keys.
+                'invoice_number' => $sale->sale_number,
+                'post_sale_sheet' => SchemaResponse::postSaleActionSheet($sale->fresh(['customer', 'company']), $whatsappUrl),
+                'receipt_pdf_url' => URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]),
+                'whatsapp_share_url' => $whatsappUrl,
                 'sms_text' => "Invoice #{$sale->sale_number} paid. Total: {$currency}".number_format($result['net_amount'], 2),
             ]);
         } catch (\InvalidArgumentException $e) {
