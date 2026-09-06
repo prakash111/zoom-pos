@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\CustomNotificationChannel;
@@ -13,6 +14,39 @@ use Illuminate\Http\Request;
 
 class InvoiceController extends Controller
 {
+    use ResolvesTenantSyncContext;
+
+    /**
+     * Raw invoice PDF stream for the native mobile Post-Sale Action Sheet's
+     * "Preview & Print" row. Authenticated by the tenant API bearer token
+     * (route middleware), scoped to the caller's company, and always
+     * `application/pdf` — never the HTML receipt template — so the Flutter
+     * client can hand the bytes straight to `Printing.layoutPdf()`.
+     */
+    public function pdfStream(Request $request, string $sale)
+    {
+        $company = $this->resolveCompany($request);
+
+        $model = Sale::withoutGlobalScope('company')
+            ->with(['payments' => fn ($q) => $q->withoutGlobalScope('company')])
+            ->where('company_id', $company->id)
+            ->where(function ($q) use ($sale) {
+                $q->where('id', $sale)->orWhere('sale_number', $sale)->orWhere('external_id', $sale);
+            })
+            ->first();
+
+        abort_if($model === null, 404, 'Invoice not found.');
+
+        $pdf = app(InvoiceDeliveryService::class)->generateInvoicePdf($model, $request->query('format'));
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="Invoice-'.$model->sale_number.'.pdf"',
+            'Content-Length' => strlen($pdf),
+            'Cache-Control' => 'no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+        ]);
+    }
     /**
      * Login-free invoice PDF, authorized purely by a valid URL signature
      * (see route `receipt.signed.pdf`). Used by the mobile Post-Sale Action

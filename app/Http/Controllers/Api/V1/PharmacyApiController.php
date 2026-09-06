@@ -409,8 +409,7 @@ class PharmacyApiController extends Controller
                 'prescription' => $result['prescription'],
                 // In-app Post-Sale Action Sheet — no auto-launch keys.
                 'invoice_number' => $sale->sale_number,
-                'post_sale_sheet' => \App\Services\Sdui\SchemaResponse::postSaleActionSheet($sale->fresh(['customer', 'company']), $whatsappUrl),
-                'receipt_pdf_url' => \Illuminate\Support\Facades\URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]),
+                'post_sale_sheet' => \App\Services\Sdui\SchemaResponse::postSaleActionResponse($sale->fresh(['customer', 'company', 'payments']), $whatsappUrl),
                 'whatsapp_share_url' => $whatsappUrl,
             ]);
         } catch (\InvalidArgumentException $e) {

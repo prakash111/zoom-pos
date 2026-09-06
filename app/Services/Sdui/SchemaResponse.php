@@ -28,7 +28,6 @@ use App\Services\Navigation\TenantNavRegistry;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\URL;
 
 /**
  * Centralized Server-Driven UI (SDUI) Schema Response Builder.
@@ -63,7 +62,7 @@ class SchemaResponse
 
     public const ACTION_TYPES = [
         'navigate', 'form_submit', 'api_post', 'open_modal', 'navigate_back', 'pop',
-        'add_to_cart', 'open_remote_sheet', 'open_url',
+        'add_to_cart', 'open_remote_sheet', 'open_url', 'show_post_sale_sheet',
     ];
 
     // =========================================================================
@@ -341,6 +340,11 @@ class SchemaResponse
             'label' => $label,
             'action' => $action,
             'icon' => $icon,
+            // System-standard forest green — every primary button renders the
+            // same colour regardless of the tenant's Material seed. Callers
+            // that need a different fill pass their own background_color.
+            'background_color' => '#166534',
+            'foreground_color' => '#ffffff',
             'full_width' => $props['full_width'] ?? true,
         ], $props);
     }
@@ -352,6 +356,8 @@ class SchemaResponse
             'label' => $label,
             'action' => $action,
             'icon' => $icon,
+            // Forest-green outline + label to match the primary buttons.
+            'color' => '#15803d',
             'full_width' => $props['full_width'] ?? true,
         ], $props);
     }
@@ -389,30 +395,117 @@ class SchemaResponse
     }
 
     /**
-     * Native Post-Sale Action Sheet — a single compact card rendered the
-     * moment a settlement completes, matching the core POS design language:
-     * a surface-variant container (12px radius), an invoice / timestamp /
-     * status strip, a financial pill row, and a balanced 2x2 grid of
-     * uniform outline actions.
+     * Payload for the native `show_post_sale_sheet` action — everything the
+     * Flutter client needs to drive its own bottom sheet (Preview & Print,
+     * Bluetooth thermal, Share via WhatsApp, Send via Email) entirely
+     * in-app. No signed web URLs: "Preview & Print" fetches
+     * `/api/tenant/invoices/{id}/pdf-stream` with the normal bearer token
+     * and renders it through the native PDF viewer.
      *
-     * Every action resolves without dropping session state:
-     *  - Print / PDF & Thermal → a signed, login-free receipt URL
-     *    (route `receipt.signed.pdf`; the signature is the authorization, so
-     *    it renders straight to the PDF viewer — no web /login, no blank page)
-     *  - WhatsApp → wa.me / api.whatsapp.com deep link (opens WhatsApp)
-     *  - SMS      → an in-app modal that POSTs to /sales/{id}/send-invoice
+     * @return array<string, mixed>
+     */
+    public static function postSaleActionData(Sale $sale, ?string $whatsAppUrl = null): array
+    {
+        $sale->loadMissing(['company', 'customer']);
+        $company = $sale->company;
+        $currency = $company?->currency_symbol ?: '$';
+
+        $total = round((float) ($sale->net_amount ?: $sale->total), 2);
+        $tax = round((float) ($sale->tax_amount ?? 0), 2);
+        $discount = round((float) ($sale->discount ?? 0), 2);
+        $subtotal = round((float) $sale->total - $tax + $discount, 2);
+        $paid = round((float) ($sale->paid_amount ?: $total), 2);
+        $due = round((float) ($sale->due_amount ?? 0), 2);
+        $taxBase = max(0.01, $subtotal - $discount);
+        $taxRate = $tax > 0 ? round($tax / $taxBase * 100, 2) : 0.0;
+
+        $lines = [];
+        foreach ((array) ($sale->items ?? []) as $it) {
+            if (! is_array($it)) {
+                continue;
+            }
+            $qty = (float) ($it['quantity'] ?? $it['qty'] ?? 1);
+            $unit = (float) ($it['price'] ?? $it['unit_price'] ?? 0);
+            $lines[] = [
+                'name' => (string) ($it['name'] ?? $it['product_name'] ?? 'Item'),
+                'quantity' => $qty,
+                'unit_price' => $unit,
+                'line_total' => (float) ($it['line_total'] ?? $it['subtotal'] ?? round($qty * $unit, 2)),
+            ];
+        }
+
+        $country = strtoupper(trim((string) ($company?->country ?? '')));
+        $isIndia = in_array($country, ['IN', 'IND', 'INDIA'], true) || $currency === '₹';
+
+        $publicLink = '';
+        try {
+            $publicLink = route('sales.public', $sale->sale_number);
+        } catch (\Throwable) {
+            // route helper unavailable in some contexts — omit the link
+        }
+
+        return [
+            'invoice_number' => $sale->sale_number,
+            'sale_id' => $sale->id,
+            'customer_name' => (string) ($sale->customer?->name ?? $sale->customer_name ?? ''),
+            'customer_phone' => preg_replace('/[^0-9+]/', '', (string) ($sale->customer?->phone ?? $sale->customer_phone ?? '')),
+            'customer_email' => (string) ($sale->customer?->email ?? ''),
+            'company_name' => (string) ($company?->trade_name ?: $company?->name ?: ''),
+            'currency_symbol' => $currency,
+            'total' => $total,
+            'subtotal' => $subtotal,
+            'discount' => $discount,
+            'tax' => $tax,
+            'tax_rate' => $taxRate,
+            'tax_id' => (string) ($company?->tax_id ?? ''),
+            'tax_label' => (string) ($company?->tax_id_label ?: 'Tax'),
+            'is_india' => $isIndia,
+            'paid_amount' => $paid,
+            'due_amount' => $due,
+            'pdf_endpoint' => "/api/tenant/invoices/{$sale->id}/pdf-stream",
+            'share_text' => trim(sprintf(
+                'Thank you for your business! Your receipt for %s%s%s',
+                $sale->sale_number,
+                $total > 0 ? ' ('.$currency.number_format($total, 2).')' : '',
+                $publicLink !== '' ? ': '.$publicLink : ''
+            )),
+            'whatsapp_url' => $whatsAppUrl,
+            'lines' => $lines,
+        ];
+    }
+
+    /**
+     * The raw `show_post_sale_sheet` action envelope returned by every
+     * checkout / settle endpoint under the `post_sale_sheet` response key.
+     * The Flutter client opens its native bottom sheet from this — no web
+     * page is ever launched.
+     *
+     * @return array{action: string, data: array<string, mixed>}
+     */
+    public static function postSaleActionResponse(Sale $sale, ?string $whatsAppUrl = null): array
+    {
+        return [
+            'action' => 'show_post_sale_sheet',
+            'data' => self::postSaleActionData($sale, $whatsAppUrl),
+        ];
+    }
+
+    /**
+     * Compact post-sale summary card prepended to a settled ticket's
+     * workbench view: an invoice / timestamp / status strip, a financial
+     * pill row, and a single forest-green primary button that fires the
+     * native `show_post_sale_sheet` action (Preview & Print, Bluetooth
+     * thermal, WhatsApp, Email). No 2x2 outline grid, no signed web URLs.
      *
      * @return array<string, mixed>  a ready-to-prepend `card` component
      */
     public static function postSaleActionSheet(Sale $sale, ?string $whatsAppUrl = null): array
     {
         $sale->loadMissing(['payments', 'company', 'customer']);
-        $currency = $sale->company?->currency_symbol ?: '';
+        $data = self::postSaleActionData($sale, $whatsAppUrl);
+        $currency = $data['currency_symbol'];
+        $total = (float) $data['total'];
 
-        $pdfUrl = URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]);
-        $thermalUrl = URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id, 'format' => '58mm']);
-
-        $total = round((float) $sale->net_amount, 2);
         $advance = 0.0;
         try {
             $advance = round((float) $sale->payments->where('payment_method', 'advance_deposit')->sum('amount'), 2);
@@ -422,42 +515,12 @@ class SchemaResponse
         $balancePaid = max(0, round($total - $advance, 2));
         $settledAt = optional($sale->created_at)->format('d M Y · g:i A') ?: '';
 
-        $smsModal = self::openModalAction('Text Invoice #'.$sale->sale_number, [
-            self::textInput('recipient', 'Customer mobile number', (string) ($sale->customer?->phone ?? '')),
-            self::buttonPrimary('Send SMS', self::formSubmitAction(
-                "/api/tenant/sales/{$sale->id}/send-invoice?channel=sms",
-                'POST',
-                'Receipt link texted to the customer.',
-                navigateBack: true
-            ), 'sms', ['background_color' => '#166534', 'border_radius' => 10]),
-        ]);
-        $emailModal = self::openModalAction('Email Invoice #'.$sale->sale_number, [
-            self::textInput('recipient', 'Customer email address', (string) ($sale->customer?->email ?? '')),
-            self::buttonPrimary('Send Invoice', self::formSubmitAction(
-                "/api/tenant/sales/{$sale->id}/send-invoice?channel=email",
-                'POST',
-                'Invoice emailed to the customer.',
-                navigateBack: true
-            ), 'send', ['background_color' => '#166534', 'border_radius' => 10]),
-        ]);
-
-        $shareButton = $whatsAppUrl
-            ? self::buttonOutlined('WhatsApp', self::openUrlAction($whatsAppUrl), 'chat', ['border_radius' => 10])
-            : self::buttonOutlined('Email', $emailModal, 'mail', ['border_radius' => 10]);
-
-        $actionGrid = self::gridView([
-            self::buttonOutlined('Print / PDF', self::openUrlAction($pdfUrl), 'picture_as_pdf', ['border_radius' => 10]),
-            self::buttonOutlined('Thermal', self::openUrlAction($thermalUrl), 'print', ['border_radius' => 10]),
-            $shareButton,
-            self::buttonOutlined('SMS', $smsModal, 'sms', ['border_radius' => 10]),
-        ], 2, ['spacing' => 8, 'run_spacing' => 8]);
-
         return self::card([
             self::row([
-                self::badge('#'.$sale->sale_number, '#1d4ed8', 'subtle'),
+                self::badge('#'.$sale->sale_number, '#166534', 'subtle'),
                 self::text($settledAt, 'label_small', ['color' => '#64748b']),
                 self::badge('PAID · DELIVERED', '#15803d', 'subtle'),
-            ], ['main_axis_alignment' => 'space_between']),
+            ], ['main_axis_alignment' => 'space_between', 'cross_axis_alignment' => 'center']),
             self::divider(),
             self::wrap([
                 self::badge('Total '.$currency.number_format($total, 2), '#475569', 'subtle'),
@@ -465,7 +528,10 @@ class SchemaResponse
                 self::badge('Balance Paid '.$currency.number_format($balancePaid, 2), '#166534', 'subtle'),
             ]),
             self::divider(),
-            $actionGrid,
+            self::buttonPrimary('Invoice & Receipt Options', [
+                'type' => 'show_post_sale_sheet',
+                'data' => $data,
+            ], 'receipt_long', ['background_color' => '#166534', 'border_radius' => 10]),
         ], ['color' => '#f1f5f9', 'border_color' => '#e2e8f0', 'border_radius' => 12, 'elevation' => 0]);
     }
 
@@ -1737,9 +1803,9 @@ class SchemaResponse
                 default => '#64748b',
             };
             $checklistItems[] = self::row([
-                self::text($itemName, 'body_small'),
+                self::text($itemName, 'body_small', ['expanded' => true, 'max_lines' => 2]),
                 self::badge(strtoupper($status), $statusColor, 'subtle'),
-            ]);
+            ], ['main_axis_alignment' => 'space_between', 'cross_axis_alignment' => 'center']);
         }
 
         // Once the ticket is settled & handed over, lead with the native

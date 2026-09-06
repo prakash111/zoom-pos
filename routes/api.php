@@ -201,6 +201,16 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::post('/tenant/sales/{id}/print', [SaleApiController::class, 'printInvoice']);
     Route::post('/app/sales/{id}/print', [SaleApiController::class, 'printInvoice']);
 
+    // Raw invoice PDF bytes for the native Post-Sale Action Sheet's
+    // "Preview & Print" row — token-authenticated (bearer), returns
+    // application/pdf, never HTML, so it renders straight into the device's
+    // native PDF viewer with no web session / /login bounce.
+    Route::get('/tenant/invoices/{sale}/pdf-stream', [\App\Http\Controllers\Tenant\InvoiceController::class, 'pdfStream'])
+        ->middleware('tenant.api.permission:sales,view')
+        ->name('invoice.pdf.stream');
+    Route::get('/app/invoices/{sale}/pdf-stream', [\App\Http\Controllers\Tenant\InvoiceController::class, 'pdfStream'])
+        ->middleware('tenant.api.permission:sales,view');
+
     // Terminal Devices & Active Session Management
     Route::get('/tenant/devices', [DeviceApiController::class, 'index']);
     Route::post('/tenant/devices/{token}/revoke', [DeviceApiController::class, 'revoke']);

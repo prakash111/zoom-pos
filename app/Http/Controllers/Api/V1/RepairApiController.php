@@ -22,7 +22,6 @@ use App\Services\Sdui\PosScreenBuilder;
 use App\Services\Sdui\SchemaResponse;
 use App\Services\Sdui\SchemaValidator;
 use App\Services\Sdui\UniversalPosBuilder;
-use Illuminate\Support\Facades\URL;
 use App\Services\TaxCalculationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -1349,8 +1348,7 @@ class RepairApiController extends Controller
                 // which the SDUI client would otherwise open in an external
                 // browser (and bounce to the web login page).
                 'invoice_number' => $sale->sale_number,
-                'post_sale_sheet' => SchemaResponse::postSaleActionSheet($sale->fresh(['customer', 'company']), $whatsappUrl),
-                'receipt_pdf_url' => URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]),
+                'post_sale_sheet' => SchemaResponse::postSaleActionResponse($sale->fresh(['customer', 'company', 'payments']), $whatsappUrl),
                 'whatsapp_share_url' => $whatsappUrl,
                 'sms_text' => "Invoice #{$sale->sale_number} settled. Total: {$currency}".number_format($result['net_amount'], 2),
             ]);
@@ -1687,8 +1685,7 @@ class RepairApiController extends Controller
                 'due_amount' => $result['due_amount'],
                 // In-app Post-Sale Action Sheet only — no auto-launch keys.
                 'invoice_number' => $sale->sale_number,
-                'post_sale_sheet' => SchemaResponse::postSaleActionSheet($sale->fresh(['customer', 'company']), $whatsappUrl),
-                'receipt_pdf_url' => URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]),
+                'post_sale_sheet' => SchemaResponse::postSaleActionResponse($sale->fresh(['customer', 'company', 'payments']), $whatsappUrl),
                 'whatsapp_share_url' => $whatsappUrl,
                 'sms_text' => "Invoice #{$sale->sale_number} paid. Total: {$currency}".number_format($result['net_amount'], 2),
             ]);

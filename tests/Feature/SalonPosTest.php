@@ -362,8 +362,9 @@ class SalonPosTest extends TestCase
         $this->assertNull($checkoutRes->json('url'));
         $this->assertNull($checkoutRes->json('print_url'));
         $this->assertNull($checkoutRes->json('whatsapp_url'));
-        $this->assertNotEmpty($checkoutRes->json('receipt_pdf_url'));
-        $this->assertNotEmpty($checkoutRes->json('post_sale_sheet'));
+        $this->assertNull($checkoutRes->json('receipt_pdf_url'));
+        $this->assertSame('show_post_sale_sheet', $checkoutRes->json('post_sale_sheet.action'));
+        $this->assertStringContainsString('/pdf-stream', (string) $checkoutRes->json('post_sale_sheet.data.pdf_endpoint'));
         $this->assertEquals(50.00, (float) $checkoutRes->json('sale.total'));
         $this->assertEquals(50.00, (float) $checkoutRes->json('sale.paid_amount'));
         $this->assertEquals(0.00, (float) $checkoutRes->json('sale.due_amount'));

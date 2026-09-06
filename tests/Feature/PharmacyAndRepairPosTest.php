@@ -996,9 +996,10 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertNull($settleRes->json('url'));
         $this->assertNull($settleRes->json('print_url'));
         $this->assertNull($settleRes->json('whatsapp_url'));
-        $this->assertNotEmpty($settleRes->json('receipt_pdf_url'));
+        $this->assertNull($settleRes->json('receipt_pdf_url'));
         $this->assertNotEmpty($settleRes->json('whatsapp_share_url'));
-        $this->assertNotEmpty($settleRes->json('post_sale_sheet'));
+        $this->assertSame('show_post_sale_sheet', $settleRes->json('post_sale_sheet.action'));
+        $this->assertStringContainsString('/pdf-stream', (string) $settleRes->json('post_sale_sheet.data.pdf_endpoint'));
         $this->assertEquals(35.00, (float) $settleRes->json('sale.paid_amount')); // 35 labor - 20 advance = 15 due; total sale = 35 paid
 
         // 7. Test repair pos checkout returns post-sale URLs
@@ -1018,8 +1019,9 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertNull($posRes->json('url'));
         $this->assertNull($posRes->json('print_url'));
         $this->assertNull($posRes->json('whatsapp_url'));
-        $this->assertNotEmpty($posRes->json('receipt_pdf_url'));
-        $this->assertNotEmpty($posRes->json('post_sale_sheet'));
+        $this->assertNull($posRes->json('receipt_pdf_url'));
+        $this->assertSame('show_post_sale_sheet', $posRes->json('post_sale_sheet.action'));
+        $this->assertStringContainsString('/pdf-stream', (string) $posRes->json('post_sale_sheet.data.pdf_endpoint'));
     }
 
     public function test_repair_device_categories_merged_into_inventory_and_universal_pos_contract(): void
@@ -1184,20 +1186,24 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertNull($settleRes->json('url'), 'settlement must not carry an auto-launch url');
         $this->assertNull($settleRes->json('print_url'));
         $this->assertNull($settleRes->json('whatsapp_url'));
-        $this->assertNotEmpty($settleRes->json('post_sale_sheet'));
-        $this->assertNotEmpty($settleRes->json('receipt_pdf_url'));
-        $this->assertStringContainsString('/api/tenant/receipt/', (string) $settleRes->json('receipt_pdf_url'));
+        $this->assertNull($settleRes->json('receipt_pdf_url'), 'no signed web receipt link — the native sheet carries everything');
+        $this->assertSame('show_post_sale_sheet', $settleRes->json('post_sale_sheet.action'));
+        $this->assertStringContainsString('/pdf-stream', (string) $settleRes->json('post_sale_sheet.data.pdf_endpoint'));
 
-        // 10. Reloading the workbench view now leads with the Post-Sale Action Sheet.
+        // 10. Reloading the workbench view now leads with the compact post-sale
+        // summary card + a single "Invoice & Receipt Options" button that fires
+        // the native show_post_sale_sheet action — no 2x2 outline grid.
         $afterView = $this->withHeaders($this->authHeaders())
             ->getJson("/api/tenant/views/repair-detail?ticket_id={$ticketId}");
         $afterView->assertOk();
         $afterStr = json_encode($afterView->json('schema'), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $this->assertStringContainsString('PAID', $afterStr);
         $this->assertStringContainsString('#'.$settleRes->json('invoice_number'), $afterStr);
-        $this->assertStringContainsString('Print / PDF', $afterStr);
-        $this->assertStringContainsString('grid_view', $afterStr);
+        $this->assertStringContainsString('Invoice & Receipt Options', $afterStr);
+        $this->assertStringContainsString('"type":"show_post_sale_sheet"', $afterStr);
         $this->assertStringContainsString('Balance Paid', $afterStr);
+        $this->assertStringNotContainsString('"type":"grid_view"', $afterStr);
+        $this->assertStringNotContainsString('/api/tenant/receipt/', $afterStr);
         $this->assertEmpty($validator->validate($afterView->json('schema')));
     }
 

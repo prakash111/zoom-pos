@@ -499,11 +499,10 @@ class SaleApiController extends Controller
                 // / `whatsapp_url`, which the SDUI client auto-opens in an
                 // external browser (bouncing to the web login page).
                 'invoice_number' => $sale->sale_number,
-                'post_sale_sheet' => \App\Services\Sdui\SchemaResponse::postSaleActionSheet(
-                    $sale->fresh(['customer', 'company']),
+                'post_sale_sheet' => \App\Services\Sdui\SchemaResponse::postSaleActionResponse(
+                    $sale->fresh(['customer', 'company', 'payments']),
                     app(InvoiceDeliveryService::class)->generateInvoiceWhatsAppUrl($sale->fresh(), $sale->customer?->phone)
                 ),
-                'receipt_pdf_url' => \Illuminate\Support\Facades\URL::temporarySignedRoute('receipt.signed.pdf', now()->addDays(7), ['sale' => $sale->id]),
             ]);
         } catch (\InvalidArgumentException $e) {
             return response()->json([

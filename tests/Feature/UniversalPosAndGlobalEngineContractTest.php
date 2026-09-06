@@ -13,6 +13,7 @@ use App\Models\SduiModule;
 use App\Models\User;
 use App\Services\Modular\ModulePackageService;
 use App\Services\Navigation\TenantNavRegistry;
+use App\Services\Sdui\SchemaResponse;
 use App\Services\Sdui\SchemaValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -218,36 +219,50 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
         ], $this->authHeaders());
         $response->assertOk()->assertJsonPath('success', true);
 
-        // No key the SDUI client would auto-launch in an external browser.
+        // No key the SDUI client would auto-launch in an external browser, and
+        // no signed web receipt URL at all — the native sheet carries everything.
         $this->assertNull($response->json('url'));
         $this->assertNull($response->json('print_url'));
         $this->assertNull($response->json('whatsapp_url'));
+        $this->assertNull($response->json('receipt_pdf_url'));
 
-        // The post-sale sheet is a valid SDUI component tree.
+        // The post-sale response is the native `show_post_sale_sheet` action
+        // envelope — the Flutter client drives its own bottom sheet from it.
         $sheet = $response->json('post_sale_sheet');
         $this->assertIsArray($sheet);
-        $this->assertEmpty(app(SchemaValidator::class)->validate($sheet));
-        $sheetStr = json_encode($sheet, JSON_UNESCAPED_SLASHES);
-        // Compact 2x2 native action grid, no vertical bulky stack.
-        $this->assertStringContainsString('"type":"grid_view"', $sheetStr);
-        $this->assertStringContainsString('"cross_axis_count":2', $sheetStr);
-        $this->assertStringContainsString('Print / PDF', $sheetStr);
-        $this->assertStringContainsString('Thermal', $sheetStr);
-        $this->assertStringContainsString('Balance Paid', $sheetStr);
-        $this->assertStringNotContainsString('open_pdf', $sheetStr);
-        // No external-web-page launches — only signed API paths, wa.me, or in-app modals.
-        $this->assertStringNotContainsString('tenant.sales.pdf', $sheetStr);
+        $this->assertSame('show_post_sale_sheet', $sheet['action']);
+        $data = $sheet['data'];
+        $this->assertSame($response->json('invoice_number'), $data['invoice_number']);
+        $this->assertStringContainsString('/pdf-stream', $data['pdf_endpoint']);
+        $this->assertArrayHasKey('customer_phone', $data);
+        $this->assertArrayHasKey('lines', $data);
+        $this->assertEqualsWithDelta(60.00, (float) $data['total'], 0.01);
 
-        // The receipt link is signed and renders a PDF with NO auth header at all.
-        $pdfUrl = $response->json('receipt_pdf_url');
-        $this->assertStringContainsString('signature=', (string) $pdfUrl);
-        $path = str_replace(config('app.url'), '', $pdfUrl);
-        $pdf = $this->get($path); // deliberately unauthenticated
+        $sheetStr = json_encode($sheet, JSON_UNESCAPED_SLASHES);
+        // No web-page launches: no signed receipt route, no old outline grid.
+        $this->assertStringNotContainsString('tenant.sales.pdf', $sheetStr);
+        $this->assertStringNotContainsString('receipt.signed.pdf', $sheetStr);
+        $this->assertStringNotContainsString('/api/tenant/receipt/', $sheetStr);
+        $this->assertStringNotContainsString('open_pdf', $sheetStr);
+
+        // The prepended workbench summary card is a valid component tree with a
+        // single primary button that fires the same native action.
+        $card = SchemaResponse::postSaleActionSheet(\App\Models\Sale::findOrFail($data['sale_id']));
+        $screen = SchemaResponse::screen('Post-Sale', [$card]);
+        $this->assertEmpty(app(SchemaValidator::class)->validate($screen));
+        $cardStr = json_encode($card, JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('Invoice & Receipt Options', $cardStr);
+        $this->assertStringContainsString('"type":"show_post_sale_sheet"', $cardStr);
+        $this->assertStringContainsString('Balance Paid', $cardStr);
+        $this->assertStringNotContainsString('"type":"grid_view"', $cardStr);
+
+        // The PDF endpoint streams application/pdf to an authenticated caller…
+        $pdf = $this->get('/api/tenant/invoices/'.$data['sale_id'].'/pdf-stream', $this->authHeaders());
         $pdf->assertOk();
         $this->assertSame('application/pdf', $pdf->headers->get('content-type'));
 
-        // A tampered signature is rejected.
-        $this->get($path.'x')->assertStatus(403);
+        // …and rejects an unauthenticated one (no signature fallback).
+        $this->getJson('/api/tenant/invoices/'.$data['sale_id'].'/pdf-stream')->assertStatus(401);
     }
 
     public function test_hold_order_parks_the_cart_without_touching_sales_or_stock(): void
@@ -376,14 +391,14 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
         $this->assertSame('120.00', number_format((float) $payment->tendered, 2, '.', ''));
         $this->assertSame('20.00', number_format((float) $payment->change_returned, 2, '.', ''));
 
-        // Settlement returns a signed, login-free receipt link and the in-app
-        // post-sale sheet — never a top-level url/print_url the client would
+        // Settlement returns the native in-app post-sale sheet action — never a
+        // top-level url/print_url or a signed web receipt link the client would
         // auto-open in an external browser.
         $this->assertNull($response->json('url'));
         $this->assertNull($response->json('print_url'));
-        $this->assertNotEmpty($response->json('receipt_pdf_url'));
-        $this->assertStringContainsString('signature=', (string) $response->json('receipt_pdf_url'));
-        $this->assertNotEmpty($response->json('post_sale_sheet'));
+        $this->assertNull($response->json('receipt_pdf_url'));
+        $this->assertSame('show_post_sale_sheet', $response->json('post_sale_sheet.action'));
+        $this->assertStringContainsString('/pdf-stream', (string) $response->json('post_sale_sheet.data.pdf_endpoint'));
     }
 
     public function test_universal_checkout_supports_split_payments_and_khata_due_tracking(): void

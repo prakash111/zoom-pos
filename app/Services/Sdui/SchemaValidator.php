@@ -174,5 +174,14 @@ class SchemaValidator
         if ($type === 'open_url' && trim((string) ($action['url'] ?? '')) === '') {
             $errors[] = "{$path}.url: is required for [open_url]";
         }
+
+        if ($type === 'show_post_sale_sheet') {
+            $data = $action['data'] ?? null;
+            if (! is_array($data) || trim((string) ($data['invoice_number'] ?? '')) === '') {
+                $errors[] = "{$path}.data: [show_post_sale_sheet] requires a data object with an invoice_number";
+            } elseif (! str_contains((string) ($data['pdf_endpoint'] ?? ''), '/pdf-stream')) {
+                $errors[] = "{$path}.data.pdf_endpoint: [show_post_sale_sheet] must point at the token-authed /pdf-stream route";
+            }
+        }
     }
 }
