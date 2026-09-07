@@ -1002,7 +1002,10 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertStringContainsString('6-Stage Workbench Kanban', $dashContent);
         $this->assertStringContainsString('Received', $dashContent);
         $this->assertStringContainsString('5. Repaired & Ready for Pickup', $dashContent);
-        $this->assertStringContainsString('Deliver & Settle', $dashContent);
+        // "Repaired & Ready" tickets check out straight into the native POS.
+        $this->assertStringContainsString('Checkout & Bill', $dashContent);
+        $this->assertStringContainsString('load_repair_to_pos', $dashContent);
+        $this->assertStringNotContainsString('Deliver & Settle', $dashContent);
 
         // 6. Test repair ticket settlement returns post-sale URLs
         $settleRes = $this->withHeaders($this->authHeaders())->postJson("/api/tenant/repair/tickets/{$ticket->id}/settle", [
@@ -1627,6 +1630,128 @@ class PharmacyAndRepairPosTest extends TestCase
         $showStr = json_encode($show->json());
         $this->assertStringContainsString('Valid for 30 days.', $showStr);
         $this->assertStringContainsString('Bank: Acme', $showStr);
+    }
+
+    public function test_repair_workbench_checkout_button_feeds_the_native_pos_cart(): void
+    {
+        $part = Product::create([
+            'company_id' => $this->company->id,
+            'name' => '512GB NVMe SSD Replacement',
+            'code' => 'PART-SSD-512',
+            'sale_price' => 65.00,
+            'current_stock' => 5,
+            'active' => true,
+        ]);
+        $customer = Customer::create([
+            'company_id' => $this->company->id,
+            'name' => 'prakash',
+            'phone' => '918535075196',
+        ]);
+        $ticket = RepairTicket::create([
+            'company_id' => $this->company->id,
+            'ticket_number' => 'REP-CHK-01',
+            'customer_id' => $customer->id,
+            'customer_name' => 'prakash',
+            'customer_phone' => '918535075196',
+            'brand' => 'Dell',
+            'model' => 'Inspiron 15',
+            'serial_or_imei' => 'DL-9921',
+            'issue_description' => 'Boot loop',
+            'status' => 'ready',
+            'labor_fee' => 45.00,
+            'diagnostic_fee' => 0,
+            'total_amount' => 110.00,
+            'advance_paid' => 0,
+        ]);
+        RepairTicketItem::create([
+            'company_id' => $this->company->id,
+            'ticket_id' => $ticket->id,
+            'product_id' => $part->id,
+            'item_name' => '512GB NVMe SSD Replacement',
+            'item_type' => 'spare_part',
+            'quantity' => 1,
+            'unit_price' => 65.00,
+            'subtotal' => 65.00,
+            'total' => 65.00,
+        ]);
+
+        $schema = $this->withHeaders($this->authHeaders())
+            ->getJson("/api/tenant/views/repair-detail?ticket_id={$ticket->id}")
+            ->assertOk()->json('schema');
+        $this->assertEmpty((new SchemaValidator)->validate($schema));
+
+        $json = json_encode($schema, JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('"label":"Checkout & Bill"', $json);
+        $this->assertStringContainsString('"type":"load_repair_to_pos"', $json);
+        // No detached checkout-sheet route on the workbench any more.
+        $this->assertStringNotContainsString("/api/tenant/repair/tickets/{$ticket->id}/checkout-sheet", $json);
+
+        $btn = $this->findFirst($schema, fn ($n) => ($n['label'] ?? null) === 'Checkout & Bill');
+        $payload = $btn['action']['payload'];
+        $this->assertSame((string) $ticket->id, $payload['ticket_id']);
+        $this->assertSame('REP-CHK-01', $payload['ticket_number']);
+        $this->assertSame($customer->id, $payload['customer']['id']);
+        $this->assertSame('prakash', $payload['customer']['name']);
+        $this->assertSame('Dell Inspiron 15 (SN: DL-9921)', $payload['device']);
+        $this->assertEquals(45.0, $payload['labor_cost']);
+        $this->assertCount(1, $payload['parts']);
+        $this->assertSame($part->id, $payload['parts'][0]['product_id']);
+        $this->assertSame('512GB NVMe SSD Replacement', $payload['parts'][0]['name']);
+        $this->assertEquals(65.0, $payload['parts'][0]['unit_price']);
+        $this->assertSame(1, $payload['parts'][0]['quantity']);
+    }
+
+    public function test_ticket_creation_returns_a_share_sheet_action_not_a_forced_whatsapp_url(): void
+    {
+        $res = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/repair/tickets', [
+            'customer_name' => 'Sarah Connor',
+            'customer_phone' => '+15551239876',
+            'brand' => 'Lenovo',
+            'model' => 'ThinkPad X1',
+            'issue_description' => 'Keyboard unresponsive',
+        ]);
+
+        $res->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('action', 'show_ticket_share_sheet')
+            ->assertJsonPath('redirect_route', '/api/tenant/views/repair-tickets');
+
+        // The native share sheet payload.
+        $share = $res->json('share');
+        $this->assertSame($res->json('ticket.ticket_number'), $share['id']);
+        $this->assertSame('Lenovo ThinkPad X1', $share['device']);
+        $this->assertStringContainsString('repair ticket #'.$share['id'], $share['share_text']);
+        $this->assertStringContainsString('wa.me', (string) $share['whatsapp_url']);
+
+        // Legacy contract preserved (existing clients / tests).
+        $this->assertNotNull($res->json('ticket.id'));
+        $this->assertNotEmpty($res->json('whatsapp_url'));
+        $this->assertNotEmpty($res->json('tracking_url'));
+    }
+
+    /**
+     * Depth-first find of the first schema node matching $match.
+     *
+     * @param  array<string, mixed>  $node
+     * @return array<string, mixed>|null
+     */
+    private function findFirst(array $node, callable $match): ?array
+    {
+        if ($match($node)) {
+            return $node;
+        }
+        foreach (['components', 'children'] as $bucket) {
+            foreach ($node[$bucket] ?? [] as $child) {
+                if (is_array($child)) {
+                    $found = $this->findFirst($child, $match);
+                    if ($found !== null) {
+                        return $found;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 }
 

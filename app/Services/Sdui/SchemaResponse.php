@@ -67,7 +67,7 @@ class SchemaResponse
     public const ACTION_TYPES = [
         'navigate', 'form_submit', 'api_post', 'open_modal', 'navigate_back', 'pop',
         'add_to_cart', 'open_remote_sheet', 'open_url', 'show_post_sale_sheet',
-        'load_rx_to_pos', 'filter_view',
+        'load_rx_to_pos', 'load_repair_to_pos', 'filter_view', 'show_ticket_share_sheet',
     ];
 
     // =========================================================================
@@ -801,6 +801,59 @@ class SchemaResponse
         return [
             'type' => 'load_rx_to_pos',
             'payload' => $payload,
+        ];
+    }
+
+    /**
+     * Hands a repair ticket's labor, diagnostic fee, replaced parts and linked
+     * customer straight into the core native POS cart, then opens the POS
+     * screen — no detached checkout sheet. Handled entirely client-side.
+     *
+     * @param  array<string, mixed>  $payload  {ticket_id, ticket_number, customer, device, defect, labor_cost, diagnostic_fee, parts[]}
+     */
+    public static function loadRepairToPosAction(array $payload): array
+    {
+        return [
+            'type' => 'load_repair_to_pos',
+            'payload' => $payload,
+        ];
+    }
+
+    /**
+     * The cart-ready payload for a repair ticket's "Checkout & Bill" action.
+     *
+     * @return array<string, mixed>
+     */
+    public static function repairPosPayload(RepairTicket $ticket): array
+    {
+        $device = trim("{$ticket->brand} {$ticket->model}");
+        $serial = trim((string) ($ticket->serial_or_imei ?? ''));
+        $deviceLabel = ($device !== '' ? $device : 'Repair Service')
+            .($serial !== '' ? " (SN: {$serial})" : '');
+
+        $parts = $ticket->parts
+            ->map(static fn ($p) => [
+                'product_id' => $p->product_id,
+                'name' => $p->item_name ?: 'Replacement part',
+                'unit_price' => round((float) $p->unit_price, 2),
+                'quantity' => max(1, (int) round((float) $p->quantity)),
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'ticket_id' => (string) $ticket->id,
+            'ticket_number' => $ticket->ticket_number,
+            'customer' => [
+                'id' => $ticket->customer_id,
+                'name' => $ticket->customer_name,
+                'phone' => $ticket->customer_phone,
+            ],
+            'device' => $deviceLabel,
+            'defect' => $ticket->issue_description ?: ($ticket->reported_defect ?? null),
+            'labor_cost' => round((float) $ticket->labor_fee, 2),
+            'diagnostic_fee' => round((float) $ticket->diagnostic_fee, 2),
+            'parts' => $parts,
         ];
     }
 
@@ -1715,10 +1768,7 @@ class SchemaResponse
                     reload: true
                 ), 'task_alt', ['full_width' => false]);
             } elseif (in_array($stage, ['repaired', 'ready'])) {
-                $actions[] = self::buttonPrimary('Deliver & Settle', self::openRemoteSheetAction(
-                    "/api/tenant/repair/tickets/{$t->id}/checkout-sheet",
-                    "Deliver & Settle #{$t->ticket_number}"
-                ), 'payments', ['full_width' => false]);
+                $actions[] = self::buttonPrimary('Checkout & Bill', self::loadRepairToPosAction(self::repairPosPayload($t)), 'point_of_sale', ['full_width' => false]);
             }
 
             $actions[] = self::buttonOutlined('Workbench', self::navigateAction(
@@ -2337,10 +2387,7 @@ class SchemaResponse
                     self::badge('Tax Receipt', '#7c3aed', 'subtle'),
                 ]),
                 self::divider(),
-                self::buttonPrimary('Open Parts & Labor Checkout', self::openRemoteSheetAction(
-                    "/api/tenant/repair/tickets/{$ticket->id}/checkout-sheet",
-                    "Checkout Repair #{$ticket->ticket_number}"
-                ), 'point_of_sale'),
+                self::buttonPrimary('Checkout & Bill', self::loadRepairToPosAction(self::repairPosPayload($ticket)), 'point_of_sale'),
             ]),
         ]));
     }

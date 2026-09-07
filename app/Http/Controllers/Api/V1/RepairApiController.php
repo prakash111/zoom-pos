@@ -702,7 +702,7 @@ class RepairApiController extends Controller
                 }
             }
 
-            // Dispatch customer SMS, WhatsApp, and tracking links
+            // Generate (never auto-send) customer tracking / WhatsApp / SMS links.
             $dispatchResults = $this->notificationService->notifyTicketCreated($ticket);
 
             AuditLog::record('repair.ticket_created', $company->id, $user->id, [
@@ -711,14 +711,37 @@ class RepairApiController extends Controller
                 'customer_name' => $customerName,
             ]);
 
+            $deviceLabel = trim(trim((string) $ticket->brand).' '.trim((string) $ticket->model)) ?: 'Device';
+            $trackingUrl = $dispatchResults['tracking_url'] ?? url('/track/'.$ticket->ticket_number);
+            $shareText = "Hello {$ticket->customer_name}, your repair ticket #{$ticket->ticket_number} for {$deviceLabel} has been booked. Track status: {$trackingUrl}";
+
+            // `action: show_ticket_share_sheet` tells the client to pop a native
+            // bottom sheet (WhatsApp / Print Token / System Share / Done)
+            // instead of force-launching wa.me. Every legacy key is kept so the
+            // existing response contract is unchanged — only additive.
             return response()->json([
                 'success' => true,
-                'message' => 'Repair ticket created successfully.',
+                'message' => 'Repair ticket created successfully!',
+                'action' => 'show_ticket_share_sheet',
                 'ticket' => $ticket->fresh(['items.product', 'customer', 'category', 'technician']),
-                'tracking_url' => $dispatchResults['tracking_url'],
+                'tracking_url' => $trackingUrl,
                 'whatsapp_url' => $dispatchResults['whatsapp_url'],
-                'sms_text' => $dispatchResults['sms_text'],
+                'sms_text' => $dispatchResults['sms_text'] ?? $shareText,
                 'intake_sheet_url' => $dispatchResults['intake_sheet_url'],
+                'redirect_route' => '/api/tenant/views/repair-tickets',
+                'share' => [
+                    'id' => $ticket->ticket_number,
+                    'ticket_id' => $ticket->id,
+                    'customer_name' => $ticket->customer_name,
+                    'customer_phone' => $ticket->customer_phone,
+                    'device' => $deviceLabel,
+                    'status' => $ticket->status,
+                    'defect' => $ticket->issue_description ?: $ticket->reported_defect,
+                    'share_text' => $shareText,
+                    'whatsapp_url' => $dispatchResults['whatsapp_url'],
+                    'print_url' => $dispatchResults['intake_sheet_url'] ?? null,
+                    'tracking_url' => $trackingUrl,
+                ],
             ], 200);
         });
     }
