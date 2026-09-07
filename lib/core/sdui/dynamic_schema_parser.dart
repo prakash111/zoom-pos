@@ -70,6 +70,8 @@ class DynamicSchemaParser {
         return _buildTextInput(context, schema);
       case 'dropdown_select':
         return _buildDropdownSelect(context, schema);
+      case 'creatable_select':
+        return _SduiCreatableSelect(schema: schema);
       case 'checkbox':
         return _buildCheckbox(context, schema);
       case 'toggle_switch':
@@ -2181,6 +2183,177 @@ class _DottedUploadArea extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// `creatable_select` — a dropdown of preset options plus a "+ Custom" entry
+/// that reveals a free-text field. Whatever the user picks or types is bound
+/// to `formValues[name]` as a plain string, so the backend keeps validating
+/// it as `nullable|string` with no special handling.
+class _SduiCreatableSelect extends StatefulWidget {
+  const _SduiCreatableSelect({required this.schema});
+
+  final Map<String, dynamic> schema;
+
+  @override
+  State<_SduiCreatableSelect> createState() => _SduiCreatableSelectState();
+}
+
+class _SduiCreatableSelectState extends State<_SduiCreatableSelect> {
+  static const _customSentinel = '__custom__';
+
+  final _customController = TextEditingController();
+  late List<({String label, String value})> _presets;
+  bool _custom = false;
+  String? _selected;
+
+  String get _name => widget.schema['name']?.toString() ?? '';
+  String get _customValue =>
+      widget.schema['custom_value']?.toString() ?? _customSentinel;
+
+  @override
+  void initState() {
+    super.initState();
+    _presets = ((widget.schema['options'] as List<dynamic>?) ?? const [])
+        .map((o) {
+          if (o is Map) {
+            final label = (o['label'] ?? o['name'] ?? o['value'] ?? '').toString();
+            final value = (o['value'] ?? o['code'] ?? label).toString();
+            return (label: label, value: value);
+          }
+          return (label: o.toString(), value: o.toString());
+        })
+        .where((o) => o.value != _customValue && o.value != _customSentinel)
+        .toList();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final sdui = DynamicSchemaContext.of(context);
+      final current = (sdui?.formValues[_name] ??
+              widget.schema['initial_value'])
+          ?.toString();
+
+      if (current != null &&
+          current.isNotEmpty &&
+          _presets.any((p) => p.value == current)) {
+        setState(() {
+          _custom = false;
+          _selected = current;
+        });
+        sdui?.setFormValue(_name, current);
+      } else if (current != null &&
+          current.isNotEmpty &&
+          current != _customValue) {
+        setState(() {
+          _custom = true;
+          _customController.text = current;
+        });
+        sdui?.setFormValue(_name, current);
+      } else {
+        setState(() {
+          _custom = false;
+          _selected = _presets.isNotEmpty ? _presets.first.value : null;
+        });
+        if (_selected != null) sdui?.setFormValue(_name, _selected);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _customController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sdui = DynamicSchemaContext.of(context);
+    final label = context.tr(widget.schema['label']?.toString() ?? '');
+    final placeholder = context.tr(widget.schema['placeholder']?.toString() ??
+        widget.schema['hint']?.toString() ??
+        'Type a custom reason…');
+    final customLabel = context.tr(
+        widget.schema['custom_label']?.toString() ?? '+ Other / Custom Reason');
+    final disabled = widget.schema['disabled'] == true;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DropdownButtonFormField<String>(
+            initialValue: _custom ? _customValue : _selected,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            ),
+            validator: (value) {
+              if (DynamicSchemaParser._isRequired(widget.schema)) {
+                final effective =
+                    _custom ? _customController.text.trim() : (value ?? '');
+                if (effective.isEmpty || effective == _customValue) {
+                  return DynamicSchemaParser._requiredMessage(widget.schema);
+                }
+              }
+              return null;
+            },
+            items: [
+              for (final p in _presets)
+                DropdownMenuItem(
+                    value: p.value, child: Text(context.tr(p.label))),
+              DropdownMenuItem(
+                value: _customValue,
+                child: Text(customLabel,
+                    style: const TextStyle(fontStyle: FontStyle.italic)),
+              ),
+            ],
+            onChanged: disabled
+                ? null
+                : (val) {
+                    if (val == null) return;
+                    if (val == _customValue) {
+                      setState(() => _custom = true);
+                      sdui?.setFormValue(
+                          _name, _customController.text.trim());
+                    } else {
+                      setState(() {
+                        _custom = false;
+                        _selected = val;
+                      });
+                      sdui?.setFormValue(_name, val);
+                    }
+                  },
+          ),
+          if (_custom) ...[
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _customController,
+              enabled: !disabled,
+              autofocus: true,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              decoration: InputDecoration(
+                labelText: context.tr('Custom reason'),
+                hintText: placeholder,
+                border: const OutlineInputBorder(),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+              validator: (value) {
+                if (DynamicSchemaParser._isRequired(widget.schema) &&
+                    (value == null || value.trim().isEmpty)) {
+                  return DynamicSchemaParser._requiredMessage(widget.schema);
+                }
+                return null;
+              },
+              onChanged: (val) => sdui?.setFormValue(_name, val.trim()),
+            ),
+          ],
         ],
       ),
     );

@@ -241,6 +241,96 @@ void main() {
       expect(dispatched?['fields'], ['search']);
     });
 
+    testWidgets(
+        'creatable_select binds a preset, then a typed custom reason',
+        (tester) async {
+      final formValues = <String, dynamic>{};
+      final schema = {
+        'type': 'creatable_select',
+        'name': 'reason',
+        'label': 'Adjustment Reason',
+        'allow_custom': true,
+        'custom_value': '__custom__',
+        'custom_label': '+ Other / Custom Reason',
+        'initial_value': 'Damaged stock',
+        'options': [
+          {'label': 'Physical audit / discrepancy', 'value': 'Physical audit / discrepancy'},
+          {'label': 'Damaged stock', 'value': 'Damaged stock'},
+          {'label': 'Vendor return', 'value': 'Vendor return'},
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: formValues,
+              setFormValue: (k, v) => formValues[k] = v,
+              dispatchAction: (_) async {},
+              child: Builder(
+                builder: (ctx) =>
+                    DynamicSchemaParser.buildComponent(ctx, schema),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Starts on the preset from initial_value.
+      expect(formValues['reason'], 'Damaged stock');
+      expect(find.byType(TextFormField), findsNothing);
+
+      // Pick "+ Other / Custom Reason" → a free-text field appears.
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('+ Other / Custom Reason').last);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TextFormField), findsOneWidget);
+      await tester.enterText(
+          find.byType(TextFormField), 'Cold-chain temperature excursion');
+      await tester.pump();
+
+      expect(formValues['reason'], 'Cold-chain temperature excursion');
+    });
+
+    testWidgets('creatable_select opens in custom mode for an off-list value',
+        (tester) async {
+      final formValues = <String, dynamic>{'reason': 'Supplier recall lot 88B'};
+      final schema = {
+        'type': 'creatable_select',
+        'name': 'reason',
+        'label': 'Adjustment Reason',
+        'options': [
+          {'label': 'Damaged stock', 'value': 'Damaged stock'},
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: formValues,
+              setFormValue: (k, v) => formValues[k] = v,
+              dispatchAction: (_) async {},
+              child: Builder(
+                builder: (ctx) =>
+                    DynamicSchemaParser.buildComponent(ctx, schema),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TextFormField), findsOneWidget);
+      expect(
+          tester.widget<TextFormField>(find.byType(TextFormField)).controller?.text,
+          'Supplier recall lot 88B');
+      expect(formValues['reason'], 'Supplier recall lot 88B');
+    });
+
     testWidgets('renders grid view with columns', (tester) async {
       final schema = {
         'type': 'grid_view',
