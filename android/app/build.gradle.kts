@@ -37,21 +37,60 @@ android {
             val keystorePropertiesFile = rootProject.file("key.properties")
             if (keystorePropertiesFile.exists()) {
                 keystoreProperties.load(FileInputStream(keystorePropertiesFile))
-                storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+                val storePath = keystoreProperties.getProperty("storeFile")
+                if (storePath != null) {
+                    val candidate = file(storePath)
+                    storeFile = when {
+                        candidate.exists() -> candidate
+                        rootProject.file(storePath).exists() -> rootProject.file(storePath)
+                        rootProject.file("../$storePath").exists() -> rootProject.file("../$storePath")
+                        else -> candidate
+                    }
+                }
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+
+            // Fallback to environment variables if not specified in key.properties
+            val envStorePath = System.getenv("KEYSTORE_FILE") ?: System.getenv("KEYSTORE_PATH")
+            if (storeFile == null && envStorePath != null) {
+                val candidate = file(envStorePath)
+                storeFile = when {
+                    candidate.exists() -> candidate
+                    rootProject.file(envStorePath).exists() -> rootProject.file(envStorePath)
+                    rootProject.file("../$envStorePath").exists() -> rootProject.file("../$envStorePath")
+                    else -> candidate
+                }
+            }
+            if (storePassword == null) {
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+            }
+            if (keyAlias == null) {
+                keyAlias = System.getenv("KEY_ALIAS")
+            }
+            if (keyPassword == null) {
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+
+            // Fallback to repository root keystore zoom-pos.jks if present
+            if (storeFile == null || !storeFile!!.exists()) {
+                val repoKeystore = rootProject.file("../zoom-pos.jks")
+                if (repoKeystore.exists()) {
+                    storeFile = repoKeystore
+                    if (storePassword == null) storePassword = "123456789"
+                    if (keyAlias == null) keyAlias = "zoom-pos"
+                    if (keyPassword == null) keyPassword = "123456789"
+                }
             }
         }
     }
 
     buildTypes {
         release {
-            // Signed with the release config when key.properties is present
-            // (gitignored, per-machine); falls back to the debug key otherwise
-            // so `flutter build apk --release` still works without it.
-            signingConfig = if (rootProject.file("key.properties").exists()) {
-                signingConfigs.getByName("release")
+            val releaseConfig = signingConfigs.getByName("release")
+            signingConfig = if (releaseConfig.storeFile?.exists() == true && !releaseConfig.keyAlias.isNullOrEmpty()) {
+                releaseConfig
             } else {
                 signingConfigs.getByName("debug")
             }

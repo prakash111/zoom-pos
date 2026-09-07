@@ -1,0 +1,142 @@
+name: Android Build
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+      - "mobile-v*"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write # needed to attach the APK/AAB to a GitHub Release
+
+jobs:
+  build-android-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter (stable, cached)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Extract app version from pubspec.yaml
+        id: version
+        run: |
+          APP_VERSION=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          BUILD_NUMBER=$(grep -m1 '^version:' pubspec.yaml | sed -nE 's/.*\+([0-9]+).*/\1/p')
+          if [ -z "$APP_VERSION" ]; then
+            echo "Could not determine app version from pubspec.yaml"
+            exit 1
+          fi
+          echo "App version: $APP_VERSION (build: $BUILD_NUMBER)"
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+          echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Set up Android Keystore & Signing Configuration
+        env:
+          STORE_PASS: ${{ secrets.KEYSTORE_PASSWORD || '123456789' }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD || '123456789' }}
+          ALIAS: ${{ secrets.KEY_ALIAS || 'zoom-pos' }}
+        run: |
+          KEYSTORE_PATH="$GITHUB_WORKSPACE/zoom-pos.jks"
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Restoring keystore from KEYSTORE_BASE64 secret..."
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_PATH"
+          fi
+
+          if [ ! -f "$KEYSTORE_PATH" ]; then
+            echo "::error::Keystore not found at $KEYSTORE_PATH"
+            exit 1
+          fi
+
+          cat <<KEYPROP > android/key.properties
+          storePassword=$STORE_PASS
+          keyPassword=$KEY_PASS
+          keyAlias=$ALIAS
+          storeFile=$KEYSTORE_PATH
+          KEYPROP
+
+          echo "Signing config created in android/key.properties:"
+          echo "storeFile=$KEYSTORE_PATH"
+          echo "keyAlias=$ALIAS"
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Run Flutter tests
+        run: flutter test
+
+      - name: Build signed Android release APK
+        env:
+          KEYSTORE_FILE: ${{ github.workspace }}/zoom-pos.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || '123456789' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'zoom-pos' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || '123456789' }}
+        run: flutter build apk --release --android-skip-build-dependency-validation
+
+      - name: Build signed Android release App Bundle (AAB)
+        env:
+          KEYSTORE_FILE: ${{ github.workspace }}/zoom-pos.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || '123456789' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'zoom-pos' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || '123456789' }}
+        run: flutter build appbundle --release --android-skip-build-dependency-validation
+
+      - name: Prepare release artifacts
+        run: |
+          mkdir -p release-output
+          cp build/app/outputs/flutter-apk/app-release.apk release-output/zoom-pos-v${{ env.APP_VERSION }}.apk
+          cp build/app/outputs/flutter-apk/app-release.apk release-output/zoom-pos-release.apk
+          cp build/app/outputs/bundle/release/app-release.aab release-output/zoom-pos-v${{ env.APP_VERSION }}.aab
+          cp build/app/outputs/bundle/release/app-release.aab release-output/zoom-pos-release.aab
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZoomPOS-Android-APK-v${{ env.APP_VERSION }}
+          path: |
+            release-output/zoom-pos-v${{ env.APP_VERSION }}.apk
+            release-output/zoom-pos-release.apk
+            build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload App Bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZoomPOS-Android-Bundle-v${{ env.APP_VERSION }}
+          path: |
+            release-output/zoom-pos-v${{ env.APP_VERSION }}.aab
+            release-output/zoom-pos-release.aab
+            build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-output/zoom-pos-v${{ env.APP_VERSION }}.apk
+            release-output/zoom-pos-v${{ env.APP_VERSION }}.aab
+          generate_release_notes: true
