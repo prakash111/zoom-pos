@@ -46,6 +46,7 @@ class SchemaResponse
         'container', 'card', 'scroll_view', 'grid_view', 'accordion_group',
         'accordion', 'column', 'row', 'tabs', 'stepper', 'text', 'image_network',
         'badge', 'icon', 'divider', 'text_input', 'dropdown_select',
+        'creatable_select',
         'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker', 'file_upload',
         'file_picker',
         'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
@@ -54,7 +55,7 @@ class SchemaResponse
     ];
 
     public const INPUT_TYPES = [
-        'text_input', 'dropdown_select', 'checkbox', 'toggle_switch',
+        'text_input', 'dropdown_select', 'creatable_select', 'checkbox', 'toggle_switch',
         'date_time_picker', 'color_picker', 'file_upload', 'file_picker', 'step_counter',
         'cash_tendered_field', 'customer_selector',
     ];
@@ -257,6 +258,44 @@ class SchemaResponse
             'name' => $name,
             'label' => $label,
             'options' => $normalizedOptions,
+            'initial_value' => (string) ($initialValue ?? ($normalizedOptions[0]['value'] ?? '')),
+        ], $props);
+    }
+
+    /**
+     * A preset dropdown plus a "+ Custom" entry that reveals a free-text
+     * field on the client. The chosen preset value OR the typed text is bound
+     * to $name as a plain string — the endpoint keeps treating it as free text.
+     *
+     * @param  list<array{label:string,value?:string}>|array<string,string>  $options
+     */
+    public static function creatableSelect(string $name, string $label, array $options, mixed $initialValue = null, array $props = []): array
+    {
+        $normalizedOptions = [];
+        foreach ($options as $key => $val) {
+            if (is_array($val)) {
+                $optLabel = (string) ($val['label'] ?? $val['name'] ?? $key);
+                $normalizedOptions[] = [
+                    'label' => $optLabel,
+                    'value' => (string) ($val['value'] ?? $val['code'] ?? $optLabel),
+                ];
+            } else {
+                $normalizedOptions[] = [
+                    'label' => (string) $val,
+                    'value' => (string) (is_numeric($key) ? $val : $key),
+                ];
+            }
+        }
+
+        return array_merge([
+            'type' => 'creatable_select',
+            'name' => $name,
+            'label' => $label,
+            'options' => $normalizedOptions,
+            'allow_custom' => true,
+            'custom_value' => '__custom__',
+            'custom_label' => '+ Other / Custom Reason',
+            'placeholder' => 'Select or type a custom reason…',
             'initial_value' => (string) ($initialValue ?? ($normalizedOptions[0]['value'] ?? '')),
         ], $props);
     }
@@ -1252,13 +1291,17 @@ class SchemaResponse
         }
         $adjustTabChildren = array_merge($adjustTabChildren, [
             self::textInput('new_stock_qty', 'New Audited Quantity', $adjustBatch ? (string) $adjustBatch->stock_qty : '0', ['keyboard_type' => 'number']),
-            self::dropdownSelect('reason', 'Adjustment Reason', [
-                ['label' => 'Physical audit / discrepancy', 'value' => 'Discrepancy'],
-                ['label' => 'Damaged stock', 'value' => 'Damaged'],
-                ['label' => 'Vendor return', 'value' => 'Vendor Return'],
-                ['label' => 'Expired disposal', 'value' => 'Expired Disposal'],
-            ], 'Discrepancy'),
-            self::textInput('notes', 'Notes', '', ['max_lines' => 2]),
+            self::creatableSelect('reason', 'Adjustment Reason *', [
+                ['label' => 'Physical audit / discrepancy', 'value' => 'Physical audit / discrepancy'],
+                ['label' => 'Damaged stock', 'value' => 'Damaged stock'],
+                ['label' => 'Vendor return', 'value' => 'Vendor return'],
+                ['label' => 'Expired disposal', 'value' => 'Expired disposal'],
+                ['label' => 'Supplier recall / withdrawal', 'value' => 'Supplier recall / withdrawal'],
+                ['label' => 'Temperature excursion', 'value' => 'Temperature excursion'],
+                ['label' => 'Breakage during unboxing', 'value' => 'Breakage during unboxing'],
+                ['label' => 'Internal laboratory testing', 'value' => 'Internal laboratory testing'],
+            ], 'Physical audit / discrepancy', ['required' => true]),
+            self::textInput('notes', 'Notes', '', ['max_lines' => 2, 'placeholder' => 'Optional extra detail — lot conditions, personnel, references…']),
             self::divider(),
             self::row([
                 self::buttonOutlined('Adjust Stock', self::formSubmitAction(

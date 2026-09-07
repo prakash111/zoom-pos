@@ -608,4 +608,57 @@ class PharmacyDecoupledIntakeTest extends TestCase
         ]);
         $bad->assertStatus(422)->assertJsonPath('success', false);
     }
+
+    public function test_adjustment_reason_is_creatable_and_accepts_free_text(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id, 'name' => 'Ranitidine 150mg',
+            'sale_price' => 3.00, 'current_stock' => 0, 'active' => true,
+        ]);
+        $batch = PharmacyBatch::create([
+            'company_id' => $this->company->id, 'product_id' => $product->id,
+            'batch_number' => 'RAN-01', 'expiry_date' => now()->addMonths(6),
+            'cost_price' => 1.5, 'selling_price' => 3.0, 'stock_qty' => 30, 'is_active' => true,
+        ]);
+
+        // Schema: the reason field is a creatable_select with an "+ Other"
+        // custom entry, not a rigid dropdown.
+        $schema = $this->withHeaders($this->authHeaders())
+            ->getJson("/api/tenant/views/pharmacy-batches?tab=adjust&batch_id={$batch->id}")
+            ->assertOk()->json('schema');
+        $this->assertEmpty((new SchemaValidator())->validate($schema));
+
+        $reason = $this->firstComponentOfType(
+            $this->firstComponentOfType($schema, 'tabs')['tabs'][2],
+            'creatable_select',
+        );
+        $this->assertNotNull($reason, 'Adjustment Reason must be a creatable_select.');
+        $this->assertSame('reason', $reason['name']);
+        $this->assertTrue($reason['allow_custom']);
+        $this->assertSame('__custom__', $reason['custom_value']);
+        $this->assertContains('Supplier recall / withdrawal', array_column($reason['options'], 'value'));
+
+        // A free-text custom reason is persisted verbatim on adjust.
+        $adj = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/pharmacy/batches/adjust', [
+            'batch_id' => $batch->id,
+            'new_stock_qty' => 25,
+            'reason' => 'Temperature excursion during 3rd-party cold-chain transfer',
+        ]);
+        $adj->assertOk()->assertJsonPath('success', true);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'pharmacy.batch_adjusted',
+        ]);
+        $log = \App\Models\AuditLog::where('action', 'pharmacy.batch_adjusted')->latest('id')->first();
+        $this->assertSame('Temperature excursion during 3rd-party cold-chain transfer', $log->details['reason']);
+
+        // The bare "__custom__" sentinel never lands in the record.
+        $ret = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/pharmacy/batches/return', [
+            'batch_id' => $batch->id,
+            'quantity' => 2,
+            'reason' => '__custom__',
+        ]);
+        $ret->assertOk()->assertJsonPath('success', true);
+        $retLog = \App\Models\AuditLog::where('action', 'pharmacy.vendor_return')->latest('id')->first();
+        $this->assertNull($retLog->details['reason']);
+    }
 }

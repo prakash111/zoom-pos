@@ -658,6 +658,21 @@ class PharmacyApiController extends Controller
     }
 
     /**
+     * The SDUI `creatable_select` sends a preset value, free text, or the
+     * `__custom__` sentinel when "+ Other" was picked but nothing typed.
+     * Accept `adjustment_reason` as an alias, trim, and drop the sentinel so
+     * only a real reason (or null) is ever persisted / audit-logged.
+     */
+    private function normalizeBatchReason(Request $request): void
+    {
+        $reason = trim((string) ($request->input('reason') ?? $request->input('adjustment_reason') ?? ''));
+        if ($reason === '__custom__' || $reason === '') {
+            $reason = null;
+        }
+        $request->merge(['reason' => $reason]);
+    }
+
+    /**
      * Adjust batch stock.
      * POST /api/tenant/pharmacy/batches/adjust
      */
@@ -666,6 +681,7 @@ class PharmacyApiController extends Controller
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
+        $this->normalizeBatchReason($request);
         $batchId = $id ?? $request->input('batch_id');
         $newStock = $request->input('new_stock_qty') ?? $request->input('new_stock');
 
@@ -729,6 +745,7 @@ class PharmacyApiController extends Controller
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
+        $this->normalizeBatchReason($request);
         $batchId = $id ?? $request->input('batch_id');
 
         $validator = Validator::make([
