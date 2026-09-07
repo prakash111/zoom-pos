@@ -336,6 +336,32 @@ class DynamicSchemaParser {
     final children = _extractChildren(schema);
     final spacing = _parseDouble(schema['spacing']);
 
+    // A horizontally scrollable row: children keep their natural width (no
+    // Flexible/Expanded, so nothing is squeezed into an ellipsis) and the
+    // user swipes if the run is wider than the screen. Used for filter-chip
+    // strips and any tab-bar-style control.
+    final scrollable = schema['scrollable'] == true ||
+        schema['scroll_horizontal'] == true ||
+        schema['is_scrollable'] == true;
+    if (scrollable) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: _parseEdgeInsets(schema['padding'],
+            fallback: EdgeInsets.zero),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: _parseCrossAxis(schema['cross_axis_alignment']),
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              buildComponent(context, children[i]),
+              if (spacing != null && i < children.length - 1)
+                SizedBox(width: spacing),
+            ],
+          ],
+        ),
+      );
+    }
+
     bool isExpanded(Map<String, dynamic> child) =>
         child['expanded'] == true || child['flex'] is num;
     bool isFixed(Map<String, dynamic> child) =>

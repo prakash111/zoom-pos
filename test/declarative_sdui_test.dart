@@ -47,6 +47,71 @@ void main() {
       expect(find.byType(Card), findsOneWidget);
     });
 
+    testWidgets(
+        'a scrollable row lays chips out horizontally without clipping labels',
+        (tester) async {
+      final schema = {
+        'type': 'row',
+        'scrollable': true,
+        'spacing': 8,
+        'components': [
+          {
+            'type': 'button_primary',
+            'label': 'All (3)',
+            'dense': true,
+            'full_width': false,
+            'action': {'type': 'pop'},
+          },
+          {
+            'type': 'button_outlined',
+            'label': 'Pending (1)',
+            'dense': true,
+            'full_width': false,
+            'action': {'type': 'pop'},
+          },
+          {
+            'type': 'button_outlined',
+            'label': 'Dispensed (2)',
+            'dense': true,
+            'full_width': false,
+            'action': {'type': 'pop'},
+          },
+        ],
+      };
+
+      // A deliberately narrow viewport — the un-scrollable version ellipsized
+      // here ("Pendi...", "Dispe...").
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, schema),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(SingleChildScrollView), findsOneWidget);
+      // Every label is present and rendered in full (no RenderFlex overflow,
+      // no ellipsis truncation).
+      for (final label in ['All (3)', 'Pending (1)', 'Dispensed (2)']) {
+        final textWidget = tester.widget<Text>(find.text(label));
+        expect(textWidget.overflow, TextOverflow.ellipsis);
+        final painter = TextPainter(
+          text: TextSpan(text: label, style: textWidget.style),
+          textDirection: TextDirection.ltr,
+          maxLines: 1,
+        )..layout();
+        expect(painter.didExceedMaxLines, isFalse,
+            reason: '"$label" should fit on one line at its natural width');
+      }
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('renders accordion group with ExpansionTile', (tester) async {
       final schema = {
         'type': 'accordion_group',
