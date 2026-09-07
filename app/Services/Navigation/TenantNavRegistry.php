@@ -1694,6 +1694,12 @@ class TenantNavRegistry
                 ['key' => 'staff', 'label' => 'Users & Permissions', 'title' => 'Users & Permissions', 'icon' => 'badge', 'component' => 'staff', 'type' => 'link', 'permission' => 'users'],
                 ['key' => 'roles', 'label' => 'Roles & Access Levels', 'title' => 'Roles & Access Levels', 'icon' => 'admin_panel_settings', 'component' => 'roles', 'type' => 'link', 'permission' => 'users', 'target_endpoint' => '/api/tenant/views/roles'],
                 ['key' => 'devices', 'label' => 'Terminals & Devices', 'title' => 'Terminals & Devices', 'icon' => 'devices_other', 'component' => 'devices', 'type' => 'link', 'permission' => null],
+                // Hardware pairing is mode-agnostic — every operating mode
+                // prints receipts / tokens, so this row is anchored in the
+                // shared administration section for all tenants. `component`
+                // resolves to the native GlobalPrinterSetupScreen on mobile;
+                // `target_endpoint` is the graceful web / non-native fallback.
+                ['key' => 'hardware_printer', 'label' => 'Printer & Hardware Setup', 'title' => 'Printer & Hardware Setup', 'icon' => 'print', 'component' => 'printer_setup', 'type' => 'link', 'permission' => null, 'route' => 'printer_setup', 'target_endpoint' => '/api/tenant/views/printer-setup'],
                 ['key' => 'change_password', 'label' => 'Change Password', 'title' => 'Change Password', 'icon' => 'lock_reset', 'component' => 'change_password', 'type' => 'link', 'permission' => null, 'target_endpoint' => '/api/tenant/views/change-password'],
             ],
         ];

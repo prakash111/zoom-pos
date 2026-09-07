@@ -4190,6 +4190,46 @@ class SchemaResponse
                 'POST',
                 'Receipt settings updated successfully'
             ), 'save'),
+            self::card([
+                self::text('Hardware & Printer', 'title_medium', ['bold' => true]),
+                self::text('Pair a Bluetooth, USB or network (LAN/WiFi) thermal printer and set the receipt paper width (58mm / 80mm). Applies to every operating mode.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::buttonOutlined(
+                    'Printer & Hardware Setup',
+                    self::navigateAction('printer_setup', 'native', 'Printer & Hardware Setup'),
+                    'print',
+                ),
+            ]),
+        ]);
+    }
+
+    /**
+     * GET /api/tenant/views/printer-setup
+     *
+     * Native clients resolve the `printer_setup` route to the on-device
+     * GlobalPrinterSetupScreen (Bluetooth / USB / network pairing) and never
+     * fetch this endpoint. It exists so the same drawer row degrades to a
+     * useful screen on web / older builds instead of an empty shell.
+     */
+    public static function hardwareSetupView(Company $company): array
+    {
+        return self::screen('Printer & Hardware Setup', [
+            self::card([
+                self::text('Device pairing happens on the terminal', 'title_medium', ['bold' => true]),
+                self::text('Open this screen from the ZoomNearby app on the phone or tablet that is physically connected to the printer. There you can pair a Bluetooth, USB (OTG) or network (LAN/WiFi, port 9100) thermal printer, choose 58mm or 80mm paper, and run a test print.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::text('The selected printer and paper width are stored on that device and used automatically for every receipt, invoice and repair/pickup token — across all operating modes.', 'body_small', ['color' => '#6b7280']),
+            ]),
+            self::card([
+                self::text('Receipt content & footers', 'label_large', ['bold' => true]),
+                self::text('Prefixes, disclaimers and bank details printed on those receipts are configured under Receipt Settings.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::buttonOutlined(
+                    'Open Receipt Settings',
+                    self::navigateAction('/api/tenant/views/settings-receipts', 'dynamic_page', 'Receipt Settings'),
+                    'receipt_long',
+                ),
+            ]),
         ]);
     }
 
@@ -5014,6 +5054,7 @@ class SchemaResponse
             'settings-profile', 'profile' => self::profileView($company),
             'settings-branding', 'branding' => self::brandingView($company),
             'settings-receipts', 'receipts' => self::receiptsView($company),
+            'printer-setup', 'hardware-printer', 'hardware-settings' => self::hardwareSetupView($company),
             'settings-financial', 'financial' => self::financialView($company),
             'settings-localization', 'localization' => self::localizationView($company),
             'settings-taxes', 'taxes' => self::taxesView($company),
