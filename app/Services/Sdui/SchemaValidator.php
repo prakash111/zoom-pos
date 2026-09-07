@@ -66,6 +66,10 @@ class SchemaValidator
             $errors[] = "{$path}.name: is required for input components";
         }
 
+        if ($type === 'text_input' && isset($component['submit_action'])) {
+            $this->validateAction($component['submit_action'], "{$path}.submit_action", $errors);
+        }
+
         if (in_array($type, ['file_upload', 'file_picker'], true)) {
             $uploadEndpoint = trim((string) ($component['upload_endpoint'] ?? ''));
             if ($uploadEndpoint === '' || ! str_starts_with($uploadEndpoint, '/api/')) {

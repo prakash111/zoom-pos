@@ -526,6 +526,7 @@ class PharmacyApiController extends Controller
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $q->where('batch_number', 'like', "%{$search}%")
+                    ->orWhere('rack_location', 'like', "%{$search}%")
                     ->orWhereHas('product', function ($pq) use ($search) {
                         $pq->where('name', 'like', "%{$search}%")
                             ->orWhere('generic_name', 'like', "%{$search}%");
@@ -582,8 +583,17 @@ class PharmacyApiController extends Controller
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
+        // The SDUI dropdown submits its value as a string ("102"); numeric
+        // fields arrive as strings too. Normalize before validation so a
+        // well-formed request never trips "must be an integer".
+        foreach (['product_id', 'stock_qty', 'alert_days_before_expiry'] as $intField) {
+            if ($request->filled($intField) && is_numeric($request->input($intField))) {
+                $request->merge([$intField => (int) $request->input($intField)]);
+            }
+        }
+
         $validator = Validator::make($request->all(), [
-            'product_id' => 'required|integer',
+            'product_id' => 'required|integer|exists:products,id',
             'batch_number' => 'required|string|max:100',
             'rack_location' => 'nullable|string|max:100',
             'manufacturing_date' => 'nullable|date',

@@ -539,15 +539,73 @@ class PharmacyDecoupledIntakeTest extends TestCase
         $this->assertStringContainsString('"name":"batch_id","label":"Batch ID \/ Medicine Search","initial_value":"' . $batch->id . '"', $adjJson);
         $this->assertStringContainsString('Current Qty: 60', $adjJson);
 
-        // --- ?q= filters the Active Batches list ---
-        $hit = $this->withHeaders($this->authHeaders())
-            ->getJson('/api/tenant/views/pharmacy-batches?q=MET-2026')->assertOk()->json('schema');
-        $this->assertStringContainsString('Metformin 500mg', json_encode($this->firstComponentOfType($hit, 'tabs')['tabs'][0]));
+        // --- ?search= filters the Active Batches list; the search field and
+        //     button are bound to a filter_view action on `search` ---
+        foreach (['search', 'q'] as $param) {
+            $hit = $this->withHeaders($this->authHeaders())
+                ->getJson("/api/tenant/views/pharmacy-batches?{$param}=MET-2026")->assertOk()->json('schema');
+            $this->assertStringContainsString('Metformin 500mg', json_encode($this->firstComponentOfType($hit, 'tabs')['tabs'][0]));
+        }
 
         $miss = $this->withHeaders($this->authHeaders())
-            ->getJson('/api/tenant/views/pharmacy-batches?q=Ibuprofen')->assertOk()->json('schema');
+            ->getJson('/api/tenant/views/pharmacy-batches?search=Ibuprofen')->assertOk()->json('schema');
         $missActive = json_encode($this->firstComponentOfType($miss, 'tabs')['tabs'][0]);
         $this->assertStringNotContainsString('Metformin 500mg', $missActive);
         $this->assertStringContainsString('No batches match your search', $missActive);
+
+        $searchRow = $this->firstComponentOfType($tabs['tabs'][0], 'text_input');
+        $this->assertSame('search', $searchRow['name']);
+        $this->assertSame(
+            ['type' => 'filter_view', 'endpoint' => '/api/tenant/views/pharmacy-batches?tab=active', 'fields' => ['search']],
+            $searchRow['submit_action'],
+        );
+    }
+
+    public function test_register_batch_dropdown_emits_integer_ids_and_store_accepts_string_ints(): void
+    {
+        $amox = Product::create([
+            'company_id' => $this->company->id, 'name' => 'Amoxicillin 500mg Capsules (10pk)',
+            'sale_price' => 9.50, 'current_stock' => 0, 'active' => true,
+        ]);
+        Product::create([
+            'company_id' => $this->company->id, 'name' => 'Ibuprofen 400mg Softgels (20pk)',
+            'sale_price' => 6.00, 'current_stock' => 0, 'active' => true,
+        ]);
+
+        $schema = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/tenant/views/pharmacy-batches?tab=register')->assertOk()->json('schema');
+        $tabs = $this->firstComponentOfType($schema, 'tabs');
+        $dropdown = $this->firstComponentOfType($tabs['tabs'][1], 'dropdown_select');
+
+        $this->assertSame('product_id', $dropdown['name']);
+        // Option values are the integer primary keys (as strings on the wire),
+        // never the medicine name.
+        $values = array_column($dropdown['options'], 'value');
+        $this->assertSame([(string) $amox->id, (string) Product::where('name', 'like', 'Ibuprofen%')->first()->id], $values);
+        $this->assertSame($amox->name, $dropdown['options'][0]['label']);
+
+        // Store accepts a string integer id (the shape the SDUI form submits).
+        $ok = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/pharmacy/batches', [
+            'product_id' => (string) $amox->id,
+            'batch_number' => 'AMX-2026-77',
+            'expiry_date' => now()->addYear()->toDateString(),
+            'stock_qty' => '40',
+            'cost_price' => '5.00',
+            'selling_price' => '9.50',
+            'alert_days_before_expiry' => '60',
+        ]);
+        $ok->assertOk()->assertJsonPath('success', true);
+        $this->assertDatabaseHas('pharmacy_batches', [
+            'batch_number' => 'AMX-2026-77', 'product_id' => $amox->id, 'stock_qty' => 40,
+        ]);
+
+        // A non-numeric product_id fails cleanly (422), never a 500.
+        $bad = $this->withHeaders($this->authHeaders())->postJson('/api/tenant/pharmacy/batches', [
+            'product_id' => 'Amoxicillin 500mg Capsules (10pk)',
+            'batch_number' => 'AMX-BAD-1',
+            'expiry_date' => now()->addYear()->toDateString(),
+            'stock_qty' => '10',
+        ]);
+        $bad->assertStatus(422)->assertJsonPath('success', false);
     }
 }

@@ -1109,7 +1109,8 @@ class SchemaResponse
             default => 0,
         };
         $prefillBatchId = trim((string) request('batch_id', ''));
-        $search = trim((string) request('q', ''));
+        // `search` is the current param; `q` kept as a legacy alias.
+        $search = trim((string) (request('search') ?? request('q', '')));
 
         // ---- Tab 1: Active Batches (FEFO list + search) ----
         $batchQuery = $base()->with('product')->orderBy('expiry_date', 'asc');
@@ -1165,8 +1166,8 @@ class SchemaResponse
 
         $activeTabChildren = [
             self::row([
-                self::textInput('q', 'Search medicine, batch # or rack', $search, ['expanded' => true]),
-                self::buttonPrimary('Search', self::filterViewAction('/api/tenant/views/pharmacy-batches?tab=active', ['q']), 'search', ['full_width' => false, 'dense' => true]),
+                self::textInput('search', 'Search medicine, batch # or rack', $search, ['expanded' => true, 'submit_action' => self::filterViewAction('/api/tenant/views/pharmacy-batches?tab=active', ['search'])]),
+                self::buttonPrimary('Search', self::filterViewAction('/api/tenant/views/pharmacy-batches?tab=active', ['search']), 'search', ['full_width' => false, 'dense' => true]),
             ], ['spacing' => 8, 'cross_axis_alignment' => 'center']),
         ];
         if ($search !== '') {
@@ -1189,13 +1190,18 @@ class SchemaResponse
         }
 
         // ---- Tab 2: Register Batch (standalone form) ----
+        // Options MUST carry the integer primary key as `value` — the backend
+        // validates product_id as an integer, so sending the medicine name
+        // (the old pluck('name','id') shape) fails "must be an integer".
         $productOptions = Product::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('active', true)
-            ->pluck('name', 'id')
-            ->toArray();
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(static fn ($p) => ['label' => (string) $p->name, 'value' => (int) $p->id])
+            ->all();
         if (empty($productOptions)) {
-            $productOptions = ['1' => 'General Medicine Item'];
+            $productOptions = [['label' => 'General Medicine Item', 'value' => 0]];
         }
 
         $registerTabChildren = [
@@ -1203,7 +1209,7 @@ class SchemaResponse
                 self::text('Register a New Medicine Batch', 'title_medium', ['bold' => true]),
                 self::text('Batch intake fields only — stock adjustments live on the next tab.', 'body_small', ['color' => '#64748b']),
             ]),
-            self::dropdownSelect('product_id', 'Medicine / Drug', $productOptions),
+            self::dropdownSelect('product_id', 'Medicine / Drug *', $productOptions),
             self::textInput('batch_number', 'Batch ID / Lot Number *', ''),
             self::row([
                 self::dateTimePicker('manufacturing_date', 'Manufacturing Date', null, 'date'),
