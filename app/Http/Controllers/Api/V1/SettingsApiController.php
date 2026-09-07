@@ -309,6 +309,72 @@ class SettingsApiController extends Controller
         return response()->json(['success' => true, 'message' => 'Receipt settings saved.', 'receipts' => $this->presentReceipts($company->fresh())]);
     }
 
+    /**
+     * Save the tenant's custom repair intake checklist.
+     * POST /api/tenant/settings/repair-checklist
+     *
+     * Accepts either a structured `checklist_schema` [{key,label,default}, ...]
+     * or a newline `checklist_labels` blob ("Label | default" per line), or
+     * `reset: true` to fall back to the built-in defaults.
+     */
+    public function updateRepairChecklist(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        if ($request->boolean('reset')) {
+            $company->update(['repair_checklist_schema' => null]);
+            AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'repair_checklist', 'reset' => true]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Checklist reset to defaults.',
+                'checklist' => $company->fresh()->repairChecklistSchema(),
+            ]);
+        }
+
+        $items = [];
+
+        if ($request->filled('checklist_schema') && is_array($request->input('checklist_schema'))) {
+            $items = $request->input('checklist_schema');
+        } elseif ($request->filled('checklist_labels')) {
+            foreach (preg_split('/\R/', (string) $request->input('checklist_labels')) ?: [] as $line) {
+                $line = trim($line);
+                if ($line === '') {
+                    continue;
+                }
+                $parts = array_map('trim', explode('|', $line, 2));
+                $items[] = ['label' => $parts[0], 'default' => $parts[1] ?? 'pass'];
+            }
+        }
+
+        if ($items === []) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Add at least one checkpoint, or use Reset to Defaults.',
+            ], 422);
+        }
+        if (count($items) > 40) {
+            return response()->json(['success' => false, 'error' => 'A checklist may have at most 40 checkpoints.'], 422);
+        }
+
+        // Normalise through the model helper (fills keys, clamps defaults).
+        $company->repair_checklist_schema = $items;
+        $normalized = $company->repairChecklistSchema();
+        $company->repair_checklist_schema = $normalized;
+        $company->save();
+
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, [
+            'section' => 'repair_checklist', 'count' => count($normalized),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Repair checklist saved.',
+            'checklist' => $normalized,
+        ]);
+    }
+
     public function updateFinancial(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);

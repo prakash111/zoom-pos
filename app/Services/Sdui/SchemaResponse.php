@@ -29,6 +29,7 @@ use App\Services\Navigation\TenantNavRegistry;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * Centralized Server-Driven UI (SDUI) Schema Response Builder.
@@ -1980,9 +1981,28 @@ class SchemaResponse
 
         $checkOptions = [
             ['label' => 'Pass', 'value' => 'pass'],
-            ['label' => 'Fail', 'value' => 'fail'],
-            ['label' => 'Not Tested', 'value' => 'not_tested'],
+            ['label' => 'Fail / Damaged', 'value' => 'fail'],
+            ['label' => 'Pending / Untested', 'value' => 'pending'],
+            ['label' => 'Not Applicable (N/A)', 'value' => 'not_applicable'],
         ];
+
+        // Step 4 checkpoints are whatever this tenant configured for its
+        // vertical (Settings → Repair Checklist), not a hardcoded phone list.
+        $checklistFields = [];
+        foreach ($company->repairChecklistSchema() as $index => $item) {
+            $checklistFields[] = self::dropdownSelect(
+                "check_{$item['key']}",
+                ($index + 1).". {$item['label']}",
+                $checkOptions,
+                $item['default'] ?? 'pass',
+            );
+        }
+        $checklistFields[] = self::textInput(
+            'custom_checklist',
+            'Additional checkpoints (one per line — e.g. S-Pen, FaceID, Hinge)',
+            '',
+            ['max_lines' => 3, 'placeholder' => "S-Pen detection\nFace ID / IR camera\nWaterproof seal"],
+        );
 
         return self::screen('New Repair Ticket', [
             // Compact intro strip — no card chrome so the wizard sits close to
@@ -2071,18 +2091,11 @@ class SchemaResponse
                     ],
                 ],
 
-                // Step 4 — Inspection Checklist
+                // Step 4 — Inspection Checklist (tenant-configured checkpoints)
                 [
                     'title' => 'Intake Inspection Checklist',
-                    'subtitle' => 'Verify the working state of common components before disassembly.',
-                    'components' => [
-                        self::dropdownSelect('check_power', '1. Power On / Boot Up State', $checkOptions, 'pass'),
-                        self::dropdownSelect('check_display', '2. Display & Touchscreen', $checkOptions, 'pass'),
-                        self::dropdownSelect('check_cameras', '3. Front & Back Cameras', $checkOptions, 'pass'),
-                        self::dropdownSelect('check_charging', '4. Charging Port & Battery', $checkOptions, 'pass'),
-                        self::dropdownSelect('check_speakers', '5. Audio, Mic & Speakers', $checkOptions, 'pass'),
-                        self::dropdownSelect('check_battery', '6. Battery Health & State', $checkOptions, 'pass'),
-                    ],
+                    'subtitle' => 'Verify the working state of each checkpoint before disassembly. Configure your own list in Settings → Repair Checklist.',
+                    'components' => $checklistFields,
                 ],
             ], self::formSubmitAction(
                 '/api/tenant/repair/tickets',
@@ -2258,21 +2271,87 @@ class SchemaResponse
             ]);
         }
 
-        $checklistItems = [];
+        // Interactive checklist. Each row is an action-sheet trigger: tap it,
+        // pick Pass / Fail / Pending / N-A, and the option api_posts
+        // {key, value} to .../checklist and reloads the view.
         $rawChecklist = (array) ($ticket->inspection_checklist ?? []);
+        if ($rawChecklist === []) {
+            $rawChecklist = array_map(
+                static fn ($item) => ['key' => $item['key'], 'item_name' => $item['label'], 'status' => 'pending'],
+                $company->repairChecklistSchema(),
+            );
+        }
+
+        $checklistStatusMeta = static function (string $status): array {
+            return match (strtolower($status)) {
+                'pass' => ['PASS', '#15803d', 'check_circle'],
+                'fail' => ['FAIL', '#dc2626', 'cancel'],
+                'not_applicable', 'na', 'n/a' => ['N/A', '#64748b', 'block'],
+                default => ['PENDING', '#f59e0b', 'hourglass_top'],
+            };
+        };
+
+        $checklistItems = [];
         foreach ($rawChecklist as $c) {
             $itemName = is_array($c) ? ($c['item_name'] ?? $c['name'] ?? 'Checklist Item') : (string) $c;
-            $status = is_array($c) ? ($c['status'] ?? 'pending') : 'pending';
-            $statusColor = match ($status) {
-                'pass' => '#10b981',
-                'fail' => '#ef4444',
-                default => '#64748b',
-            };
-            $checklistItems[] = self::row([
-                self::text($itemName, 'body_small', ['expanded' => true, 'max_lines' => 2]),
-                self::badge(strtoupper($status), $statusColor, 'subtle'),
-            ], ['main_axis_alignment' => 'space_between', 'cross_axis_alignment' => 'center']);
+            $status = is_array($c) ? (string) ($c['status'] ?? 'pending') : 'pending';
+            $key = is_array($c) && ! empty($c['key'])
+                ? (string) $c['key']
+                : (Str::slug($itemName, '_') ?: 'check');
+            [$statusLabel, $statusColor, $statusIcon] = $checklistStatusMeta($status);
+
+            $checklistItems[] = self::actionSheetTrigger(
+                "{$itemName}   —   {$statusLabel}",
+                array_map(
+                    static fn (array $opt) => [
+                        'label' => $opt[0],
+                        'icon' => $opt[2],
+                        'action' => self::apiPostAction(
+                            "/api/tenant/repair/tickets/{$ticket->id}/checklist",
+                            ['key' => $key, 'value' => $opt[1]],
+                            "{$itemName}: {$opt[0]}",
+                            reload: true,
+                        ),
+                    ],
+                    [
+                        ['Pass', 'pass', 'check_circle'],
+                        ['Fail / Damaged', 'fail', 'cancel'],
+                        ['Pending / Untested', 'pending', 'hourglass_top'],
+                        ['Not Applicable (N/A)', 'not_applicable', 'block'],
+                    ],
+                ),
+                $statusIcon,
+                ['sheet_title' => "Set status — {$itemName}"],
+            );
         }
+
+        // Header lifecycle status picker — moves the ticket through the 6
+        // workshop stages, one tap per transition.
+        $statusSelector = self::actionSheetTrigger(
+            'Change Ticket Status',
+            array_map(
+                static fn (array $s) => [
+                    'label' => $s[1],
+                    'icon' => $s[2],
+                    'action' => self::apiPostAction(
+                        "/api/tenant/repair/tickets/{$ticket->id}/status",
+                        ['status' => $s[0]],
+                        "Moved to {$s[1]}",
+                        reload: true,
+                    ),
+                ],
+                [
+                    ['received', '1. Received / Intake', 'inbox'],
+                    ['diagnosing', '2. Diagnosing', 'biotech'],
+                    ['waiting_parts', '3. Waiting for Parts', 'hourglass_top'],
+                    ['in_progress', '4. In Progress', 'construction'],
+                    ['ready', '5. Ready for Pickup', 'task_alt'],
+                    ['delivered', '6. Delivered & Closed', 'verified'],
+                ],
+            ),
+            'swap_horiz',
+            ['sheet_title' => 'Move ticket to stage'],
+        );
 
         // Once the ticket is settled & handed over, lead with the native
         // Post-Sale Action Sheet so the cashier can print / share the invoice
@@ -2297,7 +2376,7 @@ class SchemaResponse
                         self::text("Ticket #{$ticket->ticket_number}", 'title_large', ['bold' => true]),
                         self::text(trim("{$ticket->brand} {$ticket->model}").' ('.($ticket->device_type ?: 'Device').')', 'body_medium', ['color' => '#64748b']),
                     ]),
-                    self::badge(strtoupper((string) ($ticket->status ?? 'received')), $ticket->status_color, 'subtle'),
+                    self::badge(strtoupper(str_replace('_', ' ', (string) ($ticket->status ?? 'received'))), $ticket->status_color, 'subtle'),
                 ]),
                 self::divider(),
                 self::row([
@@ -2306,6 +2385,8 @@ class SchemaResponse
                 ]),
                 self::text('Hardware Serial / IMEI: '.($ticket->serial_or_imei ?: 'N/A'), 'body_small', ['color' => '#64748b']),
                 self::text('Passcode / Unlock Pattern: '.($ticket->passcode_or_pattern ?: 'None'), 'body_small', ['color' => '#dc2626']),
+                self::divider(),
+                $statusSelector,
             ]),
 
             self::card([
@@ -2318,8 +2399,10 @@ class SchemaResponse
 
             self::card([
                 self::text('Intake Diagnostic Checklist', 'title_medium', ['bold' => true]),
+                self::text('Tap any checkpoint to set Pass / Fail / Pending / N-A.', 'body_small', ['color' => '#64748b']),
+                self::divider(),
                 self::column(! empty($checklistItems) ? $checklistItems : [
-                    self::text('No checklist verified at intake.', 'body_small', ['color' => '#64748b']),
+                    self::text('No checkpoints configured. Add them in Settings → Repair Checklist.', 'body_small', ['color' => '#64748b']),
                 ]),
             ]),
 
@@ -2481,6 +2564,74 @@ class SchemaResponse
                 self::column(! empty($categoryCards) ? $categoryCards : [
                     self::text('No categories configured yet.', 'body_medium', ['color' => '#64748b']),
                 ]),
+            ]),
+        ]);
+    }
+
+    /**
+     * Settings screen for the tenant's custom repair intake checklist.
+     * GET /api/tenant/views/repair-checklist-settings
+     */
+    public static function repairChecklistSettingsView(Company $company): array
+    {
+        $schema = $company->repairChecklistSchema();
+        $isCustom = is_array($company->repair_checklist_schema) && $company->repair_checklist_schema !== [];
+
+        $currentText = implode("\n", array_map(
+            static fn ($item) => $item['label'].' | '.($item['default'] ?? 'pass'),
+            $schema,
+        ));
+
+        $previewRows = [];
+        foreach ($schema as $i => $item) {
+            $previewRows[] = self::row([
+                self::text(($i + 1).". {$item['label']}", 'body_small', ['expanded' => true]),
+                self::badge(strtoupper($item['default'] ?? 'pass'), '#0284c7', 'subtle'),
+            ], ['cross_axis_alignment' => 'center']);
+        }
+
+        return self::screen('Repair Intake Checklist', [
+            self::card([
+                self::row([
+                    self::icon('checklist', ['color' => '#0284c7', 'size' => 24], ['flexible' => false]),
+                    self::column([
+                        self::text('Custom Diagnostic Checklist', 'title_medium', ['bold' => true]),
+                        self::text('Define the checkpoints your technicians verify at intake. Applies to every new repair ticket.', 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+                self::divider(),
+                self::badge($isCustom ? 'Using your custom checklist' : 'Using default checklist', $isCustom ? '#15803d' : '#64748b', 'subtle'),
+            ]),
+
+            self::card([
+                self::text('Current Checkpoints', 'label_large', ['bold' => true]),
+                self::column(! empty($previewRows) ? $previewRows : [
+                    self::text('No checkpoints.', 'body_small', ['color' => '#64748b']),
+                ]),
+            ]),
+
+            self::card([
+                self::text('Edit Checklist', 'label_large', ['bold' => true]),
+                self::text('One checkpoint per line. Optionally append " | pass", " | fail", " | pending" or " | not_applicable" to set its default state.', 'body_small', ['color' => '#64748b']),
+                self::divider(),
+                self::textInput('checklist_labels', 'Checkpoints', $currentText, [
+                    'max_lines' => 10,
+                    'keyboard_type' => 'multiline',
+                    'placeholder' => "Sole & heel wear | pass\nStitching integrity | pass\nWaterproofing | not_applicable",
+                ]),
+                self::divider(),
+                self::buttonPrimary('Save Checklist', self::formSubmitAction(
+                    '/api/tenant/settings/repair-checklist',
+                    'POST',
+                    'Repair checklist saved.',
+                    reload: true,
+                ), 'save'),
+                self::buttonOutlined('Reset to Defaults', self::apiPostAction(
+                    '/api/tenant/settings/repair-checklist',
+                    ['reset' => true],
+                    'Checklist reset to defaults.',
+                    reload: true,
+                ), 'restart_alt'),
             ]),
         ]);
     }
@@ -4750,7 +4901,7 @@ class SchemaResponse
         }
 
         if (str_starts_with($normalized, 'settings-')
-            || in_array($normalized, ['mode', 'profile', 'branding', 'receipts', 'financial', 'localization', 'taxes', 'api', 'api-integrations', 'navigation', 'navigation-menu', 'notifications', 'custom-notifications'], true)) {
+            || in_array($normalized, ['mode', 'profile', 'branding', 'receipts', 'financial', 'localization', 'taxes', 'api', 'api-integrations', 'navigation', 'navigation-menu', 'notifications', 'custom-notifications', 'repair-checklist-settings'], true)) {
             return 'settings.view';
         }
 
@@ -4875,6 +5026,7 @@ class SchemaResponse
             'repair-my-jobs' => self::repairMyJobsView($company),
             'repair-detail' => self::repairDetailView($company),
             'repair-categories' => self::repairCategoriesView($company),
+            'repair-checklist-settings', 'settings-repair-checklist', 'repair-checklist' => self::repairChecklistSettingsView($company),
             'salon-calendar', 'booking-calendar', 'service-calendar', 'service-booking-calendar', 'calendar' => self::serviceCalendarView($company),
             'salon-booking-create', 'service-booking-create', 'book-service-appointment', 'book-appointment', 'salon-booking' => self::salonBookingCreateView($company),
             'service-stylists', 'stylists' => self::serviceStylistsView($company),

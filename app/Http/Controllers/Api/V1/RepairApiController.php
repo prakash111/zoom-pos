@@ -560,6 +560,42 @@ class RepairApiController extends Controller
             $categoryId, $technicianId, $serial, $passcode, $problem, $advanceDeposit, $advanceMethod
         ) {
             $checklist = $request->input('inspection_checklist');
+
+            // Build from the intake wizard's per-checkpoint `check_<key>` selects
+            // (dynamically generated from the tenant's configured checklist) plus
+            // any free-text "custom_checklist" lines — but ONLY when the wizard
+            // actually submitted them. A bare API create still falls through to
+            // the device-category defaults below.
+            $customChecklist = trim((string) $request->input('custom_checklist', ''));
+            $submittedCheckKeys = array_filter(
+                array_keys($request->all()),
+                static fn ($k) => is_string($k) && str_starts_with($k, 'check_'),
+            );
+            if (empty($checklist) && ($submittedCheckKeys !== [] || $customChecklist !== '')) {
+                $built = [];
+                foreach ($company->repairChecklistSchema() as $item) {
+                    if (! $request->has("check_{$item['key']}")) {
+                        continue;
+                    }
+                    $built[] = [
+                        'key' => $item['key'],
+                        'item_name' => $item['label'],
+                        'status' => $this->normalizeChecklistStatus((string) $request->input("check_{$item['key']}")),
+                        'notes' => null,
+                    ];
+                }
+                foreach (preg_split('/\R/', $customChecklist) ?: [] as $line) {
+                    $line = trim($line);
+                    if ($line === '') {
+                        continue;
+                    }
+                    $built[] = ['key' => Str::slug($line, '_') ?: 'custom', 'item_name' => $line, 'status' => 'pending', 'notes' => null];
+                }
+                if ($built !== []) {
+                    $checklist = $built;
+                }
+            }
+
             if (empty($checklist) && $categoryId) {
                 $category = Category::withoutGlobalScopes()->find($categoryId);
                 if ($category) {
@@ -800,7 +836,7 @@ class RepairApiController extends Controller
         $newStatus = strtolower(trim((string) $request->input('status')));
         if ($newStatus === 'active') {
             $newStatus = RepairTicket::STATUS_RECEIVED;
-        } elseif ($newStatus === 'repaired') {
+        } elseif (in_array($newStatus, ['repaired', 'ready_pickup', 'ready-pickup', 'ready_for_pickup'], true)) {
             $newStatus = RepairTicket::STATUS_READY;
         }
         if (! array_key_exists($newStatus, RepairTicket::STATUSES)) {
@@ -1118,6 +1154,47 @@ class RepairApiController extends Controller
 
         $user = $this->authorizeAction($request, 'diagnose', $ticket);
 
+        // Single-item toggle from the interactive workbench checklist:
+        // { "key": "power_boot", "value": "PASS" }.
+        if ($request->filled('key')) {
+            $key = (string) $request->input('key');
+            $value = $this->normalizeChecklistStatus((string) $request->input('value', 'pending'));
+
+            $list = array_values((array) ($ticket->inspection_checklist ?? []));
+            $matched = false;
+            foreach ($list as $idx => $row) {
+                $rowKey = is_array($row)
+                    ? (string) ($row['key'] ?? Str::slug((string) ($row['item_name'] ?? $row['name'] ?? ''), '_'))
+                    : Str::slug((string) $row, '_');
+                if ($rowKey === $key) {
+                    $list[$idx] = [
+                        'key' => $key,
+                        'item_name' => is_array($row) ? ($row['item_name'] ?? $row['name'] ?? $key) : (string) $row,
+                        'status' => $value,
+                        'notes' => is_array($row) ? ($row['notes'] ?? null) : null,
+                    ];
+                    $matched = true;
+                    break;
+                }
+            }
+            if (! $matched) {
+                $list[] = ['key' => $key, 'item_name' => $key, 'status' => $value, 'notes' => null];
+            }
+
+            $ticket->update(['inspection_checklist' => $list]);
+            AuditLog::record('repair.checklist_updated', $company->id, $user->id, [
+                'ticket_id' => $ticket->id, 'key' => $key, 'value' => $value,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Checklist updated.',
+                'action' => 'refresh_view',
+                'data' => $ticket->inspection_checklist,
+                'ticket' => $ticket->fresh(),
+            ]);
+        }
+
         $checklist = $request->input('inspection_checklist') ?? $request->input('checklist');
         if (! is_array($checklist)) {
             return response()->json(['success' => false, 'error' => 'The inspection checklist must be an array.'], 422);
@@ -1132,8 +1209,23 @@ class RepairApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Inspection checklist updated.',
+            'action' => 'refresh_view',
             'ticket' => $ticket->fresh(),
         ]);
+    }
+
+    /**
+     * Normalise a free-form checklist status token to one of
+     * pass | fail | pending | not_applicable.
+     */
+    private function normalizeChecklistStatus(string $raw): string
+    {
+        return match (strtolower(trim($raw))) {
+            'pass', 'passed', 'ok', 'good' => 'pass',
+            'fail', 'failed', 'damaged', 'broken', 'bad' => 'fail',
+            'na', 'n/a', 'not_applicable', 'not applicable', 'skip' => 'not_applicable',
+            default => 'pending',
+        };
     }
 
     /**

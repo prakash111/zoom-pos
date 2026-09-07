@@ -34,7 +34,7 @@ class Company extends Model
         'max_users', 'max_devices', 'pricing_mode', 'tax_api_mode', 'tax_api_key', 'tax_api_endpoint',
         'navigation_menu_customization', 'navigation_labels', 'form_field_customizations',
         'invoice_prefix', 'quotation_prefix', 'repair_prefix', 'prescription_prefix', 'salon_prefix', 'tax_settings', 'invoice_terms', 'quote_terms', 'bank_details',
-        'dispensing_disclaimer', 'repair_warranty_terms', 'salon_policy_terms',
+        'dispensing_disclaimer', 'repair_warranty_terms', 'salon_policy_terms', 'repair_checklist_schema',
         'currency_symbol', 'currency_decimals', 'currency_symbol_position', 'other_currencies',
         'default_commission_rate', 'default_commission_type',
         'pix_key_type', 'pix_key', 'pix_merchant_name', 'pix_merchant_city', 'pix_qr_image',
@@ -55,6 +55,7 @@ class Company extends Model
             'other_currencies' => 'array',
             'restaurant_mode_locked' => 'boolean',
             'licensed_modules' => 'array',
+            'repair_checklist_schema' => 'array',
             'nav_config' => 'array',
             'navigation_menu_customization' => 'array',
             'navigation_labels' => 'array',
@@ -486,6 +487,64 @@ class Company extends Model
     public function hasModule(string $moduleKey): bool
     {
         return in_array($moduleKey, $this->licensedModuleKeys(), true);
+    }
+
+    /**
+     * Default repair intake checkpoints for a tenant that hasn't configured
+     * its own. Mobile-device biased — a shop overrides this per its vertical.
+     *
+     * @return list<array{key:string,label:string,default:string}>
+     */
+    public const DEFAULT_REPAIR_CHECKLIST = [
+        ['key' => 'power', 'label' => 'Power On / Boot Up State', 'default' => 'pass'],
+        ['key' => 'display', 'label' => 'Display & Touchscreen', 'default' => 'pass'],
+        ['key' => 'cameras', 'label' => 'Front & Back Cameras', 'default' => 'pass'],
+        ['key' => 'charging', 'label' => 'Charging Port & Battery', 'default' => 'pass'],
+        ['key' => 'speakers', 'label' => 'Audio, Mic & Speakers', 'default' => 'pass'],
+        ['key' => 'battery', 'label' => 'Battery Health & State', 'default' => 'pass'],
+    ];
+
+    /**
+     * The tenant's configured repair checklist, normalised to
+     * {key, label, default}. Falls back to [DEFAULT_REPAIR_CHECKLIST].
+     *
+     * @return list<array{key:string,label:string,default:string}>
+     */
+    public function repairChecklistSchema(): array
+    {
+        $raw = $this->repair_checklist_schema;
+        if (! is_array($raw) || $raw === []) {
+            return self::DEFAULT_REPAIR_CHECKLIST;
+        }
+
+        $normalized = [];
+        foreach ($raw as $i => $item) {
+            if (is_string($item)) {
+                $label = trim($item);
+                $item = ['label' => $label];
+            }
+            if (! is_array($item)) {
+                continue;
+            }
+            $label = trim((string) ($item['label'] ?? $item['name'] ?? $item['item_name'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+            $key = trim((string) ($item['key'] ?? ''));
+            if ($key === '') {
+                $key = \Illuminate\Support\Str::slug($label, '_') ?: 'check_'.($i + 1);
+            }
+            $default = strtolower(trim((string) ($item['default'] ?? 'pass')));
+            $default = match ($default) {
+                'fail', 'failed', 'damaged' => 'fail',
+                'na', 'n/a', 'not_applicable', 'not applicable' => 'not_applicable',
+                'pending', 'untested', 'not_tested' => 'pending',
+                default => 'pass',
+            };
+            $normalized[] = ['key' => $key, 'label' => $label, 'default' => $default];
+        }
+
+        return $normalized !== [] ? $normalized : self::DEFAULT_REPAIR_CHECKLIST;
     }
 
     public function getThemeColor(): string

@@ -82,6 +82,10 @@ class SduiViewController extends Controller
             case 'receipts':
                 return $settingsController->updateReceipts($request);
 
+            case 'repair-checklist':
+            case 'repair-checklist-settings':
+                return $settingsController->updateRepairChecklist($request);
+
             case 'financial':
                 return $settingsController->updateFinancial($request);
 

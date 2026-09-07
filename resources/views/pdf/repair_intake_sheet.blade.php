@@ -70,15 +70,25 @@
                 </thead>
                 <tbody>
                     @foreach($ticket->inspection_checklist as $chkKey => $chkVal)
+                        @php
+                            // Rows come in two shapes: a flat {key => 'pass'} map,
+                            // or a list of {key,item_name,status} objects.
+                            $chkName = is_array($chkVal)
+                                ? ($chkVal['item_name'] ?? $chkVal['name'] ?? $chkVal['key'] ?? $chkKey)
+                                : ucwords(str_replace('_', ' ', (string) $chkKey));
+                            $chkStatus = is_array($chkVal) ? ($chkVal['status'] ?? 'pending') : $chkVal;
+                        @endphp
                         <tr>
-                            <td>{{ ucwords(str_replace('_', ' ', $chkKey)) }}</td>
+                            <td>{{ $chkName }}</td>
                             <td>
-                                @if($chkVal === true || $chkVal === 'pass' || $chkVal === 1 || $chkVal === '1')
+                                @if($chkStatus === true || $chkStatus === 'pass' || $chkStatus === 1 || $chkStatus === '1')
                                     <span style="color: #16a34a; font-weight: bold;">✔ PASS</span>
-                                @elseif($chkVal === false || $chkVal === 'fail' || $chkVal === 0 || $chkVal === '0')
+                                @elseif($chkStatus === false || $chkStatus === 'fail' || $chkStatus === 0 || $chkStatus === '0')
                                     <span style="color: #dc2626; font-weight: bold;">✘ FAIL</span>
+                                @elseif($chkStatus === 'not_applicable')
+                                    <span style="color: #64748b; font-weight: bold;">N/A</span>
                                 @else
-                                    <span>{{ (string) $chkVal }}</span>
+                                    <span>{{ ucfirst((string) $chkStatus) }}</span>
                                 @endif
                             </td>
                         </tr>

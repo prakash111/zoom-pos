@@ -482,6 +482,7 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/settings/profile/drawer-cover', [SettingsApiController::class, 'uploadDrawerCover'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/settings/profile/drawer-cover', [SettingsApiController::class, 'removeDrawerCover'])->middleware('tenant.api.permission:settings,edit');
         Route::put('/settings/receipts', [SettingsApiController::class, 'updateReceipts'])->middleware('tenant.api.permission:settings,edit');
+        Route::match(['post', 'put'], '/settings/repair-checklist', [SettingsApiController::class, 'updateRepairChecklist'])->middleware('tenant.api.permission:settings,edit');
         Route::put('/settings/financial', [SettingsApiController::class, 'updateFinancial'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/settings/payment-methods', [SettingsApiController::class, 'paymentMethodsIndex'])->middleware('tenant.api.permission:settings,view');
         Route::post('/settings/payment-methods', [SettingsApiController::class, 'paymentMethodsStore'])->middleware('tenant.api.permission:settings,edit');
