@@ -26,8 +26,8 @@ class SocialAuthController extends Controller
     {
         $config = $this->config($provider);
 
-        if (! $config['enabled'] || empty($config['client_id']) || empty($config['client_secret'])) {
-            if (app()->environment('local', 'testing') || $request->has('mock')) {
+        if (! self::providerConfigured($provider)) {
+            if ($this->mockAllowed($request)) {
                 $mockUrl = route('social.callback', ['provider' => $provider, 'state' => 'mock_state', 'code' => 'mock_code']);
                 if ($request->wantsJson()) {
                     return response()->json(['success' => true, 'url' => $mockUrl]);
@@ -38,11 +38,14 @@ class SocialAuthController extends Controller
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => false,
-                    'error' => ucfirst($provider) . ' login is not enabled or credentials are missing.',
+                    'error' => ucfirst($provider) . ' login is not configured yet.',
                 ], 422);
             }
 
-            return redirect()->route('tenant.login')->with('warning', ucfirst($provider) . ' login is not enabled yet.');
+            return redirect()->route('tenant.login')->with(
+                'error',
+                ucfirst($provider) . ' sign-in isn’t set up on this server yet. Please contact your administrator.'
+            );
         }
 
         $state = Str::random(40);
@@ -79,12 +82,13 @@ class SocialAuthController extends Controller
     {
         $config = $this->config($provider);
 
-        // Allow mock bypass during testing
-        if ((app()->environment('local', 'testing') || $request->has('mock')) && $request->query('code') === 'mock_code') {
+        // Allow mock bypass during automated tests / explicit local dev only —
+        // never on a real deployment, even one mistakenly left on APP_ENV=local.
+        if ($this->mockAllowed($request) && $request->query('code') === 'mock_code') {
             $email = "mock.{$provider}@example.com";
             $name = ucfirst($provider) . ' User';
         } else {
-            abort_unless($config['enabled'] && filled($config['client_id']) && filled($config['client_secret']), 404);
+            abort_unless(self::providerConfigured($provider), 404);
             if ($request->hasSession()) {
                 $savedState = (string) $request->session()->pull('social_oauth_state');
                 abort_unless(hash_equals($savedState, (string) $request->query('state')), 419);
@@ -244,5 +248,66 @@ class SocialAuthController extends Controller
             'client_id' => (string) PlatformSystem::get("social_{$provider}_client_id", ''),
             'client_secret' => (string) PlatformSystem::get("social_{$provider}_client_secret", ''),
         ];
+    }
+
+    /**
+     * True only when the provider is enabled AND the stored client id / secret
+     * actually look like real provider credentials. A placeholder such as
+     * "xxxxxxx" passes a bare `!empty()` check but makes the login button
+     * forward the user straight to a broken provider error page — so the login
+     * screen must treat that as "not configured" and hide the button.
+     */
+    public static function providerConfigured(string $provider): bool
+    {
+        if (! in_array($provider, ['google', 'facebook'], true)) {
+            return false;
+        }
+
+        $enabled = filter_var(PlatformSystem::get("social_{$provider}_enabled", false), FILTER_VALIDATE_BOOLEAN);
+        $clientId = trim((string) PlatformSystem::get("social_{$provider}_client_id", ''));
+        $secret = trim((string) PlatformSystem::get("social_{$provider}_client_secret", ''));
+
+        if (! $enabled || $clientId === '' || $secret === '') {
+            return false;
+        }
+
+        return match ($provider) {
+            // e.g. 1234567890-abc.apps.googleusercontent.com  +  GOCSPX-...
+            'google' => (str_ends_with($clientId, '.apps.googleusercontent.com') || strlen($clientId) >= 24)
+                && strlen($secret) >= 16,
+            // Facebook App ID is a 15-16 digit number; App Secret is 32 hex chars.
+            'facebook' => ctype_digit($clientId) && strlen($clientId) >= 13 && strlen($secret) >= 24,
+            default => false,
+        };
+    }
+
+    /**
+     * Provider key => display label, for only the providers that are truly
+     * ready to use. Shared by the login and register screens so the button
+     * only shows when a click will actually reach the provider.
+     *
+     * @return array<string, string>
+     */
+    public static function enabledProviders(): array
+    {
+        $out = [];
+        foreach (['google' => 'Google', 'facebook' => 'Facebook'] as $key => $label) {
+            if (self::providerConfigured($key)) {
+                $out[$key] = $label;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The mock OAuth bypass is for the automated test suite and hands-on local
+     * development only. A production box accidentally left on APP_ENV=local
+     * must never be able to mint a "mock.google@example.com" session.
+     */
+    private function mockAllowed(Request $request): bool
+    {
+        return app()->environment('testing')
+            || (app()->environment('local') && $request->boolean('mock'));
     }
 }

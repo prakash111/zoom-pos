@@ -149,6 +149,12 @@
 
         <!-- Inner Content (Login / Register / Onboarding) -->
         <div class="relative z-10 w-full">
+            @php($__flash = collect(['error', 'warning', 'status', 'success'])->first(fn ($k) => session($k)))
+            @if ($__flash)
+                <div class="mb-4 rounded-xl border px-4 py-3 text-xs font-semibold {{ in_array($__flash, ['error', 'warning']) ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' }}">
+                    {{ session($__flash) }}
+                </div>
+            @endif
             {{ $slot }}
         </div>
 
