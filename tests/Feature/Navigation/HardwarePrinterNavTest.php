@@ -47,6 +47,61 @@ class HardwarePrinterNavTest extends TestCase
         $this->assertSame('change_password', $items->pluck('key')->last());
     }
 
+    public function test_printer_setup_row_is_reconciled_into_a_saved_custom_nav_tree(): void
+    {
+        // A tenant who customised their drawer before this row shipped keeps a
+        // saved nav_config that never mentions it — it must still be injected.
+        $company = Company::create([
+            'name' => 'Custom Nav Co', 'slug' => 'custom-nav-co', 'status' => 'active',
+            'pos_mode' => 'retail', 'currency' => 'USD', 'currency_symbol' => '$',
+        ]);
+        $company->update(['nav_config' => [
+            'sections' => [
+                ['key' => 'cashier_sales', 'order' => 0],
+                ['key' => 'administration', 'order' => 1],
+            ],
+            'items' => [
+                ['key' => 'pos', 'section' => 'cashier_sales', 'order' => 0, 'visible' => true],
+                ['key' => 'settings', 'section' => 'administration', 'order' => 0, 'visible' => true],
+                ['key' => 'change_password', 'section' => 'administration', 'order' => 1, 'visible' => true],
+            ],
+        ]]);
+
+        $sections = TenantNavRegistry::getEffectiveNavForTenant($company->fresh());
+        $admin = collect($sections)->firstWhere('key', 'administration');
+        $this->assertNotNull($admin);
+
+        $keys = collect($admin['items'])->pluck('key');
+        $this->assertContains('hardware_printer', $keys, 'Printer & Hardware Setup was not reconciled into the custom nav.');
+        $printer = collect($admin['items'])->firstWhere('key', 'hardware_printer');
+        $this->assertSame('printer_setup', $printer['component']);
+        // Still lands ahead of Change Password.
+        $this->assertLessThan(
+            $keys->search('change_password'),
+            $keys->search('hardware_printer'),
+        );
+    }
+
+    public function test_explicitly_hidden_printer_row_is_not_re_added(): void
+    {
+        $company = Company::create([
+            'name' => 'Hidden Row Co', 'slug' => 'hidden-row-co', 'status' => 'active',
+            'pos_mode' => 'retail', 'currency' => 'USD', 'currency_symbol' => '$',
+        ]);
+        $company->update(['nav_config' => [
+            'sections' => [['key' => 'administration', 'order' => 0]],
+            'items' => [
+                ['key' => 'settings', 'section' => 'administration', 'order' => 0, 'visible' => true],
+                ['key' => 'hardware_printer', 'section' => 'administration', 'order' => 1, 'visible' => false],
+                ['key' => 'change_password', 'section' => 'administration', 'order' => 2, 'visible' => true],
+            ],
+        ]]);
+
+        $sections = TenantNavRegistry::getEffectiveNavForTenant($company->fresh());
+        $admin = collect($sections)->firstWhere('key', 'administration');
+        $this->assertNotContains('hardware_printer', collect($admin['items'])->pluck('key'));
+    }
+
     public function test_printer_setup_view_is_a_valid_graceful_fallback_screen(): void
     {
         file_put_contents(storage_path('installed'), '{}');

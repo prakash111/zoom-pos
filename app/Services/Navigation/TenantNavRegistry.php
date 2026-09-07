@@ -515,6 +515,76 @@ class TenantNavRegistry
             $customSections[] = self::getAdministrationSection();
         }
 
+        // Reconcile: mandatory Administration rows shipped after this tenant
+        // last saved their custom layout (e.g. "Printer & Hardware Setup")
+        // would otherwise stay invisible forever. Re-add any base
+        // administration leaf row whose key never appears anywhere in the
+        // saved tree — unless the tenant explicitly hid it — just before
+        // "Change Password".
+        $seenKeys = [];
+        $hiddenKeys = [];
+        $walk = function (array $items, bool $fromRawTree) use (&$walk, &$seenKeys, &$hiddenKeys): void {
+            foreach ($items as $node) {
+                if (! is_array($node)) {
+                    continue;
+                }
+                $k = trim((string) ($node['key'] ?? $node['id'] ?? ''));
+                if ($k !== '') {
+                    $seenKeys[$k] = true;
+                    if ($fromRawTree && ($node['visible'] ?? true) === false) {
+                        $hiddenKeys[$k] = true;
+                    }
+                }
+                if (! empty($node['children']) && is_array($node['children'])) {
+                    $walk($node['children'], $fromRawTree);
+                }
+            }
+        };
+        foreach ($customSections as $cs) {
+            $walk($cs['items'] ?? [], false);
+        }
+        foreach ($tree as $ts) {
+            if (is_array($ts)) {
+                $walk($ts['items'] ?? [], true);
+            }
+        }
+
+        foreach ($customSections as $i => $cs) {
+            if (($cs['key'] ?? null) !== 'administration') {
+                continue;
+            }
+            $baseAdmin = self::getAdministrationSection();
+            $missing = [];
+            foreach ($baseAdmin['items'] ?? [] as $baseItem) {
+                if (! is_array($baseItem) || ! empty($baseItem['children'])) {
+                    continue;
+                }
+                $k = trim((string) ($baseItem['key'] ?? ''));
+                if ($k === '' || isset($seenKeys[$k]) || isset($hiddenKeys[$k])) {
+                    continue;
+                }
+                $missing[] = $baseItem;
+            }
+            if ($missing === []) {
+                break;
+            }
+            $items = $cs['items'];
+            $cpPos = null;
+            foreach ($items as $p => $it) {
+                if (($it['key'] ?? null) === 'change_password') {
+                    $cpPos = $p;
+                    break;
+                }
+            }
+            if ($cpPos !== null) {
+                array_splice($items, $cpPos, 0, $missing);
+            } else {
+                $items = array_merge($items, $missing);
+            }
+            $customSections[$i]['items'] = $items;
+            break;
+        }
+
         return empty($customSections) ? null : array_values($customSections);
     }
 
