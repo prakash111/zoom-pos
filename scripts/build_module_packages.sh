@@ -20,7 +20,7 @@ OUT_DIR="$ROOT/storage/app/module-dist"
 MASTER="all-modules-clean.zip"
 
 # Keys we manage here. Add a directory under module-packages/ and list it here.
-MODULES=(pharmacy repairtechnician)
+MODULES=(pharmacy repairtechnician salon)
 
 sha() { command -v sha256sum >/dev/null 2>&1 && sha256sum "$1" | awk '{print $1}' || shasum -a 256 "$1" | awk '{print $1}'; }
 
@@ -52,14 +52,18 @@ cmd_build() {
 cmd_reset() {
     echo "This removes the packaged modules from THIS installation:"
     echo "  - deletes sdui_modules rows with slug in: ${MODULES[*]}"
-    echo "  - drops their pharmacy_mod_* / repair_mod_* tables"
+    echo "  - drops their pharmacy_mod_* / repair_mod_* / salon_mod_* tables"
     echo "  - deletes modules/<key>/ directories"
     read -r -p "Type 'wipe' to continue: " confirm
     [ "$confirm" = "wipe" ] || { echo "Aborted."; exit 1; }
 
     php "$ROOT/artisan" tinker --execute='
-        $slugs = ["pharmacy", "repairtechnician"];
-        foreach (["pharmacy_mod_prescription_items","pharmacy_mod_prescriptions","pharmacy_mod_drug_batches","repair_mod_ticket_items","repair_mod_tickets","repair_mod_device_categories"] as $t) {
+        $slugs = ["pharmacy", "repairtechnician", "salon"];
+        foreach ([
+            "pharmacy_mod_prescription_items","pharmacy_mod_prescriptions","pharmacy_mod_drug_batches",
+            "repair_mod_ticket_items","repair_mod_tickets","repair_mod_device_categories",
+            "salon_mod_appointments","salon_mod_stylists","salon_mod_services",
+        ] as $t) {
             if (Schema::hasTable($t)) { Schema::drop($t); echo "dropped $t\n"; }
         }
         if (Schema::hasTable("sdui_modules")) {

@@ -4,17 +4,18 @@
 on this platform's Perfex-style plugin engine
 (`App\Services\Modular\ModulePackageService`, Super Admin → Modules).
 
-Two are shipped here, extracted as self-contained verticals:
+Three are shipped here, extracted as self-contained verticals:
 
 | Key | Name | Tables | API prefix |
 |---|---|---|---|
 | `pharmacy` | Pharmacy | `pharmacy_mod_drug_batches`, `pharmacy_mod_prescriptions`, `pharmacy_mod_prescription_items` | `/api/tenant/pharmacy-module` |
 | `repairtechnician` | Repair Technician | `repair_mod_device_categories`, `repair_mod_tickets`, `repair_mod_ticket_items` | `/api/tenant/repair-module` |
+| `salon` | Salon & Bookings | `salon_mod_services`, `salon_mod_stylists`, `salon_mod_appointments` | `/api/tenant/salon-module` |
 
-They are **additive** — the core built-in `pharmacy` / `repair_technician`
-operating modes are untouched. The package tables are `*_mod_*`-prefixed so a
-package installs cleanly whether or not the host also has the built-in
-vertical.
+They are **additive** — the core built-in `pharmacy` / `repair_technician` /
+`service_booking` operating modes are untouched. The package tables are
+`*_mod_*`-prefixed so a package installs cleanly whether or not the host
+also has the built-in vertical.
 
 ## Package layout
 
@@ -44,6 +45,7 @@ Produces (all git-ignored):
 ```
 storage/app/module-dist/pharmacy.zip
 storage/app/module-dist/repairtechnician.zip
+storage/app/module-dist/salon.zip
 storage/app/module-dist/all-modules-clean.zip    # master bundle of the above
 ```
 

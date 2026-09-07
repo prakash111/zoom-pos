@@ -27,11 +27,12 @@ class PackagedVerticalModulesTest extends TestCase
     private const TABLES = [
         'pharmacy_mod_prescription_items', 'pharmacy_mod_prescriptions', 'pharmacy_mod_drug_batches',
         'repair_mod_ticket_items', 'repair_mod_tickets', 'repair_mod_device_categories',
+        'salon_mod_appointments', 'salon_mod_stylists', 'salon_mod_services',
     ];
 
     protected function tearDown(): void
     {
-        foreach (['pharmacy', 'repairtechnician'] as $key) {
+        foreach (['pharmacy', 'repairtechnician', 'salon'] as $key) {
             File::deleteDirectory(base_path('modules/'.$key));
         }
         foreach (self::TABLES as $t) {
@@ -169,6 +170,64 @@ class PackagedVerticalModulesTest extends TestCase
         $service->uninstall($module->fresh(), true, null);
         $this->assertFalse(Schema::hasTable('repair_mod_tickets'));
         $this->assertFalse(is_dir(base_path('modules/repairtechnician')));
+    }
+
+    public function test_salon_package_installs_activates_runs_and_uninstalls(): void
+    {
+        $service = app(ModulePackageService::class);
+        $company = Company::create([
+            'name' => 'Glow Co', 'slug' => 'glow-co', 'status' => 'active',
+            'pos_mode' => 'retail', 'currency' => 'USD', 'currency_symbol' => '$',
+        ]);
+
+        $module = $service->install($this->zipPackage('salon'), null);
+        $this->assertSame('salon', $module->slug);
+        $this->assertFalse($module->is_active);
+
+        $service->activate($module, null);
+        $this->assertTrue(Schema::hasTable('salon_mod_appointments'));
+        $this->assertTrue(Schema::hasTable('salon_mod_services'));
+        $this->assertTrue(Schema::hasTable('salon_mod_stylists'));
+
+        $controller = new \Modules\salon\Http\Controllers\SalonModuleController();
+
+        $dash = $controller->dashboard($this->tenantRequest($company))->getData(true);
+        $this->assertTrue($dash['success']);
+        $this->assertEmpty(app(SchemaValidator::class)->validate($dash['schema']));
+
+        // service + stylist -> appointment -> priced from the service
+        $svcReq = Request::create('/', 'POST', ['name' => 'Haircut & Style', 'duration_minutes' => 30, 'price' => 25]);
+        $svcReq->attributes->set('company_id', $company->id);
+        $svcId = $controller->servicesStore($svcReq)->getData(true)['id'];
+
+        $stReq = Request::create('/', 'POST', ['name' => 'Alex Kim', 'specialties' => 'colour, balayage']);
+        $stReq->attributes->set('company_id', $company->id);
+        $stId = $controller->stylistsStore($stReq)->getData(true)['id'];
+
+        $apReq = Request::create('/', 'POST', [
+            'customer_name' => 'Priya', 'customer_phone' => '555-2000',
+            'service_id' => $svcId, 'stylist_id' => $stId,
+            'scheduled_at' => now()->addDay()->format('Y-m-d H:i:s'),
+        ]);
+        $apReq->attributes->set('company_id', $company->id);
+        $apId = $controller->appointmentsStore($apReq)->getData(true)['id'];
+
+        $appt = \Modules\salon\Models\Appointment::find($apId);
+        $this->assertSame('25.00', (string) $appt->price);
+
+        $detail = $controller->appointmentDetail(
+            tap(Request::create('/', 'GET', ['id' => $apId]), fn ($r) => $r->attributes->set('company_id', $company->id))
+        )->getData(true);
+        $this->assertEmpty(app(SchemaValidator::class)->validate($detail['schema']));
+
+        $stReq2 = Request::create('/', 'POST', ['status' => 'confirmed']);
+        $stReq2->attributes->set('company_id', $company->id);
+        $this->assertTrue($controller->appointmentStatus($stReq2, (string) $apId)->getData(true)['success']);
+        $this->assertSame('confirmed', $appt->fresh()->status);
+
+        $service->uninstall($module->fresh(), true, null);
+        $this->assertFalse(Schema::hasTable('salon_mod_appointments'));
+        $this->assertFalse(is_dir(base_path('modules/salon')));
     }
 
     public function test_reserved_pharmacy_key_is_allowed_only_because_it_inherits_universal_pos(): void

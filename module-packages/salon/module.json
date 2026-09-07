@@ -1,0 +1,49 @@
+{
+    "key": "salon",
+    "name": "Salon & Bookings",
+    "description": "Standalone salon vertical: service catalogue, stylists / specialists, appointment booking and lifecycle.",
+    "version": "1.0.0",
+    "author": "ZoomNearby",
+    "icon": "content_cut",
+    "layout_type": "standard_grid",
+    "inherits_ui": "universal_pos",
+    "min_system_version": "1.0.0",
+    "features": {
+        "has_appointments": true,
+        "has_due_reminders": true,
+        "has_staff_selector": true
+    },
+    "navigation": [
+        {
+            "key": "salon_ops",
+            "title": "Salon",
+            "icon": "content_cut",
+            "items": [
+                {
+                    "key": "salon_dashboard",
+                    "title": "Salon Dashboard",
+                    "icon": "dashboard",
+                    "target_endpoint": "/api/tenant/salon-module/views/dashboard"
+                },
+                {
+                    "key": "salon_appointments",
+                    "title": "Appointments",
+                    "icon": "event",
+                    "target_endpoint": "/api/tenant/salon-module/views/appointments"
+                },
+                {
+                    "key": "salon_services",
+                    "title": "Service Catalogue",
+                    "icon": "design_services",
+                    "target_endpoint": "/api/tenant/salon-module/views/services"
+                },
+                {
+                    "key": "salon_stylists",
+                    "title": "Stylists & Specialists",
+                    "icon": "badge",
+                    "target_endpoint": "/api/tenant/salon-module/views/stylists"
+                }
+            ]
+        }
+    ]
+}
