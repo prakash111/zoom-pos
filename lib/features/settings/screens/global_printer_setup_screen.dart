@@ -33,6 +33,7 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
   bool _isTesting = false;
   String? _connectedDeviceName;
   String? _connectedDeviceAddress;
+  List<BluetoothInfo> _btDevices = [];
 
   final _ipController = TextEditingController();
   final _portController = TextEditingController(text: '9100');
@@ -46,6 +47,7 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
   void initState() {
     super.initState();
     _loadSavedPrinter();
+    if (_isMobile) _loadBtDevices();
   }
 
   @override
@@ -116,63 +118,33 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
 
   // --- Bluetooth -----------------------------------------------------------
 
-  Future<void> _scanBluetoothDevices() async {
-    if (!_isMobile) {
-      _toast('Bluetooth pairing is available on the Android / iOS app.',
-          ok: false);
-      return;
-    }
+  /// Populates the inline list with devices already paired in the OS. No
+  /// discovery scan is forced — the operator sees and picks from their bonded
+  /// printers straight away.
+  Future<void> _loadBtDevices() async {
+    if (!_isMobile) return;
     setState(() => _isScanning = true);
     try {
       if (!await _service.bluetoothEnabled) {
-        _toast('Turn on Bluetooth in your device settings, then scan again.',
+        if (mounted) setState(() => _btDevices = []);
+        _toast('Turn on Bluetooth in your device settings, then re-scan.',
             ok: false);
         return;
       }
       final devices = await _service.pairedDevices();
-      if (!mounted) return;
-      if (devices.isEmpty) {
-        _toast('No paired Bluetooth printers. Pair the printer in Android '
-            'Settings first, then scan again.', ok: false);
-        return;
-      }
-      await _showDevicePicker(devices);
+      if (mounted) setState(() => _btDevices = devices);
     } finally {
       if (mounted) setState(() => _isScanning = false);
     }
   }
 
-  Future<void> _showDevicePicker(List<BluetoothInfo> devices) async {
-    final picked = await showModalBottomSheet<BluetoothInfo>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(
-              title: Text('Paired Bluetooth printers',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            for (final d in devices)
-              ListTile(
-                leading: const Icon(Icons.print_outlined),
-                title: Text(d.name),
-                subtitle: Text(d.macAdress),
-                onTap: () => Navigator.of(sheetContext).pop(d),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (picked == null) return;
-
-    await _service.saveDefaultDevice(picked.macAdress);
-    final connected = await _service.connect(picked.macAdress);
-    await _savePrinterConfig(name: picked.name, address: picked.macAdress);
+  Future<void> _selectBtDevice(BluetoothInfo device) async {
+    await _service.saveDefaultDevice(device.macAdress);
+    final connected = await _service.connect(device.macAdress);
+    await _savePrinterConfig(name: device.name, address: device.macAdress);
     _toast(connected
-        ? 'Connected to ${picked.name}.'
-        : 'Saved ${picked.name}. Power the printer on to connect.');
+        ? 'Connected to ${device.name}.'
+        : 'Saved ${device.name}. Power the printer on to connect.');
   }
 
   // --- USB ---------------------------------------------------------------
@@ -291,6 +263,10 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
                 onSelectionChanged: (set) {
                   setState(() => _selectedType = set.first);
                   _persist();
+                  if (_selectedType == PrinterConnectionType.bluetooth &&
+                      _btDevices.isEmpty) {
+                    _loadBtDevices();
+                  }
                 },
               ),
             ),
@@ -346,24 +322,60 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
   Widget _discoveryForType() {
     switch (_selectedType) {
       case PrinterConnectionType.bluetooth:
-        return ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _greenHex,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-          ),
-          onPressed: _isScanning ? null : _scanBluetoothDevices,
-          icon: _isScanning
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
-              : const Icon(Icons.bluetooth_searching),
-          label: Text(_isScanning
-              ? 'Searching nearby printers…'
-              : 'Scan Bluetooth Printers'),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text('Paired Bluetooth printers',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+                TextButton.icon(
+                  onPressed: _isScanning ? null : _loadBtDevices,
+                  icon: _isScanning
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh, size: 18),
+                  label: Text(_isScanning ? 'Scanning…' : 'Re-scan'),
+                ),
+              ],
+            ),
+            if (!_isScanning && _btDevices.isEmpty)
+              Card(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                child: const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'No paired Bluetooth printers found. Pair the printer in '
+                    'Android Settings → Connected Devices, then tap Re-scan.',
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                ),
+              )
+            else
+              for (final d in _btDevices)
+                Card(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  child: ListTile(
+                    leading: Icon(Icons.print,
+                        color: d.macAdress == _connectedDeviceAddress
+                            ? _greenHex
+                            : null),
+                    title: Text(d.name.isEmpty ? 'Unknown device' : d.name),
+                    subtitle: Text(d.macAdress),
+                    trailing: d.macAdress == _connectedDeviceAddress
+                        ? const Icon(Icons.check_circle, color: _greenHex)
+                        : const Text('Select'),
+                    onTap: () => _selectBtDevice(d),
+                  ),
+                ),
+          ],
         );
       case PrinterConnectionType.usb:
         return ElevatedButton.icon(

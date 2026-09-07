@@ -9,7 +9,7 @@ import 'package:printing/printing.dart';
 
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../settings/screens/printer_settings_screen.dart';
+import '../../settings/screens/printer_selection_dialog.dart';
 import '../cart_item.dart';
 
 /// The page formats the preview can be rendered as. The two roll sizes are
@@ -138,13 +138,9 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
   Future<void> _printThermal() async {
     final data = widget.data;
     final service = ThermalPrinterService();
-    if (await service.savedDeviceAddress() == null) {
-      if (!mounted) return;
-      await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()));
-      return;
-    }
     if (!mounted) return;
+    final target = await PrinterSelectionDialog.ensureSelected(context);
+    if (target == null || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(const SnackBar(content: Text('Printing…')));
     final ok = await service.printReceipt(

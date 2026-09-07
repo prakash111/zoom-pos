@@ -12,7 +12,7 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/widgets/adaptive_sheet.dart';
-import '../../settings/screens/printer_settings_screen.dart';
+import '../../settings/screens/printer_selection_dialog.dart';
 
 /// Everything the actions sheet needs to preview/print/share a document,
 /// independent of whether it backs a Sale or a Quotation.
@@ -201,14 +201,10 @@ Future<void> showInvoiceActionsSheet(
 Future<void> _printThermal(
     BuildContext context, InvoiceActionsData data) async {
   final service = ThermalPrinterService();
-  final saved = await service.savedDeviceAddress();
-  if (!context.mounted) return;
 
-  if (saved == null) {
-    await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()));
-    return;
-  }
+  // Pick / confirm the Bluetooth printer if none is set yet.
+  final target = await PrinterSelectionDialog.ensureSelected(context);
+  if (target == null || !context.mounted) return;
 
   final messenger = ScaffoldMessenger.of(context);
   messenger.showSnackBar(const SnackBar(content: Text('Printing…')));

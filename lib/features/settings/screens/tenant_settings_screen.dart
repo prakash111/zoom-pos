@@ -19,7 +19,7 @@ import '../settings_repository.dart';
 import '../../../core/sdui/components/navigation_tree_builder.dart';
 import '../../../core/sdui/screens/dynamic_schema_page.dart';
 import 'payment_methods_screen.dart';
-import 'printer_settings_screen.dart';
+import 'global_printer_setup_screen.dart';
 
 /// Preset brand-color swatches offered in the Profile tab — a fixed palette
 /// avoids pulling in a color-picker package for what's a fairly small need.
@@ -940,12 +940,12 @@ class _ReceiptsTabState extends State<_ReceiptsTab> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.print_outlined),
-          title: const Text('Bluetooth thermal printer'),
+          title: const Text('Printer & hardware setup'),
           subtitle: const Text(
-              'Pair ESC/POS receipt printer for direct POS printing'),
+              'Pair a Bluetooth / USB / network ESC/POS printer and set paper width'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()),
+            MaterialPageRoute(builder: (_) => const GlobalPrinterSetupScreen()),
           ),
         ),
       ],

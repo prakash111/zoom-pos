@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/services/thermal/thermal_printer_service.dart';
+import '../settings/screens/printer_selection_dialog.dart';
 
 bool get _supportsThermalPrint =>
     !kIsWeb &&
@@ -111,6 +112,11 @@ Future<void> showTicketShareSheet(
                 onTap: () async {
                   final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(sheetContext);
+                  // Let the operator pick / confirm the Bluetooth printer the
+                  // first time — no silent "no printer" failure.
+                  final target =
+                      await PrinterSelectionDialog.ensureSelected(context);
+                  if (target == null) return;
                   messenger.showSnackBar(
                       const SnackBar(content: Text('Printing token…')));
                   final ok = await ThermalPrinterService().printToken(
