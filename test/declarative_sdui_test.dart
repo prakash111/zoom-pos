@@ -331,6 +331,68 @@ void main() {
       expect(formValues['reason'], 'Supplier recall lot 88B');
     });
 
+    testWidgets(
+        'search_bar is full-width, shows the full hint, and filters on submit',
+        (tester) async {
+      final formValues = <String, dynamic>{};
+      Map<String, dynamic>? dispatched;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 360,
+              child: DynamicSchemaContext(
+                formValues: formValues,
+                setFormValue: (k, v) => formValues[k] = v,
+                dispatchAction: (a) async => dispatched = a,
+                child: Builder(
+                  builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, {
+                    'type': 'search_bar',
+                    'name': 'search',
+                    'placeholder': 'Search medicine name, batch #, or rack...',
+                    'prefix_icon': 'search',
+                    'clearable': true,
+                    'action': {
+                      'type': 'filter_view',
+                      'endpoint': '/api/tenant/views/pharmacy-batches?tab=active',
+                      'fields': ['search'],
+                    },
+                  }),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Full hint present (no "Search medici..." truncation) and full width
+      // (the field spans the 360px parent, minus the 1px pill border).
+      expect(find.text('Search medicine name, batch #, or rack...'),
+          findsOneWidget);
+      expect(tester.getSize(find.byType(TextField)).width, greaterThan(355));
+      expect(find.byIcon(Icons.clear), findsNothing);
+
+      await tester.enterText(find.byType(TextField), 'Amoxicillin');
+      await tester.pump();
+      // Clear button appears once there's text.
+      expect(find.byIcon(Icons.clear), findsOneWidget);
+
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pump();
+      expect(formValues['search'], 'Amoxicillin');
+      expect(dispatched?['type'], 'filter_view');
+      expect(dispatched?['fields'], ['search']);
+
+      // Clear wipes the field and re-fires the filter (now unscoped).
+      dispatched = null;
+      await tester.tap(find.byIcon(Icons.clear));
+      await tester.pump();
+      expect(formValues['search'], '');
+      expect(dispatched?['type'], 'filter_view');
+    });
+
     testWidgets('renders grid view with columns', (tester) async {
       final schema = {
         'type': 'grid_view',

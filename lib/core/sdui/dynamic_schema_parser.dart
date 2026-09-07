@@ -72,6 +72,8 @@ class DynamicSchemaParser {
         return _buildDropdownSelect(context, schema);
       case 'creatable_select':
         return _SduiCreatableSelect(schema: schema);
+      case 'search_bar':
+        return _SduiSearchBar(schema: schema);
       case 'checkbox':
         return _buildCheckbox(context, schema);
       case 'toggle_switch':
@@ -2184,6 +2186,108 @@ class _DottedUploadArea extends StatelessWidget {
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// `search_bar` — full-width pill search field matching the core POS search
+/// styling. Pressing the keyboard search key or tapping the inline clear
+/// button fires the schema's `action` (a `filter_view`), re-opening the view
+/// with the query as a param.
+class _SduiSearchBar extends StatefulWidget {
+  const _SduiSearchBar({required this.schema});
+
+  final Map<String, dynamic> schema;
+
+  @override
+  State<_SduiSearchBar> createState() => _SduiSearchBarState();
+}
+
+class _SduiSearchBarState extends State<_SduiSearchBar> {
+  final _controller = TextEditingController();
+
+  String get _name => widget.schema['name']?.toString() ?? 'search';
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.text = widget.schema['initial_value']?.toString() ?? '';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final sdui = DynamicSchemaContext.of(context);
+      final seeded = sdui?.formValues[_name]?.toString();
+      if (seeded != null && seeded.isNotEmpty && _controller.text.isEmpty) {
+        _controller.text = seeded;
+        setState(() {});
+      }
+      sdui?.setFormValue(_name, _controller.text);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _dispatch() {
+    final sdui = DynamicSchemaContext.of(context);
+    sdui?.setFormValue(_name, _controller.text.trim());
+    final action = widget.schema['action'];
+    if (action is Map) {
+      sdui?.dispatchAction(Map<String, dynamic>.from(action));
+    }
+  }
+
+  void _clear() {
+    _controller.clear();
+    setState(() {});
+    _dispatch();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hint = context.tr(widget.schema['placeholder']?.toString() ??
+        widget.schema['hint']?.toString() ??
+        'Search…');
+    final prefixIcon = SduiIconRegistry.resolve(
+        widget.schema['prefix_icon']?.toString() ?? 'search',
+        fallback: Icons.search);
+    final clearable = widget.schema['clearable'] != false;
+    final autofocus = widget.schema['autofocus'] == true;
+
+    return Container(
+      height: 48,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: TextField(
+        controller: _controller,
+        autofocus: autofocus,
+        textInputAction: TextInputAction.search,
+        onChanged: (val) {
+          DynamicSchemaContext.of(context)?.setFormValue(_name, val);
+          setState(() {}); // toggle the clear button
+        },
+        onSubmitted: (_) => _dispatch(),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: hint,
+          prefixIcon: Icon(prefixIcon, size: 22, color: Colors.grey.shade600),
+          suffixIcon: (clearable && _controller.text.isNotEmpty)
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 20),
+                  color: Colors.grey.shade600,
+                  onPressed: _clear,
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        ),
       ),
     );
   }
