@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/sdui/sdui_icon_registry.dart';
 import '../auth_provider.dart';
+import 'verify_otp_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -101,7 +102,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     final auth = context.read<AuthProvider>();
-    final success = await auth.register(
+    final result = await auth.register(
       storeName: _storeNameController.text.trim(),
       ownerName: _ownerNameController.text.trim(),
       email: _emailController.text.trim(),
@@ -110,12 +111,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
       posMode: _posMode,
     );
 
-    if (success && mounted) {
+    if (!mounted) return;
+
+    if (result != null) {
+      if (result.requiresOtp) {
+        final email = result.email ?? _emailController.text.trim();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (ctx) => VerifyOtpScreen(
+              email: email,
+              tokenExpiry: result.expiresIn,
+            ),
+          ),
+        );
+        return;
+      }
+
       Navigator.of(context).pop();
       return;
     }
 
-    if (!success && mounted && auth.errorMessage != null) {
+    if (auth.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(auth.errorMessage!)),
       );

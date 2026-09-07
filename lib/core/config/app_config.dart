@@ -40,6 +40,12 @@ class ApiEndpoints {
   static const String registrationMetaAbsolute = '/api/app/registration-meta';
   static const String appTranslationsAbsolute = '/api/app/translations';
   static const String authBranding = '/auth/branding';
+  static const String authConfig = '/auth/auth-config';
+  static const String authConfigAbsolute = '/api/app/auth-config';
+  static const String verifyOtp = '/auth/verify-otp';
+  static const String verifyOtpAbsolute = '/api/app/verify-otp';
+  static const String resendOtp = '/auth/resend-otp';
+  static const String resendOtpAbsolute = '/api/app/resend-otp';
   static const String session = '/auth/session';
   static const String status = '/status';
 

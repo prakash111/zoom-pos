@@ -28,6 +28,7 @@ import '../../features/staff/screens/staff_screen.dart';
 import '../../features/subscription/screens/subscription_screen.dart';
 import '../../features/taxes/screens/taxes_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/verify_otp_screen.dart';
 import '../config/bootstrap_cache.dart';
 import '../widgets/barcode_scanner_screen.dart';
 import '../widgets/coming_soon_screen.dart';
@@ -82,6 +83,9 @@ class SduiComponentRegistry {
     'consignments': (_) => const ConsignmentsScreen(),
     'service_orders': (_) => _resolveServiceOrdersScreen(),
     'service-orders': (_) => _resolveServiceOrdersScreen(),
+    'verify_otp': (_) => const VerifyOtpScreen(email: ''),
+    'verify-otp': (_) => const VerifyOtpScreen(email: ''),
+    'verify_email': (_) => const VerifyOtpScreen(email: ''),
     'change_password': (_) => const ChangePasswordScreen(),
     'change-password': (_) => const ChangePasswordScreen(),
     'customers': (_) => const CustomersScreen(),

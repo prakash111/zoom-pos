@@ -97,7 +97,10 @@ class AuthProvider extends ChangeNotifier {
         ));
   }
 
-  Future<bool> register({
+  RegisterResult? _lastRegisterResult;
+  RegisterResult? get lastRegisterResult => _lastRegisterResult;
+
+  Future<RegisterResult?> register({
     required String storeName,
     required String ownerName,
     required String email,
@@ -105,16 +108,150 @@ class AuthProvider extends ChangeNotifier {
     String? phone,
     String? currency,
     String posMode = 'general',
-  }) {
-    return _attempt(() => _authRepository.register(
-          storeName: storeName,
-          ownerName: ownerName,
-          email: email,
-          password: password,
-          phone: phone,
-          currency: currency,
-          posMode: posMode,
+  }) async {
+    _status = AuthStatus.authenticating;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final result = await _authRepository.register(
+        storeName: storeName,
+        ownerName: ownerName,
+        email: email,
+        password: password,
+        phone: phone,
+        currency: currency,
+        posMode: posMode,
+      );
+
+      _lastRegisterResult = result;
+
+      if (result.requiresOtp) {
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return result;
+      }
+
+      if (result.token != null && result.token!.isNotEmpty) {
+        await _handleLoginSuccess(LoginResult(
+          token: result.token!,
+          user: result.user ??
+              UserModel.fromJson({
+                'id': '0',
+                'name': ownerName,
+                'email': email,
+                'role': 'admin',
+                'company_id': '0',
+                'permissions': {'*': true},
+              }),
+          company: result.company ??
+              CompanyModel.fromJson({
+                'id': '0',
+                'name': storeName,
+                'trade_name': storeName,
+                'currency': currency ?? 'USD',
+                'currency_symbol': '\$',
+                'plan_name': 'trial',
+              }),
         ));
+      }
+
+      return result;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return null;
+    } catch (e, stackTrace) {
+      debugPrint('AuthProvider.register unexpected error: $e');
+      debugPrintStack(stackTrace: stackTrace);
+      _errorMessage = 'Registration failed (${e.runtimeType}): $e';
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<bool> verifyOtp({
+    required String email,
+    required String otp,
+  }) {
+    return _attempt(() => _authRepository.verifyOtp(
+          email: email,
+          otp: otp,
+        ));
+  }
+
+  Future<void> resendOtp({required String email}) async {
+    try {
+      await _authRepository.resendOtp(email: email);
+    } catch (e) {
+      debugPrint('AuthProvider.resendOtp error: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> loginWithToken(String token, {UserModel? user, CompanyModel? company}) async {
+    _status = AuthStatus.authenticating;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _secureStorage.saveToken(token);
+      if (user != null) _user = user;
+      if (company != null) _applyCompany(company);
+
+      try {
+        final session = await _authRepository.session();
+        _applyCompany(session.company);
+        if (session.user != null) _user = session.user;
+      } catch (_) {}
+
+      try {
+        await BootstrapCache.instance
+            .hydrate(forceRefresh: true, client: _apiClient);
+      } catch (_) {}
+
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Authentication failed: $e';
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> _handleLoginSuccess(LoginResult result) async {
+    await _secureStorage.saveToken(result.token);
+    _user = result.user;
+    _applyCompany(result.company);
+
+    // The login/register responses omit a few company fields (notably
+    // pos_mode/restaurant_mode_locked) that only GET /auth/session
+    // returns in full — refresh from there so mode-dependent UI (e.g.
+    // the dashboard's retail vs. restaurant POS branch) is correct
+    // immediately after signing in, not just after an app restart.
+    try {
+      final refreshed = await _authRepository.session();
+      _applyCompany(refreshed.company);
+      if (refreshed.user != null) _user = refreshed.user;
+    } catch (_) {
+      // Keep the company from the login/register response if this fails.
+    }
+
+    // Pre-hydrate bootstrap menu and theme before setting status to authenticated
+    // so first login / signup renders the populated server-driven drawer instantly!
+    try {
+      await BootstrapCache.instance
+          .hydrate(forceRefresh: true, client: _apiClient);
+    } catch (e) {
+      debugPrint('Bootstrap pre-hydration error: $e');
+    }
+
+    _status = AuthStatus.authenticated;
+    notifyListeners();
   }
 
   Future<bool> _attempt(Future<LoginResult> Function() action) async {
@@ -124,34 +261,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final result = await action();
-      await _secureStorage.saveToken(result.token);
-      _user = result.user;
-      _applyCompany(result.company);
-
-      // The login/register responses omit a few company fields (notably
-      // pos_mode/restaurant_mode_locked) that only GET /auth/session
-      // returns in full — refresh from there so mode-dependent UI (e.g.
-      // the dashboard's retail vs. restaurant POS branch) is correct
-      // immediately after signing in, not just after an app restart.
-      try {
-        final refreshed = await _authRepository.session();
-        _applyCompany(refreshed.company);
-        if (refreshed.user != null) _user = refreshed.user;
-      } catch (_) {
-        // Keep the company from the login/register response if this fails.
-      }
-
-      // Pre-hydrate bootstrap menu and theme before setting status to authenticated
-      // so first login / signup renders the populated server-driven drawer instantly!
-      try {
-        await BootstrapCache.instance
-            .hydrate(forceRefresh: true, client: _apiClient);
-      } catch (e) {
-        debugPrint('Bootstrap pre-hydration error: $e');
-      }
-
-      _status = AuthStatus.authenticated;
-      notifyListeners();
+      await _handleLoginSuccess(result);
       return true;
     } on ApiException catch (e) {
       _errorMessage = e.message;

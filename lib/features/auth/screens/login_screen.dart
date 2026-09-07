@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/api/api_exception.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/storage/app_preferences.dart';
 import '../../../l10n/app_localizations.dart';
@@ -26,6 +28,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _showAccountId = false;
   String? _brandLogoUrl;
+  bool _googleEnabled = true;
+  bool _facebookEnabled = true;
+  bool _socialLoading = false;
 
   @override
   void initState() {
@@ -36,6 +41,18 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _brandLogoUrl = url);
     }).catchError((_) {
       // Pre-auth branding fetch is best-effort — fall back to the store icon.
+    });
+
+    context.read<ApiClient>().get(ApiEndpoints.authConfig).then((response) {
+      final social = response['social_login'];
+      if (social is Map && mounted) {
+        setState(() {
+          _googleEnabled = social['google'] == true;
+          _facebookEnabled = social['facebook'] == true;
+        });
+      }
+    }).catchError((_) {
+      // Best-effort pre-auth social config fetch — default to true.
     });
   }
 
@@ -70,6 +87,42 @@ class _LoginScreenState extends State<LoginScreen> {
       MaterialPageRoute(
           builder: (_) => ServerSettingsScreen(preferences: preferences)),
     );
+  }
+
+  Future<void> _handleSocialLogin(String provider) async {
+    setState(() => _socialLoading = true);
+    final client = context.read<ApiClient>();
+
+    try {
+      final redirectRes = await client.get('/auth/$provider/redirect', query: {'mobile': 1});
+      final authUrl = redirectRes['url']?.toString();
+
+      String targetUrl = authUrl ?? '';
+      if (targetUrl.isEmpty) {
+        final host = await client.currentBaseUrl();
+        targetUrl = '$host/auth/$provider/redirect?mobile=1';
+      }
+
+      final uri = Uri.parse(targetUrl);
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        throw ApiException('Could not open browser for $provider sign-in.');
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to initiate $provider sign-in: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _socialLoading = false);
+    }
   }
 
   @override
@@ -198,6 +251,101 @@ class _LoginScreenState extends State<LoginScreen> {
                             )
                           : Text(l10n.signIn),
                     ),
+                    if (_googleEnabled || _facebookEnabled) ...[
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: Colors.grey.shade300)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              'Or continue with',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          Expanded(child: Divider(color: Colors.grey.shade300)),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      if (_googleEnabled)
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF1F2937),
+                            side: BorderSide(color: Colors.grey.shade300, width: 1.2),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: (_socialLoading || auth.isBusy)
+                              ? null
+                              : () => _handleSocialLogin('google'),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 22,
+                                height: 22,
+                                alignment: Alignment.center,
+                                child: const Text(
+                                  'G',
+                                  style: TextStyle(
+                                    color: Color(0xFF4285F4),
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              const Text(
+                                'Continue with Google',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1F2937),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (_googleEnabled && _facebookEnabled)
+                        const SizedBox(height: 12),
+                      if (_facebookEnabled)
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1877F2),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: (_socialLoading || auth.isBusy)
+                              ? null
+                              : () => _handleSocialLogin('facebook'),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.facebook, size: 22, color: Colors.white),
+                              SizedBox(width: 10),
+                              Text(
+                                'Continue with Facebook',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                     const SizedBox(height: 12),
                     Wrap(
                       alignment: WrapAlignment.center,

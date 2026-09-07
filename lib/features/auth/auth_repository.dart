@@ -12,6 +12,35 @@ class LoginResult {
   final CompanyModel company;
 }
 
+class RegisterResult {
+  RegisterResult({
+    required this.requiresOtp,
+    this.token,
+    this.user,
+    this.company,
+    this.email,
+    this.expiresIn = 600,
+    this.message,
+    this.route,
+  });
+
+  final bool requiresOtp;
+  final String? token;
+  final UserModel? user;
+  final CompanyModel? company;
+  final String? email;
+  final int expiresIn;
+  final String? message;
+  final String? route;
+
+  LoginResult toLoginResult() {
+    if (token == null || user == null || company == null) {
+      throw ApiException('The server did not return an authentication token.');
+    }
+    return LoginResult(token: token!, user: user!, company: company!);
+  }
+}
+
 /// Talks to POST /auth/login, /auth/register and GET /auth/session
 /// (PosSyncApiController) — see that controller for the exact response shape.
 class AuthRepository {
@@ -33,7 +62,7 @@ class AuthRepository {
     return _loginResult(response);
   }
 
-  Future<LoginResult> register({
+  Future<RegisterResult> register({
     required String storeName,
     required String ownerName,
     required String email,
@@ -52,7 +81,69 @@ class AuthRepository {
       'pos_mode': posMode,
     });
 
+    final payload = _payload(response);
+    final requiresOtp = payload['requires_otp'] == true ||
+        payload['status'] == 'requires_verification' ||
+        (payload['action'] == 'navigate' &&
+            payload['route']?.toString().contains('verify-otp') == true);
+
+    if (requiresOtp) {
+      final userMap = payload['user'] is Map
+          ? Map<String, dynamic>.from(payload['user'] as Map)
+          : null;
+      final companyMap = payload['company'] is Map
+          ? Map<String, dynamic>.from(payload['company'] as Map)
+          : null;
+      final resolvedEmail = payload['email']?.toString() ??
+          (payload['arguments'] is Map
+              ? (payload['arguments'] as Map)['email']?.toString()
+              : null) ??
+          userMap?['email']?.toString() ??
+          email;
+
+      return RegisterResult(
+        requiresOtp: true,
+        email: resolvedEmail,
+        expiresIn: payload['expires_in'] is int
+            ? payload['expires_in'] as int
+            : 600,
+        message: payload['message']?.toString(),
+        route: payload['route']?.toString(),
+        token: payload['token']?.toString(),
+        user: userMap != null && userMap['id'] != null
+            ? UserModel.fromJson(userMap)
+            : null,
+        company: companyMap != null && companyMap['id'] != null
+            ? CompanyModel.fromJson(companyMap)
+            : null,
+      );
+    }
+
+    final loginRes = _loginResult(response);
+    return RegisterResult(
+      requiresOtp: false,
+      token: loginRes.token,
+      user: loginRes.user,
+      company: loginRes.company,
+    );
+  }
+
+  Future<LoginResult> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final response = await _client.post(ApiEndpoints.verifyOtp, data: {
+      'email': email,
+      'otp': otp,
+    });
+
     return _loginResult(response);
+  }
+
+  Future<void> resendOtp({required String email}) async {
+    await _client.post(ApiEndpoints.resendOtp, data: {
+      'email': email,
+    });
   }
 
   Future<({UserModel? user, CompanyModel company})> session() async {
@@ -72,10 +163,21 @@ class AuthRepository {
       throw ApiException('The server did not return an authentication token.');
     }
 
+    final userMap = _requiredMap(payload, 'user');
+    final companyMap = payload['company'] is Map
+        ? Map<String, dynamic>.from(payload['company'] as Map)
+        : <String, dynamic>{
+            'id': 0,
+            'name': 'My Store',
+            'slug': 'my-store',
+            'currency': 'USD',
+            'currency_symbol': '\$',
+          };
+
     return LoginResult(
       token: token,
-      user: UserModel.fromJson(_requiredMap(payload, 'user')),
-      company: CompanyModel.fromJson(_requiredMap(payload, 'company')),
+      user: UserModel.fromJson(userMap),
+      company: CompanyModel.fromJson(companyMap),
     );
   }
 

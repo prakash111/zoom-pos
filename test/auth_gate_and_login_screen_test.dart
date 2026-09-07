@@ -13,6 +13,7 @@ import 'package:zoom_pos_mobile/core/services/dynamic_string_service.dart';
 import 'package:zoom_pos_mobile/core/services/sync/sync_engine.dart';
 import 'package:zoom_pos_mobile/core/storage/app_preferences.dart';
 import 'package:zoom_pos_mobile/features/auth/auth_provider.dart';
+import 'package:zoom_pos_mobile/features/auth/auth_repository.dart';
 import 'package:zoom_pos_mobile/features/auth/screens/auth_gate.dart';
 import 'package:zoom_pos_mobile/features/auth/screens/login_screen.dart';
 import 'package:zoom_pos_mobile/features/dashboard/dashboard_screen.dart';
@@ -60,7 +61,10 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
   }) async => true;
 
   @override
-  Future<bool> register({
+  RegisterResult? get lastRegisterResult => null;
+
+  @override
+  Future<RegisterResult?> register({
     required String storeName,
     required String ownerName,
     required String email,
@@ -68,6 +72,22 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
     String? phone,
     String? currency,
     String posMode = 'general',
+  }) async => RegisterResult(requiresOtp: false, token: 'fake_token');
+
+  @override
+  Future<bool> verifyOtp({
+    required String email,
+    required String otp,
+  }) async => true;
+
+  @override
+  Future<void> resendOtp({required String email}) async {}
+
+  @override
+  Future<bool> loginWithToken(
+    String token, {
+    UserModel? user,
+    CompanyModel? company,
   }) async => true;
 
   @override
@@ -81,6 +101,15 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
 }
 
 class FakeApiClient extends Fake implements ApiClient {
+  @override
+  Future<String> currentBaseUrl() async => 'https://saas.zoomnearby.com';
+
+  @override
+  Future<Map<String, dynamic>> getAbsolute(
+    String path, {
+    Map<String, dynamic>? query,
+  }) async => get(path, query: query);
+
   @override
   Future<Map<String, dynamic>> get(
     String path, {
