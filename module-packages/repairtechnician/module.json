@@ -1,0 +1,43 @@
+{
+    "key": "repairtechnician",
+    "name": "Repair Technician",
+    "description": "Standalone repair vertical: device intake tickets, diagnostic checklist, parts & labor, lifecycle status and pickup.",
+    "version": "1.0.0",
+    "author": "ZoomNearby",
+    "icon": "handyman",
+    "layout_type": "standard_grid",
+    "inherits_ui": "universal_pos",
+    "min_system_version": "1.0.0",
+    "features": {
+        "has_barcode_scanner": true,
+        "has_due_reminders": true,
+        "has_checklist": true
+    },
+    "navigation": [
+        {
+            "key": "repair_ops",
+            "title": "Repair",
+            "icon": "handyman",
+            "items": [
+                {
+                    "key": "repair_dashboard",
+                    "title": "Repair Dashboard",
+                    "icon": "dashboard",
+                    "target_endpoint": "/api/tenant/repair-module/views/dashboard"
+                },
+                {
+                    "key": "repair_tickets",
+                    "title": "Repair Tickets",
+                    "icon": "confirmation_number",
+                    "target_endpoint": "/api/tenant/repair-module/views/tickets"
+                },
+                {
+                    "key": "repair_categories",
+                    "title": "Device Categories",
+                    "icon": "category",
+                    "target_endpoint": "/api/tenant/repair-module/views/categories"
+                }
+            ]
+        }
+    ]
+}

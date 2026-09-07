@@ -1,0 +1,43 @@
+{
+    "key": "pharmacy",
+    "name": "Pharmacy",
+    "description": "Standalone pharmacy vertical: drug batch & expiry tracking, prescription intake and dispensing.",
+    "version": "1.0.0",
+    "author": "ZoomNearby",
+    "icon": "local_pharmacy",
+    "layout_type": "standard_grid",
+    "inherits_ui": "universal_pos",
+    "min_system_version": "1.0.0",
+    "features": {
+        "has_barcode_scanner": true,
+        "has_expiry_tracking": true,
+        "has_due_reminders": true
+    },
+    "navigation": [
+        {
+            "key": "pharmacy_ops",
+            "title": "Pharmacy",
+            "icon": "local_pharmacy",
+            "items": [
+                {
+                    "key": "pharmacy_dashboard",
+                    "title": "Pharmacy Dashboard",
+                    "icon": "dashboard",
+                    "target_endpoint": "/api/tenant/pharmacy-module/views/dashboard"
+                },
+                {
+                    "key": "pharmacy_batches",
+                    "title": "Drug Batches & Expiry",
+                    "icon": "inventory_2",
+                    "target_endpoint": "/api/tenant/pharmacy-module/views/batches"
+                },
+                {
+                    "key": "pharmacy_prescriptions",
+                    "title": "Prescriptions",
+                    "icon": "receipt_long",
+                    "target_endpoint": "/api/tenant/pharmacy-module/views/prescriptions"
+                }
+            ]
+        }
+    ]
+}
