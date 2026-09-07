@@ -325,6 +325,32 @@ class PosSyncApiController extends Controller
         ]);
     }
 
+    /**
+     * Unauthenticated public auth & social OAuth configuration.
+     * GET /api/app/auth-config
+     * GET /api/v1/pos/auth/auth-config
+     */
+    public function authConfig(): JsonResponse
+    {
+        $googleEnabled = filter_var(\App\Models\PlatformSystem::get('social_google_enabled', false), FILTER_VALIDATE_BOOLEAN)
+            || (bool) config('services.google.enabled', true);
+        $googleClientId = (string) (\App\Models\PlatformSystem::get('social_google_client_id') ?: config('services.google.client_id', ''));
+
+        $facebookEnabled = filter_var(\App\Models\PlatformSystem::get('social_facebook_enabled', false), FILTER_VALIDATE_BOOLEAN)
+            || (bool) config('services.facebook.enabled', true);
+        $facebookClientId = (string) (\App\Models\PlatformSystem::get('social_facebook_client_id') ?: config('services.facebook.client_id', ''));
+
+        return response()->json([
+            'success' => true,
+            'social_login' => [
+                'google' => (bool) $googleEnabled,
+                'facebook' => (bool) $facebookEnabled,
+                'google_client_id' => $googleClientId ?: null,
+                'facebook_client_id' => $facebookClientId ?: null,
+            ],
+        ]);
+    }
+
     public function register(Request $request, TenantProvisioningService $provisioner): JsonResponse
     {
         $validator = Validator::make($request->all(), [

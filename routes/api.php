@@ -65,13 +65,21 @@ Route::post('/tenant/profile/change-password', [PasswordResetController::class, 
 
 // Unauthenticated Dynamic Store Registration Metadata
 Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
+Route::get('/app/auth-config', [PosSyncApiController::class, 'authConfig']);
+Route::get('/api/app/auth-config', [PosSyncApiController::class, 'authConfig']);
 
 // Authentication, Registration, Email OTP & Social Auth
 Route::post('/auth/register', [AuthApiController::class, 'register']);
 Route::post('/register', [AuthApiController::class, 'register']);
 Route::post('/auth/verify-email-otp', [AuthApiController::class, 'verifyEmailOtp']);
 Route::post('/api/auth/verify-email-otp', [AuthApiController::class, 'verifyEmailOtp']);
+Route::post('/app/verify-otp', [AuthApiController::class, 'verifyEmailOtp']);
+Route::post('/api/app/verify-otp', [AuthApiController::class, 'verifyEmailOtp']);
+Route::post('/auth/verify-otp', [AuthApiController::class, 'verifyEmailOtp']);
+Route::post('/api/auth/verify-otp', [AuthApiController::class, 'verifyEmailOtp']);
 Route::post('/auth/resend-otp', [AuthApiController::class, 'resendOtp']);
+Route::post('/app/resend-otp', [AuthApiController::class, 'resendOtp']);
+Route::post('/api/app/resend-otp', [AuthApiController::class, 'resendOtp']);
 Route::get('/auth/{provider}/redirect', [SocialAuthController::class, 'redirect']);
 Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback']);
 Route::post('/auth/{provider}/mobile-token', [SocialAuthController::class, 'mobileToken']);
@@ -302,7 +310,10 @@ Route::prefix('v1/pos')->group(function () {
     Route::post('/auth/register', [AuthApiController::class, 'register']);
     Route::post('/register', [AuthApiController::class, 'register']);
     Route::post('/auth/verify-email-otp', [AuthApiController::class, 'verifyEmailOtp']);
+    Route::post('/auth/verify-otp', [AuthApiController::class, 'verifyEmailOtp']);
+    Route::post('/app/verify-otp', [AuthApiController::class, 'verifyEmailOtp']);
     Route::post('/auth/resend-otp', [AuthApiController::class, 'resendOtp']);
+    Route::post('/app/resend-otp', [AuthApiController::class, 'resendOtp']);
     Route::get('/auth/{provider}/redirect', [SocialAuthController::class, 'redirect']);
     Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback']);
     Route::post('/auth/{provider}/mobile-token', [SocialAuthController::class, 'mobileToken']);
@@ -310,6 +321,9 @@ Route::prefix('v1/pos')->group(function () {
     Route::get('/auth/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
     Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
     Route::get('/auth/branding', [PosSyncApiController::class, 'branding']);
+    Route::get('/auth/auth-config', [PosSyncApiController::class, 'authConfig']);
+    Route::get('/auth-config', [PosSyncApiController::class, 'authConfig']);
+    Route::get('/app/auth-config', [PosSyncApiController::class, 'authConfig']);
     Route::get('/auth/push-config', [PushDeviceApiController::class, 'config']);
 
     // Protected POS Endpoints (Require API Key or Bearer Token)

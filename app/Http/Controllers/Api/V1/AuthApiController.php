@@ -123,9 +123,12 @@ class AuthApiController extends Controller
 
                 return response()->json([
                     'success' => true,
-                    'status' => 'success',
+                    'status' => 'requires_verification',
+                    'requires_otp' => true,
                     'action' => 'navigate',
                     'route' => '/api/tenant/views/verify-otp',
+                    'email' => $user->email,
+                    'expires_in' => 600,
                     'message' => 'Enter the 6-digit code sent to your email.',
                     'arguments' => [
                         'email' => $user->email,
@@ -258,9 +261,19 @@ class AuthApiController extends Controller
         }
 
         $company = Company::find($user->company_id);
+        if (! $company) {
+            $company = Company::create([
+                'name' => ($user->name ?: 'Store') . "'s POS",
+                'slug' => Str::slug($user->name . '-' . Str::random(5)),
+                'status' => 'active',
+                'currency' => 'USD',
+                'currency_symbol' => '$',
+            ]);
+            $user->update(['company_id' => $company->id]);
+        }
 
         $apiKey = TenantApiKey::firstOrCreate([
-            'company_id' => $company?->id ?? $user->company_id,
+            'company_id' => $company->id,
             'user_id' => $user->id,
             'name' => 'Mobile/Desktop POS Client ('.$user->name.')',
         ], [
@@ -284,13 +297,13 @@ class AuthApiController extends Controller
                 'role' => $user->role,
                 'company_id' => $user->company_id,
             ],
-            'company' => $company ? [
+            'company' => [
                 'id' => $company->id,
                 'name' => $company->name,
                 'slug' => $company->slug,
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
-            ] : null,
+            ],
         ]);
     }
 

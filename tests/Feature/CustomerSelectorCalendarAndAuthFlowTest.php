@@ -376,4 +376,45 @@ class CustomerSelectorCalendarAndAuthFlowTest extends TestCase
         ]);
         $this->assertFalse($invalidTokenRes->json('success') ?? true);
     }
+
+    /**
+     * Test 8: Public auth-config endpoint and verify-otp endpoint aliases.
+     */
+    public function test_auth_config_and_app_verify_otp_endpoints(): void
+    {
+        // GET /api/app/auth-config
+        $configRes = $this->getJson('/api/app/auth-config');
+        $configRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'social_login' => [
+                    'google',
+                    'facebook',
+                ],
+            ]);
+
+        // POST /api/app/verify-otp with pending user
+        $otp = '789123';
+        $user = User::create([
+            'company_id' => $this->company->id,
+            'name' => 'OTP Verify User',
+            'email' => 'otp.verify@example.com',
+            'password' => Hash::make('password'),
+            'role' => 'administrator',
+            'status' => 'pending',
+            'verification_code' => Hash::make($otp),
+            'verification_code_expires_at' => now()->addMinutes(10),
+        ]);
+
+        $verifyRes = $this->postJson('/api/app/verify-otp', [
+            'email' => 'otp.verify@example.com',
+            'otp' => $otp,
+        ]);
+
+        $verifyRes->assertOk()
+            ->assertJsonPath('status', 'success');
+        $this->assertNotEmpty($verifyRes->json('token'));
+        $this->assertSame($user->id, $verifyRes->json('user.id'));
+        $this->assertNotNull($verifyRes->json('company'));
+    }
 }
