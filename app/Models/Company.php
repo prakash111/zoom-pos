@@ -34,6 +34,7 @@ class Company extends Model
         'max_users', 'max_devices', 'pricing_mode', 'tax_api_mode', 'tax_api_key', 'tax_api_endpoint',
         'navigation_menu_customization', 'navigation_labels', 'form_field_customizations',
         'invoice_prefix', 'quotation_prefix', 'repair_prefix', 'prescription_prefix', 'salon_prefix', 'tax_settings', 'invoice_terms', 'quote_terms', 'bank_details',
+        'dispensing_disclaimer', 'repair_warranty_terms', 'salon_policy_terms',
         'currency_symbol', 'currency_decimals', 'currency_symbol_position', 'other_currencies',
         'default_commission_rate', 'default_commission_type',
         'pix_key_type', 'pix_key', 'pix_merchant_name', 'pix_merchant_city', 'pix_qr_image',
@@ -437,6 +438,54 @@ class Company extends Model
     public function isGeneralMode(): bool
     {
         return empty($this->pos_mode) || in_array($this->pos_mode, ['general', 'general_retail'], true);
+    }
+
+    /**
+     * Normalised set of module keys this tenant operates in — one or more of
+     * retail | restaurant | pharmacy | service_booking | repair_technician.
+     *
+     * Sourced from `licensed_modules`, falling back to `pos_mode`. Mirrors the
+     * gating in TenantNavRegistry so settings screens can hide vertical fields
+     * (Rx / repair / salon prefixes, disclaimers) that don't apply.
+     *
+     * @return list<string>
+     */
+    public function licensedModuleKeys(): array
+    {
+        $raw = is_array($this->licensed_modules) && $this->licensed_modules !== []
+            ? $this->licensed_modules
+            : [$this->pos_mode ?: 'retail'];
+
+        $keys = [];
+        foreach ($raw as $item) {
+            if (! is_string($item)) {
+                continue;
+            }
+            $key = match (strtolower(trim($item))) {
+                'general', 'general_retail', 'retail' => 'retail',
+                'food_restaurant', 'restaurant' => 'restaurant',
+                'repair', 'repairs', 'technician', 'repair_technician', 'automotive', 'electronics_service' => 'repair_technician',
+                'salon', 'spa', 'wellness', 'beauty', 'salon_wellness', 'service_booking', 'service', 'services' => 'service_booking',
+                'pharmacy', 'pharmacy_pos', 'chemist' => 'pharmacy',
+                default => strtolower(trim($item)),
+            };
+            if ($key !== '') {
+                $keys[] = $key;
+            }
+        }
+
+        if ($this->restaurant_mode_locked) {
+            $keys = array_values(array_diff($keys, ['restaurant']));
+        }
+
+        $keys = array_values(array_unique($keys));
+
+        return $keys === [] ? ['retail'] : $keys;
+    }
+
+    public function hasModule(string $moduleKey): bool
+    {
+        return in_array($moduleKey, $this->licensedModuleKeys(), true);
     }
 
     public function getThemeColor(): string

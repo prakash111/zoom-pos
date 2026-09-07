@@ -290,6 +290,9 @@ class SettingsApiController extends Controller
             'invoice_terms' => ['nullable', 'string', 'max:4000'],
             'quote_terms' => ['nullable', 'string', 'max:4000'],
             'bank_details' => ['nullable', 'string', 'max:2000'],
+            'dispensing_disclaimer' => ['nullable', 'string', 'max:4000'],
+            'repair_warranty_terms' => ['nullable', 'string', 'max:4000'],
+            'salon_policy_terms' => ['nullable', 'string', 'max:4000'],
         ]);
 
         if ($validator->fails()) {
@@ -604,6 +607,9 @@ class SettingsApiController extends Controller
             'invoice_terms' => $company->invoice_terms ?? '',
             'quote_terms' => $company->quote_terms ?? '',
             'bank_details' => $company->bank_details ?? '',
+            'dispensing_disclaimer' => $company->dispensing_disclaimer ?? '',
+            'repair_warranty_terms' => $company->repair_warranty_terms ?? '',
+            'salon_policy_terms' => $company->salon_policy_terms ?? '',
         ];
     }
 

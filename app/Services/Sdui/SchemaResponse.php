@@ -3910,33 +3910,68 @@ class SchemaResponse
 
     public static function receiptsView(Company $company): array
     {
+        // Only surface the document prefix / disclaimer fields for the
+        // verticals this tenant actually runs — a pharmacy never issues repair
+        // tickets or salon bookings, so those inputs are domain clutter.
+        $hasPharmacy = $company->hasModule('pharmacy');
+        $hasRepair = $company->hasModule('repair_technician');
+        $hasSalon = $company->hasModule('service_booking');
+
+        $numbering = [
+            self::text('Invoice & Quote Numbering', 'title_medium', ['bold' => true]),
+            self::text('Define prefix tags used when generating official customer invoices.', 'body_small', ['color' => '#6b7280']),
+            self::divider(),
+            self::textInput('invoice_prefix', 'Invoice Prefix', $company->invoice_prefix ?? 'INV-', ['placeholder' => 'INV-']),
+            self::textInput('quotation_prefix', 'Quotation Prefix', $company->quotation_prefix ?? 'QUO-', ['placeholder' => 'QUO-']),
+        ];
+        if ($hasPharmacy) {
+            $numbering[] = self::textInput('prescription_prefix', 'Prescription / Rx Prefix', $company->prescription_prefix ?? 'RX-', ['placeholder' => 'RX-']);
+        }
+        if ($hasRepair) {
+            $numbering[] = self::textInput('repair_prefix', 'Repair Ticket Prefix', $company->repair_prefix ?? 'REP-', ['placeholder' => 'REP-']);
+        }
+        if ($hasSalon) {
+            $numbering[] = self::textInput('salon_prefix', 'Salon Booking Prefix', $company->salon_prefix ?? 'SAL-', ['placeholder' => 'SAL-']);
+        }
+
+        $terms = [
+            self::text('Receipt Footnotes & Terms', 'title_medium', ['bold' => true]),
+            self::divider(),
+            self::textInput('invoice_terms', 'Invoice Terms & Conditions', $company->invoice_terms, [
+                'max_lines' => 4,
+                'keyboard_type' => 'multiline',
+            ]),
+            self::textInput('quote_terms', 'Quotation Terms & Conditions', $company->quote_terms, [
+                'max_lines' => 3,
+                'keyboard_type' => 'multiline',
+            ]),
+        ];
+        if ($hasPharmacy) {
+            $terms[] = self::textInput('dispensing_disclaimer', 'Prescription / Drug Dispensing Disclaimer & Policies', $company->dispensing_disclaimer, [
+                'max_lines' => 3,
+                'keyboard_type' => 'multiline',
+            ]);
+        }
+        if ($hasRepair) {
+            $terms[] = self::textInput('repair_warranty_terms', 'Equipment Repair Warranty Disclaimer', $company->repair_warranty_terms, [
+                'max_lines' => 3,
+                'keyboard_type' => 'multiline',
+            ]);
+        }
+        if ($hasSalon) {
+            $terms[] = self::textInput('salon_policy_terms', 'Salon Cancellation & Service Policies', $company->salon_policy_terms, [
+                'max_lines' => 3,
+                'keyboard_type' => 'multiline',
+            ]);
+        }
+        $terms[] = self::textInput('bank_details', 'Bank Account & Settlement Details', $company->bank_details, [
+            'max_lines' => 3,
+            'keyboard_type' => 'multiline',
+        ]);
+
         return self::screen('Receipt Prefixes & Bank Terms', [
-            self::card([
-                self::text('Invoice & Quote Numbering', 'title_medium', ['bold' => true]),
-                self::text('Define prefix tags used when generating official customer invoices.', 'body_small', ['color' => '#6b7280']),
-                self::divider(),
-                self::textInput('invoice_prefix', 'Invoice Prefix', $company->invoice_prefix ?? 'INV-'),
-                self::textInput('quotation_prefix', 'Quotation Prefix', $company->quotation_prefix ?? 'QUO-'),
-                self::textInput('repair_prefix', 'Repair Ticket Prefix', $company->repair_prefix ?? 'REP-'),
-                self::textInput('prescription_prefix', 'Prescription / Rx Prefix', $company->prescription_prefix ?? 'RX-'),
-                self::textInput('salon_prefix', 'Salon Booking Prefix', $company->salon_prefix ?? 'SAL-'),
-            ]),
-            self::card([
-                self::text('Receipt Footnotes & Terms', 'title_medium', ['bold' => true]),
-                self::divider(),
-                self::textInput('invoice_terms', 'Invoice Terms & Conditions', $company->invoice_terms, [
-                    'max_lines' => 4,
-                    'keyboard_type' => 'multiline',
-                ]),
-                self::textInput('quote_terms', 'Quotation Terms & Conditions', $company->quote_terms, [
-                    'max_lines' => 3,
-                    'keyboard_type' => 'multiline',
-                ]),
-                self::textInput('bank_details', 'Bank Account & Settlement Details', $company->bank_details, [
-                    'max_lines' => 3,
-                    'keyboard_type' => 'multiline',
-                ]),
-            ]),
+            self::card($numbering),
+            self::card($terms),
             self::buttonPrimary('Save Receipt Settings', self::formSubmitAction(
                 '/api/tenant/settings/receipts',
                 'POST',
