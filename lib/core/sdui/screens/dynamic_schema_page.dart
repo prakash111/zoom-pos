@@ -325,11 +325,17 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
         _schema!['layout']?.toString().toLowerCase().trim() ?? 'scroll_view';
     final components = _schema!['components'] as List<dynamic>? ?? const [];
 
+    // Keep the last field / submit button reachable above the on-screen
+    // keyboard, with extra clearance for any floating action bar.
+    final scrollPadding = EdgeInsets.fromLTRB(
+        16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 80);
+
     Widget content;
     switch (layout) {
       case 'column':
         content = SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: scrollPadding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: DynamicSchemaParser.buildChildren(context, components),
@@ -339,7 +345,8 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
       case 'grid':
       case 'grid_view':
         content = SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: scrollPadding,
           child: DynamicSchemaParser.buildComponent(context, {
             'type': 'grid_view',
             'cross_axis_count': _schema!['cross_axis_count'] ?? 2,
@@ -353,12 +360,15 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
         content = DynamicSchemaParser.buildComponent(context, {
           'type': 'tabs',
           'tabs': _schema!['tabs'] ?? components,
+          'initial_index': _schema!['initial_index'],
+          'is_scrollable': _schema!['is_scrollable'],
         });
         break;
       case 'scroll_view':
       default:
         content = ListView(
-          padding: const EdgeInsets.all(16),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: scrollPadding,
           children: DynamicSchemaParser.buildChildren(context, components),
         );
         break;

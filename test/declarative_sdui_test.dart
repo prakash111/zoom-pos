@@ -190,6 +190,55 @@ void main() {
       expect(DefaultTabController.of(tester.element(find.text('Active Batches')))
           .index, 2);
       expect(find.text('ADJUST BODY'), findsOneWidget);
+
+      // Each tab body is a real scroll view (never a fixed, non-scrollable
+      // container) so long forms + the submit button stay reachable.
+      final bodyScroll = tester.widget<SingleChildScrollView>(
+        find.ancestor(
+          of: find.text('ADJUST BODY'),
+          matching: find.byType(SingleChildScrollView),
+        ),
+      );
+      expect(bodyScroll.physics, isA<AlwaysScrollableScrollPhysics>());
+      expect(bodyScroll.padding, isNotNull);
+    });
+
+    testWidgets('text_input submit_action fires on keyboard submit',
+        (tester) async {
+      final formValues = <String, dynamic>{};
+      Map<String, dynamic>? dispatched;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: formValues,
+              setFormValue: (k, v) => formValues[k] = v,
+              dispatchAction: (a) async => dispatched = a,
+              child: Builder(
+                builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, {
+                  'type': 'text_input',
+                  'name': 'search',
+                  'label': 'Search',
+                  'submit_action': {
+                    'type': 'filter_view',
+                    'endpoint': '/api/tenant/views/pharmacy-batches?tab=active',
+                    'fields': ['search'],
+                  },
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextFormField), 'metformin');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pump();
+
+      expect(formValues['search'], 'metformin');
+      expect(dispatched?['type'], 'filter_view');
+      expect(dispatched?['fields'], ['search']);
     });
 
     testWidgets('renders grid view with columns', (tester) async {

@@ -471,11 +471,14 @@ class DynamicSchemaParser {
             .clamp(0, tabItems.length - 1) ??
         0;
 
-    // The tab panel carries its own scroll, so it needs a bounded height. Use
-    // most of the viewport (not a rigid 400) so long lists like Active Batches
-    // aren't crammed into a tiny window on tall phones.
-    final panelHeight =
-        (MediaQuery.of(context).size.height * 0.66).clamp(360.0, 680.0);
+    // The tab panel carries its own scroll, so it needs a bounded height.
+    // Take most of the viewport (not a rigid 400) so a long form or list has
+    // room, then let its inner SingleChildScrollView handle the rest.
+    final mq = MediaQuery.of(context);
+    final panelHeight = (mq.size.height * 0.78).clamp(420.0, 900.0).toDouble();
+    // Clear the on-screen keyboard plus a floating-action margin, so the last
+    // field / submit button can always be scrolled fully into view.
+    final bottomInset = mq.viewInsets.bottom + 96;
 
     return DefaultTabController(
       length: tabItems.length,
@@ -502,13 +505,18 @@ class DynamicSchemaParser {
             ],
           ),
           SizedBox(
-            height: panelHeight.toDouble(),
+            height: panelHeight,
             child: TabBarView(
               children: [
                 for (final t in tabItems)
-                  ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: buildChildren(context, _extractChildren(t)),
+                  SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.only(
+                        left: 16, right: 16, top: 12, bottom: bottomInset),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: buildChildren(context, _extractChildren(t)),
+                    ),
                   ),
               ],
             ),
@@ -711,6 +719,12 @@ class DynamicSchemaParser {
     if (keyboardTypeStr == 'multiline' || maxLines > 1)
       keyboardType = TextInputType.multiline;
 
+    // Optional: an action fired when the user presses the keyboard's
+    // search/done key — used by search rows so "Enter" filters the list.
+    final submitAction = schema['submit_action'] is Map
+        ? Map<String, dynamic>.from(schema['submit_action'] as Map)
+        : null;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: TextFormField(
@@ -719,6 +733,8 @@ class DynamicSchemaParser {
         obscureText: isPassword,
         maxLines: maxLines,
         keyboardType: keyboardType,
+        textInputAction:
+            submitAction != null ? TextInputAction.search : null,
         autovalidateMode: AutovalidateMode.onUserInteraction,
         validator: _textValidator(schema),
         decoration: InputDecoration(
@@ -731,6 +747,12 @@ class DynamicSchemaParser {
         onChanged: (val) {
           sduiContext?.setFormValue(name, val);
         },
+        onFieldSubmitted: submitAction == null
+            ? null
+            : (val) {
+                sduiContext?.setFormValue(name, val);
+                sduiContext?.dispatchAction(submitAction);
+              },
       ),
     );
   }
