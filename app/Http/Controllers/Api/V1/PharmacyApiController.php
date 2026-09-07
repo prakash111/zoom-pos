@@ -836,12 +836,16 @@ class PharmacyApiController extends Controller
             'gender' => 'nullable|string|max:30',
             'allergies' => 'nullable|string|max:2000',
             'rx_image_url' => 'nullable|string|max:4000',
+            // Native SDUI file_picker binds the uploaded storage URL here.
+            'rx_attachment_url' => 'nullable|string|max:4000',
             'dosage_duration_days' => 'nullable|integer|min:1|max:3650',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'error' => $validator->errors()->first()], 422);
         }
+
+        $rxAttachmentUrl = $request->input('rx_attachment_url') ?: $request->input('rx_image_url');
 
         $customer = $this->resolvePatientCustomer(
             $company->id,
@@ -870,7 +874,7 @@ class PharmacyApiController extends Controller
             'diagnosis' => $request->input('diagnosis'),
             'medicines' => $request->input('medicines'),
             'notes' => $request->input('notes'),
-            'rx_image_url' => $request->input('rx_image_url'),
+            'rx_image_url' => $rxAttachmentUrl,
             'dosage_duration_days' => $request->integer('dosage_duration_days') ?: null,
             'status' => 'pending',
         ]);

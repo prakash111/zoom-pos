@@ -411,8 +411,9 @@ class AppBootstrapApiTest extends TestCase
 
         $pharmacyItems = collect($menu['pharmacy_management']['items'])->pluck('key')->all();
         $this->assertContains('pharmacy_pos', $pharmacyItems);
-        $this->assertContains('pharmacy_batches', $pharmacyItems);
-        $this->assertContains('pharmacy_prescriptions', $pharmacyItems);
+        $this->assertTrue(in_array('new_prescription_intake', $pharmacyItems, true) || in_array('new_rx_intake', $pharmacyItems, true));
+        $this->assertTrue(in_array('prescriptions_queue', $pharmacyItems, true) || in_array('pharmacy_prescriptions', $pharmacyItems, true));
+        $this->assertTrue(in_array('batch_inventory', $pharmacyItems, true) || in_array('pharmacy_batches', $pharmacyItems, true));
 
         $serviceItems = collect($menu['salon_bookings']['items'])->pluck('key')->all();
         $this->assertContains('salon_pos', $serviceItems);

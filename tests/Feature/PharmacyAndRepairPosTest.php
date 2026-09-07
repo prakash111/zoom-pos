@@ -508,6 +508,7 @@ class PharmacyAndRepairPosTest extends TestCase
         $views = [
             'pharmacy-batches' => 'Batch & Expiry Manager',
             'pharmacy-prescriptions' => 'Prescriptions Queue',
+            'pharmacy-rx-create' => 'New Prescription Intake',
             'repair-dashboard' => 'Repair Workbench',
             'repair-create-ticket' => 'New Repair Ticket',
             'repair-tickets' => 'Repair Ticket Register',
@@ -946,12 +947,23 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertStringContainsString('Print Barcode', $batchViewJson);
         $this->assertStringContainsString('Audit Stock', $batchViewJson);
 
-        // 3. Test pharmacy-prescriptions view with status filter
+        // 3. Test pharmacy-prescriptions view with status filter & decoupled standalone intake action
         $rxViewRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/pharmacy-prescriptions?status=pending');
         $rxViewRes->assertOk();
         $rxViewJson = json_encode($rxViewRes->json());
         $this->assertStringContainsString('Alice Patient', $rxViewJson);
         $this->assertStringContainsString('Load Prescription into POS', $rxViewJson);
+        $this->assertStringContainsString('+ New Prescription Intake', $rxViewJson);
+        $this->assertStringNotContainsString('accordion_group', $rxViewJson);
+
+        // 3b. Test pharmacy-rx-create standalone view schema
+        $createRxRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/pharmacy-rx-create');
+        $createRxRes->assertOk();
+        $createRxJson = json_encode($createRxRes->json(), JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('New Prescription Intake', $createRxJson);
+        $this->assertStringContainsString('customer_selector', $createRxJson);
+        $this->assertStringContainsString('Prescribing Doctor Name', $createRxJson);
+        $this->assertStringContainsString('/api/tenant/pharmacy/prescriptions', $createRxJson);
 
         // 4. Test repair-create-ticket view includes check_battery
         $createTicketRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/repair-create-ticket');

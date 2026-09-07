@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\ServiceOrderApiController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
 use App\Http\Controllers\Api\V1\TaxApiController;
 use App\Http\Controllers\Api\V1\TenantDemoDataController;
+use App\Http\Controllers\Api\V1\UploadApiController;
 use App\Http\Controllers\Api\V1\UserApiController;
 use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Middleware\AuthenticateTenantApi;
@@ -147,6 +148,13 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
         Route::put('/{id}', [SettingsApiController::class, 'notificationChannelsUpdate']);
         Route::delete('/{id}', [SettingsApiController::class, 'notificationChannelsDestroy']);
         Route::post('/test', [SettingsApiController::class, 'testNotificationChannel']);
+    });
+
+    // Secure tenant file uploads (non-executable image/PDF whitelist) — backs
+    // the SDUI `file_picker` component (e.g. prescription attachments).
+    Route::prefix('tenant/uploads')->group(function () {
+        Route::post('/prescription-doc', [UploadApiController::class, 'uploadRxAttachment'])
+            ->middleware('tenant.api.permission:sales,create');
     });
 
     // Pharmacy POS Module Routes

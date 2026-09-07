@@ -47,6 +47,7 @@ class SchemaResponse
         'accordion', 'column', 'row', 'tabs', 'stepper', 'text', 'image_network',
         'badge', 'icon', 'divider', 'text_input', 'dropdown_select',
         'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker', 'file_upload',
+        'file_picker',
         'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
         'button_outlined', 'button_danger', 'fab', 'action_sheet_trigger', 'navigation_builder', 'tree_builder',
         'wrap', 'cash_tendered_field', 'customer_selector',
@@ -54,7 +55,7 @@ class SchemaResponse
 
     public const INPUT_TYPES = [
         'text_input', 'dropdown_select', 'checkbox', 'toggle_switch',
-        'date_time_picker', 'color_picker', 'file_upload', 'step_counter',
+        'date_time_picker', 'color_picker', 'file_upload', 'file_picker', 'step_counter',
         'cash_tendered_field', 'customer_selector',
     ];
 
@@ -65,6 +66,7 @@ class SchemaResponse
     public const ACTION_TYPES = [
         'navigate', 'form_submit', 'api_post', 'open_modal', 'navigate_back', 'pop',
         'add_to_cart', 'open_remote_sheet', 'open_url', 'show_post_sale_sheet',
+        'load_rx_to_pos',
     ];
 
     // =========================================================================
@@ -314,6 +316,34 @@ class SchemaResponse
             'field_name' => $name,
             'select_label' => 'Choose File',
             'remove_label' => 'Remove',
+        ], $props);
+    }
+
+    /**
+     * Native document / photo attachment picker. The client renders an action
+     * card offering camera, gallery and document sources, uploads the picked
+     * file to $uploadEndpoint as multipart `file`, and binds the returned
+     * storage URL into the form value $name so it is submitted with the record.
+     *
+     * Only non-executable image/PDF types are ever accepted — the client
+     * filters by $allowedExtensions and the upload endpoint re-validates the
+     * MIME type and rejects script/binary disguises server-side.
+     */
+    public static function filePicker(string $name, string $label, string $uploadEndpoint, array $props = []): array
+    {
+        return array_merge([
+            'type' => 'file_picker',
+            'name' => $name,
+            'label' => $label,
+            'hint' => 'Upload a photo or PDF — non-executable files only',
+            'upload_endpoint' => $uploadEndpoint,
+            'field_name' => 'file',
+            'allowed_extensions' => ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'heic'],
+            'max_size_mb' => 10,
+            'allow_camera' => true,
+            'allow_gallery' => true,
+            'allow_document' => true,
+            'response_url_path' => 'url',
         ], $props);
     }
 
@@ -693,6 +723,21 @@ class SchemaResponse
         ];
     }
 
+    /**
+     * Hands a prescription's resolved line items, patient and doctor straight
+     * to the native POS cart state, then opens the interactive POS screen —
+     * no intermediate checkout sheet. Handled entirely client-side.
+     *
+     * @param  array<string, mixed>  $payload  {rx_id, rx_number, customer, doctor, diagnosis, items[]}
+     */
+    public static function loadRxToPosAction(array $payload): array
+    {
+        return [
+            'type' => 'load_rx_to_pos',
+            'payload' => $payload,
+        ];
+    }
+
     public static function openUrlAction(string $url): array
     {
         return [
@@ -1003,6 +1048,13 @@ class SchemaResponse
     // Pharmacy POS Module Views
     // =========================================================================
 
+    /**
+     * @deprecated Superseded by the core native POS screen (client route 'pos').
+     * The pharmacy drawer entry and the "Pharmacy POS" quick-action in the
+     * prescription queue both open the native POS directly now. This endpoint
+     * stays only for backward compatibility with shipped app builds and the
+     * pharmacy/repair POS parity contract test.
+     */
     public static function pharmacyPosView(Company $company): array
     {
         return PosScreenBuilder::pharmacyPosScreen($company);
@@ -1224,7 +1276,10 @@ class SchemaResponse
             $isPending = $rx->status === 'pending';
             $badgeColor = $isPending ? '#f59e0b' : '#10b981';
 
-            $rxCards[] = self::card([
+            $lineItems = $isPending ? self::resolveRxLineItems($company, $rx) : [];
+            $itemCount = array_sum(array_map(static fn ($i) => (int) $i['quantity'], $lineItems));
+
+            $cardChildren = [
                 self::row([
                     self::icon('receipt_long', ['color' => $badgeColor, 'size' => 24]),
                     self::column([
@@ -1236,23 +1291,48 @@ class SchemaResponse
                 self::divider(),
                 self::text('Diagnosis / Notes: '.($rx->diagnosis ?: ($rx->notes ?: 'General prescription')), 'body_small'),
                 self::text('Date: '.($rx->prescription_date?->format('Y-m-d') ?? 'Today'), 'body_small', ['color' => '#94a3b8']),
-                self::divider(),
-                $isPending ? self::buttonPrimary('Load Prescription into POS', self::openRemoteSheetAction(
-                    "/api/tenant/pharmacy/prescriptions/{$rx->id}/checkout-sheet",
-                    "Dispense Rx #{$rx->prescription_number}"
-                ), 'point_of_sale') : self::badge('Dispensed Successfully', '#10b981', 'subtle'),
-            ]);
+            ];
+
+            if ($isPending && $lineItems !== []) {
+                $cardChildren[] = self::text(
+                    $itemCount.' item(s): '.implode(', ', array_map(static fn ($i) => $i['product_name'].' ×'.$i['quantity'], $lineItems)),
+                    'body_small',
+                    ['color' => '#0f766e']
+                );
+            }
+
+            $cardChildren[] = self::divider();
+            $cardChildren[] = $isPending
+                ? self::buttonPrimary('Load Prescription into POS', self::loadRxToPosAction([
+                    'rx_id' => (string) $rx->id,
+                    'rx_number' => $rx->prescription_number,
+                    'diagnosis' => $rx->diagnosis,
+                    'patient_name' => $rx->patient_name,
+                    'customer' => [
+                        'id' => $rx->customer_id,
+                        'name' => $rx->patient_name,
+                        'phone' => $rx->patient_phone,
+                    ],
+                    'doctor' => [
+                        'name' => $rx->doctor_name,
+                        'registration_no' => $rx->doctor_registration_no ?? '',
+                    ],
+                    'items' => $lineItems,
+                ]), 'shopping_cart_checkout')
+                : self::badge('Dispensed Successfully', '#10b981', 'subtle');
+
+            $rxCards[] = self::card($cardChildren);
         }
 
         return self::screen('Prescriptions Queue', [
             self::card([
                 self::row([
-                    self::icon('receipt_long', ['color' => '#059669', 'size' => 28]),
+                    self::icon('medical_information', ['color' => '#059669', 'size' => 28], ['flexible' => false]),
                     self::column([
                         self::text('Prescriptions & Patient Queue', 'title_medium', ['bold' => true]),
                         self::text('Doctor referrals, prescription intake, and controlled drug verification.', 'body_small', ['color' => '#64748b']),
-                    ]),
-                ]),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
                 self::divider(),
                 self::row([
                     self::badge("Total Prescriptions: {$totalRx}", '#0284c7', 'subtle'),
@@ -1260,6 +1340,11 @@ class SchemaResponse
                     self::badge("Dispensed: {$dispensedRx}", '#10b981', 'subtle'),
                 ]),
             ]),
+
+            self::row([
+                self::buttonPrimary('+ New Prescription Intake', self::navigateAction('/api/tenant/views/pharmacy-rx-create', title: 'New Prescription Intake'), 'note_add', ['expanded' => true, 'background_color' => '#059669']),
+                self::buttonOutlined('Pharmacy POS', self::navigateAction('pos', title: 'Pharmacy POS'), 'point_of_sale', ['expanded' => true]),
+            ], ['spacing' => 10]),
 
             self::row([
                 $statusFilter === 'all'
@@ -1273,38 +1358,179 @@ class SchemaResponse
                     : self::buttonOutlined("Dispensed ({$dispensedRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=dispensed', title: 'Dispensed Prescriptions'), 'task_alt', ['full_width' => false]),
             ]),
 
-            self::accordionGroup('New Prescription Intake', [
-                self::textInput('patient_name', 'Patient Full Name', ''),
-                self::textInput('patient_phone', 'Patient Contact Phone #', ''),
-                self::textInput('age', 'Age (Optional)', '', ['keyboard_type' => 'number']),
-                self::dropdownSelect('gender', 'Gender (Optional)', [
-                    ['label' => 'Not specified', 'value' => ''],
-                    ['label' => 'Female', 'value' => 'female'],
-                    ['label' => 'Male', 'value' => 'male'],
-                    ['label' => 'Other', 'value' => 'other'],
-                ], ''),
-                self::textInput('allergies', 'Known Allergies (Optional)', ''),
-                self::textInput('doctor_name', 'Prescribing Doctor Name', ''),
-                self::textInput('doctor_registration_no', 'Doctor Registration / License #', ''),
-                self::dateTimePicker('prescription_date', 'Prescription Date', mode: 'date'),
-                self::textInput('diagnosis', 'Diagnosis / Clinical Indications', ''),
-                self::textInput('notes', 'Prescribed Medicines, Dosages & Frequency', ''),
-                self::textInput('dosage_duration_days', 'Days Supply / Dosage Duration', '30', ['keyboard_type' => 'number']),
-                self::textInput('rx_image_url', 'Scanned Rx Image URL (Optional)', ''),
-                self::divider(),
-                self::buttonPrimary('Save to Prescription Queue', self::formSubmitAction(
-                    '/api/tenant/pharmacy/prescriptions',
-                    'POST',
-                    'Prescription logged to queue.',
-                    reload: true
-                ), 'post_add'),
-            ]),
-
             self::card([
                 self::text('Prescription Queue', 'title_medium', ['bold' => true]),
                 self::column(! empty($rxCards) ? $rxCards : [
-                    self::text('No prescriptions currently logged matching this status. Use the form above to add a new Rx.', 'body_medium', ['color' => '#64748b']),
+                    self::text("No prescriptions currently logged matching this status. Tap '+ New Prescription Intake' above to log a new prescription.", 'body_medium', ['color' => '#64748b']),
                 ]),
+            ]),
+        ]);
+    }
+
+    /**
+     * Resolve a prescription's stored `medicines` array into concrete catalog
+     * line items the native POS cart can load directly. Medicines that don't
+     * match an active product are skipped (the cashier adds them manually).
+     *
+     * @return list<array{product_id:int,product_name:string,quantity:int,unit_price:float,dosage:?string,days_supply:mixed}>
+     */
+    private static function resolveRxLineItems(Company $company, PharmacyPrescription $rx): array
+    {
+        $medicines = is_array($rx->medicines) ? $rx->medicines : [];
+        if ($medicines === []) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($medicines as $medicine) {
+            $medicine = is_array($medicine) ? $medicine : ['name' => (string) $medicine];
+            $name = trim((string) ($medicine['name'] ?? $medicine['medicine_name'] ?? ''));
+            $productId = (int) ($medicine['product_id'] ?? 0);
+            $qty = max(1, (int) ($medicine['qty'] ?? $medicine['quantity'] ?? 1));
+
+            $query = Product::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where('active', true);
+
+            $product = $productId > 0 ? (clone $query)->find($productId) : null;
+            if (! $product && $name !== '') {
+                $product = (clone $query)
+                    ->where(function ($q) use ($name) {
+                        $q->where('name', $name)
+                            ->orWhere('generic_name', $name)
+                            ->orWhere('name', 'like', '%'.$name.'%')
+                            ->orWhere('generic_name', 'like', '%'.$name.'%');
+                    })
+                    ->first();
+            }
+
+            if (! $product) {
+                continue;
+            }
+
+            $batch = PharmacyBatch::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where('product_id', $product->id)
+                ->where('is_active', true)
+                ->where('stock_qty', '>=', $qty)
+                ->where('expiry_date', '>=', now()->toDateString())
+                ->orderBy('expiry_date')
+                ->first();
+
+            $unitPrice = (float) ($batch && $batch->selling_price > 0
+                ? $batch->selling_price
+                : ($product->sale_price ?? 0));
+
+            $items[] = [
+                'product_id' => (int) $product->id,
+                'product_name' => $product->name,
+                'quantity' => $qty,
+                'unit_price' => round($unitPrice, 2),
+                'dosage' => $medicine['dosage'] ?? $medicine['dosage_notes'] ?? null,
+                'days_supply' => $medicine['days_supply'] ?? $medicine['duration_days'] ?? $rx->dosage_duration_days,
+            ];
+        }
+
+        return $items;
+    }
+
+    public static function pharmacyRxCreateView(Company $company): array
+    {
+        $timezone = $company->resolveTimezone();
+        $todayDate = now($timezone)->toDateString();
+
+        return self::screen('New Prescription Intake', [
+            self::card([
+                self::row([
+                    self::icon('note_add', ['color' => '#059669', 'size' => 28], ['flexible' => false]),
+                    self::column([
+                        self::text('New Prescription Intake', 'title_medium', ['bold' => true]),
+                        self::text('Log doctor prescriptions, patient demographics, clinical indications, and dosage schedule.', 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+                self::divider(),
+                self::row([
+                    self::buttonOutlined('Prescriptions Queue', self::navigateAction('/api/tenant/views/pharmacy-prescriptions', title: 'Prescriptions & Patient Queue'), 'medical_information', ['expanded' => true]),
+                    self::buttonOutlined('Pharmacy POS', self::navigateAction('pos', title: 'Pharmacy POS'), 'point_of_sale', ['expanded' => true]),
+                ], ['spacing' => 10]),
+            ]),
+
+            self::card([
+                self::column([
+                    self::text('Patient Information', 'title_medium', ['bold' => true]),
+                    self::divider(),
+                    self::customerSelector(
+                        'customer_id',
+                        'Patient / Customer Lookup',
+                        '/api/tenant/customers/search',
+                        [
+                            'name_field' => 'patient_name',
+                            'phone_field' => 'patient_phone',
+                        ],
+                        [
+                            'name_label' => 'Patient Full Name *',
+                            'phone_label' => 'Patient Contact Phone #',
+                            'placeholder' => 'Search existing patient or type name below...',
+                            'required' => true,
+                        ]
+                    ),
+                    self::row([
+                        self::textInput('age', 'Age (Optional)', '', [
+                            'keyboard_type' => 'number',
+                            'placeholder' => 'e.g. 35',
+                        ]),
+                        self::dropdownSelect('gender', 'Gender (Optional)', [
+                            ['label' => 'Not specified', 'value' => ''],
+                            ['label' => 'Female', 'value' => 'female'],
+                            ['label' => 'Male', 'value' => 'male'],
+                            ['label' => 'Other', 'value' => 'other'],
+                        ], ''),
+                    ], ['spacing' => 10]),
+                    self::textInput('allergies', 'Known Allergies (Optional)', '', [
+                        'placeholder' => 'e.g. Penicillin, Sulfa, Latex...',
+                    ]),
+                ], ['spacing' => 12]),
+            ]),
+
+            self::card([
+                self::column([
+                    self::text('Prescribing Doctor & Clinical Details', 'title_medium', ['bold' => true]),
+                    self::divider(),
+                    self::textInput('doctor_name', 'Prescribing Doctor Name *', '', [
+                        'required' => true,
+                        'placeholder' => 'Dr. Full Name',
+                    ]),
+                    self::textInput('doctor_registration_no', 'Doctor Registration / License # (Optional)', '', [
+                        'placeholder' => 'e.g. MED-84729',
+                    ]),
+                    self::dateTimePicker('prescription_date', 'Prescription Date *', $todayDate, 'date'),
+                    self::textInput('diagnosis', 'Diagnosis / Clinical Indications (Optional)', '', [
+                        'max_lines' => 2,
+                        'placeholder' => 'e.g. Acute Bronchitis, Hypertension Stage 1...',
+                    ]),
+                    self::textInput('notes', 'Prescribed Medicines, Dosages & Frequency *', '', [
+                        'max_lines' => 3,
+                        'placeholder' => 'e.g. Amoxicillin 500mg TDS x 7 days, Paracetamol 650mg SOS...',
+                    ]),
+                    self::textInput('dosage_duration_days', 'Days Supply / Dosage Duration', '30', [
+                        'keyboard_type' => 'number',
+                        'placeholder' => '30',
+                    ]),
+                    self::filePicker(
+                        'rx_attachment_url',
+                        'Prescription Document / Photo (Optional)',
+                        '/api/tenant/uploads/prescription-doc',
+                        ['hint' => 'Upload prescription photo or PDF (non-executable only)']
+                    ),
+                    self::divider(),
+                    self::buttonPrimary('Save to Prescription Queue', self::formSubmitAction(
+                        '/api/tenant/pharmacy/prescriptions',
+                        'POST',
+                        'Prescription logged to queue successfully.',
+                        navigateBack: false,
+                        redirectRoute: '/api/tenant/views/pharmacy-prescriptions'
+                    ), 'post_add', ['background_color' => '#059669']),
+                ], ['spacing' => 12]),
             ]),
         ]);
     }
@@ -4328,7 +4554,7 @@ class SchemaResponse
             return 'pos.view';
         }
 
-        if (in_array($normalized, ['sales', 'invoices', 'sales-invoices', 'pos-sales', 'dining-history', 'kot-history', 'pharmacy-prescriptions'], true)) {
+        if (in_array($normalized, ['sales', 'invoices', 'sales-invoices', 'pos-sales', 'dining-history', 'kot-history', 'pharmacy-prescriptions', 'pharmacy-rx-create', 'pharmacy-prescription-create', 'new-prescription-intake', 'prescription-intake', 'rx-create'], true)) {
             return 'sales.view';
         }
 
@@ -4430,9 +4656,15 @@ class SchemaResponse
             'restaurant-kds', 'kds', 'kitchen-display' => self::restaurantKdsView($company),
             'restaurant-pos' => self::restaurantPosView($company),
             'dining-history', 'kot-history' => self::diningHistoryView($company),
+            // DEPRECATED: the old "Pharmacy Counter POS" SDUI screen. Nothing in
+            // the drawer or the prescription queue routes here any more — all
+            // pharmacy checkouts now open the core native POS ('pos'). Kept only
+            // so already-installed app builds and the parity contract test keep
+            // resolving; do not add new navigation targets to it.
             'pharmacy-pos' => self::pharmacyPosView($company),
             'pharmacy-batches', 'batches' => self::pharmacyBatchesView($company),
-            'pharmacy-prescriptions', 'prescriptions' => self::pharmacyPrescriptionsView($company),
+            'pharmacy-prescriptions', 'prescriptions', 'prescriptions-queue' => self::pharmacyPrescriptionsView($company),
+            'pharmacy-rx-create', 'pharmacy-prescription-create', 'new-prescription-intake', 'prescription-intake', 'rx-create' => self::pharmacyRxCreateView($company),
             'repair-dashboard', 'repair' => self::repairDashboardView($company),
             'repair-create-ticket', 'repair-ticket-create' => self::repairCreateTicketView($company),
             'repair-tickets' => self::repairTicketsView($company),

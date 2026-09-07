@@ -257,8 +257,8 @@ class TenantNavRegistry
             $sections[] = self::normalizeSection([
                 'id' => 'pharmacy_management',
                 'key' => 'pharmacy_management',
-                'title' => 'Pharmacy Management',
-                'label' => 'Pharmacy Management',
+                'title' => 'PHARMACY OPERATIONS',
+                'label' => 'PHARMACY OPERATIONS',
                 'color' => '#059669',
                 'items' => self::getPharmacyMenuItems(),
             ]);
@@ -682,67 +682,95 @@ class TenantNavRegistry
     {
         return [
             [
+                'id' => 'pharmacy_pos',
                 'key' => 'pharmacy_pos',
-                'label' => 'Pharmacy Counter POS',
-                'title' => 'Pharmacy Counter POS',
-                'icon' => 'local_pharmacy',
+                'title' => 'Pharmacy POS & Checkout',
+                'label' => 'Pharmacy POS & Checkout',
+                'icon' => 'point_of_sale',
                 'component' => 'pos',
                 'permission' => 'pos',
-                'target_endpoint' => '/api/tenant/views/pos',
+                // Opens the core native POS resolver directly — NOT the retired
+                // "Pharmacy Counter POS" SDUI screen at
+                // /api/tenant/views/pharmacy-pos.
+                'route' => 'pos',
+                'target_endpoint' => 'pos',
             ],
             [
-                'key' => 'sales',
-                'label' => 'Sales & Invoices History',
-                'title' => 'Sales & Invoices History',
-                'icon' => 'receipt_long',
-                'component' => 'sales',
+                'id' => 'new_prescription_intake',
+                'key' => 'new_prescription_intake',
+                'title' => 'New Prescription Intake',
+                'label' => 'New Prescription Intake',
+                'icon' => 'note_add',
+                'component' => 'new_prescription_intake',
                 'permission' => 'sales',
-                'target_endpoint' => '/api/tenant/views/sales',
+                'route' => '/api/tenant/views/pharmacy-rx-create',
+                'target_endpoint' => '/api/tenant/views/pharmacy-rx-create',
             ],
             [
-                'key' => 'quotations',
-                'label' => 'Quotations & Estimates',
-                'title' => 'Quotations & Estimates',
-                'icon' => 'description',
-                'component' => 'quotations',
-                'permission' => 'quotes',
-                'target_endpoint' => '/api/tenant/views/quotations',
+                'id' => 'prescriptions_queue',
+                'key' => 'prescriptions_queue',
+                'title' => 'Prescriptions & Patient Queue',
+                'label' => 'Prescriptions & Patient Queue',
+                'icon' => 'medical_information',
+                'component' => 'pharmacy_prescriptions',
+                'permission' => 'sales',
+                'route' => '/api/tenant/views/pharmacy-prescriptions',
+                'target_endpoint' => '/api/tenant/views/pharmacy-prescriptions',
             ],
             [
-                'key' => 'customers',
-                'label' => 'Patients & Customers',
-                'title' => 'Patients & Customers',
-                'icon' => 'people',
-                'component' => 'customers',
-                'permission' => 'customers',
-                'target_endpoint' => '/api/tenant/views/customers',
-            ],
-            [
-                'key' => 'cash_register',
-                'label' => 'Cash Register',
-                'title' => 'Cash Register',
-                'icon' => 'savings',
-                'component' => 'cash_register',
-                'permission' => 'cash_register',
-                'target_endpoint' => '/api/tenant/views/cash-register',
-            ],
-            [
-                'key' => 'pharmacy_batches',
-                'label' => 'Batch & Expiry Manager',
-                'title' => 'Batch & Expiry Manager',
-                'icon' => 'medication',
+                'id' => 'batch_inventory',
+                'key' => 'batch_inventory',
+                'title' => 'Drug Batches & Expiry Tracker',
+                'label' => 'Drug Batches & Expiry Tracker',
+                'icon' => 'inventory_2',
                 'component' => 'pharmacy_batches',
                 'permission' => 'products',
+                'route' => '/api/tenant/views/pharmacy-batches',
                 'target_endpoint' => '/api/tenant/views/pharmacy-batches',
             ],
             [
-                'key' => 'pharmacy_prescriptions',
-                'label' => 'Prescriptions Queue',
-                'title' => 'Prescriptions Queue',
+                'id' => 'sales',
+                'key' => 'sales',
+                'title' => 'Sales & Invoices History',
+                'label' => 'Sales & Invoices History',
                 'icon' => 'receipt_long',
-                'component' => 'pharmacy_prescriptions',
+                'component' => 'sales',
                 'permission' => 'sales',
-                'target_endpoint' => '/api/tenant/views/pharmacy-prescriptions',
+                'route' => '/api/tenant/views/sales',
+                'target_endpoint' => '/api/tenant/views/sales',
+            ],
+            [
+                'id' => 'quotations',
+                'key' => 'quotations',
+                'title' => 'Quotations & Estimates',
+                'label' => 'Quotations & Estimates',
+                'icon' => 'description',
+                'component' => 'quotations',
+                'permission' => 'quotes',
+                'route' => '/api/tenant/views/quotations',
+                'target_endpoint' => '/api/tenant/views/quotations',
+            ],
+            [
+                'id' => 'customers',
+                'key' => 'customers',
+                'title' => 'Patients & Doctors',
+                'label' => 'Patients & Doctors',
+                'icon' => 'people',
+                'component' => 'customers',
+                'permission' => 'customers',
+                'route' => '/api/tenant/views/customers',
+                'target_endpoint' => '/api/tenant/views/customers',
+            ],
+            [
+                'id' => 'cash_register',
+                'key' => 'cash_register',
+                'title' => 'Cash Register',
+                'label' => 'Cash Register',
+                'icon' => 'savings',
+                'component' => 'cash_register',
+                'permission' => 'cash_register',
+                'route' => '/api/tenant/views/cash-register',
+                'target_endpoint' => '/api/tenant/views/cash-register',
             ],
         ];
     }
@@ -1012,8 +1040,8 @@ class TenantNavRegistry
             'pharmacy' => self::normalizeSection([
                 'id' => 'pharmacy_management',
                 'key' => 'pharmacy_management',
-                'title' => 'Pharmacy Management',
-                'label' => 'Pharmacy Management',
+                'title' => 'PHARMACY OPERATIONS',
+                'label' => 'PHARMACY OPERATIONS',
                 'color' => '#059669',
                 'items' => self::getPharmacyMenuItems(),
             ]),
@@ -1146,12 +1174,29 @@ class TenantNavRegistry
 
         $applyToItem = function (array $item) use (&$applyToItem, $resolveLabel): array {
             $key = (string) ($item['key'] ?? $item['id'] ?? '');
+            $id = (string) ($item['id'] ?? '');
             $component = (string) ($item['component'] ?? '');
             $labelSlug = \Illuminate\Support\Str::snake(strtolower($item['label'] ?? ''));
-            $candidates = [$key, $component, $labelSlug];
+            $candidates = array_unique(array_filter([$key, $id, $component, $labelSlug]));
             if ($key === 'repair_dashboard' || $key === 'repair_workbench') {
                 $candidates[] = 'repair_workbench';
                 $candidates[] = 'repair_dashboard';
+            }
+            if ($key === 'pharmacy_prescriptions' || $id === 'prescriptions_queue') {
+                $candidates[] = 'prescriptions_queue';
+                $candidates[] = 'pharmacy_prescriptions';
+            }
+            if ($key === 'pharmacy_batches' || $id === 'batch_inventory') {
+                $candidates[] = 'batch_inventory';
+                $candidates[] = 'pharmacy_batches';
+            }
+            if ($key === 'new_prescription_intake' || $id === 'new_prescription_intake') {
+                $candidates[] = 'new_rx_intake';
+                $candidates[] = 'new_prescription_intake';
+                $candidates[] = 'pharmacy_rx_create';
+            }
+            if ($key === 'pharmacy_pos' || $id === 'pharmacy_pos') {
+                $candidates[] = 'pharmacy_pos';
             }
             $custom = $resolveLabel(...$candidates);
             if ($custom !== null) {
@@ -1496,14 +1541,17 @@ class TenantNavRegistry
         return [
             [
                 'key' => 'pharmacy_dispensary',
-                'label' => 'Dispensary & Counter',
+                'label' => 'PHARMACY OPERATIONS',
                 'color' => '#059669',
                 'items' => [
-                    ['key' => 'pharmacy_pos', 'label' => 'Pharmacy Counter POS', 'icon' => 'local_pharmacy', 'component' => 'pos', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/pos'],
-                    ['key' => 'sales', 'label' => 'Dispensed Prescriptions', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales', 'target_endpoint' => '/api/tenant/views/sales'],
-                    ['key' => 'quotations', 'label' => 'Quotations & Estimates', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes', 'target_endpoint' => '/api/tenant/views/quotations'],
-                    ['key' => 'customers', 'label' => 'Patients & Doctors', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'target_endpoint' => '/api/tenant/views/customers'],
-                    ['key' => 'cash_register', 'label' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register', 'target_endpoint' => '/api/tenant/views/cash-register'],
+                    ['key' => 'pharmacy_pos', 'id' => 'pharmacy_pos', 'label' => 'Pharmacy POS & Checkout', 'title' => 'Pharmacy POS & Checkout', 'icon' => 'point_of_sale', 'component' => 'pos', 'permission' => 'pos', 'route' => 'pos', 'target_endpoint' => 'pos'],
+                    ['key' => 'new_prescription_intake', 'id' => 'new_prescription_intake', 'label' => 'New Prescription Intake', 'title' => 'New Prescription Intake', 'icon' => 'note_add', 'component' => 'new_prescription_intake', 'permission' => 'sales', 'route' => '/api/tenant/views/pharmacy-rx-create', 'target_endpoint' => '/api/tenant/views/pharmacy-rx-create'],
+                    ['key' => 'prescriptions_queue', 'id' => 'prescriptions_queue', 'label' => 'Prescriptions & Patient Queue', 'title' => 'Prescriptions & Patient Queue', 'icon' => 'medical_information', 'component' => 'pharmacy_prescriptions', 'permission' => 'sales', 'route' => '/api/tenant/views/pharmacy-prescriptions', 'target_endpoint' => '/api/tenant/views/pharmacy-prescriptions'],
+                    ['key' => 'batch_inventory', 'id' => 'batch_inventory', 'label' => 'Drug Batches & Expiry Tracker', 'title' => 'Drug Batches & Expiry Tracker', 'icon' => 'inventory_2', 'component' => 'pharmacy_batches', 'permission' => 'products', 'route' => '/api/tenant/views/pharmacy-batches', 'target_endpoint' => '/api/tenant/views/pharmacy-batches'],
+                    ['key' => 'sales', 'id' => 'sales', 'label' => 'Dispensed Prescriptions', 'title' => 'Dispensed Prescriptions', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales', 'route' => '/api/tenant/views/sales', 'target_endpoint' => '/api/tenant/views/sales'],
+                    ['key' => 'quotations', 'id' => 'quotations', 'label' => 'Quotations & Estimates', 'title' => 'Quotations & Estimates', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes', 'route' => '/api/tenant/views/quotations', 'target_endpoint' => '/api/tenant/views/quotations'],
+                    ['key' => 'customers', 'id' => 'customers', 'label' => 'Patients & Doctors', 'title' => 'Patients & Doctors', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'route' => '/api/tenant/views/customers', 'target_endpoint' => '/api/tenant/views/customers'],
+                    ['key' => 'cash_register', 'id' => 'cash_register', 'label' => 'Cash Register', 'title' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register', 'route' => '/api/tenant/views/cash-register', 'target_endpoint' => '/api/tenant/views/cash-register'],
                 ],
             ],
             [
@@ -1511,11 +1559,12 @@ class TenantNavRegistry
                 'label' => 'Medicines & Inventory',
                 'color' => '#2563eb',
                 'items' => [
-                    ['key' => 'pharmacy_batches', 'label' => 'Batch & Expiry Manager', 'icon' => 'medication', 'component' => 'pharmacy_batches', 'permission' => 'products', 'target_endpoint' => '/api/tenant/views/pharmacy-batches'],
-                    ['key' => 'pharmacy_prescriptions', 'label' => 'Prescriptions Queue', 'icon' => 'receipt_long', 'component' => 'pharmacy_prescriptions', 'permission' => 'sales', 'target_endpoint' => '/api/tenant/views/pharmacy-prescriptions'],
-                    ['key' => 'inventory', 'label' => 'Drugs & Formulations', 'icon' => 'medication', 'component' => 'inventory', 'permission' => 'products', 'target_endpoint' => '/api/tenant/views/inventory'],
-                    ['key' => 'categories', 'label' => 'Therapeutic Categories', 'icon' => 'sell', 'component' => 'categories', 'permission' => 'categories', 'target_endpoint' => '/api/tenant/views/categories'],
-                    ['key' => 'suppliers', 'label' => 'Pharma Distributors', 'icon' => 'local_shipping', 'component' => 'suppliers', 'permission' => 'suppliers', 'target_endpoint' => '/api/tenant/views/suppliers'],
+                    ['key' => 'batch_inventory', 'id' => 'batch_inventory', 'label' => 'Drug Batches & Expiry Tracker', 'title' => 'Drug Batches & Expiry Tracker', 'icon' => 'inventory_2', 'component' => 'pharmacy_batches', 'permission' => 'products', 'route' => '/api/tenant/views/pharmacy-batches', 'target_endpoint' => '/api/tenant/views/pharmacy-batches'],
+                    ['key' => 'prescriptions_queue', 'id' => 'prescriptions_queue', 'label' => 'Prescriptions & Patient Queue', 'title' => 'Prescriptions & Patient Queue', 'icon' => 'medical_information', 'component' => 'pharmacy_prescriptions', 'permission' => 'sales', 'route' => '/api/tenant/views/pharmacy-prescriptions', 'target_endpoint' => '/api/tenant/views/pharmacy-prescriptions'],
+                    ['key' => 'new_prescription_intake', 'id' => 'new_prescription_intake', 'label' => 'New Prescription Intake', 'title' => 'New Prescription Intake', 'icon' => 'note_add', 'component' => 'new_prescription_intake', 'permission' => 'sales', 'route' => '/api/tenant/views/pharmacy-rx-create', 'target_endpoint' => '/api/tenant/views/pharmacy-rx-create'],
+                    ['key' => 'inventory', 'id' => 'inventory', 'label' => 'Drugs & Formulations', 'title' => 'Drugs & Formulations', 'icon' => 'medication', 'component' => 'inventory', 'permission' => 'products', 'route' => '/api/tenant/views/inventory', 'target_endpoint' => '/api/tenant/views/inventory'],
+                    ['key' => 'categories', 'id' => 'categories', 'label' => 'Therapeutic Categories', 'title' => 'Therapeutic Categories', 'icon' => 'sell', 'component' => 'categories', 'permission' => 'categories', 'route' => '/api/tenant/views/categories', 'target_endpoint' => '/api/tenant/views/categories'],
+                    ['key' => 'suppliers', 'id' => 'suppliers', 'label' => 'Pharma Distributors', 'title' => 'Pharma Distributors', 'icon' => 'local_shipping', 'component' => 'suppliers', 'permission' => 'suppliers', 'route' => '/api/tenant/views/suppliers', 'target_endpoint' => '/api/tenant/views/suppliers'],
                 ],
             ],
             [
@@ -1523,10 +1572,10 @@ class TenantNavRegistry
                 'label' => 'Financial Management',
                 'color' => '#0f766e',
                 'items' => [
-                    ['key' => 'cash_register', 'label' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register', 'target_endpoint' => '/api/tenant/views/cash-register'],
-                    ['key' => 'due_receivables', 'label' => 'Patient Credit / Khata', 'icon' => 'notifications_active', 'component' => 'due_receivables', 'permission' => 'finance', 'target_endpoint' => '/api/tenant/views/due-receivables'],
-                    ['key' => 'payables', 'label' => 'Supplier Payables', 'icon' => 'request_quote', 'component' => 'payables', 'permission' => 'finance', 'target_endpoint' => '/api/tenant/views/payables'],
-                    ['key' => 'reports', 'label' => 'Reports & Analytics', 'icon' => 'insights', 'component' => 'reports', 'permission' => 'reports', 'target_endpoint' => '/api/tenant/views/reports'],
+                    ['key' => 'cash_register', 'id' => 'cash_register', 'label' => 'Cash Register', 'title' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register', 'route' => '/api/tenant/views/cash-register', 'target_endpoint' => '/api/tenant/views/cash-register'],
+                    ['key' => 'due_receivables', 'id' => 'due_receivables', 'label' => 'Patient Credit / Khata', 'title' => 'Patient Credit / Khata', 'icon' => 'notifications_active', 'component' => 'due_receivables', 'permission' => 'finance', 'route' => '/api/tenant/views/due-receivables', 'target_endpoint' => '/api/tenant/views/due-receivables'],
+                    ['key' => 'payables', 'id' => 'payables', 'label' => 'Supplier Payables', 'title' => 'Supplier Payables', 'icon' => 'request_quote', 'component' => 'payables', 'permission' => 'finance', 'route' => '/api/tenant/views/payables', 'target_endpoint' => '/api/tenant/views/payables'],
+                    ['key' => 'reports', 'id' => 'reports', 'label' => 'Reports & Analytics', 'title' => 'Reports & Analytics', 'icon' => 'insights', 'component' => 'reports', 'permission' => 'reports', 'route' => '/api/tenant/views/reports', 'target_endpoint' => '/api/tenant/views/reports'],
                 ],
             ],
             self::administrationSection(),

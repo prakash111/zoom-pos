@@ -141,6 +141,33 @@ class PosSyncApiController extends Controller
             ], 403);
         }
 
+        // Email-verification gate. When the SuperAdmin has SMTP configured, OTP
+        // verification is mandatory: an account that registered but never
+        // entered its 6-digit code must not be handed a working POS token.
+        // Return a structured JSON payload (HTTP 200, success:true — same shape
+        // the register endpoint uses) that the mobile client routes to its
+        // Verify screen on. This is deliberately NOT a 302 redirect: the Dio
+        // client throws on any 3xx status.
+        $branding = PlatformBranding::current();
+        $otpRequired = method_exists($branding, 'isSmtpConfigured') && $branding->isSmtpConfigured();
+
+        if ($otpRequired && is_null($user->email_verified_at)) {
+            return response()->json([
+                'success' => true,
+                'status' => 'requires_verification',
+                'requires_otp' => true,
+                'action' => 'navigate',
+                'route' => '/api/tenant/views/verify-otp',
+                'email' => $user->email,
+                'expires_in' => 600,
+                'message' => 'Please verify your email address to continue. Enter the 6-digit code sent to your email, or tap Resend Code.',
+                'arguments' => [
+                    'email' => $user->email,
+                    'message' => 'Please verify your email address to continue.',
+                ],
+            ], 200);
+        }
+
         // Detect client terminal / device platform metadata
         $deviceName = $request->input('device_name')
             ?? $request->header('X-Device-Name')

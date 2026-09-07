@@ -66,6 +66,13 @@ class SchemaValidator
             $errors[] = "{$path}.name: is required for input components";
         }
 
+        if (in_array($type, ['file_upload', 'file_picker'], true)) {
+            $uploadEndpoint = trim((string) ($component['upload_endpoint'] ?? ''));
+            if ($uploadEndpoint === '' || ! str_starts_with($uploadEndpoint, '/api/')) {
+                $errors[] = "{$path}.upload_endpoint: must be a same-origin /api/ path";
+            }
+        }
+
         if (in_array($type, SchemaResponse::ACTION_COMPONENT_TYPES, true)) {
             $this->validateAction($component['action'] ?? null, "{$path}.action", $errors);
         }
@@ -148,8 +155,15 @@ class SchemaValidator
 
         if (in_array($type, ['navigate', 'form_submit', 'api_post'], true)) {
             $endpoint = trim((string) ($action['endpoint'] ?? $action['target_endpoint'] ?? ''));
-            if ($endpoint !== '' && ! str_starts_with($endpoint, '/api/')) {
-                $errors[] = "{$path}.endpoint: must be a same-origin /api/ path";
+            // A `navigate` action may also target a native client screen by its
+            // component-registry key (e.g. 'pos', 'restaurant_pos') — a bare
+            // lowercase slug resolved entirely on-device and never fetched.
+            // `form_submit` / `api_post` always hit the network, so they stay
+            // restricted to same-origin /api/ paths.
+            $isNativeRouteKey = $type === 'navigate'
+                && preg_match('/^[a-z][a-z0-9_-]*$/', $endpoint) === 1;
+            if ($endpoint !== '' && ! str_starts_with($endpoint, '/api/') && ! $isNativeRouteKey) {
+                $errors[] = "{$path}.endpoint: must be a same-origin /api/ path or a native route key";
             }
         }
 

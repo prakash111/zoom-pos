@@ -75,9 +75,21 @@ return Application::configure(basePath: dirname(__DIR__))
         // There is no single named "login" route — two separate guards each
         // have their own. Route an unauthenticated hit to the right one by
         // which panel the URL belongs to.
-        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('superadmin*')
-            ? route('superadmin.login')
-            : route('tenant.login'));
+        //
+        // API and JSON clients must NEVER be bounced with a 302 to an HTML
+        // login page: the mobile app's Dio client throws on any 3xx, so an
+        // unauthenticated (or header-less) API call has to come back as a
+        // 401 JSON body instead. Returning null here makes the framework's
+        // Authenticate middleware do exactly that.
+        $middleware->redirectGuestsTo(function (Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return null;
+            }
+
+            return $request->is('superadmin*')
+                ? route('superadmin.login')
+                : route('tenant.login');
+        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
