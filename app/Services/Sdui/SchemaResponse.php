@@ -46,7 +46,7 @@ class SchemaResponse
         'container', 'card', 'scroll_view', 'grid_view', 'accordion_group',
         'accordion', 'column', 'row', 'tabs', 'stepper', 'text', 'image_network',
         'badge', 'icon', 'divider', 'text_input', 'dropdown_select',
-        'creatable_select',
+        'creatable_select', 'search_bar',
         'checkbox', 'toggle_switch', 'date_time_picker', 'color_picker', 'file_upload',
         'file_picker',
         'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
@@ -55,7 +55,7 @@ class SchemaResponse
     ];
 
     public const INPUT_TYPES = [
-        'text_input', 'dropdown_select', 'creatable_select', 'checkbox', 'toggle_switch',
+        'text_input', 'dropdown_select', 'creatable_select', 'search_bar', 'checkbox', 'toggle_switch',
         'date_time_picker', 'color_picker', 'file_upload', 'file_picker', 'step_counter',
         'cash_tendered_field', 'customer_selector',
     ];
@@ -211,6 +211,29 @@ class SchemaResponse
             'name' => $name,
             'label' => $label,
             'initial_value' => (string) ($initialValue ?? ''),
+        ], $props);
+    }
+
+    /**
+     * Full-width pill search field styled like the core POS search bar. The
+     * value binds to $name; pressing the keyboard search key (or the inline
+     * clear button) fires a `filter_view` against $filterEndpoint scoped to
+     * $name, re-opening the current view with the query as a param.
+     *
+     * @param  array<string, mixed>  $props  e.g. ['initial_value' => $q, 'debounce_ms' => 300]
+     */
+    public static function searchBar(string $name, string $placeholder, string $filterEndpoint, array $props = []): array
+    {
+        return array_merge([
+            'type' => 'search_bar',
+            'name' => $name,
+            'placeholder' => $placeholder,
+            'prefix_icon' => 'search',
+            'clearable' => true,
+            'autofocus' => false,
+            'debounce_ms' => 300,
+            'initial_value' => '',
+            'action' => self::filterViewAction($filterEndpoint, [$name]),
         ], $props);
     }
 
@@ -1204,10 +1227,12 @@ class SchemaResponse
         }
 
         $activeTabChildren = [
-            self::row([
-                self::textInput('search', 'Search medicine, batch # or rack', $search, ['expanded' => true, 'submit_action' => self::filterViewAction('/api/tenant/views/pharmacy-batches?tab=active', ['search'])]),
-                self::buttonPrimary('Search', self::filterViewAction('/api/tenant/views/pharmacy-batches?tab=active', ['search']), 'search', ['full_width' => false, 'dense' => true]),
-            ], ['spacing' => 8, 'cross_axis_alignment' => 'center']),
+            self::searchBar(
+                'search',
+                'Search medicine name, batch #, or rack...',
+                '/api/tenant/views/pharmacy-batches?tab=active',
+                ['initial_value' => $search],
+            ),
         ];
         if ($search !== '') {
             $activeTabChildren[] = self::row([

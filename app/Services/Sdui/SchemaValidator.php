@@ -70,6 +70,10 @@ class SchemaValidator
             $this->validateAction($component['submit_action'], "{$path}.submit_action", $errors);
         }
 
+        if ($type === 'search_bar' && isset($component['action'])) {
+            $this->validateAction($component['action'], "{$path}.action", $errors);
+        }
+
         if (in_array($type, ['file_upload', 'file_picker'], true)) {
             $uploadEndpoint = trim((string) ($component['upload_endpoint'] ?? ''));
             if ($uploadEndpoint === '' || ! str_starts_with($uploadEndpoint, '/api/')) {

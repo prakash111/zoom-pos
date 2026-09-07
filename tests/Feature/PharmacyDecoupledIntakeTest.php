@@ -553,12 +553,18 @@ class PharmacyDecoupledIntakeTest extends TestCase
         $this->assertStringNotContainsString('Metformin 500mg', $missActive);
         $this->assertStringContainsString('No batches match your search', $missActive);
 
-        $searchRow = $this->firstComponentOfType($tabs['tabs'][0], 'text_input');
-        $this->assertSame('search', $searchRow['name']);
+        // The Active Batches tab leads with a single full-width search_bar,
+        // not a narrow text_input + detached button.
+        $searchBar = $this->firstComponentOfType($tabs['tabs'][0], 'search_bar');
+        $this->assertNotNull($searchBar, 'Active Batches must use a search_bar.');
+        $this->assertSame('search', $searchBar['name']);
+        $this->assertSame('Search medicine name, batch #, or rack...', $searchBar['placeholder']);
+        $this->assertTrue($searchBar['clearable']);
         $this->assertSame(
             ['type' => 'filter_view', 'endpoint' => '/api/tenant/views/pharmacy-batches?tab=active', 'fields' => ['search']],
-            $searchRow['submit_action'],
+            $searchBar['action'],
         );
+        $this->assertNull($this->firstComponentOfType($tabs['tabs'][0], 'text_input'));
     }
 
     public function test_register_batch_dropdown_emits_integer_ids_and_store_accepts_string_ints(): void
