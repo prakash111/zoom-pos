@@ -82,7 +82,21 @@ request instead of after the next deploy.
 | **Uninstall + "drop data"** | deleted | deleted | `migrate:rollback --path` | hidden |
 
 Uninstall also drops the key from `allowed_registration_modes` so it can't
-linger as a selectable store type.
+linger as a selectable store type, and — on **drop data** — sweeps the
+`migrations` table of this module's exact migration filenames (scoped, not
+`LIKE '%name%'`) so a later re-install re-runs its migrations instead of
+skipping them or hitting *table already exists*.
+
+### Not applicable here (this is not nwidart/laravel-modules)
+
+The engine is custom. There is **no** `module:migrate-rollback` command, **no**
+`modules_statuses.json`, and **no** Composer namespace mapping — so
+`composer dump-autoload` is never needed (see the `spl_autoload_register`
+note above). The built-in verticals (`retail`, `restaurant`, `pharmacy`,
+`service_booking`, `repair_technician`) are compiled into
+`ModuleRegistry::allModules()` and are **not** removable — they always show
+in the SuperAdmin "Module Governance" card; the checkboxes there control
+whether each is offered at tenant registration, nothing more.
 
 There is **no composer step** — module classes load through a runtime
 `spl_autoload_register` in `App\Providers\ModuleServiceProvider`

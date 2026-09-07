@@ -275,6 +275,38 @@ class PackagedVerticalModulesTest extends TestCase
         $this->assertContains('retail', $modes);
     }
 
+    public function test_a_purged_module_re_installs_cleanly_without_table_already_exists(): void
+    {
+        $service = app(ModulePackageService::class);
+        Company::create([
+            'name' => 'Cycle Co', 'slug' => 'cycle-co', 'status' => 'active',
+            'pos_mode' => 'retail', 'currency' => 'USD', 'currency_symbol' => '$',
+        ]);
+
+        // Cycle 1 — install, activate, uninstall + drop data.
+        $m1 = $service->install($this->zipPackage('pharmacy'), null);
+        $service->activate($m1, null);
+        $this->assertTrue(Schema::hasTable('pharmacy_mod_drug_batches'));
+        $service->uninstall($m1->fresh(), true, null);
+        $this->assertFalse(Schema::hasTable('pharmacy_mod_drug_batches'));
+
+        // The migration tracking row must be gone, or cycle 2's activate
+        // would silently skip the migration and leave no tables.
+        $this->assertDatabaseMissing('migrations', [
+            'migration' => '2026_09_08_000001_create_pharmacy_module_tables',
+        ]);
+
+        // Cycle 2 — a fresh install + activate must succeed and rebuild the
+        // tables (no "table already exists", no skipped migration).
+        $m2 = $service->install($this->zipPackage('pharmacy'), null);
+        $this->assertFalse($m2->is_active);
+        $service->activate($m2, null); // would throw RuntimeException on failure
+        $this->assertTrue(Schema::hasTable('pharmacy_mod_drug_batches'));
+        $this->assertTrue(Schema::hasTable('pharmacy_mod_prescriptions'));
+
+        $service->uninstall($m2->fresh(), true, null);
+    }
+
     public function test_reserved_pharmacy_key_is_allowed_only_because_it_inherits_universal_pos(): void
     {
         // Sanity: the built-in "pharmacy" key is reserved; our manifest gets

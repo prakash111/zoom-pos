@@ -7,7 +7,9 @@ use App\Models\PlatformSystem;
 use App\Models\SduiModule;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
@@ -145,6 +147,8 @@ class ModulePackageService
         $this->assertPackageModule($module);
 
         $migrationsPath = 'modules/'.$module->package_path.'/Database/Migrations';
+        $migrationNames = $this->migrationNamesIn(base_path($migrationsPath));
+
         if ($dropData && $module->installed_at !== null && File::isDirectory(base_path($migrationsPath))) {
             try {
                 Artisan::call('migrate:rollback', [
@@ -155,6 +159,12 @@ class ModulePackageService
                 // Best-effort: still proceed with removing files/row even if rollback fails
                 // (e.g. module was never activated so nothing was ever migrated).
             }
+
+            // migrate:rollback already deletes the tracking rows on a clean
+            // down(); this sweeps up anything a partial/failed down() left
+            // behind, scoped to this module's exact migration filenames so a
+            // re-install never hits "table already exists" / silently skips.
+            $this->purgeMigrationRecords($migrationNames);
         }
 
         $moduleDir = base_path('modules/'.$module->package_path);
@@ -201,6 +211,44 @@ class ModulePackageService
             \Illuminate\Support\Facades\Log::warning('ModulePackageService: optimize:clear failed after a module lifecycle change.', [
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Migration class-names (filename without .php) in a module's migrations
+     * directory — read while the files still exist, used afterwards to sweep
+     * the `migrations` table.
+     *
+     * @return list<string>
+     */
+    private function migrationNamesIn(string $absPath): array
+    {
+        if (! File::isDirectory($absPath)) {
+            return [];
+        }
+
+        return collect(File::files($absPath))
+            ->filter(fn ($f) => strtolower($f->getExtension()) === 'php')
+            ->map(fn ($f) => $f->getFilenameWithoutExtension())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<string>  $migrationNames
+     */
+    private function purgeMigrationRecords(array $migrationNames): void
+    {
+        if ($migrationNames === []) {
+            return;
+        }
+
+        try {
+            if (Schema::hasTable('migrations')) {
+                DB::table('migrations')->whereIn('migration', $migrationNames)->delete();
+            }
+        } catch (Throwable $e) {
+            // Non-fatal.
         }
     }
 
