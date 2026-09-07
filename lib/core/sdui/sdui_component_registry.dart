@@ -22,6 +22,7 @@ import '../../features/sales/screens/sales_screen.dart';
 import '../../features/sales_targets/screens/sales_targets_screen.dart';
 import '../../features/service_orders/screens/service_orders_screen.dart';
 import '../../features/settings/screens/change_password_screen.dart';
+import '../../features/settings/screens/global_printer_setup_screen.dart';
 import 'components/navigation_tree_builder.dart';
 import '../../features/settings/screens/tenant_settings_screen.dart';
 import '../../features/staff/screens/staff_screen.dart';
@@ -161,6 +162,12 @@ class SduiComponentRegistry {
     'languages': (_) => const LanguagesScreen(),
     'staff': (_) => const StaffScreen(),
     'devices': (_) => const DevicesScreen(),
+    // Global hardware pairing — same native screen for every operating mode,
+    // surfaced from the drawer ("Printer & Hardware Setup") and Receipt Settings.
+    'printer_setup': (_) => const GlobalPrinterSetupScreen(),
+    'printer-setup': (_) => const GlobalPrinterSetupScreen(),
+    'hardware_printer': (_) => const GlobalPrinterSetupScreen(),
+    'hardware_settings': (_) => const GlobalPrinterSetupScreen(),
     'dynamic_page': (_) => const DynamicSchemaPage(),
   };
 
@@ -180,6 +187,11 @@ class SduiComponentRegistry {
       case 'barcode_scanner':
       case 'scanner':
         return const BarcodeScannerScreen();
+      case 'printer_setup':
+      case 'printer-setup':
+      case 'hardware_settings':
+      case 'hardware_printer':
+        return const GlobalPrinterSetupScreen();
     }
 
     // Pre-registered native screens when invoked by route key (not an explicit API endpoint)

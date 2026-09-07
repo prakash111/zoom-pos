@@ -4,6 +4,7 @@ import 'package:zoom_pos_mobile/core/sdui/dynamic_schema_context.dart';
 import 'package:zoom_pos_mobile/core/sdui/dynamic_schema_parser.dart';
 import 'package:zoom_pos_mobile/core/sdui/screens/dynamic_schema_page.dart';
 import 'package:zoom_pos_mobile/core/sdui/sdui_component_registry.dart';
+import 'package:zoom_pos_mobile/features/settings/screens/global_printer_setup_screen.dart';
 
 void main() {
   group('Declarative SDUI Schema Parser - Layouts', () {
@@ -1065,6 +1066,35 @@ void main() {
         SduiComponentRegistry.resolveRoute('/api/tenant/views/pharmacy-pos'),
         isA<DynamicSchemaPage>(),
       );
+    });
+
+    test('the "printer_setup" route resolves to the native hardware screen',
+        () {
+      // Drawer row ("Printer & Hardware Setup") and the Receipt Settings
+      // button both navigate to the bare key — it must open the on-device
+      // pairing screen, never a schema page.
+      expect(
+        SduiComponentRegistry.resolveRoute('printer_setup'),
+        isA<GlobalPrinterSetupScreen>(),
+      );
+      expect(
+        SduiComponentRegistry.resolveRoute('hardware_settings'),
+        isA<GlobalPrinterSetupScreen>(),
+      );
+    });
+
+    testWidgets(
+        'drawer resolve() prefers the native printer screen over its fallback endpoint',
+        (tester) async {
+      // The drawer passes component="printer_setup" AND a target_endpoint;
+      // the native registration must win.
+      final builder = SduiComponentRegistry.instance.resolve(
+        'printer_setup',
+        targetEndpoint: '/api/tenant/views/printer-setup',
+      );
+      await tester.pumpWidget(MaterialApp(home: Builder(builder: builder)));
+      expect(find.byType(GlobalPrinterSetupScreen), findsOneWidget);
+      expect(find.byType(DynamicSchemaPage), findsNothing);
     });
 
     testWidgets(

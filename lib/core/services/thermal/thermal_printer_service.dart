@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +22,25 @@ class ReceiptLine {
 /// needs a desktop/web fallback of its own.
 class ThermalPrinterService {
   static const _savedDeviceKey = 'zoom_pos.thermal_printer_mac';
+
+  // Written by GlobalPrinterSetupScreen. Kept as plain strings so the value is
+  // portable across the (few) places that read it without importing esc_pos.
+  static const paperSizePrefKey = 'printer_paper_size';
+  static const connectionTypePrefKey = 'printer_type';
+  static const networkIpPrefKey = 'printer_ip';
+  static const networkPortPrefKey = 'printer_port';
+
+  /// Receipt paper width the operator picked in Printer & Hardware Setup.
+  /// Defaults to 80mm (the previous hard-coded value) when unset.
+  Future<PaperSize> savedPaperSize() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = (prefs.getString(paperSizePrefKey) ?? '80mm').toLowerCase();
+      return raw.contains('58') ? PaperSize.mm58 : PaperSize.mm80;
+    } catch (_) {
+      return PaperSize.mm80;
+    }
+  }
 
   Future<bool> get bluetoothEnabled async {
     try {
@@ -122,7 +143,7 @@ class ThermalPrinterService {
     }
 
     final profile = await CapabilityProfile.load();
-    final generator = Generator(PaperSize.mm80, profile);
+    final generator = Generator(await savedPaperSize(), profile);
     final bytes = <int>[];
 
     bytes.addAll(generator.text(
@@ -205,7 +226,7 @@ class ThermalPrinterService {
     }
 
     final profile = await CapabilityProfile.load();
-    final generator = Generator(PaperSize.mm80, profile);
+    final generator = Generator(await savedPaperSize(), profile);
     final bytes = <int>[];
 
     if (heading != null && heading.isNotEmpty) {
@@ -234,6 +255,73 @@ class ThermalPrinterService {
           .timeout(const Duration(seconds: 6), onTimeout: () => false);
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Builds a short, human-readable "printer works" ticket at the configured
+  /// paper width. Shared by every test-print button.
+  Future<List<int>> buildTestTicketBytes({String? subtitle}) async {
+    final profile = await CapabilityProfile.load();
+    final size = await savedPaperSize();
+    final generator = Generator(size, profile);
+    final bytes = <int>[
+      ...generator.text('ZoomNearby POS',
+          styles: const PosStyles(
+              align: PosAlign.center,
+              bold: true,
+              height: PosTextSize.size2,
+              width: PosTextSize.size2)),
+      ...generator.text('Printer Test',
+          styles: const PosStyles(align: PosAlign.center, bold: true)),
+      ...generator.hr(),
+      ...generator.text(
+          'Paper: ${size == PaperSize.mm58 ? '58mm (2 inch)' : '80mm (3 inch)'}'),
+      if (subtitle != null && subtitle.isNotEmpty) ...generator.text(subtitle),
+      ...generator.text('Time : ${DateTime.now().toIso8601String()}'),
+      ...generator.text('Alignment check |....|....|....|....|'),
+      ...generator.feed(2),
+      ...generator.text('If you can read this, printing works.',
+          styles: const PosStyles(align: PosAlign.center)),
+      ...generator.feed(2),
+      ...generator.cut(),
+    ];
+    return bytes;
+  }
+
+  /// Test print over the currently saved / connected Bluetooth printer.
+  Future<bool> testBluetoothPrint() async {
+    final connected = await isConnected;
+    if (!connected) {
+      final saved = await savedDeviceAddress();
+      if (saved == null) return false;
+      if (!await connect(saved)) return false;
+    }
+    try {
+      final bytes = await buildTestTicketBytes(subtitle: 'Link : Bluetooth');
+      return await PrintBluetoothThermal.writeBytes(bytes)
+          .timeout(const Duration(seconds: 6), onTimeout: () => false);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Opens a raw TCP socket to a network / WiFi ESC/POS printer (JetDirect,
+  /// port 9100 by default), writes a test ticket and closes. No plugin needed.
+  Future<bool> testNetworkPrint(String host, int port) async {
+    if (host.trim().isEmpty) return false;
+    Socket? socket;
+    try {
+      socket = await Socket.connect(host.trim(), port,
+          timeout: const Duration(seconds: 5));
+      final bytes = await buildTestTicketBytes(subtitle: 'Link : $host:$port');
+      socket.add(bytes);
+      await socket.flush();
+      await socket.close();
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      socket?.destroy();
     }
   }
 
