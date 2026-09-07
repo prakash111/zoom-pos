@@ -478,4 +478,76 @@ class PharmacyDecoupledIntakeTest extends TestCase
         $this->assertStringContainsString('Sarah Connor', $queueJson);
         $this->assertStringContainsString('Dr. Gregory House', $queueJson);
     }
+
+    public function test_batches_view_is_a_single_tabbed_screen_with_deep_links(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Metformin 500mg',
+            'sale_price' => 4.00,
+            'current_stock' => 100,
+            'active' => true,
+        ]);
+        $batch = PharmacyBatch::create([
+            'company_id' => $this->company->id,
+            'product_id' => $product->id,
+            'batch_number' => 'MET-2026-01',
+            'manufacturing_date' => now()->subMonths(2),
+            'expiry_date' => now()->addMonths(10),
+            'cost_price' => 2.00,
+            'selling_price' => 4.00,
+            'stock_qty' => 60,
+            'rack_location' => 'A3',
+            'is_active' => true,
+        ]);
+
+        $validator = new SchemaValidator();
+
+        // --- default load: Active Batches tab ---
+        $schema = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/tenant/views/pharmacy-batches')
+            ->assertOk()->assertJsonPath('schema.title', 'Batch & Expiry Manager')
+            ->json('schema');
+        $this->assertEmpty($validator->validate($schema));
+
+        $tabs = $this->firstComponentOfType($schema, 'tabs');
+        $this->assertNotNull($tabs, 'Batches view must be a tabbed single-screen.');
+        $this->assertSame(0, $tabs['initial_index']);
+        $this->assertTrue($tabs['is_scrollable']);
+        $this->assertSame(
+            ['active_batches', 'register_batch', 'stock_adjust'],
+            array_column($tabs['tabs'], 'id'),
+        );
+        // Only Tab 1 carries the batch card; the register/adjust forms are on
+        // their own tabs, not stacked above the list.
+        $active = $tabs['tabs'][0]['components'];
+        $this->assertStringContainsString('Metformin 500mg', json_encode($active));
+        $this->assertStringNotContainsString('Save Batch to Inventory', json_encode($active));
+
+        // --- ?tab=register opens Tab 2 ---
+        $reg = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/tenant/views/pharmacy-batches?tab=register')->assertOk()->json('schema');
+        $this->assertSame(1, $this->firstComponentOfType($reg, 'tabs')['initial_index']);
+
+        // --- ?tab=adjust&batch_id opens Tab 3 with the batch pre-filled ---
+        $adj = $this->withHeaders($this->authHeaders())
+            ->getJson("/api/tenant/views/pharmacy-batches?tab=adjust&batch_id={$batch->id}")
+            ->assertOk()->json('schema');
+        $adjTabs = $this->firstComponentOfType($adj, 'tabs');
+        $this->assertSame(2, $adjTabs['initial_index']);
+        $adjJson = json_encode($adjTabs['tabs'][2]['components']);
+        $this->assertStringContainsString('"name":"batch_id","label":"Batch ID \/ Medicine Search","initial_value":"' . $batch->id . '"', $adjJson);
+        $this->assertStringContainsString('Current Qty: 60', $adjJson);
+
+        // --- ?q= filters the Active Batches list ---
+        $hit = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/tenant/views/pharmacy-batches?q=MET-2026')->assertOk()->json('schema');
+        $this->assertStringContainsString('Metformin 500mg', json_encode($this->firstComponentOfType($hit, 'tabs')['tabs'][0]));
+
+        $miss = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/tenant/views/pharmacy-batches?q=Ibuprofen')->assertOk()->json('schema');
+        $missActive = json_encode($this->firstComponentOfType($miss, 'tabs')['tabs'][0]);
+        $this->assertStringNotContainsString('Metformin 500mg', $missActive);
+        $this->assertStringContainsString('No batches match your search', $missActive);
+    }
 }

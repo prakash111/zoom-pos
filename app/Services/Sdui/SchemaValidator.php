@@ -148,12 +148,12 @@ class SchemaValidator
             return;
         }
 
-        if (in_array($type, ['navigate', 'form_submit', 'api_post'], true)
+        if (in_array($type, ['navigate', 'form_submit', 'api_post', 'filter_view'], true)
             && trim((string) ($action['endpoint'] ?? $action['target_endpoint'] ?? '')) === '') {
             $errors[] = "{$path}.endpoint: is required for [{$type}]";
         }
 
-        if (in_array($type, ['navigate', 'form_submit', 'api_post'], true)) {
+        if (in_array($type, ['navigate', 'form_submit', 'api_post', 'filter_view'], true)) {
             $endpoint = trim((string) ($action['endpoint'] ?? $action['target_endpoint'] ?? ''));
             // A `navigate` action may also target a native client screen by its
             // component-registry key (e.g. 'pos', 'restaurant_pos') — a bare

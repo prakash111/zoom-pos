@@ -939,13 +939,20 @@ class PharmacyAndRepairPosTest extends TestCase
             'medicines' => [['name' => 'Amoxicillin 500mg', 'quantity' => 15]],
         ]);
 
-        // 2. Test pharmacy-batches view
+        // 2. Test pharmacy-batches view — unified tabbed single-view
         $batchViewRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/pharmacy-batches');
         $batchViewRes->assertOk();
         $batchViewJson = json_encode($batchViewRes->json());
-        $this->assertStringContainsString('Expiring in 30 Days', $batchViewJson);
+        $this->assertStringContainsString('"type":"tabs"', $batchViewJson);
+        $this->assertStringContainsString('Total Batches:', $batchViewJson); // compact summary banner
+        $this->assertStringContainsString('"scrollable":true', $batchViewJson);
+        $this->assertStringContainsString('Active Batches', $batchViewJson);
+        $this->assertStringContainsString('Register Batch', $batchViewJson);
+        $this->assertStringContainsString('Stock Adjust & Returns', $batchViewJson);
+        $this->assertStringContainsString('Save Batch to Inventory', $batchViewJson);
         $this->assertStringContainsString('Print Barcode', $batchViewJson);
-        $this->assertStringContainsString('Audit Stock', $batchViewJson);
+        // The two big forms are no longer stacked above the list.
+        $this->assertStringNotContainsString('accordion', $batchViewJson);
 
         // 3. Test pharmacy-prescriptions view with status filter & decoupled standalone intake action
         $rxViewRes = $this->withHeaders($this->authHeaders())->getJson('/api/tenant/views/pharmacy-prescriptions?status=pending');

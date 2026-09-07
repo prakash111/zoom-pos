@@ -66,7 +66,7 @@ class SchemaResponse
     public const ACTION_TYPES = [
         'navigate', 'form_submit', 'api_post', 'open_modal', 'navigate_back', 'pop',
         'add_to_cart', 'open_remote_sheet', 'open_url', 'show_post_sale_sheet',
-        'load_rx_to_pos',
+        'load_rx_to_pos', 'filter_view',
     ];
 
     // =========================================================================
@@ -141,12 +141,16 @@ class SchemaResponse
         ], $props);
     }
 
-    public static function tabs(array $tabs): array
+    /**
+     * @param  list<array<string, mixed>>  $tabs   each: ['id' => .., 'label'|'title' => .., 'icon' => .., 'components' => [..]]
+     * @param  array<string, mixed>  $props  e.g. ['initial_index' => 1, 'is_scrollable' => true]
+     */
+    public static function tabs(array $tabs, array $props = []): array
     {
-        return [
+        return array_merge([
             'type' => 'tabs',
-            'tabs' => $tabs,
-        ];
+            'tabs' => array_values($tabs),
+        ], $props);
     }
 
     // =========================================================================
@@ -746,6 +750,24 @@ class SchemaResponse
         ];
     }
 
+    /**
+     * Re-opens the current SDUI view with the named form fields appended as
+     * query params — a lightweight in-place "search / filter this list"
+     * primitive. Only $fields are forwarded (never the whole shared form
+     * scope), and the client replaces the current page rather than stacking a
+     * new one.
+     *
+     * @param  list<string>  $fields
+     */
+    public static function filterViewAction(string $endpoint, array $fields = []): array
+    {
+        return [
+            'type' => 'filter_view',
+            'endpoint' => $endpoint,
+            'fields' => array_values($fields),
+        ];
+    }
+
     // =========================================================================
     // Screen Envelope
     // =========================================================================
@@ -1060,196 +1082,216 @@ class SchemaResponse
         return PosScreenBuilder::pharmacyPosScreen($company);
     }
 
+    /**
+     * Drug Batches & Expiry Tracker — one screen, three tabs (Active Batches /
+     * Register Batch / Stock Adjust & Returns) sitting under a compact summary
+     * banner, instead of two large forms stacked above the list.
+     *
+     * Deep links: `?tab=register|adjust|active` selects the opening tab and
+     * `?tab=adjust&batch_id=<id>` pre-fills the adjustment form. `?q=<term>`
+     * filters the Active Batches list.
+     */
     public static function pharmacyBatchesView(Company $company): array
     {
-        $batches = PharmacyBatch::withoutGlobalScope('company')
-            ->where('company_id', $company->id)
-            ->with('product')
-            ->orderBy('expiry_date', 'asc')
-            ->limit(25)
-            ->get();
-
         $today = now()->toDateString();
         $in30Days = now()->addDays(30)->toDateString();
-        $in90Days = now()->addDays(90)->toDateString();
 
-        $totalBatches = PharmacyBatch::withoutGlobalScope('company')->where('company_id', $company->id)->count();
-        $expiredCount = PharmacyBatch::withoutGlobalScope('company')->where('company_id', $company->id)->where('expiry_date', '<', $today)->count();
-        $critical30Count = PharmacyBatch::withoutGlobalScope('company')->where('company_id', $company->id)->whereBetween('expiry_date', [$today, $in30Days])->count();
-        $nearExpiryCount = PharmacyBatch::withoutGlobalScope('company')->where('company_id', $company->id)->whereBetween('expiry_date', [$today, $in90Days])->count();
-        $safeCount = PharmacyBatch::withoutGlobalScope('company')->where('company_id', $company->id)->where('expiry_date', '>', $in90Days)->count();
+        $base = static fn () => PharmacyBatch::withoutGlobalScope('company')->where('company_id', $company->id);
+
+        $totalBatches = $base()->count();
+        $expiredCount = $base()->where('expiry_date', '<', $today)->count();
+        $critical30Count = $base()->whereBetween('expiry_date', [$today, $in30Days])->count();
+
+        $tabParam = strtolower(trim((string) request('tab', 'active')));
+        $initialIndex = match ($tabParam) {
+            'register', 'new', 'create', 'register-batch' => 1,
+            'adjust', 'returns', 'audit', 'stock-adjust', 'stock_adjust' => 2,
+            default => 0,
+        };
+        $prefillBatchId = trim((string) request('batch_id', ''));
+        $search = trim((string) request('q', ''));
+
+        // ---- Tab 1: Active Batches (FEFO list + search) ----
+        $batchQuery = $base()->with('product')->orderBy('expiry_date', 'asc');
+        if ($search !== '') {
+            $batchQuery->where(function ($w) use ($search) {
+                $w->where('batch_number', 'like', "%{$search}%")
+                    ->orWhere('rack_location', 'like', "%{$search}%")
+                    ->orWhereHas('product', function ($p) use ($search) {
+                        $p->where('name', 'like', "%{$search}%")
+                            ->orWhere('generic_name', 'like', "%{$search}%");
+                    });
+            });
+        }
+        $batches = $batchQuery->limit(50)->get();
 
         $batchCards = [];
         foreach ($batches as $b) {
             $days = $b->days_until_expiry;
-            $statusLabel = $days < 0 ? "EXPIRED ({$days}d)" : ($days <= 90 ? "EXPIRING SOON ({$days}d left)" : "SAFE ({$days}d)");
+            $statusLabel = $days < 0 ? 'EXPIRED' : ($days <= 90 ? "{$days}d LEFT" : "SAFE · {$days}d");
 
             $batchCards[] = self::card([
                 self::row([
-                    self::icon('medication', ['color' => $b->expiry_color, 'size' => 24]),
+                    self::icon('medication', ['color' => $b->expiry_color, 'size' => 22], ['flexible' => false]),
                     self::column([
-                        self::text("Batch #{$b->batch_number}", 'title_medium', ['bold' => true]),
-                        self::text(($b->product?->name ?? 'Unknown Medicine').' ('.($b->product?->generic_name ?: 'Standard').')', 'body_small', ['color' => '#64748b']),
-                    ]),
+                        self::text($b->product?->name ?? 'Unknown Medicine', 'title_small', ['bold' => true]),
+                        self::text("Batch #{$b->batch_number} · Rack ".($b->rack_location ?: '—'), 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
                     self::badge($statusLabel, $b->expiry_color, 'subtle'),
-                ]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
                 self::divider(),
-                self::row([
-                    self::text("Stock: {$b->stock_qty} units", 'label_large', ['bold' => true]),
-                    self::text('Cost: '.number_format((float) $b->cost_price, 2), 'body_small'),
-                    self::text('MRP: '.number_format((float) $b->selling_price, 2), 'body_small', ['color' => '#059669', 'bold' => true]),
-                    self::text("Exp: {$b->expiry_date?->format('Y-m-d')} · Rack: ".($b->rack_location ?: 'Unassigned'), 'body_small', ['color' => '#64748b']),
+                self::wrap([
+                    self::badge("Stock: {$b->stock_qty}", '#0284c7', 'subtle'),
+                    self::badge('Exp: '.($b->expiry_date?->format('Y-m-d') ?? '—'), '#64748b', 'subtle'),
+                    self::badge('MRP: '.number_format((float) $b->selling_price, 2), '#059669', 'subtle'),
                 ]),
-                self::divider(),
                 self::row([
-                    self::buttonOutlined('Print Barcode', self::openUrlAction("/api/tenant/pharmacy/batches/{$b->id}/barcode"), 'qr_code_2', ['full_width' => false]),
-                    self::buttonOutlined('Audit Stock', self::openModalAction("Audit Batch #{$b->batch_number}", [
-                        self::text('Medicine: '.($b->product?->name ?? 'Item'), 'body_medium', ['bold' => true]),
-                        self::text("Recorded Quantity: {$b->stock_qty} units", 'body_small', ['color' => '#64748b']),
+                    self::buttonOutlined('Adjust', self::navigateAction("/api/tenant/views/pharmacy-batches?tab=adjust&batch_id={$b->id}", title: 'Stock Adjust & Returns'), 'tune', ['full_width' => false, 'dense' => true]),
+                    self::buttonOutlined('Details', self::openModalAction("Batch #{$b->batch_number}", [
+                        self::text($b->product?->name ?? 'Medicine', 'title_small', ['bold' => true]),
                         self::divider(),
-                        self::textInput('batch_id', 'Batch ID Number', (string) $b->id),
-                        self::textInput('new_stock_qty', 'New Audited Quantity', (string) $b->stock_qty),
-                        self::textInput('reason', 'Adjustment Reason', 'Physical inventory verification'),
+                        self::text('Batch Number: '.$b->batch_number, 'body_small'),
+                        self::text('Manufactured: '.($b->manufacturing_date?->format('Y-m-d') ?? '—'), 'body_small'),
+                        self::text('Expiry: '.($b->expiry_date?->format('Y-m-d') ?? '—'), 'body_small'),
+                        self::text("Remaining Stock: {$b->stock_qty} units", 'body_small'),
+                        self::text('Rack / Shelf: '.($b->rack_location ?: 'Unassigned'), 'body_small'),
+                        self::text('Cost / Selling: '.number_format((float) $b->cost_price, 2).' / '.number_format((float) $b->selling_price, 2), 'body_small'),
                         self::divider(),
-                        self::buttonPrimary('Save Stock Adjustment', self::formSubmitAction(
-                            '/api/tenant/pharmacy/batches/adjust',
-                            'POST',
-                            'Batch stock adjusted.',
-                            reload: true
-                        ), 'tune'),
-                    ]), 'tune', ['full_width' => false]),
-                    self::buttonDanger('Vendor Return', self::openModalAction("Vendor Return #{$b->batch_number}", [
-                        self::text('Medicine: '.($b->product?->name ?? 'Item'), 'body_medium', ['bold' => true]),
-                        self::text("Batch #{$b->batch_number} · Available: {$b->stock_qty}", 'body_small', ['color' => '#64748b']),
-                        self::divider(),
-                        self::textInput('batch_id', 'Batch ID Number', (string) $b->id),
-                        self::textInput('new_stock_qty', 'Remaining Quantity After Return', '0'),
-                        self::textInput('reason', 'Return Reason (e.g. Expired / Damaged / Distributor Recall)', 'Vendor Return'),
-                        self::divider(),
-                        self::buttonDanger('Confirm Return', self::formSubmitAction(
-                            '/api/tenant/pharmacy/batches/return',
-                            'POST',
-                            'Vendor return recorded.',
-                            reload: true
-                        ), 'keyboard_return'),
-                    ]), 'keyboard_return', ['full_width' => false]),
-                ]),
+                        self::buttonOutlined('Print Barcode', self::openUrlAction("/api/tenant/pharmacy/batches/{$b->id}/barcode"), 'qr_code_2'),
+                    ]), 'history', ['full_width' => false, 'dense' => true]),
+                ], ['spacing' => 8]),
             ]);
         }
 
+        $activeTabChildren = [
+            self::row([
+                self::textInput('q', 'Search medicine, batch # or rack', $search, ['expanded' => true]),
+                self::buttonPrimary('Search', self::filterViewAction('/api/tenant/views/pharmacy-batches?tab=active', ['q']), 'search', ['full_width' => false, 'dense' => true]),
+            ], ['spacing' => 8, 'cross_axis_alignment' => 'center']),
+        ];
+        if ($search !== '') {
+            $activeTabChildren[] = self::row([
+                self::badge('Filter: "'.$search.'"', '#0284c7', 'subtle'),
+                self::buttonOutlined('Clear', self::navigateAction('/api/tenant/views/pharmacy-batches?tab=active', title: 'Active Batches'), 'close', ['full_width' => false, 'dense' => true]),
+            ], ['spacing' => 8]);
+        }
+
+        if (! empty($batchCards)) {
+            $activeTabChildren = array_merge($activeTabChildren, $batchCards);
+        } else {
+            $activeTabChildren[] = self::card([
+                self::icon('inventory_2', ['color' => '#94a3b8', 'size' => 40], ['flexible' => false]),
+                self::text($search !== '' ? 'No batches match your search.' : 'No medicine batches registered yet.', 'body_medium', ['bold' => true, 'color' => '#475569']),
+                self::text($search !== '' ? 'Try a different medicine name, batch number or rack.' : 'Register your first batch to start FEFO expiry tracking.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::buttonPrimary('+ Register First Batch', self::navigateAction('/api/tenant/views/pharmacy-batches?tab=register', title: 'Register Batch'), 'add_box', ['background_color' => '#059669']),
+            ]);
+        }
+
+        // ---- Tab 2: Register Batch (standalone form) ----
         $productOptions = Product::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('active', true)
             ->pluck('name', 'id')
             ->toArray();
-
         if (empty($productOptions)) {
             $productOptions = ['1' => 'General Medicine Item'];
         }
 
+        $registerTabChildren = [
+            self::card([
+                self::text('Register a New Medicine Batch', 'title_medium', ['bold' => true]),
+                self::text('Batch intake fields only — stock adjustments live on the next tab.', 'body_small', ['color' => '#64748b']),
+            ]),
+            self::dropdownSelect('product_id', 'Medicine / Drug', $productOptions),
+            self::textInput('batch_number', 'Batch ID / Lot Number *', ''),
+            self::row([
+                self::dateTimePicker('manufacturing_date', 'Manufacturing Date', null, 'date'),
+                self::dateTimePicker('expiry_date', 'Expiry Date (FEFO) *', null, 'date'),
+            ], ['spacing' => 8]),
+            self::textInput('rack_location', 'Rack / Shelf Location', ''),
+            self::row([
+                self::textInput('cost_price', 'Cost Price ($)', '0.00', ['keyboard_type' => 'number']),
+                self::textInput('selling_price', 'Selling Price ($)', '0.00', ['keyboard_type' => 'number']),
+            ], ['spacing' => 8]),
+            self::row([
+                self::textInput('stock_qty', 'Initial Quantity *', '100', ['keyboard_type' => 'number']),
+                self::textInput('alert_days_before_expiry', 'Alert Days Before Expiry', '90', ['keyboard_type' => 'number']),
+            ], ['spacing' => 8]),
+            self::divider(),
+            self::buttonPrimary('Save Batch to Inventory', self::formSubmitAction(
+                '/api/tenant/pharmacy/batches',
+                'POST',
+                'Batch saved to inventory.',
+                redirectRoute: '/api/tenant/views/pharmacy-batches?tab=active'
+            ), 'add_circle', ['background_color' => '#059669']),
+        ];
+
+        // ---- Tab 3: Stock Adjust & Returns (audit workspace) ----
+        $adjustBatch = $prefillBatchId !== '' ? $base()->with('product')->find($prefillBatchId) : null;
+
+        $adjustTabChildren = [
+            self::card([
+                self::text('Stock Adjustment & Vendor Returns', 'title_medium', ['bold' => true]),
+                self::text('Audit physical stock or record a distributor return against a batch.', 'body_small', ['color' => '#64748b']),
+            ]),
+            self::textInput('batch_id', 'Batch ID / Medicine Search', $prefillBatchId),
+        ];
+        if ($adjustBatch) {
+            $adjustTabChildren[] = self::wrap([
+                self::badge($adjustBatch->product?->name ?? 'Medicine', '#0284c7', 'subtle'),
+                self::badge("Current Qty: {$adjustBatch->stock_qty}", '#f59e0b', 'subtle'),
+                self::badge("Batch #{$adjustBatch->batch_number}", '#64748b', 'subtle'),
+            ]);
+        }
+        $adjustTabChildren = array_merge($adjustTabChildren, [
+            self::textInput('new_stock_qty', 'New Audited Quantity', $adjustBatch ? (string) $adjustBatch->stock_qty : '0', ['keyboard_type' => 'number']),
+            self::dropdownSelect('reason', 'Adjustment Reason', [
+                ['label' => 'Physical audit / discrepancy', 'value' => 'Discrepancy'],
+                ['label' => 'Damaged stock', 'value' => 'Damaged'],
+                ['label' => 'Vendor return', 'value' => 'Vendor Return'],
+                ['label' => 'Expired disposal', 'value' => 'Expired Disposal'],
+            ], 'Discrepancy'),
+            self::textInput('notes', 'Notes', '', ['max_lines' => 2]),
+            self::divider(),
+            self::row([
+                self::buttonOutlined('Adjust Stock', self::formSubmitAction(
+                    '/api/tenant/pharmacy/batches/adjust',
+                    'POST',
+                    'Batch stock adjusted.',
+                    redirectRoute: '/api/tenant/views/pharmacy-batches?tab=active'
+                ), 'tune'),
+                self::buttonDanger('Vendor Return', self::formSubmitAction(
+                    '/api/tenant/pharmacy/batches/return',
+                    'POST',
+                    'Vendor return recorded.',
+                    redirectRoute: '/api/tenant/views/pharmacy-batches?tab=active'
+                ), 'keyboard_return'),
+            ], ['spacing' => 8]),
+        ]);
+
         return self::screen('Batch & Expiry Manager', [
             self::card([
                 self::row([
-                    self::icon('medication', ['color' => '#059669', 'size' => 28]),
+                    self::icon('inventory_2', ['color' => '#059669', 'size' => 24], ['flexible' => false]),
                     self::column([
-                        self::text('Medicine Batches & Expiry Tracking', 'title_medium', ['bold' => true]),
-                        self::text('Track batch numbers, manufacturing dates, and upcoming expirations under FEFO.', 'body_small', ['color' => '#64748b']),
-                    ]),
-                ]),
-                self::divider(),
-                self::wrap([
-                    self::badge("Total Batches: {$totalBatches}", '#0284c7', 'subtle'),
-                    self::badge("Safe (>90d): {$safeCount}", '#10b981', 'subtle'),
-                    self::badge("Expiring (≤90d): {$nearExpiryCount}", '#f59e0b', 'subtle'),
-                    self::badge("Critical (≤30d): {$critical30Count}", '#ea580c', 'subtle'),
-                    self::badge("Expired: {$expiredCount}", '#ef4444', 'subtle'),
-                ]),
-            ]),
-
-            self::gridView([
-                self::card([
-                    self::row([
-                        self::icon('inventory_2', ['color' => '#0284c7', 'size' => 22]),
-                        self::text((string) $totalBatches, 'headline_small', ['bold' => true, 'color' => '#0284c7']),
-                    ]),
-                    self::text('Total Batches', 'label_large', ['bold' => true]),
-                    self::text('Registered medicine lots', 'body_small', ['color' => '#64748b']),
-                ]),
-                self::card([
-                    self::row([
-                        self::icon('verified', ['color' => '#10b981', 'size' => 22]),
-                        self::text((string) $safeCount, 'headline_small', ['bold' => true, 'color' => '#10b981']),
-                    ]),
-                    self::text('Safe Batches', 'label_large', ['bold' => true]),
-                    self::text('> 90 days validity', 'body_small', ['color' => '#64748b']),
-                ]),
-                self::card([
-                    self::row([
-                        self::icon('notification_important', ['color' => '#ea580c', 'size' => 22]),
-                        self::text((string) $critical30Count, 'headline_small', ['bold' => true, 'color' => '#ea580c']),
-                    ]),
-                    self::text('Expiring in 30 Days', 'label_large', ['bold' => true]),
-                    self::text('Urgent FEFO attention', 'body_small', ['color' => '#64748b']),
-                ]),
-                self::card([
-                    self::row([
-                        self::icon('block', ['color' => '#ef4444', 'size' => 22]),
-                        self::text((string) $expiredCount, 'headline_small', ['bold' => true, 'color' => '#ef4444']),
-                    ]),
-                    self::text('Expired Lots', 'label_large', ['bold' => true]),
-                    self::text('Do not dispense to patients', 'body_small', ['color' => '#64748b']),
-                ]),
-            ], 2),
-
-            self::accordionGroup('Register New Medicine Batch', [
-                self::dropdownSelect('product_id', 'Select Medicine / Drug', $productOptions),
-                self::textInput('batch_number', 'Batch Number (e.g. BTH-2026-908)', ''),
-                self::textInput('rack_location', 'Rack / Shelf Location', ''),
-                self::dateTimePicker('manufacturing_date', 'Manufacturing Date', mode: 'date'),
-                self::dateTimePicker('expiry_date', 'Expiry Date (FEFO Sorted)', mode: 'date'),
-                self::textInput('cost_price', 'Cost Price (Per Unit)', '0.00'),
-                self::textInput('selling_price', 'Selling Price (MRP / Unit)', '0.00'),
-                self::textInput('stock_qty', 'Initial Received Stock Quantity', '100'),
-                self::textInput('alert_days_before_expiry', 'Alert Days Before Expiry', '90'),
-                self::divider(),
-                self::buttonPrimary('Save Batch to Inventory', self::formSubmitAction(
-                    '/api/tenant/pharmacy/batches',
-                    'POST',
-                    'Batch registered and stock updated.',
-                    reload: true
-                ), 'add_circle'),
-            ]),
-
-            self::card([
-                self::text('Batch Stock Adjustment / Vendor Return', 'label_large', ['bold' => true]),
-                self::text('Adjust damaged stock or record returns to pharmaceutical distributors.', 'body_small', ['color' => '#64748b']),
-                self::divider(),
-                self::textInput('batch_id', 'Batch ID Number', ''),
-                self::textInput('new_stock_qty', 'New Audited Quantity', '0'),
-                self::textInput('reason', 'Adjustment Reason (Damaged / Return / Discrepancy)', 'Audit verification'),
+                        self::text('Drug Batches & Expiry Tracker', 'title_medium', ['bold' => true]),
+                        self::text('FEFO stock control for every medicine lot.', 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
                 self::divider(),
                 self::row([
-                    self::buttonOutlined('Adjust Stock', self::formSubmitAction(
-                        '/api/tenant/pharmacy/batches/adjust',
-                        'POST',
-                        'Batch stock adjusted.',
-                        reload: true
-                    ), 'tune'),
-                    self::buttonDanger('Vendor Return', self::formSubmitAction(
-                        '/api/tenant/pharmacy/batches/return',
-                        'POST',
-                        'Vendor return recorded.',
-                        reload: true
-                    ), 'keyboard_return'),
-                ]),
+                    self::badge("Total Batches: {$totalBatches}", '#0284c7', 'subtle'),
+                    self::badge("Expiring ≤30d: {$critical30Count}", '#ea580c', 'subtle'),
+                    self::badge("Expired: {$expiredCount}", '#ef4444', 'subtle'),
+                ], ['scrollable' => true, 'spacing' => 8]),
             ]),
 
-            self::card([
-                self::text('Active Medicine Batches (FEFO Order)', 'title_medium', ['bold' => true]),
-                self::column(! empty($batchCards) ? $batchCards : [
-                    self::text('No active batches registered yet. Use the form above to add a new batch.', 'body_medium', ['color' => '#64748b']),
-                ]),
-            ]),
+            self::tabs([
+                ['id' => 'active_batches', 'label' => 'Active Batches', 'icon' => 'inventory_2', 'components' => $activeTabChildren],
+                ['id' => 'register_batch', 'label' => 'Register Batch', 'icon' => 'add_box', 'components' => $registerTabChildren],
+                ['id' => 'stock_adjust', 'label' => 'Stock Adjust & Returns', 'icon' => 'tune', 'components' => $adjustTabChildren],
+            ], ['initial_index' => $initialIndex, 'is_scrollable' => true]),
         ]);
     }
 
