@@ -66,6 +66,51 @@ expects.
 6. Repeat 2–5 for `repairtechnician.zip`.
 7. **Uninstall → "drop data"** to return to a clean state.
 
+## Lifecycle & cleanup
+
+`ModulePackageService` (Super Admin → Modules) is the single entry point.
+Every transition below also runs `php artisan optimize:clear`, so a
+route/config/view-cached deployment reflects the change on the very next
+request instead of after the next deploy.
+
+| Action | `sdui_modules` row | `modules/<key>/` files | Own tables | Registry / drawer / governance card |
+|---|---|---|---|---|
+| **Install** | created, `is_active = false` | written | — | hidden (inactive) |
+| **Activate** | `is_active = true` | kept | `migrate --path` | shown |
+| **Deactivate** | `is_active = false` | kept | kept | **hidden** |
+| **Uninstall** | deleted | `File::deleteDirectory()` | kept | hidden |
+| **Uninstall + "drop data"** | deleted | deleted | `migrate:rollback --path` | hidden |
+
+Uninstall also drops the key from `allowed_registration_modes` so it can't
+linger as a selectable store type.
+
+There is **no composer step** — module classes load through a runtime
+`spl_autoload_register` in `App\Providers\ModuleServiceProvider`
+(`Modules\<key>\Foo\Bar` → `modules/<key>/Foo/Bar.php`), so nothing needs
+`composer dump-autoload`.
+
+## Gating module-specific UI
+
+Anything that should only render while a module is usable checks the
+registry rather than hard-coding the vertical:
+
+```blade
+@if (\App\Services\Modular\ModuleRegistry::isActive('pharmacy'))
+    {{-- pharmacy-only settings card / menu entry / form --}}
+@endif
+```
+
+- `ModuleRegistry::isActive($key)` — built-in vertical, or a package module
+  whose row exists **and** `is_active`. A deactivated / uninstalled package
+  is `false`.
+- `ModuleRegistry::isInstalled($key)` — present at all (active or not);
+  `false` once fully uninstalled.
+
+`ModuleRegistry::allModules()`, `TenantNavRegistry` (drawer), and the
+SuperAdmin "Module Governance" card already filter on `is_active`, so
+deactivating or uninstalling a package removes it from all of them with no
+per-screen code.
+
 ## Adding another packaged vertical
 
 1. `mkdir module-packages/<key>` with the layout above.

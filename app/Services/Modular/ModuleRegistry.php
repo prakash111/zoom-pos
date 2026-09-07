@@ -203,6 +203,43 @@ class ModuleRegistry
     }
 
     /**
+     * Is this module usable right now? True for a built-in vertical, or for a
+     * package module whose sdui_modules row exists and is active. A
+     * deactivated / uninstalled package returns false.
+     *
+     * Blade / controller gate for module-specific UI:
+     *   @if (\App\Services\Modular\ModuleRegistry::isActive('pharmacy')) ...
+     */
+    public static function isActive(string $key): bool
+    {
+        return self::find(strtolower(trim($key))) !== null;
+    }
+
+    /**
+     * Is a package module present on disk / in the registry at all (active or
+     * not)? False once it has been fully uninstalled. Built-ins are always
+     * "installed".
+     */
+    public static function isInstalled(string $key): bool
+    {
+        $key = strtolower(trim($key));
+
+        if (in_array($key, ['retail', 'restaurant', 'pharmacy', 'service_booking', 'repair_technician'], true)) {
+            return true;
+        }
+
+        if (! Schema::hasTable('sdui_modules')) {
+            return false;
+        }
+
+        try {
+            return SduiModule::query()->where('slug', $key)->exists();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Resolve the active operating mode for the given company.
      */
     public static function resolveActiveMode(Company $company): string

@@ -3,6 +3,7 @@
 namespace App\Services\Modular;
 
 use App\Models\AuditLog;
+use App\Models\PlatformSystem;
 use App\Models\SduiModule;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
@@ -118,6 +119,10 @@ class ModulePackageService
         AuditLog::record('module.activated', null, $adminUserId !== null ? (string) $adminUserId : null, [
             'key' => $module->slug,
         ]);
+
+        // A cached route/config/view table baked before this activation does
+        // not know about the module's routes.php — flush so it resolves now.
+        $this->flushPlatformCaches();
     }
 
     public function deactivate(SduiModule $module, int|string|null $adminUserId): void
@@ -129,6 +134,10 @@ class ModulePackageService
         AuditLog::record('module.deactivated', null, $adminUserId !== null ? (string) $adminUserId : null, [
             'key' => $module->slug,
         ]);
+
+        // Drop the module's routes/nav/settings from every cached layer
+        // immediately, not just from fresh (uncached) requests.
+        $this->flushPlatformCaches();
     }
 
     public function uninstall(SduiModule $module, bool $dropData, int|string|null $adminUserId): void
@@ -156,16 +165,60 @@ class ModulePackageService
         $slug = $module->slug;
         $module->delete();
 
+        // Drop a dangling reference to this module from the platform-wide
+        // "which store types can register" list so it can't reappear as a
+        // selectable option or a governance toggle.
+        $this->purgeFromRegistrationModes($slug);
+
         AuditLog::record('module.uninstalled', null, $adminUserId !== null ? (string) $adminUserId : null, [
             'key' => $slug,
             'drop_data' => $dropData,
         ]);
+
+        // route:clear + config:clear + view:clear + cache:clear + event:clear
+        // + clear-compiled — otherwise cached routes keep pointing at the
+        // controller files we just deleted (500s) and the SuperAdmin panel
+        // keeps rendering the module until the next deploy.
+        $this->flushPlatformCaches();
     }
 
     private function assertPackageModule(SduiModule $module): void
     {
         if ($module->source_type !== 'package' || empty($module->package_path)) {
             throw new InvalidArgumentException('This module is not a package-installed module.');
+        }
+    }
+
+    /**
+     * Best-effort `php artisan optimize:clear`. A wedged cache driver must not
+     * abort an activate / deactivate / uninstall that has otherwise succeeded.
+     */
+    private function flushPlatformCaches(): void
+    {
+        try {
+            Artisan::call('optimize:clear');
+        } catch (Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('ModulePackageService: optimize:clear failed after a module lifecycle change.', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function purgeFromRegistrationModes(string $slug): void
+    {
+        try {
+            $raw = PlatformSystem::get('allowed_registration_modes');
+            $modes = is_string($raw) ? json_decode($raw, true) : $raw;
+            if (! is_array($modes) || ! in_array($slug, $modes, true)) {
+                return;
+            }
+            PlatformSystem::set(
+                'allowed_registration_modes',
+                json_encode(array_values(array_diff($modes, [$slug])))
+            );
+        } catch (Throwable $e) {
+            // Non-fatal — the module is still gone from sdui_modules, which is
+            // what every read path actually filters on.
         }
     }
 

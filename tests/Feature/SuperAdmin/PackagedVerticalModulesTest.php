@@ -3,7 +3,10 @@
 namespace Tests\Feature\SuperAdmin;
 
 use App\Models\Company;
+use App\Models\PlatformSystem;
 use App\Services\Modular\ModulePackageService;
+use App\Services\Modular\ModuleRegistry;
+use App\Services\Navigation\TenantNavRegistry;
 use App\Services\Sdui\SchemaValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -228,6 +231,48 @@ class PackagedVerticalModulesTest extends TestCase
         $service->uninstall($module->fresh(), true, null);
         $this->assertFalse(Schema::hasTable('salon_mod_appointments'));
         $this->assertFalse(is_dir(base_path('modules/salon')));
+    }
+
+    public function test_deactivate_and_uninstall_fully_remove_the_module_from_every_surface(): void
+    {
+        $service = app(ModulePackageService::class);
+        $company = Company::create([
+            'name' => 'Gate Co', 'slug' => 'gate-co', 'status' => 'active',
+            'pos_mode' => 'retail', 'currency' => 'USD', 'currency_symbol' => '$',
+        ]);
+
+        // Pretend a SuperAdmin had also enabled it for registration.
+        PlatformSystem::set('allowed_registration_modes', json_encode(['retail', 'salon']));
+
+        $module = $service->install($this->zipPackage('salon'), null);
+        $service->activate($module, null);
+
+        // Active -> visible in the module registry AND the tenant drawer.
+        $this->assertTrue(ModuleRegistry::isActive('salon'));
+        $this->assertArrayHasKey('salon', ModuleRegistry::allModules());
+        $navKeys = collect(TenantNavRegistry::getEffectiveNavForTenant($company))->pluck('key');
+        $this->assertTrue($navKeys->contains(fn ($k) => str_starts_with((string) $k, 'salon')));
+
+        // Deactivate -> gone from every read surface, data + files kept.
+        $service->deactivate($module->fresh(), null);
+        $this->assertFalse(ModuleRegistry::isActive('salon'));
+        $this->assertArrayNotHasKey('salon', ModuleRegistry::allModules());
+        $this->assertTrue(ModuleRegistry::isInstalled('salon'));
+        $this->assertTrue(Schema::hasTable('salon_mod_services'));
+        $this->assertTrue(is_dir(base_path('modules/salon')));
+        $navKeys = collect(TenantNavRegistry::getEffectiveNavForTenant($company))->pluck('key');
+        $this->assertFalse($navKeys->contains(fn ($k) => str_starts_with((string) $k, 'salon')));
+
+        // Uninstall + drop data -> row, files, tables all gone; registration
+        // modes list no longer carries the dangling key.
+        $service->uninstall($module->fresh(), true, null);
+        $this->assertFalse(ModuleRegistry::isInstalled('salon'));
+        $this->assertFalse(Schema::hasTable('salon_mod_services'));
+        $this->assertFalse(is_dir(base_path('modules/salon')));
+
+        $modes = json_decode((string) PlatformSystem::get('allowed_registration_modes'), true);
+        $this->assertNotContains('salon', $modes);
+        $this->assertContains('retail', $modes);
     }
 
     public function test_reserved_pharmacy_key_is_allowed_only_because_it_inherits_universal_pos(): void
