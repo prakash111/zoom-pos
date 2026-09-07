@@ -237,4 +237,46 @@ class RepairChecklistCustomizationTest extends TestCase
             ->assertOk();
         $this->assertSame('ready', $ticket->fresh()->status);
     }
+
+    public function test_workbench_share_button_opens_native_share_sheet(): void
+    {
+        $ticket = RepairTicket::create([
+            'company_id' => $this->company->id,
+            'ticket_number' => 'REP-SH-1',
+            'customer_name' => 'Priya',
+            'customer_phone' => '+91 90000 11111',
+            'brand' => 'Apple',
+            'model' => 'iPhone 13',
+            'issue_description' => 'Cracked screen',
+            'status' => 'diagnosing',
+        ]);
+
+        $schema = $this->withHeaders($this->headers)
+            ->getJson("/api/tenant/views/repair-detail?ticket_id={$ticket->id}")->assertOk()->json('schema');
+
+        $buttons = $this->allOfType($schema, 'button_outlined');
+        $share = collect($buttons)->firstWhere('label', 'Share Ticket');
+        $this->assertNotNull($share, 'Workbench is missing the Share Ticket button.');
+        $this->assertSame('form_submit', $share['action']['type']);
+        $this->assertSame(
+            "/api/tenant/repair/tickets/{$ticket->id}/share",
+            $share['action']['endpoint'],
+        );
+        // Must NOT redirect away from the workbench after sharing.
+        $this->assertArrayNotHasKey('redirect_route', $share['action']);
+
+        $res = $this->withHeaders($this->headers)
+            ->postJson("/api/tenant/repair/tickets/{$ticket->id}/share");
+        $res->assertOk()
+            ->assertJsonPath('action', 'show_ticket_share_sheet')
+            ->assertJsonPath('share.id', 'REP-SH-1')
+            ->assertJsonPath('share.customer_name', 'Priya')
+            ->assertJsonPath('share.device', 'Apple iPhone 13')
+            ->assertJsonPath('share.status', 'diagnosing');
+        $share = $res->json('share');
+        $this->assertStringContainsString('/portal/repair/REP-SH-1', $share['tracking_url']);
+        $this->assertStringStartsWith('https://wa.me/919000011111', $share['whatsapp_url']);
+        $this->assertStringContainsString('REP-SH-1', $share['share_text']);
+        $this->assertStringContainsString("/repair/tickets/{$ticket->id}/intake-sheet", $share['print_url']);
+    }
 }

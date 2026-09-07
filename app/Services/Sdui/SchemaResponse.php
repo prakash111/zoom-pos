@@ -2353,6 +2353,20 @@ class SchemaResponse
             ['sheet_title' => 'Move ticket to stage'],
         );
 
+        // "Share Ticket" — a form_submit whose server response carries
+        // `action: show_ticket_share_sheet`, so the existing dispatcher pops
+        // the native WhatsApp / Thermal Print / System Share bottom sheet.
+        // No wa.me force-redirect, no Flutter changes.
+        $shareButton = self::buttonOutlined(
+            'Share Ticket',
+            self::formSubmitAction(
+                "/api/tenant/repair/tickets/{$ticket->id}/share",
+                'POST',
+                'Opening share options…',
+            ),
+            'share',
+        );
+
         // Once the ticket is settled & handed over, lead with the native
         // Post-Sale Action Sheet so the cashier can print / share the invoice
         // without the app ever bouncing out to a browser login.
@@ -2387,6 +2401,7 @@ class SchemaResponse
                 self::text('Passcode / Unlock Pattern: '.($ticket->passcode_or_pattern ?: 'None'), 'body_small', ['color' => '#dc2626']),
                 self::divider(),
                 $statusSelector,
+                $shareButton,
             ]),
 
             self::card([

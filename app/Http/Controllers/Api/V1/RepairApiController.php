@@ -807,6 +807,62 @@ class RepairApiController extends Controller
     }
 
     /**
+     * Return the payload for the native "Share Ticket" bottom sheet for an
+     * existing ticket — the same `action: show_ticket_share_sheet` contract
+     * the intake flow uses, so the Workbench "Share Ticket" button opens the
+     * WhatsApp / Thermal Print / System Share sheet with zero client changes
+     * and never force-launches wa.me.
+     *
+     * GET|POST /api/tenant/repair/tickets/{id}/share
+     */
+    public function ticketsShareSheet(Request $request, string $id): JsonResponse
+    {
+        $this->authorizeAction($request, 'view');
+        $company = $this->resolveCompany($request);
+
+        $ticket = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['customer'])
+            ->find($id);
+
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Repair ticket not found.'], 404);
+        }
+
+        $customerName = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Walk-in Customer');
+        $phone = $ticket->customer?->phone ?: ($ticket->customer_phone ?: '');
+        $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'Device';
+
+        // Build the customer-facing links inline (no notifyTicketCreated — that
+        // dispatches webhooks and audit rows; sharing an existing ticket must
+        // stay a read-only, idempotent action).
+        $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
+        $shareText = "Hello {$customerName}, your repair ticket #{$ticket->ticket_number} for {$device} is with "
+            .($company->name ?: 'our service center').". Track status: {$trackingUrl}";
+        $whatsappUrl = RepairNotificationService::whatsAppUrl($shareText, $phone);
+        $printUrl = url("/api/tenant/repair/tickets/{$ticket->id}/intake-sheet");
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Share repair ticket',
+            'action' => 'show_ticket_share_sheet',
+            'share' => [
+                'id' => $ticket->ticket_number,
+                'ticket_id' => $ticket->id,
+                'customer_name' => $customerName,
+                'customer_phone' => $phone,
+                'device' => $device,
+                'status' => $ticket->status,
+                'defect' => $ticket->issue_description ?: $ticket->reported_defect,
+                'share_text' => $shareText,
+                'whatsapp_url' => $whatsappUrl,
+                'print_url' => $printUrl,
+                'tracking_url' => $trackingUrl,
+            ],
+        ]);
+    }
+
+    /**
      * Update ticket lifecycle status.
      * Moving to 'ready' fires instant Push + WhatsApp/SMS with balance due.
      * Moving to 'cancelled' restores stock for spare parts.
