@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zoom_pos_mobile/core/sdui/screens/dynamic_schema_page.dart';
 import 'package:zoom_pos_mobile/core/sdui/sdui_action_dispatcher.dart';
 import 'package:zoom_pos_mobile/features/pos_universal/local_cart.dart';
 import 'package:zoom_pos_mobile/features/pos_universal/pos_screen_model.dart';
@@ -364,6 +365,31 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(interceptedAction?['item']?['id'], 501);
+    });
+
+    testWidgets(
+        'filter_view re-opens the view with only the allow-listed fields as query',
+        (tester) async {
+      formValues['q'] = 'metformin';
+      formValues['stock_qty'] = '100'; // a foreign form field, must NOT leak
+
+      final dispatcher = buildDispatcher();
+
+      await tester
+          .pumpWidget(const MaterialApp(home: Scaffold(body: SizedBox())));
+      final context = tester.element(find.byType(Scaffold));
+
+      await dispatcher.dispatch(context, {
+        'type': 'filter_view',
+        'endpoint': '/api/tenant/views/pharmacy-batches?tab=active',
+        'fields': ['q'],
+      });
+      await tester.pumpAndSettle();
+
+      final page = tester.widget<DynamicSchemaPage>(find.byType(DynamicSchemaPage));
+      expect(page.endpoint,
+          '/api/tenant/views/pharmacy-batches?tab=active&q=metformin');
+      expect(page.endpoint, isNot(contains('stock_qty')));
     });
   });
 }

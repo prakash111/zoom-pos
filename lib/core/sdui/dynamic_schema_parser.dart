@@ -463,17 +463,37 @@ class DynamicSchemaParser {
         .map((tab) => Map<String, dynamic>.from(tab))
         .toList();
 
+    final scrollable =
+        schema['is_scrollable'] == true || schema['scrollable'] == true;
+    final initialIndex = ((schema['initial_index'] ?? schema['active_index'])
+                as num?)
+            ?.toInt()
+            .clamp(0, tabItems.length - 1) ??
+        0;
+
+    // The tab panel carries its own scroll, so it needs a bounded height. Use
+    // most of the viewport (not a rigid 400) so long lists like Active Batches
+    // aren't crammed into a tiny window on tall phones.
+    final panelHeight =
+        (MediaQuery.of(context).size.height * 0.66).clamp(360.0, 680.0);
+
     return DefaultTabController(
       length: tabItems.length,
+      initialIndex: initialIndex,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TabBar(
-            isScrollable: tabItems.length > 3,
+            isScrollable: scrollable || tabItems.length > 3,
+            tabAlignment: (scrollable || tabItems.length > 3)
+                ? TabAlignment.start
+                : null,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 14),
             tabs: [
               for (final t in tabItems)
                 Tab(
-                  text: context.tr(t['title']?.toString() ?? ''),
+                  text: context.tr(
+                      (t['label'] ?? t['title'])?.toString() ?? ''),
                   icon: t['icon'] != null
                       ? Icon(SduiIconRegistry.resolve(t['icon'].toString()),
                           size: 18)
@@ -482,7 +502,7 @@ class DynamicSchemaParser {
             ],
           ),
           SizedBox(
-            height: 400,
+            height: panelHeight.toDouble(),
             child: TabBarView(
               children: [
                 for (final t in tabItems)

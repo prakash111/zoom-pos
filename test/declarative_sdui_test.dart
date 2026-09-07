@@ -137,6 +137,61 @@ void main() {
       expect(find.text('Strict Lock Notice'), findsOneWidget);
     });
 
+    testWidgets(
+        'tabs honor initial_index and is_scrollable and accept label or title',
+        (tester) async {
+      final schema = {
+        'type': 'tabs',
+        'initial_index': 2,
+        'is_scrollable': true,
+        'tabs': [
+          {
+            'id': 'active',
+            'label': 'Active Batches',
+            'components': [
+              {'type': 'text', 'text': 'ACTIVE BODY'}
+            ],
+          },
+          {
+            'id': 'register',
+            'label': 'Register Batch',
+            'components': [
+              {'type': 'text', 'text': 'REGISTER BODY'}
+            ],
+          },
+          {
+            'id': 'adjust',
+            'label': 'Stock Adjust & Returns',
+            'components': [
+              {'type': 'text', 'text': 'ADJUST BODY'}
+            ],
+          },
+        ],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, schema),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // All three tab labels are present in full.
+      expect(find.text('Active Batches'), findsOneWidget);
+      expect(find.text('Register Batch'), findsOneWidget);
+      expect(find.text('Stock Adjust & Returns'), findsOneWidget);
+      expect(tester.widget<TabBar>(find.byType(TabBar)).isScrollable, isTrue);
+
+      // initial_index: 2 → the third tab's body is the visible one.
+      expect(DefaultTabController.of(tester.element(find.text('Active Batches')))
+          .index, 2);
+      expect(find.text('ADJUST BODY'), findsOneWidget);
+    });
+
     testWidgets('renders grid view with columns', (tester) async {
       final schema = {
         'type': 'grid_view',

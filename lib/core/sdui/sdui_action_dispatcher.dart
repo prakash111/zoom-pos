@@ -297,9 +297,47 @@ class SduiActionDispatcher {
         _loadRxToPos(context, action);
         break;
 
+      case 'filter_view':
+        _filterView(context, action);
+        break;
+
       default:
         break;
     }
+  }
+
+  /// Re-opens the current SDUI view with the named form fields appended as
+  /// query params (a "search / filter this list" primitive). Replaces the
+  /// current page so repeated searches don't pile up on the nav stack.
+  void _filterView(BuildContext context, Map<String, dynamic> action) {
+    final endpoint = action['endpoint']?.toString() ?? '';
+    if (endpoint.isEmpty) {
+      showToast('This search action is missing an endpoint.', isError: true);
+      return;
+    }
+    final fields = (action['fields'] as List?)?.map((e) => '$e').toList() ??
+        formValues.keys.toList();
+
+    final params = <String, String>{};
+    for (final f in fields) {
+      final v = formValues[f];
+      if (v == null || v is List || v is Map) continue;
+      final s = '$v'.trim();
+      if (s.isNotEmpty) params[f] = s;
+    }
+
+    var target = endpoint;
+    if (params.isNotEmpty) {
+      final sep = endpoint.contains('?') ? '&' : '?';
+      target = '$endpoint$sep${params.entries.map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}').join('&')}';
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) =>
+            SduiComponentRegistry.resolveRoute(target, arguments: action),
+      ),
+    );
   }
 
   /// Hands a prescription's resolved line items, patient and doctor straight
