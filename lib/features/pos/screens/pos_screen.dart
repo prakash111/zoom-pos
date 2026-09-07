@@ -19,6 +19,7 @@ import '../../customers/customers_repository.dart';
 import '../../inventory/inventory_repository.dart';
 import '../held_carts_store.dart';
 import '../pos_provider.dart';
+import '../rx_cart_handoff.dart';
 import '../sales_repository.dart';
 import 'cart_sheet.dart';
 import 'invoice_actions_sheet.dart';
@@ -34,15 +35,25 @@ class PosScreen extends StatelessWidget {
     final syncEngine = context.read<SyncEngine>();
 
     return ChangeNotifierProvider(
-      create: (_) => PosProvider(
-        inventoryRepository: InventoryRepository(apiClient),
-        salesRepository: SalesRepository(apiClient),
-        cashRegisterRepository: CashRegisterRepository(apiClient),
-        heldCartsStore: heldCartsStore,
-        syncEngine: syncEngine,
-      )
-        ..loadCatalog()
-        ..checkRegisterStatus(),
+      create: (_) {
+        final provider = PosProvider(
+          inventoryRepository: InventoryRepository(apiClient),
+          salesRepository: SalesRepository(apiClient),
+          cashRegisterRepository: CashRegisterRepository(apiClient),
+          heldCartsStore: heldCartsStore,
+          syncEngine: syncEngine,
+        );
+        // Drain a prescription staged by the SDUI "Load Prescription into POS"
+        // action BEFORE the catalog load kicks off, so the resolved line items
+        // are matched and injected the moment products arrive.
+        final pendingRx = RxCartHandoff.instance.take();
+        if (pendingRx != null) {
+          provider.loadPrescription(pendingRx);
+        }
+        return provider
+          ..loadCatalog()
+          ..checkRegisterStatus();
+      },
       child: const _PosScreenBody(),
     );
   }
@@ -195,6 +206,34 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
                 TextButton(
                   onPressed: () => _openRegisterPrompt(context),
                   child: Text(l10n.open),
+                ),
+              ],
+            ),
+          ),
+        if (pos.hasRxContext)
+          Container(
+            width: double.infinity,
+            color: const Color(0xFFECFDF5),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                const Icon(Icons.medical_information_outlined,
+                    size: 18, color: Color(0xFF047857)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    [
+                      if ((pos.rxNumber ?? '').isNotEmpty) 'Rx #${pos.rxNumber}',
+                      if ((pos.selectedCustomer?.name ?? '').isNotEmpty)
+                        '${pos.selectedCustomer!.name} (CRM LINKED)',
+                      if ((pos.rxDoctorName ?? '').isNotEmpty)
+                        'Dr. ${pos.rxDoctorName}',
+                    ].join('  ·  '),
+                    style: const TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF065F46),
+                        fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
             ),

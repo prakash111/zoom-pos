@@ -63,8 +63,11 @@ class SduiComponentRegistry {
     'restaurant_pos': (_) => const RestaurantPosScreen(),
     'floor_plan': (_) => const RestaurantTablesScreen(),
     'kitchen_display': (_) => const RestaurantKdsScreen(),
-    'pharmacy_pos': (_) =>
-        const UniversalPosScreen(endpoint: '/api/tenant/views/pharmacy-pos'),
+    // Pharmacy checkouts run through the core native POS now — the old
+    // '/api/tenant/views/pharmacy-pos' UniversalPosScreen (rendered as the
+    // broken "Pharmacy Counter POS") is retired. Alias the key to PosScreen so
+    // every resolution path (drawer, quick-actions, custom nav) lands there.
+    'pharmacy_pos': (_) => const PosScreen(),
     'repair_pos': (_) =>
         const UniversalPosScreen(endpoint: '/api/tenant/views/repair-pos'),
     'salon_pos': (_) =>
@@ -83,6 +86,38 @@ class SduiComponentRegistry {
     'consignments': (_) => const ConsignmentsScreen(),
     'service_orders': (_) => _resolveServiceOrdersScreen(),
     'service-orders': (_) => _resolveServiceOrdersScreen(),
+    'new_prescription_intake': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/pharmacy-rx-create',
+          initialTitle: 'New Prescription Intake',
+        ),
+    'pharmacy_rx_create': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/pharmacy-rx-create',
+          initialTitle: 'New Prescription Intake',
+        ),
+    'pharmacy-rx-create': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/pharmacy-rx-create',
+          initialTitle: 'New Prescription Intake',
+        ),
+    'prescriptions_queue': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/pharmacy-prescriptions',
+          initialTitle: 'Prescriptions & Patient Queue',
+        ),
+    'pharmacy_prescriptions': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/pharmacy-prescriptions',
+          initialTitle: 'Prescriptions & Patient Queue',
+        ),
+    'pharmacy-prescriptions': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/pharmacy-prescriptions',
+          initialTitle: 'Prescriptions & Patient Queue',
+        ),
+    'batch_inventory': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/pharmacy-batches',
+          initialTitle: 'Drug Batches & Expiry Tracker',
+        ),
+    'pharmacy_batches': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/pharmacy-batches',
+          initialTitle: 'Drug Batches & Expiry Tracker',
+        ),
     'verify_otp': (_) => const VerifyOtpScreen(email: ''),
     'verify-otp': (_) => const VerifyOtpScreen(email: ''),
     'verify_email': (_) => const VerifyOtpScreen(email: ''),

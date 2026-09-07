@@ -12,6 +12,7 @@ import '../../settings/server_settings_screen.dart';
 import '../auth_provider.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
+import 'verify_otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -74,7 +75,24 @@ class _LoginScreenState extends State<LoginScreen> {
       accountId: _accountIdController.text.trim(),
     );
 
-    if (!success && mounted && auth.errorMessage != null) {
+    if (success || !mounted) return;
+
+    // Valid credentials, but the account never finished email verification —
+    // route to the OTP screen instead of surfacing it as a sign-in error.
+    final pending = auth.pendingEmailVerification;
+    if (pending != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VerifyOtpScreen(
+            email: pending.email ?? _emailController.text.trim(),
+            tokenExpiry: pending.expiresIn,
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (auth.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(auth.errorMessage!)),
       );

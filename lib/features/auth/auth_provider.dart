@@ -85,16 +85,52 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Set when a valid email+password belongs to an account that never
+  /// completed email OTP verification. The login screen reads this (on a
+  /// `false` return from [login]) and pushes the verify screen instead of
+  /// showing an error snackbar. Cleared at the start of every [login].
+  RegisterResult? _pendingEmailVerification;
+  RegisterResult? get pendingEmailVerification => _pendingEmailVerification;
+
   Future<bool> login({
     required String email,
     required String password,
     String? accountId,
-  }) {
-    return _attempt(() => _authRepository.login(
-          email: email,
-          password: password,
-          accountId: accountId,
-        ));
+  }) async {
+    _status = AuthStatus.authenticating;
+    _errorMessage = null;
+    _pendingEmailVerification = null;
+    notifyListeners();
+
+    try {
+      final result = await _authRepository.login(
+        email: email,
+        password: password,
+        accountId: accountId,
+      );
+
+      if (result.requiresOtp) {
+        _pendingEmailVerification = result;
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return false;
+      }
+
+      await _handleLoginSuccess(result.toLoginResult());
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return false;
+    } catch (e, stackTrace) {
+      debugPrint('AuthProvider.login unexpected error: $e');
+      debugPrintStack(stackTrace: stackTrace);
+      _errorMessage = 'Sign-in failed (${e.runtimeType}): $e';
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return false;
+    }
   }
 
   RegisterResult? _lastRegisterResult;

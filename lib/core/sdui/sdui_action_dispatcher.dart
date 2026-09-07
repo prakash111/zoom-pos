@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../features/pos/rx_cart_handoff.dart';
 import '../../features/pos/screens/invoice_actions_sheet.dart';
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
@@ -292,9 +293,29 @@ class SduiActionDispatcher {
         Navigator.of(context).pop();
         break;
 
+      case 'load_rx_to_pos':
+        _loadRxToPos(context, action);
+        break;
+
       default:
         break;
     }
+  }
+
+  /// Hands a prescription's resolved line items, patient and doctor straight
+  /// to the native POS cart state, then opens the interactive POS screen. The
+  /// payload is parked in [RxCartHandoff]; [PosScreen] drains it while building
+  /// its [PosProvider] (which is a screen-local provider, not a global one).
+  void _loadRxToPos(BuildContext context, Map<String, dynamic> action) {
+    final payload = action['payload'];
+    RxCartHandoff.instance.stage(
+      payload is Map ? Map<String, dynamic>.from(payload) : <String, dynamic>{},
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SduiComponentRegistry.resolveRoute('pos'),
+      ),
+    );
   }
 
   /// True when a form_submit / api_post response carries the native

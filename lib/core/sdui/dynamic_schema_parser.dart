@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../api/api_exception.dart';
 import '../models/settings_models.dart';
@@ -79,6 +80,8 @@ class DynamicSchemaParser {
         return _buildColorPicker(context, schema);
       case 'file_upload':
         return _buildFileUpload(context, schema);
+      case 'file_picker':
+        return _SduiFilePickerField(schema: schema);
       case 'cash_tendered_field':
         return _CashTenderedField(schema: schema);
       case 'customer_selector':
@@ -1707,6 +1710,408 @@ class _SduiFileUploadFieldState extends State<_SduiFileUploadField> {
                   label: Text(removeLabel),
                 ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// `file_picker` — native secure document / photo attachment.
+///
+/// Renders an upload card that offers camera, gallery and document sources
+/// (gated by the schema's `allow_*` flags), enforces the schema's
+/// `allowed_extensions` + `max_size_mb` on-device, uploads the picked file to
+/// `upload_endpoint` as multipart `file`, then binds the returned storage URL
+/// into the form value `name` and shows a removable preview card.
+class _SduiFilePickerField extends StatefulWidget {
+  const _SduiFilePickerField({required this.schema});
+
+  final Map<String, dynamic> schema;
+
+  @override
+  State<_SduiFilePickerField> createState() => _SduiFilePickerFieldState();
+}
+
+class _SduiFilePickerFieldState extends State<_SduiFilePickerField> {
+  static const _imageExtensions = {
+    'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'bmp',
+  };
+
+  String? _url;
+  String? _fileName;
+  bool _busy = false;
+
+  List<String> get _allowedExtensions {
+    final raw = widget.schema['allowed_extensions'];
+    final list = raw is List
+        ? raw.map((e) => e.toString().toLowerCase().trim()).toList()
+        : const ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'heic'];
+    return list.isEmpty
+        ? const ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'heic']
+        : list;
+  }
+
+  int get _maxBytes {
+    final mb = (widget.schema['max_size_mb'] as num?)?.toInt() ?? 10;
+    return mb * 1024 * 1024;
+  }
+
+  bool get _allowCamera => widget.schema['allow_camera'] != false;
+  bool get _allowGallery => widget.schema['allow_gallery'] != false;
+  bool get _allowDocument => widget.schema['allow_document'] != false;
+
+  @override
+  void initState() {
+    super.initState();
+    _url = widget.schema['current_url']?.toString();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final existing = _readContext()?.formValues[_name]?.toString();
+      if (existing != null && existing.isNotEmpty && existing != _url) {
+        setState(() => _url = existing);
+      }
+    });
+  }
+
+  String get _name => widget.schema['name']?.toString() ?? 'attachment';
+
+  DynamicSchemaContext? _readContext() =>
+      mounted ? DynamicSchemaContext.of(context) : null;
+
+  void _snack(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: error ? Colors.red.shade600 : null,
+    ));
+  }
+
+  String _extensionOf(String name) {
+    final dot = name.lastIndexOf('.');
+    return dot >= 0 ? name.substring(dot + 1).toLowerCase().trim() : '';
+  }
+
+  /// Client-side gate mirroring the backend allow-list: only non-executable
+  /// image / PDF types ever leave the device.
+  bool _isPermitted(String name) => _allowedExtensions.contains(_extensionOf(name));
+
+  Future<void> _showSourceSheet() async {
+    if (_busy) return;
+    final sdui = _readContext();
+    if (sdui?.apiClient == null) {
+      _snack('Uploads are unavailable right now.', error: true);
+      return;
+    }
+
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_allowCamera)
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: Text(sheetContext.tr('Take Photo')),
+                onTap: () => Navigator.pop(sheetContext, 'camera'),
+              ),
+            if (_allowGallery)
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: Text(sheetContext.tr('Upload from Gallery')),
+                onTap: () => Navigator.pop(sheetContext, 'gallery'),
+              ),
+            if (_allowDocument)
+              ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: Text(sheetContext.tr('Select PDF / Document')),
+                onTap: () => Navigator.pop(sheetContext, 'document'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: Text(sheetContext.tr('Cancel')),
+              onTap: () => Navigator.pop(sheetContext),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    switch (choice) {
+      case 'camera':
+        await _pickImage(ImageSource.camera);
+        break;
+      case 'gallery':
+        await _pickImage(ImageSource.gallery);
+        break;
+      case 'document':
+        await _pickDocument();
+        break;
+    }
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 2400,
+      );
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      var name = picked.name;
+      if (_extensionOf(name).isEmpty) name = '$name.jpg';
+      await _upload(name, bytes);
+    } catch (error) {
+      _snack('Could not open the camera or gallery: $error', error: true);
+    }
+  }
+
+  Future<void> _pickDocument() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: _allowedExtensions,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      final bytes = file.bytes;
+      if (bytes == null) {
+        _snack('That file could not be read.', error: true);
+        return;
+      }
+      await _upload(file.name, bytes);
+    } catch (error) {
+      _snack('Could not open the document picker: $error', error: true);
+    }
+  }
+
+  Future<void> _upload(String fileName, List<int> bytes) async {
+    // Defense in depth — FileType.custom already filters, but a gallery item
+    // or a platform quirk could still yield a disallowed type.
+    if (!_isPermitted(fileName)) {
+      _snack(
+        'Only ${_allowedExtensions.join(', ').toUpperCase()} files are allowed. '
+        'Executable and script files are blocked.',
+        error: true,
+      );
+      return;
+    }
+    if (bytes.length > _maxBytes) {
+      final mb = (widget.schema['max_size_mb'] as num?)?.toInt() ?? 10;
+      _snack('That file is larger than the ${mb}MB limit.', error: true);
+      return;
+    }
+
+    final sdui = _readContext();
+    final client = sdui?.apiClient;
+    final endpoint = widget.schema['upload_endpoint']?.toString() ?? '';
+    if (client == null || endpoint.isEmpty) {
+      _snack('Uploads are unavailable right now.', error: true);
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final response = await client.postMultipartAbsolute(
+        endpoint,
+        fieldName: widget.schema['field_name']?.toString() ?? 'file',
+        bytes: bytes,
+        filename: fileName,
+      );
+      final urlPath = widget.schema['response_url_path']?.toString() ?? 'url';
+      final nextUrl = (_readPath(response, urlPath) ??
+              response['url'] ??
+              response['file_url'])
+          ?.toString();
+      if (nextUrl == null || nextUrl.isEmpty) {
+        _snack('The server did not return a file link.', error: true);
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _url = nextUrl;
+        _fileName = fileName;
+      });
+      _readContext()?.setFormValue(_name, nextUrl);
+    } on ApiException catch (error) {
+      _snack(error.message, error: true);
+    } catch (error) {
+      _snack('Upload failed: $error', error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _remove() {
+    setState(() {
+      _url = null;
+      _fileName = null;
+    });
+    _readContext()?.setFormValue(_name, null);
+  }
+
+  static dynamic _readPath(Map<String, dynamic> source, String path) {
+    dynamic value = source;
+    for (final segment in path.split('.')) {
+      if (value is! Map || !value.containsKey(segment)) return null;
+      value = value[segment];
+    }
+    return value;
+  }
+
+  bool get _currentIsImage {
+    final fromName = _fileName != null ? _extensionOf(_fileName!) : '';
+    if (fromName.isNotEmpty) return _imageExtensions.contains(fromName);
+    return _imageExtensions.contains(_extensionOf(_url ?? ''));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = context.tr(widget.schema['label']?.toString() ?? 'Attachment');
+    final hint = context.tr(widget.schema['hint']?.toString() ??
+        'Upload a photo or PDF (non-executable files only)');
+    final hasFile = _url?.isNotEmpty == true;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(height: 6),
+          if (hasFile)
+            _PreviewCard(
+              isImage: _currentIsImage,
+              url: _url!,
+              fileName: _fileName,
+              onRemove: _busy ? null : _remove,
+            )
+          else
+            InkWell(
+              onTap: _busy ? null : _showSourceSheet,
+              borderRadius: BorderRadius.circular(12),
+              child: _DottedUploadArea(busy: _busy, hint: hint),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact preview shown after a successful upload.
+class _PreviewCard extends StatelessWidget {
+  const _PreviewCard({
+    required this.isImage,
+    required this.url,
+    required this.onRemove,
+    this.fileName,
+  });
+
+  final bool isImage;
+  final String url;
+  final String? fileName;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(10),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: isImage
+                ? CachedNetworkImage(
+                    imageUrl: url,
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) =>
+                        const Icon(Icons.broken_image_outlined),
+                  )
+                : Container(
+                    width: 56,
+                    height: 56,
+                    color: Colors.red.shade50,
+                    child: Icon(Icons.picture_as_pdf_outlined,
+                        color: Colors.red.shade400),
+                  ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fileName ?? context.tr('Attachment uploaded'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  context.tr(isImage ? 'Photo attached' : 'Document attached'),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: context.tr('Remove'),
+            icon: const Icon(Icons.close),
+            onPressed: onRemove,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tap target shown before a file is chosen (also renders the busy state).
+class _DottedUploadArea extends StatelessWidget {
+  const _DottedUploadArea({required this.busy, required this.hint});
+
+  final bool busy;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        border: Border.all(color: Colors.grey.shade400),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          busy
+              ? const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                )
+              : Icon(Icons.cloud_upload_outlined,
+                  size: 32, color: Colors.grey.shade600),
+          const SizedBox(height: 8),
+          Text(
+            busy ? context.tr('Uploading…') : context.tr('Tap to upload'),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            hint,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
         ],
       ),

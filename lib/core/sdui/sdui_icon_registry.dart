@@ -7,6 +7,8 @@ class SduiIconRegistry {
   static const Map<String, IconData> _icons = {
     // Sales & POS
     'point_of_sale': Icons.point_of_sale_outlined,
+    'shopping_cart_checkout': Icons.shopping_cart_checkout,
+    'shopping_cart': Icons.shopping_cart_outlined,
     'receipt_long': Icons.receipt_long_outlined,
     'description': Icons.description_outlined,
     'local_shipping': Icons.local_shipping_outlined,
@@ -27,7 +29,11 @@ class SduiIconRegistry {
     'local_pharmacy': Icons.local_pharmacy_outlined,
     'medication': Icons.medication_outlined,
     'medical_services': Icons.medical_services_outlined,
+    'medical_information': Icons.medical_information_outlined,
     'personal_injury': Icons.personal_injury_outlined,
+    'note_add': Icons.note_add_outlined,
+    'post_add': Icons.post_add_outlined,
+    'assignment_add': Icons.assignment_outlined,
 
     // Service & Salon
     'spa': Icons.spa_outlined,

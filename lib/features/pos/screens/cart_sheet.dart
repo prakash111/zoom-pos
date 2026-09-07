@@ -736,6 +736,54 @@ class CartSheet extends StatelessWidget {
               ),
               const Divider(height: 1),
 
+              if (pos.hasRxContext)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.medical_information_outlined,
+                          size: 18, color: Color(0xFF047857)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.text('attachDoctorRxDetails',
+                                  fallback: 'Attach Doctor & Rx Details'),
+                              style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF065F46)),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              [
+                                if ((pos.rxDoctorName ?? '').isNotEmpty)
+                                  pos.rxDoctorName!,
+                                if ((pos.rxNumber ?? '').isNotEmpty)
+                                  '#${pos.rxNumber}',
+                                if ((pos.rxDoctorRegistrationNo ?? '').isNotEmpty)
+                                  'Reg. ${pos.rxDoctorRegistrationNo}',
+                              ].join('  ·  '),
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF047857)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // Items List + Bottom Section share one scroll view (with the
               // sheet's own scrollController) so the cash-tender field,
               // preset chips, totals, and Complete Sale button are never

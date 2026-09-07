@@ -64,6 +64,9 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
   RegisterResult? get lastRegisterResult => null;
 
   @override
+  RegisterResult? get pendingEmailVerification => null;
+
+  @override
   Future<RegisterResult?> register({
     required String storeName,
     required String ownerName,

@@ -48,7 +48,15 @@ class AuthRepository {
 
   final ApiClient _client;
 
-  Future<LoginResult> login({
+  /// Signs in against POST /auth/login.
+  ///
+  /// Returns a [RegisterResult] rather than a bare [LoginResult] because the
+  /// backend can answer a valid email+password with a `requires_verification`
+  /// payload (HTTP 200) when the account never completed email OTP — the same
+  /// shape [register] can return. Callers check [RegisterResult.requiresOtp]
+  /// and route to the verify screen; otherwise `.toLoginResult()` unwraps the
+  /// token/user/company.
+  Future<RegisterResult> login({
     required String email,
     required String password,
     String? accountId,
@@ -59,7 +67,7 @@ class AuthRepository {
       if (accountId != null && accountId.isNotEmpty) 'account_id': accountId,
     });
 
-    return _loginResult(response);
+    return _authOutcome(response, email);
   }
 
   Future<RegisterResult> register({
@@ -81,6 +89,17 @@ class AuthRepository {
       'pos_mode': posMode,
     });
 
+    return _authOutcome(response, email);
+  }
+
+  /// Normalizes a /auth/login or /auth/register response into a
+  /// [RegisterResult]. A `requires_verification` / `requires_otp` payload
+  /// becomes `requiresOtp: true` (never throwing "missing token"); anything
+  /// else is unwrapped as a completed token session.
+  RegisterResult _authOutcome(
+    Map<String, dynamic> response,
+    String fallbackEmail,
+  ) {
     final payload = _payload(response);
     final requiresOtp = payload['requires_otp'] == true ||
         payload['status'] == 'requires_verification' ||
@@ -99,7 +118,7 @@ class AuthRepository {
               ? (payload['arguments'] as Map)['email']?.toString()
               : null) ??
           userMap?['email']?.toString() ??
-          email;
+          fallbackEmail;
 
       return RegisterResult(
         requiresOtp: true,

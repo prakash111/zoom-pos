@@ -158,6 +158,28 @@ class PosProvider extends ChangeNotifier {
 
   final Map<String, CartItem> _cart = {};
 
+  // --- Prescription (Rx) load context -------------------------------------
+  // Set when the cart was populated from the pharmacy "Load Prescription into
+  // POS" action, so the POS screen and cart sheet can show the linked patient
+  // and prescribing doctor for controlled-drug compliance.
+  String? rxId;
+  String? rxNumber;
+  String? rxDoctorName;
+  String? rxDoctorRegistrationNo;
+  String? rxDiagnosis;
+
+  bool get hasRxContext =>
+      (rxNumber?.isNotEmpty ?? false) || (rxId?.isNotEmpty ?? false);
+
+  /// Raw prescription line items from the "Load Prescription into POS" action,
+  /// kept so [loadCatalog] can re-match them to real catalog products once the
+  /// catalog resolves.
+  List<Map<String, dynamic>> _rxItems = const [];
+
+  /// Cart keys whose line is still a synthesized placeholder (product not yet
+  /// found in the catalog) — upgraded in place once the catalog loads.
+  final Set<String> _rxSyntheticKeys = {};
+
   /// Backed by [HeldCartsStore], which persists independently of this
   /// provider's lifecycle so held carts survive navigating away from POS.
   List<HeldCart> get heldCarts => _heldCartsStore.carts;
@@ -346,12 +368,15 @@ class PosProvider extends ChangeNotifier {
             : paymentMethods.first.id;
       }
       catalogStatus = CatalogStatus.loaded;
+      _hydrateRxItems();
     } on ApiException catch (e) {
       catalogError = e.message;
       catalogStatus = CatalogStatus.error;
+      _hydrateRxItems();
     } catch (e) {
       catalogError = e.toString();
       catalogStatus = CatalogStatus.error;
+      _hydrateRxItems();
     }
     notifyListeners();
   }
@@ -385,6 +410,128 @@ class PosProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  /// Loads a prescription handed off from the Rx queue straight into the cart:
+  /// clears any stale draft, links the patient as the CRM customer, records
+  /// the prescribing doctor for compliance, and injects every prescribed
+  /// medicine as a cart line.
+  ///
+  /// Lines are added immediately (so the POS never shows an empty cart) using
+  /// the live catalog product when it's already loaded, or a synthesized line
+  /// otherwise; [loadCatalog] calls [_hydrateRxItems] again once real products
+  /// arrive to swap the synthesized lines for the catalog originals.
+  void loadPrescription(Map<String, dynamic> payload) {
+    clearCart();
+
+    rxId = _asString(payload['rx_id']);
+    rxNumber = _asString(payload['rx_number']);
+    rxDiagnosis = _asString(payload['diagnosis']);
+
+    final doctor = payload['doctor'];
+    if (doctor is Map) {
+      rxDoctorName = _asString(doctor['name']);
+      rxDoctorRegistrationNo = _asString(doctor['registration_no']);
+    }
+
+    final customer = payload['customer'];
+    if (customer is Map && (_asString(customer['name'])?.isNotEmpty ?? false)) {
+      selectedCustomer = CustomerModel.fromJson({
+        'id': customer['id'] ?? 0,
+        'name': customer['name'],
+        'phone': customer['phone'] ?? '',
+      });
+    }
+
+    // Carry the Rx reference into the order notes so it reaches the sale
+    // record even though the native checkout has no dedicated Rx field.
+    final parts = <String>[
+      if (rxNumber?.isNotEmpty ?? false) 'Rx #$rxNumber',
+      if (rxDoctorName?.isNotEmpty ?? false)
+        'Dr. $rxDoctorName'
+            '${(rxDoctorRegistrationNo?.isNotEmpty ?? false) ? ' (${rxDoctorRegistrationNo!})' : ''}',
+    ];
+    if (parts.isNotEmpty) orderNotes = parts.join(' · ');
+
+    final items = payload['items'];
+    _rxItems = items is List
+        ? items
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList()
+        : const <Map<String, dynamic>>[];
+
+    _hydrateRxItems();
+    notifyListeners();
+  }
+
+  /// (Re)injects the prescription's line items into the cart. Idempotent: a
+  /// line already added by a previous call is left as-is unless it was a
+  /// synthesized placeholder that the catalog can now resolve to a real
+  /// product, in which case it is upgraded in place (quantity preserved).
+  void _hydrateRxItems() {
+    if (_rxItems.isEmpty) return;
+
+    for (final raw in _rxItems) {
+      final productId = raw['product_id']?.toString() ?? '';
+      final quantity = (raw['quantity'] as num?)?.toInt() ?? 1;
+      final name = raw['product_name']?.toString() ?? 'Prescribed medicine';
+      final key = productId.isNotEmpty ? productId : 'rx-${name.hashCode}';
+
+      final real = resolveRxProduct(raw, _products);
+      final existing = _cart[key];
+
+      if (existing == null) {
+        _cart[key] = CartItem(
+          product: real ?? synthesizeRxProduct(raw),
+          quantity: quantity.toDouble(),
+        );
+        if (real == null) {
+          _rxSyntheticKeys.add(key);
+        } else {
+          _rxSyntheticKeys.remove(key);
+        }
+      } else if (real != null && _rxSyntheticKeys.contains(key)) {
+        _cart[key] = CartItem(product: real, quantity: existing.quantity);
+        _rxSyntheticKeys.remove(key);
+      }
+    }
+    notifyListeners();
+  }
+
+  /// The catalog [ProductModel] a prescribed medicine line refers to, matched
+  /// by `product_id`. Null when the product isn't in the synced catalog.
+  @visibleForTesting
+  static ProductModel? resolveRxProduct(
+      Map<String, dynamic> raw, List<ProductModel> catalog) {
+    final productId = raw['product_id']?.toString() ?? '';
+    if (productId.isEmpty) return null;
+    for (final candidate in catalog) {
+      if (candidate.id == productId) return candidate;
+    }
+    return null;
+  }
+
+  /// A minimal stand-in [ProductModel] built from the prescription payload, so
+  /// a medicine that isn't in the synced catalog still shows in the cart with
+  /// the right name, price and quantity.
+  @visibleForTesting
+  static ProductModel synthesizeRxProduct(Map<String, dynamic> raw) {
+    final productId = raw['product_id']?.toString() ?? '';
+    final name = raw['product_name']?.toString() ?? 'Prescribed medicine';
+    final unitPrice = (raw['unit_price'] as num?)?.toDouble() ?? 0;
+    final quantity = (raw['quantity'] as num?)?.toInt() ?? 1;
+    return ProductModel.fromJson({
+      'id': productId.isNotEmpty ? productId : 'rx-${name.hashCode}',
+      'name': name,
+      'sale_price': unitPrice,
+      'tax_rate': 0,
+      'active': true,
+      'unit': 'pcs',
+      'current_stock': quantity,
+    });
+  }
+
+  static String? _asString(Object? value) => value?.toString();
 
   void incrementQuantity(String productId) {
     final item = _cart[productId];
@@ -478,6 +625,13 @@ class PosProvider extends ChangeNotifier {
     _cart.clear();
     selectedCustomer = null;
     orderNotes = '';
+    rxId = null;
+    rxNumber = null;
+    rxDoctorName = null;
+    rxDoctorRegistrationNo = null;
+    rxDiagnosis = null;
+    _rxItems = const [];
+    _rxSyntheticKeys.clear();
     customDiscount = 0;
     isPercentDiscount = false;
     isSplitPayment = false;

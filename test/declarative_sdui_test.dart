@@ -462,6 +462,92 @@ void main() {
       expect(formValues['customer_name'], 'Sarah Connor');
       expect(formValues['customer_phone'], '+1 555 123 4567');
     });
+
+    testWidgets('file_picker renders the upload card, not a raw URL text field',
+        (tester) async {
+      final formValues = <String, dynamic>{};
+      final schema = {
+        'type': 'file_picker',
+        'name': 'rx_attachment_url',
+        'label': 'Prescription Document / Photo',
+        'hint': 'Upload prescription photo or PDF (non-executable only)',
+        'upload_endpoint': '/api/tenant/uploads/prescription-doc',
+        'allowed_extensions': ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'heic'],
+        'max_size_mb': 10,
+        'allow_camera': true,
+        'allow_gallery': true,
+        'allow_document': true,
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: formValues,
+              setFormValue: (k, v) => formValues[k] = v,
+              dispatchAction: (_) async {},
+              child: Builder(
+                builder: (ctx) =>
+                    DynamicSchemaParser.buildComponent(ctx, schema),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Prescription Document / Photo'), findsOneWidget);
+      expect(find.text('Tap to upload'), findsOneWidget);
+      expect(
+        find.text('Upload prescription photo or PDF (non-executable only)'),
+        findsOneWidget,
+      );
+      // It's an upload affordance, never a plain text input for a URL.
+      expect(find.byType(TextField), findsNothing);
+      expect(find.byIcon(Icons.cloud_upload_outlined), findsOneWidget);
+    });
+
+    testWidgets('file_picker shows a removable preview when a URL is bound',
+        (tester) async {
+      final formValues = <String, dynamic>{
+        'rx_attachment_url': 'https://cdn.example.test/uploads/abc123.pdf',
+      };
+      final schema = {
+        'type': 'file_picker',
+        'name': 'rx_attachment_url',
+        'label': 'Prescription Document / Photo',
+        'upload_endpoint': '/api/tenant/uploads/prescription-doc',
+        'allowed_extensions': ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'heic'],
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: formValues,
+              setFormValue: (k, v) => formValues[k] = v,
+              dispatchAction: (_) async {},
+              child: Builder(
+                builder: (ctx) =>
+                    DynamicSchemaParser.buildComponent(ctx, schema),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // PDF preview badge + a remove (X) button.
+      expect(find.byIcon(Icons.picture_as_pdf_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      expect(find.text('Tap to upload'), findsNothing);
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+
+      expect(formValues['rx_attachment_url'], isNull);
+      expect(find.text('Tap to upload'), findsOneWidget);
+    });
   });
 
   group('Declarative SDUI Schema Parser - Lists, Tables & Stepper', () {
@@ -637,6 +723,27 @@ void main() {
       );
 
       expect(find.byType(DynamicSchemaPage), findsOneWidget);
+    });
+
+    test('navigate to the native "pos" key does not fall through to a schema page',
+        () {
+      // The pharmacy "Pharmacy POS" quick action and the drawer entry both
+      // navigate to the bare route key 'pos' — it must resolve to a native
+      // screen, never a DynamicSchemaPage of the retired counter screen.
+      expect(
+        SduiComponentRegistry.resolveRoute('pos'),
+        isNot(isA<DynamicSchemaPage>()),
+      );
+      // 'pharmacy_pos' is aliased to the same native POS screen.
+      expect(
+        SduiComponentRegistry.resolveRoute('pharmacy_pos'),
+        isNot(isA<DynamicSchemaPage>()),
+      );
+      // A genuine /api/ view still routes to the dynamic renderer.
+      expect(
+        SduiComponentRegistry.resolveRoute('/api/tenant/views/pharmacy-pos'),
+        isA<DynamicSchemaPage>(),
+      );
     });
 
     testWidgets(

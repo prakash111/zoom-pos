@@ -21,6 +21,19 @@ class ApiClient {
           receiveTimeout: AppConfig.receiveTimeout,
           contentType: 'application/json',
           headers: const {'Accept': 'application/json'},
+          // Never chase a redirect. The API only ever answers with JSON; a 3xx
+          // means the request landed on a web route (unverified-account guard,
+          // an http->https bounce, a trailing-slash rewrite) and following it
+          // would just yield an HTML login page. Surface it as a clean error
+          // in [_send]/[_mapDioError] instead of Dio's raw validateStatus text.
+          followRedirects: false,
+          maxRedirects: 0,
+          // Let 3xx and 4xx responses through to our own handlers so a
+          // structured `{success:false,error:...}` body (422 validation, 401,
+          // the 200 `requires_verification` payload) is parsed instead of
+          // thrown as an opaque DioException. Only 5xx / transport failures
+          // still raise.
+          validateStatus: (status) => status != null && status < 500,
         ));
 
   final Dio _dio;
@@ -91,7 +104,13 @@ class ApiClient {
       final response = await _dio.get<String>(
         path,
         queryParameters: query,
-        options: Options(responseType: ResponseType.plain),
+        options: Options(
+          responseType: ResponseType.plain,
+          // These helpers return a raw body, not the JSON envelope, so keep the
+          // strict "2xx or throw" contract here (the client-wide validateStatus
+          // deliberately lets 3xx/4xx through for _send to parse).
+          validateStatus: (status) => status != null && status < 300,
+        ),
       );
       return response.data ?? '';
     } on DioException catch (e) {
@@ -107,7 +126,10 @@ class ApiClient {
       final response = await _dio.get<List<int>>(
         path,
         queryParameters: query,
-        options: Options(responseType: ResponseType.bytes),
+        options: Options(
+          responseType: ResponseType.bytes,
+          validateStatus: (status) => status != null && status < 300,
+        ),
       );
       return response.data ?? const [];
     } on DioException catch (e) {
@@ -129,7 +151,10 @@ class ApiClient {
       final response = await _dio.get<List<int>>(
         url,
         queryParameters: query,
-        options: Options(responseType: ResponseType.bytes),
+        options: Options(
+          responseType: ResponseType.bytes,
+          validateStatus: (status) => status != null && status < 300,
+        ),
       );
       return response.data ?? const [];
     } on DioException catch (e) {
@@ -255,18 +280,34 @@ class ApiClient {
     await _prepare();
     try {
       final response = await request();
+      final status = response.statusCode ?? 0;
       final body = response.data;
-      if (body is Map) {
-        final json = Map<String, dynamic>.from(body);
-        if (json['success'] == false) {
-          throw ApiException(
-            _extractErrorMessage(json),
-            statusCode: response.statusCode,
-            details: _asStringMap(json['details']),
-          );
-        }
-        return json;
+
+      // followRedirects is off, so any 3xx that gets here is a misroute — the
+      // API only ever answers with JSON. Return an actionable message rather
+      // than letting a redirect masquerade as a successful (bodyless) call.
+      if (status >= 300 && status < 400) {
+        throw ApiException(
+          'The server redirected the request instead of returning data. '
+          'Check the Server Address in Settings — it must be the full '
+          'https:// URL of your store platform.',
+          statusCode: status,
+        );
       }
+
+      final json = body is Map ? Map<String, dynamic>.from(body) : null;
+
+      if (status >= 400 || json?['success'] == false) {
+        throw ApiException(
+          json != null
+              ? _extractErrorMessage(json)
+              : 'Request failed (HTTP $status).',
+          statusCode: status,
+          details: json == null ? null : _asStringMap(json['details']),
+        );
+      }
+
+      if (json != null) return json;
       return {'success': true, 'data': body};
     } on DioException catch (e) {
       throw _mapDioError(e);
@@ -292,6 +333,15 @@ class ApiClient {
 
     if (status == 401) {
       onUnauthenticated?.call();
+    }
+
+    if (status != null && status >= 300 && status < 400) {
+      return ApiException(
+        'The server redirected the request instead of returning data. '
+        'Check the Server Address in Settings — it must be the full '
+        'https:// URL of your store platform.',
+        statusCode: status,
+      );
     }
 
     if (body is Map) {
