@@ -189,6 +189,54 @@ class ThermalPrinterService {
     }
   }
 
+  /// Prints a compact text token (repair drop-off slip, pickup tag, ...) —
+  /// a centered title followed by plain body lines, no totals. Connects to the
+  /// saved printer if not already connected.
+  Future<bool> printToken({
+    required String title,
+    required List<String> lines,
+    String? heading,
+  }) async {
+    final connected = await isConnected;
+    if (!connected) {
+      final saved = await savedDeviceAddress();
+      if (saved == null) return false;
+      if (!await connect(saved)) return false;
+    }
+
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm80, profile);
+    final bytes = <int>[];
+
+    if (heading != null && heading.isNotEmpty) {
+      bytes.addAll(generator.text(heading,
+          styles: const PosStyles(align: PosAlign.center, bold: true)));
+    }
+    bytes.addAll(generator.text(title,
+        styles: const PosStyles(
+            align: PosAlign.center,
+            bold: true,
+            height: PosTextSize.size2,
+            width: PosTextSize.size2)));
+    bytes.addAll(generator.hr());
+    for (final line in lines) {
+      if (line.trim().isEmpty) {
+        bytes.addAll(generator.feed(1));
+      } else {
+        bytes.addAll(generator.text(line));
+      }
+    }
+    bytes.addAll(generator.feed(2));
+    bytes.addAll(generator.cut());
+
+    try {
+      return await PrintBluetoothThermal.writeBytes(bytes)
+          .timeout(const Duration(seconds: 6), onTimeout: () => false);
+    } catch (_) {
+      return false;
+    }
+  }
+
   List<int> _totalsRow(Generator generator, String label, double value, String currencySymbol, {bool emphasize = false}) {
     return generator.row([
       PosColumn(

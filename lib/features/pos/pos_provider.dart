@@ -158,10 +158,14 @@ class PosProvider extends ChangeNotifier {
 
   final Map<String, CartItem> _cart = {};
 
-  // --- Prescription (Rx) load context -------------------------------------
-  // Set when the cart was populated from the pharmacy "Load Prescription into
-  // POS" action, so the POS screen and cart sheet can show the linked patient
-  // and prescribing doctor for controlled-drug compliance.
+  // --- Linked-document load context -------------------------------------
+  // Set when the cart was populated from a "load into POS" hand-off — a
+  // pharmacy prescription or a repair ticket. The POS screen and cart sheet
+  // read these to show the linked patient/customer and the source reference.
+  //
+  // For a repair ticket the pharmacy-named slots are reused: `rxDoctorName`
+  // holds the device label, `rxDiagnosis` the reported defect.
+  String? linkedDocKind; // 'rx' | 'repair'
   String? rxId;
   String? rxNumber;
   String? rxDoctorName;
@@ -170,6 +174,8 @@ class PosProvider extends ChangeNotifier {
 
   bool get hasRxContext =>
       (rxNumber?.isNotEmpty ?? false) || (rxId?.isNotEmpty ?? false);
+
+  bool get isRepairContext => linkedDocKind == 'repair';
 
   /// Raw prescription line items from the "Load Prescription into POS" action,
   /// kept so [loadCatalog] can re-match them to real catalog products once the
@@ -423,6 +429,7 @@ class PosProvider extends ChangeNotifier {
   void loadPrescription(Map<String, dynamic> payload) {
     clearCart();
 
+    linkedDocKind = 'rx';
     rxId = _asString(payload['rx_id']);
     rxNumber = _asString(payload['rx_number']);
     rxDiagnosis = _asString(payload['diagnosis']);
@@ -460,6 +467,76 @@ class PosProvider extends ChangeNotifier {
             .toList()
         : const <Map<String, dynamic>>[];
 
+    _hydrateRxItems();
+    notifyListeners();
+  }
+
+  /// Loads a repair ticket handed off from the workbench "Checkout & Bill"
+  /// action: links the ticket customer, then injects the labor fee and any
+  /// diagnostic charge as synthesized service lines followed by every replaced
+  /// part. Item hydration reuses the same catalog-match / synthesize path as
+  /// [loadPrescription].
+  void loadRepairTicket(Map<String, dynamic> payload) {
+    clearCart();
+
+    linkedDocKind = 'repair';
+    rxId = _asString(payload['ticket_id']);
+    rxNumber = _asString(payload['ticket_number']) ?? _asString(payload['ticket_id']);
+    final device = _asString(payload['device']);
+    rxDoctorName = device; // reused slot: the device label
+    rxDoctorRegistrationNo = null;
+    rxDiagnosis = _asString(payload['defect']);
+
+    final customer = payload['customer'];
+    if (customer is Map && (_asString(customer['name'])?.isNotEmpty ?? false)) {
+      selectedCustomer = CustomerModel.fromJson({
+        'id': customer['id'] ?? 0,
+        'name': customer['name'],
+        'phone': customer['phone'] ?? '',
+      });
+    }
+
+    final noteParts = <String>[
+      if (rxNumber?.isNotEmpty ?? false) 'Ticket #$rxNumber',
+      if (device != null && device.isNotEmpty) device,
+    ];
+    if (noteParts.isNotEmpty) orderNotes = noteParts.join(' · ');
+
+    final lines = <Map<String, dynamic>>[];
+    final labor = (payload['labor_cost'] as num?)?.toDouble() ?? 0;
+    if (labor > 0) {
+      lines.add({
+        'product_id': 'repair-labor-${rxNumber ?? rxId ?? ''}',
+        'product_name': 'Labor: ${device ?? 'Repair Service'}',
+        'unit_price': labor,
+        'quantity': 1,
+        'is_service': true,
+      });
+    }
+    final diagnostic = (payload['diagnostic_fee'] as num?)?.toDouble() ?? 0;
+    if (diagnostic > 0) {
+      lines.add({
+        'product_id': 'repair-diagnostic-${rxNumber ?? rxId ?? ''}',
+        'product_name': 'Diagnostic charge',
+        'unit_price': diagnostic,
+        'quantity': 1,
+        'is_service': true,
+      });
+    }
+    final parts = payload['parts'];
+    if (parts is List) {
+      for (final raw in parts.whereType<Map>()) {
+        lines.add({
+          'product_id': raw['product_id'],
+          'product_name':
+              raw['name'] ?? raw['product_name'] ?? 'Replacement part',
+          'unit_price': raw['unit_price'] ?? raw['price'] ?? 0,
+          'quantity': raw['quantity'] ?? 1,
+        });
+      }
+    }
+
+    _rxItems = lines;
     _hydrateRxItems();
     notifyListeners();
   }
@@ -520,13 +597,14 @@ class PosProvider extends ChangeNotifier {
     final name = raw['product_name']?.toString() ?? 'Prescribed medicine';
     final unitPrice = (raw['unit_price'] as num?)?.toDouble() ?? 0;
     final quantity = (raw['quantity'] as num?)?.toInt() ?? 1;
+    final isService = raw['is_service'] == true;
     return ProductModel.fromJson({
       'id': productId.isNotEmpty ? productId : 'rx-${name.hashCode}',
       'name': name,
       'sale_price': unitPrice,
       'tax_rate': 0,
       'active': true,
-      'unit': 'pcs',
+      'unit': isService ? 'service' : 'pcs',
       'current_stock': quantity,
     });
   }
@@ -625,6 +703,7 @@ class PosProvider extends ChangeNotifier {
     _cart.clear();
     selectedCustomer = null;
     orderNotes = '';
+    linkedDocKind = null;
     rxId = null;
     rxNumber = null;
     rxDoctorName = null;

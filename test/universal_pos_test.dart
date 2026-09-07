@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zoom_pos_mobile/core/sdui/screens/dynamic_schema_page.dart';
@@ -390,6 +392,58 @@ void main() {
       expect(page.endpoint,
           '/api/tenant/views/pharmacy-batches?tab=active&q=metformin');
       expect(page.endpoint, isNot(contains('stock_qty')));
+    });
+
+    testWidgets(
+        'a show_ticket_share_sheet response pops a native sheet, never a wa.me redirect',
+        (tester) async {
+      final dispatcher = buildDispatcher(
+        requestExecutor: (endpoint, {required method, data}) async => {
+          'success': true,
+          'message': 'Repair ticket created successfully!',
+          'action': 'show_ticket_share_sheet',
+          'redirect_route': '/api/tenant/views/repair-tickets',
+          'whatsapp_url': 'https://wa.me/15551239876?text=hi',
+          'share': {
+            'id': 'REP-2026-0006',
+            'device': 'Lenovo ThinkPad X1',
+            'status': 'received',
+            'customer_name': 'Sarah Connor',
+            'customer_phone': '15551239876',
+            'share_text': 'Track: https://x.test/track/REP-2026-0006',
+            'whatsapp_url': 'https://wa.me/15551239876?text=hi',
+          },
+        },
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: Builder(builder: (ctx) => const SizedBox())),
+        ),
+      );
+      final context = tester.element(find.byType(Scaffold));
+
+      // Fire and forget — the dispatch future only resolves once the modal is
+      // dismissed, so drive the frames manually instead of awaiting it.
+      unawaited(dispatcher.dispatch(context, {
+        'type': 'form_submit',
+        'endpoint': '/api/tenant/repair/tickets',
+        'method': 'POST',
+      }));
+      await tester.pump(); // request completes
+      await tester.pump(const Duration(milliseconds: 400)); // sheet animates in
+
+      // The native bottom sheet, not an app switch.
+      expect(find.text('Ticket #REP-2026-0006 Created'), findsOneWidget);
+      expect(find.text('Share via WhatsApp'), findsOneWidget);
+      expect(find.text('System Share (SMS / Other Apps)'), findsOneWidget);
+      expect(find.text('Done'), findsOneWidget);
+      expect(find.textContaining('Lenovo ThinkPad X1'), findsWidgets);
+
+      // Dismiss so the widget tree tears down cleanly.
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      expect(find.text('Share via WhatsApp'), findsNothing);
     });
   });
 }

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../features/pos/rx_cart_handoff.dart';
 import '../../features/pos/screens/invoice_actions_sheet.dart';
+import '../../features/repair/ticket_share_sheet.dart';
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../config/app_config.dart';
@@ -164,6 +165,39 @@ class SduiActionDispatcher {
             await BootstrapCache.instance
                 .applyThemeJson(Map<String, dynamic>.from(rawTheme));
           }
+          final resAction = res['action']?.toString();
+          final redirectRoute = res['route']?.toString() ??
+              res['redirect_route']?.toString() ??
+              action['redirect_route']?.toString() ??
+              action['route']?.toString();
+
+          // A repair ticket create returns a native share bottom sheet — never
+          // a forced wa.me redirect. Show it, THEN go to the tickets list.
+          if (resAction == 'show_ticket_share_sheet') {
+            showToast(message);
+            if (context.mounted) {
+              final share = res['share'] is Map
+                  ? Map<String, dynamic>.from(res['share'] as Map)
+                  : (res['ticket'] is Map
+                      ? Map<String, dynamic>.from(res['ticket'] as Map)
+                      : <String, dynamic>{});
+              await showTicketShareSheet(context, share);
+            }
+            if (context.mounted &&
+                redirectRoute != null &&
+                redirectRoute.isNotEmpty) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => SduiComponentRegistry.resolveRoute(
+                    redirectRoute,
+                    arguments: res,
+                  ),
+                ),
+              );
+            }
+            return;
+          }
+
           final formUrlToOpen = res['url']?.toString() ??
               res['print_url']?.toString() ??
               res['whatsapp_url']?.toString();
@@ -179,11 +213,6 @@ class SduiActionDispatcher {
           if (action['reload'] == true) {
             onReload();
           }
-          final resAction = res['action']?.toString();
-          final redirectRoute = res['route']?.toString() ??
-              res['redirect_route']?.toString() ??
-              action['redirect_route']?.toString() ??
-              action['route']?.toString();
 
           if (context.mounted && _isPostSaleSheetResponse(res)) {
             await _showPostSaleSheet(context, res['post_sale_sheet']['data']);
@@ -294,7 +323,11 @@ class SduiActionDispatcher {
         break;
 
       case 'load_rx_to_pos':
-        _loadRxToPos(context, action);
+        _loadDocToPos(context, action, kind: 'rx');
+        break;
+
+      case 'load_repair_to_pos':
+        _loadDocToPos(context, action, kind: 'repair');
         break;
 
       case 'filter_view':
@@ -340,15 +373,19 @@ class SduiActionDispatcher {
     );
   }
 
-  /// Hands a prescription's resolved line items, patient and doctor straight
-  /// to the native POS cart state, then opens the interactive POS screen. The
-  /// payload is parked in [RxCartHandoff]; [PosScreen] drains it while building
-  /// its [PosProvider] (which is a screen-local provider, not a global one).
-  void _loadRxToPos(BuildContext context, Map<String, dynamic> action) {
+  /// Hands a source document (a pharmacy prescription or a repair ticket) with
+  /// its resolved line items and linked customer straight to the native POS
+  /// cart state, then opens the interactive POS screen. The payload is parked
+  /// in [RxCartHandoff]; [PosScreen] drains it — keyed by `_handoff_kind` —
+  /// while building its (screen-local) [PosProvider].
+  void _loadDocToPos(BuildContext context, Map<String, dynamic> action,
+      {required String kind}) {
     final payload = action['payload'];
-    RxCartHandoff.instance.stage(
-      payload is Map ? Map<String, dynamic>.from(payload) : <String, dynamic>{},
-    );
+    final staged = <String, dynamic>{
+      if (payload is Map) ...Map<String, dynamic>.from(payload),
+      '_handoff_kind': kind,
+    };
+    RxCartHandoff.instance.stage(staged);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SduiComponentRegistry.resolveRoute('pos'),

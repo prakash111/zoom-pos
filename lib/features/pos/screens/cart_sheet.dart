@@ -749,16 +749,23 @@ class CartSheet extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.medical_information_outlined,
-                          size: 18, color: Color(0xFF047857)),
+                      Icon(
+                          pos.isRepairContext
+                              ? Icons.handyman_outlined
+                              : Icons.medical_information_outlined,
+                          size: 18,
+                          color: const Color(0xFF047857)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              l10n.text('attachDoctorRxDetails',
-                                  fallback: 'Attach Doctor & Rx Details'),
+                              pos.isRepairContext
+                                  ? l10n.text('linkedRepairTicket',
+                                      fallback: 'Linked Repair Ticket')
+                                  : l10n.text('attachDoctorRxDetails',
+                                      fallback: 'Attach Doctor & Rx Details'),
                               style: const TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.bold,
@@ -767,11 +774,12 @@ class CartSheet extends StatelessWidget {
                             const SizedBox(height: 2),
                             Text(
                               [
+                                if ((pos.rxNumber ?? '').isNotEmpty)
+                                  '${pos.isRepairContext ? 'Ticket ' : ''}#${pos.rxNumber}',
                                 if ((pos.rxDoctorName ?? '').isNotEmpty)
                                   pos.rxDoctorName!,
-                                if ((pos.rxNumber ?? '').isNotEmpty)
-                                  '#${pos.rxNumber}',
-                                if ((pos.rxDoctorRegistrationNo ?? '').isNotEmpty)
+                                if (!pos.isRepairContext &&
+                                    (pos.rxDoctorRegistrationNo ?? '').isNotEmpty)
                                   'Reg. ${pos.rxDoctorRegistrationNo}',
                               ].join('  ·  '),
                               style: const TextStyle(

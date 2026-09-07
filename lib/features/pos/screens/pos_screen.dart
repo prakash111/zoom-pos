@@ -43,12 +43,16 @@ class PosScreen extends StatelessWidget {
           heldCartsStore: heldCartsStore,
           syncEngine: syncEngine,
         );
-        // Drain a prescription staged by the SDUI "Load Prescription into POS"
-        // action BEFORE the catalog load kicks off, so the resolved line items
-        // are matched and injected the moment products arrive.
-        final pendingRx = RxCartHandoff.instance.take();
-        if (pendingRx != null) {
-          provider.loadPrescription(pendingRx);
+        // Drain a document staged by a "load into POS" action (pharmacy Rx or
+        // repair ticket) BEFORE the catalog load kicks off, so the resolved
+        // line items are matched and injected the moment products arrive.
+        final pending = RxCartHandoff.instance.take();
+        if (pending != null) {
+          if (pending['_handoff_kind'] == 'repair') {
+            provider.loadRepairTicket(pending);
+          } else {
+            provider.loadPrescription(pending);
+          }
         }
         return provider
           ..loadCatalog()
@@ -217,17 +221,24 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               children: [
-                const Icon(Icons.medical_information_outlined,
-                    size: 18, color: Color(0xFF047857)),
+                Icon(
+                    pos.isRepairContext
+                        ? Icons.handyman_outlined
+                        : Icons.medical_information_outlined,
+                    size: 18,
+                    color: const Color(0xFF047857)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     [
-                      if ((pos.rxNumber ?? '').isNotEmpty) 'Rx #${pos.rxNumber}',
+                      if ((pos.rxNumber ?? '').isNotEmpty)
+                        '${pos.isRepairContext ? 'Ticket' : 'Rx'} #${pos.rxNumber}',
                       if ((pos.selectedCustomer?.name ?? '').isNotEmpty)
                         '${pos.selectedCustomer!.name} (CRM LINKED)',
                       if ((pos.rxDoctorName ?? '').isNotEmpty)
-                        'Dr. ${pos.rxDoctorName}',
+                        pos.isRepairContext
+                            ? pos.rxDoctorName!
+                            : 'Dr. ${pos.rxDoctorName}',
                     ].join('  ·  '),
                     style: const TextStyle(
                         fontSize: 12.5,

@@ -66,6 +66,44 @@ void main() {
       // Discard the pushed POS route before it tries to build without providers.
       await tester.pumpWidget(const SizedBox());
     });
+
+    testWidgets('load_repair_to_pos stages the ticket payload tagged as repair',
+        (tester) async {
+      final dispatcher = SduiActionDispatcher(
+        resolveApiClient: () => null,
+        formKey: GlobalKey<FormState>(),
+        formValues: {},
+        setFormValue: (_, __) {},
+        onReload: () {},
+        showToast: (_, {isError = false}) {},
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: SizedBox())),
+      );
+      final context = tester.element(find.byType(Scaffold));
+
+      await dispatcher.dispatch(context, {
+        'type': 'load_repair_to_pos',
+        'payload': {
+          'ticket_id': '6',
+          'ticket_number': 'REP-2026-0006',
+          'customer': {'id': 14, 'name': 'prakash', 'phone': '918535075196'},
+          'device': 'Dell Inspiron 15 (SN: DL-9921)',
+          'labor_cost': 45.0,
+          'parts': [
+            {'product_id': 88, 'name': '512GB NVMe SSD', 'unit_price': 65.0, 'quantity': 1},
+          ],
+        },
+      });
+
+      final staged = RxCartHandoff.instance.take()!;
+      expect(staged['_handoff_kind'], 'repair');
+      expect(staged['ticket_number'], 'REP-2026-0006');
+      expect(staged['labor_cost'], 45.0);
+
+      await tester.pumpWidget(const SizedBox());
+    });
   });
 
   group('PosProvider Rx line resolution', () {
@@ -113,6 +151,21 @@ void main() {
       expect(synthetic.name, 'Cough Linctus');
       expect(synthetic.salePrice, 4.25);
       expect(synthetic.currentStock, 3);
+      expect(synthetic.unit, 'pcs');
+    });
+
+    test('synthesizeRxProduct marks an is_service line as a service unit', () {
+      final labor = PosProvider.synthesizeRxProduct({
+        'product_id': 'repair-labor-REP-1',
+        'product_name': 'Labor: Dell Inspiron 15',
+        'unit_price': 45.0,
+        'quantity': 1,
+        'is_service': true,
+      });
+
+      expect(labor.name, 'Labor: Dell Inspiron 15');
+      expect(labor.salePrice, 45.0);
+      expect(labor.unit, 'service');
     });
   });
 }
