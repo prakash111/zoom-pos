@@ -1341,22 +1341,28 @@ class SchemaResponse
                 ]),
             ]),
 
+            // Two compact buttons that wrap to a second line on narrow phones
+            // rather than being squeezed into "+ New Prescrip..." / "Pharmacy
+            // PO...". `dense` keeps them content-sized; `wrap` gives the
+            // fallback stack.
             self::row([
-                self::buttonPrimary('+ New Prescription Intake', self::navigateAction('/api/tenant/views/pharmacy-rx-create', title: 'New Prescription Intake'), 'note_add', ['expanded' => true, 'background_color' => '#059669']),
-                self::buttonOutlined('Pharmacy POS', self::navigateAction('pos', title: 'Pharmacy POS'), 'point_of_sale', ['expanded' => true]),
-            ], ['spacing' => 10]),
+                self::buttonPrimary('+ New Prescription Intake', self::navigateAction('/api/tenant/views/pharmacy-rx-create', title: 'New Prescription Intake'), 'note_add', ['dense' => true, 'full_width' => false, 'background_color' => '#059669']),
+                self::buttonOutlined('Pharmacy POS', self::navigateAction('pos', title: 'Pharmacy POS'), 'point_of_sale', ['dense' => true, 'full_width' => false]),
+            ], ['spacing' => 8, 'wrap' => true]),
 
+            // Filter chips: a horizontally scrollable strip so "Pending (1)"
+            // and "Dispensed (2)" always render in full, never clipped.
             self::row([
                 $statusFilter === 'all'
-                    ? self::buttonPrimary("All ({$totalRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=all', title: 'All Prescriptions'), 'receipt_long', ['full_width' => false])
-                    : self::buttonOutlined("All ({$totalRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=all', title: 'All Prescriptions'), 'receipt_long', ['full_width' => false]),
+                    ? self::buttonPrimary("All ({$totalRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=all', title: 'All Prescriptions'), 'receipt_long', ['full_width' => false, 'dense' => true])
+                    : self::buttonOutlined("All ({$totalRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=all', title: 'All Prescriptions'), 'receipt_long', ['full_width' => false, 'dense' => true]),
                 $statusFilter === 'pending'
-                    ? self::buttonPrimary("Pending ({$pendingRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=pending', title: 'Pending Prescriptions'), 'hourglass_top', ['full_width' => false])
-                    : self::buttonOutlined("Pending ({$pendingRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=pending', title: 'Pending Prescriptions'), 'hourglass_top', ['full_width' => false]),
+                    ? self::buttonPrimary("Pending ({$pendingRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=pending', title: 'Pending Prescriptions'), 'hourglass_top', ['full_width' => false, 'dense' => true])
+                    : self::buttonOutlined("Pending ({$pendingRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=pending', title: 'Pending Prescriptions'), 'hourglass_top', ['full_width' => false, 'dense' => true]),
                 $statusFilter === 'dispensed'
-                    ? self::buttonPrimary("Dispensed ({$dispensedRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=dispensed', title: 'Dispensed Prescriptions'), 'task_alt', ['full_width' => false])
-                    : self::buttonOutlined("Dispensed ({$dispensedRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=dispensed', title: 'Dispensed Prescriptions'), 'task_alt', ['full_width' => false]),
-            ]),
+                    ? self::buttonPrimary("Dispensed ({$dispensedRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=dispensed', title: 'Dispensed Prescriptions'), 'task_alt', ['full_width' => false, 'dense' => true])
+                    : self::buttonOutlined("Dispensed ({$dispensedRx})", self::navigateAction('/api/tenant/views/pharmacy-prescriptions?status=dispensed', title: 'Dispensed Prescriptions'), 'task_alt', ['full_width' => false, 'dense' => true]),
+            ], ['scrollable' => true, 'spacing' => 8]),
 
             self::card([
                 self::text('Prescription Queue', 'title_medium', ['bold' => true]),
@@ -1450,9 +1456,9 @@ class SchemaResponse
                 ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
                 self::divider(),
                 self::row([
-                    self::buttonOutlined('Prescriptions Queue', self::navigateAction('/api/tenant/views/pharmacy-prescriptions', title: 'Prescriptions & Patient Queue'), 'medical_information', ['expanded' => true]),
-                    self::buttonOutlined('Pharmacy POS', self::navigateAction('pos', title: 'Pharmacy POS'), 'point_of_sale', ['expanded' => true]),
-                ], ['spacing' => 10]),
+                    self::buttonOutlined('Prescriptions Queue', self::navigateAction('/api/tenant/views/pharmacy-prescriptions', title: 'Prescriptions & Patient Queue'), 'medical_information', ['dense' => true, 'full_width' => false]),
+                    self::buttonOutlined('Pharmacy POS', self::navigateAction('pos', title: 'Pharmacy POS'), 'point_of_sale', ['dense' => true, 'full_width' => false]),
+                ], ['spacing' => 8, 'wrap' => true]),
             ]),
 
             self::card([

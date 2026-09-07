@@ -346,6 +346,78 @@ class PharmacyDecoupledIntakeTest extends TestCase
         $this->assertStringNotContainsString('/checkout-sheet', $schemaJson);
     }
 
+    public function test_queue_filter_and_action_rows_are_laid_out_to_avoid_text_clipping(): void
+    {
+        PharmacyPrescription::create([
+            'company_id' => $this->company->id,
+            'tenant_id' => $this->company->id,
+            'prescription_number' => 'RX-LAYOUT-1',
+            'prescription_date' => now()->toDateString(),
+            'patient_name' => 'Layout Patient',
+            'doctor_name' => 'Dr. Layout',
+            'status' => 'pending',
+        ]);
+
+        $schema = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/tenant/views/pharmacy-prescriptions')
+            ->assertOk()
+            ->json('schema');
+
+        $this->assertEmpty((new SchemaValidator())->validate($schema));
+
+        // Filter chips sit in a horizontally scrollable row so full labels
+        // like "Pending (1)" / "Dispensed (2)" never get an ellipsis.
+        $filterRow = $this->rowContainingButtonLabelPrefix($schema, 'All (');
+        $this->assertNotNull($filterRow, 'Filter row not found.');
+        $this->assertTrue($filterRow['scrollable'] ?? false);
+        foreach ($filterRow['components'] as $chip) {
+            $this->assertTrue($chip['dense'] ?? false, 'Filter chip must be dense.');
+            $this->assertFalse($chip['full_width'] ?? true, 'Filter chip must not be full width.');
+        }
+
+        // The "+ New Prescription Intake" / "Pharmacy POS" action row wraps to
+        // a second line on narrow screens instead of clipping.
+        $actionRow = $this->rowContainingButtonLabelPrefix($schema, '+ New Prescription Intake');
+        $this->assertNotNull($actionRow, 'Header action row not found.');
+        $this->assertTrue($actionRow['wrap'] ?? false);
+        foreach ($actionRow['components'] as $btn) {
+            $this->assertTrue($btn['dense'] ?? false);
+        }
+    }
+
+    /**
+     * The `row` component whose direct button children include one whose label
+     * starts with $prefix.
+     *
+     * @param  array<string, mixed>  $node
+     * @return array<string, mixed>|null
+     */
+    private function rowContainingButtonLabelPrefix(array $node, string $prefix): ?array
+    {
+        if (($node['type'] ?? null) === 'row') {
+            foreach ($node['components'] ?? [] as $child) {
+                if (is_array($child)
+                    && str_starts_with((string) ($child['label'] ?? ''), $prefix)
+                    && str_starts_with((string) ($child['type'] ?? ''), 'button')) {
+                    return $node;
+                }
+            }
+        }
+
+        foreach (['components', 'children'] as $bucket) {
+            foreach ($node[$bucket] ?? [] as $child) {
+                if (is_array($child)) {
+                    $found = $this->rowContainingButtonLabelPrefix($child, $prefix);
+                    if ($found !== null) {
+                        return $found;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Depth-first search for the first button component carrying $label.
      *
