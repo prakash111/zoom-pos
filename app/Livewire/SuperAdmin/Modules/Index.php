@@ -165,14 +165,11 @@ class Index extends Component
 
     public function render()
     {
-        $licenses = app(LicenseService::class);
         $modules = $this->packageModules();
 
         return view('livewire.superadmin.modules.index', [
             'modules' => $modules,
             'orphans' => app(ModulePackageService::class)->orphanedModuleDirs(),
-            'licenseDriver' => $licenses->getActiveDriver(),
-            'offlineFallback' => $licenses->isOfflineFallback(),
             'catalog' => $modules->mapWithKeys(fn ($m) => [
                 $m->id => ModuleCatalog::for($m->slug),
             ])->all(),

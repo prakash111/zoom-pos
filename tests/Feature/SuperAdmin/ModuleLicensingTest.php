@@ -84,7 +84,7 @@ class ModuleLicensingTest extends TestCase
 
     public function test_revalidate_license_deactivates_a_revoked_module(): void
     {
-        PlatformSystem::set('license_server_url', 'https://license.test');
+        config()->set('services.license_server.url', 'https://license.test');
         PlatformSystem::set('allowed_registration_modes', json_encode(['retail', 'widgets']));
 
         Http::fake([
@@ -141,7 +141,7 @@ class ModuleLicensingTest extends TestCase
     public function test_checkout_keeps_the_payment_when_license_issuance_fails(): void
     {
         $this->actingAsSuperAdmin();
-        PlatformSystem::set('license_server_url', 'https://license.test');
+        config()->set('services.license_server.url', 'https://license.test');
         Http::fake([
             'license.test/api/v1/license/issue' => Http::response(['status' => false, 'message' => 'no stock'], 200),
         ]);

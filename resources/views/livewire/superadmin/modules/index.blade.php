@@ -14,18 +14,6 @@
         </div>
     @endif
 
-    <div class="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
-        <span>{{ __("License driver") }}:</span>
-        <span class="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase tracking-wide">{{ $licenseDriver }}</span>
-        <a href="{{ route('superadmin.settings.index', ['tab' => 'licensing']) }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ __("Change") }}</a>
-    </div>
-
-    @if ($offlineFallback)
-        <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-xs font-bold border border-amber-200 dark:border-amber-800">
-            {{ __("License server is not configured — module keys are only format-checked. Set a license server URL under Settings → Licensing for strict verification.") }}
-        </div>
-    @endif
-
     <!-- Upload Card -->
     <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-4">
         <div>

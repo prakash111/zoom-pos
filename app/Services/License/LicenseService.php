@@ -2,13 +2,11 @@
 
 namespace App\Services\License;
 
-use App\Models\PlatformSystem;
-
 /**
  * Hybrid license verification dispatcher.
  *
- * A single global driver (platform_system key `license_driver`) decides where
- * every verification goes:
+ * The driver is vendor configuration (`LICENSE_DRIVER` env / config), fixed
+ * before the script is distributed — there is no in-app switch:
  *   - "codecanyon" → Envato Market API (EnvatoLicenseVerificationService)
  *   - "custom"     → self-hosted license server (CustomLicenseServerClient)
  *
@@ -26,15 +24,12 @@ class LicenseService
     ) {}
 
     /**
-     * Active driver: DB setting → config default → 'custom'. Any unknown value
+     * Active driver from config, defaulting to 'custom'. Any unknown value
      * collapses to 'custom'.
      */
     public function getActiveDriver(): string
     {
-        $driver = (string) PlatformSystem::get(
-            'license_driver',
-            config('services.license_server.driver', self::DRIVER_CUSTOM)
-        );
+        $driver = (string) config('services.license_server.driver', self::DRIVER_CUSTOM);
 
         return in_array($driver, [self::DRIVER_CODECANYON, self::DRIVER_CUSTOM], true)
             ? $driver

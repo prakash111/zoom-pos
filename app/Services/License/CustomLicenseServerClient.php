@@ -2,7 +2,6 @@
 
 namespace App\Services\License;
 
-use App\Models\PlatformSystem;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -13,11 +12,14 @@ use Throwable;
  * (e.g. https://license.zoomnearby.com). Contract lives in
  * docs/LICENSE_SERVER_CONTRACT.md.
  *
+ * The server URL + shared secret are vendor configuration — set once in the
+ * environment (LICENSE_SERVER_URL / LICENSE_SERVER_SECRET) before the script is
+ * distributed. There is no in-app screen for them.
+ *
  * When no base URL is configured this degrades to a local format check so a
- * fresh install / offline dev box can still activate modules — mirroring the
- * historical behaviour of EnvatoLicenseVerificationService without a token.
- * As soon as a URL is set, verification is strict: an unreachable server or a
- * non-2xx response is a failure, never a silent pass.
+ * fresh install / offline dev box can still activate modules. As soon as a URL
+ * is set, verification is strict: an unreachable server or a non-2xx response
+ * is a failure, never a silent pass.
  */
 class CustomLicenseServerClient
 {
@@ -29,11 +31,8 @@ class CustomLicenseServerClient
 
     public function __construct(?string $baseUrl = null, ?string $secret = null, ?int $timeout = null)
     {
-        // Prefer the DB-backed value (survives `config:cache`), then config/env.
-        $this->baseUrl = rtrim((string) ($baseUrl
-            ?? PlatformSystem::get('license_server_url', config('services.license_server.url'))), '/');
-        $this->secret = (string) ($secret
-            ?? PlatformSystem::get('license_server_secret', config('services.license_server.secret')));
+        $this->baseUrl = rtrim((string) ($baseUrl ?? config('services.license_server.url')), '/');
+        $this->secret = (string) ($secret ?? config('services.license_server.secret'));
         $this->timeout = $timeout ?? (int) config('services.license_server.timeout', 10);
     }
 

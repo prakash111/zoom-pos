@@ -119,12 +119,6 @@
                 <span>🎨</span> {{ __('Navigation & Appearance') }}
             </button>
 
-            <button type="button"
-                    @click="switchTab('licensing')"
-                    :class="activeTab === 'licensing' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
-                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
-                <span>🔑</span> {{ __('Licensing') }}
-            </button>
         </div>
 
         <!-- Tab Panes -->
@@ -135,7 +129,6 @@
         <div x-show="activeTab === 'pages'" x-cloak> @include('superadmin.settings.partials.pages') </div>
         <div x-show="activeTab === 'social'" x-cloak> @include('superadmin.settings.partials.social-login') </div>
         <div x-show="activeTab === 'appearance'" x-cloak> @include('superadmin.settings.partials.appearance') </div>
-        <div x-show="activeTab === 'licensing'" x-cloak> @include('superadmin.settings.partials.licensing') </div>
     </div>
 
 </div>

@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\License;
 
-use App\Models\PlatformSystem;
 use App\Services\License\LicenseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -17,14 +16,14 @@ class LicenseServiceTest extends TestCase
         return app(LicenseService::class);
     }
 
-    public function test_active_driver_defaults_to_custom_and_reads_platform_system(): void
+    public function test_active_driver_comes_from_config_and_defaults_to_custom(): void
     {
         $this->assertSame('custom', $this->service()->getActiveDriver());
 
-        PlatformSystem::set('license_driver', 'codecanyon');
+        config()->set('services.license_server.driver', 'codecanyon');
         $this->assertSame('codecanyon', $this->service()->getActiveDriver());
 
-        PlatformSystem::set('license_driver', 'garbage');
+        config()->set('services.license_server.driver', 'garbage');
         $this->assertSame('custom', $this->service()->getActiveDriver());
     }
 
@@ -46,8 +45,8 @@ class LicenseServiceTest extends TestCase
 
     public function test_custom_driver_is_strict_once_a_url_is_configured(): void
     {
-        PlatformSystem::set('license_server_url', 'https://license.test');
-        PlatformSystem::set('license_server_secret', 's3cret');
+        config()->set('services.license_server.url', 'https://license.test');
+        config()->set('services.license_server.secret', 's3cret');
 
         Http::fake([
             'license.test/api/v1/license/verify' => Http::response([
@@ -72,7 +71,7 @@ class LicenseServiceTest extends TestCase
 
     public function test_unreachable_license_server_is_a_failure_not_a_pass(): void
     {
-        PlatformSystem::set('license_server_url', 'https://license.test');
+        config()->set('services.license_server.url', 'https://license.test');
 
         Http::fake(['license.test/*' => fn () => throw new \RuntimeException('connection refused')]);
 
@@ -84,8 +83,8 @@ class LicenseServiceTest extends TestCase
 
     public function test_codecanyon_driver_routes_to_envato_api(): void
     {
-        PlatformSystem::set('license_driver', 'codecanyon');
-        PlatformSystem::set('envato_api_token', 'envato-token');
+        config()->set('services.license_server.driver', 'codecanyon');
+        config()->set('services.envato.api_token', 'envato-token');
 
         Http::fake([
             'api.envato.com/*' => Http::response([

@@ -1,13 +1,14 @@
 # Custom License Server contract
 
-The `custom` license driver (Settings → Licensing) talks to a self-hosted
-license server — e.g. `https://license.zoomnearby.com`. That server is a
-separate application; this document is the contract the platform's client
+The `custom` license driver talks to a self-hosted license server — e.g.
+`https://license.zoomnearby.com`. That server is a separate application; this
+document is the contract the platform's client
 (`App\Services\License\CustomLicenseServerClient`) expects it to honour.
 
-Configured via `platform_system` keys (`license_server_url`,
-`license_server_secret`) or `.env` (`LICENSE_SERVER_URL`,
-`LICENSE_SERVER_SECRET`). **When no URL is set the client does not call out** —
+The URL, shared secret and driver are **vendor configuration** — set in the
+environment (`LICENSE_DRIVER`, `LICENSE_SERVER_URL`, `LICENSE_SERVER_SECRET`)
+before the script is distributed. There is no in-app screen for them.
+**When no URL is set the client does not call out** —
 `verify()` only format-checks the key and `issue()` mints a `DEV-…` key. As soon
 as a URL is set, verification is strict: an unreachable server or a non-2xx
 response is a failure, never a silent pass.

@@ -25,18 +25,21 @@ verticals never do (they have no `sdui_modules` row).
 - `module.json` → `"requires_license"` (bool, **default `true`** for packages).
   Set it `false` only for internal / test modules.
 - Activation flow: SuperAdmin → Modules shows a key field on an unlicensed
-  module. The key is verified through `App\Services\License\LicenseService`
-  against the active driver (`codecanyon` = Envato API, `custom` = self-hosted
-  license server — chosen under Settings → Licensing). With no license server
-  configured the `custom` driver only *format-checks* the key.
+  module. The key (supplied by the vendor) is verified through
+  `App\Services\License\LicenseService` against the vendor-configured driver
+  (`LICENSE_DRIVER`: `codecanyon` = Envato API, `custom` = self-hosted license
+  server at `LICENSE_SERVER_URL`). There is no in-app licensing screen — the
+  driver / URL / secret are baked in before distribution. With no license
+  server configured the `custom` driver only *format-checks* the key.
 - On success the row stores `license_status = active` plus an encrypted copy of
   the key, its hash/prefix, the driver, buyer and expiry.
 - `license:check-status` runs **daily** (also `php artisan license:check-status
   --sync`): it re-verifies every `requires_license` package and the core
   installer license. A revoked / expired module is **deactivated
-  automatically**; the core license only raises a SuperAdmin warning and never
-  disables the platform. A transient "server unreachable" is tolerated for 3
-  consecutive days before the module is pulled.
+  automatically**; the core license only logs a warning
+  (`platform_system.core_license_status`) and never disables the platform. A
+  transient "server unreachable" is tolerated for 3 consecutive days before the
+  module is pulled.
 - Lifecycle: `unlicensed → active → (expired | revoked)`. A re-check or a fresh
   key returns it to `active`.
 - `SduiModule::scopeLicenseManaged()` / `isLicensed()` and the invariant

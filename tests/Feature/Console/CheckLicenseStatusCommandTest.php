@@ -32,7 +32,7 @@ class CheckLicenseStatusCommandTest extends TestCase
 
     public function test_a_revoked_module_is_deactivated_and_dropped_from_registration_modes(): void
     {
-        PlatformSystem::set('license_server_url', 'https://license.test');
+        config()->set('services.license_server.url', 'https://license.test');
         PlatformSystem::set('allowed_registration_modes', json_encode(['retail', 'widgets']));
         Http::fake(['license.test/*' => Http::response(['status' => false, 'message' => 'revoked'], 200)]);
 
@@ -49,7 +49,7 @@ class CheckLicenseStatusCommandTest extends TestCase
 
     public function test_transport_failure_tolerates_two_runs_then_deactivates_on_the_third(): void
     {
-        PlatformSystem::set('license_server_url', 'https://license.test');
+        config()->set('services.license_server.url', 'https://license.test');
         Http::fake(['license.test/*' => fn () => throw new \RuntimeException('timeout')]);
 
         $module = $this->licensedModule();
@@ -68,7 +68,7 @@ class CheckLicenseStatusCommandTest extends TestCase
 
     public function test_expired_license_past_grace_is_deactivated(): void
     {
-        PlatformSystem::set('license_server_url', 'https://license.test');
+        config()->set('services.license_server.url', 'https://license.test');
         Http::fake(['license.test/*' => Http::response([
             'status' => true,
             'expires_at' => now()->subDays(10)->toIso8601String(),
