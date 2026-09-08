@@ -6,10 +6,11 @@
  * its add-on modules. Runs on its own domain (e.g. license.example.com).
  *
  * Endpoints (all POST unless noted, header `X-Server-Secret`):
- *   /api/v1/license/verify    check a key for product + domain
- *   /api/v1/license/issue     issue a key after a paid purchase (idempotent)
- *   /api/v1/module/download   verify a key, then stream that module's ZIP
- *   /api/v1/catalog    (GET)  active products for the SaaS "Buy module" screen
+ *   /api/verify.php     check a key for product + domain
+ *   /api/issue.php      issue a key after a paid purchase (idempotent)
+ *   /api/download.php   verify a key, then stream that module's ZIP
+ *   /api/catalog.php    active products for the SaaS "Buy module" screen
+ *   (the SaaS calls these .php files directly — no URL rewriting needed)
  *   /buy.php           (GET)  public hosted checkout (Razorpay / Stripe)
  *
  * Admin panel (session login): Licenses, Products, Payments, Redeem (CodeCanyon),
@@ -84,29 +85,28 @@ Wire contract: `docs/LICENSE_SERVER_CONTRACT.md` in the SaaS repo.
 
 ## Web server routing
 
-The API paths must map to the PHP files.
+The SaaS calls the PHP files **directly** — `/api/verify.php`, `/api/issue.php`,
+`/api/catalog.php`, `/api/download.php` — so **no URL rewriting is required** on
+any server. The `/api/v1/...` pretty paths in `.htaccess` are an Apache-only
+convenience.
 
-**Apache** — the bundled `.htaccess` does it (needs `mod_rewrite`).
-
-**nginx** — in the server block (adjust the PHP-FPM socket):
+**You DO need to deny web access to the private folders** — `.htaccess` in
+`config/ lib/ bin/ database/ storage/` handles Apache, but **nginx / CloudPanel
+/ LiteSpeed ignore `.htaccess`**, so add this to the vhost:
 
 ```nginx
-location ~ ^/api/v1/license/(verify|issue)$ {
-    rewrite ^/api/v1/license/verify$ /api/verify.php break;
-    rewrite ^/api/v1/license/issue$  /api/issue.php  break;
-    include fastcgi_params;
-    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-    fastcgi_pass unix:/run/php/php8.2-fpm.sock;
-}
-location = /api/v1/catalog { rewrite ^ /api/catalog.php break; include fastcgi_params; fastcgi_param SCRIPT_FILENAME $document_root/api/catalog.php; fastcgi_pass unix:/run/php/php8.2-fpm.sock; }
-location ~ ^/(config|lib|bin|database)/ { deny all; }
+# CloudPanel: Site → Vhost → paste inside the server { } block
+location ~ ^/(config|lib|bin|database|storage)/ { deny all; return 404; }
 ```
+
+Without it, `https://license.example.com/storage/packages/…` and
+`…/database/schema.sql` would be downloadable. (Uploaded packages get a random
+filename as a second layer, but still add the rule.)
 
 ## Security notes
 
 - HTTPS only — the shared secret, admin session and gateway keys ride on it.
-- `config/`, `lib/`, `bin/`, `database/` ship with deny-all `.htaccess`; mirror
-  that on nginx.
+- Add the nginx `deny` rule above (Apache is covered by the bundled `.htaccess`).
 - Rotate `SERVER_SECRET` here and in every SaaS `.env` together.
 - The admin panel has a login gate but no rate limiting — add an IP allowlist if
   it is internet-facing.
@@ -371,9 +371,32 @@ function package_dir(): string
     return __DIR__.'/../storage/packages';
 }
 
+function package_slug(string $slug): string
+{
+    return preg_replace('/[^a-z0-9]+/i', '', strtolower($slug));
+}
+
+/**
+ * Absolute path to a product's uploaded ZIP, or '' if none.
+ * New uploads get a random filename (recorded in settings.pkg_file_<slug>) so
+ * the ZIP is not guessable even if storage/ is web-served on a mis-configured
+ * host; a legacy <slug>.zip is still honoured.
+ */
 function package_path(string $slug): string
 {
-    return package_dir().'/'.preg_replace('/[^a-z0-9]+/i', '', strtolower($slug)).'.zip';
+    $slug = package_slug($slug);
+    if ($slug === '') {
+        return '';
+    }
+
+    $named = (string) setting('pkg_file_'.$slug, '');
+    if ($named !== '' && basename($named) === $named && is_file(package_dir().'/'.$named)) {
+        return package_dir().'/'.$named;
+    }
+
+    $legacy = package_dir().'/'.$slug.'.zip';
+
+    return is_file($legacy) ? $legacy : '';
 }
 
 /* --- shared license check (used by verify.php and download.php) --- */
@@ -972,15 +995,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $msg = 'Product saved, but the package must be a .zip.';
                 } else {
                     @mkdir(package_dir(), 0770, true);
-                    move_uploaded_file($_FILES['package']['tmp_name'], package_path($slug));
-                    $pdo->prepare('UPDATE products SET package_uploaded_at = NOW() WHERE slug = ?')->execute([$slug]);
-                    $msg = 'Product + package saved.';
+                    $old = package_path($slug);
+                    $fname = package_slug($slug).'-'.bin2hex(random_bytes(12)).'.zip';
+                    if (move_uploaded_file($_FILES['package']['tmp_name'], package_dir().'/'.$fname)) {
+                        set_setting('pkg_file_'.package_slug($slug), $fname);
+                        if ($old !== '' && basename($old) !== $fname) {
+                            @unlink($old);
+                        }
+                        $pdo->prepare('UPDATE products SET package_uploaded_at = NOW() WHERE slug = ?')->execute([$slug]);
+                        $msg = 'Product + package saved.';
+                    } else {
+                        $msg = 'Product saved, but the package upload failed (check storage/packages permissions).';
+                    }
                 }
             }
         }
     } elseif ($action === 'delete' && ! empty($_POST['slug'])) {
+        $old = package_path($_POST['slug']);
         $pdo->prepare('DELETE FROM products WHERE slug = ?')->execute([$_POST['slug']]);
-        @unlink(package_path($_POST['slug']));
+        if ($old !== '') {
+            @unlink($old);
+        }
+        set_setting('pkg_file_'.package_slug($_POST['slug']), '');
     }
     header('Location: products.php?msg='.urlencode($msg));
     exit;

@@ -12,6 +12,20 @@ of it. Verification is strict — an unreachable server or a non-2xx response is
 failure, never a silent pass. (In tests the URL is blanked, and the client then
 only format-checks keys.)
 
+### Endpoint paths
+
+The SaaS client calls the PHP files **directly** so nothing needs URL rewriting:
+
+| Contract name (below) | Actual URL the SaaS calls |
+|---|---|
+| `POST /api/v1/license/verify` | `POST /api/verify.php` |
+| `POST /api/v1/license/issue` | `POST /api/issue.php` |
+| `POST /api/v1/module/download` | `POST /api/download.php` |
+| `GET /api/v1/catalog` | `GET /api/catalog.php` |
+
+The `/api/v1/...` forms are Apache-only aliases (`.htaccess`); a reference
+implementation only needs the `.php` files to answer.
+
 All requests send:
 
 ```

@@ -60,7 +60,7 @@ class CustomLicenseServerClient
         try {
             $response = Http::withHeaders(['X-Server-Secret' => $this->secret])
                 ->timeout(max($this->timeout, 60))
-                ->post($this->baseUrl.'/api/v1/module/download', [
+                ->post($this->baseUrl.'/api/download.php', [
                     'license_key' => trim($key),
                     'product_slug' => $slug,
                     'domain' => $domain,
@@ -99,7 +99,7 @@ class CustomLicenseServerClient
             $response = Http::withHeaders(['X-Server-Secret' => $this->secret])
                 ->acceptJson()
                 ->timeout($this->timeout)
-                ->get($this->baseUrl.'/api/v1/catalog');
+                ->get($this->baseUrl.'/api/catalog.php');
 
             if ($response->successful() && $response->json('status')) {
                 return array_map(fn ($p) => [
@@ -144,7 +144,7 @@ class CustomLicenseServerClient
             $response = Http::withHeaders(['X-Server-Secret' => $this->secret])
                 ->acceptJson()
                 ->timeout($this->timeout)
-                ->post($this->baseUrl.'/api/v1/license/verify', [
+                ->post($this->baseUrl.'/api/verify.php', [
                     'license_key' => $key,
                     'product_slug' => $slug,
                     'domain' => $domain,
@@ -214,7 +214,7 @@ class CustomLicenseServerClient
             $response = Http::withHeaders(['X-Server-Secret' => $this->secret])
                 ->acceptJson()
                 ->timeout($this->timeout)
-                ->post($this->baseUrl.'/api/v1/license/issue', array_filter([
+                ->post($this->baseUrl.'/api/issue.php', array_filter([
                     'payment' => $payment,
                     'product_slug' => $slug,
                     'domain' => $domain,

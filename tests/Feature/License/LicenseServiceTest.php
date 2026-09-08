@@ -49,7 +49,7 @@ class LicenseServiceTest extends TestCase
         config()->set('services.license_server.secret', 's3cret');
 
         Http::fake([
-            'license.test/api/v1/license/verify' => Http::response([
+            'license.test/api/verify.php' => Http::response([
                 'status' => true,
                 'expires_at' => '2027-01-01T00:00:00Z',
                 'message' => 'ok',

@@ -143,8 +143,8 @@ class ModuleLicensingTest extends TestCase
     {
         config()->set('services.license_server.url', 'https://lm.test');
         Http::fake([
-            'lm.test/api/v1/module/download' => Http::response($this->fakeModuleZip('widgets'), 200, ['Content-Type' => 'application/zip']),
-            'lm.test/api/v1/license/verify' => Http::response(['status' => true, 'expires_at' => null, 'message' => 'ok', 'plan' => null], 200),
+            'lm.test/api/download.php' => Http::response($this->fakeModuleZip('widgets'), 200, ['Content-Type' => 'application/zip']),
+            'lm.test/api/verify.php' => Http::response(['status' => true, 'expires_at' => null, 'message' => 'ok', 'plan' => null], 200),
         ]);
 
         $this->actingAsSuperAdmin();
@@ -161,14 +161,14 @@ class ModuleLicensingTest extends TestCase
         $this->assertTrue($module->is_active);
         $this->assertTrue(is_dir(base_path('modules/widgets')));
 
-        Http::assertSent(fn ($r) => str_contains($r->url(), '/api/v1/module/download') && $r->hasHeader('X-Server-Secret'));
+        Http::assertSent(fn ($r) => str_contains($r->url(), '/api/download.php') && $r->hasHeader('X-Server-Secret'));
     }
 
     public function test_get_module_reports_a_declined_download(): void
     {
         config()->set('services.license_server.url', 'https://lm.test');
         Http::fake([
-            'lm.test/api/v1/module/download' => Http::response(['status' => false, 'message' => 'License is revoked.'], 403),
+            'lm.test/api/download.php' => Http::response(['status' => false, 'message' => 'License is revoked.'], 403),
         ]);
 
         $this->actingAsSuperAdmin();
