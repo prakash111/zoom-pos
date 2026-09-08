@@ -25,7 +25,9 @@ class PeriodicLicenseCheck
 
     public function terminate(Request $request, Response $response): void
     {
-        if (! config('services.license_server.url')) {
+        // Nothing to check until the shared secret is set (License Manager not
+        // wired up yet). The server URL itself is hardcoded.
+        if (! config('services.license_server.secret')) {
             return;
         }
 

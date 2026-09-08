@@ -81,21 +81,21 @@ callback is additionally HMAC-signed with the same secret.
 
 ## Part B — Configure each SaaS install
 
-In the SaaS `.env` (set these before you ship the build, or per customer):
+The license server is **hardcoded** to `https://license.zoomnearby.com`
+(`config/services.php` → `services.license_server`). The only thing set per
+install is the shared secret:
 
 ```dotenv
-LICENSE_DRIVER=custom
-LICENSE_SERVER_URL=https://license.yourdomain.com
-LICENSE_SERVER_SECRET=<the SERVER_SECRET from config/config.php>
+LICENSE_SERVER_SECRET=<the SERVER_SECRET from the License Manager's config/config.php>
 LICENSE_SERVER_TIMEOUT=10
-MODULE_STORE_URL=https://license.yourdomain.com/buy.php
 ```
 
-- `LICENSE_DRIVER=codecanyon` instead routes verification to the Envato API
-  (`ENVATO_API_TOKEN`) — use only if that install was sold on CodeCanyon.
-- If `LICENSE_SERVER_URL` is empty the `custom` driver only *format-checks*
-  keys (any well-formed 16+ char string passes) — fine for local dev, not for
-  production.
+then `php artisan config:clear`.
+
+- No `LICENSE_SERVER_URL` / `MODULE_STORE_URL` / `LICENSE_DRIVER` — the URL, the
+  `/buy.php` store link and the `custom` driver are fixed in `config/services.php`.
+- Until the secret is set, the daily / request-time re-check is skipped and the
+  "Available modules" card shows a reminder.
 - There is **no in-app licensing screen**. Operators only ever type license
   keys.
 
@@ -276,7 +276,7 @@ Full contract with response bodies: `docs/LICENSE_SERVER_CONTRACT.md`.
 |---|---|
 | `app/Services/License/LicenseService.php` | driver dispatch: `verify()`, `issue()`, `catalog()`, `currentDomain()` |
 | `app/Services/License/CustomLicenseServerClient.php` | HTTP client for the License Manager |
-| `app/Services/License/EnvatoLicenseVerificationService.php` | the `codecanyon` driver (unused unless `LICENSE_DRIVER=codecanyon`) |
+| `app/Services/License/EnvatoLicenseVerificationService.php` | the `codecanyon` driver (retained but unused — driver is hardcoded `custom`) |
 | `app/Services/Modular/ModulePackageService.php` | `activate()` gate, `verifyAndRecordLicense()`, `clearLicense()`, pending-license apply |
 | `app/Services/Modular/ModuleCatalog.php` | merge vendor catalog + manifest + override; `storeLink()` |
 | `app/Http/Controllers/Api/LicenseActivationController.php` | `POST /api/license/activate` (signed callback) |

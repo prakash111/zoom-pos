@@ -68,13 +68,12 @@ Wire contract: `docs/LICENSE_SERVER_CONTRACT.md` in the SaaS repo.
 6. Sign in at `/admin/`, open **Settings**, choose the validation mode and enter
    your payment gateway credentials. Add your **Products** (core + modules) with
    prices.
-7. In each SaaS install's `.env` (vendor build config):
+7. In each SaaS install's `.env` — the server URL is hardcoded in the SaaS
+   (`config/services.php`); only the shared secret is set:
    ```
-   LICENSE_DRIVER=custom
-   LICENSE_SERVER_URL=https://license.example.com
-   LICENSE_SERVER_SECRET=<the same SERVER_SECRET>
-   MODULE_STORE_URL=https://license.example.com/buy.php
+   LICENSE_SERVER_SECRET=<the same SERVER_SECRET as this config/config.php>
    ```
+   then `php artisan config:clear` on the SaaS.
 
 ## Validation modes (Settings)
 

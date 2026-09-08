@@ -7,10 +7,9 @@ use Illuminate\Support\Facades\Cache;
 /**
  * Hybrid license verification dispatcher.
  *
- * The driver is vendor configuration (`LICENSE_DRIVER` env / config), fixed
- * before the script is distributed — there is no in-app switch:
- *   - "codecanyon" → Envato Market API (EnvatoLicenseVerificationService)
- *   - "custom"     → self-hosted license server (CustomLicenseServerClient)
+ * The driver is fixed in config/services.php (`custom`) — the self-hosted
+ * license server at the hardcoded https://license.zoomnearby.com. The
+ * "codecanyon" branch (Envato Market API) is retained but unused.
  *
  * All callers get one unified response shape regardless of driver.
  */

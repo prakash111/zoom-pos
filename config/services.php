@@ -54,24 +54,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | License Server (hybrid license verification)
+    | License Server
     |--------------------------------------------------------------------------
     |
-    | `driver` is only the first-run default — the live value is stored in the
-    | `platform_system` table under key `license_driver` (codecanyon | custom)
-    | and edited from SuperAdmin → Settings → Licensing. When `url` is empty the
-    | custom driver falls back to a local format check (dev / offline).
+    | The license server location is fixed for this product — it is NOT taken
+    | from the environment. Only the shared secret (which must stay private) and
+    | the request timeout are configurable via .env.
     |
     */
     'license_server' => [
-        'driver' => env('LICENSE_DRIVER', 'custom'),
-        'url' => env('LICENSE_SERVER_URL'),
+        'driver' => 'custom',
+        'url' => 'https://license.zoomnearby.com',
+        'store_url' => 'https://license.zoomnearby.com/buy.php',
         'secret' => env('LICENSE_SERVER_SECRET'),
         'timeout' => (int) env('LICENSE_SERVER_TIMEOUT', 10),
-        // Vendor storefront where operators buy add-on modules. When set, an
-        // unlicensed module links out to "{store_url}?module={slug}" (or the
-        // module.json "buy_url" if it declares one).
-        'store_url' => env('MODULE_STORE_URL'),
     ],
 
 ];

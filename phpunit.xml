@@ -32,10 +32,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
-        <env name="LICENSE_DRIVER" value="custom"/>
-        <env name="LICENSE_SERVER_URL" value=""/>
         <env name="LICENSE_SERVER_SECRET" value=""/>
-        <env name="MODULE_STORE_URL" value=""/>
         <env name="ENVATO_API_TOKEN" value=""/>
     </php>
 </phpunit>

@@ -43,7 +43,7 @@
                 <h4 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">{{ __("Available modules") }}</h4>
                 <p class="text-xs text-slate-400">{{ __("Buy a module (a key is issued and this site fetches + installs it), or paste a key you already have to download and activate it now.") }}</p>
                 @unless ($licenseServerConfigured ?? false)
-                    <p class="text-[11px] text-amber-600 dark:text-amber-400 font-bold mt-1">{{ __("Set LICENSE_SERVER_URL (and MODULE_STORE_URL) in .env, then run: php artisan config:clear — to buy or download modules.") }}</p>
+                    <p class="text-[11px] text-amber-600 dark:text-amber-400 font-bold mt-1">{{ __("Set LICENSE_SERVER_SECRET in .env (from the License Manager), then run: php artisan config:clear — to buy or download modules.") }}</p>
                 @endunless
             </div>
             <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

@@ -27,9 +27,8 @@ verticals never do (they have no `sdui_modules` row).
 - Activation flow: SuperAdmin → Modules shows a key field on an unlicensed
   module. The key (supplied by the vendor) is verified through
   `App\Services\License\LicenseService` against the vendor-configured driver
-  (`LICENSE_DRIVER`: `codecanyon` = Envato API, `custom` = self-hosted license
-  server at `LICENSE_SERVER_URL`). There is no in-app licensing screen — the
-  driver / URL / secret are baked in before distribution. With no license
+  (driver hardcoded to `custom`; server hardcoded to https://license.zoomnearby.com
+  in config/services.php). There is no in-app licensing screen. With no license
   server configured the `custom` driver only *format-checks* the key.
 - On success the row stores `license_status = active` plus an encrypted copy of
   the key, its hash/prefix, the driver, buyer and expiry.

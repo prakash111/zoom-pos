@@ -12,14 +12,13 @@ use Throwable;
  * (e.g. https://license.zoomnearby.com). Contract lives in
  * docs/LICENSE_SERVER_CONTRACT.md.
  *
- * The server URL + shared secret are vendor configuration — set once in the
- * environment (LICENSE_SERVER_URL / LICENSE_SERVER_SECRET) before the script is
- * distributed. There is no in-app screen for them.
+ * The server URL is hardcoded (config/services.php, not the environment); only
+ * the shared secret (LICENSE_SERVER_SECRET) is configurable. There is no in-app
+ * screen for either.
  *
- * When no base URL is configured this degrades to a local format check so a
- * fresh install / offline dev box can still activate modules. As soon as a URL
- * is set, verification is strict: an unreachable server or a non-2xx response
- * is a failure, never a silent pass.
+ * When no base URL is configured (tests only) this degrades to a local format
+ * check. In production the URL is always set, so verification is strict: an
+ * unreachable server or a non-2xx response is a failure, never a silent pass.
  */
 class CustomLicenseServerClient
 {

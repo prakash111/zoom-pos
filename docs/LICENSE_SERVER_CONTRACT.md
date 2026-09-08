@@ -5,13 +5,12 @@ The `custom` license driver talks to a self-hosted license server — e.g.
 document is the contract the platform's client
 (`App\Services\License\CustomLicenseServerClient`) expects it to honour.
 
-The URL, shared secret and driver are **vendor configuration** — set in the
-environment (`LICENSE_DRIVER`, `LICENSE_SERVER_URL`, `LICENSE_SERVER_SECRET`)
-before the script is distributed. There is no in-app screen for them.
-**When no URL is set the client does not call out** —
-`verify()` only format-checks the key and `issue()` mints a `DEV-…` key. As soon
-as a URL is set, verification is strict: an unreachable server or a non-2xx
-response is a failure, never a silent pass.
+The URL (`https://license.zoomnearby.com`) and `custom` driver are **hardcoded**
+in the SaaS `config/services.php`. Only `LICENSE_SERVER_SECRET` is set in `.env`
+(it must equal the server's `SERVER_SECRET`). There is no in-app screen for any
+of it. Verification is strict — an unreachable server or a non-2xx response is a
+failure, never a silent pass. (In tests the URL is blanked, and the client then
+only format-checks keys.)
 
 All requests send:
 
@@ -222,8 +221,8 @@ php scripts/build_license_server.php
 The ZIP is a dependency-free PHP 8+ micro-app (`api/verify.php`, `api/issue.php`,
 a password-protected admin panel, `database/schema.sql`) meant to run on its own
 subdomain. Deploy it, import the schema, set `SERVER_SECRET` in
-`config/config.php`, and point the SaaS `LICENSE_SERVER_URL` /
-`LICENSE_SERVER_SECRET` at it. See the ZIP's `README.md` for the full runbook.
+`config/config.php`, and put that same value in the SaaS's `LICENSE_SERVER_SECRET`
+(the URL is already hardcoded). See the ZIP's `README.md` for the full runbook.
 
 ## Semantics
 
