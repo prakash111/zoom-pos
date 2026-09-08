@@ -8,6 +8,7 @@ use App\Models\SduiModule;
 use App\Services\Modular\ModuleCatalog;
 use App\Services\Modular\ModulePackageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -18,6 +19,15 @@ use Tests\TestCase;
 class ModuleLicensingTest extends TestCase
 {
     use ActsAsPlatformAdmin, RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        foreach (['pharmacy', 'salon', 'repairtechnician', 'widgets'] as $slug) {
+            File::deleteDirectory(base_path('modules/'.$slug));
+        }
+
+        parent::tearDown();
+    }
 
     private function packageRow(array $overrides = []): SduiModule
     {
@@ -104,6 +114,35 @@ class ModuleLicensingTest extends TestCase
         $this->assertFalse($module->is_active);
         $this->assertSame('revoked', $module->license_status);
         $this->assertNotContains('widgets', json_decode(PlatformSystem::get('allowed_registration_modes'), true));
+    }
+
+    public function test_available_catalog_lists_the_bundled_verticals(): void
+    {
+        $slugs = collect(ModuleCatalog::available())->pluck('slug')->all();
+
+        $this->assertContains('pharmacy', $slugs);
+        $this->assertContains('salon', $slugs);
+        $this->assertContains('repairtechnician', $slugs);
+        $this->assertNotContains('core', $slugs);
+    }
+
+    public function test_install_bundled_registers_a_module_row_without_an_upload(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        Livewire::test(ModulesIndex::class)
+            ->call('installBundled', 'pharmacy')
+            ->assertHasNoErrors();
+
+        $module = SduiModule::where('slug', 'pharmacy')->first();
+        $this->assertNotNull($module);
+        $this->assertSame('package', $module->source_type);
+        $this->assertFalse($module->is_active);
+        $this->assertTrue($module->requires_license);
+        $this->assertTrue(is_dir(base_path('modules/pharmacy')));
+
+        // cleanup
+        app(ModulePackageService::class)->uninstall($module, true, null);
     }
 
     public function test_unlicensed_module_exposes_a_vendor_store_link(): void

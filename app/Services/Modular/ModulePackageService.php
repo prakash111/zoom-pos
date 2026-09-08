@@ -49,77 +49,108 @@ class ModulePackageService
         try {
             $this->extractSafely($zip->getRealPath(), $tmpDir);
             $manifestDir = $this->locateManifestDir($tmpDir);
-            $manifest = $this->readManifest($manifestDir);
 
-            $existing = SduiModule::where('slug', $manifest['key'])->first();
-            $this->validateManifest($manifest, $existing);
-
-            $modulesRoot = base_path('modules');
-            File::ensureDirectoryExists($modulesRoot);
-            $destination = $modulesRoot.'/'.$manifest['key'];
-
-            if (File::isDirectory($destination)) {
-                File::deleteDirectory($destination);
-            }
-
-            if (! @rename($manifestDir, $destination)) {
-                throw new RuntimeException('Could not move extracted module into place.');
-            }
-
-            $inheritsUi = $manifest['inherits_ui'] ?? null;
-            $features = $manifest['features'] ?? [];
-            if ($inheritsUi !== null) {
-                $features['inherits_ui'] = $inheritsUi;
-            }
-
-            // Storefront metadata for the "Get this module" link. Stored inside
-            // features so no extra column is needed; a SuperAdmin can override
-            // per-slug via the platform_system `module_catalog` key.
-            $catalog = array_filter([
-                'price' => isset($manifest['price']) ? (float) $manifest['price'] : null,
-                'currency' => isset($manifest['currency']) ? strtoupper((string) $manifest['currency']) : null,
-                'buy_url' => isset($manifest['buy_url']) ? (string) $manifest['buy_url'] : null,
-                'buy_enabled' => array_key_exists('buy_enabled', $manifest) ? (bool) $manifest['buy_enabled'] : null,
-            ], fn ($v) => $v !== null);
-            if ($catalog !== []) {
-                $features['catalog'] = $catalog;
-            }
-
-            $module = SduiModule::updateOrCreate(
-                ['slug' => $manifest['key']],
-                [
-                    'name' => $manifest['name'],
-                    'description' => $manifest['description'] ?? null,
-                    'icon' => $manifest['icon'] ?? 'widgets',
-                    'layout_type' => $manifest['layout_type'] ?? ($inheritsUi === 'universal_pos' ? 'universal_pos' : 'standard_grid'),
-                    'features' => $features,
-                    'navigation' => $manifest['navigation'] ?? [],
-                    'version' => $manifest['version'],
-                    'author' => $manifest['author'] ?? null,
-                    'min_system_version' => $manifest['min_system_version'] ?? null,
-                    'source_type' => 'package',
-                    'package_path' => $manifest['key'],
-                    'installed_at' => now(),
-                    'is_active' => false,
-                    'requires_license' => $manifest['requires_license'] ?? true,
-                ]
-            );
-
-            AuditLog::record('module.installed', null, $adminUserId !== null ? (string) $adminUserId : null, [
-                'key' => $manifest['key'],
-                'version' => $manifest['version'],
-            ]);
-
-            // A license pushed by the License Manager before the ZIP was
-            // uploaded (see LicenseActivationController) — apply it now.
-            $this->applyPendingLicense($module, $adminUserId);
-
-            return $module;
+            return $this->registerFromDir($manifestDir, $adminUserId, move: true);
         } finally {
             if (File::isDirectory($tmpDir)) {
                 File::deleteDirectory($tmpDir);
             }
         }
+    }
+
+    /**
+     * Install one of the modules bundled in the repo (module-packages/<slug>/)
+     * directly — no ZIP upload. Used by the "Available modules" card so the
+     * operator can install a first-party vertical in one click.
+     */
+    public function installBundled(string $slug, int|string|null $adminUserId): SduiModule
+    {
+        $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '', $slug));
+        $source = base_path('module-packages/'.$slug);
+
+        if ($slug === '' || ! File::exists($source.'/module.json')) {
+            throw new InvalidArgumentException("No bundled module \"{$slug}\" is available in this build.");
+        }
+
+        return $this->registerFromDir($source, $adminUserId, move: false);
+    }
+
+    /**
+     * Register a module from a directory that already contains module.json:
+     * validate the manifest, place the files under modules/<key>/, upsert the
+     * sdui_modules row, and apply any license the License Manager pushed early.
+     */
+    private function registerFromDir(string $sourceDir, int|string|null $adminUserId, bool $move): SduiModule
+    {
+        $manifest = $this->readManifest($sourceDir);
+
+        $existing = SduiModule::where('slug', $manifest['key'])->first();
+        $this->validateManifest($manifest, $existing);
+
+        $modulesRoot = base_path('modules');
+        File::ensureDirectoryExists($modulesRoot);
+        $destination = $modulesRoot.'/'.$manifest['key'];
+
+        if (File::isDirectory($destination)) {
+            File::deleteDirectory($destination);
+        }
+
+        if ($move) {
+            if (! @rename($sourceDir, $destination)) {
+                throw new RuntimeException('Could not move extracted module into place.');
+            }
+        } elseif (! File::copyDirectory($sourceDir, $destination)) {
+            throw new RuntimeException('Could not copy the bundled module into place.');
+        }
+
+        $inheritsUi = $manifest['inherits_ui'] ?? null;
+        $features = $manifest['features'] ?? [];
+        if ($inheritsUi !== null) {
+            $features['inherits_ui'] = $inheritsUi;
+        }
+
+        // Storefront metadata for the "Buy module" link. Stored inside features
+        // so no extra column is needed; a SuperAdmin can override per-slug via
+        // the platform_system `module_catalog` key.
+        $catalog = array_filter([
+            'price' => isset($manifest['price']) ? (float) $manifest['price'] : null,
+            'currency' => isset($manifest['currency']) ? strtoupper((string) $manifest['currency']) : null,
+            'buy_url' => isset($manifest['buy_url']) ? (string) $manifest['buy_url'] : null,
+            'buy_enabled' => array_key_exists('buy_enabled', $manifest) ? (bool) $manifest['buy_enabled'] : null,
+        ], fn ($v) => $v !== null);
+        if ($catalog !== []) {
+            $features['catalog'] = $catalog;
+        }
+
+        $module = SduiModule::updateOrCreate(
+            ['slug' => $manifest['key']],
+            [
+                'name' => $manifest['name'],
+                'description' => $manifest['description'] ?? null,
+                'icon' => $manifest['icon'] ?? 'widgets',
+                'layout_type' => $manifest['layout_type'] ?? ($inheritsUi === 'universal_pos' ? 'universal_pos' : 'standard_grid'),
+                'features' => $features,
+                'navigation' => $manifest['navigation'] ?? [],
+                'version' => $manifest['version'],
+                'author' => $manifest['author'] ?? null,
+                'min_system_version' => $manifest['min_system_version'] ?? null,
+                'source_type' => 'package',
+                'package_path' => $manifest['key'],
+                'installed_at' => now(),
+                'is_active' => false,
+                'requires_license' => $manifest['requires_license'] ?? true,
+            ]
+        );
+
+        AuditLog::record('module.installed', null, $adminUserId !== null ? (string) $adminUserId : null, [
+            'key' => $manifest['key'],
+            'version' => $manifest['version'],
+        ]);
+
+        // A license the License Manager pushed before the files were in place.
+        $this->applyPendingLicense($module, $adminUserId);
+
+        return $module;
     }
 
     public function activate(SduiModule $module, int|string|null $adminUserId): void

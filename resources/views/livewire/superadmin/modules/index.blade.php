@@ -61,32 +61,40 @@
         </div>
     @endif
 
-    <!-- Available to purchase -->
+    <!-- Available modules (catalog) -->
     @if (isset($purchasable) && $purchasable->isNotEmpty())
         <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-4">
             <div>
                 <h4 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">{{ __("Available modules") }}</h4>
-                <p class="text-xs text-slate-400">{{ __("Buy a module — a license key is issued and activated on this site automatically. Or upload a ZIP you already have.") }}</p>
+                <p class="text-xs text-slate-400">{{ __("Buy a module (a license key is issued and pushed to this site), or install one that ships with this build and activate it with a key.") }}</p>
             </div>
-            <div class="grid gap-3 sm:grid-cols-2">
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 @foreach ($purchasable as $p)
-                    <div class="rounded-2xl border border-slate-100 dark:border-slate-800 p-4 flex flex-col gap-1">
+                    <div class="rounded-2xl border border-slate-100 dark:border-slate-800 p-4 flex flex-col gap-1.5">
                         <div class="flex items-center justify-between gap-2">
                             <span class="font-bold text-slate-900 dark:text-white text-sm">{{ $p['name'] }}</span>
                             <span class="font-mono text-[11px] text-slate-400">{{ $p['slug'] }}</span>
                         </div>
                         @if (! empty($p['description']))
-                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ $p['description'] }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{{ $p['description'] }}</p>
                         @endif
-                        <div class="flex items-center justify-between mt-2">
-                            <span class="text-sm font-black text-slate-900 dark:text-white">
-                                @if (($p['price'] ?? 0) > 0){{ $p['currency'] }} {{ number_format($p['price'], 2) }}@else{{ __('—') }}@endif
-                            </span>
+                        <div class="text-sm font-black text-slate-900 dark:text-white mt-1">
+                            @if (($p['price'] ?? 0) > 0){{ $p['currency'] }} {{ number_format($p['price'], 2) }}@else<span class="text-slate-400 font-bold">{{ __('Price on the store') }}</span>@endif
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 mt-2">
                             @if (! empty($p['store_link']))
                                 <a href="{{ $p['store_link'] }}" target="_blank" rel="noopener noreferrer"
                                    class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white">{{ __("Buy module") }} ↗</a>
                             @endif
+                            @if (! empty($p['bundled']))
+                                <button type="button" wire:click="installBundled('{{ $p['slug'] }}')"
+                                        wire:confirm="{{ __('Install :name from this build? It will need a license key to activate.', ['name' => $p['name']]) }}"
+                                        class="px-3 py-1.5 rounded-xl text-xs font-extrabold border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40">{{ __("Install") }}</button>
+                            @endif
                         </div>
+                        @if (empty($p['store_link']) && empty($p['bundled']))
+                            <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">{{ __("Set MODULE_STORE_URL, or upload the module ZIP below.") }}</p>
+                        @endif
                     </div>
                 @endforeach
             </div>

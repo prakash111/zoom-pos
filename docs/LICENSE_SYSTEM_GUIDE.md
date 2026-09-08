@@ -99,10 +99,18 @@ MODULE_STORE_URL=https://license.yourdomain.com/buy.php
 
 ## Part C — The three ways a customer gets a key
 
+SuperAdmin → Modules always shows an **"Available modules"** card listing every
+sellable vertical — the ones bundled in the build (`module-packages/`) plus
+anything extra from the vendor catalog. Each card has:
+
+- **Install** — for a bundled module: registers it from the build with no upload.
+  The row then drops into *Installed Modules* needing a license key.
+- **Buy module ↗** — opens the hosted checkout (see below).
+
 ### 1. Buy through the hosted checkout (self-serve, gateway)
 
 - **Core:** installer step 4 shows **"Buy a license ↗"** → `/buy.php?product=core&domain=<their-host>`.
-- **Module:** SuperAdmin → Modules → *Available modules* card → **"Buy module ↗"** → `/buy.php?product=<slug>&domain=<their-host>&return=<modules-url>`.
+- **Module:** the *Available modules* card's **"Buy module ↗"** → `/buy.php?product=<slug>&domain=<their-host>&return=<modules-url>`.
 
 Flow: `/buy.php` collects an email → creates a gateway order (Razorpay/Stripe)
 → on payment it issues a key **bound to that domain**, records the payment,
@@ -116,8 +124,8 @@ License Manager → **Licenses** → *Issue a license*: pick the product, enter 
 buyer email, optionally pre-bind a domain / set an expiry. Copy the generated
 key and send it to the customer. They paste it:
 - **Core** → installer step 4, or the SuperAdmin **dashboard banner** later.
-- **Module** → SuperAdmin → Modules → the module's *license key* field →
-  *Verify & Activate*.
+- **Module** → SuperAdmin → Modules → **Install** the module (or upload its
+  ZIP), then paste the key in its *license key* field → *Verify & Activate*.
 
 ### 3. Redeem a CodeCanyon purchase code
 

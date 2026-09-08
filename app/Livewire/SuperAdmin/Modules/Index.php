@@ -39,6 +39,25 @@ class Index extends Component
         $this->reset('zipFile');
     }
 
+    /**
+     * One-click install of a vertical bundled in this build (module-packages/).
+     * The row then needs a license key to activate, like any other package.
+     */
+    public function installBundled(ModulePackageService $service, string $slug): void
+    {
+        try {
+            $module = $service->installBundled($slug, auth('platform_web')->id());
+            session()->flash(
+                'status',
+                $module->license_status === 'active'
+                    ? "Module \"{$module->name}\" installed and licensed — Activate it below."
+                    : "Module \"{$module->name}\" installed. Enter its license key below to activate."
+            );
+        } catch (Throwable $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
     public function activate(ModulePackageService $service, int $moduleId): void
     {
         $module = SduiModule::findOrFail($moduleId);
@@ -166,13 +185,12 @@ class Index extends Component
     public function render()
     {
         $modules = $this->packageModules();
-
-        // Vendor catalog entries that are not already installed here — offered
-        // as "Buy" cards. `core` never appears (it's the platform itself).
         $installedSlugs = $modules->pluck('slug')->all();
-        $purchasable = collect(app(LicenseService::class)->catalog())
-            ->reject(fn ($p) => $p['slug'] === 'core' || in_array($p['slug'], $installedSlugs, true))
-            ->map(fn ($p) => $p + ['store_link' => ModuleCatalog::storeLink($p['slug'])])
+
+        // Every sellable vertical (bundled + vendor catalog) that is not already
+        // installed here — shown as a card with Buy / Install.
+        $purchasable = collect(ModuleCatalog::available())
+            ->reject(fn ($p) => in_array($p['slug'], $installedSlugs, true))
             ->values();
 
         return view('livewire.superadmin.modules.index', [
@@ -180,7 +198,7 @@ class Index extends Component
             'orphans' => app(ModulePackageService::class)->orphanedModuleDirs(),
             'purchasable' => $purchasable,
             'catalog' => $modules->mapWithKeys(fn ($m) => [
-                $m->id => ModuleCatalog::for($m->slug) + ['store_link' => ModuleCatalog::storeLink($m->slug)],
+                $m->id => ModuleCatalog::for($m->slug),
             ])->all(),
         ]);
     }
