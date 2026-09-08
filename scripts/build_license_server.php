@@ -6,10 +6,11 @@
  * its add-on modules. Runs on its own domain (e.g. license.example.com).
  *
  * Endpoints (all POST unless noted, header `X-Server-Secret`):
- *   /api/v1/license/verify   check a key for product + domain
- *   /api/v1/license/issue    issue a key after a paid purchase (idempotent)
- *   /api/v1/catalog   (GET)  active products for the SaaS "Buy module" screen
- *   /buy.php          (GET)  public hosted checkout (Razorpay / Stripe)
+ *   /api/v1/license/verify    check a key for product + domain
+ *   /api/v1/license/issue     issue a key after a paid purchase (idempotent)
+ *   /api/v1/module/download   verify a key, then stream that module's ZIP
+ *   /api/v1/catalog    (GET)  active products for the SaaS "Buy module" screen
+ *   /buy.php           (GET)  public hosted checkout (Razorpay / Stripe)
  *
  * Admin panel (session login): Licenses, Products, Payments, Redeem (CodeCanyon),
  * Settings (validation mode, Envato token, gateway credentials).
@@ -37,11 +38,21 @@ add-on modules. Dependency-free PHP 8+. Runs on its own domain
 
 | Path | Auth | Purpose |
 |---|---|---|
-| `POST /api/v1/license/verify` | `X-Server-Secret` | Check a key for a product + domain. |
-| `POST /api/v1/license/issue`  | `X-Server-Secret` | Issue a key after a paid purchase (idempotent on `payment.reference`). |
-| `GET  /api/v1/catalog`        | `X-Server-Secret` | Active products for the SaaS "Buy module" list. |
-| `GET  /buy.php`               | public | Hosted checkout — operator pays, a key is issued and pushed to their site. |
-| `/admin/`                     | session login | Licenses, Products, Payments, Redeem CodeCanyon codes, Settings. |
+| `POST /api/v1/license/verify`   | `X-Server-Secret` | Check a key for a product + domain. |
+| `POST /api/v1/license/issue`    | `X-Server-Secret` | Issue a key after a paid purchase (idempotent on `payment.reference`). |
+| `POST /api/v1/module/download`  | `X-Server-Secret` | Verify a key, then stream that product's package ZIP. **Module source files live only here.** |
+| `GET  /api/v1/catalog`          | `X-Server-Secret` | Active products for the SaaS "Buy module" list. |
+| `GET  /buy.php`                 | public | Hosted checkout — operator pays, a key is issued and pushed to their site. |
+| `/admin/`                       | session login | Licenses, Products (+ package upload), Payments, Redeem CodeCanyon codes, Settings. |
+
+## Module packages
+
+Each module's source is a ZIP (`module.json` at its root, exactly as the SaaS
+`ModulePackageService` expects). Upload it on **Products** → per-product
+*Module package (.zip)*. It is stored under `storage/packages/<slug>.zip`,
+**denied to the web**, and only ever sent through `POST /api/v1/module/download`
+after the caller's license key verifies for that product + domain. The SaaS
+extracts and installs it on the client server. `core` needs no package.
 
 Wire contract: `docs/LICENSE_SERVER_CONTRACT.md` in the SaaS repo.
 
@@ -354,6 +365,63 @@ function envato_verify(string $code): array
     ];
 }
 
+/* --- module packages (files kept ONLY on this server) --- */
+
+function package_dir(): string
+{
+    return __DIR__.'/../storage/packages';
+}
+
+function package_path(string $slug): string
+{
+    return package_dir().'/'.preg_replace('/[^a-z0-9]+/i', '', strtolower($slug)).'.zip';
+}
+
+/* --- shared license check (used by verify.php and download.php) --- */
+
+/**
+ * @return array{ok:bool, message:string, expires_at:?string, plan:?string, license:?array}
+ */
+function verify_license(PDO $pdo, string $key, string $slug, string $domain, bool $bind = true): array
+{
+    $key = trim($key);
+    $slug = strtolower(trim($slug));
+    $domain = strtolower(trim($domain));
+
+    $st = $pdo->prepare('SELECT * FROM licenses WHERE license_key = ? AND product_slug = ? LIMIT 1');
+    $st->execute([$key, $slug]);
+    $lic = $st->fetch();
+
+    if (! $lic) {
+        return ['ok' => false, 'message' => 'Unknown license key for this product.', 'expires_at' => null, 'plan' => null, 'license' => null];
+    }
+
+    $expiresAt = iso8601_from_date($lic['valid_until']);
+
+    if ($lic['status'] !== 'active') {
+        return ['ok' => false, 'message' => 'License is '.$lic['status'].'.', 'expires_at' => $expiresAt, 'plan' => $lic['plan'], 'license' => $lic];
+    }
+
+    if (! empty($lic['valid_until']) && strtotime($lic['valid_until'].' 23:59:59 UTC') < time()) {
+        $pdo->prepare("UPDATE licenses SET status = 'expired' WHERE id = ?")->execute([$lic['id']]);
+
+        return ['ok' => false, 'message' => 'License expired on '.$lic['valid_until'].'.', 'expires_at' => $expiresAt, 'plan' => $lic['plan'], 'license' => $lic];
+    }
+
+    if (empty($lic['bound_domain'])) {
+        if ($bind) {
+            $pdo->prepare('UPDATE licenses SET bound_domain = ?, bound_ip = ? WHERE id = ?')->execute([$domain, remote_ip(), $lic['id']]);
+        }
+    } elseif (strtolower($lic['bound_domain']) !== $domain) {
+        return ['ok' => false, 'message' => 'License is bound to another domain ('.$lic['bound_domain'].').', 'expires_at' => $expiresAt, 'plan' => $lic['plan'], 'license' => $lic];
+    }
+
+    $pdo->prepare('UPDATE licenses SET last_verified_at = UTC_TIMESTAMP(), last_verified_ip = ? WHERE id = ?')
+        ->execute([remote_ip(), $lic['id']]);
+
+    return ['ok' => true, 'message' => 'License verified for '.$domain.'.', 'expires_at' => $expiresAt, 'plan' => $lic['plan'], 'license' => $lic];
+}
+
 /* --- shared issuing --- */
 
 function issue_license(PDO $pdo, string $slug, ?string $domain, ?string $email, ?string $plan = null, ?int $ttlDays = null): array
@@ -434,41 +502,55 @@ if ($key === '' || $slug === '' || $domain === '') {
     json_out(422, ['status' => false, 'message' => 'license_key, product_slug and domain are required.']);
 }
 
-$pdo = db();
-$st = $pdo->prepare('SELECT * FROM licenses WHERE license_key = ? AND product_slug = ? LIMIT 1');
-$st->execute([$key, $slug]);
-$lic = $st->fetch();
-
-if (! $lic) {
-    json_out(200, ['status' => false, 'expires_at' => null, 'message' => 'Unknown license key for this product.', 'plan' => null]);
-}
-
-$expiresAt = iso8601_from_date($lic['valid_until']);
-
-if ($lic['status'] !== 'active') {
-    json_out(200, ['status' => false, 'expires_at' => $expiresAt, 'message' => 'License is '.$lic['status'].'.', 'plan' => $lic['plan']]);
-}
-
-if (! empty($lic['valid_until']) && strtotime($lic['valid_until'].' 23:59:59 UTC') < time()) {
-    $pdo->prepare("UPDATE licenses SET status = 'expired' WHERE id = ?")->execute([$lic['id']]);
-    json_out(200, ['status' => false, 'expires_at' => $expiresAt, 'message' => 'License expired on '.$lic['valid_until'].'.', 'plan' => $lic['plan']]);
-}
-
-if (empty($lic['bound_domain'])) {
-    $pdo->prepare('UPDATE licenses SET bound_domain = ?, bound_ip = ? WHERE id = ?')->execute([$domain, remote_ip(), $lic['id']]);
-} elseif (strtolower($lic['bound_domain']) !== $domain) {
-    json_out(200, ['status' => false, 'expires_at' => $expiresAt, 'message' => 'License is bound to another domain ('.$lic['bound_domain'].').', 'plan' => $lic['plan']]);
-}
-
-$pdo->prepare('UPDATE licenses SET last_verified_at = UTC_TIMESTAMP(), last_verified_ip = ? WHERE id = ?')
-    ->execute([remote_ip(), $lic['id']]);
+$r = verify_license(db(), $key, $slug, $domain);
 
 json_out(200, [
-    'status' => true,
-    'expires_at' => $expiresAt,
-    'message' => 'License verified for '.$domain.'.',
-    'plan' => $lic['plan'],
+    'status' => $r['ok'],
+    'expires_at' => $r['expires_at'],
+    'message' => $r['message'],
+    'plan' => $r['plan'],
 ]);
+PHP;
+
+/* ============================================================== api: download */
+
+$files['api/download.php'] = <<<'PHP'
+<?php
+
+require __DIR__.'/../lib/bootstrap.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    json_out(405, ['status' => false, 'message' => 'Method not allowed.']);
+}
+
+require_secret();
+require_schema_api();
+
+$in = read_json_body();
+$key = trim($in['license_key'] ?? '');
+$slug = strtolower(trim($in['product_slug'] ?? ''));
+$domain = strtolower(trim($in['domain'] ?? ''));
+
+if ($key === '' || $slug === '' || $domain === '') {
+    json_out(422, ['status' => false, 'message' => 'license_key, product_slug and domain are required.']);
+}
+
+$r = verify_license(db(), $key, $slug, $domain);
+if (! $r['ok']) {
+    json_out(403, ['status' => false, 'message' => $r['message']]);
+}
+
+$zip = package_path($slug);
+if (! is_file($zip)) {
+    json_out(404, ['status' => false, 'message' => 'No package uploaded for "'.$slug.'" yet.']);
+}
+
+header('Content-Type: application/zip');
+header('Content-Disposition: attachment; filename="'.$slug.'.zip"');
+header('Content-Length: '.filesize($zip));
+header('X-License-Expires-At: '.($r['expires_at'] ?? ''));
+readfile($zip);
+exit;
 PHP;
 
 /* ================================================================= api: issue */
@@ -866,6 +948,7 @@ $pdo = db();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     $action = $_POST['action'] ?? '';
+    $msg = 'Saved.';
     if ($action === 'save') {
         $slug = strtolower(preg_replace('/[^a-z0-9_-]+/i', '', trim($_POST['slug'] ?? '')));
         if ($slug !== '') {
@@ -882,11 +965,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 strtoupper(substr(trim($_POST['currency'] ?? 'USD'), 0, 3)),
                 isset($_POST['is_active']) ? 1 : 0,
             ]);
+
+            // Module package upload — the ZIP the client server downloads once
+            // its license key checks out. `core` needs no package.
+            if ($slug !== 'core' && ! empty($_FILES['package']['tmp_name']) && is_uploaded_file($_FILES['package']['tmp_name'])) {
+                if (strtolower(pathinfo($_FILES['package']['name'], PATHINFO_EXTENSION)) !== 'zip') {
+                    $msg = 'Product saved, but the package must be a .zip.';
+                } else {
+                    @mkdir(package_dir(), 0770, true);
+                    move_uploaded_file($_FILES['package']['tmp_name'], package_path($slug));
+                    $pdo->prepare('UPDATE products SET package_uploaded_at = NOW() WHERE slug = ?')->execute([$slug]);
+                    $msg = 'Product + package saved.';
+                }
+            }
         }
     } elseif ($action === 'delete' && ! empty($_POST['slug'])) {
         $pdo->prepare('DELETE FROM products WHERE slug = ?')->execute([$_POST['slug']]);
+        @unlink(package_path($_POST['slug']));
     }
-    header('Location: products.php?msg='.urlencode('Saved.'));
+    header('Location: products.php?msg='.urlencode($msg));
     exit;
 }
 
@@ -896,7 +993,7 @@ lm_header('products');
 ?>
 <section class="card">
     <h2>Add / edit product</h2>
-    <form method="post" class="grid">
+    <form method="post" class="grid" enctype="multipart/form-data">
         <input type="hidden" name="csrf" value="<?= e($token) ?>">
         <input type="hidden" name="action" value="save">
         <label>Slug (immutable id)<input name="slug" placeholder="pharmacy" required></label>
@@ -904,16 +1001,17 @@ lm_header('products');
         <label>Price<input type="number" name="price" step="0.01" min="0" value="0"></label>
         <label>Currency<input name="currency" value="USD" maxlength="3"></label>
         <label style="grid-column:1/-1">Description<input name="description" placeholder="Batches, expiry, prescriptions"></label>
+        <label>Module package (.zip)<input type="file" name="package" accept=".zip"></label>
         <label class="row"><input type="checkbox" name="is_active" checked> Active (listed for sale)</label>
         <button type="submit">Save product</button>
     </form>
-    <p class="muted">Use slug <code>core</code> for the main script; module slugs must match the SaaS module keys (e.g. <code>pharmacy</code>, <code>salon</code>, <code>repairtechnician</code>).</p>
+    <p class="muted">Use slug <code>core</code> for the main script (no package). Module slugs must match the SaaS module keys (e.g. <code>pharmacy</code>, <code>salon</code>, <code>repairtechnician</code>). The <b>package ZIP is the module's source</b> — it is sent to a client server only after its license key verifies, then extracted and installed there. Re-uploading replaces it.</p>
 </section>
 
 <section class="card">
     <h2>Products</h2>
     <table>
-        <thead><tr><th>Slug</th><th>Name</th><th>Price</th><th>Active</th><th>Description</th><th></th></tr></thead>
+        <thead><tr><th>Slug</th><th>Name</th><th>Price</th><th>Active</th><th>Package</th><th>Description</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($products as $p): ?>
             <tr>
@@ -921,6 +1019,13 @@ lm_header('products');
                 <td><?= e($p['name']) ?></td>
                 <td><?= e(number_format((float) $p['price'], 2)).' '.e($p['currency']) ?></td>
                 <td><?= $p['is_active'] ? 'yes' : '<span class="muted">no</span>' ?></td>
+                <td>
+                    <?php if ($p['slug'] === 'core'): ?><span class="muted">n/a</span>
+                    <?php elseif (is_file(package_path($p['slug']))): ?>
+                        <span class="tag green">uploaded</span>
+                        <span class="muted"><?= e(number_format(filesize(package_path($p['slug'])) / 1024, 0)) ?> KB</span>
+                    <?php else: ?><span class="tag red">missing</span><?php endif; ?>
+                </td>
                 <td class="muted"><?= e($p['description']) ?></td>
                 <td class="acts">
                     <form method="post" onsubmit="return confirm('Delete product <?= e($p['slug']) ?>?')">
@@ -1375,6 +1480,7 @@ CREATE TABLE IF NOT EXISTS `products` (
   `price` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   `currency` CHAR(3) NOT NULL DEFAULT 'USD',
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `package_uploaded_at` DATETIME NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -1408,6 +1514,10 @@ CREATE TABLE IF NOT EXISTS `payments` (
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX `idx_license` (`license_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Upgrade path for installs created before packages existed. A "duplicate
+-- column" error here on a fresh DB is expected and ignored by the runners.
+ALTER TABLE `products` ADD COLUMN `package_uploaded_at` DATETIME NULL;
 
 INSERT INTO `settings` (`k`, `v`) VALUES
   ('validation_mode', 'native'),
@@ -1461,8 +1571,17 @@ try {
 }
 
 foreach (array_filter(array_map('trim', explode(';', file_get_contents(__DIR__.'/../database/schema.sql')))) as $stmt) {
-    $pdo->exec($stmt);
+    try {
+        $pdo->exec($stmt);
+    } catch (Throwable $e) {
+        // Idempotent upgrade statements (e.g. "duplicate column") are expected.
+        if (! preg_match('/duplicate|exists/i', $e->getMessage())) {
+            throw $e;
+        }
+    }
 }
+
+@mkdir(__DIR__.'/../storage/packages', 0770, true);
 
 echo "Schema imported into '".DB_NAME."'. Tables: ".implode(', ', $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN))."\n";
 PHP;
@@ -1495,8 +1614,15 @@ if ($connected && schema_ready()) {
 if (! $done && ! $placeholder && $connected && $_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         foreach (array_filter(array_map('trim', explode(';', file_get_contents(__DIR__.'/database/schema.sql')))) as $stmt) {
-            db()->exec($stmt);
+            try {
+                db()->exec($stmt);
+            } catch (Throwable $e) {
+                if (! preg_match('/duplicate|exists/i', $e->getMessage())) {
+                    throw $e;
+                }
+            }
         }
+        @mkdir(__DIR__.'/storage/packages', 0770, true);
         $done = true;
     } catch (Throwable $ex) {
         $error = $ex->getMessage();
@@ -1530,19 +1656,23 @@ PHP;
 $files['.htaccess'] = <<<'HT'
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteRule ^api/v1/license/verify/?$ api/verify.php  [L]
-    RewriteRule ^api/v1/license/issue/?$  api/issue.php   [L]
-    RewriteRule ^api/v1/catalog/?$        api/catalog.php  [L]
+    RewriteRule ^api/v1/license/verify/?$   api/verify.php   [L]
+    RewriteRule ^api/v1/license/issue/?$    api/issue.php    [L]
+    RewriteRule ^api/v1/catalog/?$          api/catalog.php  [L]
+    RewriteRule ^api/v1/module/download/?$  api/download.php [L]
 </IfModule>
 HT;
 
-foreach (['config', 'lib', 'bin', 'database'] as $dir) {
+foreach (['config', 'lib', 'bin', 'database', 'storage', 'storage/packages'] as $dir) {
     $files[$dir.'/.htaccess'] = "Require all denied\n<IfModule !mod_authz_core.c>\n    Deny from all\n</IfModule>\n";
 }
+// Keep the storage dir in the archive so it exists on extract.
+$files['storage/packages/.gitkeep'] = '';
 
 $files['.gitignore'] = <<<'GI'
 /config/config.php
 /setup.php
+/storage/
 *.log
 GI;
 

@@ -29,3 +29,5 @@ docker-compose.override.yml
 /read
 /modules/*
 !/modules/.gitkeep
+
+/license-review

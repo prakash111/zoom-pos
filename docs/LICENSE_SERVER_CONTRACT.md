@@ -107,6 +107,28 @@ has been verified with the gateway.
 
 ---
 
+## POST `/api/v1/module/download`
+
+The module source files live **only** on the license server. The SaaS calls
+this to fetch a module's package after (or as part of) licensing it.
+
+**Request body** — same as `verify`: `{license_key, product_slug, domain}`.
+
+- License verifies → **`200` with the raw ZIP bytes**
+  (`Content-Type: application/zip`, `Content-Disposition: attachment`,
+  optional `X-License-Expires-At` header). The SaaS extracts it into
+  `modules/<slug>/` and installs.
+- License invalid / revoked / wrong domain → **`403`** JSON
+  `{status:false, message}`.
+- No package uploaded for that product yet → **`404`** JSON.
+- `401` bad secret, `422` bad body.
+
+The vendor uploads each product's ZIP on the License Manager admin →
+**Products** → *Module package (.zip)*; it is stored web-inaccessible under
+`storage/packages/<slug>.zip`.
+
+---
+
 ## GET `/api/v1/catalog`
 
 Called by the SaaS Modules screen to list what the vendor sells.

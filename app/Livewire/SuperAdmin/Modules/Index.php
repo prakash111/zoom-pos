@@ -23,6 +23,9 @@ class Index extends Component
     /** @var array<int, string>  moduleId => license key typed in the activate row */
     public array $licenseKeys = [];
 
+    /** @var array<string, string>  slug => license key typed in the "Available modules" card */
+    public array $catalogKeys = [];
+
     public function install(ModulePackageService $service): void
     {
         $this->validate([
@@ -40,22 +43,27 @@ class Index extends Component
     }
 
     /**
-     * One-click install of a vertical bundled in this build (module-packages/).
-     * The row then needs a license key to activate, like any other package.
+     * Fetch a module from the vendor's License Manager using a license key,
+     * install it, and activate — one step from the "Available modules" card.
      */
-    public function installBundled(ModulePackageService $service, string $slug): void
+    public function getModule(ModulePackageService $service, string $slug): void
     {
-        try {
-            $module = $service->installBundled($slug, auth('platform_web')->id());
-            session()->flash(
-                'status',
-                $module->license_status === 'active'
-                    ? "Module \"{$module->name}\" installed and licensed — Activate it below."
-                    : "Module \"{$module->name}\" installed. Enter its license key below to activate."
-            );
-        } catch (Throwable $e) {
-            session()->flash('error', $e->getMessage());
+        $this->validate(
+            ["catalogKeys.$slug" => ['required', 'string', 'min:8', 'max:191']],
+            [],
+            ["catalogKeys.$slug" => 'license key'],
+        );
+
+        $result = $service->installFromLicenseServer($slug, (string) $this->catalogKeys[$slug], auth('platform_web')->id());
+
+        if (! $result['status']) {
+            $this->addError("catalogKeys.$slug", $result['message']);
+
+            return;
         }
+
+        unset($this->catalogKeys[$slug]);
+        session()->flash($result['activated'] ? 'status' : 'error', $result['message']);
     }
 
     public function activate(ModulePackageService $service, int $moduleId): void

@@ -5,96 +5,57 @@ namespace App\Services\Modular;
 use App\Models\PlatformSystem;
 use App\Models\SduiModule;
 use App\Services\License\LicenseService;
-use Illuminate\Support\Facades\File;
 
 /**
  * Storefront metadata for package modules — the list the SuperAdmin → Modules
- * screen shows so an operator can buy / install a vertical.
+ * screen shows so an operator can buy / fetch a vertical.
  *
- * Sources, merged in order:
- *   1. modules bundled in this build   (module-packages/<slug>/module.json)
- *   2. the vendor catalog              (License Manager GET /api/v1/catalog)
- *   3. per-slug override               (platform_system `module_catalog`)
- *
- * There is no in-app checkout — buying links out to the vendor's hosted
- * `buy.php`.
+ * The catalog comes entirely from the vendor's License Manager
+ * (`GET /api/v1/catalog`); the module source files also live only there and are
+ * downloaded once a license key verifies. A per-slug `platform_system`
+ * `module_catalog` override can adjust price / currency locally.
  */
 class ModuleCatalog
 {
     /**
      * Everything sellable, whether or not it is installed here.
      *
-     * @return list<array{slug:string,name:string,description:?string,price:float,currency:string,bundled:bool,store_link:?string}>
+     * @return list<array{slug:string,name:string,description:?string,price:float,currency:string,store_link:?string}>
      */
     public static function available(): array
     {
         $currency = strtoupper((string) (PlatformSystem::get('platform_default_currency') ?: config('app.currency', 'USD')));
+
+        $decoded = json_decode((string) PlatformSystem::get('module_catalog'), true);
+        $override = is_array($decoded) ? $decoded : [];
+
         $rows = [];
-
-        // 1. bundled in this build
-        $root = base_path('module-packages');
-        if (File::isDirectory($root)) {
-            foreach (File::directories($root) as $dir) {
-                $manifest = $dir.'/module.json';
-                if (! File::exists($manifest)) {
-                    continue;
-                }
-                $m = json_decode(File::get($manifest), true) ?: [];
-                $slug = strtolower((string) ($m['key'] ?? basename($dir)));
-                $rows[$slug] = [
-                    'slug' => $slug,
-                    'name' => (string) ($m['name'] ?? $slug),
-                    'description' => $m['description'] ?? null,
-                    'price' => isset($m['price']) ? (float) $m['price'] : 0.0,
-                    'currency' => strtoupper((string) ($m['currency'] ?? $currency)),
-                    'bundled' => true,
-                ];
-            }
-        }
-
-        // 2. vendor catalog (adds price / non-bundled products)
         foreach (app(LicenseService::class)->catalog() as $p) {
             $slug = strtolower((string) ($p['slug'] ?? ''));
             if ($slug === '' || $slug === 'core') {
                 continue;
             }
-            $rows[$slug] = array_merge($rows[$slug] ?? ['bundled' => false], [
+
+            $ov = is_array($override[$slug] ?? null) ? $override[$slug] : [];
+
+            $rows[] = [
                 'slug' => $slug,
-                'name' => $p['name'] ?: ($rows[$slug]['name'] ?? $slug),
-                'description' => $p['description'] ?? ($rows[$slug]['description'] ?? null),
-                'price' => (float) ($p['price'] ?? ($rows[$slug]['price'] ?? 0)),
-                'currency' => strtoupper((string) ($p['currency'] ?? ($rows[$slug]['currency'] ?? $currency))),
-            ]);
-            $rows[$slug]['bundled'] = $rows[$slug]['bundled'] ?? false;
+                'name' => (string) ($p['name'] ?? $slug),
+                'description' => $p['description'] ?? null,
+                'price' => round((float) ($ov['price'] ?? $p['price'] ?? 0), 2),
+                'currency' => strtoupper((string) ($ov['currency'] ?? $p['currency'] ?? $currency)),
+                'store_link' => self::storeLink($slug),
+            ];
         }
 
-        // 3. per-slug override
-        $decoded = json_decode((string) PlatformSystem::get('module_catalog'), true);
-        if (is_array($decoded)) {
-            foreach ($decoded as $slug => $ov) {
-                $slug = strtolower((string) $slug);
-                if (! isset($rows[$slug]) || ! is_array($ov)) {
-                    continue;
-                }
-                if (isset($ov['price'])) {
-                    $rows[$slug]['price'] = (float) $ov['price'];
-                }
-                if (isset($ov['currency'])) {
-                    $rows[$slug]['currency'] = strtoupper((string) $ov['currency']);
-                }
-            }
-        }
+        usort($rows, fn ($a, $b) => strcmp($a['name'], $b['name']));
 
-        return collect($rows)
-            ->map(fn ($r) => $r + ['store_link' => self::storeLink($r['slug'])])
-            ->sortBy('name')
-            ->values()
-            ->all();
+        return $rows;
     }
 
     /**
-     * Price / currency for one installed module (manifest-cached), plus its
-     * buy link. Used by the "Installed Modules" table.
+     * Price / currency / description for one installed module. Used by the
+     * "Installed Modules" table.
      *
      * @return array{price: float, currency: string, description: ?string, store_link: ?string}
      */

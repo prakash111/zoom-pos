@@ -47,6 +47,45 @@ class CustomLicenseServerClient
     }
 
     /**
+     * Verify a key, then download that product's package ZIP. The module source
+     * files live only on the license server — this is the only way to get them.
+     *
+     * @return array{status: bool, path: ?string, message: string}
+     */
+    public function downloadModule(string $key, string $slug, string $domain): array
+    {
+        if (! $this->isConfigured()) {
+            return ['status' => false, 'path' => null, 'message' => 'License server is not configured.'];
+        }
+
+        try {
+            $response = Http::withHeaders(['X-Server-Secret' => $this->secret])
+                ->timeout(max($this->timeout, 60))
+                ->post($this->baseUrl.'/api/v1/module/download', [
+                    'license_key' => trim($key),
+                    'product_slug' => $slug,
+                    'domain' => $domain,
+                ]);
+
+            if ($response->successful() && str_contains(strtolower($response->header('Content-Type') ?? ''), 'zip')) {
+                $tmp = tempnam(sys_get_temp_dir(), 'modpkg_').'.zip';
+                file_put_contents($tmp, $response->body());
+
+                return ['status' => true, 'path' => $tmp, 'message' => 'Package downloaded.'];
+            }
+
+            $message = $response->json('message')
+                ?: 'License server declined the download (HTTP '.$response->status().').';
+
+            return ['status' => false, 'path' => null, 'message' => (string) $message];
+        } catch (Throwable $e) {
+            Log::warning('License server module download failed: '.$e->getMessage(), ['slug' => $slug]);
+
+            return ['status' => false, 'path' => null, 'message' => 'License server unreachable: '.$e->getMessage()];
+        }
+    }
+
+    /**
      * Active products the vendor sells, for the "Buy module" list.
      *
      * @return list<array{slug: string, name: string, description: ?string, price: float, currency: string}>

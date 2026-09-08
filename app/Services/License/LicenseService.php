@@ -124,6 +124,16 @@ class LicenseService
     }
 
     /**
+     * Download a module's package ZIP from the license server (key must verify).
+     *
+     * @return array{status: bool, path: ?string, message: string}
+     */
+    public function downloadModule(string $key, string $slug, string $domain): array
+    {
+        return $this->custom->downloadModule($key, $slug, $domain);
+    }
+
+    /**
      * The host this installation identifies as, for domain-locked licenses.
      */
     public static function currentDomain(): string

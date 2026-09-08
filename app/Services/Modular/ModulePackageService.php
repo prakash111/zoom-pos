@@ -59,20 +59,52 @@ class ModulePackageService
     }
 
     /**
-     * Install one of the modules bundled in the repo (module-packages/<slug>/)
-     * directly — no ZIP upload. Used by the "Available modules" card so the
-     * operator can install a first-party vertical in one click.
+     * Download a module's package from the license server (the module source
+     * lives only there), install it, record the license, and activate.
+     *
+     * @return array{status: bool, message: string, module: ?SduiModule, activated: bool}
      */
-    public function installBundled(string $slug, int|string|null $adminUserId): SduiModule
+    public function installFromLicenseServer(string $slug, string $key, int|string|null $adminUserId): array
     {
         $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '', $slug));
-        $source = base_path('module-packages/'.$slug);
+        $key = trim($key);
 
-        if ($slug === '' || ! File::exists($source.'/module.json')) {
-            throw new InvalidArgumentException("No bundled module \"{$slug}\" is available in this build.");
+        $dl = app(LicenseService::class)->downloadModule($key, $slug, LicenseService::currentDomain());
+        if (! $dl['status'] || empty($dl['path'])) {
+            return ['status' => false, 'message' => $dl['message'], 'module' => null, 'activated' => false];
         }
 
-        return $this->registerFromDir($source, $adminUserId, move: false);
+        $tmpDir = storage_path('app/tmp_module_'.Str::random(12));
+        File::makeDirectory($tmpDir, 0700, true);
+
+        try {
+            $this->extractSafely($dl['path'], $tmpDir);
+            $manifestDir = $this->locateManifestDir($tmpDir);
+            $module = $this->registerFromDir($manifestDir, $adminUserId, move: true);
+        } catch (Throwable $e) {
+            return ['status' => false, 'message' => 'Downloaded package could not be installed: '.$e->getMessage(), 'module' => null, 'activated' => false];
+        } finally {
+            @unlink($dl['path']);
+            if (File::isDirectory($tmpDir)) {
+                File::deleteDirectory($tmpDir);
+            }
+        }
+
+        if ($module->license_status !== 'active') {
+            $recorded = $this->verifyAndRecordLicense($module, $key, $adminUserId);
+            if (! $recorded['status']) {
+                return ['status' => true, 'message' => 'Installed, but the license did not verify: '.$recorded['message'], 'module' => $module, 'activated' => false];
+            }
+            $module->refresh();
+        }
+
+        try {
+            $this->activate($module, $adminUserId);
+
+            return ['status' => true, 'message' => "\"{$module->name}\" installed and activated.", 'module' => $module, 'activated' => true];
+        } catch (Throwable $e) {
+            return ['status' => true, 'message' => "\"{$module->name}\" installed and licensed. Activation failed: ".$e->getMessage(), 'module' => $module, 'activated' => false];
+        }
     }
 
     /**

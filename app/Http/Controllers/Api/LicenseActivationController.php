@@ -58,11 +58,20 @@ class LicenseActivationController extends Controller
         $module = SduiModule::query()->where('slug', $slug)->where('source_type', 'package')->first();
 
         if (! $module) {
-            // The ZIP is not uploaded yet — stash the key; install() applies it.
-            PlatformSystem::set('license_pending_'.$slug, encrypt($key));
-            AuditLog::record('module.license_received', null, null, ['key' => $slug, 'pending' => true]);
+            // Not installed yet — pull the package from the License Manager now.
+            $r = $packages->installFromLicenseServer($slug, $key, null);
+            if ($r['status']) {
+                AuditLog::record('module.installed_from_server', null, null, ['key' => $slug, 'activated' => $r['activated']]);
 
-            return response()->json(['status' => true, 'pending' => true, 'message' => 'License stored. Upload the module ZIP to finish installing.']);
+                return response()->json(['status' => true, 'activated' => $r['activated'], 'message' => $r['message']]);
+            }
+
+            // Download failed (server busy, no package yet) — stash the key so a
+            // manual retry or ZIP upload finishes the job.
+            PlatformSystem::set('license_pending_'.$slug, encrypt($key));
+            AuditLog::record('module.license_received', null, null, ['key' => $slug, 'pending' => true, 'reason' => $r['message']]);
+
+            return response()->json(['status' => true, 'pending' => true, 'message' => 'License stored; module fetch will be retried. '.$r['message']]);
         }
 
         $result = $packages->verifyAndRecordLicense($module, $key, null);

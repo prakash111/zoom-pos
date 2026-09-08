@@ -45,20 +45,29 @@ verticals never do (they have no `sdui_modules` row).
 - `SduiModule::scopeLicenseManaged()` / `isLicensed()` and the invariant
   **`is_active` ⇒ licensed** mean no read path needs its own license check.
 
+### Module distribution — source lives on the License Manager only
+
+The ZIPs built here are **not shipped** in a sold build (`.gitattributes`
+`export-ignore`s `module-packages/`). The vendor uploads each one on the
+License Manager admin → Products → *Module package (.zip)*. It is stored
+web‑inaccessible and only sent through `POST /api/v1/module/download` after a
+license key verifies for that product + domain.
+
 ### Getting a module (SuperAdmin)
 
-There is no in-app checkout. An unlicensed module shows a **"Get this module"**
-link out to the vendor's storefront when a URL can be resolved:
+SuperAdmin → Modules → **Available modules** (populated from the License
+Manager's `GET /api/v1/catalog`). Per module:
 
-1. `module.json` `"buy_url"` (per-module), else
-2. `MODULE_STORE_URL` env → `"{MODULE_STORE_URL}?module={slug}"`, else
-3. no link (operator gets the key out of band).
+- **Buy module ↗** → the vendor's hosted `buy.php`. On payment the key is
+  issued, pushed to this site, and the module is downloaded + installed
+  automatically.
+- **Already have a key?** → paste it → **Download & Activate**:
+  `ModulePackageService::installFromLicenseServer()` calls
+  `POST /api/v1/module/download`, extracts the returned ZIP into
+  `modules/<slug>/`, records the license, and activates.
 
-Optional `"price"` / `"currency"` in the manifest are shown next to the link.
-A SuperAdmin can override any of this per slug via the `platform_system` key
-`module_catalog` (JSON `{ "<slug>": { "price": …, "buy_url": …, "buy_enabled": false } }`),
-resolved by `App\Services\Modular\ModuleCatalog::for()`. The operator buys from
-the vendor, receives a key, and pastes it into the module's Activate field.
+A SuperAdmin can override price / currency per slug via the `platform_system`
+key `module_catalog` (`{ "<slug>": { "price": …, "currency": … } }`).
 
 ## Package layout
 

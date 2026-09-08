@@ -9,3 +9,12 @@
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
+
+# Vendor-only: module source + the License Manager builder. These must NOT ship
+# in a sold build — module ZIPs are uploaded to the License Manager, and the
+# client downloads them after license verification.
+/module-packages export-ignore
+/scripts/build_module_packages.sh export-ignore
+/scripts/build_license_server.php export-ignore
+/read export-ignore
+/license-review export-ignore

@@ -116,33 +116,69 @@ class ModuleLicensingTest extends TestCase
         $this->assertNotContains('widgets', json_decode(PlatformSystem::get('allowed_registration_modes'), true));
     }
 
-    public function test_available_catalog_lists_the_bundled_verticals(): void
+    private function fakeModuleZip(string $slug): string
     {
-        $slugs = collect(ModuleCatalog::available())->pluck('slug')->all();
+        $path = tempnam(sys_get_temp_dir(), 'modtest_').'.zip';
+        $zip = new \ZipArchive;
+        $zip->open($path, \ZipArchive::CREATE);
+        $zip->addFromString('module.json', json_encode([
+            'key' => $slug,
+            'name' => ucfirst($slug),
+            'version' => '1.0.0',
+            'requires_license' => true,
+            'navigation' => [[
+                'key' => $slug.'_sec',
+                'title' => ucfirst($slug),
+                'items' => [['key' => $slug.'_x', 'title' => 'X', 'target_endpoint' => '/api/tenant/'.$slug.'/x']],
+            ]],
+        ]));
+        $zip->close();
+        $bytes = file_get_contents($path);
+        @unlink($path);
 
-        $this->assertContains('pharmacy', $slugs);
-        $this->assertContains('salon', $slugs);
-        $this->assertContains('repairtechnician', $slugs);
-        $this->assertNotContains('core', $slugs);
+        return $bytes;
     }
 
-    public function test_install_bundled_registers_a_module_row_without_an_upload(): void
+    public function test_get_module_downloads_from_the_license_server_and_activates(): void
     {
+        config()->set('services.license_server.url', 'https://lm.test');
+        Http::fake([
+            'lm.test/api/v1/module/download' => Http::response($this->fakeModuleZip('widgets'), 200, ['Content-Type' => 'application/zip']),
+            'lm.test/api/v1/license/verify' => Http::response(['status' => true, 'expires_at' => null, 'message' => 'ok', 'plan' => null], 200),
+        ]);
+
         $this->actingAsSuperAdmin();
 
         Livewire::test(ModulesIndex::class)
-            ->call('installBundled', 'pharmacy')
+            ->set('catalogKeys.widgets', 'WGT-1234-5678-ABCD')
+            ->call('getModule', 'widgets')
             ->assertHasNoErrors();
 
-        $module = SduiModule::where('slug', 'pharmacy')->first();
+        $module = SduiModule::where('slug', 'widgets')->first();
         $this->assertNotNull($module);
         $this->assertSame('package', $module->source_type);
-        $this->assertFalse($module->is_active);
-        $this->assertTrue($module->requires_license);
-        $this->assertTrue(is_dir(base_path('modules/pharmacy')));
+        $this->assertSame('active', $module->license_status);
+        $this->assertTrue($module->is_active);
+        $this->assertTrue(is_dir(base_path('modules/widgets')));
 
-        // cleanup
-        app(ModulePackageService::class)->uninstall($module, true, null);
+        Http::assertSent(fn ($r) => str_contains($r->url(), '/api/v1/module/download') && $r->hasHeader('X-Server-Secret'));
+    }
+
+    public function test_get_module_reports_a_declined_download(): void
+    {
+        config()->set('services.license_server.url', 'https://lm.test');
+        Http::fake([
+            'lm.test/api/v1/module/download' => Http::response(['status' => false, 'message' => 'License is revoked.'], 403),
+        ]);
+
+        $this->actingAsSuperAdmin();
+
+        Livewire::test(ModulesIndex::class)
+            ->set('catalogKeys.widgets', 'WGT-1234-5678-ABCD')
+            ->call('getModule', 'widgets')
+            ->assertHasErrors('catalogKeys.widgets');
+
+        $this->assertNull(SduiModule::where('slug', 'widgets')->first());
     }
 
     public function test_unlicensed_module_exposes_a_vendor_store_link(): void

@@ -67,11 +67,15 @@ callback is additionally HMAC-signed with the same secret.
      currency. Used by `/buy.php`.
 
 8. **Products** → add every sellable item:
-   - `core` — the main script (used at install time).
+   - `core` — the main script (used at install time; no package).
    - one row per module, `slug` **exactly** matching the SaaS module key
      (`pharmacy`, `salon`, `repairtechnician`, …).
-   - price, currency, description, and *Active* (unticked = hidden from the
-     "Buy" list).
+   - price, currency, description, *Active* (unticked = hidden from the "Buy" list).
+   - **Module package (.zip)** — the module's source ZIP (`module.json` at its
+     root). Build it with `scripts/build_module_packages.sh`, then upload it
+     here. It is stored **web‑inaccessible** and only ever sent through
+     `POST /api/v1/module/download` after a license key verifies. The client
+     SaaS never ships module source — it downloads it from here.
 
 ---
 
@@ -99,13 +103,15 @@ MODULE_STORE_URL=https://license.yourdomain.com/buy.php
 
 ## Part C — The three ways a customer gets a key
 
-SuperAdmin → Modules always shows an **"Available modules"** card listing every
-sellable vertical — the ones bundled in the build (`module-packages/`) plus
-anything extra from the vendor catalog. Each card has:
+SuperAdmin → Modules shows an **"Available modules"** card from the License
+Manager's catalog (`GET /api/v1/catalog`). Each card has:
 
-- **Install** — for a bundled module: registers it from the build with no upload.
-  The row then drops into *Installed Modules* needing a license key.
-- **Buy module ↗** — opens the hosted checkout (see below).
+- **Buy module ↗** — opens the hosted checkout (see below). On payment the key
+  is issued, pushed to this site, and the module is **downloaded from the
+  License Manager and installed** automatically.
+- **Already have a key?** — paste it + **Download & Activate**: the SaaS calls
+  `POST /api/v1/module/download` with the key, gets the ZIP, extracts it into
+  `modules/<slug>/`, records the license and activates. One step.
 
 ### 1. Buy through the hosted checkout (self-serve, gateway)
 
@@ -124,8 +130,8 @@ License Manager → **Licenses** → *Issue a license*: pick the product, enter 
 buyer email, optionally pre-bind a domain / set an expiry. Copy the generated
 key and send it to the customer. They paste it:
 - **Core** → installer step 4, or the SuperAdmin **dashboard banner** later.
-- **Module** → SuperAdmin → Modules → **Install** the module (or upload its
-  ZIP), then paste the key in its *license key* field → *Verify & Activate*.
+- **Module** → SuperAdmin → Modules → *Available modules* → paste the key →
+  **Download & Activate** (the SaaS fetches the package from the License Manager).
 
 ### 3. Redeem a CodeCanyon purchase code
 
