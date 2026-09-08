@@ -195,8 +195,8 @@ class Index extends Component
         $modules = $this->packageModules();
         $installedSlugs = $modules->pluck('slug')->all();
 
-        // Every sellable vertical (bundled + vendor catalog) that is not already
-        // installed here — shown as a card with Buy / Install.
+        // Every sellable vertical not already installed here — shown as a card
+        // with Buy / Download & Activate.
         $purchasable = collect(ModuleCatalog::available())
             ->reject(fn ($p) => in_array($p['slug'], $installedSlugs, true))
             ->values();
@@ -205,6 +205,7 @@ class Index extends Component
             'modules' => $modules,
             'orphans' => app(ModulePackageService::class)->orphanedModuleDirs(),
             'purchasable' => $purchasable,
+            'licenseServerConfigured' => filled(config('services.license_server.url')),
             'catalog' => $modules->mapWithKeys(fn ($m) => [
                 $m->id => ModuleCatalog::for($m->slug),
             ])->all(),

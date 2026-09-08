@@ -29,28 +29,49 @@ class ModuleCatalog
         $decoded = json_decode((string) PlatformSystem::get('module_catalog'), true);
         $override = is_array($decoded) ? $decoded : [];
 
+        // Base list from config (always shown), then let the License Manager
+        // catalog override / extend it (price, extra products).
         $rows = [];
+        foreach ((array) config('modules.catalog', []) as $p) {
+            $slug = strtolower((string) ($p['slug'] ?? ''));
+            if ($slug === '' || $slug === 'core') {
+                continue;
+            }
+            $rows[$slug] = [
+                'slug' => $slug,
+                'name' => (string) ($p['name'] ?? $slug),
+                'description' => $p['description'] ?? null,
+                'price' => 0.0,
+                'currency' => $currency,
+            ];
+        }
+
         foreach (app(LicenseService::class)->catalog() as $p) {
             $slug = strtolower((string) ($p['slug'] ?? ''));
             if ($slug === '' || $slug === 'core') {
                 continue;
             }
-
-            $ov = is_array($override[$slug] ?? null) ? $override[$slug] : [];
-
-            $rows[] = [
+            $rows[$slug] = array_merge($rows[$slug] ?? [], [
                 'slug' => $slug,
-                'name' => (string) ($p['name'] ?? $slug),
-                'description' => $p['description'] ?? null,
-                'price' => round((float) ($ov['price'] ?? $p['price'] ?? 0), 2),
-                'currency' => strtoupper((string) ($ov['currency'] ?? $p['currency'] ?? $currency)),
-                'store_link' => self::storeLink($slug),
-            ];
+                'name' => (string) ($p['name'] ?? ($rows[$slug]['name'] ?? $slug)),
+                'description' => $p['description'] ?? ($rows[$slug]['description'] ?? null),
+                'price' => (float) ($p['price'] ?? 0),
+                'currency' => strtoupper((string) ($p['currency'] ?? $currency)),
+            ]);
         }
 
-        usort($rows, fn ($a, $b) => strcmp($a['name'], $b['name']));
+        return collect($rows)->map(function ($r) use ($override) {
+            $ov = is_array($override[$r['slug']] ?? null) ? $override[$r['slug']] : [];
 
-        return $rows;
+            return [
+                'slug' => $r['slug'],
+                'name' => $r['name'],
+                'description' => $r['description'],
+                'price' => round((float) ($ov['price'] ?? $r['price']), 2),
+                'currency' => strtoupper((string) ($ov['currency'] ?? $r['currency'])),
+                'store_link' => self::storeLink($r['slug']),
+            ];
+        })->sortBy('name')->values()->all();
     }
 
     /**

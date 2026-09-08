@@ -14,31 +14,6 @@
         </div>
     @endif
 
-    <!-- Upload Card -->
-    <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-4">
-        <div>
-            <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🧩 {{ __("Install a Module Package") }}</span>
-            </h3>
-            <p class="text-xs text-slate-400">{{ __("Upload a .zip containing module.json to register a new business module. It installs inactive — review it, then Activate.") }}</p>
-        </div>
-
-        <form wire:submit="install" class="flex flex-wrap gap-4 items-end pt-2">
-            <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Module Archive (.zip, max 10MB)") }}</label>
-                <input type="file" wire:model="zipFile" accept=".zip" class="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-100 dark:file:bg-slate-800 file:text-slate-700 dark:file:text-slate-300">
-                @error('zipFile')
-                    <p class="text-xs text-rose-600 font-bold mt-1">{{ $message }}</p>
-                @enderror
-            </div>
-
-            <button type="submit" wire:loading.attr="disabled" wire:target="zipFile,install" class="px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/25 active:scale-95 transition flex items-center gap-1.5 cursor-pointer">
-                <span wire:loading.remove wire:target="install">⬆ {{ __("Install Module") }}</span>
-                <span wire:loading wire:target="install">{{ __("Installing…") }}</span>
-            </button>
-        </form>
-    </div>
-
     @if (! empty($orphans))
         <div class="bg-amber-50 dark:bg-amber-950/30 rounded-3xl p-6 border border-amber-200 dark:border-amber-800 space-y-3">
             <h4 class="font-extrabold text-sm text-amber-800 dark:text-amber-300 flex items-center gap-2">
@@ -67,6 +42,9 @@
             <div>
                 <h4 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">{{ __("Available modules") }}</h4>
                 <p class="text-xs text-slate-400">{{ __("Buy a module (a key is issued and this site fetches + installs it), or paste a key you already have to download and activate it now.") }}</p>
+                @unless ($licenseServerConfigured ?? false)
+                    <p class="text-[11px] text-amber-600 dark:text-amber-400 font-bold mt-1">{{ __("Set LICENSE_SERVER_URL (and MODULE_STORE_URL) in .env, then run: php artisan config:clear — to buy or download modules.") }}</p>
+                @endunless
             </div>
             <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 @foreach ($purchasable as $p)
@@ -111,7 +89,7 @@
     <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
             <h4 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">{{ __("Installed Modules") }}</h4>
-            <p class="text-xs text-slate-400">{{ __("Package-based modules installed via ZIP upload") }}</p>
+            <p class="text-xs text-slate-400">{{ __("Modules fetched from the License Manager") }}</p>
         </div>
 
         <div class="overflow-x-auto">
@@ -212,7 +190,7 @@
                     @empty
                         <tr>
                             <td colspan="7" class="px-6 py-12 text-center text-slate-400">
-                                {{ __("No package-based modules installed yet. Upload a .zip above to get started.") }}
+                                {{ __("No modules installed yet — buy or activate one from Available modules above.") }}
                             </td>
                         </tr>
                     @endforelse
