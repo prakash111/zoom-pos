@@ -97,6 +97,8 @@
                     </a>
                 </div>
 
+                <x-landing.download-buttons :branding="$branding" class="mt-5" />
+
                 <!-- Quick highlights bullets -->
                 <div class="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-bold text-slate-500 dark:text-slate-400">
                     <span class="flex items-center gap-1.5"><span class="text-brand-lime font-black">✓</span> {{ __('Barcode & Touch POS') }}</span>

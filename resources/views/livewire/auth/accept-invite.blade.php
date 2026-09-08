@@ -1,7 +1,7 @@
-<div class="max-w-xl mx-auto rounded-3xl bg-slate-900/90 backdrop-blur-xl border border-white/15 p-7 sm:p-9 shadow-2xl space-y-6">
-    <div class="border-b border-white/10 pb-4">
-        <h1 class="text-2xl sm:text-3xl font-black text-white tracking-tight">{{ __('Accept Team Invitation') }}</h1>
-        <p class="text-xs text-slate-400 mt-1">{{ __('Enter your team invitation code and set your account password.') }}</p>
+<div class="max-w-xl mx-auto rounded-3xl bg-slate-50 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-300 dark:border-white/15 p-7 sm:p-9 shadow-2xl space-y-6">
+    <div class="border-b border-slate-200 dark:border-white/10 pb-4">
+        <h1 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">{{ __('Accept Team Invitation') }}</h1>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ __('Enter your team invitation code and set your account password.') }}</p>
     </div>
 
     @if ($error)
@@ -13,25 +13,25 @@
 
     <div class="space-y-4">
         <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-300 mb-1">{{ __('Invite Code *') }}</label>
-            <div class="relative flex items-center rounded-2xl border border-white/10 bg-white/5 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition">
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">{{ __('Invite Code *') }}</label>
+            <div class="relative flex items-center rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition">
                 <input type="text" wire:model="code" placeholder="INV-XXXX-XXXX" class="w-full border-none bg-transparent text-xs sm:text-sm font-black uppercase tracking-wider text-brand-lime placeholder-slate-500 focus:ring-0 py-3 px-4 font-mono">
             </div>
             @error('code') <p class="text-rose-400 text-[11px] mt-0.5">{{ $message }}</p> @enderror
         </div>
 
         <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-300 mb-1">{{ __('Set Password *') }}</label>
-            <div class="relative flex items-center rounded-2xl border border-white/10 bg-white/5 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition">
-                <input type="password" wire:model="password" placeholder="••••••••••••" class="w-full border-none bg-transparent text-xs sm:text-sm font-semibold text-white placeholder-slate-500 focus:ring-0 py-3 px-4">
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">{{ __('Set Password *') }}</label>
+            <div class="relative flex items-center rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition">
+                <input type="password" wire:model="password" placeholder="••••••••••••" class="w-full border-none bg-transparent text-xs sm:text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-500 focus:ring-0 py-3 px-4">
             </div>
             @error('password') <p class="text-rose-400 text-[11px] mt-0.5">{{ $message }}</p> @enderror
         </div>
 
         <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-300 mb-1">{{ __('Confirm Password *') }}</label>
-            <div class="relative flex items-center rounded-2xl border border-white/10 bg-white/5 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition">
-                <input type="password" wire:model="password_confirmation" placeholder="••••••••••••" class="w-full border-none bg-transparent text-xs sm:text-sm font-semibold text-white placeholder-slate-500 focus:ring-0 py-3 px-4">
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">{{ __('Confirm Password *') }}</label>
+            <div class="relative flex items-center rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition">
+                <input type="password" wire:model="password_confirmation" placeholder="••••••••••••" class="w-full border-none bg-transparent text-xs sm:text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-500 focus:ring-0 py-3 px-4">
             </div>
         </div>
     </div>
