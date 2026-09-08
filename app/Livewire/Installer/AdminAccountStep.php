@@ -3,7 +3,7 @@
 namespace App\Livewire\Installer;
 
 use App\Models\PlatformAdmin;
-use App\Services\License\EnvatoLicenseVerificationService;
+use App\Services\License\LicenseService;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -19,7 +19,7 @@ class AdminAccountStep extends Component
 
     public string $password_confirmation = '';
 
-    public string $purchaseCode = '';
+    public string $licenseKey = '';
 
     public string $buyerUsername = '';
 
@@ -33,7 +33,20 @@ class AdminAccountStep extends Component
         $this->alreadyBootstrapped = PlatformAdmin::query()->exists();
     }
 
-    public function save(EnvatoLicenseVerificationService $licenseService)
+    public function getStoreLinkProperty(): ?string
+    {
+        $store = app(LicenseService::class)->storeUrl();
+        if ($store === '') {
+            return null;
+        }
+
+        return $store.'?'.http_build_query([
+            'product' => 'core',
+            'domain' => LicenseService::currentDomain(),
+        ]);
+    }
+
+    public function save(LicenseService $licenseService)
     {
         if ($this->alreadyBootstrapped) {
             abort(403, 'A Super Admin account already exists.');
@@ -43,30 +56,26 @@ class AdminAccountStep extends Component
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'purchaseCode' => ['nullable', 'string', 'max:100'],
+            'licenseKey' => ['required', 'string', 'min:8', 'max:191'],
             'buyerUsername' => ['nullable', 'string', 'max:100'],
         ]);
 
-        // License validation
-        $licenseData = [
-            'license_type' => 'Standard Commercial License',
-            'purchase_code' => $this->purchaseCode ?: 'STANDARD-CODECANYON-LICENSE',
-            'buyer' => $this->buyerUsername ?: $this->name,
-            'verified_at' => now()->toIso8601String(),
-        ];
+        $result = $licenseService->verify(trim($this->licenseKey), 'core', LicenseService::currentDomain());
 
-        if (! empty($this->purchaseCode)) {
-            $verification = $licenseService->verify($this->purchaseCode, $this->buyerUsername);
-            if (! $verification['success']) {
-                $this->addError('purchaseCode', $verification['message']);
+        if (! $result['status']) {
+            $this->addError('licenseKey', $result['message'] ?: 'The license key could not be verified.');
 
-                return;
-            }
-            $licenseData['license_type'] = $verification['license'] ?? 'Regular License';
-            $licenseData['buyer'] = $verification['buyer'] ?? ($this->buyerUsername ?: $this->name);
+            return;
         }
 
-        session(['installer_license_data' => $licenseData]);
+        session(['installer_license_data' => [
+            'license_type' => $result['plan'] ?: 'Commercial License',
+            'purchase_code' => trim($this->licenseKey),
+            'buyer' => $result['buyer'] ?: ($this->buyerUsername ?: $this->name),
+            'driver' => $result['driver'],
+            'expires_at' => $result['expires_at'],
+            'verified_at' => now()->toIso8601String(),
+        ]]);
 
         PlatformAdmin::create([
             'name' => $this->name,

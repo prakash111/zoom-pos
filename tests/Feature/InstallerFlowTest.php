@@ -41,7 +41,9 @@ class InstallerFlowTest extends TestCase
             ->set('email', 'owner@example.com')
             ->set('password', 'password123')
             ->set('password_confirmation', 'password123')
+            ->set('licenseKey', 'DEMO-INSTALL-LICENSE-KEY-000000')
             ->call('save')
+            ->assertHasNoErrors()
             ->assertRedirect(route('install.finish'));
 
         $this->assertSame(1, PlatformAdmin::count());

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Installer;
 
+use App\Models\PlatformSystem;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
@@ -54,6 +55,15 @@ class FinishStep extends Component
             'app_version' => config('app.version', '1.0.0'),
             'license' => $license,
         ], JSON_PRETTY_PRINT));
+
+        try {
+            PlatformSystem::set('core_license_status', 'ok');
+            PlatformSystem::set('core_license_last_checked', now()->toIso8601String());
+            PlatformSystem::set('core_license_message', 'Activated during installation.');
+            PlatformSystem::set('core_license_expires_at', (string) ($license['expires_at'] ?? ''));
+        } catch (\Throwable $e) {
+            Log::info('Installer core_license_status notice: '.$e->getMessage());
+        }
 
         $this->done = true;
     }
