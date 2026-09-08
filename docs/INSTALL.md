@@ -54,19 +54,18 @@ requirements → environment → migrate → admin-account → finish steps. Thi
 creates the schema, seeds platform defaults, and creates the first
 super-admin account.
 
-**CLI** – for a clean production database (no demo tenants):
+**CLI** – equivalent to the browser installer:
 
 ```bash
-php artisan migrate --force
-php artisan db:seed --class=PlatformDefaultsSeeder --force
-php artisan db:seed --class=PermissionsTableSeeder --force
-php artisan db:seed --class=LandingPageSeeder --force
+php artisan migrate --force --seed
 php artisan storage:link
 ```
 
-`php artisan db:seed --force` (no `--class`) additionally seeds sample
-Retail and Restaurant tenants — useful for evaluation, skip it for a real
-deployment. Then create the super-admin through the `/install` admin step.
+`--seed` always installs platform defaults, landing-page content and
+permissions. The sample Retail and Restaurant demo tenants are seeded **only
+when `DEMO_MODE=true`** in `.env` — a production install (`DEMO_MODE=false`)
+starts with a clean database. Then create the super-admin through the
+`/install` admin step.
 
 ## 5. Production cache & permissions
 
