@@ -103,6 +103,20 @@ class ModuleRegistry
     }
 
     /**
+     * Collapse a package slug to its canonical operating-mode id so a module is
+     * only ever represented once (e.g. the "salon" package === the
+     * "service_booking" mode, "repairtechnician" === "repair_technician").
+     * Anything without an alias — the native verticals, a future third-party
+     * module — is returned unchanged.
+     */
+    public static function canonicalKey(string $key): string
+    {
+        $key = strtolower(trim($key));
+
+        return self::packageAliases()[$key] ?? $key;
+    }
+
+    /**
      * All registered business module schemas.
      *
      * @return array<string, array<string, mixed>>
@@ -153,38 +167,39 @@ class ModuleRegistry
 
         try {
             $extended = self::extendedSchemas();
-            $aliases = self::packageAliases();
             $databaseModules = [];
 
             foreach (SduiModule::query()->where('is_active', true)->orderBy('sort_order')->get() as $module) {
                 $routes = $module->routes ?? [];
-                $schema = [
-                    'id' => $module->slug,
-                    'title' => $module->name,
-                    'description' => $module->description ?? '',
-                    'layout_type' => $module->layout_type,
-                    'icon' => $module->icon,
-                    'features' => $module->features ?? [],
-                    'cart_configuration' => $routes['cart_configuration'] ?? [],
-                    'routes' => $routes,
-                    'navigation' => $module->navigation ?? [],
-                    'source' => 'database',
-                ];
-                $databaseModules[$module->slug] = $schema;
 
-                // A packaged vertical also surfaces under its canonical mode id,
-                // with the extended schema as the base so an installed package
-                // reproduces the same feature flags a native build would have.
-                $mode = $aliases[$module->slug] ?? $module->slug;
-                if (isset($extended[$mode])) {
-                    $databaseModules[$mode] = array_replace($extended[$mode], array_filter([
+                // One entry per physical module, keyed by its canonical
+                // operating-mode id (so "salon"/"repairtechnician" don't show
+                // up twice alongside "service_booking"/"repair_technician").
+                $key = self::canonicalKey($module->slug);
+
+                $base = isset($extended[$key])
+                    ? array_replace($extended[$key], [
+                        'features' => array_replace($extended[$key]['features'], $module->features ?? []),
+                    ])
+                    : [
+                        'id' => $key,
                         'title' => $module->name,
-                        'navigation' => $module->navigation ?: null,
-                        'routes' => $routes ?: null,
-                    ], fn ($v) => $v !== null), [
-                        'features' => array_replace($extended[$mode]['features'], $module->features ?? []),
-                    ]);
-                }
+                        'description' => $module->description ?? '',
+                        'layout_type' => $module->layout_type,
+                        'icon' => $module->icon,
+                        'features' => $module->features ?? [],
+                        'cart_configuration' => $routes['cart_configuration'] ?? [],
+                    ];
+
+                $databaseModules[$key] = array_replace($base, array_filter([
+                    'title' => $module->name,
+                    'navigation' => $module->navigation ?: null,
+                    'routes' => $routes ?: null,
+                ], fn ($v) => $v !== null), [
+                    'id' => $key,
+                    'slug' => $module->slug,
+                    'source' => 'database',
+                ]);
             }
 
             // Database rows override built-ins with the same slug, letting
@@ -200,7 +215,7 @@ class ModuleRegistry
     /** @return array<string, mixed>|null */
     public static function find(string $modeId): ?array
     {
-        $key = strtolower(trim($modeId));
+        $key = self::canonicalKey($modeId);
 
         return self::allModules()[$key] ?? null;
     }
@@ -260,6 +275,7 @@ class ModuleRegistry
             return 'retail';
         }
 
+        $rawMode = self::canonicalKey($rawMode);
         $all = self::allModules();
         if (isset($all[$rawMode])) {
             return $rawMode;
@@ -291,6 +307,11 @@ class ModuleRegistry
             }
         }
 
+        // Stored values and package slugs may be pre-alias (e.g. "salon"); map
+        // everything to canonical mode ids so they match $allKeys.
+        $canon = fn (array $keys) => array_map([self::class, 'canonicalKey'], $keys);
+        $databaseDefaults = $canon($databaseDefaults);
+
         if (is_string($raw)) {
             $trimmed = trim($raw);
             if ($trimmed === 'both' || $trimmed === 'all') {
@@ -305,13 +326,13 @@ class ModuleRegistry
 
             $decoded = json_decode($trimmed, true);
             if (is_array($decoded)) {
-                $filtered = array_values(array_intersect(array_unique([...$decoded, ...$databaseDefaults]), $allKeys));
+                $filtered = array_values(array_intersect(array_unique([...$canon($decoded), ...$databaseDefaults]), $allKeys));
                 if (! empty($filtered)) {
                     return $filtered;
                 }
             }
         } elseif (is_array($raw)) {
-            $filtered = array_values(array_intersect(array_unique([...$raw, ...$databaseDefaults]), $allKeys));
+            $filtered = array_values(array_intersect(array_unique([...$canon($raw), ...$databaseDefaults]), $allKeys));
             if (! empty($filtered)) {
                 return $filtered;
             }
@@ -350,6 +371,7 @@ class ModuleRegistry
         $licensed = $company->licensed_modules;
 
         if (is_array($licensed) && ! empty($licensed)) {
+            $licensed = array_map([self::class, 'canonicalKey'], $licensed);
             $modes = array_values(array_intersect($licensed, $all));
         } else {
             // Default to permanent active mode

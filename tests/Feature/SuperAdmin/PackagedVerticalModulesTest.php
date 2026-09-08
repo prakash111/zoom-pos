@@ -266,16 +266,18 @@ class PackagedVerticalModulesTest extends TestCase
         $this->licenseModule($module);
         $service->activate($module, null);
 
-        // Active -> visible in the module registry AND the tenant drawer.
+        // Active -> visible in the module registry AND the tenant drawer. The
+        // "salon" package registers under its canonical mode id, once.
         $this->assertTrue(ModuleRegistry::isActive('salon'));
-        $this->assertArrayHasKey('salon', ModuleRegistry::allModules());
+        $this->assertArrayHasKey('service_booking', ModuleRegistry::allModules());
+        $this->assertArrayNotHasKey('salon', ModuleRegistry::allModules());
         $navKeys = collect(TenantNavRegistry::getEffectiveNavForTenant($company))->pluck('key');
         $this->assertTrue($navKeys->contains(fn ($k) => str_starts_with((string) $k, 'salon')));
 
         // Deactivate -> gone from every read surface, data + files kept.
         $service->deactivate($module->fresh(), null);
         $this->assertFalse(ModuleRegistry::isActive('salon'));
-        $this->assertArrayNotHasKey('salon', ModuleRegistry::allModules());
+        $this->assertArrayNotHasKey('service_booking', ModuleRegistry::allModules());
         $this->assertTrue(ModuleRegistry::isInstalled('salon'));
         $this->assertTrue(Schema::hasTable('salon_mod_services'));
         $this->assertTrue(is_dir(base_path('modules/salon')));

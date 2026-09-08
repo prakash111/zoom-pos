@@ -144,7 +144,7 @@ class SchemaResponse
     }
 
     /**
-     * @param  list<array<string, mixed>>  $tabs   each: ['id' => .., 'label'|'title' => .., 'icon' => .., 'components' => [..]]
+     * @param  list<array<string, mixed>>  $tabs  each: ['id' => .., 'label'|'title' => .., 'icon' => .., 'components' => [..]]
      * @param  array<string, mixed>  $props  e.g. ['initial_index' => 1, 'is_scrollable' => true]
      */
     public static function tabs(array $tabs, array $props = []): array
@@ -4766,7 +4766,7 @@ class SchemaResponse
 
         foreach ($stored as $screen) {
             if ($screen->module !== null
-                && (! $screen->module->is_active || ! in_array($screen->module->slug, $licensed, true))) {
+                && (! $screen->module->is_active || ! in_array(ModuleRegistry::canonicalKey($screen->module->slug), $licensed, true))) {
                 continue;
             }
 
@@ -5014,7 +5014,7 @@ class SchemaResponse
         if ($stored !== null) {
             if ($stored->module !== null
                 && (! $stored->module->is_active
-                    || ! in_array($stored->module->slug, ModuleRegistry::availableModes($company), true))) {
+                    || ! in_array(ModuleRegistry::canonicalKey($stored->module->slug), ModuleRegistry::availableModes($company), true))) {
                 return response()->json([
                     'success' => false,
                     'error' => 'This screen is not enabled for the current tenant.',
@@ -5112,7 +5112,7 @@ class SchemaResponse
 
         if ($schema === null) {
             $module = ModuleRegistry::find($normalized);
-            if ($module !== null && in_array($normalized, ModuleRegistry::availableModes($company), true)) {
+            if ($module !== null && in_array(ModuleRegistry::canonicalKey($normalized), ModuleRegistry::availableModes($company), true)) {
                 $schema = self::moduleView($normalized, $company);
             } else {
                 $navItem = self::findNavigationItem($normalized, $company);

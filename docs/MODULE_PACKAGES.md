@@ -20,6 +20,11 @@ surfaces once the package's `sdui_modules` row is active. `config/modules.php`
 (`service_booking` ⇄ `salon`, `repair_technician` ⇄ `repairtechnician`).
 The package tables are `*_mod_*`-prefixed and independent of any core table.
 
+An installed package is represented **once** in `ModuleRegistry::allModules()`,
+keyed by its canonical operating-mode id (so the `salon` package appears as
+`service_booking`, not both). `ModuleRegistry::canonicalKey()` collapses a
+slug to that id; `find()` / `isActive()` / `isInstalled()` accept either form.
+
 ## Licensing
 
 Every ZIP-installed module needs a **valid license key to Activate**. Built-in
