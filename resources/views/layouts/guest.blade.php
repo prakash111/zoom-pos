@@ -21,21 +21,26 @@
         <link rel="icon" href="{{ $guestFaviconUrl }}">
     @endif
 
-    <!-- Google Fonts: Plus Jakarta Sans, Inter, JetBrains Mono -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600;1,700;1,800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    {{-- Set the saved theme before CSS loads, preventing a light/dark flash. --}}
+    <script>try{document.documentElement.classList.toggle('dark',localStorage.getItem('theme')==='dark')}catch(e){}</script>
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @livewireStyles
     <style>
         :root {
             --color-brand-emerald: {{ $branding->landing_primary_color ?: '#10b981' }};
             --color-brand-lime: {{ $branding->landing_accent_color ?: '#d7f24e' }};
             --color-brand-teal: {{ $branding->primary_color ?: '#0c5966' }};
         }
+        html { background: #020617; }
+        body { margin: 0; min-height: 100vh; background: #020617; color: #f1f5f9;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, ui-sans-serif, system-ui, Helvetica, Arial, sans-serif; }
         [x-cloak] { display: none !important; }
     </style>
+
+    {{-- Scoped auth stylesheet only. The full app.css / app.js bundle and the
+         Google Fonts request are NOT loaded on the sign-in screens; Alpine
+         comes from @livewireScripts. --}}
+    @vite(['resources/css/auth.css'])
+    @livewireStyles
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between p-3 sm:p-6 lg:p-10 font-sans antialiased relative overflow-x-hidden selection:bg-brand-lime selection:text-slate-900">
     
@@ -44,9 +49,9 @@
     <!-- Ambient Aurora Canvas Background matching landing page -->
     <div class="fixed inset-0 bg-gradient-to-br from-[#0c5966] via-[#10707e] to-[#6da734] dark:from-[#06242a] dark:via-[#09353c] dark:to-[#2b4414] -z-20"></div>
 
-    <!-- Soft radial glow orbs -->
-    <div class="fixed top-1/4 -left-20 w-96 h-96 rounded-full bg-teal-400/20 blur-[120px] pointer-events-none -z-10 animate-pulse-glow"></div>
-    <div class="fixed bottom-10 right-0 w-[500px] h-[500px] rounded-full bg-lime-400/20 blur-[130px] pointer-events-none -z-10 animate-pulse-glow" style="animation-delay: 2s;"></div>
+    <!-- Soft radial glow orbs (decorative; hidden on phones / reduced-motion) -->
+    <div class="auth-ambient fixed top-1/4 -left-20 w-96 h-96 rounded-full bg-teal-400/20 blur-3xl pointer-events-none -z-10"></div>
+    <div class="auth-ambient fixed bottom-10 right-0 w-[500px] h-[500px] rounded-full bg-lime-400/15 blur-3xl pointer-events-none -z-10"></div>
 
     <!-- Top Floating Navigation Bar -->
     <div class="w-full max-w-6xl mx-auto flex items-center justify-between py-3 px-2 sm:px-4 z-20 mb-4 sm:mb-6">
