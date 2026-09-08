@@ -26,7 +26,7 @@ class Index extends Component
     #[Url(as: 'tab')]
     public string $activeTab = 'general';
 
-    public string $landingTheme = 'theme_modern';
+    public string $landingTheme = 'theme_fast';
 
     public array $social = [
         'google' => ['enabled' => false, 'client_id' => '', 'client_secret' => ''],
@@ -270,7 +270,7 @@ class Index extends Component
         $this->sectionContact = (bool) ($cfg['contact'] ?? true);
         $this->sectionCta = (bool) ($cfg['cta'] ?? true);
 
-        $this->landingTheme = (string) setting('landing_page_theme', 'theme_modern');
+        $this->landingTheme = (string) setting('landing_page_theme', 'theme_fast');
 
         foreach (array_keys($this->social) as $provider) {
             $this->social[$provider] = [
@@ -416,11 +416,12 @@ class Index extends Component
 
     public function setLandingTheme(string $themeKey): void
     {
-        $allowedThemes = ['theme_modern', 'theme_enterprise', 'theme_minimal', 'theme_dark_studio'];
+        $allowedThemes = ['theme_fast', 'theme_modern', 'theme_enterprise', 'theme_minimal', 'theme_dark_studio'];
         if (in_array($themeKey, $allowedThemes, true)) {
             $this->landingTheme = $themeKey;
             set_setting('landing_page_theme', $themeKey);
             cache()->forget('app_landing_page_theme');
+            cache()->increment('landing_page_cache_version') ?: cache()->forever('landing_page_cache_version', 2);
             $this->dispatch('toast', ['message' => 'Landing page layout updated successfully!', 'type' => 'success']);
             $this->dispatch('notify', ['type' => 'success', 'message' => 'Landing page layout updated successfully!']);
         }

@@ -1,14 +1,15 @@
 <?php
 
+use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\PublicContactController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Middleware\EnsureAppIsInstalled;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Auth\SocialAuthController;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Route;
 
 Route::middleware(EnsureAppIsInstalled::class)->get('/', [LandingPageController::class, 'index'])->name('home');
 
@@ -22,6 +23,10 @@ Route::middleware(EnsureAppIsInstalled::class)->get('/register', function () {
 
 Route::middleware(EnsureAppIsInstalled::class)->get('/page/{page:slug}', [PublicPageController::class, 'show'])->name('page.show');
 Route::middleware(EnsureAppIsInstalled::class)->get('/pages/{page:slug}', [PublicPageController::class, 'show'])->name('pages.show');
+
+Route::middleware([EnsureAppIsInstalled::class, 'throttle:6,1'])
+    ->post('/contact', [PublicContactController::class, 'store'])
+    ->name('contact.store');
 
 Route::get('/locale/{locale}', [LocaleController::class, 'switch'])->name('locale.switch');
 Route::middleware(EnsureAppIsInstalled::class)->group(function () {

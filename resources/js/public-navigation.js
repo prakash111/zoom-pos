@@ -1,43 +1,36 @@
 /**
- * Lightweight SPA navigation for the public website.
- * Livewire is already present for the contact form, so reuse its navigator
- * without loading the much larger authenticated application bundle.
+ * Public marketing site runtime.
+ *
+ * The public pages (landing themes, CMS pages) no longer load Livewire, so
+ * this bundle carries the one small dependency their layout needs — Alpine —
+ * plus progressive-enhancement niceties (smooth in-page anchor scroll). It is
+ * deliberately tiny: Alpine core only, no plugins, deferred.
  */
+import Alpine from 'alpinejs';
+
+window.Alpine = Alpine;
+Alpine.start();
+
+/* Smooth-scroll same-page anchors without the layout-thrash of CSS
+   `scroll-behavior: smooth` on the whole document. Respects reduced motion. */
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
 document.addEventListener('click', (event) => {
-    if (
-        event.defaultPrevented
-        || event.button !== 0
-        || event.metaKey
-        || event.ctrlKey
-        || event.shiftKey
-        || event.altKey
-    ) return;
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey) return;
 
-    const link = event.target.closest('a[href]');
-    if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
-    if (link.dataset.noSpa === 'true' || link.dataset.navigateIgnore === 'true') return;
+    const link = event.target.closest('a[href^="#"]');
+    if (!link) return;
 
-    const href = link.getAttribute('href');
-    if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+    const id = link.getAttribute('href').slice(1);
+    if (!id) return;
 
-    let destination;
-    try {
-        destination = new URL(link.href, window.location.href);
-    } catch {
-        return;
-    }
+    const target = document.getElementById(id);
+    if (!target) return;
 
-    if (destination.origin !== window.location.origin) return;
-
-    const current = new URL(window.location.href);
-    if (
-        destination.pathname === current.pathname
-        && destination.search === current.search
-        && destination.hash
-    ) return;
-
-    if (window.Livewire?.navigate) {
-        event.preventDefault();
-        window.Livewire.navigate(destination.href);
-    }
+    event.preventDefault();
+    target.scrollIntoView({
+        behavior: prefersReducedMotion.matches ? 'auto' : 'smooth',
+        block: 'start',
+    });
+    history.replaceState(null, '', `#${id}`);
 });

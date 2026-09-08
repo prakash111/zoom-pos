@@ -53,7 +53,7 @@ if (! function_exists('get_appearance_settings')) {
         $branding = PlatformBranding::current();
 
         return [
-            'theme' => setting('landing_page_theme', 'theme_modern'),
+            'theme' => setting('landing_page_theme', 'theme_fast'),
             'primary_color' => $branding->primary_color ?? '#4f46e5',
             'landing_primary_color' => $branding->landing_primary_color ?? '#10b981',
             'landing_accent_color' => $branding->landing_accent_color ?? '#d7f24e',

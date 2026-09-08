@@ -4,12 +4,17 @@ namespace App\Providers;
 
 use App\Events\TenantRegistered;
 use App\Listeners\TenantRegisteredListener;
+use App\Models\MenuItem;
+use App\Models\Page;
+use App\Models\PlatformBranding;
+use App\Models\SaaSPlan;
 use App\Models\Sale;
 use App\Models\User;
 use App\Observers\SaleObserver;
 use App\Services\Auth\PermissionChecker;
 use App\Support\Desktop;
 use App\View\Composers\TenantNavigationComposer;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
@@ -34,6 +39,17 @@ class AppServiceProvider extends ServiceProvider
     {
         Sale::observe(SaleObserver::class);
         Event::listen(TenantRegistered::class, TenantRegisteredListener::class);
+
+        // Bump the marketing landing page's whole-response cache whenever any
+        // content it renders changes (branding, plans, footer pages, menus).
+        $bustLandingCache = static function (): void {
+            Cache::increment('landing_page_cache_version')
+                ?: Cache::forever('landing_page_cache_version', 2);
+        };
+        foreach ([PlatformBranding::class, SaaSPlan::class, Page::class, MenuItem::class] as $model) {
+            $model::saved($bustLandingCache);
+            $model::deleted($bustLandingCache);
+        }
 
         $storageDirs = [
             storage_path('framework/views'),

@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Middleware\CheckMaintenanceMode;
-use App\Http\Middleware\CheckTenantPermission;
 use App\Http\Middleware\CheckTenantApiUserPermission;
+use App\Http\Middleware\CheckTenantPermission;
 use App\Http\Middleware\EnsureAppIsInstalled;
 use App\Http\Middleware\EnsureNotInstalled;
 use App\Http\Middleware\EnsureTenantEmailIsVerified;
@@ -58,6 +58,12 @@ return Application::configure(basePath: dirname(__DIR__))
             SetLocale::class,
             SecurityHeaders::class,
         ]);
+
+        // The public landing page is served from a whole-response cache shared
+        // across visitors, so its embedded CSRF token is not per-session. The
+        // marketing contact form is instead protected by an origin-locked
+        // rate limit (throttle:6,1) and a honeypot field.
+        $middleware->validateCsrfTokens(except: ['contact']);
 
         $middleware->alias([
             'installed' => EnsureAppIsInstalled::class,

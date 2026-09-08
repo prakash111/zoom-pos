@@ -146,4 +146,37 @@ class PagesAndLandingPageTest extends TestCase
 
         $this->assertSame(0, ContactInquiry::count());
     }
+
+    public function test_public_contact_endpoint_stores_inquiry_and_notifies(): void
+    {
+        Mail::fake();
+        PlatformBranding::current()->update(['support_email' => 'owner@example.com']);
+
+        $this->post('/contact', [
+            'name' => 'Sam Lead',
+            'email' => 'sam@lead.test',
+            'store_type' => 'Retail Store',
+            'message' => 'Do you support weighing scales at the counter?',
+        ])->assertRedirect();
+
+        $inquiry = ContactInquiry::where('email', 'sam@lead.test')->firstOrFail();
+        $this->assertSame('Retail Store', $inquiry->store_type);
+        Mail::assertQueued(ContactInquiryMailable::class);
+    }
+
+    public function test_public_contact_endpoint_validates_and_honours_the_honeypot(): void
+    {
+        $this->post('/contact', ['email' => 'nope'])
+            ->assertSessionHasErrors(['name', 'email', 'message']);
+
+        // Honeypot filled → silently accepted, nothing stored.
+        $this->post('/contact', [
+            'name' => 'Bot',
+            'email' => 'bot@spam.test',
+            'message' => 'buy cheap things now',
+            'company_website' => 'http://spam.example',
+        ])->assertRedirect();
+
+        $this->assertSame(0, ContactInquiry::count());
+    }
 }

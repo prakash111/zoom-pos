@@ -8,6 +8,11 @@
     $publicActiveLang = $publicLocService->getActiveLanguage();
     $publicLanguages = $publicLocService->getActiveLanguages();
     $isRtl = $publicLocService->isRtl();
+
+    // The fast theme ships a ~9 KB-gzip scoped stylesheet; the four legacy
+    // themes still need the full app.css for their richer markup.
+    $publicTheme = $appearance['theme'] ?? setting('landing_page_theme', 'theme_fast');
+    $publicCssBundle = $publicTheme === 'theme_fast' ? 'resources/css/public.css' : 'resources/css/app.css';
 @endphp
 <!DOCTYPE html>
 <html lang="{{ $publicActiveLang?->code ?? 'en' }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="scroll-smooth" x-data="{ dark: document.documentElement.classList.contains('dark') }" x-init="$watch('dark', v => { localStorage.setItem('theme', v ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', v) })">
@@ -24,28 +29,26 @@
 
     {{-- Set the saved theme before CSS is requested, preventing a light/dark flash. --}}
     <script>try{document.documentElement.classList.toggle('dark',localStorage.getItem('theme')==='dark')}catch(e){}</script>
-    @vite(['resources/css/app.css', 'resources/js/public-navigation.js'])
-    @livewireStyles
+
+    {{-- Critical above-the-fold CSS: paints the page background and sticky
+         header before the (render-blocking but small) public stylesheet
+         arrives, so there is no flash of unstyled header. --}}
     <style>
         :root {
             --color-brand-emerald: {{ $publicBranding->landing_primary_color ?: '#10b981' }};
             --color-brand-lime: {{ $publicBranding->landing_accent_color ?: '#d7f24e' }};
             --color-brand-teal: {{ $publicBranding->primary_color ?: '#0c5966' }};
         }
-        .page-content :where(h1, h2, h3, h4) { font-weight: 800; letter-spacing: -0.02em; margin: 1.5em 0 0.5em; }
-        .page-content h1 { font-size: 2rem; }
-        .page-content h2 { font-size: 1.625rem; }
-        .page-content h3 { font-size: 1.25rem; }
-        .page-content p { margin: 1em 0; line-height: 1.75; }
-        .page-content ul, .page-content ol { margin: 1em 0; padding-inline-start: 1.5em; }
-        .page-content li { margin: 0.35em 0; }
-        .page-content a { color: var(--color-brand-emerald); text-decoration: underline; }
-        .page-content img { border-radius: 1rem; max-width: 100%; height: auto; }
-        .page-content table { width: 100%; border-collapse: collapse; margin: 1em 0; }
-        .page-content td, .page-content th { border: 1px solid rgb(226 232 240); padding: 0.5em 0.75em; }
-        html.dark .page-content td, html.dark .page-content th { border-color: rgb(51 65 85); }
+        html { background: #0f172a; }
+        body { margin: 0; min-height: 100vh; background: #0f172a; color: #f1f5f9;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, ui-sans-serif, system-ui, Helvetica, Arial, sans-serif; }
         [x-cloak] { display: none !important; }
     </style>
+
+    {{-- Public stylesheet (scoped ~9 KB gzip for the fast theme, full app.css
+         for legacy themes) + an Alpine-only runtime, both deferred. Livewire
+         is not loaded on the marketing site. --}}
+    @vite([$publicCssBundle, 'resources/js/public-navigation.js'])
 </head>
 <body class="public-site bg-slate-900 text-slate-900 dark:text-slate-100 font-sans antialiased min-h-screen selection:bg-brand-lime selection:text-slate-900">
 
@@ -429,6 +432,5 @@
         </div>
     </div>
 
-    @livewireScripts
 </body>
 </html>
