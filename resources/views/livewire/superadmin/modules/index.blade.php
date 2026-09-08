@@ -39,6 +39,28 @@
         </form>
     </div>
 
+    @if (! empty($orphans))
+        <div class="bg-amber-50 dark:bg-amber-950/30 rounded-3xl p-6 border border-amber-200 dark:border-amber-800 space-y-3">
+            <h4 class="font-extrabold text-sm text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                ⚠ {{ __("Leftover module files") }}
+            </h4>
+            <p class="text-xs text-amber-700/80 dark:text-amber-400/80">
+                {{ __("These directories are on disk under modules/ but have no registered module. Safe to delete — they are not loaded or shown as store types.") }}
+            </p>
+            <ul class="divide-y divide-amber-200/70 dark:divide-amber-800/60">
+                @foreach ($orphans as $slug => $path)
+                    <li class="flex items-center justify-between py-2.5 gap-4">
+                        <code class="text-xs font-bold text-amber-900 dark:text-amber-200">modules/{{ $slug }}</code>
+                        <button wire:click="pruneOrphan('{{ $slug }}')"
+                                wire:confirm="{{ __('Permanently delete the modules/:slug directory from disk?', ['slug' => $slug]) }}"
+                                type="button"
+                                class="text-rose-700 dark:text-rose-400 hover:underline font-bold text-xs shrink-0">{{ __("Delete files") }}</button>
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     <!-- Installed Modules Table -->
     <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800">

@@ -70,10 +70,26 @@ class Index extends Component
         }
     }
 
+    public function pruneOrphan(ModulePackageService $service, string $slug): void
+    {
+        try {
+            $removed = $service->pruneOrphanDir($slug);
+            session()->flash(
+                $removed ? 'status' : 'error',
+                $removed
+                    ? "Leftover files for \"{$slug}\" were deleted from disk."
+                    : "Could not remove the \"{$slug}\" directory — check filesystem permissions."
+            );
+        } catch (Throwable $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
     public function render()
     {
         return view('livewire.superadmin.modules.index', [
             'modules' => $this->packageModules(),
+            'orphans' => app(ModulePackageService::class)->orphanedModuleDirs(),
         ]);
     }
 

@@ -210,6 +210,74 @@ class ModulePackageService
     }
 
     /**
+     * Directories under modules/ that hold a module.json but have NO
+     * sdui_modules row — i.e. files left behind by a pre-fix uninstall, a
+     * failed install, or a manual copy. The uninstall flow prevents these
+     * going forward; this lets a SuperAdmin sweep any that already exist.
+     *
+     * @return array<string, string>  slug => absolute path
+     */
+    public function orphanedModuleDirs(): array
+    {
+        $root = base_path('modules');
+        if (! File::isDirectory($root)) {
+            return [];
+        }
+
+        $known = Schema::hasTable('sdui_modules')
+            ? SduiModule::query()->pluck('package_path')->filter()->map('strval')->all()
+            : [];
+
+        $orphans = [];
+        foreach (File::directories($root) as $dir) {
+            $slug = basename($dir);
+            if (in_array($slug, $known, true)) {
+                continue;
+            }
+            if (File::exists($dir.'/module.json')) {
+                $orphans[$slug] = $dir;
+            }
+        }
+
+        return $orphans;
+    }
+
+    /**
+     * Delete one orphaned module directory. Refuses to touch anything that
+     * still has an sdui_modules row (use uninstall() for those) or that
+     * escapes modules/.
+     */
+    public function pruneOrphanDir(string $slug): bool
+    {
+        $slug = trim($slug);
+        if ($slug === '' || ! preg_match('/^[a-z0-9]+$/', $slug)) {
+            throw new InvalidArgumentException('Invalid module directory name.');
+        }
+
+        if (Schema::hasTable('sdui_modules')
+            && SduiModule::query()->where('package_path', $slug)->orWhere('slug', $slug)->exists()) {
+            throw new InvalidArgumentException("\"{$slug}\" is a registered module — uninstall it instead.");
+        }
+
+        $dir = base_path('modules/'.$slug);
+        $root = realpath(base_path('modules'));
+        if ($root === false || ! File::isDirectory($dir) || dirname(realpath($dir) ?: $dir) !== $root) {
+            return false;
+        }
+
+        if (! File::deleteDirectory($dir)) {
+            @exec('rm -rf '.escapeshellarg($dir));
+        }
+
+        $removed = ! File::isDirectory($dir);
+        if ($removed) {
+            $this->flushPlatformCaches();
+        }
+
+        return $removed;
+    }
+
+    /**
      * Best-effort `php artisan optimize:clear`. A wedged cache driver must not
      * abort an activate / deactivate / uninstall that has otherwise succeeded.
      */
