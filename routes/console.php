@@ -15,3 +15,8 @@ Schedule::command('notifications:dispatch-scheduled')
 Schedule::command('notifications:dispatch-vertical')
     ->everyMinute()
     ->withoutOverlapping();
+
+Schedule::command('license:check-status')
+    ->daily()
+    ->withoutOverlapping()
+    ->runInBackground();

@@ -14,6 +14,18 @@
         </div>
     @endif
 
+    <div class="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+        <span>{{ __("License driver") }}:</span>
+        <span class="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase tracking-wide">{{ $licenseDriver }}</span>
+        <a href="{{ route('superadmin.settings.index', ['tab' => 'licensing']) }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ __("Change") }}</a>
+    </div>
+
+    @if ($offlineFallback)
+        <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-xs font-bold border border-amber-200 dark:border-amber-800">
+            {{ __("License server is not configured — module keys are only format-checked. Set a license server URL under Settings → Licensing for strict verification.") }}
+        </div>
+    @endif
+
     <!-- Upload Card -->
     <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-4">
         <div>
@@ -89,23 +101,78 @@
                             <td class="px-6 py-4 text-slate-700 dark:text-slate-300">{{ $module->version ?? '—' }}</td>
                             <td class="px-6 py-4 text-slate-700 dark:text-slate-300">{{ $module->author ?? '—' }}</td>
                             <td class="px-6 py-4">
-                                @if ($module->is_active)
-                                    <span class="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-extrabold">{{ __("Active") }}</span>
-                                @else
-                                    <span class="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[11px] font-extrabold">{{ __("Inactive") }}</span>
-                                @endif
+                                <div class="flex flex-col gap-1 items-start">
+                                    @if ($module->is_active)
+                                        <span class="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-extrabold">{{ __("Active") }}</span>
+                                    @else
+                                        <span class="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[11px] font-extrabold">{{ __("Inactive") }}</span>
+                                    @endif
+
+                                    @if ($module->requires_license)
+                                        @php
+                                            $ls = $module->license_status;
+                                            $lsClass = match ($ls) {
+                                                'active' => 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300',
+                                                'expired' => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300',
+                                                'revoked' => 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300',
+                                                default => 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
+                                            };
+                                        @endphp
+                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-extrabold {{ $lsClass }}">
+                                            {{ __("License") }}: {{ ucfirst($ls) }}
+                                        </span>
+                                        @if ($ls === 'active')
+                                            <span class="text-[10px] font-mono text-slate-400">
+                                                {{ $module->license_driver ?? '—' }} ·
+                                                {{ $module->license_expires_at ? $module->license_expires_at->format('Y-m-d') : __('no expiry') }}
+                                            </span>
+                                        @endif
+                                    @endif
+                                </div>
                             </td>
                             <td class="px-6 py-4 text-slate-400 text-xs font-mono">
                                 {{ $module->installed_at?->format('Y-m-d H:i:s') ?? '—' }}
                             </td>
-                            <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap">
+                            <td class="px-6 py-4 text-right whitespace-nowrap align-top">
+                                @php $needsKey = $module->requires_license && $module->license_status !== 'active'; @endphp
+
                                 @if ($module->is_active)
-                                    <button wire:click="deactivate({{ $module->id }})" wire:confirm="{{ __("Deactivate this module? Its navigation and routes will stop working, but its data is kept.") }}" type="button" class="text-amber-600 hover:underline font-bold">{{ __("Deactivate") }}</button>
+                                    <div class="space-x-3">
+                                        <button wire:click="deactivate({{ $module->id }})" wire:confirm="{{ __("Deactivate this module? Its navigation and routes stop working (and it is removed from selectable store types), but its data is kept.") }}" type="button" class="text-amber-600 hover:underline font-bold">{{ __("Deactivate") }}</button>
+                                        @if ($module->requires_license)
+                                            <button wire:click="revalidateLicense({{ $module->id }})" type="button" class="text-slate-500 hover:underline font-bold">{{ __("Re-check license") }}</button>
+                                        @endif
+                                    </div>
+                                @elseif ($needsKey)
+                                    <div class="flex flex-col items-end gap-1.5 max-w-xs ml-auto">
+                                        <input type="text" wire:model.defer="licenseKeys.{{ $module->id }}"
+                                               placeholder="{{ __('Enter license key') }}"
+                                               class="w-56 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-slate-800 dark:text-slate-100">
+                                        @error('licenseKeys.'.$module->id)
+                                            <p class="text-[11px] text-rose-600 font-bold text-right">{{ $message }}</p>
+                                        @enderror
+                                        <div class="flex items-center gap-3">
+                                            @if (($catalog[$module->id]['buy_enabled'] ?? false) && ($catalog[$module->id]['price'] ?? 0) > 0)
+                                                <a href="{{ route('superadmin.modules.buy', $module->slug) }}" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold text-xs">
+                                                    {{ __("Buy") }} {{ $catalog[$module->id]['currency'] }} {{ number_format($catalog[$module->id]['price'], 2) }}
+                                                </a>
+                                            @endif
+                                            <button wire:click="activate({{ $module->id }})" type="button" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white">{{ __("Verify & Activate") }}</button>
+                                        </div>
+                                    </div>
                                 @else
-                                    <button wire:click="activate({{ $module->id }})" wire:confirm="{{ __("Activate this module and run its migrations?") }}" type="button" class="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">{{ __("Activate") }}</button>
+                                    <div class="space-x-3">
+                                        <button wire:click="activate({{ $module->id }})" wire:confirm="{{ __("Activate this module and run its migrations?") }}" type="button" class="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">{{ __("Activate") }}</button>
+                                        @if ($module->requires_license)
+                                            <button wire:click="revalidateLicense({{ $module->id }})" type="button" class="text-slate-500 hover:underline font-bold">{{ __("Re-check license") }}</button>
+                                        @endif
+                                    </div>
                                 @endif
-                                <button wire:click="uninstall({{ $module->id }}, false)" wire:confirm="{{ __("Uninstall this module? Its files will be removed but its data tables are kept.") }}" type="button" class="text-rose-600 hover:underline font-bold">{{ __("Uninstall") }}</button>
-                                <button wire:click="uninstall({{ $module->id }}, true)" wire:confirm="{{ __("Uninstall this module AND drop its data tables? This cannot be undone.") }}" type="button" class="text-rose-800 hover:underline font-bold">{{ __("Uninstall + Drop Data") }}</button>
+
+                                <div class="space-x-3 mt-2">
+                                    <button wire:click="uninstall({{ $module->id }}, false)" wire:confirm="{{ __("Uninstall this module? Its files will be removed but its data tables are kept.") }}" type="button" class="text-rose-600 hover:underline font-bold">{{ __("Uninstall") }}</button>
+                                    <button wire:click="uninstall({{ $module->id }}, true)" wire:confirm="{{ __("Uninstall this module AND drop its data tables? This cannot be undone.") }}" type="button" class="text-rose-800 hover:underline font-bold">{{ __("Uninstall + Drop Data") }}</button>
+                                </div>
                             </td>
                         </tr>
                     @empty

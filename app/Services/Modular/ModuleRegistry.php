@@ -208,6 +208,7 @@ class ModuleRegistry
      * deactivated / uninstalled package returns false.
      *
      * Blade / controller gate for module-specific UI:
+     *
      *   @if (\App\Services\Modular\ModuleRegistry::isActive('pharmacy')) ...
      */
     public static function isActive(string $key): bool
@@ -358,6 +359,38 @@ class ModuleRegistry
         }
 
         return ! empty($modes) ? $modes : ['retail'];
+    }
+
+    /**
+     * Merged feature map across every mode currently available to the tenant
+     * (built-ins + licensed, active package modules). Additive: a flag is on if
+     * any active module turns it on. Lets the mobile app show/hide features
+     * purely from server state — no client build.
+     *
+     * No license lookup is needed here: allModules() already only contains
+     * package rows with is_active = true, and the daily license job guarantees
+     * `is_active` ⇒ licensed.
+     *
+     * @return array<string, mixed>
+     */
+    public static function activeFeaturesFor(Company $company): array
+    {
+        $all = self::allModules();
+        $keys = array_values(array_unique([
+            ...self::availableModes($company),
+            self::resolveActiveMode($company),
+        ]));
+
+        $merged = [];
+        foreach ($keys as $key) {
+            foreach (($all[$key]['features'] ?? []) as $featureKey => $value) {
+                $merged[$featureKey] = (($merged[$featureKey] ?? false) === true || $value === true)
+                    ? true
+                    : ($merged[$featureKey] ?? $value);
+            }
+        }
+
+        return $merged;
     }
 
     /**

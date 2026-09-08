@@ -36,6 +36,7 @@ class ModulesTest extends TestCase
             'name' => 'Test Module',
             'version' => '1.0.0',
             'author' => 'Test Suite',
+            'requires_license' => false,
             'navigation' => [
                 [
                     'key' => $key.'_section',

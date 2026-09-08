@@ -4,7 +4,11 @@ namespace Tests\Feature\SuperAdmin;
 
 use App\Livewire\SuperAdmin\Modules\Index as ModulesIndex;
 use App\Models\Company;
+use App\Models\Configuration;
+use App\Models\Permission;
 use App\Models\PlatformSystem;
+use App\Models\SduiModule;
+use App\Models\User;
 use App\Services\Modular\ModulePackageService;
 use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\TenantNavRegistry;
@@ -12,11 +16,16 @@ use App\Services\Sdui\SchemaValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
+use Modules\pharmacy\Http\Controllers\PharmacyModuleController;
+use Modules\repairtechnician\Http\Controllers\RepairModuleController;
+use Modules\repairtechnician\Models\RepairTicket;
+use Modules\salon\Http\Controllers\SalonModuleController;
+use Modules\salon\Models\Appointment;
 use Tests\Concerns\ActsAsPlatformAdmin;
+use Tests\Concerns\LicensesModules;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -29,7 +38,7 @@ use ZipArchive;
  */
 class PackagedVerticalModulesTest extends TestCase
 {
-    use ActsAsPlatformAdmin, RefreshDatabase;
+    use ActsAsPlatformAdmin, LicensesModules, RefreshDatabase;
 
     private const TABLES = [
         'pharmacy_mod_prescription_items', 'pharmacy_mod_prescriptions', 'pharmacy_mod_drug_batches',
@@ -91,12 +100,13 @@ class PackagedVerticalModulesTest extends TestCase
         $this->assertTrue(is_dir(base_path('modules/pharmacy')));
 
         // activate -> migrations run
+        $this->licenseModule($module);
         $service->activate($module, null);
         $this->assertTrue($module->fresh()->is_active);
         $this->assertTrue(Schema::hasTable('pharmacy_mod_drug_batches'));
         $this->assertTrue(Schema::hasTable('pharmacy_mod_prescriptions'));
 
-        $controller = new \Modules\pharmacy\Http\Controllers\PharmacyModuleController();
+        $controller = new PharmacyModuleController;
 
         // dashboard renders a valid SDUI screen
         $dash = $controller->dashboard($this->tenantRequest($company));
@@ -122,7 +132,7 @@ class PackagedVerticalModulesTest extends TestCase
 
         // uninstall + drop data -> clean slate
         $service->uninstall($module->fresh(), true, null);
-        $this->assertNull(\App\Models\SduiModule::where('slug', 'pharmacy')->first());
+        $this->assertNull(SduiModule::where('slug', 'pharmacy')->first());
         $this->assertFalse(is_dir(base_path('modules/pharmacy')));
         $this->assertFalse(Schema::hasTable('pharmacy_mod_drug_batches'));
     }
@@ -139,11 +149,13 @@ class PackagedVerticalModulesTest extends TestCase
         $this->assertSame('repairtechnician', $module->slug);
         $this->assertFalse($module->is_active);
 
+        $this->licenseModule($module);
+
         $service->activate($module, null);
         $this->assertTrue(Schema::hasTable('repair_mod_tickets'));
         $this->assertTrue(Schema::hasTable('repair_mod_device_categories'));
 
-        $controller = new \Modules\repairtechnician\Http\Controllers\RepairModuleController();
+        $controller = new RepairModuleController;
 
         $dash = $controller->dashboard($this->tenantRequest($company))->getData(true);
         $this->assertTrue($dash['success']);
@@ -165,7 +177,7 @@ class PackagedVerticalModulesTest extends TestCase
         $ticketReq->attributes->set('company_id', $company->id);
         $ticketId = $controller->ticketsStore($ticketReq)->getData(true)['id'];
 
-        $ticket = \Modules\repairtechnician\Models\RepairTicket::find($ticketId);
+        $ticket = RepairTicket::find($ticketId);
         $this->assertCount(3, $ticket->inspection_checklist);
 
         // status transition
@@ -191,12 +203,14 @@ class PackagedVerticalModulesTest extends TestCase
         $this->assertSame('salon', $module->slug);
         $this->assertFalse($module->is_active);
 
+        $this->licenseModule($module);
+
         $service->activate($module, null);
         $this->assertTrue(Schema::hasTable('salon_mod_appointments'));
         $this->assertTrue(Schema::hasTable('salon_mod_services'));
         $this->assertTrue(Schema::hasTable('salon_mod_stylists'));
 
-        $controller = new \Modules\salon\Http\Controllers\SalonModuleController();
+        $controller = new SalonModuleController;
 
         $dash = $controller->dashboard($this->tenantRequest($company))->getData(true);
         $this->assertTrue($dash['success']);
@@ -219,7 +233,7 @@ class PackagedVerticalModulesTest extends TestCase
         $apReq->attributes->set('company_id', $company->id);
         $apId = $controller->appointmentsStore($apReq)->getData(true)['id'];
 
-        $appt = \Modules\salon\Models\Appointment::find($apId);
+        $appt = Appointment::find($apId);
         $this->assertSame('25.00', (string) $appt->price);
 
         $detail = $controller->appointmentDetail(
@@ -249,6 +263,7 @@ class PackagedVerticalModulesTest extends TestCase
         PlatformSystem::set('allowed_registration_modes', json_encode(['retail', 'salon']));
 
         $module = $service->install($this->zipPackage('salon'), null);
+        $this->licenseModule($module);
         $service->activate($module, null);
 
         // Active -> visible in the module registry AND the tenant drawer.
@@ -289,6 +304,7 @@ class PackagedVerticalModulesTest extends TestCase
 
         // Cycle 1 — install, activate, uninstall + drop data.
         $m1 = $service->install($this->zipPackage('pharmacy'), null);
+        $this->licenseModule($m1);
         $service->activate($m1, null);
         $this->assertTrue(Schema::hasTable('pharmacy_mod_drug_batches'));
         $service->uninstall($m1->fresh(), true, null);
@@ -304,6 +320,7 @@ class PackagedVerticalModulesTest extends TestCase
         // tables (no "table already exists", no skipped migration).
         $m2 = $service->install($this->zipPackage('pharmacy'), null);
         $this->assertFalse($m2->is_active);
+        $this->licenseModule($m2);
         $service->activate($m2, null); // would throw RuntimeException on failure
         $this->assertTrue(Schema::hasTable('pharmacy_mod_drug_batches'));
         $this->assertTrue(Schema::hasTable('pharmacy_mod_prescriptions'));
@@ -317,6 +334,7 @@ class PackagedVerticalModulesTest extends TestCase
         $service = app(ModulePackageService::class);
 
         $module = $service->install($this->zipPackage('repairtechnician'), null);
+        $this->licenseModule($module);
         $service->activate($module, null);
         $this->assertTrue(is_dir(base_path('modules/repairtechnician')));
 
@@ -327,7 +345,7 @@ class PackagedVerticalModulesTest extends TestCase
 
         $this->assertFalse(is_dir(base_path('modules/repairtechnician')), 'module directory was left on disk');
         $this->assertFalse(Schema::hasTable('repair_mod_tickets'));
-        $this->assertNull(\App\Models\SduiModule::find($module->id));
+        $this->assertNull(SduiModule::find($module->id));
     }
 
     public function test_uninstall_purges_module_permissions_and_declared_config_keys(): void
@@ -337,23 +355,24 @@ class PackagedVerticalModulesTest extends TestCase
             'name' => 'Purge Co', 'slug' => 'purge-co', 'status' => 'active',
             'pos_mode' => 'retail', 'currency' => 'USD', 'currency_symbol' => '$',
         ]);
-        $user = \App\Models\User::create([
+        $user = User::create([
             'company_id' => $company->id, 'name' => 'U', 'email' => 'u@purge.test',
             'password' => bcrypt('x'), 'role' => 'administrator', 'status' => 'active',
         ]);
 
         $module = $service->install($this->zipPackage('pharmacy'), null);
+        $this->licenseModule($module);
         $service->activate($module, null);
 
         // Rows a module of this namespace could have created.
-        \App\Models\Permission::create([
+        Permission::create([
             'user_id' => $user->id, 'company_id' => $company->id,
             'module' => 'pharmacy', 'action' => 'view', 'allowed' => true,
         ]);
-        \App\Models\Configuration::withoutGlobalScopes()->create([
+        Configuration::withoutGlobalScopes()->create([
             'company_id' => $company->id, 'key' => 'pharmacy_mod.default_tax', 'value' => '5',
         ]);
-        \App\Models\Configuration::withoutGlobalScopes()->create([
+        Configuration::withoutGlobalScopes()->create([
             'company_id' => $company->id, 'key' => 'unrelated.flag', 'value' => '1',
         ]);
 

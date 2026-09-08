@@ -7,7 +7,10 @@ use App\Models\Page;
 use App\Models\PlatformBranding;
 use App\Models\PlatformSystem;
 use App\Models\PushNotificationSetting;
+use App\Models\SduiModule;
+use App\Services\License\LicenseService;
 use App\Services\Localization\PlatformRegionalService;
+use App\Services\Modular\ModuleRegistry;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Layout;
@@ -74,6 +77,19 @@ class Index extends Component
     public bool $hasAiImageGeminiApiKey = false;
 
     public bool $hasAiImageClaudeApiKey = false;
+
+    // --- TAB: LICENSING ---
+    public string $licenseDriver = 'custom';
+
+    public string $envatoApiToken = '';
+
+    public bool $hasEnvatoApiToken = false;
+
+    public string $licenseServerUrl = '';
+
+    public string $licenseServerSecret = '';
+
+    public bool $hasLicenseServerSecret = false;
 
     // --- TAB 2: SMTP SETTINGS ---
     public string $smtpHost = '';
@@ -203,7 +219,7 @@ class Index extends Component
             $this->activeTab = 'general';
         }
 
-        $allowedTabs = ['general', 'smtp', 'push', 'branding', 'whitelabel', 'social', 'pages', 'appearance'];
+        $allowedTabs = ['general', 'smtp', 'push', 'branding', 'whitelabel', 'social', 'pages', 'appearance', 'licensing'];
         if (! in_array($this->activeTab, $allowedTabs, true)) {
             $this->activeTab = 'general';
         }
@@ -220,13 +236,20 @@ class Index extends Component
         $this->minClientBuildVersion = (string) PlatformSystem::get('min_client_build_version', '0');
         $this->appVersion = (string) PlatformSystem::get('app_version', '1.0.0');
         $this->showPoweredBy = filter_var(PlatformSystem::get('show_powered_by', true), FILTER_VALIDATE_BOOLEAN);
-        $this->enabledRegistrationModules = \App\Services\Modular\ModuleRegistry::enabledRegistrationModes();
+        $this->enabledRegistrationModules = ModuleRegistry::enabledRegistrationModes();
         $this->allowedRegistrationModes = in_array('restaurant', $this->enabledRegistrationModules, true) && in_array('retail', $this->enabledRegistrationModules, true) ? 'both' : (in_array('restaurant', $this->enabledRegistrationModules, true) ? 'restaurant_only' : 'retail_only');
         $this->aiImageEnabled = filter_var(PlatformSystem::get('ai_image_enabled', false), FILTER_VALIDATE_BOOLEAN);
         $this->aiImageProvider = (string) PlatformSystem::get('ai_image_provider', 'openai');
         $this->hasAiImageOpenaiApiKey = filled(PlatformSystem::get('ai_image_openai_api_key'));
         $this->hasAiImageGeminiApiKey = filled(PlatformSystem::get('ai_image_gemini_api_key'));
         $this->hasAiImageClaudeApiKey = filled(PlatformSystem::get('ai_image_claude_api_key'));
+
+        // Licensing
+        $driver = (string) PlatformSystem::get('license_driver', config('services.license_server.driver', 'custom'));
+        $this->licenseDriver = in_array($driver, ['custom', 'codecanyon'], true) ? $driver : 'custom';
+        $this->hasEnvatoApiToken = filled(PlatformSystem::get('envato_api_token')) || filled(config('services.envato.api_token'));
+        $this->licenseServerUrl = (string) PlatformSystem::get('license_server_url', config('services.license_server.url', ''));
+        $this->hasLicenseServerSecret = filled(PlatformSystem::get('license_server_secret')) || filled(config('services.license_server.secret'));
 
         // Load Platform Branding & SMTP
         $branding = PlatformBranding::current();
@@ -302,7 +325,7 @@ class Index extends Component
 
     public function setTab(string $tab): void
     {
-        $allowedTabs = ['general', 'smtp', 'push', 'branding', 'whitelabel', 'social', 'pages', 'appearance'];
+        $allowedTabs = ['general', 'smtp', 'push', 'branding', 'whitelabel', 'social', 'pages', 'appearance', 'licensing'];
         if (in_array($tab, $allowedTabs, true)) {
             $this->activeTab = $tab;
         }
@@ -541,7 +564,7 @@ class Index extends Component
         // Never persist a key that is no longer a real store type — an
         // uninstalled / deactivated package module must not linger in this
         // list even if it was somehow still in the posted payload.
-        $validModeKeys = array_keys(\App\Services\Modular\ModuleRegistry::allModules());
+        $validModeKeys = array_keys(ModuleRegistry::allModules());
         $this->enabledRegistrationModules = array_values(array_intersect(
             array_values($this->enabledRegistrationModules),
             $validModeKeys,
@@ -575,6 +598,51 @@ class Index extends Component
             'message' => 'Platform general settings saved successfully.',
         ]);
         session()->flash('status', 'Platform general settings saved successfully.');
+    }
+
+    // --- LICENSING TAB SAVE ---
+    public function saveLicensing(): void
+    {
+        $this->validate([
+            'licenseDriver' => ['required', 'in:custom,codecanyon'],
+            'licenseServerUrl' => ['nullable', 'url', 'max:255'],
+            'envatoApiToken' => ['nullable', 'string', 'max:255'],
+            'licenseServerSecret' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        PlatformSystem::set('license_driver', $this->licenseDriver);
+        PlatformSystem::set('license_server_url', rtrim(trim($this->licenseServerUrl), '/'));
+
+        if (filled($this->envatoApiToken)) {
+            PlatformSystem::set('envato_api_token', trim($this->envatoApiToken));
+            $this->hasEnvatoApiToken = true;
+            $this->envatoApiToken = '';
+        }
+
+        if (filled($this->licenseServerSecret)) {
+            PlatformSystem::set('license_server_secret', trim($this->licenseServerSecret));
+            $this->hasLicenseServerSecret = true;
+            $this->licenseServerSecret = '';
+        }
+
+        AuditLog::record('license.settings_updated', null, auth('platform_web')->id(), [
+            'driver' => $this->licenseDriver,
+            'server_configured' => filled($this->licenseServerUrl),
+        ]);
+
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Licensing settings saved.']);
+        session()->flash('status', 'Licensing settings saved.');
+    }
+
+    public function recheckCoreLicense(): void
+    {
+        try {
+            Artisan::call('license:check-status', ['--core-only' => true, '--sync' => true]);
+            $this->dispatch('notify', ['type' => 'success', 'message' => 'Core license re-checked.']);
+            session()->flash('status', 'Core license re-checked.');
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Re-check failed: '.$e->getMessage()]);
+        }
     }
 
     public function clearSystemCache(): void
@@ -786,6 +854,8 @@ class Index extends Component
             ->orderByDesc('updated_at')
             ->paginate(10);
 
+        $licenses = app(LicenseService::class);
+
         return view('livewire.superadmin.settings.index', [
             'pages' => $pages,
             'availablePages' => Page::orderBy('title')->get(),
@@ -793,6 +863,44 @@ class Index extends Component
             'currencyOptions' => PlatformRegionalService::currencyOptions(),
             'languageOptions' => PlatformRegionalService::languageOptions(),
             'timezoneOptions' => PlatformRegionalService::timezoneOptions(),
+            'coreLicense' => $this->coreLicenseSnapshot(),
+            'moduleLicenses' => SduiModule::licenseManaged()
+                ->orderBy('name')
+                ->get(['name', 'slug', 'license_status', 'license_driver', 'license_verified_at', 'license_expires_at', 'is_active']),
+            'licenseDriverEffective' => $licenses->getActiveDriver(),
+            'licenseOfflineFallback' => $licenses->isOfflineFallback(),
         ]);
+    }
+
+    /**
+     * Read-only view of the core installer license: the one-time
+     * storage/installed blob plus whatever the daily re-check last recorded.
+     *
+     * @return array<string, mixed>
+     */
+    private function coreLicenseSnapshot(): array
+    {
+        $installed = [];
+        $path = storage_path('installed');
+        if (is_file($path)) {
+            $decoded = json_decode((string) file_get_contents($path), true);
+            $installed = is_array($decoded) ? ($decoded['license'] ?? $decoded) : [];
+        }
+
+        $code = (string) ($installed['purchase_code'] ?? '');
+        $maskedCode = $code === ''
+            ? '—'
+            : substr($code, 0, 8).str_repeat('•', max(0, strlen($code) - 8));
+
+        return [
+            'type' => $installed['license_type'] ?? '—',
+            'buyer' => $installed['buyer'] ?? '—',
+            'masked_code' => $maskedCode,
+            'installed_verified_at' => $installed['verified_at'] ?? null,
+            'status' => (string) PlatformSystem::get('core_license_status', 'unknown'),
+            'last_checked' => PlatformSystem::get('core_license_last_checked'),
+            'message' => (string) PlatformSystem::get('core_license_message', ''),
+            'expires_at' => PlatformSystem::get('core_license_expires_at') ?: null,
+        ];
     }
 }

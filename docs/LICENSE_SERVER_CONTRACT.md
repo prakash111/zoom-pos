@@ -1,0 +1,144 @@
+# Custom License Server contract
+
+The `custom` license driver (Settings → Licensing) talks to a self-hosted
+license server — e.g. `https://license.zoomnearby.com`. That server is a
+separate application; this document is the contract the platform's client
+(`App\Services\License\CustomLicenseServerClient`) expects it to honour.
+
+Configured via `platform_system` keys (`license_server_url`,
+`license_server_secret`) or `.env` (`LICENSE_SERVER_URL`,
+`LICENSE_SERVER_SECRET`). **When no URL is set the client does not call out** —
+`verify()` only format-checks the key and `issue()` mints a `DEV-…` key. As soon
+as a URL is set, verification is strict: an unreachable server or a non-2xx
+response is a failure, never a silent pass.
+
+All requests send:
+
+```
+Content-Type: application/json
+Accept: application/json
+X-Server-Secret: <LICENSE_SERVER_SECRET>
+```
+
+Timeout: `LICENSE_SERVER_TIMEOUT` seconds (default 10).
+
+---
+
+## POST `/api/v1/license/verify`
+
+Called on module activation, on the SuperAdmin "Re-check license" button, and by
+the daily `license:check-status` job for every licensed module + the core
+product (`product_slug = "core"`).
+
+**Request body**
+
+```json
+{ "license_key": "…", "product_slug": "pharmacy", "domain": "acme.example.com" }
+```
+
+**200 response**
+
+```json
+{
+  "status": true,
+  "expires_at": "2027-01-01T00:00:00Z",   // ISO-8601, or null for a perpetual license
+  "message": "License valid for acme.example.com.",
+  "plan": "extended"                        // optional, free-form
+}
+```
+
+- `status: false` — key unknown, revoked, expired, or **domain-locked to a
+  different host**. Include a human `message`; the client shows it and, from the
+  daily job, deactivates the module immediately.
+- `401` — bad / missing `X-Server-Secret`.
+- `422` — malformed request.
+- Any non-200 or a transport error → the client treats it as
+  `status: false, message: "License server unreachable: …"`. The daily job
+  tolerates this for **3 consecutive days** (`license_module_<slug>_fail_streak`
+  in `platform_system`) before deactivating the module; a definitive
+  `status: false` deactivates on the first run.
+
+---
+
+## POST `/api/v1/license/issue`
+
+Called once, from the SuperAdmin "Buy Module" checkout, **after** the payment
+has been verified with the gateway.
+
+**Request body**
+
+```json
+{
+  "payment": {
+    "gateway": "razorpay",
+    "reference": "pay_XXXXXXXXXXXX",
+    "amount": 49.0,
+    "currency": "USD",
+    "payer_email": "owner@acme.example.com"
+  },
+  "product_slug": "pharmacy",
+  "domain": "acme.example.com",
+  "item_id": "codecanyon-or-internal-product-id"   // optional (module.json "buy_item_id")
+}
+```
+
+**200 response**
+
+```json
+{
+  "status": true,
+  "license_key": "PH-XXXX-XXXX-XXXX",
+  "expires_at": "2027-01-01T00:00:00Z",   // or null
+  "message": "License issued.",
+  "plan": "regular"
+}
+```
+
+- **Must be idempotent on `payment.reference`** — the platform may retry. A
+  repeat call for a reference that already issued returns the same
+  `license_key`.
+- `status: false` (or a missing `license_key`) → the platform keeps the payment
+  record under `platform_system` key `module_purchase_pending_<slug>` and shows
+  the SuperAdmin the payment reference to quote to support. The payment is never
+  dropped.
+- The platform immediately calls `/api/v1/license/verify` with the returned key;
+  it must pass for the domain in the request.
+
+---
+
+## Optional: POST `<app>/api/v1/license/webhook` (server → platform)
+
+Not required — the daily poll already keeps state correct — but supported for
+faster propagation. If implemented, the license server calls the platform with:
+
+```
+X-License-Signature: <hex hmac-sha256(raw_body, LICENSE_SERVER_SECRET)>
+```
+
+```json
+{
+  "event": "revoked",                       // revoked | renewed | expired
+  "product_slug": "pharmacy",
+  "domain": "acme.example.com",
+  "license_key_prefix": "PH-XXXX-XX",       // first 10 chars, matches sdui_modules.license_key_prefix
+  "expires_at": "2028-01-01T00:00:00Z"      // for "renewed"
+}
+```
+
+The platform verifies the HMAC, finds the `sdui_modules` row by
+`license_key_prefix` + `product_slug`, and applies the same
+`clearLicense` / `deactivate` / re-activate logic as `license:check-status`.
+
+---
+
+## Semantics
+
+- **Domain lock.** A key is bound to one `domain`. `verify` for any other host
+  returns `status: false`. `domain` is the host of the platform's `APP_URL`.
+- **Perpetual vs subscription.** `expires_at: null` = perpetual (CodeCanyon
+  regular/extended style). A date = subscription; the platform enforces a
+  configurable grace window (`license:check-status --grace-days`, default 3)
+  before deactivating.
+- **Core product.** `product_slug = "core"` verification is informational only —
+  a failure raises a SuperAdmin banner (`core_license_status = warn`) and never
+  disables the platform.

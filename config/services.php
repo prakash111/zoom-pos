@@ -47,4 +47,27 @@ return [
         'api_key' => env('ANTHROPIC_API_KEY'),
     ],
 
+    'envato' => [
+        'api_token' => env('ENVATO_API_TOKEN'),
+        'item_id' => env('ENVATO_ITEM_ID'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | License Server (hybrid license verification)
+    |--------------------------------------------------------------------------
+    |
+    | `driver` is only the first-run default — the live value is stored in the
+    | `platform_system` table under key `license_driver` (codecanyon | custom)
+    | and edited from SuperAdmin → Settings → Licensing. When `url` is empty the
+    | custom driver falls back to a local format check (dev / offline).
+    |
+    */
+    'license_server' => [
+        'driver' => env('LICENSE_DRIVER', 'custom'),
+        'url' => env('LICENSE_SERVER_URL'),
+        'secret' => env('LICENSE_SERVER_SECRET'),
+        'timeout' => (int) env('LICENSE_SERVER_TIMEOUT', 10),
+    ],
+
 ];

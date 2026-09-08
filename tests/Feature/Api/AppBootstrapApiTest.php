@@ -232,6 +232,20 @@ class AppBootstrapApiTest extends TestCase
             ]);
     }
 
+    public function test_bootstrap_exposes_active_features_and_store_types_for_zero_touch_clients(): void
+    {
+        $response = $this->withToken($this->token())->getJson('/api/v1/pos/app/bootstrap?locale=en');
+
+        $response->assertOk()
+            ->assertJsonPath('store_types', ['retail'])
+            ->assertJsonStructure(['active_features', 'store_types']);
+
+        $features = $response->json('active_features');
+        $this->assertIsArray($features);
+        $this->assertArrayHasKey('has_barcode_scanner', $features);
+        $this->assertTrue($features['has_barcode_scanner']);
+    }
+
     public function test_empty_or_corrupted_database_navigation_falls_back_to_core_sections(): void
     {
         DB::table('sdui_modules')->insert([
@@ -325,17 +339,17 @@ class AppBootstrapApiTest extends TestCase
 
     public function test_bootstrap_seeds_sample_data_on_first_launch_without_error(): void
     {
-        $unseededCompany = \App\Models\Company::create([
-            'id' => 'test_unseeded_' . uniqid(),
+        $unseededCompany = Company::create([
+            'id' => 'test_unseeded_'.uniqid(),
             'name' => 'Unseeded Test Store',
             'pos_mode' => 'retail',
             'is_seeding_complete' => false,
             'status' => 'active',
         ]);
 
-        $user = \App\Models\User::factory()->create([
+        $user = User::factory()->create([
             'company_id' => $unseededCompany->id,
-            'email' => 'unseeded_' . uniqid() . '@example.com',
+            'email' => 'unseeded_'.uniqid().'@example.com',
             'password' => Hash::make('secret123'),
             'role' => 'admin',
         ]);
@@ -425,4 +439,3 @@ class AppBootstrapApiTest extends TestCase
         $this->assertNotContains('service_orders', $serviceItems);
     }
 }
-

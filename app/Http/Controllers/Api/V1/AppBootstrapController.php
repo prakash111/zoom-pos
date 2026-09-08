@@ -11,6 +11,7 @@ use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\TenantNavigationConfigService;
 use App\Services\Navigation\TenantNavRegistry;
 use App\Services\Sdui\SchemaResponse;
+use App\Services\Tenancy\TenantSampleDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -34,7 +35,7 @@ class AppBootstrapController extends Controller
         $company = $this->resolveCompany($request);
 
         if (! $company->is_seeding_complete) {
-            app(\App\Services\Tenancy\TenantSampleDataService::class)->seed($company, $company->pos_mode ?: 'general');
+            app(TenantSampleDataService::class)->seed($company, $company->pos_mode ?: 'general');
             $company->refresh();
         }
 
@@ -67,13 +68,17 @@ class AppBootstrapController extends Controller
                 'active_mode' => $activeMode,
                 'available_modes' => $availableModes,
                 'is_seeding_complete' => (bool) $company->is_seeding_complete,
-                'navigation_labels' => $company->navigation_labels ?? new \stdClass(),
-                'form_field_customizations' => $company->form_field_customizations ?? new \stdClass(),
+                'navigation_labels' => $company->navigation_labels ?? new \stdClass,
+                'form_field_customizations' => $company->form_field_customizations ?? new \stdClass,
             ],
-            'navigation_labels' => $company->navigation_labels ?? new \stdClass(),
-            'form_field_customizations' => $company->form_field_customizations ?? new \stdClass(),
+            'navigation_labels' => $company->navigation_labels ?? new \stdClass,
+            'form_field_customizations' => $company->form_field_customizations ?? new \stdClass,
             'modules' => $allModules,
             'active_module' => $activeModule,
+            // Zero-touch feature/store-type contract for the mobile app: purely
+            // derived from currently licensed + active modules.
+            'active_features' => ModuleRegistry::activeFeaturesFor($company),
+            'store_types' => $availableModes,
             'menu_structure' => $menuStructure,
             'navigation' => $menuStructure,
             'theme' => $company->getThemeTokens(),

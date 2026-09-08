@@ -17,6 +17,44 @@ They are **additive** — the core built-in `pharmacy` / `repair_technician` /
 `*_mod_*`-prefixed so a package installs cleanly whether or not the host
 also has the built-in vertical.
 
+## Licensing
+
+Every ZIP-installed module needs a **valid license key to Activate**. Built-in
+verticals never do (they have no `sdui_modules` row).
+
+- `module.json` → `"requires_license"` (bool, **default `true`** for packages).
+  Set it `false` only for internal / test modules.
+- Activation flow: SuperAdmin → Modules shows a key field on an unlicensed
+  module. The key is verified through `App\Services\License\LicenseService`
+  against the active driver (`codecanyon` = Envato API, `custom` = self-hosted
+  license server — chosen under Settings → Licensing). With no license server
+  configured the `custom` driver only *format-checks* the key.
+- On success the row stores `license_status = active` plus an encrypted copy of
+  the key, its hash/prefix, the driver, buyer and expiry.
+- `license:check-status` runs **daily** (also `php artisan license:check-status
+  --sync`): it re-verifies every `requires_license` package and the core
+  installer license. A revoked / expired module is **deactivated
+  automatically**; the core license only raises a SuperAdmin warning and never
+  disables the platform. A transient "server unreachable" is tolerated for 3
+  consecutive days before the module is pulled.
+- Lifecycle: `unlicensed → active → (expired | revoked)`. A re-check or a fresh
+  key returns it to `active`.
+- `SduiModule::scopeLicenseManaged()` / `isLicensed()` and the invariant
+  **`is_active` ⇒ licensed** mean no read path needs its own license check.
+
+### Buying a module (SuperAdmin)
+
+If `module.json` carries `"price"` / `"currency"` (and optional
+`"buy_item_id"`, `"buy_enabled"`), an unlicensed module shows a **Buy** link →
+`superadmin.modules.buy`. Payment goes through
+`App\Services\Payment\PlatformCheckoutService` (reuses the platform Razorpay /
+Stripe credentials); on success `LicenseService::issue()` asks the license
+server for a key, which is then recorded and the module activated (or marked
+owned if its files are not on disk yet). A SuperAdmin can override price /
+availability per slug via the `platform_system` key `module_catalog`
+(JSON `{ "<slug>": { "price": …, "buy_enabled": false } }`). See
+`docs/LICENSE_SERVER_CONTRACT.md` for the `/verify` + `/issue` contract.
+
 ## Package layout
 
 ```
@@ -76,10 +114,14 @@ request instead of after the next deploy.
 | Action | `sdui_modules` row | `modules/<key>/` files | Own tables | Registry / drawer / governance card |
 |---|---|---|---|---|
 | **Install** | created, `is_active = false` | written | — | hidden (inactive) |
-| **Activate** | `is_active = true` | kept | `migrate --path` | shown |
-| **Deactivate** | `is_active = false` | kept | kept | **hidden** |
+| **Activate** | `is_active = true` (requires `license_status = active` when `requires_license`) | kept | `migrate --path` | shown |
+| **Deactivate** | `is_active = false`, dropped from `allowed_registration_modes` | kept | kept | **hidden** |
 | **Uninstall** | deleted | `File::deleteDirectory()` | kept | hidden |
 | **Uninstall + "drop data"** | deleted | deleted | `migrate:rollback --path` | hidden |
+
+**Deactivate** (manual button *or* the daily license job) now also drops the
+slug from `allowed_registration_modes`, so a pulled module stops being an
+offered store type — not just Uninstall.
 
 Uninstall also:
 

@@ -2,6 +2,7 @@
 
 namespace App\Services\License;
 
+use App\Models\PlatformSystem;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -34,7 +35,10 @@ class EnvatoLicenseVerificationService
             ];
         }
 
-        $apiToken = config('services.envato.api_token') ?: env('ENVATO_API_TOKEN');
+        // DB setting first (survives `config:cache`), then config, then raw env.
+        $apiToken = PlatformSystem::get('envato_api_token')
+            ?: config('services.envato.api_token')
+            ?: env('ENVATO_API_TOKEN');
 
         if (! empty($apiToken)) {
             try {
