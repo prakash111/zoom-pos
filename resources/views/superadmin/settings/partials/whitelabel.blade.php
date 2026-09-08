@@ -193,17 +193,94 @@
                 </div>
             </div>
 
+            <!-- Mobile & Desktop App Download Links -->
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+                <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('App Download Links') }}</label>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-3">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" wire:model="landingPlaystoreEnabled" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-xs font-bold text-slate-700 dark:text-slate-300">▶ {{ __('Show Google Play Store button') }}</span>
+                        </label>
+                        <input type="url" wire:model="landingPlaystoreUrl" placeholder="https://play.google.com/store/apps/details?id=..."
+                               class="w-full px-4 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs">
+                        @error('landingPlaystoreUrl') <p class="text-[11px] text-rose-500 font-bold">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-3">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" wire:model="landingWindowsEnabled" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-xs font-bold text-slate-700 dark:text-slate-300">🪟 {{ __('Show Windows App download button') }}</span>
+                        </label>
+                        <input type="url" wire:model="landingWindowsUrl" placeholder="https://cdn.example.com/YourApp-Setup.exe"
+                               class="w-full px-4 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs">
+                        @error('landingWindowsUrl') <p class="text-[11px] text-rose-500 font-bold">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+                <p class="text-[11px] text-slate-400">{{ __('Buttons appear in the Hero and the Downloads section. A button is hidden when its toggle is off or its URL is blank.') }}</p>
+            </div>
+
+            <!-- Editable Section Titles & Subtitles -->
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+                <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('Section Headings') }}</label>
+                <p class="text-[11px] text-slate-400 -mt-2">{{ __('Leave blank to use the built-in default text.') }}</p>
+
+                @foreach ([
+                    'hero' => __('Hero'),
+                    'features' => __('Features'),
+                    'downloads' => __('Downloads'),
+                    'pricing' => __('Pricing'),
+                    'faq' => __('FAQ'),
+                ] as $key => $label)
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                        <div class="md:col-span-2 text-xs font-black text-slate-600 dark:text-slate-300">{{ $label }}</div>
+                        <input type="text" wire:model="sectionMeta.{{ $key }}.title" placeholder="{{ __('Title') }}"
+                               class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs">
+                        <input type="text" wire:model="sectionMeta.{{ $key }}.subtitle" placeholder="{{ __('Subtitle') }}"
+                               class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs">
+                    </div>
+                @endforeach
+            </div>
+
+            <!-- FAQ Entries -->
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('FAQ Entries') }}</label>
+                    <button type="button" wire:click="addFaq"
+                            class="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 text-[11px] font-black hover:bg-indigo-100 transition">
+                        + {{ __('Add Question') }}
+                    </button>
+                </div>
+                @forelse ($landingFaqs as $i => $faq)
+                    <div wire:key="faq-{{ $i }}" class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-2">
+                        <div class="flex items-center gap-2">
+                            <input type="text" wire:model="landingFaqs.{{ $i }}.q" placeholder="{{ __('Question') }}"
+                                   class="flex-1 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                            <button type="button" wire:click="removeFaq({{ $i }})" class="px-2.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 text-xs font-black hover:bg-rose-100 transition">✕</button>
+                        </div>
+                        <textarea wire:model="landingFaqs.{{ $i }}.a" rows="2" placeholder="{{ __('Answer') }}"
+                                  class="w-full px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs"></textarea>
+                    </div>
+                @empty
+                    <p class="text-[11px] text-slate-400">{{ __('No custom FAQ entries — a default set is shown on the landing page. Add entries here to override it.') }}</p>
+                @endforelse
+            </div>
+
             <!-- Landing Page Section Toggles -->
             <div class="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
                 <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('Enabled Landing Page Sections') }}</label>
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-xs">
+                    <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model="sectionHero" class="rounded text-indigo-600"> <span>{{ __('Hero') }}</span></label>
                     <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model="sectionTrustBar" class="rounded text-indigo-600"> <span>{{ __('Trust Bar & Logos') }}</span></label>
                     <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model="sectionFeatures" class="rounded text-indigo-600"> <span>{{ __('Key Features') }}</span></label>
                     <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model="sectionSolutions" class="rounded text-indigo-600"> <span>{{ __('Solutions by Business') }}</span></label>
+                    <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model="sectionDownloads" class="rounded text-indigo-600"> <span>{{ __('App Downloads') }}</span></label>
                     <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model="sectionStats" class="rounded text-indigo-600"> <span>{{ __('Stats & Metrics') }}</span></label>
                     <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model="sectionAbout" class="rounded text-indigo-600"> <span>{{ __('About Platform') }}</span></label>
                     <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model="sectionTestimonials" class="rounded text-indigo-600"> <span>{{ __('Customer Reviews') }}</span></label>
                     <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model="sectionPricing" class="rounded text-indigo-600"> <span>{{ __('SaaS Pricing Plans') }}</span></label>
+                    <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model="sectionFaq" class="rounded text-indigo-600"> <span>{{ __('FAQ') }}</span></label>
                     <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model="sectionContact" class="rounded text-indigo-600"> <span>{{ __('Contact Support') }}</span></label>
                 </div>
             </div>

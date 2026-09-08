@@ -191,6 +191,37 @@ class Index extends Component
 
     public bool $sectionCta = true;
 
+    public bool $sectionHero = true;
+
+    public bool $sectionDownloads = true;
+
+    public bool $sectionFaq = true;
+
+    // App download links
+    public string $landingPlaystoreUrl = '';
+
+    public bool $landingPlaystoreEnabled = false;
+
+    public string $landingWindowsUrl = '';
+
+    public bool $landingWindowsEnabled = false;
+
+    /**
+     * Per-section title / subtitle overrides, keyed by section slug.
+     *
+     * @var array<string, array{title: string, subtitle: string}>
+     */
+    public array $sectionMeta = [
+        'hero' => ['title' => '', 'subtitle' => ''],
+        'features' => ['title' => '', 'subtitle' => ''],
+        'downloads' => ['title' => '', 'subtitle' => ''],
+        'pricing' => ['title' => '', 'subtitle' => ''],
+        'faq' => ['title' => '', 'subtitle' => ''],
+    ];
+
+    /** @var array<int, array{q: string, a: string}> */
+    public array $landingFaqs = [];
+
     // --- TAB 4: CUSTOM PAGES (CMS) ---
     public string $pageSearch = '';
 
@@ -269,6 +300,27 @@ class Index extends Component
         $this->sectionPricing = (bool) ($cfg['pricing'] ?? true);
         $this->sectionContact = (bool) ($cfg['contact'] ?? true);
         $this->sectionCta = (bool) ($cfg['cta'] ?? true);
+        $this->sectionHero = (bool) ($cfg['hero'] ?? true);
+        $this->sectionFaq = (bool) ($cfg['faq'] ?? true);
+        $this->sectionDownloads = (bool) ($cfg['downloads'] ?? $branding->hasAnyDownloadLink());
+
+        $this->landingPlaystoreUrl = (string) ($branding->landing_playstore_url ?? '');
+        $this->landingPlaystoreEnabled = (bool) $branding->landing_playstore_enabled;
+        $this->landingWindowsUrl = (string) ($branding->landing_windows_url ?? '');
+        $this->landingWindowsEnabled = (bool) $branding->landing_windows_enabled;
+
+        $meta = $branding->landing_section_meta ?? [];
+        foreach (array_keys($this->sectionMeta) as $key) {
+            $this->sectionMeta[$key] = [
+                'title' => (string) ($meta[$key]['title'] ?? ''),
+                'subtitle' => (string) ($meta[$key]['subtitle'] ?? ''),
+            ];
+        }
+
+        $this->landingFaqs = collect($branding->landing_faqs ?? [])
+            ->map(fn ($row) => ['q' => (string) ($row['q'] ?? ''), 'a' => (string) ($row['a'] ?? '')])
+            ->values()
+            ->all();
 
         $this->landingTheme = (string) setting('landing_page_theme', 'theme_fast');
 
@@ -691,6 +743,19 @@ class Index extends Component
     }
 
     // --- BRANDING TAB SAVE ---
+    public function addFaq(): void
+    {
+        if (count($this->landingFaqs) < 20) {
+            $this->landingFaqs[] = ['q' => '', 'a' => ''];
+        }
+    }
+
+    public function removeFaq(int $index): void
+    {
+        unset($this->landingFaqs[$index]);
+        $this->landingFaqs = array_values($this->landingFaqs);
+    }
+
     public function saveBranding(): void
     {
         $data = $this->validate([
@@ -712,19 +777,44 @@ class Index extends Component
             'landingHeroCtaSecondaryText' => ['nullable', 'string', 'max:100'],
             'landingHeroCtaSecondaryUrl' => ['nullable', 'string', 'max:500'],
             'landingHeroBannerImageUrl' => ['nullable', 'string', 'max:500'],
+            'landingPlaystoreUrl' => ['nullable', 'url', 'max:500'],
+            'landingWindowsUrl' => ['nullable', 'url', 'max:500'],
+            'sectionMeta.*.title' => ['nullable', 'string', 'max:255'],
+            'sectionMeta.*.subtitle' => ['nullable', 'string', 'max:500'],
+            'landingFaqs' => ['array', 'max:20'],
+            'landingFaqs.*.q' => ['nullable', 'string', 'max:255'],
+            'landingFaqs.*.a' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $sectionsConfig = [
+            'hero' => $this->sectionHero,
             'trust_bar' => $this->sectionTrustBar,
             'features' => $this->sectionFeatures,
             'solutions' => $this->sectionSolutions,
+            'downloads' => $this->sectionDownloads,
             'stats' => $this->sectionStats,
             'about' => $this->sectionAbout,
             'testimonials' => $this->sectionTestimonials,
             'pricing' => $this->sectionPricing,
+            'faq' => $this->sectionFaq,
             'contact' => $this->sectionContact,
             'cta' => $this->sectionCta,
         ];
+
+        $sectionMeta = [];
+        foreach ($this->sectionMeta as $key => $meta) {
+            $title = trim((string) ($meta['title'] ?? ''));
+            $subtitle = trim((string) ($meta['subtitle'] ?? ''));
+            if ($title !== '' || $subtitle !== '') {
+                $sectionMeta[$key] = ['title' => $title, 'subtitle' => $subtitle];
+            }
+        }
+
+        $faqs = collect($this->landingFaqs)
+            ->map(fn ($row) => ['q' => trim((string) ($row['q'] ?? '')), 'a' => trim((string) ($row['a'] ?? ''))])
+            ->filter(fn ($row) => $row['q'] !== '' && $row['a'] !== '')
+            ->values()
+            ->all();
 
         PlatformBranding::current()->update([
             'platform_name' => $data['platformName'],
@@ -748,6 +838,12 @@ class Index extends Component
             'landing_hero_cta_secondary_url' => $data['landingHeroCtaSecondaryUrl'] ?: null,
             'landing_hero_banner_image_url' => $data['landingHeroBannerImageUrl'] ?: null,
             'landing_sections_config' => $sectionsConfig,
+            'landing_playstore_url' => $data['landingPlaystoreUrl'] ?: null,
+            'landing_playstore_enabled' => $this->landingPlaystoreEnabled,
+            'landing_windows_url' => $data['landingWindowsUrl'] ?: null,
+            'landing_windows_enabled' => $this->landingWindowsEnabled,
+            'landing_section_meta' => $sectionMeta ?: null,
+            'landing_faqs' => $faqs ?: null,
         ]);
 
         AuditLog::record('branding.updated', null, auth('platform_web')->id());

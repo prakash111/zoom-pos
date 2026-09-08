@@ -21,6 +21,9 @@ class PlatformBranding extends Model
         'landing_hero_cta_primary_text', 'landing_hero_cta_primary_url',
         'landing_hero_cta_secondary_text', 'landing_hero_cta_secondary_url',
         'landing_hero_banner_image_url', 'landing_sections_config',
+        'landing_playstore_url', 'landing_playstore_enabled',
+        'landing_windows_url', 'landing_windows_enabled',
+        'landing_section_meta', 'landing_faqs',
     ];
 
     protected function casts(): array
@@ -31,6 +34,10 @@ class PlatformBranding extends Model
             'otp_registration_enabled' => 'boolean',
             'landing_page_enabled' => 'boolean',
             'landing_sections_config' => 'array',
+            'landing_playstore_enabled' => 'boolean',
+            'landing_windows_enabled' => 'boolean',
+            'landing_section_meta' => 'array',
+            'landing_faqs' => 'array',
         ];
     }
 
@@ -105,11 +112,81 @@ class PlatformBranding extends Model
 
     public function isSectionEnabled(string $section): bool
     {
+        // The downloads section is only meaningful when at least one store
+        // link is configured — default it off otherwise.
+        $default = $section === 'downloads' ? $this->hasAnyDownloadLink() : true;
+
         if (empty($this->landing_sections_config)) {
-            return true;
+            return $default;
         }
 
-        return (bool) ($this->landing_sections_config[$section] ?? true);
+        return (bool) ($this->landing_sections_config[$section] ?? $default);
+    }
+
+    /** Section title override configured by the SuperAdmin, or the given default. */
+    public function getSectionTitle(string $section, string $default = ''): string
+    {
+        $value = trim((string) ($this->landing_section_meta[$section]['title'] ?? ''));
+
+        return $value !== '' ? $value : $default;
+    }
+
+    /** Section subtitle override configured by the SuperAdmin, or the given default. */
+    public function getSectionSubtitle(string $section, string $default = ''): string
+    {
+        $value = trim((string) ($this->landing_section_meta[$section]['subtitle'] ?? ''));
+
+        return $value !== '' ? $value : $default;
+    }
+
+    /** Public Google Play Store URL, or null when disabled / blank. */
+    public function playStoreLink(): ?string
+    {
+        return $this->landing_playstore_enabled && filled($this->landing_playstore_url)
+            ? $this->landing_playstore_url
+            : null;
+    }
+
+    /** Windows installer download URL, or null when disabled / blank. */
+    public function windowsAppLink(): ?string
+    {
+        return $this->landing_windows_enabled && filled($this->landing_windows_url)
+            ? $this->landing_windows_url
+            : null;
+    }
+
+    public function hasAnyDownloadLink(): bool
+    {
+        return $this->playStoreLink() !== null || $this->windowsAppLink() !== null;
+    }
+
+    /**
+     * FAQ entries for the landing page: the SuperAdmin-authored list, or a
+     * sensible built-in set when none has been configured.
+     *
+     * @return array<int, array{q: string, a: string}>
+     */
+    public function landingFaqs(): array
+    {
+        $configured = collect($this->landing_faqs ?? [])
+            ->map(fn ($row) => [
+                'q' => trim((string) ($row['q'] ?? '')),
+                'a' => trim((string) ($row['a'] ?? '')),
+            ])
+            ->filter(fn ($row) => $row['q'] !== '' && $row['a'] !== '')
+            ->values()
+            ->all();
+
+        if ($configured !== []) {
+            return $configured;
+        }
+
+        return [
+            ['q' => __('Do I need to install anything to get started?'), 'a' => __('No. The platform runs in any modern browser. Native Android and Windows apps are optional and available from the download section.')],
+            ['q' => __('Does the POS work offline?'), 'a' => __('Yes. Sales are queued locally during a network outage and sync automatically once the connection is restored.')],
+            ['q' => __('Can I run more than one store or branch?'), 'a' => __('Yes. Each workspace supports multiple locations with isolated data, shared catalogue and consolidated reporting.')],
+            ['q' => __('Is my data secure and backed up?'), 'a' => __('All data is encrypted in transit and at rest, with automated cloud redundancy and point-in-time recovery.')],
+        ];
     }
 
     /**
