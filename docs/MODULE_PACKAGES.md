@@ -81,11 +81,37 @@ request instead of after the next deploy.
 | **Uninstall** | deleted | `File::deleteDirectory()` | kept | hidden |
 | **Uninstall + "drop data"** | deleted | deleted | `migrate:rollback --path` | hidden |
 
-Uninstall also drops the key from `allowed_registration_modes` so it can't
-linger as a selectable store type, and — on **drop data** — sweeps the
-`migrations` table of this module's exact migration filenames (scoped, not
-`LIKE '%name%'`) so a later re-install re-runs its migrations instead of
-skipping them or hitting *table already exists*.
+Uninstall also:
+
+- drops the key from `allowed_registration_modes` so it can't linger as a
+  selectable store type;
+- on **drop data**, sweeps the `migrations` table of this module's exact
+  migration filenames (scoped, not `LIKE '%name%'`) so a later re-install
+  re-runs its migrations instead of skipping them or hitting *table
+  already exists*;
+- deletes `permissions` rows whose `module` equals the slug (a module that
+  registered none simply has none), plus anything the manifest names under
+  `features.cleanup` (below);
+- if `File::deleteDirectory()` fails (e.g. the FPM user can't write the
+  tree), falls back to `rm -rf` so the directory is never left behind.
+
+### Optional `module.json` → `features.cleanup`
+
+```json
+"features": {
+    "cleanup": {
+        "permission_modules": ["pharmacy", "pharmacy_batches"],
+        "config_key_prefixes": ["pharmacy_mod."],
+        "platform_system_keys": ["pharmacy_promo_enabled"]
+    }
+}
+```
+
+On uninstall this deletes `permissions` rows for those extra `module`
+values, `configurations` rows whose `key` starts with each prefix, and
+`platform_system` rows for those exact keys. Everything is opt-in — the
+purge only ever removes what the manifest lists (plus permission rows
+matching the slug).
 
 ### Not applicable here (this is not nwidart/laravel-modules)
 

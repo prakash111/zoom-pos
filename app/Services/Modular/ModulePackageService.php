@@ -168,17 +168,27 @@ class ModulePackageService
         }
 
         $moduleDir = base_path('modules/'.$module->package_path);
-        if (File::isDirectory($moduleDir)) {
-            File::deleteDirectory($moduleDir);
+        if (File::isDirectory($moduleDir) && ! File::deleteDirectory($moduleDir)) {
+            // Rare: FPM user can't write the tree. Fall back to a shell rm so a
+            // stale directory never keeps the module "installed".
+            @exec('rm -rf '.escapeshellarg($moduleDir));
         }
 
         $slug = $module->slug;
+        $cleanup = (array) (((array) $module->features)['cleanup'] ?? []);
         $module->delete();
 
         // Drop a dangling reference to this module from the platform-wide
         // "which store types can register" list so it can't reappear as a
         // selectable option or a governance toggle.
         $this->purgeFromRegistrationModes($slug);
+
+        // Permissions the module registered under its own namespace, plus any
+        // config / platform-setting keys it declared in module.json
+        // ("features": {"cleanup": {...}}). Only ever deletes what the
+        // manifest names — plus permission rows whose `module` equals the
+        // slug, which a module that created none simply won't have.
+        $this->purgeModuleData($slug, $cleanup);
 
         AuditLog::record('module.uninstalled', null, $adminUserId !== null ? (string) $adminUserId : null, [
             'key' => $slug,
@@ -249,6 +259,53 @@ class ModulePackageService
             }
         } catch (Throwable $e) {
             // Non-fatal.
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $cleanup  the module.json `features.cleanup` block
+     */
+    private function purgeModuleData(string $slug, array $cleanup): void
+    {
+        // 1. Permission rows. Default namespace is the slug; a manifest may
+        //    list extra `permissions.module` values it also owns.
+        $permissionModules = array_values(array_unique(array_filter(array_merge(
+            [$slug],
+            array_map('strval', (array) ($cleanup['permission_modules'] ?? [])),
+        ))));
+        try {
+            if (Schema::hasTable('permissions')) {
+                DB::table('permissions')->whereIn('module', $permissionModules)->delete();
+            }
+        } catch (Throwable $e) {
+            // Non-fatal.
+        }
+
+        // 2. Per-tenant configuration keys — only prefixes the manifest names.
+        foreach (array_map('strval', (array) ($cleanup['config_key_prefixes'] ?? [])) as $prefix) {
+            $prefix = trim($prefix);
+            if ($prefix === '') {
+                continue;
+            }
+            try {
+                if (Schema::hasTable('configurations')) {
+                    DB::table('configurations')->where('key', 'like', $prefix.'%')->delete();
+                }
+            } catch (Throwable $e) {
+                // Non-fatal.
+            }
+        }
+
+        // 3. Platform-wide settings — only the exact keys the manifest names.
+        $platformKeys = array_values(array_filter(array_map('strval', (array) ($cleanup['platform_system_keys'] ?? []))));
+        if ($platformKeys !== []) {
+            try {
+                if (Schema::hasTable('platform_system')) {
+                    DB::table('platform_system')->whereIn('key', $platformKeys)->delete();
+                }
+            } catch (Throwable $e) {
+                // Non-fatal.
+            }
         }
     }
 

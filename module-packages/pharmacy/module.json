@@ -11,7 +11,11 @@
     "features": {
         "has_barcode_scanner": true,
         "has_expiry_tracking": true,
-        "has_due_reminders": true
+        "has_due_reminders": true,
+        "cleanup": {
+            "permission_modules": ["pharmacy"],
+            "config_key_prefixes": ["pharmacy_mod."]
+        }
     },
     "navigation": [
         {

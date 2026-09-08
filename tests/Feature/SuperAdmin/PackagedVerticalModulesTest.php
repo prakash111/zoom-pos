@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SuperAdmin;
 
+use App\Livewire\SuperAdmin\Modules\Index as ModulesIndex;
 use App\Models\Company;
 use App\Models\PlatformSystem;
 use App\Services\Modular\ModulePackageService;
@@ -11,8 +12,11 @@ use App\Services\Sdui\SchemaValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
+use Livewire\Livewire;
+use Tests\Concerns\ActsAsPlatformAdmin;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -25,7 +29,7 @@ use ZipArchive;
  */
 class PackagedVerticalModulesTest extends TestCase
 {
-    use RefreshDatabase;
+    use ActsAsPlatformAdmin, RefreshDatabase;
 
     private const TABLES = [
         'pharmacy_mod_prescription_items', 'pharmacy_mod_prescriptions', 'pharmacy_mod_drug_batches',
@@ -305,6 +309,60 @@ class PackagedVerticalModulesTest extends TestCase
         $this->assertTrue(Schema::hasTable('pharmacy_mod_prescriptions'));
 
         $service->uninstall($m2->fresh(), true, null);
+    }
+
+    public function test_super_admin_uninstall_button_removes_the_directory_from_disk(): void
+    {
+        $this->actingAsSuperAdmin();
+        $service = app(ModulePackageService::class);
+
+        $module = $service->install($this->zipPackage('repairtechnician'), null);
+        $service->activate($module, null);
+        $this->assertTrue(is_dir(base_path('modules/repairtechnician')));
+
+        // Exactly what the "Uninstall + Drop Data" button in the panel calls.
+        Livewire::test(ModulesIndex::class)
+            ->call('uninstall', $module->id, true)
+            ->assertHasNoErrors();
+
+        $this->assertFalse(is_dir(base_path('modules/repairtechnician')), 'module directory was left on disk');
+        $this->assertFalse(Schema::hasTable('repair_mod_tickets'));
+        $this->assertNull(\App\Models\SduiModule::find($module->id));
+    }
+
+    public function test_uninstall_purges_module_permissions_and_declared_config_keys(): void
+    {
+        $service = app(ModulePackageService::class);
+        $company = Company::create([
+            'name' => 'Purge Co', 'slug' => 'purge-co', 'status' => 'active',
+            'pos_mode' => 'retail', 'currency' => 'USD', 'currency_symbol' => '$',
+        ]);
+        $user = \App\Models\User::create([
+            'company_id' => $company->id, 'name' => 'U', 'email' => 'u@purge.test',
+            'password' => bcrypt('x'), 'role' => 'administrator', 'status' => 'active',
+        ]);
+
+        $module = $service->install($this->zipPackage('pharmacy'), null);
+        $service->activate($module, null);
+
+        // Rows a module of this namespace could have created.
+        \App\Models\Permission::create([
+            'user_id' => $user->id, 'company_id' => $company->id,
+            'module' => 'pharmacy', 'action' => 'view', 'allowed' => true,
+        ]);
+        \App\Models\Configuration::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'key' => 'pharmacy_mod.default_tax', 'value' => '5',
+        ]);
+        \App\Models\Configuration::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'key' => 'unrelated.flag', 'value' => '1',
+        ]);
+
+        $service->uninstall($module->fresh(), true, null);
+
+        $this->assertDatabaseMissing('permissions', ['module' => 'pharmacy']);
+        $this->assertDatabaseMissing('configurations', ['key' => 'pharmacy_mod.default_tax']);
+        // A prefix purge must not touch anything it wasn't told about.
+        $this->assertDatabaseHas('configurations', ['key' => 'unrelated.flag']);
     }
 
     public function test_reserved_pharmacy_key_is_allowed_only_because_it_inherits_universal_pos(): void
