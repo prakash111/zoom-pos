@@ -10,6 +10,13 @@
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
 
+# Dev-only tooling — not needed to deploy or run the sold script.
+/tests export-ignore
+/phpunit.xml export-ignore
+/.editorconfig export-ignore
+/.claude export-ignore
+*.jks export-ignore
+
 # Vendor-only: module source + the License Manager builder. These must NOT ship
 # in a sold build — module ZIPs are uploaded to the License Manager, and the
 # client downloads them after license verification.
