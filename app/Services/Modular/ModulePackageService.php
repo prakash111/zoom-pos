@@ -110,6 +110,10 @@ class ModulePackageService
                 'version' => $manifest['version'],
             ]);
 
+            // A license pushed by the License Manager before the ZIP was
+            // uploaded (see LicenseActivationController) — apply it now.
+            $this->applyPendingLicense($module, $adminUserId);
+
             return $module;
         } finally {
             if (File::isDirectory($tmpDir)) {
@@ -225,6 +229,37 @@ class ModulePackageService
             'driver' => $result['driver'],
             'expires_at' => optional($module->license_expires_at)->toIso8601String(),
         ];
+    }
+
+    /**
+     * If the License Manager pushed a key for this slug before its ZIP was
+     * uploaded, verify + record it now and clear the pending marker.
+     */
+    private function applyPendingLicense(SduiModule $module, int|string|null $adminUserId): void
+    {
+        if (! $module->requires_license || $module->license_status === 'active') {
+            return;
+        }
+
+        $stored = PlatformSystem::get('license_pending_'.$module->slug);
+        if (! $stored) {
+            return;
+        }
+
+        try {
+            $key = decrypt($stored);
+        } catch (Throwable $e) {
+            return;
+        }
+
+        $result = $this->verifyAndRecordLicense($module, $key, $adminUserId);
+        if ($result['status']) {
+            try {
+                PlatformSystem::query()->where('key', 'license_pending_'.$module->slug)->delete();
+            } catch (Throwable $e) {
+                // non-fatal
+            }
+        }
     }
 
     /**

@@ -61,6 +61,38 @@
         </div>
     @endif
 
+    <!-- Available to purchase -->
+    @if (isset($purchasable) && $purchasable->isNotEmpty())
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-4">
+            <div>
+                <h4 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">{{ __("Available modules") }}</h4>
+                <p class="text-xs text-slate-400">{{ __("Buy a module — a license key is issued and activated on this site automatically. Or upload a ZIP you already have.") }}</p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+                @foreach ($purchasable as $p)
+                    <div class="rounded-2xl border border-slate-100 dark:border-slate-800 p-4 flex flex-col gap-1">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="font-bold text-slate-900 dark:text-white text-sm">{{ $p['name'] }}</span>
+                            <span class="font-mono text-[11px] text-slate-400">{{ $p['slug'] }}</span>
+                        </div>
+                        @if (! empty($p['description']))
+                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ $p['description'] }}</p>
+                        @endif
+                        <div class="flex items-center justify-between mt-2">
+                            <span class="text-sm font-black text-slate-900 dark:text-white">
+                                @if (($p['price'] ?? 0) > 0){{ $p['currency'] }} {{ number_format($p['price'], 2) }}@else{{ __('—') }}@endif
+                            </span>
+                            @if (! empty($p['store_link']))
+                                <a href="{{ $p['store_link'] }}" target="_blank" rel="noopener noreferrer"
+                                   class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white">{{ __("Buy module") }} ↗</a>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <!-- Installed Modules Table -->
     <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
@@ -140,9 +172,9 @@
                                             <p class="text-[11px] text-rose-600 font-bold text-right">{{ $message }}</p>
                                         @enderror
                                         <div class="flex items-center gap-3">
-                                            @if (! empty($catalog[$module->id]['buy_url']))
-                                                <a href="{{ $catalog[$module->id]['buy_url'] }}" target="_blank" rel="noopener noreferrer" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold text-xs">
-                                                    {{ __("Get this module") }}@if (($catalog[$module->id]['price'] ?? 0) > 0) — {{ $catalog[$module->id]['currency'] }} {{ number_format($catalog[$module->id]['price'], 2) }}@endif ↗
+                                            @if (! empty($catalog[$module->id]['store_link']))
+                                                <a href="{{ $catalog[$module->id]['store_link'] }}" target="_blank" rel="noopener noreferrer" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold text-xs">
+                                                    {{ __("Buy") }}@if (($catalog[$module->id]['price'] ?? 0) > 0) {{ $catalog[$module->id]['currency'] }} {{ number_format($catalog[$module->id]['price'], 2) }}@endif ↗
                                                 </a>
                                             @endif
                                             <button wire:click="activate({{ $module->id }})" type="button" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white">{{ __("Verify & Activate") }}</button>

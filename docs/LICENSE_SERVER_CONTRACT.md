@@ -107,6 +107,62 @@ has been verified with the gateway.
 
 ---
 
+## GET `/api/v1/catalog`
+
+Called by the SaaS Modules screen to list what the vendor sells.
+
+**200 response**
+
+```json
+{
+  "status": true,
+  "products": [
+    { "slug": "core", "name": "Main SaaS Script", "description": "…", "price": 199.0, "currency": "USD" },
+    { "slug": "pharmacy", "name": "Pharmacy POS Module", "description": "…", "price": 49.0, "currency": "USD" }
+  ]
+}
+```
+
+Only active products. `slug` must match the SaaS module key (`pharmacy`,
+`salon`, `repairtechnician`, …); `core` is the platform itself and is filtered
+out of the "Buy module" list. The client caches this for ~30 min.
+
+---
+
+## Hosted checkout → POST `https://<domain>/api/license/activate` (server → SaaS)
+
+The vendor hosts the checkout (`/buy.php` in the reference build). After the
+operator pays, the license server issues a key bound to `<domain>` and **pushes
+it to that install** so the module (or core) self-activates:
+
+```
+X-License-Signature: <hex hmac-sha256(raw_body, LICENSE_SERVER_SECRET)>
+```
+
+```json
+{
+  "product_slug": "pharmacy",
+  "license_key": "PH-XXXX-XXXX-XXXX",
+  "domain": "acme.example.com",
+  "expires_at": "2027-01-01T00:00:00Z",   // or null
+  "plan": null
+}
+```
+
+The SaaS (`LicenseActivationController`) verifies the HMAC and the domain, then:
+- `product_slug = "core"` → records the key in `storage/installed`, sets
+  `core_license_status = ok`.
+- an installed module → verifies + records the key and activates it if the
+  files are present.
+- a module whose ZIP is not uploaded yet → stashes the key
+  (`platform_system.license_pending_<slug>`); `ModulePackageService::install()`
+  applies it when the ZIP arrives.
+
+The receipt page also shows the key so the operator can paste it manually if the
+push failed.
+
+---
+
 ## Optional: POST `<app>/api/v1/license/webhook` (server → platform)
 
 Not required — the daily poll already keeps state correct — but supported for

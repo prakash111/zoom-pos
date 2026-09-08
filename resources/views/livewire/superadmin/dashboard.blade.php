@@ -1,5 +1,25 @@
 <div class="space-y-6">
-    
+
+    @if ($coreLicenseWarn)
+        <div class="rounded-2xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 sm:p-5">
+            <div class="flex items-start gap-3">
+                <span class="text-lg">⚠️</span>
+                <div class="flex-1 space-y-2">
+                    <p class="text-sm font-bold text-amber-800 dark:text-amber-300">{{ __('Your license could not be verified') }}</p>
+                    <p class="text-xs text-amber-700/90 dark:text-amber-400/90">{{ $coreLicenseMessage ?: __('Enter your license / purchase key to re-activate. The platform keeps running regardless.') }}</p>
+                    <form wire:submit="activateCore" class="flex flex-wrap items-start gap-2 pt-1">
+                        <div>
+                            <input type="text" wire:model="coreLicenseKey" placeholder="{{ __('License / purchase key') }}"
+                                   class="w-72 max-w-full text-xs font-mono rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 px-3 py-2">
+                            @error('coreLicenseKey') <p class="text-[11px] text-rose-600 font-bold mt-1">{{ $message }}</p> @enderror
+                        </div>
+                        <button type="submit" class="px-4 py-2 rounded-xl text-xs font-extrabold bg-amber-600 hover:bg-amber-700 text-white">{{ __('Activate') }}</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <!-- Top Stats Cards Grid (High-Impact KPI Stat Cards) -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         

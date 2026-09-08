@@ -108,12 +108,14 @@ class ModuleLicensingTest extends TestCase
 
     public function test_unlicensed_module_exposes_a_vendor_store_link(): void
     {
-        config()->set('services.license_server.store_url', 'https://store.example.com/modules');
+        config()->set('services.license_server.store_url', 'https://store.example.com/buy.php');
+        config()->set('app.url', 'https://acme.example.com');
         $this->packageRow();
 
-        $catalog = ModuleCatalog::for('widgets');
+        $link = ModuleCatalog::storeLink('widgets');
 
-        $this->assertTrue($catalog['buy_enabled'] === false || is_string($catalog['buy_url']));
-        $this->assertSame('https://store.example.com/modules?module=widgets', $catalog['buy_url']);
+        $this->assertStringStartsWith('https://store.example.com/buy.php?', $link);
+        $this->assertStringContainsString('product=widgets', $link);
+        $this->assertStringContainsString('domain=acme.example.com', $link);
     }
 }

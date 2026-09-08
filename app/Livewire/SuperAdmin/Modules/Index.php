@@ -167,11 +167,20 @@ class Index extends Component
     {
         $modules = $this->packageModules();
 
+        // Vendor catalog entries that are not already installed here — offered
+        // as "Buy" cards. `core` never appears (it's the platform itself).
+        $installedSlugs = $modules->pluck('slug')->all();
+        $purchasable = collect(app(LicenseService::class)->catalog())
+            ->reject(fn ($p) => $p['slug'] === 'core' || in_array($p['slug'], $installedSlugs, true))
+            ->map(fn ($p) => $p + ['store_link' => ModuleCatalog::storeLink($p['slug'])])
+            ->values();
+
         return view('livewire.superadmin.modules.index', [
             'modules' => $modules,
             'orphans' => app(ModulePackageService::class)->orphanedModuleDirs(),
+            'purchasable' => $purchasable,
             'catalog' => $modules->mapWithKeys(fn ($m) => [
-                $m->id => ModuleCatalog::for($m->slug),
+                $m->id => ModuleCatalog::for($m->slug) + ['store_link' => ModuleCatalog::storeLink($m->slug)],
             ])->all(),
         ]);
     }

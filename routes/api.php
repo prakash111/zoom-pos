@@ -1,9 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\LicenseActivationController;
 use App\Http\Controllers\Api\V1\AiImageApiController;
 use App\Http\Controllers\Api\V1\AppBootstrapController;
 use App\Http\Controllers\Api\V1\AuthApiController;
-use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\Api\V1\CashRegisterApiController;
 use App\Http\Controllers\Api\V1\CatalogAdminApiController;
 use App\Http\Controllers\Api\V1\CatalogApiController;
@@ -14,7 +14,6 @@ use App\Http\Controllers\Api\V1\LanguageApiController;
 use App\Http\Controllers\Api\V1\PayablesApiController;
 use App\Http\Controllers\Api\V1\PermissionApiController;
 use App\Http\Controllers\Api\V1\PharmacyApiController;
-use App\Http\Controllers\Api\V1\RoleApiController;
 use App\Http\Controllers\Api\V1\PosDesktopSyncController;
 use App\Http\Controllers\Api\V1\PosSyncApiController;
 use App\Http\Controllers\Api\V1\PushDeviceApiController;
@@ -22,6 +21,7 @@ use App\Http\Controllers\Api\V1\QuotationApiController;
 use App\Http\Controllers\Api\V1\RepairApiController;
 use App\Http\Controllers\Api\V1\ReportsApiController;
 use App\Http\Controllers\Api\V1\RestaurantApiController;
+use App\Http\Controllers\Api\V1\RoleApiController;
 use App\Http\Controllers\Api\V1\SaleApiController;
 use App\Http\Controllers\Api\V1\SalesTargetApiController;
 use App\Http\Controllers\Api\V1\SalonApiController;
@@ -32,7 +32,9 @@ use App\Http\Controllers\Api\V1\TaxApiController;
 use App\Http\Controllers\Api\V1\TenantDemoDataController;
 use App\Http\Controllers\Api\V1\UploadApiController;
 use App\Http\Controllers\Api\V1\UserApiController;
+use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\Tenant\Auth\PasswordResetController;
+use App\Http\Controllers\Tenant\InvoiceController;
 use App\Http\Middleware\AuthenticateTenantApi;
 use Illuminate\Support\Facades\Route;
 
@@ -43,6 +45,10 @@ use Illuminate\Support\Facades\Route;
 | Versioned API endpoints (/api/v1/tax/*) secured with Tenant API Keys
 | and bearer tokens for third-party ERPs, Shopify, WooCommerce, etc.
 */
+
+// Signed "license issued" push from the vendor's License Manager after a
+// hosted-checkout purchase. HMAC-verified in the controller (no auth middleware).
+Route::post('/license/activate', [LicenseActivationController::class, 'activate']);
 
 Route::prefix('v1/tax')->middleware([AuthenticateTenantApi::class])->group(function () {
     Route::post('/calculate', [TaxApiController::class, 'calculate']);
@@ -89,7 +95,7 @@ Route::post('/api/auth/{provider}/mobile-token', [SocialAuthController::class, '
 // Signed, login-free invoice PDF — opened by the native Post-Sale Action
 // Sheet's "Preview & Print" row. The URL signature is the authorization, so
 // it renders in the device browser without a web session (no /login bounce).
-Route::get('/tenant/receipt/{sale}/pdf', [\App\Http\Controllers\Tenant\InvoiceController::class, 'signedPdf'])
+Route::get('/tenant/receipt/{sale}/pdf', [InvoiceController::class, 'signedPdf'])
     ->middleware('signed')
     ->name('receipt.signed.pdf');
 
@@ -262,10 +268,10 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     // "Preview & Print" row — token-authenticated (bearer), returns
     // application/pdf, never HTML, so it renders straight into the device's
     // native PDF viewer with no web session / /login bounce.
-    Route::get('/tenant/invoices/{sale}/pdf-stream', [\App\Http\Controllers\Tenant\InvoiceController::class, 'pdfStream'])
+    Route::get('/tenant/invoices/{sale}/pdf-stream', [InvoiceController::class, 'pdfStream'])
         ->middleware('tenant.api.permission:sales,view')
         ->name('invoice.pdf.stream');
-    Route::get('/app/invoices/{sale}/pdf-stream', [\App\Http\Controllers\Tenant\InvoiceController::class, 'pdfStream'])
+    Route::get('/app/invoices/{sale}/pdf-stream', [InvoiceController::class, 'pdfStream'])
         ->middleware('tenant.api.permission:sales,view');
 
     // Terminal Devices & Active Session Management

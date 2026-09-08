@@ -41,6 +41,44 @@ class CustomLicenseServerClient
         return $this->baseUrl !== '';
     }
 
+    public function storeUrl(): string
+    {
+        return rtrim((string) config('services.license_server.store_url'), '/');
+    }
+
+    /**
+     * Active products the vendor sells, for the "Buy module" list.
+     *
+     * @return list<array{slug: string, name: string, description: ?string, price: float, currency: string}>
+     */
+    public function catalog(): array
+    {
+        if (! $this->isConfigured()) {
+            return [];
+        }
+
+        try {
+            $response = Http::withHeaders(['X-Server-Secret' => $this->secret])
+                ->acceptJson()
+                ->timeout($this->timeout)
+                ->get($this->baseUrl.'/api/v1/catalog');
+
+            if ($response->successful() && $response->json('status')) {
+                return array_map(fn ($p) => [
+                    'slug' => (string) ($p['slug'] ?? ''),
+                    'name' => (string) ($p['name'] ?? ''),
+                    'description' => $p['description'] ?? null,
+                    'price' => (float) ($p['price'] ?? 0),
+                    'currency' => strtoupper((string) ($p['currency'] ?? 'USD')),
+                ], (array) $response->json('products', []));
+            }
+        } catch (Throwable $e) {
+            Log::warning('License server catalog fetch failed: '.$e->getMessage());
+        }
+
+        return [];
+    }
+
     /**
      * Verify a license key for a product against the license server.
      *

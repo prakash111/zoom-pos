@@ -86,9 +86,18 @@ class CheckLicenseStatusCommandTest extends TestCase
 
     public function test_core_license_failure_only_warns(): void
     {
-        $this->artisan('license:check-status', ['--core-only' => true, '--sync' => true])->assertExitCode(0);
+        // Deterministic: a clearly-invalid installed blob so the check fails.
+        $path = storage_path('installed');
+        $backup = is_file($path) ? file_get_contents($path) : null;
+        file_put_contents($path, json_encode(['license' => ['purchase_code' => 'x']]));
 
-        $this->assertContains(PlatformSystem::get('core_license_status'), ['warn', 'unknown']);
+        try {
+            $this->artisan('license:check-status', ['--core-only' => true, '--sync' => true])->assertExitCode(0);
+        } finally {
+            $backup === null ? @unlink($path) : file_put_contents($path, $backup);
+        }
+
+        $this->assertSame('warn', PlatformSystem::get('core_license_status'));
         $this->assertNotNull(PlatformSystem::get('core_license_last_checked'));
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Services\License;
 
+use Illuminate\Support\Facades\Cache;
+
 /**
  * Hybrid license verification dispatcher.
  *
@@ -99,6 +101,26 @@ class LicenseService
             'message' => (string) $r['message'],
             'plan' => $r['plan'] ?? null,
         ];
+    }
+
+    /**
+     * Active vendor products for the "Buy module" list. Cached briefly so the
+     * Modules screen does not hit the license server on every render.
+     *
+     * @return list<array{slug: string, name: string, description: ?string, price: float, currency: string}>
+     */
+    public function catalog(): array
+    {
+        return Cache::remember(
+            'license.catalog',
+            now()->addMinutes(30),
+            fn () => $this->custom->catalog(),
+        );
+    }
+
+    public function storeUrl(): string
+    {
+        return $this->custom->storeUrl();
     }
 
     /**
