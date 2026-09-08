@@ -189,9 +189,11 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 @foreach (\App\Services\Modular\ModuleRegistry::allModules() as $modKey => $mod)
                     @php
-                        $isEnabled = in_array($modKey, $enabledRegistrationModules, true);
+                        $g = $moduleGuard[$modKey] ?? ['premium' => false, 'licensed' => true, 'store_link' => null];
+                        $locked = $g['premium'] && ! $g['licensed'];
+                        $isEnabled = ! $locked && in_array($modKey, $enabledRegistrationModules, true);
                     @endphp
-                    <label class="flex items-start justify-between p-4 rounded-2xl border transition-all cursor-pointer {{ $isEnabled ? 'border-indigo-500/80 bg-indigo-50/60 dark:bg-indigo-950/30 ring-1 ring-indigo-500/40' : 'border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 opacity-75 hover:opacity-100' }}">
+                    <label class="flex items-start justify-between p-4 rounded-2xl border transition-all {{ $locked ? 'border-amber-300/70 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-950/20 cursor-default' : 'cursor-pointer' }} {{ $isEnabled ? 'border-indigo-500/80 bg-indigo-50/60 dark:bg-indigo-950/30 ring-1 ring-indigo-500/40' : (! $locked ? 'border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 opacity-75 hover:opacity-100' : '') }}">
                         <div class="flex items-start gap-3.5 pr-3">
                             <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 {{ $isEnabled ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400' }}">
                                 @if ($modKey === 'restaurant')
@@ -205,22 +207,32 @@
                                 @endif
                             </div>
                             <div class="space-y-1">
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 flex-wrap">
                                     <span class="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">{{ __($mod['title']) }}</span>
                                     <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide {{ $isEnabled ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' }}">
                                         {{ $modKey }}
                                     </span>
+                                    @if ($locked)
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">{{ __('Not purchased') }}</span>
+                                    @endif
                                 </div>
                                 <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                                     {{ __($mod['description']) }}
                                 </p>
+                                @if ($locked && ! empty($g['store_link']))
+                                    <a href="{{ $g['store_link'] }}" target="_blank" rel="noopener noreferrer"
+                                       class="inline-flex mt-1.5 items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-extrabold bg-amber-600 hover:bg-amber-700 text-white">
+                                        {{ __('Purchase to activate') }} ↗
+                                    </a>
+                                @endif
                             </div>
                         </div>
                         <div class="pt-0.5 shrink-0">
                             <input type="checkbox"
                                    wire:model.live="enabledRegistrationModules"
                                    value="{{ $modKey }}"
-                                   class="w-5 h-5 rounded-lg border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                                   @disabled($locked)
+                                   class="w-5 h-5 rounded-lg border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 {{ $locked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer' }}">
                         </div>
                     </label>
                 @endforeach

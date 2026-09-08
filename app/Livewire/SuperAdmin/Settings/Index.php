@@ -7,7 +7,9 @@ use App\Models\Page;
 use App\Models\PlatformBranding;
 use App\Models\PlatformSystem;
 use App\Models\PushNotificationSetting;
+use App\Models\SduiModule;
 use App\Services\Localization\PlatformRegionalService;
+use App\Services\Modular\ModuleCatalog;
 use App\Services\Modular\ModuleRegistry;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
@@ -221,7 +223,11 @@ class Index extends Component
         $this->minClientBuildVersion = (string) PlatformSystem::get('min_client_build_version', '0');
         $this->appVersion = (string) PlatformSystem::get('app_version', '1.0.0');
         $this->showPoweredBy = filter_var(PlatformSystem::get('show_powered_by', true), FILTER_VALIDATE_BOOLEAN);
-        $this->enabledRegistrationModules = ModuleRegistry::enabledRegistrationModes();
+        $guard = $this->moduleGovernance();
+        $this->enabledRegistrationModules = array_values(array_filter(
+            ModuleRegistry::enabledRegistrationModes(),
+            fn ($key) => empty($guard[$key]['premium']) || ! empty($guard[$key]['licensed']),
+        ));
         $this->allowedRegistrationModes = in_array('restaurant', $this->enabledRegistrationModules, true) && in_array('retail', $this->enabledRegistrationModules, true) ? 'both' : (in_array('restaurant', $this->enabledRegistrationModules, true) ? 'restaurant_only' : 'retail_only');
         $this->aiImageEnabled = filter_var(PlatformSystem::get('ai_image_enabled', false), FILTER_VALIDATE_BOOLEAN);
         $this->aiImageProvider = (string) PlatformSystem::get('ai_image_provider', 'openai');
@@ -543,9 +549,11 @@ class Index extends Component
         // uninstalled / deactivated package module must not linger in this
         // list even if it was somehow still in the posted payload.
         $validModeKeys = array_keys(ModuleRegistry::allModules());
-        $this->enabledRegistrationModules = array_values(array_intersect(
-            array_values($this->enabledRegistrationModules),
-            $validModeKeys,
+        $guard = $this->moduleGovernance();
+        $this->enabledRegistrationModules = array_values(array_filter(
+            array_intersect(array_values($this->enabledRegistrationModules), $validModeKeys),
+            // A premium vertical can only be enabled once its module is licensed.
+            fn ($key) => empty($guard[$key]['premium']) || ! empty($guard[$key]['licensed']),
         ));
         PlatformSystem::set('allowed_registration_modes', json_encode($this->enabledRegistrationModules));
         PlatformSystem::set('ai_image_enabled', $this->aiImageEnabled ? '1' : '0');
@@ -794,6 +802,40 @@ class Index extends Component
             'currencyOptions' => PlatformRegionalService::currencyOptions(),
             'languageOptions' => PlatformRegionalService::languageOptions(),
             'timezoneOptions' => PlatformRegionalService::timezoneOptions(),
+            'moduleGuard' => $this->moduleGovernance(),
         ]);
+    }
+
+    /**
+     * Per registration-mode gating for the Module Governance card.
+     *
+     * @return array<string, array{premium: bool, licensed: bool, catalog_slug: string, store_link: ?string}>
+     */
+    public function moduleGovernance(): array
+    {
+        $free = (array) config('modules.registration.free', ['retail', 'restaurant']);
+        $premium = (array) config('modules.registration.premium', []);
+
+        $licensedSlugs = SduiModule::query()
+            ->where('license_status', 'active')
+            ->pluck('slug')
+            ->all();
+
+        $guard = [];
+        foreach (array_keys(ModuleRegistry::allModules()) as $key) {
+            $isPremium = array_key_exists($key, $premium);
+            $catalogSlug = $isPremium ? (string) $premium[$key] : $key;
+
+            $guard[$key] = [
+                'premium' => $isPremium,
+                'licensed' => ! $isPremium
+                    || in_array($key, $free, true)
+                    || in_array($catalogSlug, $licensedSlugs, true),
+                'catalog_slug' => $catalogSlug,
+                'store_link' => $isPremium ? ModuleCatalog::storeLink($catalogSlug) : null,
+            ];
+        }
+
+        return $guard;
     }
 }

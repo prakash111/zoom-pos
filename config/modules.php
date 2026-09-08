@@ -17,6 +17,27 @@ return [
     | license key verifies — nothing is shipped in the build.
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Registration-mode gating
+    |--------------------------------------------------------------------------
+    |
+    | `free`    — store types always selectable at tenant signup, no licence.
+    | `premium` — registration-mode key => the catalog/package slug whose
+    |             licence unlocks it. Until that module is licensed & active the
+    |             SuperAdmin Module Governance card shows it as "Not purchased"
+    |             with a "Purchase to activate" button, and it cannot be enabled.
+    |
+    */
+    'registration' => [
+        'free' => ['retail', 'restaurant'],
+        'premium' => [
+            'pharmacy' => 'pharmacy',
+            'service_booking' => 'salon',
+            'repair_technician' => 'repairtechnician',
+        ],
+    ],
+
     'catalog' => [
         [
             'slug' => 'pharmacy',

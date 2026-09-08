@@ -6,6 +6,7 @@ use App\Livewire\SuperAdmin\Settings\Index as SettingsIndex;
 use App\Models\Page;
 use App\Models\PlatformBranding;
 use App\Models\PlatformSystem;
+use App\Models\SduiModule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\Concerns\ActsAsPlatformAdmin;
@@ -53,11 +54,11 @@ class TabbedSettingsAndAppearanceTest extends TestCase
         $this->assertSame('Upgrading servers...', PlatformSystem::get('maintenance_message'));
     }
 
-    public function test_general_tab_drops_unknown_store_type_keys_from_registration_modes(): void
+    public function test_general_tab_drops_unknown_and_unpurchased_store_type_keys(): void
     {
         $this->actingAsSuperAdmin();
 
-        // A stale key (an uninstalled module) must never be persisted back.
+        // retail is free; pharmacy is premium + not licensed; ghost is unknown.
         Livewire::test(SettingsIndex::class)
             ->set('activeTab', 'general')
             ->set('appName', 'X')
@@ -65,14 +66,41 @@ class TabbedSettingsAndAppearanceTest extends TestCase
             ->set('appTimezone', 'UTC')
             ->set('minClientBuildVersion', '1.0.0')
             ->set('appVersion', '1.0.0')
-            ->set('enabledRegistrationModules', ['retail', 'pharmacy', 'ghost_module_xyz'])
+            ->set('enabledRegistrationModules', ['retail', 'restaurant', 'pharmacy', 'ghost_module_xyz'])
             ->call('saveGeneral')
             ->assertHasNoErrors();
 
         $saved = json_decode((string) PlatformSystem::get('allowed_registration_modes'), true);
         $this->assertContains('retail', $saved);
+        $this->assertContains('restaurant', $saved);
+        $this->assertNotContains('pharmacy', $saved);       // premium, not purchased
+        $this->assertNotContains('ghost_module_xyz', $saved); // unknown
+    }
+
+    public function test_a_licensed_premium_vertical_can_be_enabled_as_a_store_type(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        SduiModule::create([
+            'name' => 'Pharmacy', 'slug' => 'pharmacy', 'source_type' => 'package',
+            'package_path' => 'pharmacy', 'installed_at' => now(), 'is_active' => true,
+            'requires_license' => true, 'license_status' => 'active',
+            'navigation' => [], 'features' => [],
+        ]);
+
+        Livewire::test(SettingsIndex::class)
+            ->set('activeTab', 'general')
+            ->set('appName', 'X')
+            ->set('appCurrency', 'USD')
+            ->set('appTimezone', 'UTC')
+            ->set('minClientBuildVersion', '1.0.0')
+            ->set('appVersion', '1.0.0')
+            ->set('enabledRegistrationModules', ['retail', 'pharmacy'])
+            ->call('saveGeneral')
+            ->assertHasNoErrors();
+
+        $saved = json_decode((string) PlatformSystem::get('allowed_registration_modes'), true);
         $this->assertContains('pharmacy', $saved);
-        $this->assertNotContains('ghost_module_xyz', $saved);
     }
 
     public function test_smtp_tab_saves_and_encrypts_credentials(): void
@@ -223,7 +251,7 @@ class TabbedSettingsAndAppearanceTest extends TestCase
     public function test_social_login_is_managed_from_platform_settings_and_preserves_stored_secret(): void
     {
         $this->actingAsSuperAdmin();
-        \App\Models\PlatformSystem::set('social_google_client_secret', 'existing-secret');
+        PlatformSystem::set('social_google_client_secret', 'existing-secret');
 
         Livewire::test(SettingsIndex::class)
             ->set('activeTab', 'social')
@@ -234,9 +262,9 @@ class TabbedSettingsAndAppearanceTest extends TestCase
             ->call('saveSocialLogin')
             ->assertDispatched('notify');
 
-        $this->assertSame('1', \App\Models\PlatformSystem::get('social_google_enabled'));
-        $this->assertSame('google-client', \App\Models\PlatformSystem::get('social_google_client_id'));
-        $this->assertSame('existing-secret', \App\Models\PlatformSystem::get('social_google_client_secret'));
+        $this->assertSame('1', PlatformSystem::get('social_google_enabled'));
+        $this->assertSame('google-client', PlatformSystem::get('social_google_client_id'));
+        $this->assertSame('existing-secret', PlatformSystem::get('social_google_client_secret'));
     }
 
     public function test_landing_page_controller_dynamically_renders_configured_theme(): void
