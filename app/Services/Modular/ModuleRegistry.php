@@ -15,65 +15,36 @@ use Illuminate\Support\Facades\Schema;
  * layouts, feature toggles, cart settings, payment options, status labels,
  * and menu structures originate here, ensuring new business verticals can be
  * introduced server-side without mobile client binary recompilation.
+ *
+ * The script ships with two native verticals — retail and restaurant. Every
+ * other vertical (pharmacy, salon, repair, …) is delivered as an installable
+ * package (see docs/MODULE_PACKAGES.md); its schema is registered here under
+ * extendedSchemas() and only surfaces once its sdui_modules row is active.
  */
 class ModuleRegistry
 {
+    /** Verticals bundled with the script. */
+    public const NATIVE = ['retail', 'restaurant'];
+
     /**
-     * All registered business module schemas.
+     * Base schemas for verticals that ship as installable packages, keyed by
+     * their canonical operating-mode id (which can differ from the package
+     * slug — e.g. the "salon" package is the "service_booking" mode).
      *
      * @return array<string, array<string, mixed>>
      */
-    public static function allModules(): array
+    public static function extendedSchemas(): array
     {
-        $builtIn = [
-            'retail' => [
-                'id' => 'retail',
-                'title' => 'Retail',
-                'subtitle' => 'Shops, electronics, general stores',
-                'description' => 'Shops, electronics, general stores',
-                'layout_type' => 'standard_grid',
-                'icon' => 'storefront',
-                'features' => [
-                    'has_tables' => false,
-                    'has_kot' => false,
-                    'has_barcode_scanner' => true,
-                    'has_due_reminders' => true,
-                    'prep_timer' => false,
-                    'order_alerts' => false,
-                ],
-                'cart_configuration' => [
-                    'show_customer_selector' => true,
-                    'allow_split_payment' => true,
-                    'tax_display' => 'country_default',
-                    'allow_discounts' => true,
-                    'allow_held_carts' => true,
-                    'allow_notes' => true,
-                ],
-            ],
-            'restaurant' => [
-                'id' => 'restaurant',
-                'title' => 'Cafe & Restaurant',
-                'subtitle' => 'Tables, KOT, kitchen display',
-                'description' => 'Tables, KOT, kitchen display',
-                'layout_type' => 'table_floor_plan',
-                'icon' => 'restaurant',
-                'features' => [
-                    'has_tables' => true,
-                    'has_kot' => true,
-                    'prep_timer' => true,
-                    'order_alerts' => true,
-                    'has_barcode_scanner' => false,
-                    'has_due_reminders' => false,
-                ],
-                'cart_configuration' => [
-                    'show_customer_selector' => true,
-                    'allow_split_payment' => true,
-                    'tax_display' => 'country_default',
-                    'allow_discounts' => true,
-                    'allow_held_carts' => true,
-                    'allow_notes' => true,
-                ],
-            ],
+        $cart = [
+            'show_customer_selector' => true,
+            'allow_split_payment' => true,
+            'tax_display' => 'country_default',
+            'allow_discounts' => true,
+            'allow_held_carts' => true,
+            'allow_notes' => true,
+        ];
+
+        return [
             'pharmacy' => [
                 'id' => 'pharmacy',
                 'title' => 'Pharmacy POS',
@@ -82,24 +53,11 @@ class ModuleRegistry
                 'layout_type' => 'standard_grid',
                 'icon' => 'medication',
                 'features' => [
-                    'has_tables' => false,
-                    'has_kot' => false,
-                    'has_barcode_scanner' => true,
-                    'has_due_reminders' => true,
-                    'batch_tracking' => true,
-                    'expiry_tracking' => true,
-                    'prescription_required' => true,
-                    'prep_timer' => false,
-                    'order_alerts' => false,
+                    'has_tables' => false, 'has_kot' => false, 'has_barcode_scanner' => true,
+                    'has_due_reminders' => true, 'batch_tracking' => true, 'expiry_tracking' => true,
+                    'prescription_required' => true, 'prep_timer' => false, 'order_alerts' => false,
                 ],
-                'cart_configuration' => [
-                    'show_customer_selector' => true,
-                    'allow_split_payment' => true,
-                    'tax_display' => 'country_default',
-                    'allow_discounts' => true,
-                    'allow_held_carts' => true,
-                    'allow_notes' => true,
-                ],
+                'cart_configuration' => $cart,
             ],
             'service_booking' => [
                 'id' => 'service_booking',
@@ -109,23 +67,11 @@ class ModuleRegistry
                 'layout_type' => 'service_booking_list',
                 'icon' => 'content_cut',
                 'features' => [
-                    'has_tables' => false,
-                    'has_kot' => false,
-                    'has_barcode_scanner' => false,
-                    'has_due_reminders' => true,
-                    'appointment_scheduling' => true,
-                    'staff_assignment' => true,
-                    'prep_timer' => false,
-                    'order_alerts' => true,
+                    'has_tables' => false, 'has_kot' => false, 'has_barcode_scanner' => false,
+                    'has_due_reminders' => true, 'appointment_scheduling' => true, 'staff_assignment' => true,
+                    'prep_timer' => false, 'order_alerts' => true,
                 ],
-                'cart_configuration' => [
-                    'show_customer_selector' => true,
-                    'allow_split_payment' => true,
-                    'tax_display' => 'country_default',
-                    'allow_discounts' => true,
-                    'allow_held_carts' => true,
-                    'allow_notes' => true,
-                ],
+                'cart_configuration' => $cart,
             ],
             'repair_technician' => [
                 'id' => 'repair_technician',
@@ -135,25 +81,69 @@ class ModuleRegistry
                 'layout_type' => 'repair_kanban',
                 'icon' => 'handyman',
                 'features' => [
-                    'has_tables' => false,
-                    'has_kot' => false,
-                    'has_barcode_scanner' => true,
-                    'has_due_reminders' => true,
-                    'ticket_tracking' => true,
-                    'parts_billing' => true,
-                    'technician_workbench' => true,
-                    'intake_checklist' => true,
-                    'prep_timer' => false,
+                    'has_tables' => false, 'has_kot' => false, 'has_barcode_scanner' => true,
+                    'has_due_reminders' => true, 'ticket_tracking' => true, 'parts_billing' => true,
+                    'technician_workbench' => true, 'intake_checklist' => true, 'prep_timer' => false,
                     'order_alerts' => true,
                 ],
-                'cart_configuration' => [
-                    'show_customer_selector' => true,
-                    'allow_split_payment' => true,
-                    'tax_display' => 'country_default',
-                    'allow_discounts' => true,
-                    'allow_held_carts' => true,
-                    'allow_notes' => true,
+                'cart_configuration' => $cart,
+            ],
+        ];
+    }
+
+    /** package slug => canonical operating-mode id, from config/modules.php. */
+    private static function packageAliases(): array
+    {
+        $aliases = [];
+        foreach ((array) config('modules.registration.premium', []) as $mode => $slug) {
+            $aliases[strtolower((string) $slug)] = (string) $mode;
+        }
+
+        return $aliases;
+    }
+
+    /**
+     * All registered business module schemas.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function allModules(): array
+    {
+        $cart = [
+            'show_customer_selector' => true,
+            'allow_split_payment' => true,
+            'tax_display' => 'country_default',
+            'allow_discounts' => true,
+            'allow_held_carts' => true,
+            'allow_notes' => true,
+        ];
+
+        $builtIn = [
+            'retail' => [
+                'id' => 'retail',
+                'title' => 'Retail',
+                'subtitle' => 'Shops, electronics, general stores',
+                'description' => 'Shops, electronics, general stores',
+                'layout_type' => 'standard_grid',
+                'icon' => 'storefront',
+                'features' => [
+                    'has_tables' => false, 'has_kot' => false, 'has_barcode_scanner' => true,
+                    'has_due_reminders' => true, 'prep_timer' => false, 'order_alerts' => false,
                 ],
+                'cart_configuration' => $cart,
+            ],
+            'restaurant' => [
+                'id' => 'restaurant',
+                'title' => 'Cafe & Restaurant',
+                'subtitle' => 'Tables, KOT, kitchen display',
+                'description' => 'Tables, KOT, kitchen display',
+                'layout_type' => 'table_floor_plan',
+                'icon' => 'restaurant',
+                'features' => [
+                    'has_tables' => true, 'has_kot' => true, 'prep_timer' => true,
+                    'order_alerts' => true, 'has_barcode_scanner' => false, 'has_due_reminders' => false,
+                ],
+                'cart_configuration' => $cart,
             ],
         ];
 
@@ -162,30 +152,43 @@ class ModuleRegistry
         }
 
         try {
-            $databaseModules = SduiModule::query()
-                ->where('is_active', true)
-                ->orderBy('sort_order')
-                ->get()
-                ->mapWithKeys(function (SduiModule $module): array {
-                    $routes = $module->routes ?? [];
+            $extended = self::extendedSchemas();
+            $aliases = self::packageAliases();
+            $databaseModules = [];
 
-                    return [$module->slug => [
-                        'id' => $module->slug,
+            foreach (SduiModule::query()->where('is_active', true)->orderBy('sort_order')->get() as $module) {
+                $routes = $module->routes ?? [];
+                $schema = [
+                    'id' => $module->slug,
+                    'title' => $module->name,
+                    'description' => $module->description ?? '',
+                    'layout_type' => $module->layout_type,
+                    'icon' => $module->icon,
+                    'features' => $module->features ?? [],
+                    'cart_configuration' => $routes['cart_configuration'] ?? [],
+                    'routes' => $routes,
+                    'navigation' => $module->navigation ?? [],
+                    'source' => 'database',
+                ];
+                $databaseModules[$module->slug] = $schema;
+
+                // A packaged vertical also surfaces under its canonical mode id,
+                // with the extended schema as the base so an installed package
+                // reproduces the same feature flags a native build would have.
+                $mode = $aliases[$module->slug] ?? $module->slug;
+                if (isset($extended[$mode])) {
+                    $databaseModules[$mode] = array_replace($extended[$mode], array_filter([
                         'title' => $module->name,
-                        'description' => $module->description ?? '',
-                        'layout_type' => $module->layout_type,
-                        'icon' => $module->icon,
-                        'features' => $module->features ?? [],
-                        'cart_configuration' => $routes['cart_configuration'] ?? [],
-                        'routes' => $routes,
-                        'navigation' => $module->navigation ?? [],
-                        'source' => 'database',
-                    ]];
-                })
-                ->all();
+                        'navigation' => $module->navigation ?: null,
+                        'routes' => $routes ?: null,
+                    ], fn ($v) => $v !== null), [
+                        'features' => array_replace($extended[$mode]['features'], $module->features ?? []),
+                    ]);
+                }
+            }
 
-            // Database rows intentionally override built-ins with the same
-            // slug, letting SuperAdmin change presentation without an app build.
+            // Database rows override built-ins with the same slug, letting
+            // SuperAdmin change presentation without an app build.
             return array_replace($builtIn, $databaseModules);
         } catch (\Throwable) {
             // Bootstrap must remain available while migrations are running or
@@ -225,7 +228,7 @@ class ModuleRegistry
     {
         $key = strtolower(trim($key));
 
-        if (in_array($key, ['retail', 'restaurant', 'pharmacy', 'service_booking', 'repair_technician'], true)) {
+        if (in_array($key, self::NATIVE, true)) {
             return true;
         }
 
@@ -234,7 +237,10 @@ class ModuleRegistry
         }
 
         try {
-            return SduiModule::query()->where('slug', $key)->exists();
+            $aliases = array_flip(self::packageAliases()); // mode id => package slug
+            $slug = $aliases[$key] ?? $key;
+
+            return SduiModule::query()->where('slug', $slug)->orWhere('slug', $key)->exists();
         } catch (\Throwable) {
             return false;
         }

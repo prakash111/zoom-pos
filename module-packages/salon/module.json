@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "author": "ZoomNearby",
     "icon": "content_cut",
-    "layout_type": "standard_grid",
+    "layout_type": "service_booking_list",
     "inherits_ui": "universal_pos",
     "min_system_version": "1.0.0",
     "requires_license": true,

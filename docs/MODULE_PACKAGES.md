@@ -12,10 +12,13 @@ Three are shipped here, extracted as self-contained verticals:
 | `repairtechnician` | Repair Technician | `repair_mod_device_categories`, `repair_mod_tickets`, `repair_mod_ticket_items` | `/api/tenant/repair-module` |
 | `salon` | Salon & Bookings | `salon_mod_services`, `salon_mod_stylists`, `salon_mod_appointments` | `/api/tenant/salon-module` |
 
-They are **additive** — the core built-in `pharmacy` / `repair_technician` /
-`service_booking` operating modes are untouched. The package tables are
-`*_mod_*`-prefixed so a package installs cleanly whether or not the host
-also has the built-in vertical.
+The script ships with two **native** verticals — `retail` and `restaurant`
+(`ModuleRegistry::NATIVE`). Everything else — pharmacy, salon, repair — is a
+package: its schema lives in `ModuleRegistry::extendedSchemas()` and only
+surfaces once the package's `sdui_modules` row is active. `config/modules.php`
+`registration.premium` maps each operating-mode id to its package slug
+(`service_booking` ⇄ `salon`, `repair_technician` ⇄ `repairtechnician`).
+The package tables are `*_mod_*`-prefixed and independent of any core table.
 
 ## Licensing
 

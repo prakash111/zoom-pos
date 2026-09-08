@@ -214,7 +214,20 @@ class SduiViewApiTest extends TestCase
 
     public function test_sdui_plug_and_play_future_module_view_generates_dynamically(): void
     {
-        // Pharmacy module
+        // A packaged vertical (installed as an sdui_modules row) renders its
+        // module view dynamically — no native code, no Flutter build.
+        SduiModule::create([
+            'name' => 'Pharmacy POS',
+            'slug' => 'pharmacy',
+            'description' => 'Batches, expiry dates, medicines',
+            'icon' => 'medication',
+            'source_type' => 'package',
+            'features' => [],
+            'routes' => [],
+            'navigation' => [],
+            'is_active' => true,
+        ]);
+
         $response = $this->withHeader('Authorization', 'Bearer '.$this->token())
             ->getJson('/api/tenant/views/pharmacy');
 
@@ -428,4 +441,3 @@ class SduiViewApiTest extends TestCase
         }
     }
 }
-

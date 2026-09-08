@@ -217,8 +217,9 @@ class AppBootstrapApiTest extends TestCase
             ->assertJsonPath('modules.restaurant.layout_type', 'table_floor_plan')
             ->assertJsonPath('modules.restaurant.features.has_tables', true)
             ->assertJsonPath('modules.restaurant.features.has_kot', true)
-            ->assertJsonPath('modules.pharmacy.id', 'pharmacy')
-            ->assertJsonPath('modules.service_booking.id', 'service_booking')
+            // retail + restaurant are the only native verticals; others arrive
+            // as installed packages (see PackagedVerticalModulesTest).
+            ->assertJsonMissingPath('modules.pharmacy')
             ->assertJsonPath('menu_structure.0.key', 'cashier_sales')
             ->assertJsonPath('menu_structure.0.items.0.key', 'pos')
             ->assertJsonStructure([
