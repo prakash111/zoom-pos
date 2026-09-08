@@ -41,6 +41,7 @@ class UnifiedAuthLayoutAndNavigationTest extends TestCase
             'platform_name' => 'Zenith POS & Inventory',
             'landing_primary_color' => '#10b981',
             'landing_accent_color' => '#d7f24e',
+            'landing_page_enabled' => true,
         ]);
 
         $response = $this->get(route('tenant.login'));
@@ -64,6 +65,8 @@ class UnifiedAuthLayoutAndNavigationTest extends TestCase
 
     public function test_tenant_register_screen_renders_with_unified_layout_and_navigation(): void
     {
+        PlatformBranding::current()->update(['landing_page_enabled' => true]);
+
         $response = $this->get(route('tenant.register'));
         $response->assertOk();
 
@@ -85,6 +88,8 @@ class UnifiedAuthLayoutAndNavigationTest extends TestCase
 
     public function test_superadmin_login_screen_renders_with_unified_layout_and_navigation(): void
     {
+        PlatformBranding::current()->update(['landing_page_enabled' => true]);
+
         $response = $this->get(route('superadmin.login'));
         $response->assertOk();
 

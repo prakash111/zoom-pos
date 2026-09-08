@@ -10,6 +10,15 @@
     $guestActiveLang = $guestLocService->getActiveLanguage();
     $guestLanguages = $guestLocService->getActiveLanguages();
     $isRtl = $guestLocService->isRtl();
+
+    // Same source of truth as LandingPageController: the branding column, not
+    // the (never-written) `landing_page_enabled` global-setting key.
+    $guestLandingEnabled = (bool) ($branding?->landing_page_enabled ?? false);
+    $guestNavLinks = $guestLandingEnabled ? [
+        ['label' => __('Features'), 'url' => url('/') . '#features'],
+        ['label' => __('Pricing'), 'url' => url('/') . '#pricing'],
+        ['label' => __('Contact'), 'url' => url('/') . '#contact'],
+    ] : [];
 @endphp
 <!DOCTYPE html>
 <html lang="{{ $guestActiveLang?->code ?? 'en' }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" x-data="{ dark: localStorage.getItem('theme') === 'dark' }" x-init="$watch('dark', v => { localStorage.setItem('theme', v ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', v) }); document.documentElement.classList.toggle('dark', dark)">
@@ -54,21 +63,12 @@
     <div class="auth-ambient fixed bottom-10 right-0 w-[500px] h-[500px] rounded-full bg-lime-400/15 blur-3xl pointer-events-none -z-10"></div>
 
     <!-- Top Floating Navigation Bar -->
-    <div class="w-full max-w-6xl mx-auto flex items-center justify-between py-3 px-2 sm:px-4 z-20 mb-4 sm:mb-6">
-        {{-- Top Return Navigation Link --}}
-        @if(setting('landing_page_enabled', true))
-            <a href="{{ url('/') }}" class="group inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/15 text-xs sm:text-sm font-bold text-white transition active:scale-95 shadow-md">
-                <svg class="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                </svg>
-                <span>{{ __('Back to Home') }}</span>
-            </a>
-        @else
-            <div class="w-10"><!-- Spacer when landing page is disabled --></div>
-        @endif
+    <header x-data="{ navOpen: false }"
+            class="w-full max-w-6xl mx-auto flex items-center justify-between gap-3 py-3 px-2 sm:px-4 z-30 mb-4 sm:mb-6 relative">
 
-        <!-- Center Brand Logo linking back to Home -->
-        <a @if(setting('landing_page_enabled', true)) href="{{ url('/') }}" @endif class="inline-flex items-center gap-2.5 group">
+        <!-- Brand Logo (links home when the landing page is live) -->
+        <a @if($guestLandingEnabled) href="{{ url('/') }}" @endif
+           class="inline-flex items-center gap-2.5 group shrink-0 {{ $guestLandingEnabled ? '' : 'pointer-events-none' }}">
             @if ($guestLogoUrl)
                 <img src="{{ $guestLogoUrl }}" alt="{{ $guestBrandName }}" class="h-8 w-auto object-contain">
             @else
@@ -78,12 +78,37 @@
                     </svg>
                 </div>
             @endif
-            <span class="text-base sm:text-lg font-black tracking-tight text-white hidden sm:inline">{{ $guestBrandName }}</span>
+            <span class="text-sm sm:text-lg font-black tracking-tight text-white truncate max-w-[9rem] sm:max-w-none">{{ $guestBrandName }}</span>
         </a>
 
+        @if ($guestLandingEnabled)
+            {{-- Back to Home (compact, beside the logo on tablet+) --}}
+            <a href="{{ url('/') }}" class="group hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-bold text-white transition shrink-0">
+                <svg class="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+                <span>{{ __('Back to Home') }}</span>
+            </a>
+
+            <!-- Desktop inline navigation -->
+            <nav class="hidden md:flex items-center gap-1 bg-white/10 backdrop-blur-md border border-white/15 rounded-full px-2 py-1">
+                @foreach ($guestNavLinks as $link)
+                    <a href="{{ $link['url'] }}" class="px-3.5 py-1.5 rounded-full text-xs font-bold text-slate-200 hover:text-white hover:bg-white/10 transition">{{ $link['label'] }}</a>
+                @endforeach
+            </nav>
+        @endif
+
         <!-- Right Quick Actions -->
-        <div class="flex items-center gap-2 sm:gap-2.5">
-            
+        <div class="flex items-center gap-2 sm:gap-2.5 shrink-0">
+
+            {{-- Mobile navigation toggle --}}
+            @if (!empty($guestNavLinks))
+                <button type="button" x-on:click="navOpen = !navOpen" :aria-expanded="navOpen.toString()"
+                        class="md:hidden p-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-slate-200 transition"
+                        title="{{ __('Menu') }}">
+                    <svg x-show="!navOpen" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></svg>
+                    <svg x-show="navOpen" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+            @endif
+
             <!-- Language Switcher Dropdown (Auth) -->
             @if ($guestLanguages->isNotEmpty())
                 <div class="relative" x-data="{ openAuthLang: false }">
@@ -137,13 +162,31 @@
                 <span x-show="!dark">🌙</span>
                 <span x-show="dark">☀️</span>
             </button>
-            @if(setting('landing_page_enabled', true))
-                <a href="{{ url('/') }}#features" class="hidden md:inline-flex px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/15 text-xs font-bold text-slate-200 transition">
-                    {{ __('Platform Features') }}
-                </a>
-            @endif
         </div>
-    </div>
+
+        {{-- Mobile navigation dropdown --}}
+        @if (!empty($guestNavLinks))
+            <div x-show="navOpen" x-cloak x-on:click.outside="navOpen = false"
+                 x-transition:enter="transition ease-out duration-150"
+                 x-transition:enter-start="opacity-0 -translate-y-2"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 class="md:hidden absolute top-full left-2 right-2 mt-2 rounded-2xl bg-slate-950/95 backdrop-blur-2xl border border-white/15 shadow-2xl p-2 z-50 flex flex-col gap-1">
+                <a href="{{ url('/') }}" x-on:click="navOpen = false"
+                   class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-white/[0.04] hover:bg-white/10 transition">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+                    {{ __('Back to Home') }}
+                </a>
+                @foreach ($guestNavLinks as $link)
+                    <a href="{{ $link['url'] }}" x-on:click="navOpen = false"
+                       class="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-200 bg-white/[0.04] hover:bg-white/10 transition">{{ $link['label'] }}</a>
+                @endforeach
+                <div class="mt-1 pt-2 border-t border-white/10 grid grid-cols-2 gap-1.5">
+                    <a href="{{ route('tenant.login') }}" class="text-center px-3 py-2 rounded-xl text-xs font-bold text-slate-200 bg-white/10 hover:bg-white/20 transition">{{ __('Sign in') }}</a>
+                    <a href="{{ route('tenant.register') }}" class="text-center px-3 py-2 rounded-xl text-xs font-black text-slate-950 bg-brand-lime hover:bg-brand-lime-dark transition">{{ __('Register') }}</a>
+                </div>
+            </div>
+        @endif
+    </header>
 
     <!-- Main Auth Card Outer Container (Matching Highnote Rounded Hero Card) -->
     <div class="w-full max-w-6xl mx-auto my-auto rounded-[2.5rem] sm:rounded-[3rem] bg-slate-950/90 backdrop-blur-2xl border border-white/15 shadow-[0_30px_90px_-15px_rgba(0,0,0,0.5)] p-6 sm:p-10 md:p-12 relative overflow-hidden z-10">
@@ -171,7 +214,7 @@
             <span>&copy; {{ now()->year }} {{ $guestBrandName }}.</span>
             <span>{{ __('All rights reserved.') }}</span>
         </div>
-        @if(setting('landing_page_enabled', true))
+        @if($guestLandingEnabled)
             <div class="flex items-center gap-4 text-white/80 font-medium">
                 <a href="{{ url('/') }}#pricing" class="hover:text-brand-lime transition">{{ __('Pricing Plans') }}</a>
                 <span>&middot;</span>
