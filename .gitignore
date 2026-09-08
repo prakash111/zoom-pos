@@ -31,3 +31,9 @@ docker-compose.override.yml
 !/modules/.gitkeep
 
 /license-review
+
+/scratch
+/Documentation
+/Licensing
+/localization_patch.diff
+/nativephp_debug.json
