@@ -129,6 +129,20 @@ There is **no composer step** — module classes load through a runtime
 (`Modules\<key>\Foo\Bar` → `modules/<key>/Foo/Bar.php`), so nothing needs
 `composer dump-autoload`.
 
+### How an active module is wired in (`ModuleServiceProvider::bootModule()`)
+
+For every `sdui_modules` row that is `source_type = package` and
+`is_active = true`, the provider injects — without touching any core file:
+
+| In `modules/<key>/` | Effect |
+|---|---|
+| `Providers/ModuleProvider.php` (`Modules\<key>\Providers\ModuleProvider`) | `$app->register()`ed like any Laravel provider |
+| `routes.php` | loaded (flat file — the simple case) |
+| `routes/api.php`, `routes/web.php` | loaded if present (split files) |
+| `Resources/views/` | published as the `module-<key>::` view namespace |
+
+Migrations are **not** auto-run on boot — they run once, on Activate.
+
 ## Gating module-specific UI
 
 Anything that should only render while a module is usable checks the

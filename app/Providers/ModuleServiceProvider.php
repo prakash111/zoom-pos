@@ -9,28 +9,30 @@ use Illuminate\Support\ServiceProvider;
 use Throwable;
 
 /**
- * Boots active ZIP-packaged modules: loads each one's routes.php.
+ * Boot layer for ZIP-packaged, self-contained modules (Perfex-style plugin
+ * engine). For every module whose `sdui_modules` row is `source_type =
+ * package` AND `is_active = true`, this provider wires its capabilities into
+ * the running app *without the module ever touching a core file*:
  *
- * Navigation for an active module is already surfaced automatically by
- * ModuleRegistry/TenantNavRegistry once its sdui_modules row is active, and
- * its migrations are run explicitly during activation
- * (ModulePackageService::activate) rather than on every boot. This provider
- * only wires up routes.
+ *   modules/<key>/
+ *     routes.php                      flat route file (legacy / simple modules)
+ *     routes/api.php, routes/web.php  split route files (loaded if present)
+ *     Providers/ModuleProvider.php    Modules\<key>\Providers\ModuleProvider
+ *                                     — registered + booted like any provider
+ *     Resources/views/               published under the "module-<key>::" ns
  *
- * The `sdui_modules.is_active` column is the sole source of truth for
- * whether a module's routes load — an orphaned `modules/{key}/` directory
- * on disk (e.g. left over from a failed uninstall) never grants routes on
- * its own.
+ * `sdui_modules.is_active` is the sole source of truth — an orphaned
+ * `modules/<key>/` directory left by a failed uninstall grants nothing on
+ * its own. Migrations are NOT auto-run here; they run once, explicitly, in
+ * ModulePackageService::activate().
  */
 class ModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // Scoped autoloader for module Controllers referenced from a
-        // module's routes.php. There is no Composer step available to a
-        // SuperAdmin at runtime, so `Modules\{Key}\...` classes are mapped
-        // directly onto `modules/{key}/...` files. Migrations don't need
-        // this — Artisan's migrator requires migration files directly.
+        // Runtime PSR-4-ish autoloader for `Modules\<key>\...` classes —
+        // there is no `composer dump-autoload` step available to a SuperAdmin,
+        // so the namespace maps straight onto `modules/<key>/...` on disk.
         spl_autoload_register(function (string $class): void {
             if (! str_starts_with($class, 'Modules\\')) {
                 return;
@@ -64,17 +66,49 @@ class ModuleServiceProvider extends ServiceProvider
         }
 
         foreach ($activeModules as $module) {
-            $routesFile = base_path('modules/'.$module->package_path.'/routes.php');
-            if (! is_file($routesFile)) {
-                continue;
-            }
-
             try {
-                $this->loadRoutesFrom($routesFile);
+                $this->bootModule((string) $module->package_path);
             } catch (Throwable $e) {
-                Log::warning("ModuleServiceProvider: failed loading routes for module '{$module->slug}'.", [
+                Log::warning("ModuleServiceProvider: failed booting module '{$module->slug}'.", [
                     'error' => $e->getMessage(),
                 ]);
+            }
+        }
+    }
+
+    /**
+     * Wire one on-disk module directory into the app. Public + path-based so
+     * it can be re-run after a runtime activate without rebooting the kernel.
+     */
+    public function bootModule(string $packagePath): void
+    {
+        $base = base_path('modules/'.$packagePath);
+        if ($packagePath === '' || ! is_dir($base)) {
+            return;
+        }
+
+        $key = basename($packagePath);
+
+        // 1. The module's own ServiceProvider, if it ships one.
+        $providerClass = 'Modules\\'.$key.'\\Providers\\ModuleProvider';
+        if (is_file($base.'/Providers/ModuleProvider.php') && class_exists($providerClass)) {
+            $this->app->register($providerClass);
+        }
+
+        // 2. Routes — the flat file, then split api/web files.
+        foreach (['routes.php', 'routes/api.php', 'routes/web.php'] as $rel) {
+            $file = $base.'/'.$rel;
+            if (is_file($file)) {
+                $this->loadRoutesFrom($file);
+            }
+        }
+
+        // 3. Views under a per-module namespace: view('module-<key>::foo').
+        foreach (['Resources/views', 'resources/views'] as $rel) {
+            $dir = $base.'/'.$rel;
+            if (is_dir($dir)) {
+                $this->loadViewsFrom($dir, 'module-'.$key);
+                break;
             }
         }
     }
