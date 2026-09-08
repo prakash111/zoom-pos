@@ -205,7 +205,6 @@ class Index extends Component
             'modules' => $modules,
             'orphans' => app(ModulePackageService::class)->orphanedModuleDirs(),
             'purchasable' => $purchasable,
-            'licenseServerConfigured' => filled(config('services.license_server.secret')),
             'catalog' => $modules->mapWithKeys(fn ($m) => [
                 $m->id => ModuleCatalog::for($m->slug),
             ])->all(),
