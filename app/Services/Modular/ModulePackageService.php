@@ -72,13 +72,13 @@ class ModulePackageService
                 $features['inherits_ui'] = $inheritsUi;
             }
 
-            // Storefront metadata for the SuperAdmin "Buy Module" flow. Stored
-            // inside features so no extra column is needed; a SuperAdmin can
-            // override per-slug via platform_system `module_catalog`.
+            // Storefront metadata for the "Get this module" link. Stored inside
+            // features so no extra column is needed; a SuperAdmin can override
+            // per-slug via the platform_system `module_catalog` key.
             $catalog = array_filter([
                 'price' => isset($manifest['price']) ? (float) $manifest['price'] : null,
                 'currency' => isset($manifest['currency']) ? strtoupper((string) $manifest['currency']) : null,
-                'buy_item_id' => $manifest['buy_item_id'] ?? null,
+                'buy_url' => isset($manifest['buy_url']) ? (string) $manifest['buy_url'] : null,
                 'buy_enabled' => array_key_exists('buy_enabled', $manifest) ? (bool) $manifest['buy_enabled'] : null,
             ], fn ($v) => $v !== null);
             if ($catalog !== []) {

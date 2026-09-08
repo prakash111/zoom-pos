@@ -45,18 +45,20 @@ verticals never do (they have no `sdui_modules` row).
 - `SduiModule::scopeLicenseManaged()` / `isLicensed()` and the invariant
   **`is_active` ⇒ licensed** mean no read path needs its own license check.
 
-### Buying a module (SuperAdmin)
+### Getting a module (SuperAdmin)
 
-If `module.json` carries `"price"` / `"currency"` (and optional
-`"buy_item_id"`, `"buy_enabled"`), an unlicensed module shows a **Buy** link →
-`superadmin.modules.buy`. Payment goes through
-`App\Services\Payment\PlatformCheckoutService` (reuses the platform Razorpay /
-Stripe credentials); on success `LicenseService::issue()` asks the license
-server for a key, which is then recorded and the module activated (or marked
-owned if its files are not on disk yet). A SuperAdmin can override price /
-availability per slug via the `platform_system` key `module_catalog`
-(JSON `{ "<slug>": { "price": …, "buy_enabled": false } }`). See
-`docs/LICENSE_SERVER_CONTRACT.md` for the `/verify` + `/issue` contract.
+There is no in-app checkout. An unlicensed module shows a **"Get this module"**
+link out to the vendor's storefront when a URL can be resolved:
+
+1. `module.json` `"buy_url"` (per-module), else
+2. `MODULE_STORE_URL` env → `"{MODULE_STORE_URL}?module={slug}"`, else
+3. no link (operator gets the key out of band).
+
+Optional `"price"` / `"currency"` in the manifest are shown next to the link.
+A SuperAdmin can override any of this per slug via the `platform_system` key
+`module_catalog` (JSON `{ "<slug>": { "price": …, "buy_url": …, "buy_enabled": false } }`),
+resolved by `App\Services\Modular\ModuleCatalog::for()`. The operator buys from
+the vendor, receives a key, and pastes it into the module's Activate field.
 
 ## Package layout
 

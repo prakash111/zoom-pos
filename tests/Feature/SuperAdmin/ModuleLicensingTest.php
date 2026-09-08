@@ -2,12 +2,11 @@
 
 namespace Tests\Feature\SuperAdmin;
 
-use App\Livewire\SuperAdmin\Modules\Checkout;
 use App\Livewire\SuperAdmin\Modules\Index as ModulesIndex;
 use App\Models\PlatformSystem;
 use App\Models\SduiModule;
+use App\Services\Modular\ModuleCatalog;
 use App\Services\Modular\ModulePackageService;
-use App\Services\Payment\PlatformCheckoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -107,68 +106,14 @@ class ModuleLicensingTest extends TestCase
         $this->assertNotContains('widgets', json_decode(PlatformSystem::get('allowed_registration_modes'), true));
     }
 
-    public function test_buy_module_checkout_finalizes_a_purchase(): void
+    public function test_unlicensed_module_exposes_a_vendor_store_link(): void
     {
-        $this->actingAsSuperAdmin();
-        $module = $this->packageRow([
-            'features' => ['catalog' => ['price' => 49, 'currency' => 'USD', 'buy_enabled' => true]],
-        ]);
+        config()->set('services.license_server.store_url', 'https://store.example.com/modules');
+        $this->packageRow();
 
-        $this->app->bind(PlatformCheckoutService::class, fn () => new class extends PlatformCheckoutService
-        {
-            public function getEnabledGateways(): array
-            {
-                return ['razorpay' => ['gateway' => 'razorpay', 'mode' => 'test', 'public_key' => 'rzp_test', 'has_secret' => true]];
-            }
+        $catalog = ModuleCatalog::for('widgets');
 
-            public function verifyRazorpayPayment(string $paymentId, string $orderId, string $signature): array
-            {
-                return ['verified' => true, 'payment_id' => $paymentId, 'order_id' => $orderId, 'amount' => 49.0, 'currency' => 'USD', 'method' => 'razorpay'];
-            }
-        });
-
-        Livewire::test(Checkout::class, ['slug' => 'widgets'])
-            ->call('verifyRazorpay', 'pay_abc', 'order_abc', 'sig')
-            ->assertHasNoErrors();
-
-        $module->refresh();
-        $this->assertSame('active', $module->license_status);
-        $this->assertSame('custom', $module->license_driver);
-        $this->assertDatabaseHas('audit_logs', ['action' => 'module.purchased']);
-        $this->assertNull(PlatformSystem::get('module_purchase_pending_widgets'));
-    }
-
-    public function test_checkout_keeps_the_payment_when_license_issuance_fails(): void
-    {
-        $this->actingAsSuperAdmin();
-        config()->set('services.license_server.url', 'https://license.test');
-        Http::fake([
-            'license.test/api/v1/license/issue' => Http::response(['status' => false, 'message' => 'no stock'], 200),
-        ]);
-
-        $module = $this->packageRow([
-            'features' => ['catalog' => ['price' => 49, 'currency' => 'USD', 'buy_enabled' => true]],
-        ]);
-
-        $this->app->bind(PlatformCheckoutService::class, fn () => new class extends PlatformCheckoutService
-        {
-            public function getEnabledGateways(): array
-            {
-                return ['razorpay' => ['gateway' => 'razorpay', 'mode' => 'test', 'public_key' => 'k', 'has_secret' => true]];
-            }
-
-            public function verifyRazorpayPayment(string $paymentId, string $orderId, string $signature): array
-            {
-                return ['verified' => true, 'payment_id' => $paymentId, 'order_id' => $orderId, 'amount' => 49.0, 'currency' => 'USD', 'method' => 'razorpay'];
-            }
-        });
-
-        Livewire::test(Checkout::class, ['slug' => 'widgets'])
-            ->call('verifyRazorpay', 'pay_fail', 'order_fail', 'sig');
-
-        $this->assertSame('unlicensed', $module->fresh()->license_status);
-        $this->assertFalse($module->fresh()->is_active);
-        $this->assertNotNull(PlatformSystem::get('module_purchase_pending_widgets'));
-        $this->assertDatabaseHas('audit_logs', ['action' => 'module.purchase_issue_failed']);
+        $this->assertTrue($catalog['buy_enabled'] === false || is_string($catalog['buy_url']));
+        $this->assertSame('https://store.example.com/modules?module=widgets', $catalog['buy_url']);
     }
 }

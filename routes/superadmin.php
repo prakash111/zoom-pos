@@ -54,7 +54,6 @@ Route::prefix('superadmin')->name('superadmin.')->group(function () {
         Route::get('/languages', Languages\Index::class)->name('languages.index');
         Route::get('/backups', Backups\Index::class)->name('backups.index');
         Route::get('/modules', Modules\Index::class)->name('modules.index');
-        Route::get('/modules/{slug}/buy', Modules\Checkout::class)->name('modules.buy')->whereAlphaNumeric('slug');
         Route::get('/system', System\Index::class)->name('system.index');
         Route::get('/audit', AuditLogs\Index::class)->name('audit.index');
     });

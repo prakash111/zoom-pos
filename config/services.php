@@ -68,6 +68,10 @@ return [
         'url' => env('LICENSE_SERVER_URL'),
         'secret' => env('LICENSE_SERVER_SECRET'),
         'timeout' => (int) env('LICENSE_SERVER_TIMEOUT', 10),
+        // Vendor storefront where operators buy add-on modules. When set, an
+        // unlicensed module links out to "{store_url}?module={slug}" (or the
+        // module.json "buy_url" if it declares one).
+        'store_url' => env('MODULE_STORE_URL'),
     ],
 
 ];

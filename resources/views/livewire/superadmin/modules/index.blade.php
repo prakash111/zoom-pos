@@ -140,9 +140,9 @@
                                             <p class="text-[11px] text-rose-600 font-bold text-right">{{ $message }}</p>
                                         @enderror
                                         <div class="flex items-center gap-3">
-                                            @if (($catalog[$module->id]['buy_enabled'] ?? false) && ($catalog[$module->id]['price'] ?? 0) > 0)
-                                                <a href="{{ route('superadmin.modules.buy', $module->slug) }}" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold text-xs">
-                                                    {{ __("Buy") }} {{ $catalog[$module->id]['currency'] }} {{ number_format($catalog[$module->id]['price'], 2) }}
+                                            @if (! empty($catalog[$module->id]['buy_url']))
+                                                <a href="{{ $catalog[$module->id]['buy_url'] }}" target="_blank" rel="noopener noreferrer" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold text-xs">
+                                                    {{ __("Get this module") }}@if (($catalog[$module->id]['price'] ?? 0) > 0) — {{ $catalog[$module->id]['currency'] }} {{ number_format($catalog[$module->id]['price'], 2) }}@endif ↗
                                                 </a>
                                             @endif
                                             <button wire:click="activate({{ $module->id }})" type="button" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white">{{ __("Verify & Activate") }}</button>
