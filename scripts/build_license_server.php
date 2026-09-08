@@ -56,13 +56,12 @@ The wire contract is documented in the SaaS repo at
    php bin/hash-password.php 'your-strong-password'
    ```
    Paste the output into `ADMIN_PASS_HASH` in `config/config.php`.
-5. **Import the schema:**
-   ```
-   php bin/install.php
-   ```
-   (or import `database/schema.sql` with phpMyAdmin / the `mysql` client).
-6. **Point the SaaS at it.** In the SaaS `.env` (or SuperAdmin → Settings →
-   Licensing):
+5. **Create the tables** — one of:
+   - shell: `php bin/install.php`
+   - no shell: open `https://license.example.com/setup.php` in a browser, click
+     **Create tables**, then **delete `setup.php`**
+   - manual: import `database/schema.sql` with phpMyAdmin / the `mysql` client
+6. **Point the SaaS at it** — in the SaaS `.env` (vendor build config):
    ```
    LICENSE_DRIVER=custom
    LICENSE_SERVER_URL=https://license.example.com
@@ -98,6 +97,8 @@ location ~ ^/(config|lib|bin|database)/ { deny all; }
   time (an old secret stops verifying immediately).
 - The admin panel has a login gate but no rate limiting — put it behind an IP
   allowlist or server-level auth if it is internet-facing.
+- **Delete `setup.php`** after setup (it self-disables once the schema exists,
+  but remove it anyway).
 MD;
 
 /* ------------------------------------------------------------------ config */
@@ -213,6 +214,49 @@ function e(?string $s): string
 {
     return htmlspecialchars((string) $s, ENT_QUOTES);
 }
+
+/** True once the schema has been imported (the `licenses` table exists). */
+function schema_ready(): bool
+{
+    static $ready = null;
+    if ($ready === null) {
+        try {
+            db()->query('SELECT 1 FROM licenses LIMIT 1');
+            $ready = true;
+        } catch (Throwable $e) {
+            $ready = false;
+        }
+    }
+
+    return $ready;
+}
+
+/** Stop an API request with a clear message when the DB has not been set up. */
+function require_schema_api(): void
+{
+    if (! schema_ready()) {
+        json_out(503, ['status' => false, 'message' => 'License server database is not initialised. Run: php bin/install.php']);
+    }
+}
+
+/** Stop an admin page with a clear message when the DB has not been set up. */
+function require_schema_web(): void
+{
+    if (schema_ready()) {
+        return;
+    }
+    http_response_code(503);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><meta charset="utf-8"><title>Setup needed</title>'
+        .'<div style="font:15px/1.6 system-ui,sans-serif;max-width:640px;margin:12vh auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px">'
+        .'<h1 style="margin:0 0 8px">Database not initialised</h1>'
+        .'<p>The <code>'.e(defined('DB_NAME') ? DB_NAME : '').'</code> database has no tables yet.</p>'
+        .'<p><strong>On the server, run:</strong></p>'
+        .'<pre style="background:#f1f5f9;padding:12px;border-radius:8px">php bin/install.php</pre>'
+        .'<p>or import <code>database/schema.sql</code> with phpMyAdmin / the <code>mysql</code> client, then reload this page.</p>'
+        .'</div>';
+    exit;
+}
 PHP;
 
 $files['lib/bootstrap.php'] = <<<'PHP'
@@ -234,6 +278,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 require_secret();
+require_schema_api();
 
 $in = read_json_body();
 $key = trim($in['license_key'] ?? '');
@@ -293,6 +338,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 require_secret();
+require_schema_api();
 
 $in = read_json_body();
 $payment = is_array($in['payment'] ?? null) ? $in['payment'] : [];
@@ -486,6 +532,7 @@ $files['admin/index.php'] = <<<'PHP'
 
 require __DIR__.'/../lib/bootstrap.php';
 require __DIR__.'/_guard.php';
+require_schema_web();
 
 $pdo = db();
 
@@ -611,6 +658,7 @@ $files['admin/payments.php'] = <<<'PHP'
 
 require __DIR__.'/../lib/bootstrap.php';
 require __DIR__.'/_guard.php';
+require_schema_web();
 
 $rows = db()->query(
     'SELECT p.*, l.license_key, l.client_email
@@ -765,15 +813,86 @@ $files['bin/install.php'] = <<<'PHP'
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
-    exit("CLI only.\n");
+    exit("CLI only. Use setup.php from a browser if you have no shell access.\n");
 }
 
 require __DIR__.'/../lib/bootstrap.php';
 
-$sql = file_get_contents(__DIR__.'/../database/schema.sql');
-db()->exec($sql);
+try {
+    $pdo = db();
+} catch (Throwable $e) {
+    fwrite(STDERR, "Cannot connect to database '".DB_NAME."': ".$e->getMessage()."\n");
+    fwrite(STDERR, "Create the database and check config/config.php (DB_NAME / DB_USER / DB_PASS), then re-run.\n");
+    exit(1);
+}
 
-echo "Schema imported into '".DB_NAME."'.\n";
+$sql = file_get_contents(__DIR__.'/../database/schema.sql');
+
+// Run each statement individually so a failure points at the right line.
+foreach (array_filter(array_map('trim', explode(';', $sql))) as $stmt) {
+    $pdo->exec($stmt);
+}
+
+$tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+echo "Schema imported into '".DB_NAME."'. Tables: ".implode(', ', $tables)."\n";
+PHP;
+
+$files['setup.php'] = <<<'PHP'
+<?php
+
+/**
+ * One-time web installer for hosts without shell access. Creates the schema,
+ * then self-disables. DELETE THIS FILE once setup is done.
+ */
+
+require __DIR__.'/lib/bootstrap.php';
+
+$placeholder = ! defined('SERVER_SECRET') || SERVER_SECRET === 'CHANGE_ME_TO_A_LONG_RANDOM_STRING';
+$done = false;
+$error = '';
+
+try {
+    $connected = (bool) db();
+} catch (Throwable $ex) {
+    $connected = false;
+    $error = 'Cannot connect to database "'.(defined('DB_NAME') ? DB_NAME : '?').'": '.$ex->getMessage();
+}
+
+if ($connected && schema_ready()) {
+    $done = true;
+}
+
+if (! $done && ! $placeholder && $connected && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        $sql = file_get_contents(__DIR__.'/database/schema.sql');
+        foreach (array_filter(array_map('trim', explode(';', $sql))) as $stmt) {
+            db()->exec($stmt);
+        }
+        $done = true;
+    } catch (Throwable $ex) {
+        $error = $ex->getMessage();
+    }
+}
+?>
+<!doctype html><meta charset="utf-8"><title>License Manager — Setup</title>
+<div style="font:15px/1.6 system-ui,sans-serif;max-width:620px;margin:10vh auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px">
+<h1 style="margin:0 0 12px">License Manager setup</h1>
+<?php if ($error): ?><p style="background:#fee2e2;color:#991b1b;padding:10px;border-radius:8px"><?= e($error) ?></p><?php endif; ?>
+<?php if ($done): ?>
+    <p style="background:#dcfce7;color:#166534;padding:10px;border-radius:8px">Database is ready.</p>
+    <p><strong>Now delete <code>setup.php</code></strong>, then open <a href="admin/">the admin panel</a>.</p>
+<?php elseif ($placeholder): ?>
+    <p>Edit <code>config/config.php</code> first — set <code>DB_*</code>, a real
+    <code>SERVER_SECRET</code>, and <code>ADMIN_PASS_HASH</code>
+    (run <code>php bin/hash-password.php 'pw'</code> or ask your host). Reload when done.</p>
+<?php elseif (! $connected): ?>
+    <p>Fix the database settings in <code>config/config.php</code> and reload.</p>
+<?php else: ?>
+    <p>This creates the <code>products</code>, <code>licenses</code> and
+    <code>payments</code> tables in <code><?= e(DB_NAME) ?></code>.</p>
+    <form method="post"><button style="padding:10px 16px;border:0;border-radius:8px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer">Create tables</button></form>
+<?php endif; ?>
+</div>
 PHP;
 
 /* ------------------------------------------------------------------ web server */
