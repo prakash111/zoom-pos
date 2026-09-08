@@ -53,6 +53,28 @@ class TabbedSettingsAndAppearanceTest extends TestCase
         $this->assertSame('Upgrading servers...', PlatformSystem::get('maintenance_message'));
     }
 
+    public function test_general_tab_drops_unknown_store_type_keys_from_registration_modes(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        // A stale key (an uninstalled module) must never be persisted back.
+        Livewire::test(SettingsIndex::class)
+            ->set('activeTab', 'general')
+            ->set('appName', 'X')
+            ->set('appCurrency', 'USD')
+            ->set('appTimezone', 'UTC')
+            ->set('minClientBuildVersion', '1.0.0')
+            ->set('appVersion', '1.0.0')
+            ->set('enabledRegistrationModules', ['retail', 'pharmacy', 'ghost_module_xyz'])
+            ->call('saveGeneral')
+            ->assertHasNoErrors();
+
+        $saved = json_decode((string) PlatformSystem::get('allowed_registration_modes'), true);
+        $this->assertContains('retail', $saved);
+        $this->assertContains('pharmacy', $saved);
+        $this->assertNotContains('ghost_module_xyz', $saved);
+    }
+
     public function test_smtp_tab_saves_and_encrypts_credentials(): void
     {
         $this->actingAsSuperAdmin();

@@ -538,7 +538,15 @@ class Index extends Component
         PlatformSystem::set('min_client_build_version', $this->minClientBuildVersion);
         PlatformSystem::set('app_version', $this->appVersion);
         PlatformSystem::set('show_powered_by', $this->showPoweredBy ? '1' : '0');
-        PlatformSystem::set('allowed_registration_modes', json_encode(array_values($this->enabledRegistrationModules)));
+        // Never persist a key that is no longer a real store type — an
+        // uninstalled / deactivated package module must not linger in this
+        // list even if it was somehow still in the posted payload.
+        $validModeKeys = array_keys(\App\Services\Modular\ModuleRegistry::allModules());
+        $this->enabledRegistrationModules = array_values(array_intersect(
+            array_values($this->enabledRegistrationModules),
+            $validModeKeys,
+        ));
+        PlatformSystem::set('allowed_registration_modes', json_encode($this->enabledRegistrationModules));
         PlatformSystem::set('ai_image_enabled', $this->aiImageEnabled ? '1' : '0');
         PlatformSystem::set('ai_image_provider', $this->aiImageProvider);
 
