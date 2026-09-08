@@ -103,18 +103,25 @@ class LicenseService
     }
 
     /**
-     * Active vendor products for the "Buy module" list. Cached briefly so the
-     * Modules screen does not hit the license server on every render.
+     * Active vendor products for the "Buy module" list. Cached for 10 min on a
+     * successful (non-empty) fetch; an empty result (server down / no products)
+     * is not cached so it retries on the next render.
      *
      * @return list<array{slug: string, name: string, description: ?string, price: float, currency: string}>
      */
     public function catalog(): array
     {
-        return Cache::remember(
-            'license.catalog',
-            now()->addMinutes(30),
-            fn () => $this->custom->catalog(),
-        );
+        $cached = Cache::get('license.catalog');
+        if (is_array($cached) && $cached !== []) {
+            return $cached;
+        }
+
+        $fresh = $this->custom->catalog();
+        if ($fresh !== []) {
+            Cache::put('license.catalog', $fresh, now()->addMinutes(10));
+        }
+
+        return $fresh;
     }
 
     public function storeUrl(): string

@@ -29,10 +29,17 @@ class ModuleCatalog
         $decoded = json_decode((string) PlatformSystem::get('module_catalog'), true);
         $override = is_array($decoded) ? $decoded : [];
 
-        // Base list from config (always shown), then let the License Manager
-        // catalog override / extend it (price, extra products).
+        $remote = app(LicenseService::class)->catalog();
+
+        // The License Manager is the source of truth once it is wired up — show
+        // exactly the products the vendor added there. The config fallback is
+        // only for a not‑yet‑configured install so the screen isn't blank.
+        $source = ($remote !== [] || filled(config('services.license_server.secret')))
+            ? $remote
+            : (array) config('modules.catalog', []);
+
         $rows = [];
-        foreach ((array) config('modules.catalog', []) as $p) {
+        foreach ($source as $p) {
             $slug = strtolower((string) ($p['slug'] ?? ''));
             if ($slug === '' || $slug === 'core') {
                 continue;
@@ -41,23 +48,9 @@ class ModuleCatalog
                 'slug' => $slug,
                 'name' => (string) ($p['name'] ?? $slug),
                 'description' => $p['description'] ?? null,
-                'price' => 0.0,
-                'currency' => $currency,
-            ];
-        }
-
-        foreach (app(LicenseService::class)->catalog() as $p) {
-            $slug = strtolower((string) ($p['slug'] ?? ''));
-            if ($slug === '' || $slug === 'core') {
-                continue;
-            }
-            $rows[$slug] = array_merge($rows[$slug] ?? [], [
-                'slug' => $slug,
-                'name' => (string) ($p['name'] ?? ($rows[$slug]['name'] ?? $slug)),
-                'description' => $p['description'] ?? ($rows[$slug]['description'] ?? null),
                 'price' => (float) ($p['price'] ?? 0),
                 'currency' => strtoupper((string) ($p['currency'] ?? $currency)),
-            ]);
+            ];
         }
 
         return collect($rows)->map(function ($r) use ($override) {
