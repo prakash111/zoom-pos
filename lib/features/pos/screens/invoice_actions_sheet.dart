@@ -356,6 +356,24 @@ class _InvoicePreviewScreen extends StatelessWidget {
         ],
         canChangeOrientation: false,
         canChangePageFormat: false,
+        // Keep the document at a realistic A4 width and centred, rather than
+        // stretched across the whole desktop window.
+        maxPageWidth: 820,
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        scrollViewDecoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        ),
+        pdfPreviewPageDecoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(4),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
       ),
     );
   }

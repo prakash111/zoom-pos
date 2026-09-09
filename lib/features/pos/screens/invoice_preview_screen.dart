@@ -22,9 +22,11 @@ extension on ReceiptFormat {
   PdfPageFormat get pdfFormat {
     switch (this) {
       case ReceiptFormat.thermal58:
-        return PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 4 * PdfPageFormat.mm);
+        return PdfPageFormat(58 * PdfPageFormat.mm, double.infinity,
+            marginAll: 4 * PdfPageFormat.mm);
       case ReceiptFormat.thermal80:
-        return PdfPageFormat(80 * PdfPageFormat.mm, double.infinity, marginAll: 4 * PdfPageFormat.mm);
+        return PdfPageFormat(80 * PdfPageFormat.mm, double.infinity,
+            marginAll: 4 * PdfPageFormat.mm);
       case ReceiptFormat.a4:
         return PdfPageFormat.a4;
       case ReceiptFormat.letter:
@@ -32,7 +34,8 @@ extension on ReceiptFormat {
     }
   }
 
-  bool get isThermal => this == ReceiptFormat.thermal58 || this == ReceiptFormat.thermal80;
+  bool get isThermal =>
+      this == ReceiptFormat.thermal58 || this == ReceiptFormat.thermal80;
 
   String get label {
     switch (this) {
@@ -95,7 +98,8 @@ class InvoicePreviewData {
 /// Returns `true` if the cashier tapped "Confirm & Complete Sale" (the
 /// caller should then actually submit the sale), or `false`/`null` if they
 /// backed out to keep editing the cart.
-Future<bool?> showInvoicePreview(BuildContext context, InvoicePreviewData data) {
+Future<bool?> showInvoicePreview(
+    BuildContext context, InvoicePreviewData data) {
   return Navigator.of(context).push<bool>(
     MaterialPageRoute(builder: (_) => _InvoicePreviewScreen(data: data)),
   );
@@ -113,7 +117,8 @@ class _InvoicePreviewScreen extends StatefulWidget {
 class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
   ReceiptFormat _format = ReceiptFormat.thermal80;
 
-  Future<Uint8List> _build(PdfPageFormat _) => _buildReceiptPdf(widget.data, _format);
+  Future<Uint8List> _build(PdfPageFormat _) =>
+      _buildReceiptPdf(widget.data, _format);
 
   static bool get _supportsThermalPrint =>
       !kIsWeb &&
@@ -123,7 +128,8 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
   Future<void> _print() async {
     final bytes = await _build(_format.pdfFormat);
     if (!mounted) return;
-    await Printing.layoutPdf(onLayout: (_) async => bytes, format: _format.pdfFormat);
+    await Printing.layoutPdf(
+        onLayout: (_) async => bytes, format: _format.pdfFormat);
   }
 
   Future<void> _export() async {
@@ -241,23 +247,42 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
       ),
       body: Column(
         children: [
+          // Floating toolbar above the paper — format switch + quick print /
+          // export, so the actions aren't buried in a bottom sheet.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final format in ReceiptFormat.values)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(format.label),
-                        selected: _format == format,
-                        onSelected: (_) => setState(() => _format = format),
-                      ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final format in ReceiptFormat.values)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(format.label),
+                              selected: _format == format,
+                              onSelected: (_) =>
+                                  setState(() => _format = format),
+                            ),
+                          ),
+                      ],
                     ),
-                ],
-              ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Direct print',
+                  icon: const Icon(Icons.print_outlined),
+                  onPressed: _print,
+                ),
+                IconButton(
+                  tooltip: 'Export PDF',
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                  onPressed: _export,
+                ),
+              ],
             ),
           ),
           const Divider(height: 1),
@@ -270,6 +295,25 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
               canChangeOrientation: false,
               canDebug: false,
               useActions: false,
+              // Constrain the "paper" to a realistic width — A4 ≈ 794px,
+              // an 80mm thermal slip ≈ 400px — and centre it on a neutral
+              // backdrop instead of stretching edge to edge on desktop.
+              maxPageWidth: _format.isThermal ? 400 : 794,
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              scrollViewDecoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              ),
+              pdfPreviewPageDecoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
             ),
           ),
           const Divider(height: 1),
@@ -301,7 +345,9 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
                       Expanded(
                         flex: 2,
                         child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                          style: ElevatedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14)),
                           onPressed: () => Navigator.of(context).pop(true),
                           icon: const Icon(Icons.check_circle_outline),
                           label: const Text('Confirm & Complete Sale'),
@@ -319,7 +365,8 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
   }
 }
 
-Future<Uint8List> _buildReceiptPdf(InvoicePreviewData data, ReceiptFormat format) async {
+Future<Uint8List> _buildReceiptPdf(
+    InvoicePreviewData data, ReceiptFormat format) async {
   final doc = pw.Document();
   final currency = CurrencyFormatter(data.currencySymbol);
 
@@ -338,23 +385,29 @@ Future<Uint8List> _buildReceiptPdf(InvoicePreviewData data, ReceiptFormat format
   doc.addPage(
     pw.Page(
       pageFormat: format.pdfFormat,
-      theme: regularFont != null ? pw.ThemeData.withFont(base: regularFont, bold: boldFont) : null,
-      build: (context) => format.isThermal ? _thermalLayout(data, currency) : _standardLayout(data, currency),
+      theme: regularFont != null
+          ? pw.ThemeData.withFont(base: regularFont, bold: boldFont)
+          : null,
+      build: (context) => format.isThermal
+          ? _thermalLayout(data, currency)
+          : _standardLayout(data, currency),
     ),
   );
 
   return doc.save();
 }
 
-String _formatQty(double quantity) =>
-    quantity == quantity.roundToDouble() ? quantity.toStringAsFixed(0) : quantity.toStringAsFixed(2);
+String _formatQty(double quantity) => quantity == quantity.roundToDouble()
+    ? quantity.toStringAsFixed(0)
+    : quantity.toStringAsFixed(2);
 
 pw.Widget _thermalLayout(InvoicePreviewData data, CurrencyFormatter currency) {
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.stretch,
     children: [
       pw.Center(
-        child: pw.Text(data.companyName, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+        child: pw.Text(data.companyName,
+            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
       ),
       if ((data.taxId ?? '').isNotEmpty)
         pw.Center(
@@ -371,11 +424,13 @@ pw.Widget _thermalLayout(InvoicePreviewData data, CurrencyFormatter currency) {
         ),
       ),
       pw.Center(
-        child: pw.Text('Pending — not yet finalized', style: const pw.TextStyle(fontSize: 7)),
+        child: pw.Text('Pending — not yet finalized',
+            style: const pw.TextStyle(fontSize: 7)),
       ),
       if ((data.customerName ?? '').isNotEmpty) ...[
         pw.SizedBox(height: 4),
-        pw.Text('Customer: ${data.customerName}', style: const pw.TextStyle(fontSize: 8)),
+        pw.Text('Customer: ${data.customerName}',
+            style: const pw.TextStyle(fontSize: 8)),
       ],
       pw.SizedBox(height: 4),
       pw.Divider(thickness: 0.5),
@@ -388,13 +443,15 @@ pw.Widget _thermalLayout(InvoicePreviewData data, CurrencyFormatter currency) {
               '${_formatQty(item.quantity)} x ${currency.format(item.product.salePrice)}',
               style: const pw.TextStyle(fontSize: 8),
             ),
-            pw.Text(currency.format(item.lineTotal), style: const pw.TextStyle(fontSize: 9)),
+            pw.Text(currency.format(item.lineTotal),
+                style: const pw.TextStyle(fontSize: 9)),
           ],
         ),
       ],
       pw.Divider(thickness: 0.5),
       _thermalTotalRow('Subtotal', currency.format(data.subtotal)),
-      if (data.discount > 0) _thermalTotalRow('Discount', '-${currency.format(data.discount)}'),
+      if (data.discount > 0)
+        _thermalTotalRow('Discount', '-${currency.format(data.discount)}'),
       if (data.taxTotal > 0)
         if (data.isIndia) ...[
           _thermalTotalRow('CGST', '+${currency.format(data.taxTotal / 2)}'),
@@ -404,8 +461,10 @@ pw.Widget _thermalLayout(InvoicePreviewData data, CurrencyFormatter currency) {
       pw.Divider(thickness: 0.5),
       _thermalTotalRow('TOTAL', currency.format(data.grandTotal), bold: true),
       if (data.dueAmount > 0.001) ...[
-        _thermalTotalRow('Paid', currency.format(data.paidAmount ?? data.grandTotal)),
-        _thermalTotalRow('Due Balance', currency.format(data.dueAmount), bold: true),
+        _thermalTotalRow(
+            'Paid', currency.format(data.paidAmount ?? data.grandTotal)),
+        _thermalTotalRow('Due Balance', currency.format(data.dueAmount),
+            bold: true),
       ],
       if ((data.notes ?? '').isNotEmpty) ...[
         pw.SizedBox(height: 6),
@@ -416,7 +475,9 @@ pw.Widget _thermalLayout(InvoicePreviewData data, CurrencyFormatter currency) {
 }
 
 pw.Widget _thermalTotalRow(String label, String value, {bool bold = false}) {
-  final style = pw.TextStyle(fontSize: bold ? 10 : 8, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal);
+  final style = pw.TextStyle(
+      fontSize: bold ? 10 : 8,
+      fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal);
   return pw.Padding(
     padding: const pw.EdgeInsets.symmetric(vertical: 1),
     child: pw.Row(
@@ -437,7 +498,9 @@ pw.Widget _standardLayout(InvoicePreviewData data, CurrencyFormatter currency) {
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text(data.companyName, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text(data.companyName,
+                  style: pw.TextStyle(
+                      fontSize: 18, fontWeight: pw.FontWeight.bold)),
               if ((data.taxId ?? '').isNotEmpty)
                 pw.Text(
                   '${data.isIndia ? 'GSTIN' : 'Tax ID'}: ${data.taxId}',
@@ -450,16 +513,19 @@ pw.Widget _standardLayout(InvoicePreviewData data, CurrencyFormatter currency) {
             children: [
               pw.Text(
                 '${data.documentType.toUpperCase()} PREVIEW',
-                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                style:
+                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
               ),
-              pw.Text('Pending — not yet finalized', style: const pw.TextStyle(fontSize: 9)),
+              pw.Text('Pending — not yet finalized',
+                  style: const pw.TextStyle(fontSize: 9)),
             ],
           ),
         ],
       ),
       pw.SizedBox(height: 16),
       if ((data.customerName ?? '').isNotEmpty)
-        pw.Text('Bill to: ${data.customerName}', style: const pw.TextStyle(fontSize: 11)),
+        pw.Text('Bill to: ${data.customerName}',
+            style: const pw.TextStyle(fontSize: 11)),
       pw.SizedBox(height: 16),
       pw.Table(
         border: const pw.TableBorder(
@@ -488,8 +554,10 @@ pw.Widget _standardLayout(InvoicePreviewData data, CurrencyFormatter currency) {
               children: [
                 _cell(item.product.name),
                 _cell(_formatQty(item.quantity), align: pw.TextAlign.right),
-                _cell(currency.format(item.product.salePrice), align: pw.TextAlign.right),
-                _cell(currency.format(item.lineTotal), align: pw.TextAlign.right),
+                _cell(currency.format(item.product.salePrice),
+                    align: pw.TextAlign.right),
+                _cell(currency.format(item.lineTotal),
+                    align: pw.TextAlign.right),
               ],
             ),
         ],
@@ -502,18 +570,27 @@ pw.Widget _standardLayout(InvoicePreviewData data, CurrencyFormatter currency) {
           child: pw.Column(
             children: [
               _standardTotalRow('Subtotal', currency.format(data.subtotal)),
-              if (data.discount > 0) _standardTotalRow('Discount', '-${currency.format(data.discount)}'),
+              if (data.discount > 0)
+                _standardTotalRow(
+                    'Discount', '-${currency.format(data.discount)}'),
               if (data.taxTotal > 0)
                 if (data.isIndia) ...[
-                  _standardTotalRow('CGST', '+${currency.format(data.taxTotal / 2)}'),
-                  _standardTotalRow('SGST', '+${currency.format(data.taxTotal / 2)}'),
+                  _standardTotalRow(
+                      'CGST', '+${currency.format(data.taxTotal / 2)}'),
+                  _standardTotalRow(
+                      'SGST', '+${currency.format(data.taxTotal / 2)}'),
                 ] else
-                  _standardTotalRow(data.taxLabel, '+${currency.format(data.taxTotal)}'),
+                  _standardTotalRow(
+                      data.taxLabel, '+${currency.format(data.taxTotal)}'),
               pw.Divider(thickness: 0.5),
-              _standardTotalRow('Grand Total', currency.format(data.grandTotal), bold: true),
+              _standardTotalRow('Grand Total', currency.format(data.grandTotal),
+                  bold: true),
               if (data.dueAmount > 0.001) ...[
-                _standardTotalRow('Amount Paid', currency.format(data.paidAmount ?? data.grandTotal)),
-                _standardTotalRow('Due Balance', currency.format(data.dueAmount), bold: true),
+                _standardTotalRow('Amount Paid',
+                    currency.format(data.paidAmount ?? data.grandTotal)),
+                _standardTotalRow(
+                    'Due Balance', currency.format(data.dueAmount),
+                    bold: true),
               ],
             ],
           ),
@@ -521,25 +598,31 @@ pw.Widget _standardLayout(InvoicePreviewData data, CurrencyFormatter currency) {
       ),
       if ((data.notes ?? '').isNotEmpty) ...[
         pw.SizedBox(height: 16),
-        pw.Text('Notes: ${data.notes}', style: const pw.TextStyle(fontSize: 10)),
+        pw.Text('Notes: ${data.notes}',
+            style: const pw.TextStyle(fontSize: 10)),
       ],
     ],
   );
 }
 
-pw.Widget _cell(String text, {bool bold = false, pw.TextAlign align = pw.TextAlign.left}) {
+pw.Widget _cell(String text,
+    {bool bold = false, pw.TextAlign align = pw.TextAlign.left}) {
   return pw.Padding(
     padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
     child: pw.Text(
       text,
       textAlign: align,
-      style: pw.TextStyle(fontSize: 10, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal),
+      style: pw.TextStyle(
+          fontSize: 10,
+          fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal),
     ),
   );
 }
 
 pw.Widget _standardTotalRow(String label, String value, {bool bold = false}) {
-  final style = pw.TextStyle(fontSize: bold ? 13 : 11, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal);
+  final style = pw.TextStyle(
+      fontSize: bold ? 13 : 11,
+      fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal);
   return pw.Padding(
     padding: const pw.EdgeInsets.symmetric(vertical: 3),
     child: pw.Row(

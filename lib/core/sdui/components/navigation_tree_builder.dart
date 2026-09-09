@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../api/api_client.dart';
 import '../../api/api_exception.dart';
 import '../../config/bootstrap_cache.dart';
+import '../../config/locale_provider.dart';
 import '../../models/settings_models.dart';
 import '../../services/dynamic_string_service.dart';
 import '../../../features/settings/settings_repository.dart';
@@ -643,6 +644,10 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         }
       }
 
+      // `updateNavConfig` already writes the server's canonical copy back into
+      // BootstrapCache (applyNav -> notifyListeners), so the drawer / rail /
+      // top-bar rebuild immediately. Follow it with a full bootstrap refresh
+      // so a reload or a second device also converges without an app restart.
       await _repository.updateNavConfig(NavConfig(
         sections: [
           for (var index = 0; index < _sections.length; index++)
@@ -651,6 +656,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         items: items,
       ));
       if (!mounted) return;
+      unawaited(context.read<LocaleProvider>().refreshFromServer());
       messenger.showSnackBar(
           SnackBar(content: Text(context.tr('Navigation menu updated.'))));
     } on ApiException catch (error) {
@@ -960,4 +966,3 @@ class _IndentLegend extends StatelessWidget {
     );
   }
 }
-

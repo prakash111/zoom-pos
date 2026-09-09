@@ -148,6 +148,7 @@ class ZoomPosApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) {
           final locale = context.watch<LocaleProvider>().locale;
+          final transition = context.watch<NavDockProvider>().transition;
           return MaterialApp(
             navigatorKey: appNavigatorKey,
             scaffoldMessengerKey: appMessengerKey,
@@ -157,10 +158,12 @@ class ZoomPosApp extends StatelessWidget {
               seedColor: theme.seedColor,
               accentColor: theme.accentColor,
               drawerBg: theme.drawerBg,
+              pageTransitions: transition,
             ),
             darkTheme: AppTheme.dark(
               seedColor: theme.seedColor,
               accentColor: theme.accentColor,
+              pageTransitions: transition,
             ),
             themeMode: theme.themeMode,
             locale: locale,

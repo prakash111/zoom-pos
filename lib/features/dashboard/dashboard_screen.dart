@@ -8,6 +8,7 @@ import '../../core/api/api_client.dart';
 import '../../core/config/bootstrap_cache.dart';
 import '../../core/config/locale_provider.dart';
 import '../../core/config/nav_dock_provider.dart';
+import '../../core/config/theme.dart';
 import '../../core/config/theme_provider.dart';
 import '../../core/models/analytics_model.dart';
 import '../../core/models/company_model.dart';
@@ -20,6 +21,7 @@ import '../../core/storage/app_preferences.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/widgets/coming_soon_screen.dart';
+import '../../core/widgets/tappable_scale.dart';
 import '../../l10n/app_localizations.dart';
 import '../analytics/analytics_repository.dart';
 import '../analytics/widgets/analytics_widgets.dart';
@@ -1028,6 +1030,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         bottom: appBarBottom,
         actions: [
           const SyncStatusBadge(),
+          const _ThemeModeButton(),
           IconButton(
             tooltip: l10n.refresh,
             icon: const Icon(Icons.refresh),
@@ -1348,10 +1351,13 @@ class _DashboardAnalytics extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const _DashboardShortcutRow(),
+        const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final isSmall = constraints.maxWidth < 360;
@@ -1364,12 +1370,15 @@ class _DashboardAnalytics extends StatelessWidget {
               childAspectRatio: isSmall ? 3.2 : 1.15,
               children: [
                 KpiCard(
+                    icon: Icons.payments_outlined,
                     label: l10n.todaysSales,
                     value: formatter.format(analytics.todayRevenue)),
                 KpiCard(
+                    icon: Icons.receipt_long_outlined,
                     label: l10n.ordersToday,
                     value: analytics.todayOrders.toString()),
                 KpiCard(
+                    icon: Icons.trending_up,
                     label: l10n.avgOrder,
                     value: formatter.format(analytics.averageOrderValue)),
               ],
@@ -1378,37 +1387,32 @@ class _DashboardAnalytics extends StatelessWidget {
         ),
         if (analytics.lowStockCount > 0) ...[
           const SizedBox(height: 12),
-          Card(
-            color: Colors.orange.shade50,
-            child: ListTile(
-              leading: Icon(Icons.warning_amber_outlined,
-                  color: Colors.orange.shade800),
-              title: Text(l10n.lowStockWarning(analytics.lowStockCount)),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder:
-                        SduiComponentRegistry.instance.resolve('inventory')),
-              ),
+          _StatusBanner(
+            container: scheme.warningContainer,
+            onContainer: scheme.onWarningContainer,
+            accent: scheme.warningAccent,
+            icon: Icons.warning_amber_outlined,
+            title: l10n.lowStockWarning(analytics.lowStockCount),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: SduiComponentRegistry.instance.resolve('inventory')),
             ),
           ),
         ],
         if (analytics.totalReceivables > 0) ...[
           const SizedBox(height: 12),
-          Card(
-            color: Colors.amber.shade50,
-            child: ListTile(
-              leading: Icon(Icons.request_page_outlined,
-                  color: Colors.amber.shade800),
-              title: Text(l10n.featureDueReceivables),
-              subtitle: Text(
-                  '${formatter.format(analytics.totalReceivables)} outstanding'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: SduiComponentRegistry.instance
-                        .resolve('due_receivables')),
-              ),
+          _StatusBanner(
+            container: scheme.infoContainer,
+            onContainer: scheme.onInfoContainer,
+            accent: scheme.infoAccent,
+            icon: Icons.request_page_outlined,
+            title: l10n.featureDueReceivables,
+            subtitle:
+                '${formatter.format(analytics.totalReceivables)} outstanding',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: SduiComponentRegistry.instance
+                      .resolve('due_receivables')),
             ),
           ),
         ],
@@ -1442,6 +1446,201 @@ class _DashboardAnalytics extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Header toggle for the app-wide light / dark / system theme, mirroring the
+/// same control in Settings ▸ Appearance so it's reachable from anywhere.
+class _ThemeModeButton extends StatelessWidget {
+  const _ThemeModeButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return PopupMenuButton<ThemeMode>(
+      tooltip: 'Theme',
+      icon: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
+      initialValue: theme.themeMode,
+      onSelected: theme.setThemeMode,
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: ThemeMode.system,
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.brightness_auto_outlined),
+            title: Text('Match device'),
+          ),
+        ),
+        PopupMenuItem(
+          value: ThemeMode.light,
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.light_mode_outlined),
+            title: Text('Light'),
+          ),
+        ),
+        PopupMenuItem(
+          value: ThemeMode.dark,
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.dark_mode_outlined),
+            title: Text('Dark'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Actionable quick-launch shortcuts across the top of the dashboard — each
+/// pushes straight into its module. Uses [SduiComponentRegistry] so an
+/// unavailable module still resolves to a sensible placeholder.
+class _DashboardShortcutRow extends StatelessWidget {
+  const _DashboardShortcutRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final shortcuts = <(IconData, String, String)>[
+      (Icons.point_of_sale, 'Quick Sale', 'pos'),
+      (Icons.person_add_alt_1, 'New Customer', 'customers'),
+      (Icons.lock_open, 'Open Register', 'cash_register'),
+      (Icons.receipt_long, 'Pending KOTs', 'kitchen_display'),
+    ];
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (final (icon, label, key) in shortcuts)
+          _ShortcutButton(
+            icon: icon,
+            label: label,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: SduiComponentRegistry.instance.resolve(key)),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ShortcutButton extends StatefulWidget {
+  const _ShortcutButton(
+      {required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  State<_ShortcutButton> createState() => _ShortcutButtonState();
+}
+
+class _ShortcutButtonState extends State<_ShortcutButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        decoration: BoxDecoration(
+          color: _hovered
+              ? scheme.primary.withValues(alpha: 0.12)
+              : Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _hovered ? scheme.primary : scheme.outlineVariant,
+          ),
+        ),
+        child: TappableScale(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(widget.icon, size: 18, color: scheme.primary),
+                const SizedBox(width: 8),
+                Text(widget.label,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600, color: scheme.onSurface)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A tappable status strip (low stock, receivables, …) that keeps its text
+/// readable in both themes via [StatusPalette] tones.
+class _StatusBanner extends StatelessWidget {
+  const _StatusBanner({
+    required this.container,
+    required this.onContainer,
+    required this.accent,
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    required this.onTap,
+  });
+
+  final Color container;
+  final Color onContainer;
+  final Color accent;
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: container,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Icon(icon, color: accent),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, color: onContainer)),
+                    if (subtitle != null)
+                      Text(subtitle!,
+                          style: TextStyle(
+                              fontSize: 12.5,
+                              color: onContainer.withValues(alpha: 0.85))),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  color: onContainer.withValues(alpha: 0.7)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

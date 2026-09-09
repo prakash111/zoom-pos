@@ -12,6 +12,7 @@ class AppPreferences {
   static const _baseUrlKey = 'zoom_pos.base_url';
   static const _localeKey = 'zoom_pos.locale';
   static const _navDockPositionKey = 'zoom_pos.nav_dock_position';
+  static const _pageTransitionKey = 'zoom_pos.page_transition';
   static const _windowBoundsKey = 'zoom_pos.window_bounds';
 
   Future<String> readBaseUrl() async {
@@ -80,6 +81,25 @@ class AppPreferences {
     }
   }
 
+  Future<String?> readPageTransition() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_pageTransitionKey);
+    } catch (e) {
+      debugPrint('AppPreferences.readPageTransition error: $e');
+      return null;
+    }
+  }
+
+  Future<void> savePageTransition(String style) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_pageTransitionKey, style);
+    } catch (e) {
+      debugPrint('AppPreferences.savePageTransition error: $e');
+    }
+  }
+
   /// The desktop window's last position + size (`x,y,width,height`), so the
   /// Windows app reopens where the user left it. `null` until the first save
   /// (the caller then centres a default-sized window). Windows-only in
@@ -92,7 +112,8 @@ class AppPreferences {
       final parts = raw.split(',').map(double.tryParse).toList();
       if (parts.length != 4 || parts.any((p) => p == null)) return null;
       final w = parts[2]!, h = parts[3]!;
-      if (w < 400 || h < 300) return null; // guard against a corrupt/minimised save
+      if (w < 400 || h < 300)
+        return null; // guard against a corrupt/minimised save
       return Rect.fromLTWH(parts[0]!, parts[1]!, w, h);
     } catch (e) {
       debugPrint('AppPreferences.readWindowBounds error: $e');

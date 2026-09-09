@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/config/nav_dock_provider.dart';
+import '../../../core/config/page_transitions.dart';
 import '../../../core/config/tax_jurisdictions.dart';
 import '../../../core/config/theme.dart';
 import '../../../core/config/theme_provider.dart';
@@ -239,6 +240,32 @@ class _AppearanceTab extends StatelessWidget {
                     value: option.$1,
                     secondary: Icon(option.$2),
                     title: Text(option.$3),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text('Page transition', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text('How screens move when you open a link or menu item.',
+            style: TextStyle(color: Colors.grey.shade600)),
+        const SizedBox(height: 12),
+        RadioGroup<AppPageTransition>(
+          groupValue: navDock.transition,
+          onChanged: (value) {
+            if (value != null) navDock.setTransition(value);
+          },
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (final style in AppPageTransition.values)
+                  RadioListTile<AppPageTransition>(
+                    value: style,
+                    secondary: Icon(style.icon),
+                    title: Text(style.label),
+                    subtitle: Text(style.description),
                   ),
               ],
             ),

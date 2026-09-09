@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'page_transitions.dart';
+
 class AppTheme {
   AppTheme._();
 
@@ -10,11 +12,26 @@ class AppTheme {
   /// Secondary accent.
   static const Color accent = Color(0xFF16A34A);
 
-  static const Color surface = Color(0xFFF6F7F9);
+  // --- Light enterprise-desktop palette (slate) -----------------------------
+  static const Color lightBg = Color(0xFFF8FAFC); // slate-50
+  static const Color lightCard = Color(0xFFFFFFFF);
+  static const Color lightBorder = Color(0xFFE2E8F0); // slate-200
+  static const Color lightHeading = Color(0xFF0F172A); // slate-900
+  static const Color lightBody = Color(0xFF334155); // slate-700
+  static const Color lightMuted = Color(0xFF64748B); // slate-500
 
-  /// Scaffold / card grounds for the user-selectable dark theme.
-  static const Color darkSurface = Color(0xFF0F1115);
-  static const Color darkCard = Color(0xFF1A1D23);
+  /// Kept for backwards compatibility with older call sites.
+  static const Color surface = lightBg;
+
+  // --- Dark enterprise-desktop palette -------------------------------------
+  static const Color darkBg = Color(0xFF0F172A); // slate-900
+  static const Color darkCard = Color(0xFF1E293B); // slate-800
+  static const Color darkBorder = Color(0xFF334155); // slate-700
+  static const Color darkHeading = Color(0xFFF1F5F9); // slate-100
+  static const Color darkBody = Color(0xFFCBD5E1); // slate-300
+  static const Color darkMuted = Color(0xFF94A3B8); // slate-400
+
+  static const Color darkSurface = darkBg;
 
   /// Black or white, whichever reads on [bg] — for text/icons sitting on a
   /// brand-coloured surface.
@@ -39,8 +56,12 @@ class AppTheme {
     );
   }
 
-  static ThemeData light(
-      {Color? seedColor, Color? accentColor, Color? drawerBg}) {
+  static ThemeData light({
+    Color? seedColor,
+    Color? accentColor,
+    Color? drawerBg,
+    AppPageTransition? pageTransitions,
+  }) {
     final brand = seedColor ?? primary;
 
     // Material 3's `fromSeed` tonally *remaps* the seed, so the tenant's
@@ -53,80 +74,114 @@ class AppTheme {
       brand: brand,
       secondary: accentColor ?? accent,
       brightness: Brightness.light,
+    ).copyWith(
+      surface: lightCard,
+      onSurface: lightHeading,
+      onSurfaceVariant: lightMuted,
+      outlineVariant: lightBorder,
     );
 
-    return ThemeData(
-      useMaterial3: true,
+    return _build(
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: surface,
-      drawerTheme: DrawerThemeData(
-        backgroundColor: drawerBg ?? Colors.white,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        centerTitle: false,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      ),
-      cardTheme: CardThemeData(
-        elevation: 0,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.grey.shade200),
-        ),
-      ),
+      scaffoldBg: lightBg,
+      cardColor: lightCard,
+      borderColor: lightBorder,
+      appBarBg: lightCard,
+      appBarFg: lightHeading,
+      inputFill: lightCard,
+      drawerBg: drawerBg ?? lightCard,
+      bodyColor: lightBody,
+      headingColor: lightHeading,
+      pageTransitions: pageTransitions,
     );
   }
 
   /// Dark counterpart of [light] for the user-selectable "Dark" theme mode.
   /// The tenant brand [seedColor]/[accentColor] still drive `primary`/
   /// `secondary`; only the surfaces flip to dark.
-  static ThemeData dark(
-      {Color? seedColor, Color? accentColor, Color? drawerBg}) {
+  static ThemeData dark({
+    Color? seedColor,
+    Color? accentColor,
+    Color? drawerBg,
+    AppPageTransition? pageTransitions,
+  }) {
     final brand = seedColor ?? primary;
     final colorScheme = _scheme(
       brand: brand,
       secondary: accentColor ?? accent,
       brightness: Brightness.dark,
-    ).copyWith(surface: darkCard);
+    ).copyWith(
+      surface: darkCard,
+      onSurface: darkHeading,
+      onSurfaceVariant: darkMuted,
+      outlineVariant: darkBorder,
+    );
 
-    return ThemeData(
+    return _build(
+      colorScheme: colorScheme,
+      scaffoldBg: darkBg,
+      cardColor: darkCard,
+      borderColor: darkBorder,
+      appBarBg: darkCard,
+      appBarFg: darkHeading,
+      inputFill: darkCard,
+      drawerBg: drawerBg ?? darkCard,
+      bodyColor: darkBody,
+      headingColor: darkHeading,
+      pageTransitions: pageTransitions,
+    );
+  }
+
+  static ThemeData _build({
+    required ColorScheme colorScheme,
+    required Color scaffoldBg,
+    required Color cardColor,
+    required Color borderColor,
+    required Color appBarBg,
+    required Color appBarFg,
+    required Color inputFill,
+    required Color drawerBg,
+    required Color bodyColor,
+    required Color headingColor,
+    AppPageTransition? pageTransitions,
+  }) {
+    final base = ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: darkSurface,
-      drawerTheme: DrawerThemeData(
-        backgroundColor: drawerBg ?? darkCard,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: darkCard,
-        foregroundColor: Colors.white,
+      scaffoldBackgroundColor: scaffoldBg,
+    );
+    return base.copyWith(
+      pageTransitionsTheme: pageTransitions?.theme,
+      dividerColor: borderColor,
+      dividerTheme:
+          DividerThemeData(color: borderColor, space: 1, thickness: 1),
+      drawerTheme: DrawerThemeData(backgroundColor: drawerBg),
+      appBarTheme: AppBarTheme(
+        backgroundColor: appBarBg,
+        foregroundColor: appBarFg,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0.5,
         centerTitle: false,
+      ),
+      textTheme: base.textTheme.apply(
+        bodyColor: bodyColor,
+        displayColor: headingColor,
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: colorScheme.onSurfaceVariant,
+        textColor: bodyColor,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: darkCard,
+        fillColor: inputFill,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Colors.white24),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: borderColor),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -140,12 +195,58 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: darkCard,
+        color: cardColor,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Colors.white12),
+          side: BorderSide(color: borderColor),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: cardColor,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: borderColor),
         ),
       ),
     );
   }
+}
+
+/// Theme-aware semantic status colours (success / warning / info / danger),
+/// each with a low-chroma container fill and a readable on-container tone that
+/// both flip correctly between light and dark. Use these instead of hardcoded
+/// `Colors.green.shade50` / `Colors.amber.shade50` fills, which leave white
+/// text stranded on a pale surface in dark mode.
+extension StatusPalette on ColorScheme {
+  bool get _isDark => brightness == Brightness.dark;
+
+  Color get successContainer =>
+      _isDark ? const Color(0xFF14351F) : const Color(0xFFE7F6EC);
+  Color get onSuccessContainer =>
+      _isDark ? const Color(0xFF86EFAC) : const Color(0xFF14532D);
+  Color get successAccent =>
+      _isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A);
+
+  Color get warningContainer =>
+      _isDark ? const Color(0xFF3A2E10) : const Color(0xFFFEF4E2);
+  Color get onWarningContainer =>
+      _isDark ? const Color(0xFFFCD34D) : const Color(0xFF854D0E);
+  Color get warningAccent =>
+      _isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
+
+  Color get infoContainer =>
+      _isDark ? const Color(0xFF152A44) : const Color(0xFFE8F1FE);
+  Color get onInfoContainer =>
+      _isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF);
+  Color get infoAccent =>
+      _isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB);
+
+  Color get dangerContainer =>
+      _isDark ? const Color(0xFF3B1618) : const Color(0xFFFDECEC);
+  Color get onDangerContainer =>
+      _isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B);
+  Color get dangerAccent =>
+      _isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626);
 }
