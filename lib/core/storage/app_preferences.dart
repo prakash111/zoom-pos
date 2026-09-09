@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,6 +12,7 @@ class AppPreferences {
   static const _baseUrlKey = 'zoom_pos.base_url';
   static const _localeKey = 'zoom_pos.locale';
   static const _navDockPositionKey = 'zoom_pos.nav_dock_position';
+  static const _windowBoundsKey = 'zoom_pos.window_bounds';
 
   Future<String> readBaseUrl() async {
     try {
@@ -74,6 +77,38 @@ class AppPreferences {
       await prefs.setString(_navDockPositionKey, position);
     } catch (e) {
       debugPrint('AppPreferences.saveNavDockPosition error: $e');
+    }
+  }
+
+  /// The desktop window's last position + size (`x,y,width,height`), so the
+  /// Windows app reopens where the user left it. `null` until the first save
+  /// (the caller then centres a default-sized window). Windows-only in
+  /// practice — never read on Android.
+  Future<Rect?> readWindowBounds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_windowBoundsKey);
+      if (raw == null) return null;
+      final parts = raw.split(',').map(double.tryParse).toList();
+      if (parts.length != 4 || parts.any((p) => p == null)) return null;
+      final w = parts[2]!, h = parts[3]!;
+      if (w < 400 || h < 300) return null; // guard against a corrupt/minimised save
+      return Rect.fromLTWH(parts[0]!, parts[1]!, w, h);
+    } catch (e) {
+      debugPrint('AppPreferences.readWindowBounds error: $e');
+      return null;
+    }
+  }
+
+  Future<void> saveWindowBounds(Rect bounds) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _windowBoundsKey,
+        '${bounds.left},${bounds.top},${bounds.width},${bounds.height}',
+      );
+    } catch (e) {
+      debugPrint('AppPreferences.saveWindowBounds error: $e');
     }
   }
 }

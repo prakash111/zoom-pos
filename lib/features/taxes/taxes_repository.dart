@@ -2,15 +2,19 @@ import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/tax_rule_model.dart';
+import '../../core/services/sync/offline_writeable.dart';
 import '../../core/storage/app_database.dart';
 
 /// Talks to the tax-rule endpoints on PosSyncApiController:
 /// GET/POST /taxes, PUT/DELETE /taxes/{id}, POST /taxes/{id}/set-default.
-class TaxesRepository {
+class TaxesRepository with OfflineWriteable {
   TaxesRepository(this._client, {AppDatabase? database}) : _database = database ?? AppDatabase.instance;
 
   final ApiClient _client;
   final AppDatabase _database;
+
+  @override
+  AppDatabase get offlineDb => _database;
 
   /// Fetches tax rules and refreshes the offline cache, or falls back to it
   /// if the request fails and a cache exists from a previous fetch — so the
@@ -58,9 +62,21 @@ class TaxesRepository {
     });
   }
 
-  Future<void> deleteTax(String id) {
-    return _client.delete(ApiEndpoints.tax(id));
-  }
+  /// Offline-capable: a delete made without connectivity is applied to the
+  /// cache and queued as `deleted_tax_rules` for `/sync-batch`. (Create/edit
+  /// of a tax rule still needs the server — there is no offline-replay array
+  /// for those yet — so those stay online-only.)
+  Future<void> deleteTax(String id) => writeThrough<void>(
+        op: 'delete',
+        entity: 'tax_rule',
+        externalId: id,
+        endpoint: ApiEndpoints.tax(id),
+        method: 'DELETE',
+        payload: const {},
+        cacheBucket: 'taxes',
+        online: () => _client.delete(ApiEndpoints.tax(id)),
+        offlineResult: () {},
+      );
 
   Future<void> setDefaultTax(String id) {
     return _client.post(ApiEndpoints.taxSetDefault(id));

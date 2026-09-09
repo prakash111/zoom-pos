@@ -9,12 +9,14 @@ import 'core/config/nav_dock_provider.dart';
 import 'core/config/theme.dart';
 import 'core/config/theme_provider.dart';
 import 'core/sdui/app_router.dart';
+import 'core/services/desktop/desktop_window.dart';
 import 'core/services/desktop/window_close_guard.dart';
 import 'core/services/dynamic_string_service.dart';
 import 'core/services/sync/sync_engine.dart';
 import 'core/storage/app_database.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/storage/secure_storage_service.dart';
+import 'core/widgets/desktop_chrome.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_repository.dart';
 import 'features/auth/screens/auth_gate.dart';
@@ -34,6 +36,11 @@ Future<void> main() async {
 
   final secureStorage = SecureStorageService();
   final preferences = AppPreferences();
+
+  // Windows: size/position/title the native window and restore its last
+  // bounds before the first frame. No-op on Android.
+  await DesktopWindow.initialize(preferences);
+
   final apiClient =
       ApiClient(secureStorage: secureStorage, preferences: preferences);
   final authRepository = AuthRepository(apiClient);
@@ -55,6 +62,7 @@ Future<void> main() async {
 
   final syncEngine = SyncEngine(
     database: AppDatabase.instance,
+    apiClient: apiClient,
     salesRepository: SalesRepository(apiClient),
     inventoryRepository: InventoryRepository(apiClient),
     customersRepository: CustomersRepository(apiClient),
@@ -69,9 +77,10 @@ Future<void> main() async {
       .then((_) => localeProvider.refreshFromServer())
       .catchError((_) {});
 
-  // Windows only: clear the session when the window is closed so the next
-  // launch always starts at the login screen. No-op on Android.
-  await WindowCloseGuard(authProvider).install();
+  // Windows only: clear the session when the window is closed — but only when
+  // it's safe (online, nothing queued), so offline changes are never stranded
+  // behind a login the user can't complete. No-op on Android.
+  await WindowCloseGuard(authProvider, syncEngine: syncEngine).install();
 
   runApp(ZoomPosApp(
     preferences: preferences,
@@ -173,6 +182,10 @@ class ZoomPosApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             onGenerateRoute: AppRouter.onGenerateRoute,
+            builder: DesktopWindow.isSupported
+                ? (context, child) =>
+                    DesktopChrome(child: child ?? const SizedBox.shrink())
+                : null,
             home: const AuthGate(),
           );
         },

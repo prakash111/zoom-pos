@@ -65,6 +65,29 @@ class CompanyModel {
   final String? drawerCoverUrl;
   final String timezone;
 
+  /// Snake-case shape [fromJson] round-trips — used to cache the signed-in
+  /// company for offline session restore (see SessionCache).
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'trade_name': tradeName,
+        'currency': currency,
+        'currency_symbol': currencySymbol,
+        'plan_name': planName,
+        'country': country,
+        'tax_id': taxId,
+        'address': address,
+        'city': city,
+        'state': state,
+        'postal_code': postalCode,
+        'phone': phone,
+        'email': email,
+        'pos_mode': posMode,
+        'restaurant_mode_locked': restaurantModeLocked,
+        'drawer_cover_url': drawerCoverUrl,
+        'timezone': timezone,
+      };
+
   /// True when this tenant should see the restaurant POS (table
   /// management + KOT) instead of the standard retail POS. Mirrors
   /// `Company::isRestaurantMode()` on the backend: the superadmin lock

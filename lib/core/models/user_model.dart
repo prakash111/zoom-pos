@@ -26,6 +26,17 @@ class UserModel {
   final String companyId;
   final Map<String, bool> permissions;
 
+  /// Snake-case shape [fromJson] round-trips — used to cache the signed-in
+  /// user for offline session restore (see SessionCache).
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'email': email,
+        'role': role,
+        'company_id': companyId,
+        'permissions': permissions,
+      };
+
   /// The API sends permissions as `{"pos.create": true, ...}` (see
   /// PosSyncApiController::desktopPermissions), except a raw TenantApiKey
   /// with `permissions: ['*']` grants everything — handle both shapes.

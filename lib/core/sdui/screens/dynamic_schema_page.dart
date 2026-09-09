@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,6 +8,7 @@ import '../../api/api_exception.dart';
 import '../../services/dynamic_string_service.dart';
 import '../dynamic_schema_context.dart';
 import '../dynamic_schema_parser.dart';
+import '../schema_cache.dart';
 import '../sdui_action_dispatcher.dart';
 import '../sdui_icon_registry.dart';
 
@@ -52,6 +55,13 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
   bool _isLoading = false;
   String? _errorMessage;
   Map<String, dynamic>? _schema;
+
+  /// True when [_schema] came from [SchemaCache] because the live fetch failed
+  /// — drives the "showing the last loaded version" banner.
+  bool _schemaFromCache = false;
+  DateTime? _schemaCachedAt;
+  bool _offlineBannerDismissed = false;
+
   final Map<String, dynamic> _formValues = {};
 
   @override
@@ -114,26 +124,65 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
     try {
       final res = await _request(widget.endpoint!, method: 'GET');
       final rawSchema = res['schema'] ?? res;
-      if (rawSchema is Map<String, dynamic>) {
-        _loadSchema(rawSchema);
-      } else if (rawSchema is Map) {
-        _loadSchema(Map<String, dynamic>.from(rawSchema));
-      } else {
-        throw const FormatException(
-            'The server did not return an SDUI schema.');
-      }
+      final Map<String, dynamic> schemaMap = rawSchema is Map<String, dynamic>
+          ? rawSchema
+          : rawSchema is Map
+              ? Map<String, dynamic>.from(rawSchema)
+              : throw const FormatException(
+                  'The server did not return an SDUI schema.');
+
+      _loadSchema(schemaMap);
+      // Keep the last good layout so this screen still opens offline.
+      unawaited(SchemaCache.instance.put(widget.endpoint!, schemaMap));
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _schemaFromCache = false;
+          _schemaCachedAt = null;
         });
       }
     } catch (e) {
+      // A transport failure (offline / server unreachable) falls back to the
+      // last cached copy of this screen; a real error (4xx, bad schema) is
+      // surfaced as before.
+      final isTransport = e is ApiException &&
+          (e.statusCode == null || (e.statusCode ?? 0) >= 500);
+      if (isTransport) {
+        final restored = await _loadFromCache()
+            .timeout(const Duration(seconds: 2), onTimeout: () => false);
+        if (restored) return;
+      }
+
       if (mounted) {
         setState(() {
           _isLoading = false;
           _errorMessage = e is ApiException ? e.message : e.toString();
         });
       }
+    }
+  }
+
+  /// Renders this screen from [SchemaCache] when the live fetch can't reach
+  /// the server. Returns false (leaving the caller to show its error) when
+  /// nothing was ever cached for this endpoint.
+  Future<bool> _loadFromCache() async {
+    if (widget.endpoint == null) return false;
+    try {
+      final cached = await SchemaCache.instance.get(widget.endpoint!);
+      if (cached == null) return false;
+      _loadSchema(cached.schema);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = null;
+          _schemaFromCache = true;
+          _schemaCachedAt = cached.cachedAt;
+          _offlineBannerDismissed = false;
+        });
+      }
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -376,7 +425,74 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
 
     return Form(
       key: _formKey,
-      child: content,
+      child: _schemaFromCache && !_offlineBannerDismissed
+          ? Column(
+              children: [
+                _OfflineSchemaBanner(
+                  cachedAt: _schemaCachedAt,
+                  onDismiss: () =>
+                      setState(() => _offlineBannerDismissed = true),
+                  onRetry: _fetchSchema,
+                ),
+                Expanded(child: content),
+              ],
+            )
+          : content,
+    );
+  }
+}
+
+/// Shown above a schema page whose layout was restored from [SchemaCache]
+/// because the live fetch failed. Non-blocking — the screen underneath stays
+/// interactive (writes queue offline via [SduiActionDispatcher]).
+class _OfflineSchemaBanner extends StatelessWidget {
+  const _OfflineSchemaBanner({
+    required this.cachedAt,
+    required this.onDismiss,
+    required this.onRetry,
+  });
+
+  final DateTime? cachedAt;
+  final VoidCallback onDismiss;
+  final VoidCallback onRetry;
+
+  String get _age {
+    final at = cachedAt;
+    if (at == null) return '';
+    final d = DateTime.now().difference(at);
+    if (d.inMinutes < 1) return ' · just now';
+    if (d.inMinutes < 60) return ' · ${d.inMinutes}m ago';
+    if (d.inHours < 24) return ' · ${d.inHours}h ago';
+    return ' · ${d.inDays}d ago';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_off, size: 18, color: scheme.onSecondaryContainer),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Offline — showing the last loaded version$_age',
+                style: TextStyle(
+                    fontSize: 12.5, color: scheme.onSecondaryContainer),
+              ),
+            ),
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+            IconButton(
+              icon: const Icon(Icons.close, size: 18),
+              tooltip: 'Dismiss',
+              onPressed: onDismiss,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

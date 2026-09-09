@@ -12,4 +12,12 @@ class BrandModel {
   final String id;
   final String name;
   final bool active;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'active': active,
+    };
+  }
 }

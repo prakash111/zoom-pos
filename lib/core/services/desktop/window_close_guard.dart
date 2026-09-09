@@ -4,19 +4,28 @@ import 'package:flutter/foundation.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../../features/auth/auth_provider.dart';
+import '../sync/sync_engine.dart';
 
-/// Intercepts the native window close button on Windows so a signed-in
-/// session never survives the app being closed: the stored auth token and
-/// in-memory user/company state are cleared before the process exits, so the
-/// next launch always lands back on the login screen instead of resuming
-/// into an already-unlocked app.
+/// Intercepts the native window close button on Windows.
+///
+/// A shared POS terminal should not resume into an already-unlocked app after
+/// being closed, so historically this cleared the auth token on every close.
+/// With offline-first sync that is no longer safe unconditionally: closing the
+/// app while there are unsynced local changes (or no connectivity) would
+/// strand that queue behind a login the user can't complete offline. So the
+/// session is now only cleared on close when it is safe to do so — the device
+/// is online **and** the outbox is empty. Otherwise the session is kept and
+/// the next launch resumes (still gated by the OS keystore token + the
+/// re-validation that runs the moment the device is back online).
 ///
 /// `window_manager` has no Android/iOS implementation, so every entry point
 /// here is a no-op off Windows.
 class WindowCloseGuard with WindowListener {
-  WindowCloseGuard(this._authProvider);
+  WindowCloseGuard(this._authProvider, {SyncEngine? syncEngine})
+      : _syncEngine = syncEngine;
 
   final AuthProvider _authProvider;
+  final SyncEngine? _syncEngine;
 
   static bool get isSupported => !kIsWeb && Platform.isWindows;
 
@@ -36,8 +45,15 @@ class WindowCloseGuard with WindowListener {
     final stillPrevented = await windowManager.isPreventClose();
     if (!stillPrevented) return;
 
+    final engine = _syncEngine;
+    final hasPending = (engine?.pendingCount ?? 0) > 0;
+    final offline = engine != null && !engine.isOnline;
+    final keepSession = hasPending || offline;
+
     try {
-      await _authProvider.logout();
+      if (!keepSession) {
+        await _authProvider.logout();
+      }
     } catch (e) {
       debugPrint('WindowCloseGuard: failed to clear session on close: $e');
     } finally {

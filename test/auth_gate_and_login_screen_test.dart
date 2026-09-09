@@ -101,6 +101,12 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }
+
+  @override
+  bool get isOfflineSession => false;
+
+  @override
+  Future<void> refreshSessionIfOffline() async {}
 }
 
 class FakeApiClient extends Fake implements ApiClient {

@@ -54,6 +54,26 @@ class QuotationModel {
   final String status;
   final DateTime? updatedAt;
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'quote_number': quoteNumber,
+      'customer_id': customerId,
+      'customer_name': customerName,
+      'customer_phone': customerPhone,
+      'customer_email': customerEmail,
+      'items': items,
+      'discount': discount,
+      'tax': tax,
+      'total': total,
+      'notes': notes,
+      'terms': terms,
+      'valid_until': validUntil?.toIso8601String() ?? '',
+      'status': status,
+      'updated_at': updatedAt?.toIso8601String() ?? '',
+    };
+  }
+
   bool get isConverted => status == 'converted';
   double get subtotal => items.fold(0.0, (sum, item) {
         final qty = (item['quantity'] as num?)?.toDouble() ?? 0;

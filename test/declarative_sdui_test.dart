@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zoom_pos_mobile/core/sdui/dynamic_schema_context.dart';
 import 'package:zoom_pos_mobile/core/sdui/dynamic_schema_parser.dart';
 import 'package:zoom_pos_mobile/core/sdui/screens/dynamic_schema_page.dart';
@@ -7,6 +8,12 @@ import 'package:zoom_pos_mobile/core/sdui/sdui_component_registry.dart';
 import 'package:zoom_pos_mobile/features/settings/screens/global_printer_setup_screen.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  // A DynamicSchemaPage that can't reach the server falls back to the on-disk
+  // SchemaCache (SharedPreferences); an empty mock store lets that resolve
+  // instantly instead of stalling on an unregistered plugin channel.
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   group('Declarative SDUI Schema Parser - Layouts', () {
     testWidgets('renders container, card, column, and row', (tester) async {
       final schema = {

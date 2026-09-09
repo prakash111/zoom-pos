@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../core/api/api_client.dart';
@@ -7,6 +10,7 @@ import '../../core/models/company_model.dart';
 import '../../core/models/user_model.dart';
 import '../../core/services/tenant_time_service.dart';
 import '../../core/storage/secure_storage_service.dart';
+import '../../core/storage/session_cache.dart';
 import 'auth_repository.dart';
 
 enum AuthStatus { unknown, authenticating, authenticated, unauthenticated }
@@ -23,16 +27,32 @@ class AuthProvider extends ChangeNotifier {
         _secureStorage = secureStorage,
         _apiClient = apiClient {
     apiClient.onUnauthenticated = _handleUnauthenticated;
+    // When connectivity returns, re-validate a session that was restored from
+    // the local cache while offline (below) — promote it to a fully verified
+    // session, or drop it if the server now rejects the token.
+    _connectivitySub =
+        Connectivity().onConnectivityChanged.listen((results) {
+      final online = results.any((r) => r != ConnectivityResult.none);
+      if (online) unawaited(refreshSessionIfOffline());
+    });
   }
 
   final AuthRepository _authRepository;
   final SecureStorageService _secureStorage;
   final ApiClient _apiClient;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   AuthStatus _status = AuthStatus.unknown;
   UserModel? _user;
   CompanyModel? _company;
   String? _errorMessage;
+
+  /// True while the current signed-in state was restored from [SessionCache]
+  /// because the server was unreachable at startup — the token has not been
+  /// re-validated yet this launch. Cleared by [refreshSessionIfOffline] once
+  /// the server confirms it.
+  bool _offlineSession = false;
+  bool get isOfflineSession => _offlineSession;
 
   Future<void> Function()? onBeforeLogout;
 
@@ -63,26 +83,91 @@ class AuthProvider extends ChangeNotifier {
         return;
       }
 
-      final result = await _authRepository.session().timeout(
-            const Duration(seconds: 6),
-            onTimeout: () => throw ApiException('Session restore timed out'),
-          );
-      _user = result.user;
-      _applyCompany(result.company);
       try {
-        await BootstrapCache.instance
-            .hydrate(forceRefresh: false, client: _apiClient);
-      } catch (_) {}
-      _status = AuthStatus.authenticated;
-    } on ApiException {
-      await _secureStorage.clearToken();
-      _status = AuthStatus.unauthenticated;
+        final result = await _authRepository.session().timeout(
+              const Duration(seconds: 6),
+              onTimeout: () => throw ApiException('Session restore timed out'),
+            );
+        _user = result.user;
+        _applyCompany(result.company);
+        await SessionCache.instance.save(user: result.user, company: result.company);
+        _offlineSession = false;
+        try {
+          await BootstrapCache.instance
+              .hydrate(forceRefresh: false, client: _apiClient);
+        } catch (_) {}
+        _status = AuthStatus.authenticated;
+      } on ApiException catch (e) {
+        // A real 401 means the token itself is dead — wipe everything and
+        // fall back to the login screen (unchanged behaviour).
+        if (e.isUnauthenticated) {
+          await _secureStorage.clearToken();
+          await SessionCache.instance.clear();
+          _offlineSession = false;
+          _status = AuthStatus.unauthenticated;
+          return;
+        }
+
+        // Otherwise the server was simply unreachable (timeout / no route /
+        // 5xx). If we have a cached session from a previous online run,
+        // restore straight into it and keep working offline — the token is
+        // retained and re-checked by [refreshSessionIfOffline] on reconnect.
+        final cached = await SessionCache.instance.load();
+        if (cached != null && cached.company.id.isNotEmpty) {
+          _user = cached.user;
+          _applyCompany(cached.company);
+          _offlineSession = true;
+          try {
+            await BootstrapCache.instance
+                .hydrate(forceRefresh: false, client: _apiClient);
+          } catch (_) {}
+          _status = AuthStatus.authenticated;
+          return;
+        }
+
+        // Token present but nothing cached and the server is unreachable —
+        // we can't prove who this is, so show the login screen. The token is
+        // kept so a normal restore works once connectivity returns.
+        _status = AuthStatus.unauthenticated;
+      }
     } catch (e) {
       debugPrint('AuthProvider.restoreSession error: $e');
       _status = AuthStatus.unauthenticated;
     } finally {
       notifyListeners();
     }
+  }
+
+  /// Re-validates a session that [restoreSession] restored from cache while
+  /// offline. On success the session is promoted to fully verified; on a real
+  /// 401 it is dropped; a still-unreachable server leaves it as-is for the
+  /// next attempt. No-op unless we're currently in an offline session.
+  Future<void> refreshSessionIfOffline() async {
+    if (!_offlineSession || _status != AuthStatus.authenticated) return;
+    try {
+      final result = await _authRepository.session();
+      _user = result.user;
+      _applyCompany(result.company);
+      await SessionCache.instance
+          .save(user: result.user, company: result.company);
+      _offlineSession = false;
+      try {
+        await BootstrapCache.instance
+            .hydrate(forceRefresh: true, client: _apiClient);
+      } catch (_) {}
+      notifyListeners();
+    } on ApiException catch (e) {
+      if (e.isUnauthenticated) {
+        await _secureStorage.clearToken();
+        await SessionCache.instance.clear();
+        _offlineSession = false;
+        _user = null;
+        _applyCompany(null);
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+      }
+      // A still-unreachable server: keep the offline session, try again later.
+    } catch (_) {}
   }
 
   /// Set when a valid email+password belongs to an account that never
@@ -248,6 +333,10 @@ class AuthProvider extends ChangeNotifier {
             .hydrate(forceRefresh: true, client: _apiClient);
       } catch (_) {}
 
+      if (_company != null) {
+        await SessionCache.instance.save(user: _user, company: _company!);
+      }
+      _offlineSession = false;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -286,6 +375,10 @@ class AuthProvider extends ChangeNotifier {
       debugPrint('Bootstrap pre-hydration error: $e');
     }
 
+    if (_company != null) {
+      await SessionCache.instance.save(user: _user, company: _company!);
+    }
+    _offlineSession = false;
     _status = AuthStatus.authenticated;
     notifyListeners();
   }
@@ -317,8 +410,10 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await onBeforeLogout?.call();
     await _secureStorage.clearToken();
+    await SessionCache.instance.clear();
     _user = null;
     _applyCompany(null);
+    _offlineSession = false;
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }
@@ -326,9 +421,17 @@ class AuthProvider extends ChangeNotifier {
   void _handleUnauthenticated() {
     if (_status != AuthStatus.authenticated) return;
     _secureStorage.clearToken();
+    unawaited(SessionCache.instance.clear());
     _user = null;
     _applyCompany(null);
+    _offlineSession = false;
     _status = AuthStatus.unauthenticated;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    super.dispose();
   }
 }

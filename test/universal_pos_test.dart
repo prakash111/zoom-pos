@@ -2,12 +2,19 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zoom_pos_mobile/core/sdui/screens/dynamic_schema_page.dart';
 import 'package:zoom_pos_mobile/core/sdui/sdui_action_dispatcher.dart';
 import 'package:zoom_pos_mobile/features/pos_universal/local_cart.dart';
 import 'package:zoom_pos_mobile/features/pos_universal/pos_screen_model.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  // A pushed DynamicSchemaPage that can't reach the server now consults the
+  // on-disk SchemaCache (SharedPreferences); give it an empty mock store so
+  // that lookup resolves instantly instead of on a missing-plugin channel.
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   group('LocalCart', () {
     test('adds a new line and computes count/total', () {
       final cart = LocalCart();

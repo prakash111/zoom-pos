@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../features/pos/rx_cart_handoff.dart';
 import '../../features/pos/screens/invoice_actions_sheet.dart';
@@ -10,10 +11,19 @@ import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../config/app_config.dart';
 import '../config/bootstrap_cache.dart';
+import '../services/sync/sync_engine.dart';
 import '../services/thermal/thermal_printer_service.dart' show ReceiptLine;
 import 'dynamic_schema_context.dart';
 import 'dynamic_schema_parser.dart';
 import 'sdui_component_registry.dart';
+
+/// Endpoints whose effect only exists on the server — queuing them offline
+/// would be a lie. Matched as substrings of the action endpoint.
+const _serverOnlyEndpointMarkers = <String>[
+  'checkout', 'payment-gateway', 'gateway', 'subscription', 'billing',
+  'export', 'download', 'pdf', 'print', 'device', 'session', 'revoke',
+  'kitchen', 'kds', 'report',
+];
 
 typedef SduiRequestExecutor = Future<Map<String, dynamic>> Function(
   String endpoint, {
@@ -146,8 +156,8 @@ class SduiActionDispatcher {
           return;
         }
 
+        final submitData = <String, dynamic>{};
         try {
-          final submitData = <String, dynamic>{};
           final rawPayload = action['payload'];
           if (rawPayload is Map) {
             submitData.addAll(Map<String, dynamic>.from(rawPayload));
@@ -232,6 +242,17 @@ class SduiActionDispatcher {
             Navigator.of(context).pop();
           }
         } catch (e) {
+          final offlineMsg = _queueOfflineOrNull(
+              error: e, endpoint: endpoint, method: method, payload: submitData);
+          if (offlineMsg != null) {
+            final queued = offlineMsg.startsWith('Saved offline');
+            showToast(offlineMsg, isError: !queued);
+            if (queued) {
+              if (action['reload'] == true) onReload();
+              if (navigateBack && context.mounted) Navigator.of(context).pop();
+            }
+            return;
+          }
           showToast(e is ApiException ? e.message : 'Submission failed: $e',
               isError: true);
         }
@@ -269,6 +290,14 @@ class SduiActionDispatcher {
             await _showPostSaleSheet(context, res['post_sale_sheet']['data']);
           }
         } catch (e) {
+          final offlineMsg = _queueOfflineOrNull(
+              error: e, endpoint: endpoint, method: 'POST', payload: payload);
+          if (offlineMsg != null) {
+            final queued = offlineMsg.startsWith('Saved offline');
+            showToast(offlineMsg, isError: !queued);
+            if (queued && action['reload'] == true) onReload();
+            return;
+          }
           showToast(e is ApiException ? e.message : 'Action failed: $e',
               isError: true);
         }
@@ -337,6 +366,49 @@ class SduiActionDispatcher {
       default:
         break;
     }
+  }
+
+  /// Handles an SDUI write (`form_submit` / `api_post`) that threw while
+  /// offline. Returns:
+  ///  - `"Saved offline …"` when the write was queued in `outbox_mutations`
+  ///    for [SyncEngine] to replay through `/sync-batch`'s `mutations` array;
+  ///  - a `"needs an internet connection"` message when the endpoint is one
+  ///    whose effect only exists server-side (checkout gateway, export, device
+  ///    revoke, live report) — never faked;
+  ///  - `null` when [error] isn't a transport failure, so the caller surfaces
+  ///    the real 4xx/validation message unchanged.
+  String? _queueOfflineOrNull({
+    required Object error,
+    required String endpoint,
+    required String method,
+    required Map<String, dynamic> payload,
+  }) {
+    final isTransport = error is ApiException &&
+        (error.statusCode == null || (error.statusCode ?? 0) >= 500);
+    if (!isTransport) return null;
+
+    final lower = endpoint.toLowerCase();
+    if (_serverOnlyEndpointMarkers.any(lower.contains)) {
+      return 'This action needs an internet connection.';
+    }
+
+    final engine = SyncEngine.instance;
+    if (engine == null) return null;
+
+    final segs = (Uri.tryParse(endpoint)?.pathSegments ?? const <String>[])
+        .where((s) => s.isNotEmpty && int.tryParse(s) == null)
+        .toList();
+    final entity = (segs.isEmpty ? 'sdui' : segs.last).replaceAll('-', '_');
+
+    unawaited(engine.enqueueMutation(
+      op: 'mutation',
+      entity: entity,
+      externalId: const Uuid().v4(),
+      endpoint: endpoint,
+      method: method.toUpperCase(),
+      payload: payload,
+    ));
+    return 'Saved offline — will sync when you reconnect.';
   }
 
   /// Re-opens the current SDUI view with the named form fields appended as

@@ -34,4 +34,18 @@ class SupplierModel {
   final String city;
   final String state;
   final bool active;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'legal_name': legalName,
+      'tax_id': taxId,
+      'email': email,
+      'phone': phone,
+      'city': city,
+      'state': state,
+      'active': active,
+    };
+  }
 }

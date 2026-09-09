@@ -12,4 +12,12 @@ class UnitModel {
   final String id;
   final String name;
   final String abbreviation;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'abbreviation': abbreviation,
+    };
+  }
 }
