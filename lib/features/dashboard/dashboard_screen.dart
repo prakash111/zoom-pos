@@ -26,6 +26,7 @@ import '../../l10n/app_localizations.dart';
 import '../analytics/analytics_repository.dart';
 import '../analytics/widgets/analytics_widgets.dart';
 import '../auth/auth_provider.dart';
+import '../settings/screens/app_preferences_screen.dart';
 import '../settings/screens/change_password_screen.dart';
 import '../settings/server_settings_screen.dart';
 import '../settings/settings_repository.dart';
@@ -1034,6 +1035,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           const SyncStatusBadge(),
           const _ThemeModeButton(),
+          IconButton(
+            tooltip: 'App preferences',
+            icon: const Icon(Icons.tune),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AppPreferencesScreen()),
+            ),
+          ),
           IconButton(
             tooltip: l10n.refresh,
             icon: const Icon(Icons.refresh),

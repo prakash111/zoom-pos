@@ -21,6 +21,7 @@ import '../../features/restaurant/screens/restaurant_tables_screen.dart';
 import '../../features/sales/screens/sales_screen.dart';
 import '../../features/sales_targets/screens/sales_targets_screen.dart';
 import '../../features/service_orders/screens/service_orders_screen.dart';
+import '../../features/settings/screens/app_preferences_screen.dart';
 import '../../features/settings/screens/change_password_screen.dart';
 import '../../features/settings/screens/global_printer_setup_screen.dart';
 import 'components/navigation_tree_builder.dart';
@@ -153,6 +154,12 @@ class SduiComponentRegistry {
     // target_endpoint and bypass this compatibility registry entirely.
     'subscription': (_) => const SubscriptionScreen(),
     'settings': (_) => const TenantSettingsScreen(),
+    // Device-local workspace prefs (theme / page transition / dock position).
+    'app_preferences': (_) => const AppPreferencesScreen(),
+    'appearance': (_) => const AppPreferencesScreen(),
+    'preferences': (_) => const AppPreferencesScreen(),
+    'settings-appearance': (_) => const AppPreferencesScreen(),
+    'settings_appearance': (_) => const AppPreferencesScreen(),
     'navigation': (_) => const NavMenuSettingsTab(),
     'navigation_menu': (_) => const NavMenuSettingsTab(),
     'settings-navigation': (_) => const NavMenuSettingsTab(),
@@ -234,7 +241,8 @@ class SduiComponentRegistry {
   /// 2. Explicit [targetEndpoint] dynamically resolved via [DynamicSchemaPage]
   /// 3. Registered dynamic server modules via [DynamicModuleScreen]
   /// 4. Fallback [DynamicSchemaPage] for unfamiliar views
-  WidgetBuilder resolve(String? componentKey, {String? targetEndpoint, String? title}) {
+  WidgetBuilder resolve(String? componentKey,
+      {String? targetEndpoint, String? title}) {
     final key = componentKey?.toLowerCase().trim();
     if (key != null && key.isNotEmpty) {
       final builder = _registry[key];

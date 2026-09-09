@@ -6,8 +6,6 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/config/countries.dart';
-import '../../../core/config/nav_dock_provider.dart';
-import '../../../core/config/page_transitions.dart';
 import '../../../core/config/tax_jurisdictions.dart';
 import '../../../core/config/theme.dart';
 import '../../../core/config/theme_provider.dart';
@@ -20,6 +18,7 @@ import '../../taxes/screens/taxes_screen.dart';
 import '../settings_repository.dart';
 import '../../../core/sdui/components/navigation_tree_builder.dart';
 import '../../../core/sdui/screens/dynamic_schema_page.dart';
+import 'app_preferences_screen.dart';
 import 'payment_methods_screen.dart';
 import 'global_printer_setup_screen.dart';
 
@@ -169,112 +168,15 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen>
   }
 }
 
-/// Settings > Appearance — the navigation-dock layout preference from the
-/// desktop-parity spec. Purely local (SharedPreferences via
-/// [NavDockProvider]), nothing here is synced to the server.
+/// Settings ▸ Appearance — light/dark theme, page-move animation and the
+/// navigation-dock layout. All per-device (SharedPreferences), nothing synced
+/// to the server. Same content as the standalone [AppPreferencesScreen]
+/// opened from the dashboard app bar.
 class _AppearanceTab extends StatelessWidget {
   const _AppearanceTab();
 
   @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final navDock = context.watch<NavDockProvider>();
-    final themeProvider = context.watch<ThemeProvider>();
-
-    final options = <(NavDockPosition, IconData, String)>[
-      (NavDockPosition.left, Icons.arrow_back, l10n.navDockLeft),
-      (NavDockPosition.top, Icons.arrow_upward, l10n.navDockTop),
-      (NavDockPosition.right, Icons.arrow_forward, l10n.navDockRight),
-      (NavDockPosition.bottom, Icons.arrow_downward, l10n.navDockBottom),
-    ];
-
-    const themeOptions = <(ThemeMode, IconData, String)>[
-      (ThemeMode.system, Icons.brightness_auto_outlined, 'Match device'),
-      (ThemeMode.light, Icons.light_mode_outlined, 'Light'),
-      (ThemeMode.dark, Icons.dark_mode_outlined, 'Dark'),
-    ];
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text('Theme', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        Text('Choose how the app looks on this device.',
-            style: TextStyle(color: Colors.grey.shade600)),
-        const SizedBox(height: 12),
-        RadioGroup<ThemeMode>(
-          groupValue: themeProvider.themeMode,
-          onChanged: (value) {
-            if (value != null) themeProvider.setThemeMode(value);
-          },
-          child: Card(
-            margin: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (final option in themeOptions)
-                  RadioListTile<ThemeMode>(
-                    value: option.$1,
-                    secondary: Icon(option.$2),
-                    title: Text(option.$3),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(l10n.navDockTitle, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        Text(l10n.navDockDescription,
-            style: TextStyle(color: Colors.grey.shade600)),
-        const SizedBox(height: 12),
-        RadioGroup<NavDockPosition>(
-          groupValue: navDock.position,
-          onChanged: (value) {
-            if (value != null) navDock.setPosition(value);
-          },
-          child: Card(
-            margin: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (final option in options)
-                  RadioListTile<NavDockPosition>(
-                    value: option.$1,
-                    secondary: Icon(option.$2),
-                    title: Text(option.$3),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text('Page transition', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        Text('How screens move when you open a link or menu item.',
-            style: TextStyle(color: Colors.grey.shade600)),
-        const SizedBox(height: 12),
-        RadioGroup<AppPageTransition>(
-          groupValue: navDock.transition,
-          onChanged: (value) {
-            if (value != null) navDock.setTransition(value);
-          },
-          child: Card(
-            margin: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (final style in AppPageTransition.values)
-                  RadioListTile<AppPageTransition>(
-                    value: style,
-                    secondary: Icon(style.icon),
-                    title: Text(style.label),
-                    subtitle: Text(style.description),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => const AppPreferencesBody();
 }
 
 class _ProfileTab extends StatefulWidget {
