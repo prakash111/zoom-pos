@@ -529,6 +529,9 @@ class _ProfileTabState extends State<_ProfileTab> {
         defaultCommissionType: _commissionType,
       );
       if (mounted) {
+        // Keep the live theme locked to what was just persisted, so a
+        // background bootstrap sync can't roll it back to the previous colour.
+        context.read<ThemeProvider>().setColor(_primaryColor);
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(AppLocalizations.of(context).profileSaved)));
       }
