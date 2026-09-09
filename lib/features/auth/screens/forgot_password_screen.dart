@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/config/app_config.dart';
+import '../widgets/auth_scaffold.dart';
+import '../widgets/auth_widgets.dart';
 
 /// Requests a password reset email via POST /api/tenant/password/email —
 /// the same endpoint the web "Forgot password?" form posts to. The actual
@@ -42,7 +44,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       );
       setState(() {
         _resultIsError = false;
-        _resultMessage = response['message']?.toString() ?? 'If an account exists for that email, a reset link has been sent.';
+        _resultMessage = response['message']?.toString() ??
+            'If an account exists for that email, a reset link has been sent.';
       });
     } on ApiException catch (e) {
       setState(() {
@@ -56,60 +59,62 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Forgot Password')),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(Icons.lock_reset_outlined, size: 56),
-                    const SizedBox(height: 12),
-                    const Text(
-                      "Enter your account email and we'll send you a link to reset your password.",
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      autocorrect: false,
-                      decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.email_outlined)),
-                      validator: (value) => (value == null || value.trim().isEmpty) ? 'Required' : null,
-                      onFieldSubmitted: (_) => _submit(),
-                    ),
-                    if (_resultMessage != null) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: _resultIsError ? Colors.red.shade50 : Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          _resultMessage!,
-                          style: TextStyle(color: _resultIsError ? Colors.red.shade800 : Colors.green.shade800),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: _isSending ? null : _submit,
-                      child: _isSending
-                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Send Reset Link'),
-                    ),
-                  ],
+    return AuthScaffold(
+      heading: 'Reset password',
+      headerIcon: Icons.lock_reset_outlined,
+      subheading:
+          "Enter your account email and we'll send you a link to reset your password.",
+      form: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: authInputDecoration(
+                hint: 'Email address',
+                icon: Icons.mail_outline,
+              ),
+              validator: (value) =>
+                  (value == null || value.trim().isEmpty) ? 'Required' : null,
+              onFieldSubmitted: (_) => _submit(),
+            ),
+            if (_resultMessage != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _resultIsError
+                      ? Colors.red.shade50
+                      : Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _resultMessage!,
+                  style: TextStyle(
+                      color: _resultIsError
+                          ? Colors.red.shade800
+                          : Colors.green.shade800),
                 ),
               ),
+            ],
+            const SizedBox(height: 22),
+            AuthPrimaryButton(
+              label: 'Send Reset Link',
+              busy: _isSending,
+              onPressed: _isSending ? null : _submit,
             ),
-          ),
+          ],
+        ),
+      ),
+      belowCard: Align(
+        alignment: Alignment.center,
+        child: TextButton(
+          onPressed: () => Navigator.of(context).maybePop(),
+          child: const Text('Back to sign in'),
         ),
       ),
     );
