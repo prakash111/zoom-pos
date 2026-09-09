@@ -5,6 +5,7 @@ namespace App\Services\Navigation;
 use App\Models\Company;
 use App\Models\SduiModule;
 use App\Services\Modular\ModuleRegistry;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -332,6 +333,23 @@ class TenantNavRegistry
 
                 foreach ($activePackageModules as $pkgModule) {
                     $pkgSlug = $pkgModule->slug;
+
+                    // A package row can be flagged active in the DB while its
+                    // files never landed under modules/<key>/ (fresh deploy,
+                    // half-finished install, seeded row). Its routes are then
+                    // NOT registered by ModuleServiceProvider, so injecting its
+                    // navigation only produces "route ... could not be found"
+                    // 404s (e.g. /api/tenant/repair-module/views/tickets). Skip
+                    // it — the built-in vertical section already covers the
+                    // licensed mode with working /api/tenant/views/* endpoints.
+                    if (! self::packageIsInstalledOnDisk($pkgModule)) {
+                        Log::warning('TenantNavRegistry: skipping nav for active package module without on-disk routes.', [
+                            'slug' => $pkgSlug,
+                            'package_path' => $pkgModule->package_path,
+                        ]);
+
+                        continue;
+                    }
 
                     // The primary business verticals are mutually exclusive — a
                     // store picks one at registration and licensed_modules
@@ -1457,6 +1475,33 @@ class TenantNavRegistry
      * @param  list<mixed>  $navigation
      * @return list<array<string, mixed>>|null
      */
+    /**
+     * True when a package module's files are physically present where
+     * {@see \App\Providers\ModuleServiceProvider::bootModule()} loads routes
+     * from — i.e. its endpoints will actually resolve. A DB row alone is not
+     * enough.
+     */
+    private static function packageIsInstalledOnDisk(SduiModule $module): bool
+    {
+        $path = trim((string) ($module->package_path ?: $module->slug));
+        if ($path === '') {
+            return false;
+        }
+
+        $base = base_path('modules/'.$path);
+        if (! File::isDirectory($base)) {
+            return false;
+        }
+
+        foreach (['routes.php', 'routes/api.php', 'routes/web.php', 'module.json'] as $marker) {
+            if (File::exists($base.'/'.$marker)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static function validatedCustomNavigation(array $navigation): ?array
     {
         $sections = [];

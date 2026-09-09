@@ -340,6 +340,57 @@ class PackagedVerticalModulesTest extends TestCase
         $this->assertTrue($openNavKeys->contains(fn ($k) => str_starts_with($k, 'salon')));
     }
 
+    public function test_active_package_row_without_files_on_disk_is_kept_out_of_the_drawer(): void
+    {
+        // Reproduces the production state that caused
+        // "The route api/tenant/repair-module/views/tickets could not be found."
+        // — an sdui_modules row flagged active/package whose files never landed
+        // under modules/<key>/, so ModuleServiceProvider never registered its
+        // routes.
+        File::deleteDirectory(base_path('modules/repairtechnician'));
+
+        SduiModule::create([
+            'slug' => 'repairtechnician',
+            'name' => 'Repair Technician',
+            'source_type' => 'package',
+            'package_path' => 'repairtechnician',
+            'is_active' => true,
+            'navigation' => [[
+                'key' => 'repair_ops',
+                'title' => 'Repair',
+                'items' => [[
+                    'key' => 'repair_tickets',
+                    'title' => 'Repair Tickets',
+                    'target_endpoint' => '/api/tenant/repair-module/views/tickets',
+                ]],
+            ]],
+        ]);
+
+        $tenant = Company::create([
+            'name' => 'Fix It', 'slug' => 'fix-it', 'status' => 'active',
+            'pos_mode' => 'repair_technician', 'licensed_modules' => ['repair_technician'],
+            'currency' => 'USD', 'currency_symbol' => '$',
+        ]);
+
+        $sections = TenantNavRegistry::getEffectiveNavForTenant($tenant);
+        $endpoints = collect($sections)
+            ->flatMap(fn ($s) => $s['items'] ?? [])
+            ->pluck('target_endpoint')
+            ->filter()
+            ->map(fn ($e) => (string) $e);
+
+        // The broken package endpoint must never be offered…
+        $this->assertFalse(
+            $endpoints->contains(fn ($e) => str_contains($e, 'repair-module/views')),
+            'Uninstalled package nav leaked into the drawer.'
+        );
+        // …but the built-in repair vertical (working /api/tenant/views/*) must.
+        $this->assertTrue(
+            $endpoints->contains('/api/tenant/views/repair-tickets'),
+            'Built-in repair section is missing for a repair_technician tenant.'
+        );
+    }
+
     public function test_a_purged_module_re_installs_cleanly_without_table_already_exists(): void
     {
         $service = app(ModulePackageService::class);

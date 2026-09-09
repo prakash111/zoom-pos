@@ -85,6 +85,13 @@ class SettingsApiController extends Controller
             'default_locale' => ['nullable', 'string', 'max:10'],
             'default_commission_rate' => ['nullable', 'numeric', 'min:0'],
             'default_commission_type' => ['nullable', 'string', 'in:percentage,fixed'],
+            // The mobile Profile tab sends the brand colour alongside the rest
+            // of the profile; without these it was silently dropped by
+            // `validated()` and the picked colour reverted on the next
+            // bootstrap sync. Full drawer/gradient branding still goes through
+            // `updateBranding()`.
+            'primary_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'accent_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
         if ($validator->fails()) {
@@ -714,6 +721,8 @@ class SettingsApiController extends Controller
             'logo_url' => $company->getLogoUrl(),
             'favicon_url' => $company->getFaviconUrl(),
             'drawer_cover_url' => $company->getDrawerCoverUrl(),
+            'primary_color' => $company->getPrimaryColor(),
+            'accent_color' => $company->getAccentColor(),
             'default_commission_rate' => (float) ($company->default_commission_rate ?? 0),
             'default_commission_type' => $company->default_commission_type ?: 'percentage',
         ];
