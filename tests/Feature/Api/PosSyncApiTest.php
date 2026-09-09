@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\ActivationCode;
 use App\Models\Brand;
 use App\Models\CashRegister;
 use App\Models\Category;
@@ -18,6 +17,7 @@ use App\Models\TenantApiKey;
 use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -27,7 +27,9 @@ class PosSyncApiTest extends TestCase
     use RefreshDatabase;
 
     protected Company $company;
+
     protected User $user;
+
     protected TenantApiKey $apiKey;
 
     protected function setUp(): void
@@ -81,7 +83,7 @@ class PosSyncApiTest extends TestCase
         $this->apiKey = TenantApiKey::create([
             'company_id' => $this->company->id,
             'name' => 'POS Register #1',
-            'token' => 'zk_live_' . bin2hex(random_bytes(16)),
+            'token' => 'zk_live_'.bin2hex(random_bytes(16)),
             'permissions' => ['*'],
             'active' => true,
         ]);
@@ -171,6 +173,37 @@ class PosSyncApiTest extends TestCase
         $this->assertEquals(7.50, $product->sale_price);
         $this->assertEquals(42, $product->current_stock);
         $this->assertSame(1, Product::where('company_id', $this->company->id)->where('external_id', $extId)->count());
+        // Clean apply — nothing to report as a conflict.
+        $response->assertJsonPath('conflicts', []);
+    }
+
+    public function test_sync_batch_reports_an_offline_edit_that_lost_the_last_write_wins_race(): void
+    {
+        $extId = (string) Str::uuid();
+        $product = Product::create([
+            'company_id' => $this->company->id, 'external_id' => $extId,
+            'name' => 'Server Wins', 'sale_price' => 5, 'current_stock' => 3, 'active' => true,
+        ]);
+        // The server row was edited AFTER the moment the offline edit was made.
+        $product->update(['name' => 'Edited On Web']);
+        $staleEditAt = $product->updated_at->copy()->subMinutes(10)->toIso8601String();
+
+        $response = $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'created_products' => [[
+                'id' => $extId, 'name' => 'Edited Offline (stale)', 'price' => 9,
+                'updated_at' => $staleEditAt,
+            ]],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('conflicts.0.entity', 'product')
+            ->assertJsonPath('conflicts.0.id', $extId)
+            ->assertJsonPath('conflicts.0.reason', 'server_newer')
+            ->assertJsonPath('conflicts.0.label', 'Edited On Web');
+
+        // Server row untouched; the id_map still lets the client converge.
+        $this->assertSame('Edited On Web', $product->fresh()->name);
+        $response->assertJsonPath("id_map.$extId", (string) $product->id);
     }
 
     /**
@@ -232,7 +265,7 @@ class PosSyncApiTest extends TestCase
         ]);
         $otherKey = TenantApiKey::create([
             'company_id' => $otherCompany->id, 'name' => 'Other Register',
-            'token' => 'zk_live_' . bin2hex(random_bytes(16)), 'permissions' => ['*'], 'active' => true,
+            'token' => 'zk_live_'.bin2hex(random_bytes(16)), 'permissions' => ['*'], 'active' => true,
         ]);
 
         $extId = (string) Str::uuid();
@@ -276,6 +309,240 @@ class PosSyncApiTest extends TestCase
         $this->assertDatabaseCount('desktop_sync_receipts', 1);
     }
 
+    public function test_sync_batch_processes_offline_deletes_and_returns_tombstones_in_pull(): void
+    {
+        $prodExt = (string) Str::uuid();
+        $custExt = (string) Str::uuid();
+        $product = Product::create([
+            'company_id' => $this->company->id, 'external_id' => $prodExt,
+            'name' => 'To Delete Offline', 'sale_price' => 3, 'current_stock' => 0, 'active' => true,
+        ]);
+        $customer = Customer::create([
+            'company_id' => $this->company->id, 'external_id' => $custExt, 'name' => 'Ghost Customer',
+        ]);
+
+        $response = $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'deleted_products' => [['id' => $prodExt, 'deleted_at' => now()->addMinute()->toIso8601String()]],
+            // bare-string form is also accepted
+            'deleted_customers' => [$custExt],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('deleted.products.0', $prodExt)
+            ->assertJsonPath('deleted.customers.0', $custExt);
+
+        $this->assertDatabaseMissing('products', ['id' => $product->id]);
+        $this->assertDatabaseMissing('customers', ['id' => $customer->id]);
+        $this->assertDatabaseHas('sync_tombstones', [
+            'company_id' => $this->company->id, 'entity' => 'product', 'external_id' => $prodExt,
+        ]);
+
+        // A delta-only client learns the rows are gone via sync-pull.
+        $pull = $this->withToken($this->apiKey->token)->getJson('/api/v1/pos/sync-pull');
+        $pull->assertOk()
+            ->assertJsonPath('deleted_ids.products.0', $prodExt)
+            ->assertJsonPath('deleted_ids.customers.0', $custExt);
+    }
+
+    public function test_sync_batch_offline_delete_is_idempotent_on_retry(): void
+    {
+        $ext = (string) Str::uuid();
+        Category::create(['company_id' => $this->company->id, 'external_id' => $ext, 'name' => 'Doomed', 'active' => true]);
+
+        $payload = ['deleted_categories' => [['id' => $ext, 'deleted_at' => now()->addMinute()->toIso8601String()]]];
+        $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', $payload)->assertOk();
+        // Re-push (a retried / duplicated sync cycle) — must not error and must not resurrect anything.
+        $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', $payload)
+            ->assertOk()
+            ->assertJsonPath('deleted.categories.0', $ext);
+
+        $this->assertSame(0, Category::withoutGlobalScope('company')->where('external_id', $ext)->count());
+        $this->assertSame(1, DB::table('sync_tombstones')
+            ->where('entity', 'category')->where('external_id', $ext)->count());
+        $this->assertSame(1, DB::table('desktop_sync_receipts')
+            ->where('operation_type', 'delete_category')->where('external_id', $ext)->count());
+    }
+
+    public function test_sync_batch_offline_delete_yields_to_a_newer_server_edit(): void
+    {
+        $ext = (string) Str::uuid();
+        $product = Product::create([
+            'company_id' => $this->company->id, 'external_id' => $ext,
+            'name' => 'Contested', 'sale_price' => 1, 'current_stock' => 0, 'active' => true,
+        ]);
+        // Server edited the row AFTER the moment the offline delete was queued.
+        $product->update(['name' => 'Edited On Web']);
+        $offlineDeleteAt = $product->updated_at->copy()->subMinutes(5)->toIso8601String();
+
+        $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'deleted_products' => [['id' => $ext, 'deleted_at' => $offlineDeleteAt, 'updated_at' => $offlineDeleteAt]],
+        ])->assertOk()
+            ->assertJsonMissingPath('deleted.products')
+            ->assertJsonPath('conflicts.0.reason', 'deleted_offline_kept_on_server')
+            ->assertJsonPath('conflicts.0.id', $ext);
+
+        // Row survives; no tombstone — the client re-pulls it and converges.
+        $this->assertDatabaseHas('products', ['id' => $product->id, 'name' => 'Edited On Web']);
+        $this->assertSame(0, DB::table('sync_tombstones')
+            ->where('entity', 'product')->where('external_id', $ext)->count());
+    }
+
+    public function test_sync_batch_returns_an_id_map_for_created_rows(): void
+    {
+        $ext = (string) Str::uuid();
+        $response = $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'created_products' => [['id' => $ext, 'name' => 'Fresh Offline Product', 'price' => 9]],
+        ]);
+
+        $serverId = Product::withoutGlobalScope('company')->where('external_id', $ext)->value('id');
+        $response->assertOk()->assertJsonPath("id_map.$ext", (string) $serverId);
+    }
+
+    public function test_sync_batch_offline_edit_of_a_web_created_row_matches_by_numeric_id(): void
+    {
+        // Created on the web — no external_id, so the desktop only knows it by
+        // its numeric id (that's what sync-pull hands back as `id`).
+        $product = Product::create([
+            'company_id' => $this->company->id, 'name' => 'Web Product',
+            'sale_price' => 4, 'current_stock' => 7, 'active' => true,
+        ]);
+        $category = Category::create([
+            'company_id' => $this->company->id, 'name' => 'Web Category', 'active' => true,
+        ]);
+
+        $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'created_products' => [[
+                'id' => (string) $product->id, 'name' => 'Renamed Offline', 'price' => 6,
+                'updated_at' => now()->addMinute()->toIso8601String(),
+            ]],
+            'created_categories' => [[
+                'id' => (string) $category->id, 'name' => 'Category Renamed Offline', 'active' => true,
+                'updated_at' => now()->addMinute()->toIso8601String(),
+            ]],
+        ])->assertOk();
+
+        // Edited in place — never duplicated, stock never touched.
+        $this->assertSame(1, Product::withoutGlobalScope('company')->where('name', 'Renamed Offline')->count());
+        $this->assertSame(1, Product::withoutGlobalScope('company')->where('company_id', $this->company->id)->count());
+        $this->assertEquals(6, $product->fresh()->sale_price);
+        $this->assertEquals(7, $product->fresh()->current_stock);
+        $this->assertSame(1, Category::withoutGlobalScope('company')->where('name', 'Category Renamed Offline')->count());
+        $this->assertSame(1, Category::withoutGlobalScope('company')->where('company_id', $this->company->id)->count());
+    }
+
+    public function test_sync_pull_entities_filter_returns_only_the_requested_slices(): void
+    {
+        Product::create(['company_id' => $this->company->id, 'name' => 'P1', 'sale_price' => 1, 'current_stock' => 0, 'active' => true]);
+        Customer::create(['company_id' => $this->company->id, 'name' => 'C1']);
+
+        $pull = $this->withToken($this->apiKey->token)->getJson('/api/v1/pos/sync-pull?entities=products');
+        $pull->assertOk()
+            ->assertJsonStructure(['success', 'server_time', 'company', 'products', 'counts', 'deleted_ids'])
+            ->assertJsonMissing(['customers' => []])
+            ->assertJsonCount(1, 'products');
+        $this->assertArrayNotHasKey('customers', $pull->json());
+    }
+
+    public function test_sync_batch_replays_a_generic_queued_mutation_to_its_real_endpoint(): void
+    {
+        $key = (string) Str::uuid();
+
+        $response = $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'mutations' => [[
+                'idempotency_key' => $key,
+                'op' => 'create',
+                'entity' => 'tax_rule',
+                'endpoint' => '/api/tenant/settings/tax-rules',
+                'method' => 'POST',
+                'payload' => ['name' => 'Offline VAT', 'rate' => 7.5],
+                'client_updated_at' => now()->toIso8601String(),
+            ]],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('mutations_applied', [$key])
+            ->assertJsonPath('mutations_failed', []);
+
+        $this->assertDatabaseHas('tax_rules', [
+            'company_id' => $this->company->id,
+            'tax_name' => 'Offline VAT',
+        ]);
+        $this->assertSame(1, DB::table('desktop_sync_receipts')
+            ->where('operation_type', 'mutation')->where('external_id', $key)->count());
+    }
+
+    public function test_sync_batch_generic_mutation_is_idempotent_on_replay(): void
+    {
+        $key = (string) Str::uuid();
+        $payload = [
+            'mutations' => [[
+                'idempotency_key' => $key,
+                'endpoint' => '/api/tenant/settings/tax-rules',
+                'method' => 'POST',
+                'payload' => ['name' => 'Dedupe Tax', 'rate' => 3],
+            ]],
+        ];
+
+        $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', $payload)
+            ->assertOk()->assertJsonPath('mutations_applied', [$key]);
+        $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', $payload)
+            ->assertOk()->assertJsonPath('mutations_applied', [$key]);
+
+        // Replayed twice, created once.
+        $this->assertSame(1, DB::table('tax_rules')
+            ->where('company_id', $this->company->id)->where('tax_name', 'Dedupe Tax')->count());
+    }
+
+    public function test_sync_batch_generic_mutation_failure_is_isolated_and_reported(): void
+    {
+        $goodKey = (string) Str::uuid();
+        $badKey = (string) Str::uuid();
+
+        $response = $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'mutations' => [
+                [
+                    'idempotency_key' => $badKey,
+                    'endpoint' => '/api/tenant/settings/tax-rules',
+                    'method' => 'POST',
+                    'payload' => ['name' => 'No Rate Given'], // fails validation (422)
+                ],
+                [
+                    'idempotency_key' => $goodKey,
+                    'endpoint' => '/api/tenant/settings/tax-rules',
+                    'method' => 'POST',
+                    'payload' => ['name' => 'Valid Tax', 'rate' => 5],
+                ],
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('mutations_applied', [$goodKey])
+            ->assertJsonPath('mutations_failed.0.idempotency_key', $badKey);
+
+        // The good one landed; the bad one left no ledger row so it can be
+        // retried once the client fixes it.
+        $this->assertDatabaseHas('tax_rules', ['company_id' => $this->company->id, 'tax_name' => 'Valid Tax']);
+        $this->assertDatabaseMissing('tax_rules', ['company_id' => $this->company->id, 'tax_name' => 'No Rate Given']);
+        $this->assertSame(0, DB::table('desktop_sync_receipts')
+            ->where('operation_type', 'mutation')->where('external_id', $badKey)->count());
+    }
+
+    public function test_sync_batch_refuses_to_replay_a_sync_endpoint(): void
+    {
+        $key = (string) Str::uuid();
+
+        $this->withToken($this->apiKey->token)->postJson('/api/v1/pos/sync-batch', [
+            'mutations' => [[
+                'idempotency_key' => $key,
+                'endpoint' => '/api/v1/pos/sync-batch',
+                'method' => 'POST',
+                'payload' => ['created_products' => [['id' => (string) Str::uuid(), 'name' => 'X', 'price' => 1]]],
+            ]],
+        ])->assertOk()
+            ->assertJsonPath('mutations_applied', [])
+            ->assertJsonPath('mutations_failed.0.reason', 'Endpoint is not replayable.');
+    }
+
     public function test_pos_register_endpoint_creates_new_tenant_and_api_token(): void
     {
         $response = $this->postJson('/api/v1/pos/auth/register', [
@@ -299,7 +566,7 @@ class PosSyncApiTest extends TestCase
     public function test_pos_status_handshake_returns_company_metadata(): void
     {
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey->token,
+            'Authorization' => 'Bearer '.$this->apiKey->token,
             'Accept' => 'application/json',
         ])->getJson('/api/v1/pos/status');
 
@@ -341,7 +608,7 @@ class PosSyncApiTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey->token,
+            'Authorization' => 'Bearer '.$this->apiKey->token,
             'Accept' => 'application/json',
         ])->getJson('/api/v1/pos/sync-catalog');
 
@@ -446,7 +713,7 @@ class PosSyncApiTest extends TestCase
         ];
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey->token,
+            'Authorization' => 'Bearer '.$this->apiKey->token,
             'Accept' => 'application/json',
         ])->postJson('/api/v1/pos/sync-sales', $payload);
 
@@ -499,7 +766,7 @@ class PosSyncApiTest extends TestCase
         ];
 
         $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey->token,
+            'Authorization' => 'Bearer '.$this->apiKey->token,
         ])->postJson('/api/v1/pos/sync-sales', $payload)->assertStatus(200);
 
         $product->refresh();
@@ -507,7 +774,7 @@ class PosSyncApiTest extends TestCase
         $this->assertEquals(1, Sale::where('external_id', $clientSaleUuid)->count());
 
         $response2 = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey->token,
+            'Authorization' => 'Bearer '.$this->apiKey->token,
         ])->postJson('/api/v1/pos/sync-sales', $payload);
 
         $response2->assertStatus(200)->assertJsonPath('synced_ids.0', $clientSaleUuid);
@@ -609,7 +876,7 @@ class PosSyncApiTest extends TestCase
         ];
 
         $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey->token,
+            'Authorization' => 'Bearer '.$this->apiKey->token,
         ])->postJson('/api/v1/pos/sync-sales', $payload)->assertStatus(200);
 
         $sale = Sale::where('external_id', $clientSaleUuid)->firstOrFail();
@@ -632,7 +899,7 @@ class PosSyncApiTest extends TestCase
         ]);
 
         $storeResponse = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey->token,
+            'Authorization' => 'Bearer '.$this->apiKey->token,
         ])->postJson('/api/v1/pos/quotations', [
             'customer_name' => 'Walk-in Client',
             'items' => [
@@ -656,7 +923,7 @@ class PosSyncApiTest extends TestCase
         $this->assertEquals(18.0, (float) $quote->tax_rate);
 
         $convertResponse = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey->token,
+            'Authorization' => 'Bearer '.$this->apiKey->token,
         ])->postJson("/api/v1/pos/quotations/{$quoteId}/convert");
 
         $convertResponse->assertStatus(200);
@@ -668,7 +935,7 @@ class PosSyncApiTest extends TestCase
     public function test_inventory_management_endpoints(): void
     {
         // 1. Create Product
-        $createRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $createRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->postJson('/api/v1/pos/inventory/product', [
                 'name' => 'Granola Bar',
                 'sale_price' => 2.50,
@@ -682,7 +949,7 @@ class PosSyncApiTest extends TestCase
         $productId = $createRes->json('product.id');
 
         // 2. Adjust Stock (+25)
-        $adjustRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $adjustRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->postJson('/api/v1/pos/inventory/adjust', [
                 'product_id' => $productId,
                 'type' => 'add',
@@ -693,7 +960,7 @@ class PosSyncApiTest extends TestCase
         $adjustRes->assertStatus(200)->assertJsonPath('new_stock', 75);
 
         // 3. List Inventory
-        $listRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $listRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->getJson('/api/v1/pos/inventory');
 
         $listRes->assertStatus(200)
@@ -704,7 +971,7 @@ class PosSyncApiTest extends TestCase
     public function test_customer_ledger_and_payment_endpoints(): void
     {
         // 1. Create Customer
-        $custRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $custRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->postJson('/api/v1/pos/customers', [
                 'name' => 'Charlie Brown',
                 'phone' => '+1555444555',
@@ -730,7 +997,7 @@ class PosSyncApiTest extends TestCase
         ]);
 
         // 3. Check Ledger
-        $ledgerRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $ledgerRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->getJson("/api/v1/pos/customers/{$custId}/ledger");
 
         $ledgerRes->assertStatus(200)
@@ -738,7 +1005,7 @@ class PosSyncApiTest extends TestCase
             ->assertJsonPath('customer.balance_due', 100);
 
         // 4. Record Payment ($40)
-        $payRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $payRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->postJson("/api/v1/pos/customers/{$custId}/payment", [
                 'amount' => 40.00,
                 'payment_method' => 'cash',
@@ -756,7 +1023,7 @@ class PosSyncApiTest extends TestCase
 
     public function test_sync_push_rejects_due_sale_without_customer(): void
     {
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->postJson('/api/v1/pos/sync-push', [
                 'sales' => [[
                     'id' => (string) Str::uuid(),
@@ -778,7 +1045,7 @@ class PosSyncApiTest extends TestCase
         $customer = Customer::create(['company_id' => $this->company->id, 'name' => 'Partial Pay Customer']);
         $saleUuid = (string) Str::uuid();
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->postJson('/api/v1/pos/sync-push', [
                 'sales' => [[
                     'id' => $saleUuid,
@@ -807,7 +1074,7 @@ class PosSyncApiTest extends TestCase
         $customer = Customer::create(['company_id' => $this->company->id, 'name' => 'Split Pay Customer']);
         $saleUuid = (string) Str::uuid();
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->postJson('/api/v1/pos/sync-push', [
                 'sales' => [[
                     'id' => $saleUuid,
@@ -834,7 +1101,7 @@ class PosSyncApiTest extends TestCase
     public function test_analytics_and_subscription_endpoints(): void
     {
         // Analytics
-        $analyticsRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $analyticsRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->getJson('/api/v1/pos/analytics');
 
         $analyticsRes->assertStatus(200)
@@ -842,7 +1109,7 @@ class PosSyncApiTest extends TestCase
             ->assertJsonStructure(['kpis', 'payment_breakdown', 'revenue_trend']);
 
         // Subscription
-        $subRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $subRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->getJson('/api/v1/pos/subscription');
 
         $subRes->assertStatus(200)
@@ -865,7 +1132,7 @@ class PosSyncApiTest extends TestCase
         ]);
 
         // 2. Pull catalog delta
-        $catalogRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $catalogRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->getJson('/api/v1/pos/sync-catalog');
 
         $catalogRes->assertStatus(200)
@@ -877,7 +1144,7 @@ class PosSyncApiTest extends TestCase
 
         // 3. Batch push offline created quotation
         $offlineQuoteId = (string) Str::uuid();
-        $batchRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $batchRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->postJson('/api/v1/pos/sync-batch', [
                 'sales' => [],
                 'inventory_adjustments' => [],
@@ -895,9 +1162,9 @@ class PosSyncApiTest extends TestCase
                         'tax' => 0.00,
                         'notes' => 'Created during internet outage',
                         'items' => [
-                            ['name' => 'Hardware Kit', 'price' => 450, 'qty' => 1]
+                            ['name' => 'Hardware Kit', 'price' => 450, 'qty' => 1],
                         ],
-                    ]
+                    ],
                 ],
             ]);
 
@@ -916,7 +1183,7 @@ class PosSyncApiTest extends TestCase
     public function test_tax_rules_api_endpoints(): void
     {
         // 1. Store a new tax rule
-        $storeRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $storeRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->postJson('/api/v1/pos/taxes', [
                 'name' => 'State Sales Tax',
                 'rate' => 8.5,
@@ -930,7 +1197,7 @@ class PosSyncApiTest extends TestCase
             ->assertJsonPath('tax.rate', 8.5);
 
         // 2. Fetch all taxes
-        $indexRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $indexRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->getJson('/api/v1/pos/taxes');
 
         $indexRes->assertStatus(200)
@@ -949,7 +1216,7 @@ class PosSyncApiTest extends TestCase
         ]);
 
         // WhatsApp delivery dispatch
-        $waRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $waRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->postJson('/api/v1/pos/send-delivery', [
                 'type' => 'whatsapp',
                 'document_type' => 'invoice',
@@ -982,13 +1249,13 @@ class PosSyncApiTest extends TestCase
             'items' => [['name' => 'Custom Service', 'price' => 300, 'quantity' => 1, 'total' => 300]],
         ]);
 
-        $salePdfRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $salePdfRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->get("/api/v1/pos/sales/{$sale->id}/pdf");
 
         $salePdfRes->assertStatus(200);
         $this->assertEquals('application/pdf', $salePdfRes->headers->get('Content-Type'));
 
-        $quotePdfRes = $this->withHeaders(['Authorization' => 'Bearer ' . $this->apiKey->token])
+        $quotePdfRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->get("/api/v1/pos/quotations/{$quote->id}/pdf");
 
         $quotePdfRes->assertStatus(200);

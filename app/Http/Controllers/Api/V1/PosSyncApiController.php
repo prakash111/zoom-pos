@@ -33,6 +33,7 @@ use App\Services\Payment\SubscriptionPaymentGatewayService;
 use App\Services\TaxEngineService;
 use App\Services\Tenancy\TenantProvisioningService;
 use Carbon\Carbon;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -933,7 +934,29 @@ class PosSyncApiController extends Controller
             'bank_details' => $company->bank_details,
         ];
 
-        return response()->json([
+        // Tombstones: rows deleted (by a delta-only client's queued offline
+        // delete, replayed through syncBatch) since `since`. Keyed by the
+        // plural entity name, matching the data arrays. Additive — a client
+        // that predates this key simply never prunes, which is the previous
+        // behaviour. With no `since` every tombstone is returned so a fresh
+        // client starts already converged.
+        $tombstoneQuery = DB::table('sync_tombstones')->where('company_id', $company->id);
+        if ($sinceCarbon) {
+            $tombstoneQuery->where('deleted_at', '>=', $sinceCarbon);
+        }
+        $entityPlural = [];
+        foreach (self::syncEntityConfig() as $entity => $cfg) {
+            $entityPlural[$entity] = $cfg['plural'];
+        }
+        $deletedIds = array_fill_keys(array_values($entityPlural), []);
+        foreach ($tombstoneQuery->get(['entity', 'external_id']) as $tomb) {
+            $bucket = $entityPlural[$tomb->entity] ?? null;
+            if ($bucket !== null) {
+                $deletedIds[$bucket][] = $tomb->external_id;
+            }
+        }
+
+        $payload = [
             'success' => true,
             'server_time' => now()->toIso8601String(),
             'counts' => [
@@ -957,7 +980,38 @@ class PosSyncApiController extends Controller
             'units' => $units,
             'taxes' => $taxes,
             'company' => $companySettings,
-        ]);
+            'deleted_ids' => $deletedIds,
+        ];
+
+        // Optional `?entities=products,customers` — let a client pull one
+        // entity at a time (progress UI, retry a single failed table) without
+        // downloading the whole delta each cycle. Always keeps `success`,
+        // `server_time`, `company`, and the matching `deleted_ids` subset.
+        $wanted = array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) $request->query('entities', '')),
+        )));
+        if ($wanted !== []) {
+            $keep = [
+                'success' => true,
+                'server_time' => $payload['server_time'],
+                'company' => $companySettings,
+                'counts' => [],
+                'deleted_ids' => [],
+            ];
+            foreach ($wanted as $w) {
+                if (array_key_exists($w, $payload) && ! in_array($w, ['success', 'server_time', 'company', 'counts', 'deleted_ids'], true)) {
+                    $keep[$w] = $payload[$w];
+                    $keep['counts'][$w] = $payload['counts'][$w] ?? 0;
+                }
+                if (array_key_exists($w, $deletedIds)) {
+                    $keep['deleted_ids'][$w] = $deletedIds[$w];
+                }
+            }
+            $payload = $keep;
+        }
+
+        return response()->json($payload);
     }
 
     /**
@@ -999,6 +1053,29 @@ class PosSyncApiController extends Controller
     }
 
     /**
+     * The eight entity kinds the offline desktop client can push
+     * creates / edits / deletes for: the Eloquent model, the plural key used
+     * in request/response arrays (`deleted_<plural>`, `deleted_ids.<plural>`),
+     * and whether the table carries a client `external_id`. Quotations are
+     * Sale rows with operation_type = 'quotation'.
+     *
+     * @return array<string, array{model: class-string<Model>, plural: string, external_id: bool}>
+     */
+    protected static function syncEntityConfig(): array
+    {
+        return [
+            'product' => ['model' => Product::class, 'plural' => 'products', 'external_id' => true],
+            'customer' => ['model' => Customer::class, 'plural' => 'customers', 'external_id' => true],
+            'quotation' => ['model' => Sale::class, 'plural' => 'quotations', 'external_id' => true],
+            'category' => ['model' => Category::class, 'plural' => 'categories', 'external_id' => true],
+            'brand' => ['model' => Brand::class, 'plural' => 'brands', 'external_id' => true],
+            'supplier' => ['model' => Supplier::class, 'plural' => 'suppliers', 'external_id' => true],
+            'unit' => ['model' => Unit::class, 'plural' => 'units', 'external_id' => true],
+            'tax_rule' => ['model' => TaxRule::class, 'plural' => 'tax_rules', 'external_id' => false],
+        ];
+    }
+
+    /**
      * Last-write-wins guard for a pushed field edit: apply it unless the
      * payload carries an updated_at that is not newer than the server row's
      * — a client with no updated_at (or one already applied) always applies,
@@ -1015,6 +1092,27 @@ class PosSyncApiController extends Controller
         } catch (\Throwable) {
             return true;
         }
+    }
+
+    /**
+     * One row for the sync-batch `conflicts` array: an offline edit/delete the
+     * server dropped because its own copy of the row was already newer. The
+     * desktop Sync panel lists these so the change isn't lost silently; the
+     * client also re-pulls the row so its local copy converges on the server's.
+     */
+    protected function conflictEntry(string $entity, string $externalId, Model $serverRow, string $reason = 'server_newer'): array
+    {
+        return [
+            'entity' => $entity,
+            'id' => $externalId,
+            'server_id' => (string) $serverRow->getKey(),
+            'reason' => $reason,
+            'server_updated_at' => optional($serverRow->updated_at)->toIso8601String(),
+            'label' => $serverRow->name
+                ?? $serverRow->tax_name
+                ?? $serverRow->sale_number
+                ?? null,
+        ];
     }
 
     /**
@@ -1270,6 +1368,14 @@ class PosSyncApiController extends Controller
         $syncedBrands = [];
         $syncedSuppliers = [];
         $syncedUnits = [];
+        // entity => list of external_ids the client asked us to delete and we
+        // either deleted or already had gone. Server-newer rows are skipped
+        // (not listed) so the client re-pulls them on the next delta.
+        $deleted = [];
+        // Offline edits/deletes that lost the last-write-wins race: the server
+        // row was already newer, so the client's change was dropped. Surfaced
+        // to the desktop's Sync panel so the change isn't silently lost.
+        $conflicts = [];
 
         DB::beginTransaction();
         try {
@@ -1279,7 +1385,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($prodData['id'] ?? Str::uuid()->toString());
                     $p = Product::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $p && ! empty($prodData['barcode'])) {
                         $p = Product::withoutGlobalScope('company')
@@ -1315,6 +1427,8 @@ class PosSyncApiController extends Controller
                         // A field edit made offline (e.g. name/price change) — apply it
                         // unless the server has a strictly newer edit for the same row.
                         $p->update($attrs);
+                    } elseif (! empty($prodData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('product', $extId, $p);
                     }
                     $syncedProducts[] = $extId;
                 }
@@ -1326,7 +1440,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($custData['id'] ?? Str::uuid()->toString());
                     $c = Customer::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $c && ! empty($custData['phone'])) {
                         $c = Customer::withoutGlobalScope('company')
@@ -1353,6 +1473,8 @@ class PosSyncApiController extends Controller
                         ]);
                     } elseif ($this->clientRowIsNewer($c, $custData)) {
                         $c->update($attrs);
+                    } elseif (! empty($custData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('customer', $extId, $c);
                     }
                     $syncedCustomers[] = $extId;
                 }
@@ -1371,7 +1493,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($catData['id'] ?? Str::uuid()->toString());
                     $cat = Category::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $cat && ! empty($catData['name'])) {
                         $cat = Category::withoutGlobalScope('company')
@@ -1391,6 +1519,8 @@ class PosSyncApiController extends Controller
                         $cat = Category::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
                     } elseif ($this->clientRowIsNewer($cat, $catData)) {
                         $cat->update($attrs);
+                    } elseif (! empty($catData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('category', $extId, $cat);
                     }
                     $syncedCategories[] = $extId;
                 }
@@ -1401,7 +1531,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($brandData['id'] ?? Str::uuid()->toString());
                     $brand = Brand::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $brand && ! empty($brandData['name'])) {
                         $brand = Brand::withoutGlobalScope('company')
@@ -1419,6 +1555,8 @@ class PosSyncApiController extends Controller
                         $brand = Brand::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
                     } elseif ($this->clientRowIsNewer($brand, $brandData)) {
                         $brand->update($attrs);
+                    } elseif (! empty($brandData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('brand', $extId, $brand);
                     }
                     $syncedBrands[] = $extId;
                 }
@@ -1429,7 +1567,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($supData['id'] ?? Str::uuid()->toString());
                     $sup = Supplier::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $sup && ! empty($supData['name'])) {
                         $sup = Supplier::withoutGlobalScope('company')
@@ -1454,6 +1598,8 @@ class PosSyncApiController extends Controller
                         $sup = Supplier::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
                     } elseif ($this->clientRowIsNewer($sup, $supData)) {
                         $sup->update($attrs);
+                    } elseif (! empty($supData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('supplier', $extId, $sup);
                     }
                     $syncedSuppliers[] = $extId;
                 }
@@ -1464,7 +1610,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($unitData['id'] ?? Str::uuid()->toString());
                     $unit = Unit::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $unit && ! empty($unitData['name'])) {
                         $unit = Unit::withoutGlobalScope('company')
@@ -1482,6 +1634,8 @@ class PosSyncApiController extends Controller
                         $unit = Unit::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
                     } elseif ($this->clientRowIsNewer($unit, $unitData)) {
                         $unit->update($attrs);
+                    } elseif (! empty($unitData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('unit', $extId, $unit);
                     }
                     $syncedUnits[] = $extId;
                 }
@@ -1606,7 +1760,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($quoteData['id'] ?? Str::uuid()->toString());
                     $quote = Sale::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
 
                     $items = (array) ($quoteData['items'] ?? []);
@@ -1671,6 +1831,117 @@ class PosSyncApiController extends Controller
                 }
             }
 
+            // 7. Process Offline Deletes (create/edit already handled above).
+            //
+            // The desktop client can delete a record while disconnected; it
+            // queues the delete and replays it here in `deleted_<entity>`
+            // arrays of `{id, deleted_at, updated_at?}`. Rules:
+            //   - idempotent: a `desktop_sync_receipts` row (`delete_<entity>`)
+            //     guards against re-processing the same queued delete;
+            //   - last-write-wins: if the server row was edited *after* the
+            //     offline delete (clientRowIsNewer === false) the delete is
+            //     skipped and the row survives — the client re-pulls it next
+            //     delta and converges to the server;
+            //   - otherwise the row is removed and a `sync_tombstones` row is
+            //     written so every other delta-only client learns it is gone
+            //     (`deleted_ids` in sync-pull).
+            foreach (self::syncEntityConfig() as $entity => $cfg) {
+                $modelClass = $cfg['model'];
+                $plural = $cfg['plural'];
+                $hasExternalId = $cfg['external_id'];
+                $key = 'deleted_'.$plural;
+                if (! $request->has($key) || ! is_array($request->input($key))) {
+                    continue;
+                }
+                $rows = [];
+                foreach ($request->input($key) as $delData) {
+                    if (is_string($delData)) {
+                        $delData = ['id' => $delData];
+                    }
+                    if (! is_array($delData)) {
+                        continue;
+                    }
+                    $extId = (string) ($delData['id'] ?? $delData['external_id'] ?? '');
+                    if ($extId === '') {
+                        continue;
+                    }
+
+                    $isNewOperation = DB::table('desktop_sync_receipts')->insertOrIgnore([
+                        'company_id' => $company->id,
+                        'operation_type' => 'delete_'.$entity,
+                        'external_id' => $extId,
+                        'created_at' => now(),
+                    ]) === 1;
+
+                    $row = $modelClass::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where(function ($q) use ($extId, $hasExternalId) {
+                            $q->where('id', $extId);
+                            if ($hasExternalId) {
+                                $q->orWhere('external_id', $extId);
+                            }
+                        })
+                        ->first();
+
+                    // Quotations live in the sales table — only ever delete the
+                    // quotation, never a completed sale.
+                    if ($entity === 'quotation' && $row && $row->operation_type !== 'quotation') {
+                        $row = null;
+                    }
+
+                    if ($row === null) {
+                        // Already gone (or never reached us) — still a success
+                        // for the client, and still worth a tombstone for peers.
+                        $rows[] = $extId;
+                        DB::table('sync_tombstones')->updateOrInsert(
+                            ['company_id' => $company->id, 'entity' => $entity, 'external_id' => $extId],
+                            ['deleted_at' => $delData['deleted_at'] ?? now(), 'created_at' => now()],
+                        );
+
+                        continue;
+                    }
+
+                    if (! $isNewOperation) {
+                        $rows[] = $extId;
+
+                        continue;
+                    }
+
+                    // Server edited the row after the offline delete → keep it,
+                    // and tell the client its delete was overridden.
+                    if (! $this->clientRowIsNewer($row, $delData + ['updated_at' => $delData['updated_at'] ?? $delData['deleted_at'] ?? null])) {
+                        $conflicts[] = $this->conflictEntry($entity, $extId, $row, 'deleted_offline_kept_on_server');
+
+                        continue;
+                    }
+
+                    $serverId = (string) $row->getKey();
+                    // A queued offline delete is an explicit removal and we
+                    // hold a tombstone — hard-delete so a later re-create with
+                    // the same external_id doesn't collide with a hidden
+                    // soft-deleted row (only Product has SoftDeletes today).
+                    method_exists($row, 'forceDelete') ? $row->forceDelete() : $row->delete();
+                    DB::table('sync_tombstones')->updateOrInsert(
+                        ['company_id' => $company->id, 'entity' => $entity, 'external_id' => $extId],
+                        [
+                            'server_id' => $serverId,
+                            'deleted_at' => $delData['deleted_at'] ?? now(),
+                            'created_at' => now(),
+                        ],
+                    );
+                    $rows[] = $extId;
+
+                    AuditLog::record('desktop_sync.deleted', $company->id, $user?->id, [
+                        'entity' => $entity,
+                        'external_id' => $extId,
+                        'server_id' => $serverId,
+                    ]);
+                }
+                if ($rows !== []) {
+                    $deleted[$plural] = array_values(array_unique($rows));
+                }
+            }
+
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -1681,6 +1952,48 @@ class PosSyncApiController extends Controller
                 'error' => 'Batch sync failed: '.$e->getMessage(),
             ], 500);
         }
+
+        // Generic queued mutations: offline SDUI `form_submit` / `api_post`
+        // actions the typed arrays above don't model. Replayed AFTER the
+        // transaction has committed — each one is an independent internal
+        // request against its own real route (so its own validation, auth and
+        // permission middleware run exactly as for a live call), and a single
+        // bad mutation is recorded as failed instead of poisoning the batch.
+        // Idempotent via `desktop_sync_receipts` keyed by the client's
+        // `idempotency_key`.
+        [$mutationsApplied, $mutationsFailed] = $this->replayQueuedMutations($request, $company);
+
+        // Resolve every external_id we just created/updated to its server
+        // primary key so the client can backfill `server_id` on its local
+        // rows and stop re-sending them. Additive: older clients ignore it.
+        $idMap = [];
+        $mapFor = function (string $modelClass, array $externalIds, bool $hasExternalId = true) use (&$idMap, $company) {
+            $externalIds = array_values(array_filter(array_unique($externalIds)));
+            if ($externalIds === []) {
+                return;
+            }
+            $columns = $hasExternalId ? ['id', 'external_id'] : ['id'];
+            $rows = $modelClass::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where(function ($q) use ($externalIds, $hasExternalId) {
+                    $q->whereIn('id', $externalIds);
+                    if ($hasExternalId) {
+                        $q->orWhereIn('external_id', $externalIds);
+                    }
+                })
+                ->get($columns);
+            foreach ($rows as $row) {
+                $ext = ($hasExternalId && ! empty($row->external_id)) ? (string) $row->external_id : (string) $row->id;
+                $idMap[$ext] = (string) $row->id;
+            }
+        };
+        $mapFor(Product::class, $syncedProducts);
+        $mapFor(Customer::class, $syncedCustomers);
+        $mapFor(Category::class, $syncedCategories);
+        $mapFor(Brand::class, $syncedBrands);
+        $mapFor(Supplier::class, $syncedSuppliers);
+        $mapFor(Unit::class, $syncedUnits);
+        $mapFor(Sale::class, $syncedQuotations);
 
         return response()->json([
             'success' => true,
@@ -1698,7 +2011,179 @@ class PosSyncApiController extends Controller
                 'suppliers' => $syncedSuppliers,
                 'units' => $syncedUnits,
             ],
+            // entity(plural) => [external_id, ...] the client can drop locally.
+            'deleted' => $deleted,
+            // Offline edits/deletes the server dropped because its row was
+            // already newer — [{entity, id, server_id, reason, label,
+            // server_updated_at}]. The client logs these + re-pulls the rows.
+            'conflicts' => $conflicts,
+            // external_id => server primary key, for every row touched above.
+            'id_map' => $idMap,
+            // idempotency_key => outcome, for the generic offline mutation
+            // queue (SDUI form_submit / api_post). Additive: clients that
+            // never queue generic mutations get empty arrays.
+            'mutations_applied' => $mutationsApplied,
+            'mutations_failed' => $mutationsFailed,
         ]);
+    }
+
+    /**
+     * Replay the optional `mutations: []` array on a sync-batch request.
+     *
+     * Each entry is `{idempotency_key|id, endpoint, method, payload}` — a
+     * verbatim record of an SDUI `form_submit` / `api_post` the client could
+     * not send while offline. We dispatch it as a fresh internal HTTP request
+     * against the app's own router, carrying the caller's bearer token so the
+     * target route's auth + `tenant.api.permission` middleware authorise it
+     * identically to a live call. Runs outside the batch transaction; one
+     * failure never rolls back the rest.
+     *
+     * @return array{0: list<string>, 1: list<array<string,string>>} [applied keys, failures]
+     */
+    protected function replayQueuedMutations(Request $request, Company $company): array
+    {
+        $raw = $request->input('mutations');
+        if (! is_array($raw) || $raw === []) {
+            return [[], []];
+        }
+
+        $applied = [];
+        $failed = [];
+        // Bound the work per batch — a client with a huge backlog still makes
+        // progress across several sync cycles rather than timing out here.
+        $raw = array_slice($raw, 0, 100);
+
+        $outerRequest = app()->bound('request') ? app('request') : null;
+
+        foreach ($raw as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $key = (string) ($entry['idempotency_key'] ?? $entry['id'] ?? '');
+            $endpoint = trim((string) ($entry['endpoint'] ?? ''));
+            $method = strtoupper((string) ($entry['method'] ?? 'POST'));
+            $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+
+            if ($key === '' || $endpoint === '') {
+                $failed[] = ['idempotency_key' => $key, 'reason' => 'Missing endpoint or idempotency_key.'];
+
+                continue;
+            }
+
+            // Never let a queued item re-enter the sync pipeline itself.
+            if (preg_match('#sync-(batch|pull|push|catalog|sales)#', $endpoint)) {
+                $failed[] = ['idempotency_key' => $key, 'reason' => 'Endpoint is not replayable.', 'endpoint' => $endpoint];
+
+                continue;
+            }
+
+            // Idempotency ledger: insertOrIgnore returns 1 only the first time
+            // we see this key for this company.
+            $isNew = DB::table('desktop_sync_receipts')->insertOrIgnore([
+                'company_id' => $company->id,
+                'operation_type' => 'mutation',
+                'external_id' => $key,
+                'created_at' => now(),
+            ]) === 1;
+
+            if (! $isNew) {
+                // Already handled on an earlier attempt — report success so the
+                // client drops it from the queue.
+                $applied[] = $key;
+
+                continue;
+            }
+
+            try {
+                [$status, $body] = $this->dispatchInternalRequest($request, $endpoint, $method, $payload);
+
+                if ($status >= 200 && $status < 300) {
+                    $applied[] = $key;
+                } else {
+                    // Let a future retry (or a fixed client) try again.
+                    $this->forgetMutationReceipt($company->id, $key);
+                    $failed[] = [
+                        'idempotency_key' => $key,
+                        'reason' => 'Replay returned HTTP '.$status.'.',
+                        'endpoint' => $endpoint,
+                        'response' => mb_substr($body, 0, 500),
+                    ];
+                }
+            } catch (\Throwable $e) {
+                $this->forgetMutationReceipt($company->id, $key);
+                $failed[] = ['idempotency_key' => $key, 'reason' => $e->getMessage(), 'endpoint' => $endpoint];
+                Log::warning('POS sync: queued mutation replay failed', [
+                    'endpoint' => $endpoint,
+                    'method' => $method,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Router dispatch rebinds the container's `request`; restore ours so
+        // anything downstream in this action still sees the real one.
+        if ($outerRequest !== null) {
+            app()->instance('request', $outerRequest);
+        }
+
+        return [$applied, $failed];
+    }
+
+    private function forgetMutationReceipt(int|string $companyId, string $key): void
+    {
+        DB::table('desktop_sync_receipts')
+            ->where('company_id', $companyId)
+            ->where('operation_type', 'mutation')
+            ->where('external_id', $key)
+            ->delete();
+    }
+
+    /**
+     * Build a fresh internal request for [$endpoint] (an absolute URL or a
+     * bare path), copy the caller's credential headers onto it, and run it
+     * through the HTTP kernel.
+     *
+     * @return array{0: int, 1: string} [status code, response body]
+     */
+    private function dispatchInternalRequest(Request $original, string $endpoint, string $method, array $payload): array
+    {
+        $path = $endpoint;
+        if (preg_match('#^https?://#i', $endpoint)) {
+            $parts = parse_url($endpoint);
+            $path = ($parts['path'] ?? '/').(isset($parts['query']) ? '?'.$parts['query'] : '');
+        }
+        if (! str_starts_with($path, '/')) {
+            $path = '/'.$path;
+        }
+
+        $isRead = in_array($method, ['GET', 'HEAD'], true);
+        $sub = Request::create(
+            $path,
+            $method,
+            $isRead ? [] : $payload,
+            [],
+            [],
+            [],
+            $isRead ? null : json_encode($payload)
+        );
+
+        // Carry only the headers the tenant guard / permission middleware read.
+        foreach (['Authorization', 'X-API-Key', 'X-Auth-Token', 'X-Tenant', 'X-Company-Id'] as $header) {
+            if ($original->headers->has($header)) {
+                $sub->headers->set($header, $original->headers->get($header));
+            }
+        }
+        $sub->headers->set('Accept', 'application/json');
+        if (! $isRead) {
+            $sub->headers->set('Content-Type', 'application/json');
+        }
+
+        /** @var Kernel $kernel */
+        $kernel = app(Kernel::class);
+        $response = $kernel->handle($sub);
+
+        return [$response->getStatusCode(), (string) $response->getContent()];
     }
 
     /**
