@@ -521,14 +521,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   children: [
                     Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        BootstrapCache.instance.activeModule.title.toUpperCase(),
+                        BootstrapCache.instance.activeModule.title
+                            .toUpperCase(),
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.95),
                           fontSize: 11,
@@ -551,19 +552,254 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
           ),
         ];
-    final navSections = _sectionsFor(company, user);
-    if (navSections.isEmpty) {
-      children.add(
-        bootstrap.isNavigationLoading
-            ? const _DrawerNavigationSkeleton()
-            : _DrawerNavigationUnavailable(
-                message: bootstrap.navigationError ??
-                    'No navigation items are available for this account.',
-                onRetry: () =>
-                    context.read<LocaleProvider>().refreshFromServer(),
+        final navSections = _sectionsFor(company, user);
+        if (navSections.isEmpty) {
+          children.add(
+            bootstrap.isNavigationLoading
+                ? const _DrawerNavigationSkeleton()
+                : _DrawerNavigationUnavailable(
+                    message: bootstrap.navigationError ??
+                        'No navigation items are available for this account.',
+                    onRetry: () =>
+                        context.read<LocaleProvider>().refreshFromServer(),
+                  ),
+          );
+        }
+        final indexByKey = <String, int>{};
+        var nextIndex = 1;
+        for (final section in navSections) {
+          for (final tile in section.tiles) {
+            indexByKey[tile.key] = nextIndex++;
+          }
+        }
+
+        void openTile(_FeatureTile tile) {
+          final index = indexByKey[tile.key];
+          if (index == null) return;
+          Navigator.of(context).pop();
+          _onDockItemSelected(context, index);
+        }
+
+        for (final section in navSections) {
+          if (section.header != null) {
+            children.add(Padding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+              child: Text(
+                bootstrap
+                    .resolveNavigationLabel(section.key, section.header!(l10n))
+                    .toUpperCase(),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  color: section.headerColor ??
+                      Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
-      );
-    }
+            ));
+          }
+
+          final childrenByParent = <String?, List<_FeatureTile>>{};
+          for (final tile in section.tiles) {
+            (childrenByParent[section.parentByKey[tile.key]] ??= []).add(tile);
+          }
+
+          Widget buildBranch(_FeatureTile tile, int depth) {
+            final nested = childrenByParent[tile.key] ?? const <_FeatureTile>[];
+            final index = indexByKey[tile.key]!;
+            final padding = EdgeInsets.only(
+              left: 16 + depth * 30,
+              right: 12,
+            );
+
+            if (nested.isEmpty) {
+              return ListTile(
+                key: ValueKey('drawer-item-${tile.key}'),
+                contentPadding: padding,
+                dense: depth > 0,
+                leading: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (depth > 0) ...[
+                      Text(
+                        '↳',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.outline,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Icon(tile.icon, size: depth == 0 ? 24 : 18),
+                  ],
+                ),
+                title: Text(
+                  bootstrap.resolveNavigationLabel(
+                      tile.key, tile.titleOf(l10n)),
+                  style: TextStyle(
+                    fontSize: depth > 0 ? 13 : 14,
+                    fontWeight: _dockIndex == index
+                        ? FontWeight.w700
+                        : (depth > 0 ? FontWeight.w500 : FontWeight.normal),
+                    color: _dockIndex == index
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                ),
+                selected: _dockIndex == index,
+                onTap: () => openTile(tile),
+              );
+            }
+
+            return ExpansionTile(
+              key: PageStorageKey<String>(
+                'drawer-branch-${section.key}-${tile.key}',
+              ),
+              tilePadding: padding,
+              childrenPadding: EdgeInsets.zero,
+              leading: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (depth > 0) ...[
+                    Text(
+                      '↳',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.outline,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Icon(tile.icon, size: depth == 0 ? 24 : 20),
+                ],
+              ),
+              // Parent branches always mount collapsed; they open only when the
+              // user taps them (PageStorageKey keeps that choice for the session).
+              initiallyExpanded: false,
+              maintainState: true,
+              shape: const Border(),
+              collapsedShape: const Border(),
+              title: Text(
+                bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
+                style: TextStyle(
+                  fontWeight:
+                      _dockIndex == index ? FontWeight.w700 : FontWeight.normal,
+                  color: _dockIndex == index
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+              ),
+              children: [
+                for (final child in nested)
+                  buildBranch(
+                    child,
+                    math.min(depth + 1, _maximumNavigationDepth),
+                  ),
+              ],
+            );
+          }
+
+          for (final root in childrenByParent[null] ?? const <_FeatureTile>[]) {
+            children.add(buildBranch(root, 0));
+          }
+        }
+
+        final hasChangePassword = navSections.any(
+          (sec) => sec.tiles.any(
+              (t) => t.key == 'change_password' || t.key == 'change-password'),
+        );
+
+        if (!hasChangePassword) {
+          children.add(const Divider());
+          children.add(ListTile(
+            leading: const Icon(Icons.lock_reset_outlined),
+            title: Text(l10n.changePassword),
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const ChangePasswordScreen()));
+            },
+          ));
+        }
+
+        final drawerGradient = bootstrap.theme.drawerGradient;
+
+        return Drawer(
+          backgroundColor:
+              drawerGradient != null ? Colors.transparent : drawerBgColor,
+          child: Container(
+            decoration: BoxDecoration(
+              color: drawerGradient == null ? drawerBgColor : null,
+              gradient: drawerGradient,
+            ),
+            child: SafeArea(
+              top: false,
+              bottom: true,
+              child: ListView(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom + 16,
+                ),
+                children: children,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// A persistent rail for the Left/Right dock positions on tablet/desktop
+  /// widths — wrapped in a scroll view since a rail doesn't scroll on its
+  /// own and this app has far more destinations than fit most window
+  /// heights.
+  ///
+  /// At desktop widths it renders a full hierarchical sidebar (nested items
+  /// sit under their parent, exactly like the slide-out drawer) rather than
+  /// the flat Material `NavigationRail`, which has no notion of sub-menus.
+  Widget _buildRail(BuildContext context) {
+    final extended = MediaQuery.sizeOf(context).width >= Breakpoints.desktop;
+    if (extended) return _buildRailTree(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: IntrinsicHeight(
+              child: NavigationRail(
+                extended: false,
+                selectedIndex: _dockIndex,
+                onDestinationSelected: (index) =>
+                    _onDockItemSelected(context, index),
+                labelType: NavigationRailLabelType.all,
+                destinations: [
+                  for (final destination in _dockDestinationsFor(
+                      AppLocalizations.of(context),
+                      context.read<AuthProvider>().company,
+                      context.read<AuthProvider>().user))
+                    NavigationRailDestination(
+                        icon: Icon(destination.$1),
+                        label: Text(destination.$2)),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Desktop sidebar: the same Home + section-headers + nested-tile tree the
+  /// drawer builds, in a fixed-width persistent column. Tap indices line up
+  /// with [_dockDestinationsFor] / [_featuresFor] (Home = 0, then every tile
+  /// in section/preorder), so [_dockIndex] and routing are unchanged.
+  Widget _buildRailTree(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final auth = context.read<AuthProvider>();
+    final bootstrap = context.watch<BootstrapCache>();
+    final navSections = _sectionsFor(auth.company, auth.user);
+
     final indexByKey = <String, int>{};
     var nextIndex = 1;
     for (final section in navSections) {
@@ -572,19 +808,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
-    void openTile(_FeatureTile tile) {
-      final index = indexByKey[tile.key];
-      if (index == null) return;
-      Navigator.of(context).pop();
-      _onDockItemSelected(context, index);
+    final rows = <Widget>[
+      ListTile(
+        dense: true,
+        leading: const Icon(Icons.home_outlined, size: 22),
+        title: Text(l10n.navHome,
+            style: TextStyle(
+              fontWeight: _dockIndex == 0 ? FontWeight.w700 : FontWeight.normal,
+              color: _dockIndex == 0
+                  ? Theme.of(context).colorScheme.primary
+                  : null,
+            )),
+        selected: _dockIndex == 0,
+        onTap: () => _onDockItemSelected(context, 0),
+      ),
+    ];
+
+    if (navSections.isEmpty) {
+      rows.add(bootstrap.isNavigationLoading
+          ? const _DrawerNavigationSkeleton()
+          : _DrawerNavigationUnavailable(
+              message: bootstrap.navigationError ??
+                  'No navigation items are available for this account.',
+              onRetry: () => context.read<LocaleProvider>().refreshFromServer(),
+            ));
     }
 
     for (final section in navSections) {
       if (section.header != null) {
-        children.add(Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+        rows.add(Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 12, 4),
           child: Text(
-            bootstrap.resolveNavigationLabel(section.key, section.header!(l10n)).toUpperCase(),
+            bootstrap
+                .resolveNavigationLabel(section.key, section.header!(l10n))
+                .toUpperCase(),
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
@@ -601,181 +858,69 @@ class _DashboardScreenState extends State<DashboardScreen> {
         (childrenByParent[section.parentByKey[tile.key]] ??= []).add(tile);
       }
 
-      Widget buildBranch(_FeatureTile tile, int depth) {
+      Widget branch(_FeatureTile tile, int depth) {
         final nested = childrenByParent[tile.key] ?? const <_FeatureTile>[];
         final index = indexByKey[tile.key]!;
-        final padding = EdgeInsets.only(
-          left: 16 + depth * 30,
-          right: 12,
+        final selected = _dockIndex == index;
+        final labelColor =
+            selected ? Theme.of(context).colorScheme.primary : null;
+        final label = Text(
+          bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
+          style: TextStyle(
+            fontSize: depth > 0 ? 13 : 14,
+            fontWeight: selected
+                ? FontWeight.w700
+                : (depth > 0 ? FontWeight.w500 : FontWeight.normal),
+            color: labelColor,
+          ),
         );
+        final leading = Icon(tile.icon, size: depth == 0 ? 22 : 18);
+        final pad = EdgeInsets.only(left: 12 + depth * 20, right: 8);
 
         if (nested.isEmpty) {
           return ListTile(
-            key: ValueKey('drawer-item-${tile.key}'),
-            contentPadding: padding,
-            dense: depth > 0,
-            leading: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (depth > 0) ...[
-                  Text(
-                    '↳',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.outline,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                ],
-                Icon(tile.icon, size: depth == 0 ? 24 : 18),
-              ],
-            ),
-            title: Text(
-              bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
-              style: TextStyle(
-                fontSize: depth > 0 ? 13 : 14,
-                fontWeight: _dockIndex == index
-                    ? FontWeight.w700
-                    : (depth > 0 ? FontWeight.w500 : FontWeight.normal),
-                color: _dockIndex == index
-                    ? Theme.of(context).colorScheme.primary
-                    : null,
-              ),
-            ),
-            selected: _dockIndex == index,
-            onTap: () => openTile(tile),
+            key: ValueKey('rail-item-${tile.key}'),
+            dense: true,
+            contentPadding: pad,
+            leading: leading,
+            title: label,
+            selected: selected,
+            onTap: () => _onDockItemSelected(context, index),
           );
         }
 
         return ExpansionTile(
-          key: PageStorageKey<String>(
-            'drawer-branch-${section.key}-${tile.key}',
-          ),
-          tilePadding: padding,
+          key: PageStorageKey<String>('rail-branch-${section.key}-${tile.key}'),
+          tilePadding: pad,
           childrenPadding: EdgeInsets.zero,
-          leading: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (depth > 0) ...[
-                Text(
-                  '↳',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.outline,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              Icon(tile.icon, size: depth == 0 ? 24 : 20),
-            ],
-          ),
-          // Parent branches always mount collapsed; they open only when the
-          // user taps them (PageStorageKey keeps that choice for the session).
-          initiallyExpanded: false,
-          maintainState: true,
+          dense: true,
           shape: const Border(),
           collapsedShape: const Border(),
-          title: Text(
-            bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
-            style: TextStyle(
-              fontWeight:
-                  _dockIndex == index ? FontWeight.w700 : FontWeight.normal,
-              color: _dockIndex == index
-                  ? Theme.of(context).colorScheme.primary
-                  : null,
-            ),
-          ),
+          initiallyExpanded: true,
+          maintainState: true,
+          leading: leading,
+          title: label,
           children: [
             for (final child in nested)
-              buildBranch(
-                child,
-                math.min(depth + 1, _maximumNavigationDepth),
-              ),
+              branch(child, math.min(depth + 1, _maximumNavigationDepth)),
           ],
         );
       }
 
       for (final root in childrenByParent[null] ?? const <_FeatureTile>[]) {
-        children.add(buildBranch(root, 0));
+        rows.add(branch(root, 0));
       }
     }
 
-    final hasChangePassword = navSections.any(
-      (sec) => sec.tiles.any((t) => t.key == 'change_password' || t.key == 'change-password'),
-    );
-
-    if (!hasChangePassword) {
-      children.add(const Divider());
-      children.add(ListTile(
-        leading: const Icon(Icons.lock_reset_outlined),
-        title: Text(l10n.changePassword),
-        onTap: () {
-          Navigator.of(context).pop();
-          Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
-        },
-      ));
-    }
-
-    final drawerGradient = bootstrap.theme.drawerGradient;
-
-    return Drawer(
-      backgroundColor: drawerGradient != null ? Colors.transparent : drawerBgColor,
-      child: Container(
-        decoration: BoxDecoration(
-          color: drawerGradient == null ? drawerBgColor : null,
-          gradient: drawerGradient,
-        ),
-        child: SafeArea(
-          top: false,
-          bottom: true,
-          child: ListView(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).padding.bottom + 16,
-            ),
-            children: children,
-          ),
+    return SizedBox(
+      width: 264,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: rows,
         ),
       ),
-    );
-      },
-    );
-  }
-
-  /// A persistent rail for the Left/Right dock positions on tablet/desktop
-  /// widths — wrapped in a scroll view since a rail doesn't scroll on its
-  /// own and this app has far more destinations than fit most window
-  /// heights.
-  Widget _buildRail(BuildContext context) {
-    final extended = MediaQuery.sizeOf(context).width >= Breakpoints.desktop;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: IntrinsicHeight(
-              child: NavigationRail(
-                extended: extended,
-                selectedIndex: _dockIndex,
-                onDestinationSelected: (index) => _onDockItemSelected(context, index),
-                labelType: extended
-                    ? NavigationRailLabelType.none
-                    : NavigationRailLabelType.all,
-                destinations: [
-                  for (final destination in _dockDestinationsFor(
-                      AppLocalizations.of(context),
-                      context.read<AuthProvider>().company,
-                      context.read<AuthProvider>().user))
-                    NavigationRailDestination(
-                        icon: Icon(destination.$1), label: Text(destination.$2)),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 

@@ -9,6 +9,7 @@ import 'package:zoom_pos_mobile/core/config/nav_dock_provider.dart';
 import 'package:zoom_pos_mobile/core/config/theme_provider.dart';
 import 'package:zoom_pos_mobile/core/models/company_model.dart';
 import 'package:zoom_pos_mobile/core/models/user_model.dart';
+import 'package:zoom_pos_mobile/core/sdui/models/sdui_models.dart';
 import 'package:zoom_pos_mobile/core/services/dynamic_string_service.dart';
 import 'package:zoom_pos_mobile/core/services/sync/sync_engine.dart';
 import 'package:zoom_pos_mobile/core/storage/app_preferences.dart';
@@ -58,7 +59,8 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
     required String email,
     required String password,
     String? accountId,
-  }) async => true;
+  }) async =>
+      true;
 
   @override
   RegisterResult? get lastRegisterResult => null;
@@ -75,13 +77,15 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
     String? phone,
     String? currency,
     String posMode = 'general',
-  }) async => RegisterResult(requiresOtp: false, token: 'fake_token');
+  }) async =>
+      RegisterResult(requiresOtp: false, token: 'fake_token');
 
   @override
   Future<bool> verifyOtp({
     required String email,
     required String otp,
-  }) async => true;
+  }) async =>
+      true;
 
   @override
   Future<void> resendOtp({required String email}) async {}
@@ -91,7 +95,8 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
     String token, {
     UserModel? user,
     CompanyModel? company,
-  }) async => true;
+  }) async =>
+      true;
 
   @override
   Future<void> logout() async {}
@@ -117,7 +122,8 @@ class FakeApiClient extends Fake implements ApiClient {
   Future<Map<String, dynamic>> getAbsolute(
     String path, {
     Map<String, dynamic>? query,
-  }) async => get(path, query: query);
+  }) async =>
+      get(path, query: query);
 
   @override
   Future<Map<String, dynamic>> get(
@@ -178,7 +184,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('AppLocalizations null-safety fallback', () {
-    testWidgets('AppLocalizations.of() falls back safely when delegate is absent',
+    testWidgets(
+        'AppLocalizations.of() falls back safely when delegate is absent',
         (tester) async {
       late AppLocalizations resolved;
 
@@ -242,7 +249,8 @@ void main() {
       fakeSync = FakeSyncEngine();
       heldCartsStore = HeldCartsStore();
       themeProvider = ThemeProvider();
-      localeProvider = LocaleProvider(preferences: fakePreferences, apiClient: fakeApi);
+      localeProvider =
+          LocaleProvider(preferences: fakePreferences, apiClient: fakeApi);
       navDockProvider = NavDockProvider(preferences: fakePreferences);
     });
 
@@ -333,6 +341,66 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.text('Acme Supermarket'), findsWidgets);
+    });
+
+    testWidgets(
+        'desktop sidebar nests sub-menu items under their parent, not flat',
+        (tester) async {
+      // A wide window uses the persistent left sidebar (not the drawer).
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      // Inject a nav tree whose "Store Settings" item has children.
+      BootstrapCache.instance.menuStructure = const [
+        SduiNavSectionSchema(
+          key: 'administration',
+          title: 'Administration & Settings',
+          items: [
+            SduiNavItemSchema(
+              key: 'settings',
+              title: 'Store Settings',
+              icon: 'settings',
+              children: [
+                SduiNavItemSchema(
+                    key: 'financial',
+                    title: 'Financial & Currency',
+                    icon: 'payments'),
+                SduiNavItemSchema(
+                    key: 'taxes', title: 'Taxes & Compliance', icon: 'percent'),
+              ],
+            ),
+          ],
+        ),
+      ];
+      addTearDown(() => BootstrapCache.instance.menuStructure = []);
+
+      fakeAuth.company = CompanyModel(
+        id: '1',
+        name: 'Acme Supermarket',
+        tradeName: 'Acme Supermarket',
+        currency: 'USD',
+        currencySymbol: '\$',
+        planName: 'Pro',
+      );
+      fakeAuth.status = AuthStatus.authenticated;
+
+      await tester.pumpWidget(buildTestApp(child: const AuthGate()));
+      await tester.pumpAndSettle();
+
+      // The parent is an expandable branch and the children live inside it.
+      final branch = find.widgetWithText(ExpansionTile, 'Store Settings');
+      expect(branch, findsOneWidget);
+      expect(
+        find.descendant(
+            of: branch, matching: find.text('Financial & Currency')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: branch, matching: find.text('Taxes & Compliance')),
+        findsOneWidget,
+      );
     });
   });
 }
