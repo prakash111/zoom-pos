@@ -1106,7 +1106,21 @@ class PosSyncApiTest extends TestCase
 
         $analyticsRes->assertStatus(200)
             ->assertJsonPath('success', true)
-            ->assertJsonStructure(['kpis', 'payment_breakdown', 'revenue_trend']);
+            ->assertJsonStructure([
+                'kpis' => [
+                    'month_revenue', 'month_orders', 'prev_month_revenue', 'prev_month_orders',
+                    'product_count', 'customer_count',
+                ],
+                'payment_breakdown',
+                'revenue_trend',
+                'monthly_activity' => [['month', 'year', 'completed', 'pending']],
+                'popular_tags',
+                'recent_transactions',
+                'recent_customers',
+            ]);
+        // 9 months of activity buckets, oldest first, ending on the current month.
+        $this->assertCount(9, $analyticsRes->json('monthly_activity'));
+        $this->assertSame(now()->format('M'), $analyticsRes->json('monthly_activity.8.month'));
 
         // Subscription
         $subRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])

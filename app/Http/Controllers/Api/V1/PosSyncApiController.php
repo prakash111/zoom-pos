@@ -3101,22 +3101,103 @@ class PosSyncApiController extends Controller
 
         $totalReceivables = (float) (clone $salesBase)->sum('due_amount');
 
+        // Previous calendar month — drives the ▲/▼ deltas on the redesigned
+        // "Statistics" card.
+        $prevMonthSales = (clone $salesBase)->whereBetween('created_at', [
+            now()->subMonthNoOverflow()->startOfMonth(),
+            now()->subMonthNoOverflow()->endOfMonth(),
+        ]);
+        $prevMonthRevenue = (float) (clone $prevMonthSales)->sum('total');
+        $prevMonthOrders = (clone $prevMonthSales)->count();
+
+        $productCount = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)->count();
+        $customerCount = Customer::withoutGlobalScope('company')
+            ->where('company_id', $company->id)->count();
+
+        // Monthly purchase activity for the last 9 months: a "completed" sale
+        // is fully paid, a "pending" one still carries a balance.
+        $monthlyActivity = [];
+        for ($i = 8; $i >= 0; $i--) {
+            $start = now()->subMonthsNoOverflow($i)->startOfMonth();
+            $end = (clone $start)->endOfMonth();
+            $rows = (clone $salesBase)->whereBetween('created_at', [$start, $end]);
+            $completed = (clone $rows)->where('due_amount', '<=', 0.01)->count();
+            $pending = (clone $rows)->where('due_amount', '>', 0.01)->count();
+            $monthlyActivity[] = [
+                'month' => $start->format('M'),
+                'year' => (int) $start->format('Y'),
+                'completed' => $completed,
+                'pending' => $pending,
+            ];
+        }
+
+        // "Popular tags" — the catalogue's most-used category names.
+        $popularTags = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->whereNotNull('category_name')
+            ->where('category_name', '!=', '')
+            ->select('category_name', DB::raw('COUNT(*) as c'))
+            ->groupBy('category_name')
+            ->orderByDesc('c')
+            ->limit(14)
+            ->pluck('category_name')
+            ->values();
+
+        // Latest transactions table.
+        $recentTransactions = (clone $salesBase)
+            ->latest('created_at')
+            ->limit(8)
+            ->get(['id', 'sale_number', 'customer_name', 'total', 'due_amount', 'status', 'created_at'])
+            ->map(fn ($s) => [
+                'id' => (string) $s->id,
+                'reference' => $s->sale_number ?: ('TR-'.str_pad((string) $s->id, 6, '0', STR_PAD_LEFT)),
+                'customer' => $s->customer_name ?: 'Walk-in',
+                'date' => optional($s->created_at)->format('d-m-Y'),
+                'status' => ((float) $s->due_amount) > 0.01 ? 'Pending' : 'Completed',
+                'amount' => (float) $s->total,
+            ])
+            ->values();
+
+        // Recent customers — stands in for the design's "Recent Messages".
+        $recentCustomers = Customer::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->latest('created_at')
+            ->limit(6)
+            ->get(['id', 'name', 'phone', 'email', 'created_at'])
+            ->map(fn ($c) => [
+                'id' => (string) $c->id,
+                'name' => $c->name ?: 'Customer',
+                'detail' => $c->phone ?: ($c->email ?: 'No contact on file'),
+                'time' => optional($c->created_at)->format('d M, h:i A'),
+            ])
+            ->values();
+
         return response()->json([
             'success' => true,
             'currency_symbol' => $company->currency_symbol ?? '$',
+            'server_time' => now()->toIso8601String(),
             'kpis' => [
                 'today_revenue' => $todayRevenue,
                 'today_orders' => $todayOrders,
                 'month_revenue' => $monthRevenue,
                 'month_orders' => $monthOrders,
+                'prev_month_revenue' => $prevMonthRevenue,
+                'prev_month_orders' => $prevMonthOrders,
                 'all_time_revenue' => $allTimeRevenue,
                 'all_time_orders' => $allTimeOrders,
                 'average_order_value' => $avgTicket,
                 'total_receivables' => $totalReceivables,
                 'low_stock_count' => $lowStockCount,
+                'product_count' => $productCount,
+                'customer_count' => $customerCount,
             ],
             'payment_breakdown' => $paymentMethods,
             'revenue_trend' => $sevenDaysTrend,
+            'monthly_activity' => $monthlyActivity,
+            'popular_tags' => $popularTags,
+            'recent_transactions' => $recentTransactions,
+            'recent_customers' => $recentCustomers,
             'top_products' => $topProducts,
         ]);
     }
