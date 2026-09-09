@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/bootstrap_cache.dart';
 import '../../core/config/locale_provider.dart';
+import '../../core/config/dashboard_layout.dart';
 import '../../core/config/nav_dock_provider.dart';
 import '../../core/config/theme.dart';
 import '../../core/config/theme_provider.dart';
@@ -24,6 +25,7 @@ import '../../core/widgets/coming_soon_screen.dart';
 import '../../core/widgets/tappable_scale.dart';
 import '../../l10n/app_localizations.dart';
 import '../analytics/analytics_repository.dart';
+import 'widgets/oroit_dashboard.dart';
 import 'widgets/posh_dashboard.dart';
 import '../auth/auth_provider.dart';
 import '../settings/screens/app_preferences_screen.dart';
@@ -1363,11 +1365,28 @@ class _DashboardAnalytics extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
+    final layout = context.watch<NavDockProvider>().dashboardLayout;
 
     void open(String key) => Navigator.of(context).push(
           MaterialPageRoute(
               builder: SduiComponentRegistry.instance.resolve(key)),
         );
+
+    final Widget layoutBody = switch (layout) {
+      DashboardLayout.oroit => OroitDashboardHome(
+          analytics: analytics,
+          formatter: formatter,
+          onAddProduct: () => open('inventory'),
+          onOpenTransactions: () => open('sales'),
+        ),
+      DashboardLayout.posh => PoshDashboardHome(
+          analytics: analytics,
+          formatter: formatter,
+          onAddProduct: () => open('inventory'),
+          onOpenTransactions: () => open('sales'),
+          onOpenCustomers: () => open('customers'),
+        ),
+    };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1398,13 +1417,7 @@ class _DashboardAnalytics extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 16),
-        PoshDashboardHome(
-          analytics: analytics,
-          formatter: formatter,
-          onAddProduct: () => open('inventory'),
-          onOpenTransactions: () => open('sales'),
-          onOpenCustomers: () => open('customers'),
-        ),
+        layoutBody,
       ],
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../storage/app_preferences.dart';
+import 'dashboard_layout.dart';
 import 'page_transitions.dart';
 
 /// Where the app's main navigation dock is docked — set from
@@ -33,6 +34,9 @@ class NavDockProvider extends ChangeNotifier {
   /// The page-move animation applied app-wide when navigating between screens.
   AppPageTransition transition = AppPageTransition.slide;
 
+  /// Which visual treatment the authenticated dashboard home renders.
+  DashboardLayout dashboardLayout = DashboardLayout.posh;
+
   Future<void> load() async {
     final saved = await _preferences.readNavDockPosition();
     if (saved != null) {
@@ -41,6 +45,10 @@ class NavDockProvider extends ChangeNotifier {
     final savedTransition = await _preferences.readPageTransition();
     if (savedTransition != null) {
       transition = AppPageTransition.fromName(savedTransition);
+    }
+    final savedLayout = await _preferences.readDashboardLayout();
+    if (savedLayout != null) {
+      dashboardLayout = DashboardLayout.fromName(savedLayout);
     }
     notifyListeners();
   }
@@ -57,5 +65,12 @@ class NavDockProvider extends ChangeNotifier {
     transition = value;
     notifyListeners();
     await _preferences.savePageTransition(value.name);
+  }
+
+  Future<void> setDashboardLayout(DashboardLayout value) async {
+    if (dashboardLayout == value) return;
+    dashboardLayout = value;
+    notifyListeners();
+    await _preferences.saveDashboardLayout(value.name);
   }
 }

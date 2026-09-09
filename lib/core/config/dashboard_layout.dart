@@ -1,0 +1,33 @@
+import 'package:flutter/material.dart';
+
+/// Which visual treatment the authenticated dashboard home renders. All
+/// layouts are bound to the exact same `GET /analytics` payload — only the
+/// presentation changes. Chosen in Settings ▸ Appearance / App Preferences and
+/// persisted per device.
+enum DashboardLayout {
+  /// Light "PoshPointHub" cards (default).
+  posh,
+
+  /// Dark, glossy "OroitOash" analytics board.
+  oroit;
+
+  static DashboardLayout fromName(String? name) => DashboardLayout.values
+      .firstWhere((l) => l.name == name, orElse: () => DashboardLayout.posh);
+
+  String get label => switch (this) {
+        DashboardLayout.posh => 'Cards (light)',
+        DashboardLayout.oroit => 'Analytics board (dark)',
+      };
+
+  String get description => switch (this) {
+        DashboardLayout.posh =>
+          'Balance, statistics, activity, tags & transactions',
+        DashboardLayout.oroit =>
+          'Glossy dark board — order statistics, overview lines & tracking',
+      };
+
+  IconData get icon => switch (this) {
+        DashboardLayout.posh => Icons.dashboard_outlined,
+        DashboardLayout.oroit => Icons.space_dashboard_outlined,
+      };
+}

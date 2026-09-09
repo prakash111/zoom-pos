@@ -13,6 +13,7 @@ class AppPreferences {
   static const _localeKey = 'zoom_pos.locale';
   static const _navDockPositionKey = 'zoom_pos.nav_dock_position';
   static const _pageTransitionKey = 'zoom_pos.page_transition';
+  static const _dashboardLayoutKey = 'zoom_pos.dashboard_layout';
   static const _windowBoundsKey = 'zoom_pos.window_bounds';
 
   Future<String> readBaseUrl() async {
@@ -97,6 +98,25 @@ class AppPreferences {
       await prefs.setString(_pageTransitionKey, style);
     } catch (e) {
       debugPrint('AppPreferences.savePageTransition error: $e');
+    }
+  }
+
+  Future<String?> readDashboardLayout() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_dashboardLayoutKey);
+    } catch (e) {
+      debugPrint('AppPreferences.readDashboardLayout error: $e');
+      return null;
+    }
+  }
+
+  Future<void> saveDashboardLayout(String layout) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_dashboardLayoutKey, layout);
+    } catch (e) {
+      debugPrint('AppPreferences.saveDashboardLayout error: $e');
     }
   }
 

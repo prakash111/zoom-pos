@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/config/dashboard_layout.dart';
 import '../../../core/config/nav_dock_provider.dart';
 import '../../../core/config/page_transitions.dart';
 import '../../../core/config/theme_provider.dart';
@@ -68,6 +69,30 @@ class AppPreferencesBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        group(
+          'Dashboard layout',
+          'Pick which design the home dashboard uses. Both show the same data.',
+          RadioGroup<DashboardLayout>(
+            groupValue: navDock.dashboardLayout,
+            onChanged: (value) {
+              if (value != null) navDock.setDashboardLayout(value);
+            },
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (final l in DashboardLayout.values)
+                    RadioListTile<DashboardLayout>(
+                      value: l,
+                      secondary: Icon(l.icon),
+                      title: Text(l.label),
+                      subtitle: Text(l.description),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
         group(
           'Theme',
           'Choose how the app looks on this device.',
