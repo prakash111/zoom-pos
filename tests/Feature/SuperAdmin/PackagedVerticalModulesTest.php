@@ -296,6 +296,50 @@ class PackagedVerticalModulesTest extends TestCase
         $this->assertContains('retail', $modes);
     }
 
+    public function test_a_registration_whitelisted_tenant_only_sees_its_own_vertical_in_the_drawer(): void
+    {
+        $service = app(ModulePackageService::class);
+
+        // Both verticals are installed, licensed and active platform-wide.
+        foreach (['pharmacy', 'salon'] as $key) {
+            $module = $service->install($this->zipPackage($key), null);
+            $this->licenseModule($module);
+            $service->activate($module, null);
+        }
+
+        // A store that self-registered as a pharmacy — licensed_modules holds
+        // exactly the vertical chosen at signup.
+        $pharmacyTenant = Company::create([
+            'name' => 'Rx Co', 'slug' => 'rx-co', 'status' => 'active',
+            'pos_mode' => 'pharmacy', 'licensed_modules' => ['pharmacy'],
+            'currency' => 'USD', 'currency_symbol' => '$',
+        ]);
+
+        $navKeys = collect(TenantNavRegistry::getEffectiveNavForTenant($pharmacyTenant))
+            ->pluck('key')
+            ->map(fn ($k) => (string) $k);
+
+        $this->assertTrue(
+            $navKeys->contains(fn ($k) => str_contains($k, 'pharmacy')),
+            'Pharmacy tenant should see its own vertical section.'
+        );
+        $this->assertFalse(
+            $navKeys->contains(fn ($k) => str_starts_with($k, 'salon')),
+            'Pharmacy tenant must not see the salon vertical it never licensed.'
+        );
+
+        // A tenant with no explicit whitelist keeps the legacy behaviour:
+        // every active package is offered.
+        $openTenant = Company::create([
+            'name' => 'Open Co', 'slug' => 'open-co', 'status' => 'active',
+            'pos_mode' => 'retail', 'currency' => 'USD', 'currency_symbol' => '$',
+        ]);
+        $openNavKeys = collect(TenantNavRegistry::getEffectiveNavForTenant($openTenant))
+            ->pluck('key')
+            ->map(fn ($k) => (string) $k);
+        $this->assertTrue($openNavKeys->contains(fn ($k) => str_starts_with($k, 'salon')));
+    }
+
     public function test_a_purged_module_re_installs_cleanly_without_table_already_exists(): void
     {
         $service = app(ModulePackageService::class);

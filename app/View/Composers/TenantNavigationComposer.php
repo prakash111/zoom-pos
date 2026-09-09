@@ -29,6 +29,15 @@ class TenantNavigationComposer
 
         $allows = fn (string $module, string $action = 'view'): bool => ! $user || $user->isPrivilegedRole() || $checker->allows($user, $module, $action);
 
+        // Primary non-retail business vertical this store operates in (from
+        // Company::licensedModuleKeys(), which normalises licensed_modules /
+        // pos_mode). Drives the additive "Pharmacy / Salon / Repair Operations"
+        // sidebar group; a plain retail or restaurant store has none.
+        $verticalKeys = $user ? $company->licensedModuleKeys() : ['retail'];
+        $activeVertical = collect($verticalKeys)
+            ->first(fn ($k) => in_array($k, ['pharmacy', 'service_booking', 'repair_technician'], true))
+            ?? ($verticalKeys[0] ?? 'retail');
+
         $isQuotes = $this->request->routeIs('tenant.quotes.*') || $this->request->routeIs('tenant.quotations.*');
         $isSalesTargets = $this->request->routeIs('tenant.sales-targets.*');
         $isCashRegister = $this->request->routeIs('tenant.financials.cash_register');
@@ -48,12 +57,18 @@ class TenantNavigationComposer
             'themeClasses' => $themeClasses,
             'uiAccentColorHex' => $company->primary_color ?: ($themeClasses['hex'] ?? '#2563eb'),
             'isRestaurant' => $user?->company?->isRestaurantMode() ?? false,
+            'activeVertical' => $activeVertical,
+            'isPharmacy' => $activeVertical === 'pharmacy',
+            'isSalon' => $activeVertical === 'service_booking',
+            'isRepair' => $activeVertical === 'repair_technician',
+            'isVerticalStore' => in_array($activeVertical, ['pharmacy', 'service_booking', 'repair_technician'], true),
             'isPosScreen' => $this->request->routeIs('tenant.sales.create') || $this->request->routeIs('tenant.restaurant.pos'),
 
             'canQuotes' => $allows('quotes'),
             'canSales' => $allows('sales'),
             'canConsignments' => $allows('consignments'),
             'canServiceOrders' => $allows('service_orders'),
+            'canRepair' => $allows('repair'),
             'canPos' => $allows('pos', 'create'),
             'canProducts' => $allows('products'),
             'canCategories' => $allows('categories'),

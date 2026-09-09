@@ -126,22 +126,24 @@ class AppBootstrapApiTest extends TestCase
             ],
             'items' => [
                 ['key' => 'settings', 'section' => 'administration', 'parent' => null, 'order' => 0, 'visible' => true],
-                // Un-nested from "settings" back to the section root.
+                // A drag tried to pull "settings_navigation" out to the section
+                // root — but every Store Settings tab is registry-pinned under
+                // the "settings" accordion, so normalize() snaps it back.
                 ['key' => 'settings_navigation', 'section' => 'administration', 'parent' => null, 'order' => 1, 'visible' => true],
-                // Nested under "settings" (only one of the eight tabs kept).
                 ['key' => 'settings_profile', 'section' => 'administration', 'parent' => 'settings', 'order' => 0, 'visible' => true],
             ],
         ];
         $expectedItems = [
             ['key' => 'settings', 'section' => 'administration', 'parent' => null, 'parent_id' => null, 'level' => 0, 'order' => 0, 'visible' => true],
             ['key' => 'settings_profile', 'section' => 'administration', 'parent' => 'settings', 'parent_id' => 'settings', 'level' => 1, 'order' => 0, 'visible' => true],
-            ['key' => 'settings_navigation', 'section' => 'administration', 'parent' => null, 'parent_id' => null, 'level' => 0, 'order' => 1, 'visible' => true],
+            ['key' => 'settings_navigation', 'section' => 'administration', 'parent' => 'settings', 'parent_id' => 'settings', 'level' => 1, 'order' => 1, 'visible' => true],
         ];
 
         $this->withToken($token)->postJson('/api/v1/pos/settings/nav-config', $payload)
             ->assertOk()
             ->assertJsonPath('nav.items', $expectedItems)
-            ->assertJsonPath('nav.tree.0.items.0.children.0.key', 'settings_profile');
+            ->assertJsonPath('nav.tree.0.items.0.children.0.key', 'settings_profile')
+            ->assertJsonPath('nav.tree.0.items.0.children.1.key', 'settings_navigation');
 
         $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap?locale=en')
             ->assertOk()

@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Configuration;
 use App\Models\Customer;
 use App\Models\CustomNotificationChannel;
+use App\Models\PaymentMethod;
 use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
 use App\Models\Product;
@@ -17,6 +18,7 @@ use App\Models\Role;
 use App\Models\Sale;
 use App\Models\SalonAppointment;
 use App\Models\SduiScreen;
+use App\Models\TaxRule;
 use App\Models\TenantApiKey;
 use App\Models\TenantSession;
 use App\Models\User;
@@ -26,6 +28,7 @@ use App\Services\Localization\PlatformRegionalService;
 use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\TenantNavigationConfigService;
 use App\Services\Navigation\TenantNavRegistry;
+use App\Services\TaxCalculationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Schema;
@@ -4278,7 +4281,168 @@ class SchemaResponse
             'Financial settings updated successfully'
         ), 'save');
 
+        // Payment methods are company-wide and shared by every module's POS —
+        // surface a manager entry here so the mobile app has parity with the
+        // web "Financial & Currency" tab.
+        $activeTenders = PaymentMethod::getForCompany($company->id);
+        $components[] = self::card([
+            self::text('Payment Methods', 'title_medium', ['bold' => true]),
+            self::text('Tender types offered at checkout across every module (retail, restaurant, pharmacy, salon, repair). Add UPI handles, bank accounts, wallets or store credit.', 'body_small', ['color' => '#6b7280']),
+            self::divider(),
+            self::wrap(
+                $activeTenders->isNotEmpty()
+                    ? $activeTenders->map(fn (PaymentMethod $pm) => self::badge($pm->name, '#2563eb', 'subtle'))->all()
+                    : [self::badge('No payment methods configured', '#b45309', 'subtle')]
+            ),
+            self::buttonPrimary('Manage Payment Methods', self::navigateAction(
+                '/api/tenant/views/settings-payment-methods',
+                title: 'Payment Methods'
+            ), 'account_balance_wallet'),
+        ]);
+
         return self::screen('Financial & Currency', $components);
+    }
+
+    /**
+     * Company-wide payment method manager. Backed by the same
+     * SettingsApiController endpoints the web Settings screen uses, so a method
+     * added here is immediately available at every module's checkout.
+     */
+    public static function paymentMethodsView(Company $company): array
+    {
+        $methods = PaymentMethod::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->orderBy('order_index')
+            ->orderBy('name')
+            ->get();
+
+        $cards = $methods->map(function (PaymentMethod $pm) {
+            $meta = $pm->metadata ?? [];
+            $metaBits = array_filter([
+                ($meta['bank_name'] ?? null) ? 'Bank: '.$meta['bank_name'] : null,
+                ($meta['account_no'] ?? null) ? 'A/C: '.$meta['account_no'] : null,
+                ($meta['ifsc_code'] ?? null) ? 'IFSC: '.$meta['ifsc_code'] : null,
+                ($meta['upi_id'] ?? null) ? 'UPI: '.$meta['upi_id'] : null,
+                ($meta['holder_name'] ?? null) ? 'Holder: '.$meta['holder_name'] : null,
+            ]);
+
+            return self::card([
+                self::row([
+                    self::icon(ModuleRegistry::paymentMethodPresentation((string) ($pm->code ?: $pm->name))['icon'], ['color' => '#2563eb', 'size' => 24], ['flexible' => false]),
+                    self::column([
+                        self::text($pm->name, 'title_medium', ['bold' => true, 'max_lines' => 1]),
+                        self::text(trim(((string) $pm->code).($pm->description ? '  ·  '.$pm->description : '')), 'body_small', ['color' => '#64748b', 'max_lines' => 2]),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                    self::badge($pm->is_active ? 'Active' : 'Disabled', $pm->is_active ? '#16a34a' : '#9ca3af', 'subtle'),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'start']),
+                ...($metaBits !== [] ? [self::text(implode('   ·   ', $metaBits), 'label_medium', ['color' => '#475569'])] : []),
+                self::divider(),
+                self::row([
+                    self::buttonOutlined('Edit', self::openRemoteSheetAction(
+                        "/api/tenant/settings/payment-methods/{$pm->id}/edit-sheet",
+                        "Edit {$pm->name}"
+                    ), 'edit', ['expanded' => true, 'dense' => true]),
+                    self::buttonOutlined($pm->is_active ? 'Disable' : 'Enable', self::apiPostAction(
+                        "/api/tenant/settings/payment-methods/{$pm->id}/toggle",
+                        [],
+                        'Payment method updated.',
+                        reload: true
+                    ), $pm->is_active ? 'toggle_off' : 'toggle_on', ['expanded' => true, 'dense' => true]),
+                    self::buttonDanger('Remove', self::apiPostAction(
+                        "/api/tenant/settings/payment-methods/{$pm->id}/delete",
+                        [],
+                        'Payment method removed.',
+                        reload: true
+                    ), 'delete_outline', ['expanded' => true, 'dense' => true]),
+                ], ['spacing' => 8]),
+            ], ['padding' => 14, 'border_radius' => 12]);
+        })->all();
+
+        return self::screen('Payment Methods', [
+            self::card([
+                self::row([
+                    self::icon('account_balance_wallet', ['color' => '#2563eb', 'size' => 28], ['flexible' => false]),
+                    self::column([
+                        self::text('Company Payment Methods', 'title_medium', ['bold' => true]),
+                        self::text('One shared list of tender types used by every module at checkout. Cash is always available.', 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+                self::divider(),
+                self::buttonPrimary('+ Add Payment Method', self::navigateAction(
+                    '/api/tenant/views/payment-method-create',
+                    title: 'Add Payment Method'
+                ), 'add', ['expanded' => true]),
+            ]),
+            self::column($cards ?: [
+                self::card([
+                    self::text('No payment methods configured yet.', 'title_medium', ['bold' => true, 'color' => '#64748b']),
+                    self::text('Tap "+ Add Payment Method" to add Cash, Card, UPI, Bank Transfer, a wallet, or store credit.', 'body_small', ['color' => '#64748b']),
+                ]),
+            ], ['spacing' => 10]),
+        ]);
+    }
+
+    /**
+     * Add-payment-method form screen (opened from paymentMethodsView).
+     */
+    public static function paymentMethodCreateView(Company $company): array
+    {
+        $nextOrder = PaymentMethod::withoutGlobalScopes()->where('company_id', $company->id)->count() + 1;
+
+        return self::screen('Add Payment Method', [
+            self::card([
+                self::row([
+                    self::icon('playlist_add', ['color' => '#166534', 'size' => 28], ['flexible' => false]),
+                    self::column([
+                        self::text('Register New Payment Method', 'title_medium', ['bold' => true]),
+                        self::text('Available instantly at every module checkout once saved.', 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+            ]),
+            self::card([
+                self::column([
+                    self::text('Method Details', 'title_medium', ['bold' => true]),
+                    self::divider(),
+                    self::textInput('name', 'Display Name *', '', [
+                        'required' => true,
+                        'placeholder' => 'e.g. UPI / QR, PhonePe, HDFC Bank Transfer, Store Credit',
+                    ]),
+                    self::textInput('code', 'Short Code (Optional)', '', [
+                        'placeholder' => 'auto-generated from the name if left blank (e.g. upi_qr)',
+                    ]),
+                    self::textInput('description', 'Description (Optional)', '', [
+                        'max_lines' => 2,
+                        'placeholder' => 'Shown as a hint on the checkout tender list',
+                    ]),
+                    self::textInput('order_index', 'Display Order', (string) $nextOrder, ['keyboard_type' => 'number']),
+                    self::toggleSwitch('is_active', 'Active (show at checkout)', true),
+                ], ['spacing' => 12]),
+            ]),
+            self::card([
+                self::column([
+                    self::text('Bank / UPI Details (Optional)', 'title_medium', ['bold' => true]),
+                    self::text('Printed on receipts and invoices for bank-transfer tenders.', 'body_small', ['color' => '#64748b']),
+                    self::divider(),
+                    self::textInput('metadata[bank_name]', 'Bank Name', ''),
+                    self::textInput('metadata[account_no]', 'Account Number', ''),
+                    self::textInput('metadata[ifsc_code]', 'IFSC / SWIFT Code', ''),
+                    self::textInput('metadata[upi_id]', 'UPI ID / VPA', ''),
+                    self::textInput('metadata[holder_name]', 'Account Holder Name', ''),
+                    self::divider(),
+                    self::buttonPrimary('Save Payment Method', self::formSubmitAction(
+                        '/api/tenant/settings/payment-methods',
+                        'POST',
+                        'Payment method added successfully.',
+                        navigateBack: true,
+                        reload: true
+                    ), 'check_circle', ['color' => '#166534']),
+                    self::buttonOutlined('Back to Payment Methods', self::navigateAction(
+                        '/api/tenant/views/settings-payment-methods',
+                        title: 'Payment Methods'
+                    ), 'format_list_bulleted'),
+                ], ['spacing' => 12]),
+            ]),
+        ]);
     }
 
     public static function localizationView(Company $company): array
@@ -4300,6 +4464,29 @@ class SchemaResponse
     }
 
     public static function taxesView(Company $company): array
+    {
+        $tabParam = strtolower(trim((string) request('tab', 'config')));
+        $initialIndex = match ($tabParam) {
+            'saved', 'rules', 'saved-rules', 'tax-rules' => 1,
+            'add', 'new', 'create', 'add-rule', 'new-rule' => 2,
+            default => 0,
+        };
+
+        return self::screen('Taxes & Compliance', [
+            self::tabs([
+                ['id' => 'tax_config', 'label' => 'Tax Configuration', 'icon' => 'tune', 'components' => self::taxConfigTabComponents($company)],
+                ['id' => 'saved_tax_rules', 'label' => 'Saved Tax Rules', 'icon' => 'receipt_long', 'components' => self::taxRuleSavedTabComponents($company)],
+                ['id' => 'add_tax_rule', 'label' => 'Add New Tax Rule', 'icon' => 'add_box', 'components' => self::taxRuleAddTabComponents($company)],
+            ], ['initial_index' => $initialIndex, 'is_scrollable' => true]),
+        ]);
+    }
+
+    /**
+     * Tab 1 — fiscal identifiers, receipt label, inclusive/breakdown toggles.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function taxConfigTabComponents(Company $company): array
     {
         $isIndia = ($company->country === 'IN');
         $taxLabel = $company->tax_id_label ?? ($isIndia ? 'GST' : 'Tax');
@@ -4333,7 +4520,178 @@ class SchemaResponse
             'Tax settings updated successfully'
         ), 'save');
 
-        return self::screen('Taxes & Compliance', $components);
+        return $components;
+    }
+
+    /**
+     * Tab 2 — the saved TaxRule records (same rows the web Settings > Taxes
+     * tab manages), each with edit / default / enable / remove actions.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function taxRuleSavedTabComponents(Company $company): array
+    {
+        $rules = TaxRule::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->orderByDesc('is_default')
+            ->orderBy('tax_name')
+            ->get();
+
+        $ruleCards = $rules->map(function (TaxRule $rule) {
+            $badges = [self::badge($rule->active ? 'Active' : 'Disabled', $rule->active ? '#16a34a' : '#9ca3af', 'subtle')];
+            if ($rule->is_default) {
+                $badges[] = self::badge('Default', '#2563eb', 'solid');
+            }
+
+            return self::card([
+                self::row([
+                    self::icon('percent', ['color' => '#7c3aed', 'size' => 22], ['flexible' => false]),
+                    self::column([
+                        self::text($rule->tax_name, 'title_small', ['bold' => true, 'max_lines' => 2]),
+                        self::text(number_format((float) $rule->rate, 3).'%'.($rule->tax_code ? '  ·  '.$rule->tax_code : ''), 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                    self::wrap($badges, ['spacing' => 6]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'start']),
+                self::divider(),
+                self::row([
+                    self::buttonOutlined('Edit', self::openRemoteSheetAction(
+                        "/api/tenant/settings/tax-rules/{$rule->id}/edit-sheet",
+                        "Edit {$rule->tax_name}"
+                    ), 'edit', ['expanded' => true, 'dense' => true]),
+                    ...($rule->is_default ? [] : [self::buttonOutlined('Make Default', self::apiPostAction(
+                        "/api/tenant/settings/tax-rules/{$rule->id}/set-default",
+                        [],
+                        'Default tax rule updated.',
+                        reload: true
+                    ), 'star_outline', ['expanded' => true, 'dense' => true])]),
+                    self::buttonOutlined($rule->active ? 'Disable' : 'Enable', self::apiPostAction(
+                        "/api/tenant/settings/tax-rules/{$rule->id}/toggle",
+                        [],
+                        'Tax rule updated.',
+                        reload: true
+                    ), $rule->active ? 'toggle_off' : 'toggle_on', ['expanded' => true, 'dense' => true]),
+                    self::buttonDanger('Remove', self::apiPostAction(
+                        "/api/tenant/settings/tax-rules/{$rule->id}/delete",
+                        [],
+                        'Tax rule removed.',
+                        reload: true
+                    ), 'delete_outline', ['expanded' => true, 'dense' => true]),
+                ], ['spacing' => 8, 'wrap' => true]),
+            ], ['padding' => 14, 'border_radius' => 12]);
+        })->all();
+
+        return [
+            self::card([
+                self::row([
+                    self::icon('receipt_long', ['color' => '#7c3aed', 'size' => 26], ['flexible' => false]),
+                    self::column([
+                        self::text('Saved Tax Rules', 'title_medium', ['bold' => true]),
+                        self::text('Named rates applied at checkout and to products. The default rate is applied automatically to new products.', 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+                self::divider(),
+                self::buttonPrimary('+ Add New Tax Rule', self::navigateAction(
+                    '/api/tenant/views/settings-taxes?tab=add',
+                    title: 'Taxes & Compliance'
+                ), 'add', ['expanded' => true]),
+            ]),
+            self::column($ruleCards ?: [
+                self::card([
+                    self::text('No tax rules yet.', 'title_small', ['bold' => true, 'color' => '#64748b']),
+                    self::text('Open the "Add New Tax Rule" tab to create one, or auto-add your country\'s standard rules.', 'body_small', ['color' => '#64748b']),
+                ]),
+            ], ['spacing' => 10]),
+        ];
+    }
+
+    /**
+     * Tab 3 — "Add New Tax Rule": a one-tap "auto-add my country's standard
+     * rules" card (same presets the web Settings > Taxes tab pre-seeds via
+     * TaxCalculationService::seedTenantDefaultTaxRules) plus a manual form.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function taxRuleAddTabComponents(Company $company): array
+    {
+        $country = strtoupper(trim((string) ($company->country ?: 'US')));
+        $service = app(TaxCalculationService::class);
+        $preset = $service->getJurisdictionPresets($country);
+        $countryName = $preset['country'] ?? $country;
+        $presetRules = is_array($preset['rules'] ?? null) ? $preset['rules'] : [];
+
+        $presetPreview = [];
+        foreach (array_slice($presetRules, 0, 8) as $r) {
+            $presetPreview[] = self::badge(
+                ($r['name'] ?? 'Rule').' · '.rtrim(rtrim(number_format((float) ($r['rate'] ?? 0), 2), '0'), '.').'%',
+                '#7c3aed',
+                'subtle'
+            );
+        }
+
+        $hasDefault = TaxRule::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('is_default', true)
+            ->exists();
+
+        $components = [];
+
+        if ($presetRules !== []) {
+            $components[] = self::card([
+                self::row([
+                    self::icon('public', ['color' => '#0284c7', 'size' => 26], ['flexible' => false]),
+                    self::column([
+                        self::text("Auto-add standard rules for {$countryName}", 'title_medium', ['bold' => true]),
+                        self::text(($preset['system'] ?? 'Standard fiscal rates').' — '.count($presetRules).' rule'.(count($presetRules) === 1 ? '' : 's').'. Existing rules with the same code are updated, not duplicated.', 'body_small', ['color' => '#64748b']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+                ...($presetPreview !== [] ? [self::divider(), self::wrap($presetPreview, ['spacing' => 6, 'run_spacing' => 6])] : []),
+                self::divider(),
+                self::buttonPrimary("Auto-add {$countryName} Tax Rules", self::apiPostAction(
+                    '/api/tenant/settings/tax-rules/seed-country',
+                    ['country' => $country],
+                    "Standard tax rules for {$countryName} added.",
+                    reload: true
+                ), 'auto_awesome', ['background_color' => '#0284c7', 'expanded' => true]),
+                self::text('Change the store country under Localization & Region first if it is wrong.', 'label_medium', ['color' => '#94a3b8']),
+            ], ['padding' => 14, 'border_radius' => 12]);
+        }
+
+        $components[] = self::card([
+            self::column([
+                self::text('Or add a rule manually', 'title_medium', ['bold' => true]),
+                self::divider(),
+                self::textInput('name', 'Name *', '', [
+                    'required' => true,
+                    'placeholder' => 'e.g. Standard VAT, State Sales Tax, Zero-Rated',
+                ]),
+                self::textInput('rate', 'Rate (%) *', '0', [
+                    'required' => true,
+                    'keyboard_type' => 'decimal',
+                    'placeholder' => 'e.g. 18 or 8.25',
+                ]),
+                self::toggleSwitch('is_default', 'Set as default'.($hasDefault ? ' (replaces the current default)' : ''), false),
+                self::toggleSwitch('active', 'Active', true),
+                self::divider(),
+                self::buttonPrimary('Create Tax Rule', self::formSubmitAction(
+                    '/api/tenant/settings/tax-rules',
+                    'POST',
+                    'Tax rule created.',
+                    redirectRoute: '/api/tenant/views/settings-taxes?tab=saved'
+                ), 'check_circle', ['color' => '#166534']),
+            ], ['spacing' => 12]),
+        ]);
+
+        return $components;
+    }
+
+    /**
+     * Standalone "New Tax Rule" screen (kept for the tax-rule-create view key
+     * and any deep link). The canonical entry point is now the "Add New Tax
+     * Rule" tab on taxesView.
+     */
+    public static function taxRuleCreateView(Company $company): array
+    {
+        return self::screen('New Tax Rule', self::taxRuleAddTabComponents($company));
     }
 
     public static function apiView(Company $company): array
@@ -4741,6 +5099,7 @@ class SchemaResponse
             ['key' => 'settings-branding', 'title' => 'Store Branding & Colors', 'endpoint' => '/api/tenant/views/settings-branding', 'permission' => 'settings.view'],
             ['key' => 'settings-receipts', 'title' => 'Receipt Prefixes & Bank Terms', 'endpoint' => '/api/tenant/views/settings-receipts', 'permission' => 'settings.view'],
             ['key' => 'settings-financial', 'title' => 'Financial & Currency', 'endpoint' => '/api/tenant/views/settings-financial', 'permission' => 'settings.view'],
+            ['key' => 'settings-payment-methods', 'title' => 'Payment Methods', 'endpoint' => '/api/tenant/views/settings-payment-methods', 'permission' => 'settings.view'],
             ['key' => 'settings-localization', 'title' => 'Localization & Region', 'endpoint' => '/api/tenant/views/settings-localization', 'permission' => 'settings.view'],
             ['key' => 'settings-taxes', 'title' => 'Taxes & Compliance', 'endpoint' => '/api/tenant/views/settings-taxes', 'permission' => 'settings.view'],
             ['key' => 'settings-api', 'title' => 'API & Integrations', 'endpoint' => '/api/tenant/views/settings-api', 'permission' => 'settings.view'],
@@ -5056,8 +5415,11 @@ class SchemaResponse
             'settings-receipts', 'receipts' => self::receiptsView($company),
             'printer-setup', 'hardware-printer', 'hardware-settings' => self::hardwareSetupView($company),
             'settings-financial', 'financial' => self::financialView($company),
+            'settings-payment-methods', 'payment-methods', 'payment-method-list' => self::paymentMethodsView($company),
+            'payment-method-create', 'add-payment-method', 'new-payment-method' => self::paymentMethodCreateView($company),
             'settings-localization', 'localization' => self::localizationView($company),
             'settings-taxes', 'taxes' => self::taxesView($company),
+            'tax-rule-create', 'add-tax-rule', 'new-tax-rule' => self::taxRuleCreateView($company),
             'settings-api', 'api', 'api-integrations' => self::apiView($company),
             'settings-navigation', 'navigation', 'navigation-menu' => self::navigationView($company),
             'settings-form-labels', 'form-labels', 'custom-form-fields' => self::formLabelsView($company),

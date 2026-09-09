@@ -3,8 +3,11 @@
 namespace App\Services\Navigation;
 
 use App\Models\Company;
+use App\Models\SduiModule;
 use App\Services\Modular\ModuleRegistry;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * The nav tree for the tenant sidebar/drawer and mobile client,
@@ -13,6 +16,14 @@ use Illuminate\Support\Facades\Log;
  */
 class TenantNavRegistry
 {
+    /**
+     * The primary, mutually-exclusive business verticals. A store selects one
+     * of these at registration; a tenant with an explicit licensed_modules
+     * whitelist is never shown the nav for a primary vertical it did not pick.
+     * Keyed by canonical mode id (see ModuleRegistry::canonicalKey()).
+     */
+    private const PRIMARY_VERTICALS = ['retail', 'restaurant', 'pharmacy', 'service_booking', 'repair_technician'];
+
     /**
      * Resolve all normalized active and licensed modes for a tenant.
      *
@@ -173,16 +184,19 @@ class TenantNavRegistry
             if (! empty($custom)) {
                 $sections = array_values(array_map([self::class, 'normalizeSection'], $custom));
                 $sections = self::filterDomainMismatches($sections, $tenant);
+
                 return self::applyNavigationLabels($sections, $labels);
             }
         } elseif (is_object($tenant) && ! empty($tenant->navigation_menu_customization)) {
             $sections = array_values(array_map([self::class, 'normalizeSection'], (array) $tenant->navigation_menu_customization));
             $sections = self::filterDomainMismatches($sections, $tenant);
+
             return self::applyNavigationLabels($sections, $labels);
         }
 
         $sections = self::getBaseNavSectionsForTenant($tenant);
         $sections = self::filterDomainMismatches($sections, $tenant);
+
         return self::applyNavigationLabels($sections, $labels);
     }
 
@@ -199,6 +213,15 @@ class TenantNavRegistry
         $sections = [];
 
         // Determine licensed modules
+        //
+        // $hasModuleWhitelist marks a tenant that carries an *explicit*
+        // licensed_modules list (self-registration stores exactly the vertical
+        // picked at signup, e.g. ['pharmacy']). Such a tenant must not be
+        // shown the nav for another primary vertical it never chose. Tenants
+        // without a whitelist keep the legacy "active package is visible to
+        // everyone" behaviour.
+        $hasModuleWhitelist = $tenant instanceof Company && ! empty($tenant->licensed_modules);
+
         if ($tenant instanceof Company) {
             $licensedRaw = $tenant->licensed_modules;
             if (empty($licensedRaw)) {
@@ -299,9 +322,9 @@ class TenantNavRegistry
         }
 
         // 7. Active Package Modules (Perfex CRM pattern)
-        if (\Illuminate\Support\Facades\Schema::hasTable('sdui_modules')) {
+        if (Schema::hasTable('sdui_modules')) {
             try {
-                $activePackageModules = \App\Models\SduiModule::query()
+                $activePackageModules = SduiModule::query()
                     ->where('is_active', true)
                     ->where('source_type', 'package')
                     ->orderBy('sort_order')
@@ -309,6 +332,24 @@ class TenantNavRegistry
 
                 foreach ($activePackageModules as $pkgModule) {
                     $pkgSlug = $pkgModule->slug;
+
+                    // The primary business verticals are mutually exclusive — a
+                    // store picks one at registration and licensed_modules
+                    // records it. An active vertical package must NOT be
+                    // injected into a whitelisted tenant that chose a different
+                    // one (a pharmacy store must not get salon/repair menus).
+                    // Additive third-party add-ons (not a known vertical) still
+                    // auto-hydrate for everyone, as do tenants with no explicit
+                    // whitelist. Slugs may be pre-alias ("salon",
+                    // "repairtechnician"), so match the canonical mode id too.
+                    $pkgMode = ModuleRegistry::canonicalKey($pkgSlug);
+                    if ($hasModuleWhitelist
+                        && in_array($pkgMode, self::PRIMARY_VERTICALS, true)
+                        && ! in_array($pkgMode, $licensed, true)
+                        && ! in_array(strtolower(trim((string) $pkgSlug)), $licensed, true)) {
+                        continue;
+                    }
+
                     $alreadyAdded = false;
                     foreach ($sections as $sec) {
                         $secKey = $sec['key'] ?? $sec['id'] ?? '';
@@ -329,6 +370,7 @@ class TenantNavRegistry
                                         $sections[] = self::normalizeSection($sec);
                                     }
                                 }
+
                                 continue;
                             }
                         }
@@ -1246,7 +1288,7 @@ class TenantNavRegistry
             $key = (string) ($item['key'] ?? $item['id'] ?? '');
             $id = (string) ($item['id'] ?? '');
             $component = (string) ($item['component'] ?? '');
-            $labelSlug = \Illuminate\Support\Str::snake(strtolower($item['label'] ?? ''));
+            $labelSlug = Str::snake(strtolower($item['label'] ?? ''));
             $candidates = array_unique(array_filter([$key, $id, $component, $labelSlug]));
             if ($key === 'repair_dashboard' || $key === 'repair_workbench') {
                 $candidates[] = 'repair_workbench';
@@ -1469,11 +1511,11 @@ class TenantNavRegistry
             $key = trim((string) ($item['key'] ?? $item['id'] ?? ''));
             if ($key === '') {
                 if (! empty($item['title'])) {
-                    $key = \Illuminate\Support\Str::slug($item['title'], '_');
+                    $key = Str::slug($item['title'], '_');
                 } elseif (! empty($item['label'])) {
-                    $key = \Illuminate\Support\Str::slug($item['label'], '_');
+                    $key = Str::slug($item['label'], '_');
                 } elseif (! empty($item['route'])) {
-                    $key = \Illuminate\Support\Str::slug(basename($item['route']), '_');
+                    $key = Str::slug(basename($item['route']), '_');
                 }
             }
             if ($key === '' || isset($seen[$key])) {

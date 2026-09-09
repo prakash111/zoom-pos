@@ -496,6 +496,8 @@
                     @endif
                 </div>
 
+                @include('layouts.partials.vertical-nav-expanded')
+
                 <!-- Category 5: Administration & Settings -->
                 <div :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
@@ -867,6 +869,8 @@
                             </div>
                         </div>
                     @endif
+
+                    @include('layouts.partials.vertical-nav-drawer')
 
                     <!-- Administration & Settings -->
                     <div data-section-key="administration">

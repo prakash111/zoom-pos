@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Sync\CatalogViewController;
+use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Controllers\Tenant\BackupDownloadController;
 use App\Http\Controllers\Tenant\CashRegisterSlipController;
 use App\Http\Controllers\Tenant\ImpersonationController;
@@ -30,11 +31,18 @@ use App\Livewire\Tenant\Dashboard;
 use App\Livewire\Tenant\Devices;
 use App\Livewire\Tenant\Financials;
 use App\Livewire\Tenant\Languages;
+use App\Livewire\Tenant\Pharmacy\Batches;
+use App\Livewire\Tenant\Pharmacy\Prescriptions;
 use App\Livewire\Tenant\Products;
 use App\Livewire\Tenant\Quotes;
+use App\Livewire\Tenant\Repair\TicketDetail;
+use App\Livewire\Tenant\Repair\Tickets;
 use App\Livewire\Tenant\Reports;
 use App\Livewire\Tenant\Restaurant;
 use App\Livewire\Tenant\Sales;
+use App\Livewire\Tenant\Salon\Calendar;
+use App\Livewire\Tenant\Salon\ServiceCatalog;
+use App\Livewire\Tenant\Salon\Stylists;
 use App\Livewire\Tenant\Settings;
 use App\Livewire\Tenant\Suppliers;
 use App\Livewire\Tenant\Units;
@@ -65,10 +73,10 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         ->name('register');
 
     Route::middleware('guest:web')->group(function () {
-        Route::get('/forgot-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'showForgotForm'])->name('password.request');
-        Route::post('/forgot-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'sendResetLink'])->name('password.email');
-        Route::get('/reset-password/{token}', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'showResetForm'])->name('password.reset.form');
-        Route::post('/reset-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'reset'])->name('password.reset');
+        Route::get('/forgot-password', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
+        Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])->name('password.email');
+        Route::get('/reset-password/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset.form');
+        Route::post('/reset-password', [PasswordResetController::class, 'reset'])->name('password.reset');
     });
 
     Route::get('/verify-otp', VerifyOtp::class)
@@ -101,7 +109,7 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         Route::post('/settings/navigation-menu', [NavigationMenuController::class, 'store'])
             ->middleware('tenant.permission:settings,edit')
             ->name('settings.navigation-menu.store');
-        Route::post('/settings/change-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'changePassword'])->name('settings.change-password');
+        Route::post('/settings/change-password', [PasswordResetController::class, 'changePassword'])->name('settings.change-password');
         Route::redirect('/settings-redirect', '/tenant/settings')->name('settings');
         Route::get('/settings/backup/download', [BackupDownloadController::class, 'download'])->middleware('tenant.permission:settings,view')->name('settings.backup.download');
         Route::get('/languages', Languages\Index::class)->middleware('tenant.permission:settings,view')->name('languages.index');
@@ -179,6 +187,28 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
             Route::get('/restaurant/kds', Restaurant\Kds::class)->middleware(['tenant.permission:pos,view', 'tenant.pos_mode:restaurant'])->name('restaurant.kds');
             Route::get('/restaurant/kot/{kot}/print', [KotController::class, 'print'])->middleware(['tenant.permission:pos,view', 'tenant.pos_mode:restaurant'])->name('restaurant.kot.print');
             Route::get('/restaurant/tables/{table}/qr', [TableOrderController::class, 'qrCard'])->middleware(['tenant.permission:pos,view', 'tenant.pos_mode:restaurant'])->name('restaurant.table.qr');
+
+            // Pharmacy vertical — gated to stores licensed for the pharmacy module.
+            Route::middleware('tenant.vertical:pharmacy')->prefix('pharmacy')->name('pharmacy.')->group(function () {
+                Route::get('/', App\Livewire\Tenant\Pharmacy\Dashboard::class)->middleware('tenant.permission:products,view')->name('dashboard');
+                Route::get('/batches', Batches::class)->middleware('tenant.permission:products,view')->name('batches');
+                Route::get('/prescriptions', Prescriptions::class)->middleware('tenant.permission:sales,view')->name('prescriptions');
+            });
+
+            // Salon & Service Booking vertical.
+            Route::middleware('tenant.vertical:service_booking')->prefix('salon')->name('salon.')->group(function () {
+                Route::get('/', Calendar::class)->middleware('tenant.permission:service_orders,view')->name('calendar');
+                Route::get('/stylists', Stylists::class)->middleware('tenant.permission:service_orders,view')->name('stylists');
+                Route::get('/services', ServiceCatalog::class)->middleware('tenant.permission:products,view')->name('services');
+            });
+
+            // Repair & Technician workbench vertical.
+            Route::middleware('tenant.vertical:repair_technician')->prefix('repair')->name('repair.')->group(function () {
+                Route::get('/', App\Livewire\Tenant\Repair\Dashboard::class)->middleware('tenant.permission:repair,view')->name('dashboard');
+                Route::get('/tickets', Tickets::class)->middleware('tenant.permission:repair,view')->name('tickets');
+                Route::get('/tickets/{ticket}', TicketDetail::class)->middleware('tenant.permission:repair,view')->name('ticket');
+                Route::get('/categories', App\Livewire\Tenant\Repair\Categories::class)->middleware('tenant.permission:repair,diagnose')->name('categories');
+            });
 
             Route::get('/catalog', Catalog\Index::class)->middleware('tenant.permission:catalog,view')->name('catalog.index');
 

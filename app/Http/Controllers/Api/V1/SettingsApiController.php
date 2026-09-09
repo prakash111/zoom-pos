@@ -12,7 +12,9 @@ use App\Models\OrderPayment;
 use App\Models\PaymentMethod;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Localization\PlatformRegionalService;
+use App\Services\Navigation\MenuService;
 use App\Services\Notifications\CustomChannelDispatcherService;
+use App\Services\Sdui\SchemaResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -569,6 +571,51 @@ class SettingsApiController extends Controller
         return response()->json(['success' => true, 'message' => 'Deleted.']);
     }
 
+    /**
+     * SDUI bottom-sheet schema for editing one payment method, opened by the
+     * "Edit" button on SchemaResponse::paymentMethodsView. Submits back to the
+     * same savePaymentMethod() path as create.
+     */
+    public function paymentMethodsEditSheet(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $pm = PaymentMethod::where('company_id', $company->id)->find($id);
+
+        if (! $pm) {
+            return response()->json(['success' => false, 'error' => 'Payment method not found.'], 404);
+        }
+
+        $meta = $pm->metadata ?? [];
+
+        $sheet = SchemaResponse::screen("Edit {$pm->name}", [
+            SchemaResponse::card([
+                SchemaResponse::text('Edit Payment Method', 'title_medium', ['bold' => true]),
+                SchemaResponse::text('Changes apply immediately at every module checkout.', 'body_small', ['color' => '#64748b']),
+                SchemaResponse::divider(),
+                SchemaResponse::textInput('name', 'Display Name', $pm->name),
+                SchemaResponse::textInput('code', 'Short Code', (string) ($pm->code ?? '')),
+                SchemaResponse::textInput('description', 'Description', (string) ($pm->description ?? ''), ['max_lines' => 2]),
+                SchemaResponse::textInput('order_index', 'Display Order', (string) $pm->order_index, ['keyboard_type' => 'number']),
+                SchemaResponse::toggleSwitch('is_active', 'Active (show at checkout)', (bool) $pm->is_active),
+                SchemaResponse::divider(),
+                SchemaResponse::textInput('metadata[bank_name]', 'Bank Name', (string) ($meta['bank_name'] ?? '')),
+                SchemaResponse::textInput('metadata[account_no]', 'Account Number', (string) ($meta['account_no'] ?? '')),
+                SchemaResponse::textInput('metadata[ifsc_code]', 'IFSC / SWIFT Code', (string) ($meta['ifsc_code'] ?? '')),
+                SchemaResponse::textInput('metadata[upi_id]', 'UPI ID / VPA', (string) ($meta['upi_id'] ?? '')),
+                SchemaResponse::textInput('metadata[holder_name]', 'Account Holder Name', (string) ($meta['holder_name'] ?? '')),
+                SchemaResponse::buttonPrimary('Save Changes', SchemaResponse::formSubmitAction(
+                    "/api/tenant/settings/payment-methods/{$pm->id}",
+                    'POST',
+                    'Payment method updated.',
+                    navigateBack: true,
+                    reload: true
+                ), 'save'),
+            ]),
+        ]);
+
+        return response()->json($sheet);
+    }
+
     private function savePaymentMethod(Request $request, ?string $id = null): JsonResponse
     {
         $company = $this->resolveCompany($request);
@@ -598,6 +645,16 @@ class SettingsApiController extends Controller
 
         $data = $validator->validated();
         $data['code'] = ($data['code'] ?? null) ?: Str::slug($data['name'], '_');
+
+        // The SDUI form always submits every metadata[...] field, so drop the
+        // blank ones instead of persisting a bag of empty strings. An entirely
+        // empty bag becomes null.
+        if (array_key_exists('metadata', $data)) {
+            $data['metadata'] = array_filter(
+                (array) $data['metadata'],
+                static fn ($v) => $v !== null && $v !== ''
+            ) ?: null;
+        }
 
         if ($id !== null) {
             $pm = PaymentMethod::where('company_id', $company->id)->find($id);
@@ -1041,7 +1098,7 @@ class SettingsApiController extends Controller
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
-        $sections = \App\Services\Navigation\MenuService::getDrawerTree($company, $user);
+        $sections = MenuService::getDrawerTree($company, $user);
 
         return response()->json([
             'success' => true,

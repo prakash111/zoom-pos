@@ -129,6 +129,30 @@ Route::middleware([AuthenticateTenantApi::class])->group(function () {
     Route::match(['put', 'patch'], '/tenant/roles/{id}', [RoleApiController::class, 'update'])->middleware('tenant.api.permission:users,edit');
     Route::delete('/tenant/roles/{id}', [RoleApiController::class, 'destroy'])->middleware('tenant.api.permission:users,edit');
 
+    // Payment methods — unversioned tenant URLs emitted by the SDUI
+    // "Payment Methods" settings screen (mirrors /v1/pos/settings/payment-methods).
+    // Company-wide: one list consumed by every module's checkout.
+    Route::get('/tenant/settings/payment-methods', [SettingsApiController::class, 'paymentMethodsIndex'])->middleware('tenant.api.permission:settings,view');
+    Route::post('/tenant/settings/payment-methods', [SettingsApiController::class, 'paymentMethodsStore'])->middleware('tenant.api.permission:settings,edit');
+    Route::get('/tenant/settings/payment-methods/{id}/edit-sheet', [SettingsApiController::class, 'paymentMethodsEditSheet'])->middleware('tenant.api.permission:settings,view');
+    Route::match(['put', 'post'], '/tenant/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsUpdate'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/tenant/settings/payment-methods/{id}/toggle', [SettingsApiController::class, 'paymentMethodsToggle'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/tenant/settings/payment-methods/{id}/delete', [SettingsApiController::class, 'paymentMethodsDestroy'])->middleware('tenant.api.permission:settings,edit');
+    Route::delete('/tenant/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsDestroy'])->middleware('tenant.api.permission:settings,edit');
+
+    // Tax rules (rates) — unversioned tenant URLs emitted by the SDUI
+    // "Taxes & Compliance" settings screen (mirrors /v1/pos/taxes). They live
+    // under Store Settings, not on a separate screen.
+    Route::get('/tenant/settings/tax-rules', [PosSyncApiController::class, 'taxRulesIndex'])->middleware('tenant.api.permission:settings,view');
+    Route::post('/tenant/settings/tax-rules', [PosSyncApiController::class, 'taxRulesStore'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/tenant/settings/tax-rules/seed-country', [PosSyncApiController::class, 'taxRulesSeedCountry'])->middleware('tenant.api.permission:settings,edit');
+    Route::get('/tenant/settings/tax-rules/{id}/edit-sheet', [PosSyncApiController::class, 'taxRulesEditSheet'])->middleware('tenant.api.permission:settings,view');
+    Route::match(['put', 'post'], '/tenant/settings/tax-rules/{id}', [PosSyncApiController::class, 'taxRulesUpdate'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/tenant/settings/tax-rules/{id}/set-default', [PosSyncApiController::class, 'taxRulesSetDefault'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/tenant/settings/tax-rules/{id}/toggle', [PosSyncApiController::class, 'taxRulesToggle'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/tenant/settings/tax-rules/{id}/delete', [PosSyncApiController::class, 'taxRulesDestroy'])->middleware('tenant.api.permission:settings,edit');
+    Route::delete('/tenant/settings/tax-rules/{id}', [PosSyncApiController::class, 'taxRulesDestroy'])->middleware('tenant.api.permission:settings,edit');
+
     // Native mobile cash-register contract. These unversioned tenant URLs
     // are emitted by SchemaResponse and intentionally coexist with the
     // versioned /v1/pos endpoints used by desktop/offline clients.
@@ -404,9 +428,13 @@ Route::prefix('v1/pos')->group(function () {
         // Taxes & Tax Rules Management
         Route::get('/taxes', [PosSyncApiController::class, 'taxRulesIndex']);
         Route::post('/taxes', [PosSyncApiController::class, 'taxRulesStore'])->middleware('tenant.api.permission:settings,view');
-        Route::put('/taxes/{id}', [PosSyncApiController::class, 'taxRulesUpdate'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/taxes/seed-country', [PosSyncApiController::class, 'taxRulesSeedCountry'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/taxes/{id}/edit-sheet', [PosSyncApiController::class, 'taxRulesEditSheet'])->middleware('tenant.api.permission:settings,view');
+        Route::match(['put', 'post'], '/taxes/{id}', [PosSyncApiController::class, 'taxRulesUpdate'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/taxes/{id}', [PosSyncApiController::class, 'taxRulesDestroy'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/taxes/{id}/delete', [PosSyncApiController::class, 'taxRulesDestroy'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/taxes/{id}/set-default', [PosSyncApiController::class, 'taxRulesSetDefault'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/taxes/{id}/toggle', [PosSyncApiController::class, 'taxRulesToggle'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/settings/navigation-labels', [SettingsApiController::class, 'getNavigationLabels'])->middleware('tenant.api.permission:settings,view');
         Route::post('/settings/navigation-labels', [SettingsApiController::class, 'updateNavigationLabels'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/navigation/drawer', [SettingsApiController::class, 'getDrawerNavigation']);
@@ -493,8 +521,10 @@ Route::prefix('v1/pos')->group(function () {
         Route::put('/settings/financial', [SettingsApiController::class, 'updateFinancial'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/settings/payment-methods', [SettingsApiController::class, 'paymentMethodsIndex'])->middleware('tenant.api.permission:settings,view');
         Route::post('/settings/payment-methods', [SettingsApiController::class, 'paymentMethodsStore'])->middleware('tenant.api.permission:settings,edit');
-        Route::put('/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsUpdate'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/settings/payment-methods/{id}/edit-sheet', [SettingsApiController::class, 'paymentMethodsEditSheet'])->middleware('tenant.api.permission:settings,view');
+        Route::match(['put', 'post'], '/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsUpdate'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/settings/payment-methods/{id}', [SettingsApiController::class, 'paymentMethodsDestroy'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/settings/payment-methods/{id}/delete', [SettingsApiController::class, 'paymentMethodsDestroy'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/payment-methods/{id}/toggle', [SettingsApiController::class, 'paymentMethodsToggle'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/settings/payment-methods/{id}/transactions', [SettingsApiController::class, 'paymentMethodTransactions'])->middleware('tenant.api.permission:settings,view');
         Route::get('/settings/payment-methods/{id}/transactions/export', [SettingsApiController::class, 'paymentMethodTransactionsExport'])->middleware('tenant.api.permission:settings,view');

@@ -468,11 +468,11 @@ class ModuleRegistry
         $methods = [];
         try {
             if (class_exists(PaymentMethod::class)) {
-                $dbMethods = PaymentMethod::query()
-                    ->where('company_id', $company->id)
-                    ->where('is_active', true)
-                    ->orderBy('sort_order')
-                    ->get();
+                // Single source of truth shared with the web Settings screen —
+                // auto-seeds the 3 defaults for a brand-new company and returns
+                // only the active methods, ordered. Keeps the tenant's
+                // configured tenders identical across every module and client.
+                $dbMethods = PaymentMethod::getForCompany($company->id);
 
                 foreach ($dbMethods as $method) {
                     $code = strtolower((string) ($method->code ?: $method->name));

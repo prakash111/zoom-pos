@@ -15,6 +15,7 @@ use App\Models\OrderPayment;
 use App\Models\PaymentMethod;
 use App\Models\Plan;
 use App\Models\PlatformBranding;
+use App\Models\PlatformSystem;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\Subscription;
@@ -30,6 +31,8 @@ use App\Services\Financial\CustomerLedgerService;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Modular\ModuleRegistry;
 use App\Services\Payment\SubscriptionPaymentGatewayService;
+use App\Services\Sdui\SchemaResponse;
+use App\Services\TaxCalculationService;
 use App\Services\TaxEngineService;
 use App\Services\Tenancy\TenantProvisioningService;
 use Carbon\Carbon;
@@ -360,13 +363,13 @@ class PosSyncApiController extends Controller
      */
     public function authConfig(): JsonResponse
     {
-        $googleEnabled = filter_var(\App\Models\PlatformSystem::get('social_google_enabled', false), FILTER_VALIDATE_BOOLEAN)
+        $googleEnabled = filter_var(PlatformSystem::get('social_google_enabled', false), FILTER_VALIDATE_BOOLEAN)
             || (bool) config('services.google.enabled', true);
-        $googleClientId = (string) (\App\Models\PlatformSystem::get('social_google_client_id') ?: config('services.google.client_id', ''));
+        $googleClientId = (string) (PlatformSystem::get('social_google_client_id') ?: config('services.google.client_id', ''));
 
-        $facebookEnabled = filter_var(\App\Models\PlatformSystem::get('social_facebook_enabled', false), FILTER_VALIDATE_BOOLEAN)
+        $facebookEnabled = filter_var(PlatformSystem::get('social_facebook_enabled', false), FILTER_VALIDATE_BOOLEAN)
             || (bool) config('services.facebook.enabled', true);
-        $facebookClientId = (string) (\App\Models\PlatformSystem::get('social_facebook_client_id') ?: config('services.facebook.client_id', ''));
+        $facebookClientId = (string) (PlatformSystem::get('social_facebook_client_id') ?: config('services.facebook.client_id', ''));
 
         return response()->json([
             'success' => true,
@@ -467,7 +470,7 @@ class PosSyncApiController extends Controller
                 try {
                     app(AuthApiController::class)->sendOtpEmail($user->email, $otp, $branding);
                 } catch (\Throwable $e) {
-                    Log::warning("Failed to send OTP verification email to {$user->email}: " . $e->getMessage());
+                    Log::warning("Failed to send OTP verification email to {$user->email}: ".$e->getMessage());
                 }
 
                 return response()->json([
@@ -583,8 +586,8 @@ class PosSyncApiController extends Controller
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
-                'navigation_labels' => $company->navigation_labels ?? new \stdClass(),
-                'form_field_customizations' => $company->form_field_customizations ?? new \stdClass(),
+                'navigation_labels' => $company->navigation_labels ?? new \stdClass,
+                'form_field_customizations' => $company->form_field_customizations ?? new \stdClass,
             ],
         ]);
     }
@@ -3796,6 +3799,101 @@ class PosSyncApiController extends Controller
                 'active' => (bool) $taxRule->active,
             ],
         ]);
+    }
+
+    /**
+     * Auto-add the standard fiscal tax rules for a country (SDUI "Add New Tax
+     * Rule" tab -> "Auto-add for <Country>"). Same presets the web Settings >
+     * Taxes tab pre-seeds — see TaxCalculationService::seedTenantDefaultTaxRules().
+     * POST /api/tenant/settings/tax-rules/seed-country
+     */
+    public function taxRulesSeedCountry(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $country = strtoupper(trim((string) ($request->input('country') ?: $company->country ?: 'US')));
+
+        $service = app(TaxCalculationService::class);
+        $service->seedTenantDefaultTaxRules($company, $country);
+
+        $presets = $service->getJurisdictionPresets($country);
+        $countryName = $presets['country'] ?? $country;
+        $count = TaxRule::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('country', $country)
+            ->count();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Standard tax rules for {$countryName} added.",
+            'country' => $country,
+            'count' => $count,
+        ]);
+    }
+
+    /**
+     * Flip a tax rule's active flag (SDUI "Enable / Disable" button on the
+     * Taxes & Compliance screen). Update needs name + rate; this does not.
+     * POST /api/tenant/settings/tax-rules/{id}/toggle
+     */
+    public function taxRulesToggle(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $taxRule = TaxRule::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $taxRule) {
+            return response()->json(['success' => false, 'error' => 'Tax rule not found.'], 404);
+        }
+
+        $taxRule->update(['active' => ! $taxRule->active]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $taxRule->tax_name.' is now '.($taxRule->active ? 'active' : 'disabled').'.',
+        ]);
+    }
+
+    /**
+     * SDUI bottom-sheet schema for editing one tax rule, opened by the "Edit"
+     * button on SchemaResponse::taxesView. Submits to taxRulesUpdate().
+     * GET /api/tenant/settings/tax-rules/{id}/edit-sheet
+     */
+    public function taxRulesEditSheet(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $taxRule = TaxRule::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $taxRule) {
+            return response()->json(['success' => false, 'error' => 'Tax rule not found.'], 404);
+        }
+
+        $sheet = SchemaResponse::screen("Edit {$taxRule->tax_name}", [
+            SchemaResponse::card([
+                SchemaResponse::text('Edit Tax Rule', 'title_medium', ['bold' => true]),
+                SchemaResponse::text('Changes apply immediately at checkout.', 'body_small', ['color' => '#64748b']),
+                SchemaResponse::divider(),
+                SchemaResponse::textInput('name', 'Name', $taxRule->tax_name),
+                SchemaResponse::textInput('rate', 'Rate (%)', number_format((float) $taxRule->rate, 3, '.', ''), ['keyboard_type' => 'decimal']),
+                SchemaResponse::toggleSwitch('is_default', 'Set as default', (bool) $taxRule->is_default),
+                SchemaResponse::toggleSwitch('active', 'Active', (bool) $taxRule->active),
+                SchemaResponse::buttonPrimary('Save Changes', SchemaResponse::formSubmitAction(
+                    "/api/tenant/settings/tax-rules/{$taxRule->id}",
+                    'POST',
+                    'Tax rule updated.',
+                    navigateBack: true,
+                    reload: true
+                ), 'save'),
+            ]),
+        ]);
+
+        return response()->json($sheet);
     }
 
     /**

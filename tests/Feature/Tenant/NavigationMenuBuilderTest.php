@@ -3,6 +3,7 @@
 namespace Tests\Feature\Tenant;
 
 use App\Livewire\Tenant\Settings\Index as SettingsIndex;
+use App\Services\Auth\PermissionChecker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\Concerns\ActsAsTenantUser;
@@ -69,33 +70,36 @@ class NavigationMenuBuilderTest extends TestCase
             });
     }
 
-    public function test_save_nav_config_persists_nested_children_and_supports_un_nesting(): void
+    public function test_save_nav_config_persists_nested_children_and_relocks_stray_settings_tabs(): void
     {
         [$company] = $this->actingAsTenantAdmin();
 
-        // A realistic save always round-trips the *entire* current tree (the
-        // Alpine builder's `sections` state, seeded from buildNavSections()),
-        // not just the items an admin touched — so every compiled item that
-        // was on-screen must be present here too, just as the browser would
-        // submit it after dragging "settings_navigation" out to the root.
+        // A realistic save round-trips the *entire* current tree. Here the
+        // payload simulates a drag that pulled "settings_navigation" out from
+        // under "Store Settings" to the section root and dropped "settings"
+        // itself under "Subscription & Billing" — exactly the shape the mobile
+        // tree editor was persisting. Every Store Settings tab is registry-
+        // pinned to the "settings" accordion, so normalize() must snap them
+        // back (TenantNavigationConfigService::FORCED_PARENTS / FORCED_ROOT).
         $payload = [
             [
                 'key' => 'administration',
                 'label' => 'Administration & Settings',
                 'items' => [
-                    ['key' => 'subscription', 'label' => 'Subscription & Billing', 'visible' => true, 'children' => []],
                     [
-                        'key' => 'settings',
-                        'label' => 'Store Settings',
+                        'key' => 'subscription',
+                        'label' => 'Subscription & Billing',
                         'visible' => true,
                         'children' => [
-                            ['key' => 'settings_mode', 'label' => 'Store Operating Mode', 'visible' => true],
-                            ['key' => 'settings_profile', 'label' => 'Store Profile & Branding', 'visible' => true],
-                            ['key' => 'settings_receipts', 'label' => 'Receipt Prefixes & Bank Terms', 'visible' => true],
-                            ['key' => 'settings_financial', 'label' => 'Financial & Currency', 'visible' => true],
-                            ['key' => 'settings_taxes', 'label' => 'Taxes & Compliance', 'visible' => true],
-                            ['key' => 'settings_api', 'label' => 'API & Integrations', 'visible' => true],
-                            // "settings_navigation" dragged out below, not listed here.
+                            ['key' => 'settings', 'label' => 'Store Settings', 'visible' => true, 'children' => [
+                                ['key' => 'settings_mode', 'label' => 'Store Operating Mode', 'visible' => true],
+                                ['key' => 'settings_profile', 'label' => 'Store Profile & Branding', 'visible' => true],
+                                ['key' => 'settings_receipts', 'label' => 'Receipt Prefixes & Bank Terms', 'visible' => true],
+                                ['key' => 'settings_financial', 'label' => 'Financial & Currency', 'visible' => true, 'children' => [
+                                    ['key' => 'settings_taxes', 'label' => 'Taxes & Compliance', 'visible' => true],
+                                ]],
+                                ['key' => 'settings_api', 'label' => 'API & Integrations', 'visible' => true],
+                            ]],
                         ],
                     ],
                     // Dragged out from under "settings" to the section root.
@@ -112,24 +116,29 @@ class NavigationMenuBuilderTest extends TestCase
         $nav = $company->fresh()->normalizedNavConfig();
         $itemsByKey = collect($nav['items'])->keyBy('key');
 
-        $this->assertSame('settings', $itemsByKey['settings_profile']['parent']);
-        $this->assertNull($itemsByKey['settings_navigation']['parent']);
-        $this->assertSame('administration', $itemsByKey['settings_navigation']['section']);
+        // "settings" is a first-class parent again, never nested under another row.
+        $this->assertNull($itemsByKey['settings']['parent']);
+        // Every Store Settings tab is a direct child of "settings" — the
+        // ejected "settings_navigation" and the over-nested "settings_taxes"
+        // are both snapped back.
+        foreach (['settings_mode', 'settings_profile', 'settings_receipts', 'settings_financial', 'settings_taxes', 'settings_api', 'settings_navigation'] as $tab) {
+            $this->assertSame('settings', $itemsByKey[$tab]['parent'], "{$tab} should be a child of settings");
+            $this->assertSame('administration', $itemsByKey[$tab]['section']);
+            $this->assertSame(1, $itemsByKey[$tab]['level']);
+        }
 
-        // Reloading the builder must reflect the un-nesting: "settings_profile"
-        // stays a child of "settings", "settings_navigation" is back at root.
-        // actingAs() keeps the same auth User instance alive for the rest of
-        // the test, and Eloquent memoizes its ->company relation on first
-        // access (mount() above already triggered that) — a real page reload
-        // re-resolves the user from scratch, so drop the cached relation here
-        // to reproduce that instead of reading pre-save data back.
+        // Reloading the builder reflects the relock. actingAs() keeps the same
+        // auth User instance alive and Eloquent memoizes ->company; a real page
+        // reload re-resolves the user, so drop the cached relation here.
         auth('web')->user()->unsetRelation('company');
         $sections = Livewire::test(SettingsIndex::class)->viewData('navSections');
         $administration = collect($sections)->firstWhere('key', 'administration');
         $settings = collect($administration['items'])->firstWhere('key', 'settings');
-        $this->assertContains('settings_profile', collect($settings['children'])->pluck('key')->all());
-        $this->assertNotContains('settings_navigation', collect($settings['children'])->pluck('key')->all());
-        $this->assertContains('settings_navigation', collect($administration['items'])->pluck('key')->all());
+        $childKeys = collect($settings['children'])->pluck('key')->all();
+        $this->assertContains('settings_profile', $childKeys);
+        $this->assertContains('settings_navigation', $childKeys);
+        $this->assertContains('settings_taxes', $childKeys);
+        $this->assertNotContains('settings_navigation', collect($administration['items'])->pluck('key')->all());
     }
 
     /**
@@ -437,7 +446,7 @@ class NavigationMenuBuilderTest extends TestCase
     {
         [$company, $staff] = $this->actingAsTenantStaff();
         // A staff role without the 'settings' permission by default.
-        $this->assertFalse(\App\Services\Auth\PermissionChecker::can($staff, 'settings'));
+        $this->assertFalse(PermissionChecker::can($staff, 'settings'));
 
         $response = Livewire::test(SettingsIndex::class)->call('saveNavConfig', [
             ['key' => 'cashier_sales', 'label' => 'Cashier & Sales', 'items' => []],
@@ -449,5 +458,55 @@ class NavigationMenuBuilderTest extends TestCase
             'sections' => [],
             'items' => [],
         ])->assertForbidden();
+    }
+
+    /**
+     * A nav_config the mobile tree editor had already mangled — "settings"
+     * dropped under "subscription", "settings_taxes" buried under "Financial &
+     * Currency", "settings_api" / "settings_navigation" ejected to Main Menu —
+     * must self-heal on the next read: "Store Settings" back to Main Menu with
+     * all eight tabs as its direct children.
+     */
+    public function test_a_previously_mangled_settings_tree_self_heals_on_read(): void
+    {
+        [$company] = $this->actingAsTenantAdmin();
+
+        $company->update(['nav_config' => [
+            'sections' => [['key' => 'administration', 'order' => 0]],
+            'items' => [
+                ['key' => 'subscription', 'section' => 'administration', 'parent' => null, 'order' => 0, 'visible' => true],
+                ['key' => 'settings', 'section' => 'administration', 'parent' => 'subscription', 'order' => 1, 'visible' => true],
+                ['key' => 'settings_mode', 'section' => 'administration', 'parent' => 'subscription', 'order' => 2, 'visible' => true],
+                ['key' => 'settings_profile', 'section' => 'administration', 'parent' => 'subscription', 'order' => 3, 'visible' => true],
+                ['key' => 'settings_branding', 'section' => 'administration', 'parent' => 'subscription', 'order' => 4, 'visible' => true],
+                ['key' => 'settings_receipts', 'section' => 'administration', 'parent' => 'subscription', 'order' => 5, 'visible' => true],
+                ['key' => 'settings_financial', 'section' => 'administration', 'parent' => 'subscription', 'order' => 6, 'visible' => true],
+                ['key' => 'settings_taxes', 'section' => 'administration', 'parent' => 'settings_financial', 'order' => 7, 'visible' => true],
+                ['key' => 'settings_api', 'section' => 'administration', 'parent' => null, 'order' => 8, 'visible' => true],
+                ['key' => 'settings_navigation', 'section' => 'administration', 'parent' => null, 'order' => 9, 'visible' => true],
+            ],
+        ]]);
+
+        $itemsByKey = collect($company->fresh()->normalizedNavConfig()['items'])->keyBy('key');
+
+        $this->assertNull($itemsByKey['settings']['parent']);
+        $this->assertSame(0, $itemsByKey['settings']['level']);
+        foreach ([
+            'settings_mode', 'settings_profile', 'settings_branding', 'settings_receipts',
+            'settings_financial', 'settings_taxes', 'settings_api', 'settings_navigation',
+        ] as $tab) {
+            $this->assertSame('settings', $itemsByKey[$tab]['parent'], "{$tab} must be a child of settings");
+            $this->assertSame(1, $itemsByKey[$tab]['level']);
+        }
+
+        auth('web')->user()->unsetRelation('company');
+        $sections = Livewire::test(SettingsIndex::class)->viewData('navSections');
+        $administration = collect($sections)->firstWhere('key', 'administration');
+        $settings = collect($administration['items'])->firstWhere('key', 'settings');
+        $childKeys = collect($settings['children'])->pluck('key')->sort()->values()->all();
+        $this->assertSame([
+            'settings_api', 'settings_branding', 'settings_financial', 'settings_mode',
+            'settings_navigation', 'settings_profile', 'settings_receipts', 'settings_taxes',
+        ], $childKeys);
     }
 }
