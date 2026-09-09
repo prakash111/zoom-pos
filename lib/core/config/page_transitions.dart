@@ -50,13 +50,14 @@ enum AppPageTransition {
   }
 }
 
-/// Smooth horizontal slide (new page in from the right, old page parallaxes
-/// left slightly), with the platform back-swipe still handled by the route.
+/// A full-width horizontal slide: the new page comes all the way in from the
+/// right while the page underneath parallaxes left and dims — the obvious
+/// "next screen" motion from web / desktop apps.
 class _SlidePageTransitionsBuilder extends PageTransitionsBuilder {
   const _SlidePageTransitionsBuilder();
 
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 260);
+  Duration get transitionDuration => const Duration(milliseconds: 320);
 
   @override
   Widget buildTransitions<T>(
@@ -66,32 +67,40 @@ class _SlidePageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    const curve = Curves.easeOutCubic;
     final enter = Tween<Offset>(
-      begin: const Offset(0.06, 0),
+      begin: const Offset(1, 0),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: animation, curve: curve));
-    final exit = Tween<Offset>(
+    ).animate(CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ));
+    final leave = Tween<Offset>(
       begin: Offset.zero,
-      end: const Offset(-0.04, 0),
-    ).animate(CurvedAnimation(parent: secondaryAnimation, curve: curve));
+      end: const Offset(-0.28, 0),
+    ).animate(CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ));
     return SlideTransition(
-      position: exit,
-      child: SlideTransition(
-        position: enter,
-        child: FadeTransition(opacity: animation, child: child),
+      position: leave,
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 1, end: 0.6).animate(secondaryAnimation),
+        child: SlideTransition(position: enter, child: child),
       ),
     );
   }
 }
 
-/// Material-3-style fade-through: outgoing page fades + scales down a touch,
-/// incoming page fades + scales up into place.
+/// Material-style fade-through: the incoming page cross-fades from 0 → 1 and
+/// scales up from 92% into place. No delayed interval, so the motion is
+/// visible from the first frame.
 class _FadeThroughPageTransitionsBuilder extends PageTransitionsBuilder {
   const _FadeThroughPageTransitionsBuilder();
 
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 280);
+  Duration get transitionDuration => const Duration(milliseconds: 300);
 
   @override
   Widget buildTransitions<T>(
@@ -101,17 +110,17 @@ class _FadeThroughPageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    final fade = CurvedAnimation(
+    final curved = CurvedAnimation(
       parent: animation,
-      curve: const Interval(0.35, 1, curve: Curves.easeOut),
-      reverseCurve: const Interval(0.0, 0.3, curve: Curves.easeIn),
-    );
-    final scale = Tween<double>(begin: 0.97, end: 1).animate(
-      CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+      curve: Curves.easeOut,
+      reverseCurve: Curves.easeIn,
     );
     return FadeTransition(
-      opacity: fade,
-      child: ScaleTransition(scale: scale, child: child),
+      opacity: curved,
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.92, end: 1).animate(curved),
+        child: child,
+      ),
     );
   }
 }

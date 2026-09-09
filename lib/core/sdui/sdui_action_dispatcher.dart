@@ -13,6 +13,7 @@ import '../config/app_config.dart';
 import '../config/bootstrap_cache.dart';
 import '../services/sync/sync_engine.dart';
 import '../services/thermal/thermal_printer_service.dart' show ReceiptLine;
+import '../widgets/adaptive_sheet.dart';
 import 'dynamic_schema_context.dart';
 import 'dynamic_schema_parser.dart';
 import 'sdui_component_registry.dart';
@@ -20,9 +21,21 @@ import 'sdui_component_registry.dart';
 /// Endpoints whose effect only exists on the server — queuing them offline
 /// would be a lie. Matched as substrings of the action endpoint.
 const _serverOnlyEndpointMarkers = <String>[
-  'checkout', 'payment-gateway', 'gateway', 'subscription', 'billing',
-  'export', 'download', 'pdf', 'print', 'device', 'session', 'revoke',
-  'kitchen', 'kds', 'report',
+  'checkout',
+  'payment-gateway',
+  'gateway',
+  'subscription',
+  'billing',
+  'export',
+  'download',
+  'pdf',
+  'print',
+  'device',
+  'session',
+  'revoke',
+  'kitchen',
+  'kds',
+  'report',
 ];
 
 typedef SduiRequestExecutor = Future<Map<String, dynamic>> Function(
@@ -228,7 +241,9 @@ class SduiActionDispatcher {
             await _showPostSaleSheet(context, res['post_sale_sheet']['data']);
           } else if (resAction == 'toast_and_navigate' ||
               (redirectRoute != null && redirectRoute.isNotEmpty)) {
-            if (context.mounted && redirectRoute != null && redirectRoute.isNotEmpty) {
+            if (context.mounted &&
+                redirectRoute != null &&
+                redirectRoute.isNotEmpty) {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (_) => SduiComponentRegistry.resolveRoute(
@@ -243,7 +258,10 @@ class SduiActionDispatcher {
           }
         } catch (e) {
           final offlineMsg = _queueOfflineOrNull(
-              error: e, endpoint: endpoint, method: method, payload: submitData);
+              error: e,
+              endpoint: endpoint,
+              method: method,
+              payload: submitData);
           if (offlineMsg != null) {
             final queued = offlineMsg.startsWith('Saved offline');
             showToast(offlineMsg, isError: !queued);
@@ -314,7 +332,8 @@ class SduiActionDispatcher {
               base = await client.currentBaseUrl();
             }
             base ??= AppConfig.defaultBaseUrl;
-            fullUrl = '${base.replaceAll(RegExp(r'/+$'), '')}/${rawUrl.replaceAll(RegExp(r'^/+'), '')}';
+            fullUrl =
+                '${base.replaceAll(RegExp(r'/+$'), '')}/${rawUrl.replaceAll(RegExp(r'^/+'), '')}';
           }
           final uri = Uri.tryParse(fullUrl);
           if (uri != null) {
@@ -434,7 +453,8 @@ class SduiActionDispatcher {
     var target = endpoint;
     if (params.isNotEmpty) {
       final sep = endpoint.contains('?') ? '&' : '?';
-      target = '$endpoint$sep${params.entries.map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}').join('&')}';
+      target =
+          '$endpoint$sep${params.entries.map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}').join('&')}';
     }
 
     Navigator.of(context).pushReplacement(
@@ -635,8 +655,11 @@ class SduiActionDispatcher {
     var currentComponents = components;
     var currentSource = sourceEndpoint;
 
-    return showModalBottomSheet<void>(
-      context: context,
+    // Centered dialog on tablet/desktop, bottom sheet on phones — a form like
+    // "Register New Customer" reads as a modal, not a bottom drawer, on a
+    // wide window.
+    return showAdaptiveSheet<void>(
+      context,
       isScrollControlled: true,
       builder: (modalCtx) => StatefulBuilder(
         builder: (modalCtx, setSheetState) {

@@ -18,9 +18,15 @@ Future<T?> showAdaptiveSheet<T>(
     return showDialog<T>(
       context: context,
       builder: (dialogContext) => Dialog(
+        clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
+          constraints: BoxConstraints(
+            maxWidth: 520,
+            // Keep a tall form scrollable inside the dialog instead of
+            // overflowing the viewport.
+            maxHeight: MediaQuery.of(dialogContext).size.height * 0.86,
+          ),
           child: builder(dialogContext),
         ),
       ),
@@ -30,7 +36,8 @@ Future<T?> showAdaptiveSheet<T>(
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: isScrollControlled,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
     builder: builder,
   );
 }
