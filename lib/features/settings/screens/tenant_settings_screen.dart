@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/config/countries.dart';
 import '../../../core/config/nav_dock_provider.dart';
 import '../../../core/config/page_transitions.dart';
 import '../../../core/config/tax_jurisdictions.dart';
@@ -350,10 +351,7 @@ class _ProfileTabState extends State<_ProfileTab> {
         TextEditingController(text: p.defaultCommissionRate.toStringAsFixed(2));
     _commissionType = p.defaultCommissionType;
 
-    final upperCountry = p.country.trim().toUpperCase();
-    _countryCode = kTaxJurisdictions.containsKey(upperCountry)
-        ? upperCountry
-        : kOtherCountrySentinel;
+    _countryCode = resolveCountryCode(p.country) ?? kOtherCountrySentinel;
 
     _timezoneOverride = p.timezone.isEmpty ? null : p.timezone;
     _defaultTimezoneForCountry = p.defaultTimezoneForCountry;
@@ -616,8 +614,9 @@ class _ProfileTabState extends State<_ProfileTab> {
             child: DropdownButtonFormField<String>(
               initialValue: _countryCode,
               decoration: InputDecoration(labelText: l10n.country),
+              isExpanded: true,
               items: [
-                for (final entry in kTaxJurisdictions.entries)
+                for (final entry in countryPickerOptions())
                   DropdownMenuItem(
                       value: entry.key,
                       child: Text('${entry.value} (${entry.key})',

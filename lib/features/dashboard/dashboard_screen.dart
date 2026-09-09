@@ -985,6 +985,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final bootstrap = context.watch<BootstrapCache>();
+    // Rebuild the whole shell (drawer / rail / bars included) when the display
+    // language changes, so nav labels re-resolve without reopening the drawer.
+    context.watch<LocaleProvider>();
     final company = auth.company;
     final l10n = AppLocalizations.of(context);
     final dock = context.watch<NavDockProvider>().position;

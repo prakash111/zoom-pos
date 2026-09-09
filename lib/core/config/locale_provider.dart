@@ -30,7 +30,8 @@ class LocaleProvider extends ChangeNotifier {
 
   Future<void> load() async {
     final code = await _preferences.readLocale();
-    if (_isLocaleCode(code)) locale = Locale(code);
+    final parsed = parseLocale(code);
+    if (parsed != null) locale = parsed;
     await BootstrapCache.instance.loadFromDisk();
     await _applyTranslations(locale.languageCode);
   }
@@ -45,12 +46,43 @@ class LocaleProvider extends ChangeNotifier {
       });
 
   Future<void> setLocale(Locale newLocale) async {
-    if (!_isLocaleCode(newLocale.languageCode)) return;
-    locale = Locale(newLocale.languageCode.toLowerCase());
+    final parsed = parseLocale('${newLocale.languageCode}'
+        '${newLocale.countryCode != null ? '-${newLocale.countryCode}' : ''}');
+    if (parsed == null) return;
+    locale = parsed;
     notifyListeners();
-    await _preferences.saveLocale(newLocale.languageCode);
-    await _applyTranslations(newLocale.languageCode);
+    // Persist the base language code — that's what the bundled dictionaries,
+    // the translation cache and `Accept-Language` all key on.
+    await _preferences.saveLocale(parsed.languageCode);
+    await _applyTranslations(parsed.languageCode);
   }
+
+  /// Accepts `pt`, `pt-BR`, `pt_BR`, `zh-Hans`, `ZH` … and returns a normalised
+  /// [Locale] (`languageCode` lower-cased, `countryCode` upper-cased), or
+  /// `null` when the string isn't a plausible language tag. Region-qualified
+  /// codes used to be silently dropped, so picking e.g. Brazilian Portuguese
+  /// changed nothing.
+  static Locale? parseLocale(String raw) {
+    final cleaned = raw.trim().replaceAll('_', '-');
+    if (cleaned.isEmpty) return null;
+    final parts = cleaned.split('-');
+    final lang = parts.first.toLowerCase();
+    if (!_isLocaleCode(lang)) return null;
+    if (parts.length >= 2 && parts[1].isNotEmpty) {
+      final region = parts[1].toUpperCase();
+      if (RegExp(r'^[A-Z]{2}$').hasMatch(region)) {
+        return Locale(lang, region);
+      }
+      if (RegExp(r'^[A-Za-z]{4}$').hasMatch(parts[1])) {
+        return Locale.fromSubtags(
+            languageCode: lang, scriptCode: _titleCase(parts[1]));
+      }
+    }
+    return Locale(lang);
+  }
+
+  static String _titleCase(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1).toLowerCase();
 
   /// Hydrates from disk first for an instant, non-blocking dictionary swap,
   /// then refreshes from the network in the background — one lightweight
@@ -60,7 +92,13 @@ class LocaleProvider extends ChangeNotifier {
     await DynamicStringService.instance.activate(code);
     notifyListeners();
 
-    await BootstrapCache.instance.refresh(code, _apiClient);
+    // A failed network refresh must never undo the locale swap that already
+    // took effect above — the bundled/cached dictionary still applies.
+    try {
+      await BootstrapCache.instance.refresh(code, _apiClient);
+    } catch (error) {
+      debugPrint('LocaleProvider._applyTranslations refresh failed: $error');
+    }
     notifyListeners();
   }
 
