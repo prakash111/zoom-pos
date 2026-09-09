@@ -1,50 +1,48 @@
 import 'package:flutter/material.dart';
 
 /// Visual primitives for the Windows desktop dashboard, styled after the
-/// "POWRSALE" reference: a soft lavender page, floating white cards with a
-/// large radius and a whisper-soft shadow, a violet hero banner, cyan pill
-/// CTAs and circular-progress stats.
-class PowrTokens {
-  PowrTokens._();
+/// green inventory-analytics reference: a light page, floating white cards
+/// with a large radius and a soft shadow, tinted rounded-square stat icons,
+/// green delta chips and lime bar charts.
+class SpTokens {
+  SpTokens._();
 
-  static const pageBg = Color(0xFFF4F5FB);
+  static const pageBg = Color(0xFFFAFAFB);
   static const card = Colors.white;
-  static const ink = Color(0xFF1B1D28);
-  static const muted = Color(0xFF8A8FA3);
-  static const faint = Color(0xFFB6BAC9);
-  static const line = Color(0xFFEDEEF5);
+  static const ink = Color(0xFF111827);
+  static const muted = Color(0xFF6B7280);
+  static const faint = Color(0xFF9CA3AF);
+  static const line = Color(0xFFEDEEF1);
 
-  static const primary = Color(0xFF23B7F0); // cyan CTA
-  static const accent = Color(0xFF6D28D9); // violet
-  static const accentSoft = Color(0xFF8B5CF6);
-  static const coral = Color(0xFFFF7A6B);
+  static const green = Color(0xFF7CC518); // brand lime
+  static const greenSoft = Color(0xFFE9F8D6);
+  static const greenInk = Color(0xFF3F8E00);
+  static const up = Color(0xFF16A34A);
+  static const down = Color(0xFFDC2626);
+  static const blue = Color(0xFF3B82F6);
+  static const amber = Color(0xFFF59E0B);
+  static const coral = Color(0xFFFB7185);
 
-  static const heroGradient = LinearGradient(
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-    colors: [Color(0xFF6D28D9), Color(0xFF4C1D95)],
-  );
-
-  static BorderRadius get radius => BorderRadius.circular(22);
-  static BorderRadius get radiusSm => BorderRadius.circular(14);
+  static BorderRadius get radius => BorderRadius.circular(20);
+  static BorderRadius get radiusSm => BorderRadius.circular(12);
 
   static List<BoxShadow> get shadow => [
         BoxShadow(
-          color: const Color(0xFF6B7280).withValues(alpha: 0.10),
-          blurRadius: 30,
-          offset: const Offset(0, 14),
+          color: const Color(0xFF9AA1B2).withValues(alpha: 0.14),
+          blurRadius: 24,
+          offset: const Offset(0, 10),
         ),
       ];
 }
 
-/// A floating white card.
-class PowrCard extends StatelessWidget {
-  const PowrCard({
+/// Floating white card with an optional title + trailing header.
+class SpCard extends StatelessWidget {
+  const SpCard({
     super.key,
     required this.child,
     this.title,
     this.trailing,
-    this.padding = const EdgeInsets.all(20),
+    this.padding = const EdgeInsets.all(22),
   });
 
   final Widget child;
@@ -56,9 +54,9 @@ class PowrCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: PowrTokens.card,
-        borderRadius: PowrTokens.radius,
-        boxShadow: PowrTokens.shadow,
+        color: SpTokens.card,
+        borderRadius: SpTokens.radius,
+        boxShadow: SpTokens.shadow,
       ),
       padding: padding,
       child: Column(
@@ -72,16 +70,16 @@ class PowrCard extends StatelessWidget {
                   Expanded(
                     child: Text(title!,
                         style: const TextStyle(
-                            fontSize: 14.5,
+                            fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: PowrTokens.ink)),
+                            color: SpTokens.ink)),
                   )
                 else
                   const Spacer(),
                 if (trailing != null) trailing!,
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
           ],
           child,
         ],
@@ -90,33 +88,99 @@ class PowrCard extends StatelessWidget {
   }
 }
 
-/// Bold page heading + optional trailing (the date-range pill).
-class PowrPageHeader extends StatelessWidget {
-  const PowrPageHeader(this.title, {super.key, this.trailing});
+/// Up/down delta chip: "▲ +8.2%" green, "▼ +3" red.
+class SpDeltaChip extends StatelessWidget {
+  const SpDeltaChip(this.label, {super.key, this.positive = true});
 
-  final String title;
-  final Widget? trailing;
+  final String label;
+  final bool positive;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(title,
-              style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: PowrTokens.ink)),
-        ),
-        if (trailing != null) trailing!,
-      ],
+    final c = positive ? SpTokens.up : SpTokens.down;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(positive ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+            size: 16, color: c),
+        Text(label,
+            style: TextStyle(
+                fontSize: 11.5, fontWeight: FontWeight.w800, color: c)),
+      ]),
     );
   }
 }
 
-/// The "Jan – Feb, 2020 ▾" pill.
-class PowrDateRangePill extends StatelessWidget {
-  const PowrDateRangePill(this.label, {super.key, this.onTap});
+/// Stat card: tinted rounded-square icon + big number, then label + delta.
+class SpStatCard extends StatelessWidget {
+  const SpStatCard({
+    super.key,
+    required this.icon,
+    required this.tint,
+    required this.value,
+    required this.label,
+    required this.delta,
+    this.deltaPositive = true,
+  });
+
+  final IconData icon;
+  final Color tint;
+  final String value;
+  final String label;
+  final String delta;
+  final bool deltaPositive;
+
+  @override
+  Widget build(BuildContext context) {
+    return SpCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: tint.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: tint, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                      color: SpTokens.ink,
+                      letterSpacing: -0.5),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(label,
+              style: const TextStyle(fontSize: 13, color: SpTokens.muted)),
+          const SizedBox(height: 8),
+          SpDeltaChip(delta, positive: deltaPositive),
+        ],
+      ),
+    );
+  }
+}
+
+/// "7 Days ▾" dropdown pill.
+class SpChip extends StatelessWidget {
+  const SpChip(this.label, {super.key, this.onTap});
 
   final String label;
   final VoidCallback? onTap;
@@ -124,25 +188,25 @@ class PowrDateRangePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: PowrTokens.card,
-      borderRadius: PowrTokens.radiusSm,
+      color: SpTokens.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: SpTokens.radiusSm,
+        side: const BorderSide(color: SpTokens.line),
+      ),
       child: InkWell(
-        borderRadius: PowrTokens.radiusSm,
+        borderRadius: SpTokens.radiusSm,
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.calendar_today_outlined,
-                size: 15, color: PowrTokens.accent),
-            const SizedBox(width: 8),
             Text(label,
                 style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: PowrTokens.ink)),
-            const SizedBox(width: 6),
+                    color: SpTokens.ink)),
+            const SizedBox(width: 8),
             const Icon(Icons.keyboard_arrow_down,
-                size: 16, color: PowrTokens.muted),
+                size: 18, color: SpTokens.muted),
           ]),
         ),
       ),
@@ -150,66 +214,66 @@ class PowrDateRangePill extends StatelessWidget {
   }
 }
 
-/// Cyan pill primary button (SAVE / SEND REQUEST).
-class PowrButton extends StatelessWidget {
-  const PowrButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-    this.icon,
-    this.filledColor,
-    this.busy = false,
-    this.dense = false,
-  });
+/// Green outlined button ("Investigate In Details").
+class SpOutlineButton extends StatelessWidget {
+  const SpOutlineButton(this.label, {super.key, required this.onPressed});
 
   final String label;
   final VoidCallback? onPressed;
-  final IconData? icon;
-  final Color? filledColor;
-  final bool busy;
-  final bool dense;
 
   @override
   Widget build(BuildContext context) {
-    final bg = filledColor ?? PowrTokens.primary;
-    final enabled = onPressed != null && !busy;
+    final c = Theme.of(context).colorScheme.primary;
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: c,
+        side: BorderSide(color: c.withValues(alpha: 0.5)),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+      ),
+      child: Text(label),
+    );
+  }
+}
+
+/// Solid brand button.
+class SpButton extends StatelessWidget {
+  const SpButton(this.label,
+      {super.key, required this.onPressed, this.busy = false});
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme.primary;
+    final on = ThemeData.estimateBrightnessForColor(c) == Brightness.dark
+        ? Colors.white
+        : Colors.black;
     return Opacity(
-      opacity: enabled ? 1 : 0.55,
+      opacity: (onPressed == null || busy) ? 0.55 : 1,
       child: Material(
-        color: bg,
+        color: c,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: enabled ? onPressed : null,
+          onTap: busy ? null : onPressed,
           child: Padding(
-            padding: EdgeInsets.symmetric(
-                horizontal: dense ? 16 : 24, vertical: dense ? 10 : 13),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (busy)
-                  const SizedBox(
-                    width: 15,
-                    height: 15,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
-                  )
-                else ...[
-                  if (icon != null) ...[
-                    Icon(icon, size: 16, color: Colors.white),
-                    const SizedBox(width: 8),
-                  ],
-                  Text(label.toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: busy
+                ? SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: on))
+                : Text(label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: on,
                         fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                        letterSpacing: 0.6,
-                      )),
-                ],
-              ],
-            ),
+                        fontSize: 12.5)),
           ),
         ),
       ),
@@ -217,217 +281,9 @@ class PowrButton extends StatelessWidget {
   }
 }
 
-/// The violet greeting banner with a rounded avatar blob on the left.
-class PowrHeroBanner extends StatelessWidget {
-  const PowrHeroBanner({
-    super.key,
-    required this.greeting,
-    required this.subtitle,
-  });
-
-  final String greeting;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: PowrTokens.heroGradient,
-        borderRadius: PowrTokens.radius,
-        boxShadow: [
-          BoxShadow(
-            color: PowrTokens.accent.withValues(alpha: 0.28),
-            blurRadius: 26,
-            offset: const Offset(0, 14),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: const Icon(Icons.emoji_emotions_outlined,
-                color: Colors.white, size: 30),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(greeting,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800)),
-                const SizedBox(height: 4),
-                Text(subtitle,
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 13)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Big number + caption stat (58 / New Orders).
-class PowrStat extends StatelessWidget {
-  const PowrStat(this.value, this.caption, {super.key, this.color});
-
-  final String value;
-  final String caption;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: color ?? PowrTokens.primary)),
-        const SizedBox(height: 4),
-        Text(caption,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, color: PowrTokens.muted)),
-      ],
-    );
-  }
-}
-
-/// A ring-gauge with a centred label (259K / 78%).
-class PowrRadial extends StatelessWidget {
-  const PowrRadial({
-    super.key,
-    required this.percent,
-    required this.centerTop,
-    this.centerBottom,
-    this.color = PowrTokens.accentSoft,
-    this.size = 96,
-  });
-
-  final double percent; // 0..1
-  final String centerTop;
-  final String? centerBottom;
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox(
-            width: size,
-            height: size,
-            child: CircularProgressIndicator(
-              value: percent.clamp(0, 1),
-              strokeWidth: 8,
-              backgroundColor: PowrTokens.line,
-              valueColor: AlwaysStoppedAnimation(color),
-            ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(centerTop,
-                  style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: PowrTokens.ink)),
-              if (centerBottom != null)
-                Text(centerBottom!,
-                    style: const TextStyle(
-                        fontSize: 9.5, color: PowrTokens.muted)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Underline tab bar ("History | Upcoming").
-class PowrTabs extends StatelessWidget {
-  const PowrTabs({
-    super.key,
-    required this.tabs,
-    required this.index,
-    required this.onChanged,
-  });
-
-  final List<String> tabs;
-  final int index;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < tabs.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(right: 24),
-            child: InkWell(
-              onTap: () => onChanged(i),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(tabs[i],
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight:
-                              i == index ? FontWeight.w800 : FontWeight.w600,
-                          color: i == index
-                              ? PowrTokens.primary
-                              : PowrTokens.muted,
-                        )),
-                    const SizedBox(height: 6),
-                    Container(
-                      height: 2.5,
-                      width: 26,
-                      decoration: BoxDecoration(
-                        color: i == index
-                            ? PowrTokens.primary
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// Small rounded label.
-class PowrPill extends StatelessWidget {
-  const PowrPill(this.label, {super.key, this.color = PowrTokens.primary});
+/// Small status badge ("RECEIVED").
+class SpBadge extends StatelessWidget {
+  const SpBadge(this.label, {super.key, this.color = SpTokens.up});
 
   final String label;
   final Color color;
@@ -438,67 +294,57 @@ class PowrPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(label,
+      child: Text(label.toUpperCase(),
           style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w800, color: color)),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+              color: color)),
     );
   }
 }
 
-/// A person row for the "Message" list on the right rail.
-class PowrPersonRow extends StatelessWidget {
-  const PowrPersonRow({
-    super.key,
-    required this.name,
-    required this.subtitle,
-    this.trailing,
-  });
+/// Horizontal stacked segment bar ("Gadgets 45% · Devices 45% · …").
+class SpSegmentBar extends StatelessWidget {
+  const SpSegmentBar(this.segments, {super.key});
 
-  final String name;
-  final String subtitle;
-  final Widget? trailing;
+  /// (label, fraction 0..1, colour)
+  final List<(String, double, Color)> segments;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 17,
-            backgroundColor: PowrTokens.accent.withValues(alpha: 0.12),
-            child: Text(
-              name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-              style: const TextStyle(
-                  color: PowrTokens.accent,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            height: 30,
+            child: Row(
               children: [
-                Text(name,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: PowrTokens.ink)),
-                Text(subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style:
-                        const TextStyle(fontSize: 11, color: PowrTokens.faint)),
+                for (final (label, frac, color) in segments)
+                  Expanded(
+                    flex: (frac * 1000).round().clamp(1, 100000),
+                    child: Container(
+                      color: color,
+                      alignment: Alignment.center,
+                      child: Text(label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white)),
+                    ),
+                  ),
               ],
             ),
           ),
-          if (trailing != null) trailing!,
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

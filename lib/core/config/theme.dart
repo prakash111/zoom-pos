@@ -3,15 +3,14 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  /// Default brand accent — the bright cyan CTA colour from the dashboard
+  /// Default brand colour — the lime green from the inventory dashboard
   /// design. A tenant's own brand colour still overrides this at runtime.
-  static const Color primary = Color(0xFF23B7F0);
+  static const Color primary = Color(0xFF7CC518);
 
-  /// Secondary accent — the violet used for the hero banner, the "+" create
-  /// button and chat pills.
-  static const Color accent = Color(0xFF6D28D9);
+  /// Secondary accent.
+  static const Color accent = Color(0xFF16A34A);
 
-  static const Color surface = Color(0xFFF5F6FC);
+  static const Color surface = Color(0xFFF6F7F9);
 
   /// Black or white, whichever reads on [bg] — for text/icons sitting on a
   /// brand-coloured surface.
