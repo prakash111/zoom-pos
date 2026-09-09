@@ -65,7 +65,7 @@ class NavigationMenuBuilderTest extends TestCase
 
                 return $childKeys === [
                     'settings_mode', 'settings_profile', 'settings_branding', 'settings_receipts', 'settings_financial',
-                    'settings_taxes', 'settings_api', 'settings_navigation',
+                    'settings_taxes', 'settings_api', 'settings_navigation', 'app_preferences',
                 ] && ! in_array('settings_mode', $rootKeys, true);
             });
     }
@@ -505,7 +505,7 @@ class NavigationMenuBuilderTest extends TestCase
         $settings = collect($administration['items'])->firstWhere('key', 'settings');
         $childKeys = collect($settings['children'])->pluck('key')->sort()->values()->all();
         $this->assertSame([
-            'settings_api', 'settings_branding', 'settings_financial', 'settings_mode',
+            'app_preferences', 'settings_api', 'settings_branding', 'settings_financial', 'settings_mode',
             'settings_navigation', 'settings_profile', 'settings_receipts', 'settings_taxes',
         ], $childKeys);
     }

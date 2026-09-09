@@ -1964,6 +1964,22 @@ class TenantNavRegistry
                 'parent_id' => 'settings',
                 'permission' => 'settings',
             ],
+            [
+                // Per-device: light/dark theme, page-move animation, nav-dock
+                // placement. `component` resolves to the native
+                // AppPreferencesScreen on the desktop/mobile app; the
+                // target_endpoint is the graceful web fallback.
+                'key' => 'app_preferences',
+                'label' => 'App Preferences',
+                'title' => 'App Preferences',
+                'icon' => 'tune',
+                'component' => 'app_preferences',
+                'type' => 'link',
+                'target_endpoint' => '/api/tenant/views/settings-appearance',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => null,
+            ],
         ];
     }
 }

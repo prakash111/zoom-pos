@@ -4445,6 +4445,24 @@ class SchemaResponse
         ]);
     }
 
+    /**
+     * "App Preferences" — theme, page-transition animation and nav-dock
+     * placement. These are per-device settings owned by the native client
+     * (Settings ▸ Appearance / the app-bar tune button); this view is only the
+     * graceful fallback for web / preview surfaces that can't render them.
+     */
+    public static function appearanceView(Company $company): array
+    {
+        return self::screen('App Preferences', [
+            self::card([
+                self::text('Theme, animations & layout', 'title_medium', ['bold' => true]),
+                self::text('Light / dark theme, the page-move animation and where the navigation menu sits are stored on each device.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::text('On the desktop / mobile app, open these from the top-bar "App preferences" button or Settings ▸ Appearance.', 'body_small', ['color' => '#6b7280']),
+            ]),
+        ]);
+    }
+
     public static function localizationView(Company $company): array
     {
         return self::screen('Localization & Region', [
@@ -5418,6 +5436,7 @@ class SchemaResponse
             'settings-payment-methods', 'payment-methods', 'payment-method-list' => self::paymentMethodsView($company),
             'payment-method-create', 'add-payment-method', 'new-payment-method' => self::paymentMethodCreateView($company),
             'settings-localization', 'localization' => self::localizationView($company),
+            'settings-appearance', 'appearance', 'app-preferences', 'preferences' => self::appearanceView($company),
             'settings-taxes', 'taxes' => self::taxesView($company),
             'tax-rule-create', 'add-tax-rule', 'new-tax-rule' => self::taxRuleCreateView($company),
             'settings-api', 'api', 'api-integrations' => self::apiView($company),
