@@ -13,10 +13,15 @@ class ThemeProvider extends ChangeNotifier {
   static const _colorKey = 'zoom_pos.primary_color';
   static const _accentKey = 'zoom_pos.accent_color';
   static const _drawerBgKey = 'zoom_pos.drawer_bg';
+  static const _themeModeKey = 'zoom_pos.theme_mode';
 
   Color seedColor = AppTheme.primary;
   Color? accentColor;
   Color? drawerBg;
+
+  /// User-selectable light / dark / follow-system preference, persisted per
+  /// device. Defaults to following the OS setting.
+  ThemeMode themeMode = ThemeMode.system;
 
   Future<void> load() async {
     try {
@@ -34,9 +39,33 @@ class ThemeProvider extends ChangeNotifier {
       if (drawerHex != null) {
         drawerBg = parseHexColor(drawerHex);
       }
+      themeMode = _parseThemeMode(prefs.getString(_themeModeKey));
       notifyListeners();
     } catch (e) {
       debugPrint('ThemeProvider.load error: $e');
+    }
+  }
+
+  static ThemeMode _parseThemeMode(String? raw) {
+    switch (raw) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    if (mode == themeMode) return;
+    themeMode = mode;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_themeModeKey, mode.name);
+    } catch (e) {
+      debugPrint('ThemeProvider.setThemeMode error: $e');
     }
   }
 

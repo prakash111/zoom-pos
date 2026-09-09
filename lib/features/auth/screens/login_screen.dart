@@ -259,18 +259,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: Center(
-                          child: Text(
-                            'G',
-                            style: TextStyle(
-                              color: Color(0xFF4285F4),
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
+                        width: 20,
+                        height: 20,
+                        child: CustomPaint(painter: _GoogleGPainter()),
                       ),
                       SizedBox(width: 10),
                       Text(
@@ -337,4 +328,44 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+/// The multi-colour Google "G", drawn small so it never clips inside the
+/// social-sign-in button the way a scaled text glyph did.
+class _GoogleGPainter extends CustomPainter {
+  const _GoogleGPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.width / 2;
+    final c = Offset(r, r);
+    final stroke = size.width * 0.28;
+    final rect = Rect.fromCircle(center: c, radius: r - stroke / 2);
+    final p = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt;
+
+    // Four coloured arcs around the ring.
+    p.color = const Color(0xFF4285F4); // blue  (right)
+    canvas.drawArc(rect, -0.55, 1.6, false, p);
+    p.color = const Color(0xFF34A853); // green (bottom)
+    canvas.drawArc(rect, 1.15, 1.5, false, p);
+    p.color = const Color(0xFFFBBC05); // yellow (bottom-left)
+    canvas.drawArc(rect, 2.55, 1.1, false, p);
+    p.color = const Color(0xFFEA4335); // red   (top-left)
+    canvas.drawArc(rect, 3.6, 1.6, false, p);
+
+    // The horizontal bar of the G.
+    p
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF4285F4);
+    canvas.drawRect(
+      Rect.fromLTWH(c.dx, c.dy - stroke / 2, r - stroke / 2, stroke),
+      p,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

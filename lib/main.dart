@@ -6,6 +6,7 @@ import 'core/api/api_client.dart';
 import 'core/config/bootstrap_cache.dart';
 import 'core/config/locale_provider.dart';
 import 'core/config/nav_dock_provider.dart';
+import 'core/config/platform_branding_provider.dart';
 import 'core/config/theme.dart';
 import 'core/config/theme_provider.dart';
 import 'core/sdui/app_router.dart';
@@ -60,6 +61,12 @@ Future<void> main() async {
       LocaleProvider(preferences: preferences, apiClient: apiClient)..load();
   final navDockProvider = NavDockProvider(preferences: preferences)..load();
 
+  // SaaS-owner branding (name + logo) from the superadmin panel — load the
+  // cached copy now, refresh from the server in the background.
+  final platformBranding = PlatformBrandingProvider();
+  await platformBranding.load();
+  platformBranding.refresh(apiClient);
+
   final syncEngine = SyncEngine(
     database: AppDatabase.instance,
     apiClient: apiClient,
@@ -90,6 +97,7 @@ Future<void> main() async {
     localeProvider: localeProvider,
     heldCartsStore: heldCartsStore,
     navDockProvider: navDockProvider,
+    platformBranding: platformBranding,
     syncEngine: syncEngine,
   ));
 }
@@ -104,6 +112,7 @@ class ZoomPosApp extends StatelessWidget {
     required this.localeProvider,
     required this.heldCartsStore,
     required this.navDockProvider,
+    required this.platformBranding,
     required this.syncEngine,
   });
 
@@ -114,6 +123,7 @@ class ZoomPosApp extends StatelessWidget {
   final LocaleProvider localeProvider;
   final HeldCartsStore heldCartsStore;
   final NavDockProvider navDockProvider;
+  final PlatformBrandingProvider platformBranding;
   final SyncEngine syncEngine;
 
   @override
@@ -129,6 +139,8 @@ class ZoomPosApp extends StatelessWidget {
         ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
         ChangeNotifierProvider<LocaleProvider>.value(value: localeProvider),
         ChangeNotifierProvider<NavDockProvider>.value(value: navDockProvider),
+        ChangeNotifierProvider<PlatformBrandingProvider>.value(
+            value: platformBranding),
         ChangeNotifierProvider<SyncEngine>.value(value: syncEngine),
         ChangeNotifierProvider<DynamicStringService>.value(
             value: DynamicStringService.instance),
@@ -146,6 +158,11 @@ class ZoomPosApp extends StatelessWidget {
               accentColor: theme.accentColor,
               drawerBg: theme.drawerBg,
             ),
+            darkTheme: AppTheme.dark(
+              seedColor: theme.seedColor,
+              accentColor: theme.accentColor,
+            ),
+            themeMode: theme.themeMode,
             locale: locale,
             supportedLocales: {
               locale,

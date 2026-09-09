@@ -7,6 +7,7 @@ import 'package:zoom_pos_mobile/core/config/app_config.dart';
 import 'package:zoom_pos_mobile/core/config/bootstrap_cache.dart';
 import 'package:zoom_pos_mobile/core/config/locale_provider.dart';
 import 'package:zoom_pos_mobile/core/config/nav_dock_provider.dart';
+import 'package:zoom_pos_mobile/core/config/platform_branding_provider.dart';
 import 'package:zoom_pos_mobile/core/config/theme_provider.dart';
 import 'package:zoom_pos_mobile/core/services/dynamic_string_service.dart';
 import 'package:zoom_pos_mobile/core/services/sync/sync_engine.dart';
@@ -30,7 +31,8 @@ class MockOtpApiClient extends Fake implements ApiClient {
   Future<String> currentBaseUrl() async => 'https://saas.zoomnearby.com';
 
   @override
-  Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query}) async {
+  Future<Map<String, dynamic>> get(String path,
+      {Map<String, dynamic>? query}) async {
     if (path == ApiEndpoints.authConfig) {
       return {
         'success': true,
@@ -121,7 +123,9 @@ void main() {
       );
     });
 
-    test('AuthRepository handles requires_otp cleanly without throwing missing token error', () async {
+    test(
+        'AuthRepository handles requires_otp cleanly without throwing missing token error',
+        () async {
       final result = await authRepo.register(
         storeName: 'Sunrise Bakery',
         ownerName: 'Chef Pierre',
@@ -135,7 +139,9 @@ void main() {
       expect(result.token, isNull);
     });
 
-    test('AuthProvider.register preserves requires_otp state for screen transition', () async {
+    test(
+        'AuthProvider.register preserves requires_otp state for screen transition',
+        () async {
       final result = await authProvider.register(
         storeName: 'Sunrise Bakery',
         ownerName: 'Chef Pierre',
@@ -149,7 +155,8 @@ void main() {
       expect(authProvider.errorMessage, isNull);
     });
 
-    test('AuthRepository verifyOtp exchanges 6-digit code for token session', () async {
+    test('AuthRepository verifyOtp exchanges 6-digit code for token session',
+        () async {
       final loginResult = await authRepo.verifyOtp(
         email: 'pierre@bakery.test',
         otp: '654321',
@@ -160,10 +167,17 @@ void main() {
       expect(loginResult.company.name, 'Test Store');
     });
 
-    testWidgets('VerifyOtpScreen renders 6-digit input, activate button, and cooldown link', (tester) async {
+    testWidgets(
+        'VerifyOtpScreen renders 6-digit input, activate button, and cooldown link',
+        (tester) async {
       await tester.pumpWidget(
-        ChangeNotifierProvider<AuthProvider>.value(
-          value: authProvider,
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
+            ChangeNotifierProvider<PlatformBrandingProvider>.value(
+              value: PlatformBrandingProvider(),
+            ),
+          ],
           child: const MaterialApp(
             home: VerifyOtpScreen(
               email: 'pierre@bakery.test',
@@ -180,7 +194,9 @@ void main() {
       expect(find.textContaining('Resend'), findsOneWidget);
     });
 
-    testWidgets('LoginScreen renders Social OAuth divider and Google & Facebook buttons', (tester) async {
+    testWidgets(
+        'LoginScreen renders Social OAuth divider and Google & Facebook buttons',
+        (tester) async {
       final preferences = FakeAppPreferences();
       final syncEngine = FakeSyncEngine();
 
@@ -190,10 +206,15 @@ void main() {
             Provider<ApiClient>.value(value: mockApi),
             Provider<AppPreferences>.value(value: preferences),
             ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
-            ChangeNotifierProvider<HeldCartsStore>.value(value: HeldCartsStore()),
+            ChangeNotifierProvider<HeldCartsStore>.value(
+                value: HeldCartsStore()),
             ChangeNotifierProvider<ThemeProvider>.value(value: ThemeProvider()),
+            ChangeNotifierProvider<PlatformBrandingProvider>.value(
+              value: PlatformBrandingProvider(),
+            ),
             ChangeNotifierProvider<LocaleProvider>.value(
-              value: LocaleProvider(preferences: preferences, apiClient: mockApi),
+              value:
+                  LocaleProvider(preferences: preferences, apiClient: mockApi),
             ),
             ChangeNotifierProvider<NavDockProvider>.value(
               value: NavDockProvider(preferences: preferences),

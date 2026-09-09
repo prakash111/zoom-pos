@@ -6,6 +6,7 @@ import 'package:zoom_pos_mobile/core/api/api_client.dart';
 import 'package:zoom_pos_mobile/core/config/bootstrap_cache.dart';
 import 'package:zoom_pos_mobile/core/config/locale_provider.dart';
 import 'package:zoom_pos_mobile/core/config/nav_dock_provider.dart';
+import 'package:zoom_pos_mobile/core/config/platform_branding_provider.dart';
 import 'package:zoom_pos_mobile/core/config/theme_provider.dart';
 import 'package:zoom_pos_mobile/core/models/company_model.dart';
 import 'package:zoom_pos_mobile/core/models/user_model.dart';
@@ -264,6 +265,8 @@ void main() {
           ChangeNotifierProvider<AuthProvider>.value(value: fakeAuth),
           ChangeNotifierProvider<HeldCartsStore>.value(value: heldCartsStore),
           ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
+          ChangeNotifierProvider<PlatformBrandingProvider>.value(
+              value: PlatformBrandingProvider()),
           ChangeNotifierProvider<LocaleProvider>.value(value: localeProvider),
           ChangeNotifierProvider<NavDockProvider>.value(value: navDockProvider),
           ChangeNotifierProvider<SyncEngine>.value(value: fakeSync),

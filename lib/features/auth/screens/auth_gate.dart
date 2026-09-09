@@ -1,12 +1,9 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../dashboard/dashboard_screen.dart';
-import '../../dashboard/screens/dashboard_layout_screen.dart';
 import '../../../core/services/dynamic_string_service.dart';
 import '../auth_provider.dart';
 import 'login_screen.dart';
@@ -78,12 +75,11 @@ class _AuthGateState extends State<AuthGate> {
           ),
         );
       case AuthStatus.authenticated:
-        // The Windows desktop build gets the redesigned analytics dashboard;
-        // Android / other platforms keep the classic drawer-nav dashboard.
-        final isWindowsDesktop = !kIsWeb && Platform.isWindows;
-        return isWindowsDesktop
-            ? const DashboardLayoutScreen()
-            : const DashboardScreen();
+        // The full-featured dashboard: analytics bound to the live API plus
+        // the complete hierarchical navigation (drawer + expandable desktop
+        // rail). Alternate visual layouts are offered as a Settings picker
+        // rather than being forced on by platform.
+        return const DashboardScreen();
       case AuthStatus.authenticating:
       case AuthStatus.unauthenticated:
         return const LoginScreen();

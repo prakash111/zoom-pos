@@ -1,5 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/config/platform_branding_provider.dart';
 import 'auth_illustration.dart';
 
 /// Split-screen shell shared by every pre-login screen (login, register,
@@ -43,12 +46,26 @@ class AuthScaffold extends StatelessWidget {
   static const _muted = Color(0xFF64748B);
 
   Widget _brand(BuildContext context) {
+    // Name + logo come from the SaaS owner's superadmin branding settings
+    // (GET /auth/branding), cached locally so this paints instantly.
+    final branding = context.watch<PlatformBrandingProvider>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (branding.hasLogo)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: CachedNetworkImage(
+              imageUrl: branding.brandLogoUrl!,
+              height: 44,
+              fit: BoxFit.contain,
+              alignment: Alignment.centerLeft,
+              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          ),
         Text(
-          'Sales & Inventory',
+          branding.platformName,
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w800,
                 color: _ink,

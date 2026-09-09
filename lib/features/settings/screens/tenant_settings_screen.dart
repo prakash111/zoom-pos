@@ -137,19 +137,30 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _serverTab((bundle) => _ProfileTab(
-              repository: _repository,
-              initial: bundle.profile,
-              timezones: bundle.timezones)),
-          _serverTab((bundle) =>
-              _ReceiptsTab(repository: _repository, initial: bundle.receipts)),
-          _serverTab((bundle) => _FinancialTab(
-              repository: _repository, initial: bundle.financial)),
-          _serverTab((bundle) =>
-              NavMenuSettingsTab(repository: _repository, initial: bundle.nav)),
-          // A per-device workspace preference, not a tenant setting — never
-          // gated behind the server fetch above, so it's reachable offline.
-          const _AppearanceTab(),
+          for (final tab in <Widget>[
+            _serverTab((bundle) => _ProfileTab(
+                repository: _repository,
+                initial: bundle.profile,
+                timezones: bundle.timezones)),
+            _serverTab((bundle) => _ReceiptsTab(
+                repository: _repository, initial: bundle.receipts)),
+            _serverTab((bundle) => _FinancialTab(
+                repository: _repository, initial: bundle.financial)),
+            _serverTab((bundle) => NavMenuSettingsTab(
+                repository: _repository, initial: bundle.nav)),
+            // A per-device workspace preference, not a tenant setting — never
+            // gated behind the server fetch above, so it's reachable offline.
+            const _AppearanceTab(),
+          ])
+            // Keep forms readable on wide desktop windows instead of letting
+            // every field stretch edge to edge.
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 820),
+                child: tab,
+              ),
+            ),
         ],
       ),
     );
@@ -166,6 +177,7 @@ class _AppearanceTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final navDock = context.watch<NavDockProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
 
     final options = <(NavDockPosition, IconData, String)>[
       (NavDockPosition.left, Icons.arrow_back, l10n.navDockLeft),
@@ -174,9 +186,40 @@ class _AppearanceTab extends StatelessWidget {
       (NavDockPosition.bottom, Icons.arrow_downward, l10n.navDockBottom),
     ];
 
+    const themeOptions = <(ThemeMode, IconData, String)>[
+      (ThemeMode.system, Icons.brightness_auto_outlined, 'Match device'),
+      (ThemeMode.light, Icons.light_mode_outlined, 'Light'),
+      (ThemeMode.dark, Icons.dark_mode_outlined, 'Dark'),
+    ];
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        Text('Theme', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text('Choose how the app looks on this device.',
+            style: TextStyle(color: Colors.grey.shade600)),
+        const SizedBox(height: 12),
+        RadioGroup<ThemeMode>(
+          groupValue: themeProvider.themeMode,
+          onChanged: (value) {
+            if (value != null) themeProvider.setThemeMode(value);
+          },
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (final option in themeOptions)
+                  RadioListTile<ThemeMode>(
+                    value: option.$1,
+                    secondary: Icon(option.$2),
+                    title: Text(option.$3),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
         Text(l10n.navDockTitle, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),
         Text(l10n.navDockDescription,
