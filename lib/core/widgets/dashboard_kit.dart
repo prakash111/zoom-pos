@@ -1,121 +1,87 @@
 import 'package:flutter/material.dart';
 
-/// Shared visual primitives for the Windows desktop dashboard, matching the
-/// reference admin screenshots: light slate page, elevated white cards with
-/// an emoji-led header, indigo primary actions, soft status pills and a
-/// plain data table.
-class DashTokens {
-  DashTokens._();
+/// Visual primitives for the Windows desktop dashboard, styled after the
+/// "POWRSALE" reference: a soft lavender page, floating white cards with a
+/// large radius and a whisper-soft shadow, a violet hero banner, cyan pill
+/// CTAs and circular-progress stats.
+class PowrTokens {
+  PowrTokens._();
 
-  static const pageBg = Color(0xFFF1F5F9);
-  static const topBar = Color(0xFF0B1220);
+  static const pageBg = Color(0xFFF4F5FB);
   static const card = Colors.white;
-  static const cardBorder = Color(0xFFE9EDF3);
-  static const ink = Color(0xFF0F172A);
-  static const muted = Color(0xFF64748B);
-  static const faint = Color(0xFF94A3B8);
-  static const primary = Color(0xFF4F46E5);
-  static const primaryDark = Color(0xFF4338CA);
-  static const danger = Color(0xFFDC2626);
+  static const ink = Color(0xFF1B1D28);
+  static const muted = Color(0xFF8A8FA3);
+  static const faint = Color(0xFFB6BAC9);
+  static const line = Color(0xFFEDEEF5);
 
-  static const contentMaxWidth = 1160.0;
+  static const primary = Color(0xFF23B7F0); // cyan CTA
+  static const accent = Color(0xFF6D28D9); // violet
+  static const accentSoft = Color(0xFF8B5CF6);
+  static const coral = Color(0xFFFF7A6B);
 
-  static BorderRadius get cardRadius => BorderRadius.circular(18);
+  static const heroGradient = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [Color(0xFF6D28D9), Color(0xFF4C1D95)],
+  );
 
-  static List<BoxShadow> get cardShadow => [
+  static BorderRadius get radius => BorderRadius.circular(22);
+  static BorderRadius get radiusSm => BorderRadius.circular(14);
+
+  static List<BoxShadow> get shadow => [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.04),
-          blurRadius: 24,
-          offset: const Offset(0, 10),
+          color: const Color(0xFF6B7280).withValues(alpha: 0.10),
+          blurRadius: 30,
+          offset: const Offset(0, 14),
         ),
       ];
 }
 
-/// A white rounded card with an optional `emoji + title (+ subtitle)` header
-/// and an optional trailing widget (a pill, a button…).
-class DashCard extends StatelessWidget {
-  const DashCard({
+/// A floating white card.
+class PowrCard extends StatelessWidget {
+  const PowrCard({
     super.key,
     required this.child,
-    this.emoji,
     this.title,
-    this.subtitle,
     this.trailing,
-    this.padding = const EdgeInsets.all(24),
+    this.padding = const EdgeInsets.all(20),
   });
 
   final Widget child;
-  final String? emoji;
   final String? title;
-  final String? subtitle;
   final Widget? trailing;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
-    final hasHeader = title != null || trailing != null;
     return Container(
       decoration: BoxDecoration(
-        color: DashTokens.card,
-        borderRadius: DashTokens.cardRadius,
-        border: Border.all(color: DashTokens.cardBorder),
-        boxShadow: DashTokens.cardShadow,
+        color: PowrTokens.card,
+        borderRadius: PowrTokens.radius,
+        boxShadow: PowrTokens.shadow,
       ),
       padding: padding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (hasHeader) ...[
+          if (title != null || trailing != null) ...[
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (title != null)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (emoji != null) ...[
-                              Text(emoji!,
-                                  style: const TextStyle(fontSize: 16)),
-                              const SizedBox(width: 10),
-                            ],
-                            Flexible(
-                              child: Text(
-                                title!,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: DashTokens.ink,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitle!,
-                          style: const TextStyle(
-                              fontSize: 12.5,
-                              color: DashTokens.muted,
-                              height: 1.4),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (trailing != null) ...[
-                  const SizedBox(width: 12),
-                  trailing!,
-                ],
+                if (title != null)
+                  Expanded(
+                    child: Text(title!,
+                        style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: PowrTokens.ink)),
+                  )
+                else
+                  const Spacer(),
+                if (trailing != null) trailing!,
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
           ],
           child,
         ],
@@ -124,14 +90,344 @@ class DashCard extends StatelessWidget {
   }
 }
 
-/// Small rounded label — e.g. the indigo "5 Active" count on a card header,
-/// or a category tag inside a table row.
-class DashPill extends StatelessWidget {
-  const DashPill(
-    this.label, {
+/// Bold page heading + optional trailing (the date-range pill).
+class PowrPageHeader extends StatelessWidget {
+  const PowrPageHeader(this.title, {super.key, this.trailing});
+
+  final String title;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(title,
+              style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: PowrTokens.ink)),
+        ),
+        if (trailing != null) trailing!,
+      ],
+    );
+  }
+}
+
+/// The "Jan – Feb, 2020 ▾" pill.
+class PowrDateRangePill extends StatelessWidget {
+  const PowrDateRangePill(this.label, {super.key, this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: PowrTokens.card,
+      borderRadius: PowrTokens.radiusSm,
+      child: InkWell(
+        borderRadius: PowrTokens.radiusSm,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.calendar_today_outlined,
+                size: 15, color: PowrTokens.accent),
+            const SizedBox(width: 8),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: PowrTokens.ink)),
+            const SizedBox(width: 6),
+            const Icon(Icons.keyboard_arrow_down,
+                size: 16, color: PowrTokens.muted),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Cyan pill primary button (SAVE / SEND REQUEST).
+class PowrButton extends StatelessWidget {
+  const PowrButton({
     super.key,
-    this.color = DashTokens.primary,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.filledColor,
+    this.busy = false,
+    this.dense = false,
   });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final Color? filledColor;
+  final bool busy;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = filledColor ?? PowrTokens.primary;
+    final enabled = onPressed != null && !busy;
+    return Opacity(
+      opacity: enabled ? 1 : 0.55,
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: enabled ? onPressed : null,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+                horizontal: dense ? 16 : 24, vertical: dense ? 10 : 13),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (busy)
+                  const SizedBox(
+                    width: 15,
+                    height: 15,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                else ...[
+                  if (icon != null) ...[
+                    Icon(icon, size: 16, color: Colors.white),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(label.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        letterSpacing: 0.6,
+                      )),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The violet greeting banner with a rounded avatar blob on the left.
+class PowrHeroBanner extends StatelessWidget {
+  const PowrHeroBanner({
+    super.key,
+    required this.greeting,
+    required this.subtitle,
+  });
+
+  final String greeting;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: PowrTokens.heroGradient,
+        borderRadius: PowrTokens.radius,
+        boxShadow: [
+          BoxShadow(
+            color: PowrTokens.accent.withValues(alpha: 0.28),
+            blurRadius: 26,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const Icon(Icons.emoji_emotions_outlined,
+                color: Colors.white, size: 30),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(greeting,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text(subtitle,
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 13)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Big number + caption stat (58 / New Orders).
+class PowrStat extends StatelessWidget {
+  const PowrStat(this.value, this.caption, {super.key, this.color});
+
+  final String value;
+  final String caption;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: color ?? PowrTokens.primary)),
+        const SizedBox(height: 4),
+        Text(caption,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: PowrTokens.muted)),
+      ],
+    );
+  }
+}
+
+/// A ring-gauge with a centred label (259K / 78%).
+class PowrRadial extends StatelessWidget {
+  const PowrRadial({
+    super.key,
+    required this.percent,
+    required this.centerTop,
+    this.centerBottom,
+    this.color = PowrTokens.accentSoft,
+    this.size = 96,
+  });
+
+  final double percent; // 0..1
+  final String centerTop;
+  final String? centerBottom;
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: size,
+            height: size,
+            child: CircularProgressIndicator(
+              value: percent.clamp(0, 1),
+              strokeWidth: 8,
+              backgroundColor: PowrTokens.line,
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(centerTop,
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: PowrTokens.ink)),
+              if (centerBottom != null)
+                Text(centerBottom!,
+                    style: const TextStyle(
+                        fontSize: 9.5, color: PowrTokens.muted)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Underline tab bar ("History | Upcoming").
+class PowrTabs extends StatelessWidget {
+  const PowrTabs({
+    super.key,
+    required this.tabs,
+    required this.index,
+    required this.onChanged,
+  });
+
+  final List<String> tabs;
+  final int index;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < tabs.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(right: 24),
+            child: InkWell(
+              onTap: () => onChanged(i),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(tabs[i],
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight:
+                              i == index ? FontWeight.w800 : FontWeight.w600,
+                          color: i == index
+                              ? PowrTokens.primary
+                              : PowrTokens.muted,
+                        )),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 2.5,
+                      width: 26,
+                      decoration: BoxDecoration(
+                        color: i == index
+                            ? PowrTokens.primary
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Small rounded label.
+class PowrPill extends StatelessWidget {
+  const PowrPill(this.label, {super.key, this.color = PowrTokens.primary});
 
   final String label;
   final Color color;
@@ -144,363 +440,64 @@ class DashPill extends StatelessWidget {
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w800,
-          color: color,
-        ),
-      ),
-    );
-  }
-}
-
-/// Green / amber / red status pill for a table cell.
-class DashStatusPill extends StatelessWidget {
-  const DashStatusPill(this.label, {super.key, this.tone = DashStatusTone.ok});
-
-  final String label;
-  final DashStatusTone tone;
-
-  @override
-  Widget build(BuildContext context) {
-    final (bg, fg) = switch (tone) {
-      DashStatusTone.ok => (const Color(0xFFDCFCE7), const Color(0xFF15803D)),
-      DashStatusTone.warn => (const Color(0xFFFEF3C7), const Color(0xFFB45309)),
-      DashStatusTone.bad => (const Color(0xFFFEE2E2), const Color(0xFFB91C1C)),
-      DashStatusTone.neutral => (
-          const Color(0xFFE2E8F0),
-          const Color(0xFF475569)
-        ),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
       child: Text(label,
           style: TextStyle(
-              fontSize: 11.5, fontWeight: FontWeight.w800, color: fg)),
+              fontSize: 11, fontWeight: FontWeight.w800, color: color)),
     );
   }
 }
 
-enum DashStatusTone { ok, warn, bad, neutral }
-
-/// Full-height indigo primary button, optionally with a leading emoji, in a
-/// solid or "floating" (drop-shadowed, pill) style.
-class DashPrimaryButton extends StatelessWidget {
-  const DashPrimaryButton({
+/// A person row for the "Message" list on the right rail.
+class PowrPersonRow extends StatelessWidget {
+  const PowrPersonRow({
     super.key,
-    required this.label,
-    required this.onPressed,
-    this.emoji,
-    this.busy = false,
-    this.floating = false,
-  });
-
-  final String label;
-  final VoidCallback? onPressed;
-  final String? emoji;
-  final bool busy;
-  final bool floating;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null && !busy;
-    return Opacity(
-      opacity: enabled ? 1 : 0.6,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: DashTokens.primary,
-          borderRadius: BorderRadius.circular(floating ? 999 : 12),
-          boxShadow: floating && enabled
-              ? [
-                  BoxShadow(
-                    color: DashTokens.primary.withValues(alpha: 0.35),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : null,
-        ),
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(floating ? 999 : 12),
-            onTap: enabled ? onPressed : null,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: floating ? 22 : 20, vertical: 13),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (busy)
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  else ...[
-                    if (emoji != null) ...[
-                      Text(emoji!, style: const TextStyle(fontSize: 14)),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Compact dark pill button used in a table's "Actions" column; pass
-/// `danger: true` for the red variant.
-class DashRowAction extends StatelessWidget {
-  const DashRowAction(this.label,
-      {super.key, required this.onPressed, this.danger = false});
-
-  final String label;
-  final VoidCallback? onPressed;
-  final bool danger;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = danger ? DashTokens.danger : const Color(0xFF475569);
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          child: Text(label,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700)),
-        ),
-      ),
-    );
-  }
-}
-
-/// A settings row: title + description on the left, a switch on the right —
-/// the "Powered By Receipt Branding" pattern from the reference.
-class DashToggleRow extends StatelessWidget {
-  const DashToggleRow({
-    super.key,
-    required this.title,
-    required this.value,
-    required this.onChanged,
-    this.emoji,
-    this.description,
-  });
-
-  final String title;
-  final String? emoji;
-  final String? description;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                emoji != null ? '$emoji  $title' : title,
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: DashTokens.ink),
-              ),
-              if (description != null) ...[
-                const SizedBox(height: 4),
-                Text(description!,
-                    style: const TextStyle(
-                        fontSize: 12.5, color: DashTokens.muted, height: 1.4)),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(width: 16),
-        Switch(
-          value: value,
-          activeThumbColor: DashTokens.primary,
-          onChanged: onChanged,
-        ),
-      ],
-    );
-  }
-}
-
-/// A pickable option card — indigo outline + filled check when [selected],
-/// as used by the reference's "Module Governance" grid.
-class DashSelectableCard extends StatelessWidget {
-  const DashSelectableCard({
-    super.key,
-    required this.title,
+    required this.name,
     required this.subtitle,
-    required this.selected,
-    required this.onTap,
-    this.tag,
-    this.leading,
+    this.trailing,
   });
 
-  final String title;
+  final String name;
   final String subtitle;
-  final String? tag;
-  final Widget? leading;
-  final bool selected;
-  final VoidCallback onTap;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: selected
-              ? DashTokens.primary.withValues(alpha: 0.05)
-              : DashTokens.card,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? DashTokens.primary : DashTokens.cardBorder,
-            width: selected ? 1.6 : 1,
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (leading != null) ...[
-              leading!,
-              const SizedBox(width: 12),
-            ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(title,
-                            style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: DashTokens.ink)),
-                      ),
-                      if (tag != null) ...[
-                        const SizedBox(width: 8),
-                        DashPill(tag!),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(subtitle,
-                      style: const TextStyle(
-                          fontSize: 12, color: DashTokens.muted)),
-                ],
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 17,
+            backgroundColor: PowrTokens.accent.withValues(alpha: 0.12),
+            child: Text(
+              name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+              style: const TextStyle(
+                  color: PowrTokens.accent,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13),
             ),
-            const SizedBox(width: 10),
-            Icon(
-              selected ? Icons.check_circle : Icons.circle_outlined,
-              size: 22,
-              color: selected ? DashTokens.primary : DashTokens.cardBorder,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// A plain data table with bold grey headers and horizontally scrollable
-/// rows, matching the reference "Licenses" list.
-class DashTable extends StatelessWidget {
-  const DashTable({
-    super.key,
-    required this.columns,
-    required this.rows,
-    this.columnWidths,
-  });
-
-  final List<String> columns;
-  final List<List<Widget>> rows;
-  final Map<int, TableColumnWidth>? columnWidths;
-
-  @override
-  Widget build(BuildContext context) {
-    TableRow header = TableRow(
-      children: [
-        for (final c in columns)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14, right: 12),
-            child: Text(c,
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: DashTokens.ink)),
           ),
-      ],
-    );
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 720),
-        child: Table(
-          columnWidths: columnWidths ??
-              {
-                for (var i = 0; i < columns.length; i++)
-                  i: const IntrinsicColumnWidth()
-              },
-          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-          children: [
-            header,
-            for (final r in rows)
-              TableRow(
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: DashTokens.cardBorder)),
-                ),
-                children: [
-                  for (final cell in r)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 12, horizontal: 0),
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: cell,
-                      ),
-                    ),
-                ],
-              ),
-          ],
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(name,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: PowrTokens.ink)),
+                Text(subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        const TextStyle(fontSize: 11, color: PowrTokens.faint)),
+              ],
+            ),
+          ),
+          if (trailing != null) trailing!,
+        ],
       ),
     );
   }

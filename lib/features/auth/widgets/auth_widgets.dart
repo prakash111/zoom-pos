@@ -49,7 +49,12 @@ class AuthPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = color ?? const Color(0xFF2563EB);
+    // Follow the tenant's brand colour by default; callers can still override
+    // (the OTP screen uses green for "verify & activate").
+    final base = color ?? Theme.of(context).colorScheme.primary;
+    final onBase = ThemeData.estimateBrightnessForColor(base) == Brightness.dark
+        ? Colors.white
+        : Colors.black;
     final enabled = onPressed != null && !busy;
     return Opacity(
       opacity: enabled ? 1 : 0.6,
@@ -78,16 +83,16 @@ class AuthPrimaryButton extends StatelessWidget {
               height: 52,
               alignment: Alignment.center,
               child: busy
-                  ? const SizedBox(
+                  ? SizedBox(
                       height: 22,
                       width: 22,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2.4, color: Colors.white),
+                          strokeWidth: 2.4, color: onBase),
                     )
                   : Text(
                       label,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: onBase,
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                       ),
