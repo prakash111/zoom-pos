@@ -24,7 +24,7 @@ import '../../core/widgets/coming_soon_screen.dart';
 import '../../core/widgets/tappable_scale.dart';
 import '../../l10n/app_localizations.dart';
 import '../analytics/analytics_repository.dart';
-import '../analytics/widgets/analytics_widgets.dart';
+import 'widgets/posh_dashboard.dart';
 import '../auth/auth_provider.dart';
 import '../settings/screens/app_preferences_screen.dart';
 import '../settings/screens/change_password_screen.dart';
@@ -1364,38 +1364,15 @@ class _DashboardAnalytics extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
 
+    void open(String key) => Navigator.of(context).push(
+          MaterialPageRoute(
+              builder: SduiComponentRegistry.instance.resolve(key)),
+        );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _DashboardShortcutRow(),
-        const SizedBox(height: 12),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isSmall = constraints.maxWidth < 360;
-            return GridView.count(
-              crossAxisCount: isSmall ? 1 : 3,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: isSmall ? 3.2 : 1.15,
-              children: [
-                KpiCard(
-                    icon: Icons.payments_outlined,
-                    label: l10n.todaysSales,
-                    value: formatter.format(analytics.todayRevenue)),
-                KpiCard(
-                    icon: Icons.receipt_long_outlined,
-                    label: l10n.ordersToday,
-                    value: analytics.todayOrders.toString()),
-                KpiCard(
-                    icon: Icons.trending_up,
-                    label: l10n.avgOrder,
-                    value: formatter.format(analytics.averageOrderValue)),
-              ],
-            );
-          },
-        ),
         if (analytics.lowStockCount > 0) ...[
           const SizedBox(height: 12),
           _StatusBanner(
@@ -1404,10 +1381,7 @@ class _DashboardAnalytics extends StatelessWidget {
             accent: scheme.warningAccent,
             icon: Icons.warning_amber_outlined,
             title: l10n.lowStockWarning(analytics.lowStockCount),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                  builder: SduiComponentRegistry.instance.resolve('inventory')),
-            ),
+            onTap: () => open('inventory'),
           ),
         ],
         if (analytics.totalReceivables > 0) ...[
@@ -1420,42 +1394,17 @@ class _DashboardAnalytics extends StatelessWidget {
             title: l10n.featureDueReceivables,
             subtitle:
                 '${formatter.format(analytics.totalReceivables)} outstanding',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                  builder: SduiComponentRegistry.instance
-                      .resolve('due_receivables')),
-            ),
+            onTap: () => open('due_receivables'),
           ),
         ],
-        if (analytics.revenueTrend.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text(l10n.revenueTrend,
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          SizedBox(
-              height: 140,
-              child: RevenueTrendChart(points: analytics.revenueTrend)),
-        ],
-        if (analytics.topProducts.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text(l10n.topSelling, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Card(
-            child: Column(
-              children: [
-                for (final product in analytics.topProducts.take(3))
-                  ListTile(
-                    dense: true,
-                    title: Text(product.name),
-                    subtitle:
-                        Text('${product.unitsSold.toStringAsFixed(0)} sold'),
-                    trailing: Text(formatter.format(product.revenue),
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
-                  ),
-              ],
-            ),
-          ),
-        ],
+        const SizedBox(height: 16),
+        PoshDashboardHome(
+          analytics: analytics,
+          formatter: formatter,
+          onAddProduct: () => open('inventory'),
+          onOpenTransactions: () => open('sales'),
+          onOpenCustomers: () => open('customers'),
+        ),
       ],
     );
   }
