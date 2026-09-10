@@ -101,7 +101,11 @@ class DemoAccountsSeeder extends Seeder
                     'is_demo' => true,
                     'is_seeding_complete' => true,
                     'is_profile_completed' => true,
-                    'restaurant_mode_locked' => true,
+                    // `restaurant_mode_locked` HIDES the restaurant vertical
+                    // (Tables / KOT / KDS nav section + dashboard shortcuts).
+                    // Lock it for every demo store EXCEPT the cafe one, which
+                    // must show the Cafe & Restaurant navigation.
+                    'restaurant_mode_locked' => $meta['pos_mode'] !== 'restaurant',
                 ])->save();
 
                 $user->forceFill([
@@ -128,10 +132,13 @@ class DemoAccountsSeeder extends Seeder
             'status' => 'active',
         ])->save();
 
+        $posMode = self::ACCOUNTS[$storeType]['pos_mode'];
         $company = Company::query()->withoutGlobalScopes()->find($user->company_id);
         $company?->forceFill([
             'is_demo' => true,
-            'pos_mode' => self::ACCOUNTS[$storeType]['pos_mode'],
+            'pos_mode' => $posMode,
+            // Show the Cafe & Restaurant nav only for the restaurant demo.
+            'restaurant_mode_locked' => $posMode !== 'restaurant',
         ])->save();
     }
 }

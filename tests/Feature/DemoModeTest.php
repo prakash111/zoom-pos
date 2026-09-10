@@ -6,6 +6,8 @@ use App\Http\Middleware\PreventDemoModifications;
 use App\Models\Company;
 use App\Models\TenantApiKey;
 use App\Models\User;
+use App\Services\Modular\ModuleRegistry;
+use App\Services\Navigation\TenantNavRegistry;
 use Database\Seeders\DemoAccountsSeeder;
 use Database\Seeders\PermissionsTableSeeder;
 use Database\Seeders\PlatformDefaultsSeeder;
@@ -68,7 +70,49 @@ class DemoModeTest extends TestCase
             $company = Company::withoutGlobalScopes()->find($user->company_id);
             $this->assertTrue((bool) $company->is_demo);
             $this->assertSame($meta['pos_mode'], $company->pos_mode);
+
+            // restaurant_mode_locked hides the Cafe & Restaurant vertical —
+            // it must be OFF for the restaurant demo and ON for the others.
+            $isRestaurant = $meta['pos_mode'] === 'restaurant';
+            $this->assertSame(! $isRestaurant, (bool) $company->restaurant_mode_locked,
+                "restaurant_mode_locked wrong for {$meta['email']}");
+            $this->assertSame($isRestaurant, $company->isRestaurantMode(),
+                "isRestaurantMode() wrong for {$meta['email']}");
+
+            $navKeys = collect(TenantNavRegistry::getEffectiveNavForTenant($company))
+                ->map(fn ($s) => $s['key'] ?? $s['id'] ?? null)->all();
+            if ($isRestaurant) {
+                $this->assertContains('restaurant_operations', $navKeys,
+                    'cafe demo store is missing the Cafe & Restaurant nav section');
+            } else {
+                $this->assertNotContains('restaurant_operations', $navKeys,
+                    "{$meta['email']} should not show the restaurant nav section");
+            }
         }
+    }
+
+    public function test_cafe_demo_store_exposes_restaurant_tables_kot_and_kds_nav_items(): void
+    {
+        config(['app.demo_mode' => true]);
+        $this->seed(DemoAccountsSeeder::class);
+
+        $company = Company::withoutGlobalScopes()->where('email', 'cafe@demo.com')->firstOrFail();
+
+        $sections = collect(TenantNavRegistry::getEffectiveNavForTenant($company))
+            ->keyBy(fn ($s) => $s['key'] ?? $s['id'] ?? '');
+
+        $this->assertTrue($sections->has('restaurant_operations'));
+
+        $items = collect($sections['restaurant_operations']['items'] ?? [])
+            ->map(fn ($i) => $i['key'] ?? $i['component'] ?? null)->all();
+
+        $this->assertContains('floor_plan', $items, 'Tables & Floor Plan missing');
+        $this->assertContains('kitchen_display', $items, 'Kitchen Display (KDS) missing');
+        $this->assertContains('dining_history', $items, 'KOT register missing');
+
+        // available_modes must report restaurant so the dashboard quick bar
+        // renders the Tables / Pending KOTs shortcuts.
+        $this->assertContains('restaurant', ModuleRegistry::availableModes($company));
     }
 
     public function test_demo_seeder_is_a_noop_when_demo_mode_is_off(): void
