@@ -137,6 +137,30 @@
             width: 100% !important;
             max-width: 100% !important;
         }
+
+        /* Below lg, resources/css/app.css forces every .app-main-frame to a
+           vertical column — that rule is written for the tenant panel, whose
+           dock is hidden on mobile. The Super Admin dock stays visible, so a
+           Left/Right rail must remain BESIDE the page content on phones, not
+           stacked on top of it (which left a full-height empty gap and pushed
+           the whole page off-screen after dragging the dock to a side).
+           Top / Bottom / Floating still collapse to a stack as before. */
+        @media (max-width: 1023px) {
+            html[data-dock-pos="left"]:not([data-nav-layout="macos-dock"]):not([data-nav-layout="speed-dial"]) .app-main-frame {
+                flex-direction: row !important;
+            }
+            html[data-dock-pos="right"]:not([data-nav-layout="macos-dock"]):not([data-nav-layout="speed-dial"]) .app-main-frame {
+                flex-direction: row-reverse !important;
+            }
+            html[data-dock-pos="left"] .main-content-pane,
+            html[data-dock-pos="right"] .main-content-pane {
+                width: auto !important;
+                min-width: 0 !important;
+                max-width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-[#1a1f37] dark:bg-[#0c101d] text-slate-900 dark:text-slate-100 min-h-screen p-2 sm:p-4 md:p-6 antialiased selection:bg-indigo-500 selection:text-white">

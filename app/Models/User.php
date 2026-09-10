@@ -42,7 +42,7 @@ class User extends Authenticatable implements AuthenticatableContract
 
     protected $fillable = [
         'company_id', 'name', 'login', 'email', 'password', 'role', 'locale', 'status',
-        'is_demo', 'shift', 'is_specialist',
+        'is_demo', 'shift', 'is_specialist', 'dock_position',
         'commission_rate', 'commission_type',
         'invitation_code_hash', 'invitation_expires_at', 'email_verified_at',
         'verification_code', 'verification_code_expires_at',

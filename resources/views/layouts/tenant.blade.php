@@ -16,6 +16,12 @@
     <meta name="theme-color" content="{{ $uiAccentColorHex ?? '#2563eb' }}">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    @php
+        // Per-user dock position, server-persisted, seeds first paint before
+        // localStorage (anti-flicker) and Alpine take over.
+        $dockPosition = auth()->user()?->dock_position ?: 'left';
+    @endphp
     <title>{{ $title ?? 'POS & Store Manager' }} — {{ auth()->user()?->company?->name ?? config('app.name') }}</title>
     @if (auth()->user()?->company?->favicon)
         <link rel="icon" href="{{ auth()->user()->company->favicon }}">
@@ -53,7 +59,9 @@
             try {
                 var raw = localStorage.getItem('tenant_dock_nav_state');
                 var saved = raw ? JSON.parse(raw) : null;
-                var pos = (saved && saved.position) ? saved.position : 'left';
+                // Fall back to the server-persisted position (per user, survives a
+                // cleared localStorage / a fresh device) instead of a hardcoded default.
+                var pos = (saved && saved.position) ? saved.position : @json($dockPosition);
                 var mode = (saved && saved.mode) ? saved.mode : 'docked';
                 var layout = (saved && saved.layout) ? saved.layout : 'slim';
                 var theme = (saved && saved.theme) ? saved.theme : 'violet';
@@ -108,7 +116,7 @@
          TenantNavigationComposer now, computed once per request. --}}
 
     <!-- Main Outer Container with Draggable & Dockable Layout Binding -->
-    <div x-data="dockableNav('tenant_dock_nav_state', 'left', '{{ $isRestaurant ? 'restaurant' : 'general' }}')"
+    <div x-data="dockableNav('tenant_dock_nav_state', @js($dockPosition), '{{ $isRestaurant ? 'restaurant' : 'general' }}', '{{ route('tenant.preferences.dock-position') }}')"
          :class="{
              'flex-row': position === 'left' && layout !== 'macos-dock' && layout !== 'speed-dial',
              'flex-row-reverse': position === 'right' && layout !== 'macos-dock' && layout !== 'speed-dial',

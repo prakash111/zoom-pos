@@ -13,6 +13,7 @@ use App\Http\Controllers\Tenant\RepairPortalController;
 use App\Http\Controllers\Tenant\Restaurant\KotController;
 use App\Http\Controllers\Tenant\Restaurant\TableOrderController;
 use App\Http\Controllers\Tenant\SubscriptionInvoiceController;
+use App\Http\Controllers\Tenant\UserPreferenceController;
 use App\Http\Middleware\CheckMaintenanceMode;
 use App\Http\Middleware\ResolveTenantContext;
 use App\Livewire\Auth\AcceptInvite;
@@ -110,6 +111,11 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
             ->middleware('tenant.permission:settings,edit')
             ->name('settings.navigation-menu.store');
         Route::post('/settings/change-password', [PasswordResetController::class, 'changePassword'])->name('settings.change-password');
+
+        // Per-user workspace preference — the dockable nav position. Any
+        // signed-in user may move their own dock; no settings permission.
+        Route::post('/preferences/dock-position', [UserPreferenceController::class, 'updateDockPosition'])
+            ->name('preferences.dock-position');
         Route::redirect('/settings-redirect', '/tenant/settings')->name('settings');
         Route::get('/settings/backup/download', [BackupDownloadController::class, 'download'])->middleware('tenant.permission:settings,view')->name('settings.backup.download');
         Route::get('/languages', Languages\Index::class)->middleware('tenant.permission:settings,view')->name('languages.index');
