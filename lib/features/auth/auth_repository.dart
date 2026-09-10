@@ -77,6 +77,8 @@ class AuthRepository {
     required String password,
     String? phone,
     String? currency,
+    String? country,
+    String? timezone,
     String posMode = 'general',
   }) async {
     final response = await _client.post(ApiEndpoints.register, data: {
@@ -86,6 +88,8 @@ class AuthRepository {
       'password': password,
       if (phone != null && phone.isNotEmpty) 'phone': phone,
       if (currency != null && currency.isNotEmpty) 'currency': currency,
+      if (country != null && country.isNotEmpty) 'country': country,
+      if (timezone != null && timezone.isNotEmpty) 'timezone': timezone,
       'pos_mode': posMode,
     });
 

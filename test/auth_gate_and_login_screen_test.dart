@@ -77,6 +77,8 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
     required String password,
     String? phone,
     String? currency,
+    String? country,
+    String? timezone,
     String posMode = 'general',
   }) async =>
       RegisterResult(requiresOtp: false, token: 'fake_token');

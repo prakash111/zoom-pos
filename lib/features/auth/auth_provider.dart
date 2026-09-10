@@ -228,6 +228,8 @@ class AuthProvider extends ChangeNotifier {
     required String password,
     String? phone,
     String? currency,
+    String? country,
+    String? timezone,
     String posMode = 'general',
   }) async {
     _status = AuthStatus.authenticating;
@@ -242,6 +244,8 @@ class AuthProvider extends ChangeNotifier {
         password: password,
         phone: phone,
         currency: currency,
+        country: country,
+        timezone: timezone,
         posMode: posMode,
       );
 
@@ -272,6 +276,9 @@ class AuthProvider extends ChangeNotifier {
                 'trade_name': storeName,
                 'currency': currency ?? 'USD',
                 'currency_symbol': '\$',
+                if (country != null && country.isNotEmpty) 'country': country,
+                if (timezone != null && timezone.isNotEmpty)
+                  'timezone': timezone,
                 'plan_name': 'trial',
               }),
         ));

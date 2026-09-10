@@ -1,13 +1,78 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
 
 import '../../../core/api/api_client.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/config/countries.dart';
 import '../../../core/sdui/sdui_icon_registry.dart';
 import '../auth_provider.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_widgets.dart';
 import 'verify_otp_screen.dart';
+
+/// Curated ISO-4217 set for the sign-up currency picker — the codes a new
+/// store is realistically opened in. Any other code can still be set later
+/// under Settings ▸ Financial.
+const Map<String, String> _kRegistrationCurrencies = {
+  'USD': 'US Dollar',
+  'EUR': 'Euro',
+  'GBP': 'British Pound',
+  'AUD': 'Australian Dollar',
+  'CAD': 'Canadian Dollar',
+  'NZD': 'New Zealand Dollar',
+  'CHF': 'Swiss Franc',
+  'JPY': 'Japanese Yen',
+  'CNY': 'Chinese Yuan',
+  'HKD': 'Hong Kong Dollar',
+  'SGD': 'Singapore Dollar',
+  'INR': 'Indian Rupee',
+  'PKR': 'Pakistani Rupee',
+  'BDT': 'Bangladeshi Taka',
+  'LKR': 'Sri Lankan Rupee',
+  'NPR': 'Nepalese Rupee',
+  'AED': 'UAE Dirham',
+  'SAR': 'Saudi Riyal',
+  'QAR': 'Qatari Riyal',
+  'KWD': 'Kuwaiti Dinar',
+  'BHD': 'Bahraini Dinar',
+  'OMR': 'Omani Rial',
+  'JOD': 'Jordanian Dinar',
+  'ILS': 'Israeli Shekel',
+  'TRY': 'Turkish Lira',
+  'EGP': 'Egyptian Pound',
+  'NGN': 'Nigerian Naira',
+  'GHS': 'Ghanaian Cedi',
+  'KES': 'Kenyan Shilling',
+  'TZS': 'Tanzanian Shilling',
+  'UGX': 'Ugandan Shilling',
+  'ZAR': 'South African Rand',
+  'MAD': 'Moroccan Dirham',
+  'BRL': 'Brazilian Real',
+  'MXN': 'Mexican Peso',
+  'ARS': 'Argentine Peso',
+  'CLP': 'Chilean Peso',
+  'COP': 'Colombian Peso',
+  'PEN': 'Peruvian Sol',
+  'IDR': 'Indonesian Rupiah',
+  'MYR': 'Malaysian Ringgit',
+  'THB': 'Thai Baht',
+  'PHP': 'Philippine Peso',
+  'VND': 'Vietnamese Dong',
+  'KRW': 'South Korean Won',
+  'RUB': 'Russian Ruble',
+  'UAH': 'Ukrainian Hryvnia',
+  'PLN': 'Polish Zloty',
+  'CZK': 'Czech Koruna',
+  'HUF': 'Hungarian Forint',
+  'RON': 'Romanian Leu',
+  'SEK': 'Swedish Krona',
+  'NOK': 'Norwegian Krone',
+  'DKK': 'Danish Krone',
+};
+
+typedef _Option = ({String value, String label});
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -17,21 +82,43 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _storeNameController = TextEditingController();
+  static const _stepTitles = <String>[
+    'Account credentials',
+    'Store profile',
+    'Localization & currency',
+  ];
+
+  final _step1Key = GlobalKey<FormState>();
+  final _step2Key = GlobalKey<FormState>();
+  final _step3Key = GlobalKey<FormState>();
+
   final _ownerNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _storeNameController = TextEditingController();
+
   bool _obscurePassword = true;
+  int _step = 0;
+
   String _posMode = '';
   List<Map<String, dynamic>> _registrationModes = [];
   bool _loadingModules = true;
   String? _moduleLoadError;
 
+  String _countryCode = '';
+  String _currency = 'USD';
+  String _timezone = 'UTC';
+  late final List<String> _timezones;
+
   @override
   void initState() {
     super.initState();
+
+    tzdata.initializeTimeZones();
+    final zones = tz.timeZoneDatabase.locations.keys.toList()..sort();
+    _timezones = zones.isEmpty ? const ['UTC'] : zones;
+
     final client = context.read<ApiClient>();
     Future<Map<String, dynamic>> fetch() async {
       try {
@@ -86,22 +173,55 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    _storeNameController.dispose();
     _ownerNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
+    _storeNameController.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_posMode.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a store type before continuing.')),
-      );
-      return;
+  bool _validateCurrentStep() {
+    switch (_step) {
+      case 0:
+        return _step1Key.currentState?.validate() ?? false;
+      case 1:
+        final formOk = _step2Key.currentState?.validate() ?? false;
+        if (!formOk) return false;
+        if (_loadingModules) {
+          _snack('Store types are still loading — try again in a moment.');
+          return false;
+        }
+        if (_moduleLoadError != null) {
+          _snack(_moduleLoadError!);
+          return false;
+        }
+        if (_posMode.isEmpty) {
+          _snack('Select a store type before continuing.');
+          return false;
+        }
+        return true;
+      default:
+        return _step3Key.currentState?.validate() ?? false;
     }
+  }
+
+  void _snack(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _next() {
+    if (!_validateCurrentStep()) return;
+    if (_step < 2) setState(() => _step++);
+  }
+
+  void _back() {
+    if (_step > 0) setState(() => _step--);
+  }
+
+  Future<void> _submit() async {
+    if (!_validateCurrentStep()) return;
 
     final auth = context.read<AuthProvider>();
     final result = await auth.register(
@@ -111,6 +231,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       password: _passwordController.text,
       phone: _phoneController.text.trim(),
       posMode: _posMode,
+      currency: _currency,
+      country: _countryCode,
+      timezone: _timezone,
     );
 
     if (!mounted) return;
@@ -134,154 +257,77 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     if (auth.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.errorMessage!)),
-      );
+      _snack(auth.errorMessage!);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final isLastStep = _step == 2;
 
     return AuthScaffold(
       heading: 'Create your store',
       subheading: 'Set up your workspace in a minute — no card required.',
       maxCardWidth: 520,
-      form: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: _storeNameController,
-              decoration: authInputDecoration(
-                hint: 'Store name',
-                icon: Icons.storefront_outlined,
-              ),
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? 'Required' : null,
+      form: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _StepIndicator(step: _step, total: 3),
+          const SizedBox(height: 10),
+          Text(
+            'Step ${_step + 1} of 3',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _ownerNameController,
-              decoration: authInputDecoration(
-                hint: 'Your name',
-                icon: Icons.person_outline,
-              ),
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              autocorrect: false,
-              decoration: authInputDecoration(
-                hint: 'Email',
-                icon: Icons.mail_outline,
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) return 'Required';
-                if (!value.contains('@')) return 'Enter a valid email';
-                return null;
+          ),
+          const SizedBox(height: 2),
+          Text(
+            _stepTitles[_step],
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 18),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: KeyedSubtree(
+              key: ValueKey<int>(_step),
+              child: switch (_step) {
+                0 => _stepOne(),
+                1 => _stepTwo(context),
+                _ => _stepThree(),
               },
             ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              decoration: authInputDecoration(
-                hint: 'Password',
-                icon: Icons.lock_outline,
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
-                    size: 20,
-                    color: const Color(0xFF94A3B8),
+          ),
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              if (_step > 0) ...[
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    onPressed: auth.isBusy ? null : _back,
+                    child: const Text('Back'),
                   ),
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: AuthPrimaryButton(
+                  label: isLastStep ? 'Create store' : 'Continue',
+                  busy: auth.isBusy,
+                  onPressed: auth.isBusy ? null : (isLastStep ? _submit : _next),
                 ),
               ),
-              validator: (value) => (value == null || value.length < 6)
-                  ? 'At least 6 characters'
-                  : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: authInputDecoration(
-                hint: 'Phone (optional)',
-                icon: Icons.phone_outlined,
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text('Store type',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            ),
-            const SizedBox(height: 8),
-            if (_loadingModules)
-              const Center(child: CircularProgressIndicator())
-            else if (_moduleLoadError != null)
-              Text(
-                _moduleLoadError!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              )
-            else
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final cardWidth = constraints.maxWidth > 320
-                      ? (constraints.maxWidth - 10) / 2
-                      : constraints.maxWidth;
-                  return Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      for (final mod in _registrationModes)
-                        SizedBox(
-                          width: _registrationModes.length == 1
-                              ? constraints.maxWidth
-                              : cardWidth,
-                          child: _StoreTypeCard(
-                            icon: SduiIconRegistry.resolve(
-                                mod['icon']?.toString()),
-                            label: mod['title']?.toString() ??
-                                mod['key']?.toString() ??
-                                mod['id']?.toString() ??
-                                '',
-                            description: mod['subtitle']?.toString() ??
-                                mod['description']?.toString() ??
-                                '',
-                            selected: _posMode ==
-                                (mod['key']?.toString() ??
-                                    mod['id']?.toString() ??
-                                    ''),
-                            onTap: () => setState(() => _posMode =
-                                (mod['key'] ?? mod['id']).toString()),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-            const SizedBox(height: 22),
-            AuthPrimaryButton(
-              label: 'Create store',
-              busy: auth.isBusy,
-              onPressed:
-                  auth.isBusy || _loadingModules || _moduleLoadError != null
-                      ? null
-                      : _submit,
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
       belowCard: Wrap(
         alignment: WrapAlignment.center,
@@ -293,6 +339,393 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: const Text('Sign in'),
           ),
         ],
+      ),
+    );
+  }
+
+  // --- Step 1: account credentials -----------------------------------------
+
+  Widget _stepOne() {
+    return Form(
+      key: _step1Key,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextFormField(
+            controller: _ownerNameController,
+            textInputAction: TextInputAction.next,
+            decoration: authInputDecoration(
+              hint: 'Your name',
+              icon: Icons.person_outline,
+            ),
+            validator: (value) =>
+                (value == null || value.trim().isEmpty) ? 'Required' : null,
+          ),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
+            textInputAction: TextInputAction.next,
+            decoration: authInputDecoration(
+              hint: 'Email',
+              icon: Icons.mail_outline,
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) return 'Required';
+              if (!value.contains('@')) return 'Enter a valid email';
+              return null;
+            },
+          ),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            textInputAction: TextInputAction.next,
+            decoration: authInputDecoration(
+              hint: 'Password',
+              icon: Icons.lock_outline,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  size: 20,
+                  color: const Color(0xFF94A3B8),
+                ),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+              ),
+            ),
+            validator: (value) => (value == null || value.length < 6)
+                ? 'At least 6 characters'
+                : null,
+          ),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: authInputDecoration(
+              hint: 'Phone (optional)',
+              icon: Icons.phone_outlined,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Step 2: store profile ---------------------------------------------
+
+  Widget _stepTwo(BuildContext context) {
+    return Form(
+      key: _step2Key,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextFormField(
+            controller: _storeNameController,
+            textInputAction: TextInputAction.next,
+            decoration: authInputDecoration(
+              hint: 'Store name',
+              icon: Icons.storefront_outlined,
+            ),
+            validator: (value) =>
+                (value == null || value.trim().isEmpty) ? 'Required' : null,
+          ),
+          const SizedBox(height: 20),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Store type',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+          const SizedBox(height: 8),
+          if (_loadingModules)
+            const Center(child: CircularProgressIndicator())
+          else if (_moduleLoadError != null)
+            Text(
+              _moduleLoadError!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cardWidth = constraints.maxWidth > 320
+                    ? (constraints.maxWidth - 10) / 2
+                    : constraints.maxWidth;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final mod in _registrationModes)
+                      SizedBox(
+                        width: _registrationModes.length == 1
+                            ? constraints.maxWidth
+                            : cardWidth,
+                        child: _StoreTypeCard(
+                          icon: SduiIconRegistry.resolve(mod['icon']?.toString()),
+                          label: mod['title']?.toString() ??
+                              mod['key']?.toString() ??
+                              mod['id']?.toString() ??
+                              '',
+                          description: mod['subtitle']?.toString() ??
+                              mod['description']?.toString() ??
+                              '',
+                          selected: _posMode ==
+                              (mod['key']?.toString() ??
+                                  mod['id']?.toString() ??
+                                  ''),
+                          onTap: () => setState(() => _posMode =
+                              (mod['key'] ?? mod['id']).toString()),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  // --- Step 3: localization & currency ----------------------------------
+
+  Widget _stepThree() {
+    final countryOptions = <_Option>[
+      for (final e in countryPickerOptions())
+        (value: e.key, label: '${e.value} (${e.key})'),
+    ];
+    final currencyOptions = <_Option>[
+      for (final e in _kRegistrationCurrencies.entries)
+        (value: e.key, label: '${e.key} — ${e.value}'),
+    ];
+    final timezoneOptions = <_Option>[
+      for (final z in _timezones) (value: z, label: z),
+    ];
+
+    return Form(
+      key: _step3Key,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SearchablePicker(
+            label: 'Country',
+            icon: Icons.public_outlined,
+            value: _countryCode,
+            options: countryOptions,
+            onChanged: (v) => setState(() => _countryCode = v),
+            validator: (v) =>
+                (v == null || v.isEmpty) ? 'Select a country' : null,
+          ),
+          const SizedBox(height: 14),
+          _SearchablePicker(
+            label: 'Currency',
+            icon: Icons.payments_outlined,
+            value: _currency,
+            options: currencyOptions,
+            onChanged: (v) => setState(() => _currency = v),
+          ),
+          const SizedBox(height: 14),
+          _SearchablePicker(
+            label: 'Timezone',
+            icon: Icons.schedule_outlined,
+            value: _timezone,
+            options: timezoneOptions,
+            onChanged: (v) => setState(() => _timezone = v),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Three-segment progress bar for the sign-up wizard.
+class _StepIndicator extends StatelessWidget {
+  const _StepIndicator({required this.step, required this.total});
+
+  final int step;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        for (var i = 0; i < total; i++) ...[
+          if (i > 0) const SizedBox(width: 6),
+          Expanded(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 5,
+              decoration: BoxDecoration(
+                color: i <= step
+                    ? scheme.primary
+                    : scheme.outlineVariant.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// A tappable field that opens an autofocused, case-insensitive searchable
+/// list — used for the long Country / Currency / Timezone option sets. Wired
+/// as a [FormField] so per-step validation can require a selection.
+class _SearchablePicker extends FormField<String> {
+  _SearchablePicker({
+    required String label,
+    required IconData icon,
+    required String value,
+    required List<_Option> options,
+    required ValueChanged<String> onChanged,
+    super.validator,
+  }) : super(
+          initialValue: value,
+          builder: (state) {
+            final current = options.cast<_Option?>().firstWhere(
+                  (o) => o!.value == state.value,
+                  orElse: () => null,
+                );
+            final display = current?.label ??
+                (state.value == null || state.value!.isEmpty
+                    ? ''
+                    : state.value!);
+            final hasValue = display.isNotEmpty;
+
+            return InkWell(
+              key: ValueKey<String>('picker_$label'),
+              borderRadius: BorderRadius.circular(14),
+              onTap: () async {
+                FocusScope.of(state.context).unfocus();
+                final picked = await showModalBottomSheet<String>(
+                  context: state.context,
+                  isScrollControlled: true,
+                  builder: (_) => _PickerSheet(
+                    title: label,
+                    options: options,
+                    selected: state.value,
+                  ),
+                );
+                if (picked != null) {
+                  state.didChange(picked);
+                  onChanged(picked);
+                }
+              },
+              child: InputDecorator(
+                isEmpty: !hasValue,
+                decoration: authInputDecoration(hint: label, icon: icon).copyWith(
+                  errorText: state.errorText,
+                  suffixIcon: const Icon(Icons.expand_more, size: 22),
+                ),
+                child: hasValue
+                    ? Text(
+                        display,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          color: Color(0xFF0F172A),
+                        ),
+                      )
+                    : const SizedBox(height: 20),
+              ),
+            );
+          },
+        );
+}
+
+class _PickerSheet extends StatefulWidget {
+  const _PickerSheet({
+    required this.title,
+    required this.options,
+    this.selected,
+  });
+
+  final String title;
+  final List<_Option> options;
+  final String? selected;
+
+  @override
+  State<_PickerSheet> createState() => _PickerSheetState();
+}
+
+class _PickerSheetState extends State<_PickerSheet> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _query.trim().toLowerCase();
+    final filtered = q.isEmpty
+        ? widget.options
+        : widget.options
+            .where((o) =>
+                o.label.toLowerCase().contains(q) ||
+                o.value.toLowerCase().contains(q))
+            .toList();
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.72,
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: TextField(
+                autofocus: true,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  hintText: 'Search ${widget.title.toLowerCase()}',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => setState(() => _query = ''),
+                        ),
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(child: Text('No matches'))
+                  : ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (_, i) {
+                        final o = filtered[i];
+                        final selected = o.value == widget.selected;
+                        return ListTile(
+                          dense: true,
+                          selected: selected,
+                          title: Text(o.label),
+                          trailing: selected
+                              ? Icon(Icons.check,
+                                  color: Theme.of(context).colorScheme.primary)
+                              : null,
+                          onTap: () => Navigator.of(context).pop(o.value),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
