@@ -60,6 +60,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
+      marketingHeader: true,
       brandHeadline: 'Reset your password',
       brandSubline: "We'll email you a secure link to set a new one.",
       headerTrailing: TextButton.icon(

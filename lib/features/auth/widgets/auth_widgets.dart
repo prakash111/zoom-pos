@@ -95,10 +95,10 @@ class AuthPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = color ?? AuthColors.orange;
-    final dark = color == null
-        ? AuthColors.orangeDark
-        : Color.lerp(base, Colors.black, 0.14)!;
+    // Follows the Superadmin/tenant primary from the ambient theme; callers
+    // can still override (the OTP screen uses green).
+    final base = color ?? Theme.of(context).colorScheme.primary;
+    final dark = Color.lerp(base, Colors.black, 0.15)!;
     final onBase = ThemeData.estimateBrightnessForColor(base) == Brightness.dark
         ? Colors.white
         : Colors.black;

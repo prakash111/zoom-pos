@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../dashboard/dashboard_screen.dart';
+import '../../../core/config/platform_branding_provider.dart';
 import '../../../core/services/dynamic_string_service.dart';
 import '../auth_provider.dart';
 import 'login_screen.dart';
@@ -51,25 +52,40 @@ class _AuthGateState extends State<AuthGate> {
 
     switch (status) {
       case AuthStatus.unknown:
+        // Splash background + brand come from the Superadmin global settings
+        // (GET /auth/branding). Tenant theme only applies once authenticated.
+        final branding = context.watch<PlatformBrandingProvider>();
+        final bg = branding.splashBgColor;
+        final onBg = bg.computeLuminance() < 0.5
+            ? Colors.white
+            : const Color(0xFF0F172A);
         return Scaffold(
+          backgroundColor: bg,
           body: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.storefront,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+                if (branding.hasLogo)
+                  Image.network(
+                    branding.brandLogoUrl!,
+                    height: 72,
+                    errorBuilder: (_, __, ___) =>
+                        Icon(Icons.storefront, size: 64, color: onBg),
+                  )
+                else
+                  Icon(Icons.storefront, size: 64, color: onBg),
                 const SizedBox(height: 16),
                 Text(
-                  t('Sales & Inventory'),
+                  branding.platformName.isNotEmpty
+                      ? branding.platformName
+                      : t('Sales & Inventory'),
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: onBg,
                       ),
                 ),
                 const SizedBox(height: 24),
-                const CircularProgressIndicator(),
+                CircularProgressIndicator(color: onBg),
               ],
             ),
           ),

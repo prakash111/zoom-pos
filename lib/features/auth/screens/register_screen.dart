@@ -267,6 +267,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final isLastStep = _step == 2;
 
     return AuthScaffold(
+      marketingHeader: true,
       brandHeadline: 'Create your account',
       brandSubline: 'Start managing your business today.',
       headerTrailing: TextButton.icon(

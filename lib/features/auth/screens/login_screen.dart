@@ -144,8 +144,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final hasSocial = _googleEnabled || _facebookEnabled;
 
     return AuthScaffold(
-      brandHeadline: 'Run your business smarter.',
-      brandSubline: 'Sales, inventory & orders — all in one place.',
+      // Logo + headline + description come from the Superadmin global
+      // branding (GET /auth/branding -> platform.*); no hardcoded copy.
+      marketingHeader: true,
       heading: 'Welcome back',
       subheading: 'Sign in to your account',
       onServerSettings: _openServerSettings,
@@ -196,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
               alignment: Alignment.centerRight,
               child: TextButton(
                 style: TextButton.styleFrom(
-                  foregroundColor: AuthColors.orange,
+                  foregroundColor: Theme.of(context).colorScheme.primary,
                   textStyle: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 onPressed: () => Navigator.of(context).push(

@@ -52,6 +52,54 @@ void main() {
     expect(b.showTagline, isTrue);
   });
 
+  test('branding refresh binds the Superadmin platform + theme contract',
+      () async {
+    final b = PlatformBrandingProvider();
+    await b.refresh(_FakeBrandingApi({
+      'success': true,
+      'platform': {
+        'name': 'POS Systems',
+        'headline': 'Run your business smarter.',
+        'description': 'Sales, inventory & orders — all in one place.',
+        'logo_url': 'https://saas.zoomnearby.com/uploads/superadmin-logo.png',
+        'favicon_url': 'https://saas.zoomnearby.com/uploads/favicon.png',
+      },
+      'theme': {
+        'primary_color': '#F95700',
+        'secondary_color': '#0F172A',
+        'accent_color': '#FF7A00',
+        'splash_bg_color': '#0F172A',
+        'auth_bg_color': '#F8FAFC',
+      },
+    }));
+
+    expect(b.platformName, 'POS Systems');
+    expect(b.headline, 'Run your business smarter.');
+    expect(b.description, 'Sales, inventory & orders — all in one place.');
+    expect(b.faviconUrl, 'https://saas.zoomnearby.com/uploads/favicon.png');
+    expect(b.primaryColor, const Color(0xFFF95700));
+    expect(b.secondaryColor, const Color(0xFF0F172A));
+    expect(b.accentColor, const Color(0xFFFF7A00));
+    expect(b.splashBgColor, const Color(0xFF0F172A));
+    expect(b.authBgColor, const Color(0xFFF8FAFC));
+  });
+
+  testWidgets('AuthScaffold paints the Superadmin auth_bg_color + primary',
+      (tester) async {
+    final b = PlatformBrandingProvider()
+      ..authBgColor = const Color(0xFFEAF2FF)
+      ..primaryColor = const Color(0xFF00A3FF);
+
+    await tester.pumpWidget(_host(b));
+    await tester.pump();
+
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffold.backgroundColor, const Color(0xFFEAF2FF));
+
+    final ctx = tester.element(find.byType(Scaffold));
+    expect(Theme.of(ctx).colorScheme.primary, const Color(0xFF00A3FF));
+  });
+
   testWidgets('default header is logo + title inline (12px gap), no tagline',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(700, 900));
@@ -89,7 +137,8 @@ void main() {
     );
   });
 
-  testWidgets('show_tagline:true renders the description; header_inline:false stacks',
+  testWidgets(
+      'show_tagline:true renders the description; header_inline:false stacks',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(700, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));

@@ -25,6 +25,7 @@ class AuthScaffold extends StatelessWidget {
     this.headerIcon,
     this.brandHeadline,
     this.brandSubline,
+    this.marketingHeader = false,
     this.headerTrailing,
     this.belowCard,
     this.onServerSettings,
@@ -42,6 +43,12 @@ class AuthScaffold extends StatelessWidget {
   /// Muted line under [brandHeadline]. Falls back to the platform tagline
   /// when the server enables it.
   final String? brandSubline;
+
+  /// When true the header renders the Superadmin marketing block (logo +
+  /// [PlatformBrandingProvider.headline] / `.description`, overridable per
+  /// screen via [brandHeadline] / [brandSubline]) instead of the legacy
+  /// platform-name brand.
+  final bool marketingHeader;
 
   /// Optional action on the top-right of the header (e.g. "Back to login").
   final Widget? headerTrailing;
@@ -66,11 +73,16 @@ class AuthScaffold extends StatelessWidget {
         )
       : const SizedBox.shrink();
 
+  bool get _useMarketing => marketingHeader || brandHeadline != null;
+
   Widget _brand(BuildContext context) {
     final branding = context.watch<PlatformBrandingProvider>();
 
-    // Marketing header layout used by the login / register / reset screens.
-    if (brandHeadline != null) {
+    // Marketing header used by the login / register / reset screens — logo +
+    // Superadmin headline/description (screen may override the copy).
+    if (_useMarketing) {
+      final headline = (brandHeadline ?? branding.headline).trim();
+      final subline = (brandSubline ?? branding.description).trim();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -83,19 +95,19 @@ class AuthScaffold extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            brandHeadline!,
-            style: const TextStyle(
+            headline.isEmpty ? branding.platformName : headline,
+            style: TextStyle(
               fontSize: 27,
               height: 1.15,
               fontWeight: FontWeight.w800,
-              color: AuthColors.ink,
+              color: branding.secondaryColor,
               letterSpacing: -0.5,
             ),
           ),
-          if ((brandSubline ?? '').trim().isNotEmpty) ...[
+          if (subline.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              brandSubline!,
+              subline,
               style: const TextStyle(
                 fontSize: 14.5,
                 height: 1.4,
@@ -182,7 +194,7 @@ class AuthScaffold extends StatelessWidget {
           if (heading != null) ...[
             Row(
               children: [
-                if (canPop && brandHeadline == null)
+                if (canPop && !_useMarketing)
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: IconButton(
@@ -258,24 +270,31 @@ class AuthScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final brand = Theme.of(context).colorScheme.primary;
+    // Superadmin global theme (tenant overrides only apply post-auth).
+    final branding = context.watch<PlatformBrandingProvider>();
+    final primary = branding.primaryColor;
+    final ink = branding.secondaryColor;
+    final pageBg = branding.authBgColor;
+    final pageBgDark =
+        Color.alphaBlend(Colors.black.withValues(alpha: 0.05), pageBg);
+
     final scheme = ColorScheme.fromSeed(
-      seedColor: brand,
+      seedColor: primary,
       brightness: Brightness.light,
     ).copyWith(
-      primary: AuthColors.orange,
+      primary: primary,
       surface: Colors.white,
-      onSurface: AuthColors.ink,
+      onSurface: ink,
       onSurfaceVariant: AuthColors.muted,
     );
     final theme = ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: scheme,
-      scaffoldBackgroundColor: AuthColors.pageTop,
+      scaffoldBackgroundColor: pageBg,
       textTheme: ThemeData(brightness: Brightness.light)
           .textTheme
-          .apply(bodyColor: AuthColors.ink, displayColor: AuthColors.ink),
+          .apply(bodyColor: ink, displayColor: ink),
       inputDecorationTheme: const InputDecorationTheme(
         filled: true,
         fillColor: AuthColors.fieldFill,
@@ -291,13 +310,13 @@ class AuthScaffold extends StatelessWidget {
     return Theme(
       data: theme,
       child: Scaffold(
-        backgroundColor: AuthColors.pageTop,
+        backgroundColor: pageBg,
         body: DecoratedBox(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [AuthColors.pageTop, AuthColors.pageBottom],
+              colors: [pageBg, pageBgDark],
             ),
           ),
           child: Stack(
