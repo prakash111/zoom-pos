@@ -28,6 +28,7 @@ import '../analytics/analytics_repository.dart';
 import 'widgets/oroit_dashboard.dart';
 import 'widgets/posh_dashboard.dart';
 import '../auth/auth_provider.dart';
+import '../sales/screens/sales_screen.dart';
 import '../settings/screens/app_preferences_screen.dart';
 import '../settings/screens/change_password_screen.dart';
 import '../settings/server_settings_screen.dart';
@@ -790,22 +791,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         final drawerGradient = bootstrap.theme.drawerGradient;
 
+        // Contrast guard: when the drawer background is a custom brand /
+        // "match parent" colour, invert text + icons so they never vanish.
+        final probe = drawerGradient is LinearGradient
+            ? drawerGradient.colors.first
+            : (drawerBgColor ?? Theme.of(context).colorScheme.surface);
+        final onDrawer = probe.computeLuminance() < 0.5
+            ? Colors.white
+            : const Color(0xFF0F172A);
+        final baseTheme = Theme.of(context);
+        final drawerTheme = baseTheme.copyWith(
+          colorScheme: baseTheme.colorScheme.copyWith(
+            onSurface: onDrawer,
+            onSurfaceVariant: onDrawer.withValues(alpha: 0.66),
+            outline: onDrawer.withValues(alpha: 0.42),
+          ),
+          iconTheme: IconThemeData(color: onDrawer.withValues(alpha: 0.82)),
+          listTileTheme: ListTileThemeData(
+            iconColor: onDrawer.withValues(alpha: 0.78),
+            textColor: onDrawer.withValues(alpha: 0.92),
+            selectedColor: primaryColor,
+          ),
+          textTheme: baseTheme.textTheme.apply(
+            bodyColor: onDrawer,
+            displayColor: onDrawer,
+          ),
+          dividerColor: onDrawer.withValues(alpha: 0.20),
+        );
+
         return Drawer(
           backgroundColor:
               drawerGradient != null ? Colors.transparent : drawerBgColor,
-          child: Container(
-            decoration: BoxDecoration(
-              color: drawerGradient == null ? drawerBgColor : null,
-              gradient: drawerGradient,
-            ),
-            child: SafeArea(
-              top: false,
-              bottom: true,
-              child: ListView(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).padding.bottom + 16,
+          child: Theme(
+            data: drawerTheme,
+            child: Container(
+              decoration: BoxDecoration(
+                color: drawerGradient == null ? drawerBgColor : null,
+                gradient: drawerGradient,
+              ),
+              child: SafeArea(
+                top: false,
+                bottom: true,
+                child: ListView(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).padding.bottom + 16,
+                  ),
+                  children: children,
                 ),
-                children: children,
               ),
             ),
           ),
@@ -1432,6 +1464,10 @@ class _DashboardAnalytics extends StatelessWidget {
               builder: SduiComponentRegistry.instance.resolve(key)),
         );
 
+    void openSalesForTag(String tag) => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => SalesScreen(initialFilter: tag)),
+        );
+
     final Widget layoutBody = switch (layout) {
       DashboardLayout.oroit => OroitDashboardHome(
           analytics: analytics,
@@ -1444,6 +1480,7 @@ class _DashboardAnalytics extends StatelessWidget {
           analytics: analytics,
           formatter: formatter,
           onFilter: onFilter,
+          onTagTap: openSalesForTag,
           onAddProduct: () => open('inventory'),
           onOpenTransactions: () => open('sales'),
           onOpenCustomers: () => open('customers'),

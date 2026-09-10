@@ -73,9 +73,9 @@ class AuthScaffold extends StatelessWidget {
               ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Online inventory management system',
-          style: TextStyle(
+        Text(
+          branding.tagline,
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
             color: _muted,
@@ -173,57 +173,93 @@ class AuthScaffold extends StatelessWidget {
     );
   }
 
+  /// The auth flow is a fixed light "E-Inventory" design. Pin a light
+  /// [ThemeData] over it so form inputs, hint text, borders and the
+  /// "Don't have an account?" footer keep their contrast even when the app is
+  /// running in dark mode. Primary follows the tenant brand.
+  ThemeData _authTheme(BuildContext context) {
+    final brand = Theme.of(context).colorScheme.primary;
+    final scheme = ColorScheme.fromSeed(
+      seedColor: brand,
+      brightness: Brightness.light,
+    ).copyWith(
+      primary: brand,
+      surface: Colors.white,
+      onSurface: _ink,
+      onSurfaceVariant: _muted,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: _pageBg,
+      textTheme: ThemeData(brightness: Brightness.light)
+          .textTheme
+          .apply(bodyColor: _ink, displayColor: _ink),
+      inputDecorationTheme: const InputDecorationTheme(
+        filled: true,
+        fillColor: Color(0xFFF8FAFC),
+        hintStyle: TextStyle(color: Color(0xFF94A3B8)),
+        labelStyle: TextStyle(color: _muted),
+      ),
+      iconTheme: const IconThemeData(color: _muted),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _pageBg,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final wide = constraints.maxWidth >= 900;
-                if (!wide) {
-                  return _formColumn(context);
-                }
-                return Center(
-                  child: Container(
-                    margin: const EdgeInsets.all(24),
-                    constraints:
-                        const BoxConstraints(maxWidth: 1180, maxHeight: 820),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 60,
-                          offset: const Offset(0, 24),
-                        ),
-                      ],
+    return Theme(
+      data: _authTheme(context),
+      child: Scaffold(
+        backgroundColor: _pageBg,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 900;
+                  if (!wide) {
+                    return _formColumn(context);
+                  }
+                  return Center(
+                    child: Container(
+                      margin: const EdgeInsets.all(24),
+                      constraints:
+                          const BoxConstraints(maxWidth: 1180, maxHeight: 820),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 60,
+                            offset: const Offset(0, 24),
+                          ),
+                        ],
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Row(
+                        children: [
+                          Expanded(flex: 5, child: _formColumn(context)),
+                          const Expanded(flex: 5, child: AuthIllustration()),
+                        ],
+                      ),
                     ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Row(
-                      children: [
-                        Expanded(flex: 5, child: _formColumn(context)),
-                        const Expanded(flex: 5, child: AuthIllustration()),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-            if (onServerSettings != null)
-              Positioned(
-                top: 8,
-                right: 12,
-                child: IconButton(
-                  tooltip: 'Server address',
-                  icon: const Icon(Icons.dns_outlined, color: _muted),
-                  onPressed: onServerSettings,
-                ),
+                  );
+                },
               ),
-          ],
+              if (onServerSettings != null)
+                Positioned(
+                  top: 8,
+                  right: 12,
+                  child: IconButton(
+                    tooltip: 'Server address',
+                    icon: const Icon(Icons.dns_outlined, color: _muted),
+                    onPressed: onServerSettings,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

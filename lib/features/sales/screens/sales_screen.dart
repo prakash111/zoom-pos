@@ -20,7 +20,12 @@ final _dateFormat = DateFormat('MMM d, y · h:mm a');
 /// number or customer name. Read-only — new sales are recorded from the
 /// Point of Sale module.
 class SalesScreen extends StatefulWidget {
-  const SalesScreen({super.key});
+  const SalesScreen({super.key, this.initialFilter});
+
+  /// A pre-applied text filter (e.g. a "Popular Tag" tapped on the dashboard).
+  /// Shown as a dismissible chip and matched against the sale #, customer and
+  /// line-item names.
+  final String? initialFilter;
 
   @override
   State<SalesScreen> createState() => _SalesScreenState();
@@ -31,12 +36,18 @@ class _SalesScreenState extends State<SalesScreen> {
   late Future<List<SaleModel>> _future;
   final _searchController = TextEditingController();
   String _query = '';
+  String? _tagFilter;
 
   @override
   void initState() {
     super.initState();
     _repository = SalesRepository(context.read<ApiClient>());
     _future = _repository.fetchRecentSales();
+    final tag = widget.initialFilter?.trim();
+    if (tag != null && tag.isNotEmpty) {
+      _tagFilter = tag;
+      _query = tag.toLowerCase();
+    }
   }
 
   @override
@@ -62,9 +73,12 @@ class _SalesScreenState extends State<SalesScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: TextField(
               controller: _searchController,
-              onChanged: (value) => setState(() => _query = value.trim().toLowerCase()),
+              onChanged: (value) => setState(() {
+                _query = value.trim().toLowerCase();
+                _tagFilter = null;
+              }),
               decoration: InputDecoration(
-                hintText: 'Search sale # or customer',
+                hintText: 'Search sale #, customer or item',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _query.isEmpty
                     ? null
@@ -72,12 +86,30 @@ class _SalesScreenState extends State<SalesScreen> {
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();
-                          setState(() => _query = '');
+                          setState(() {
+                            _query = '';
+                            _tagFilter = null;
+                          });
                         },
                       ),
               ),
             ),
           ),
+          if (_tagFilter != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: InputChip(
+                  avatar: const Icon(Icons.local_offer_outlined, size: 16),
+                  label: Text('Filtered by #$_tagFilter'),
+                  onDeleted: () => setState(() {
+                    _tagFilter = null;
+                    _query = '';
+                  }),
+                ),
+              ),
+            ),
           Expanded(
             child: FutureBuilder<List<SaleModel>>(
               future: _future,
@@ -86,17 +118,30 @@ class _SalesScreenState extends State<SalesScreen> {
                   return const LoadingIndicator();
                 }
                 if (snapshot.hasError) {
-                  final message =
-                      snapshot.error is ApiException ? (snapshot.error as ApiException).message : 'Could not load sales.';
+                  final message = snapshot.error is ApiException
+                      ? (snapshot.error as ApiException).message
+                      : 'Could not load sales.';
                   return ErrorView(message: message, onRetry: _reload);
                 }
 
-                final sales = (snapshot.data ?? [])
-                    .where((s) =>
-                        _query.isEmpty ||
-                        s.saleNumber.toLowerCase().contains(_query) ||
-                        (s.customerName ?? '').toLowerCase().contains(_query))
-                    .toList();
+                final sales = (snapshot.data ?? []).where((s) {
+                  if (_query.isEmpty) return true;
+                  if (s.saleNumber.toLowerCase().contains(_query) ||
+                      (s.customerName ?? '').toLowerCase().contains(_query)) {
+                    return true;
+                  }
+                  return s.items.any((it) {
+                    final name = (it['name'] ?? it['product_name'] ?? '')
+                        .toString()
+                        .toLowerCase();
+                    final cat = (it['category_name'] ?? it['category'] ?? '')
+                        .toString()
+                        .toLowerCase()
+                        .replaceAll(RegExp(r'\s+'), '');
+                    return name.contains(_query) ||
+                        cat.contains(_query.replaceAll(RegExp(r'\s+'), ''));
+                  });
+                }).toList();
 
                 if (sales.isEmpty) {
                   return const Center(child: Text('No sales found.'));
@@ -114,7 +159,9 @@ class _SalesScreenState extends State<SalesScreen> {
                         sale: sale,
                         formatter: formatter,
                         onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => SaleDetailScreen(sale: sale, formatter: formatter)),
+                          MaterialPageRoute(
+                              builder: (_) => SaleDetailScreen(
+                                  sale: sale, formatter: formatter)),
                         ),
                       );
                     },
@@ -130,7 +177,8 @@ class _SalesScreenState extends State<SalesScreen> {
 }
 
 class _SaleTile extends StatelessWidget {
-  const _SaleTile({required this.sale, required this.formatter, required this.onTap});
+  const _SaleTile(
+      {required this.sale, required this.formatter, required this.onTap});
 
   final SaleModel sale;
   final CurrencyFormatter formatter;
@@ -152,15 +200,19 @@ class _SaleTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Sale #${sale.saleNumber}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text('Sale #${sale.saleNumber}',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
                     Text(
                       [
                         if (sale.createdAt != null)
-                          _dateFormat.format(TenantTimeService.instance.toTenantTime(sale.createdAt!)),
-                        if ((sale.customerName ?? '').isNotEmpty) sale.customerName!,
+                          _dateFormat.format(TenantTimeService.instance
+                              .toTenantTime(sale.createdAt!)),
+                        if ((sale.customerName ?? '').isNotEmpty)
+                          sale.customerName!,
                       ].join(' · '),
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                      style:
+                          TextStyle(color: Colors.grey.shade600, fontSize: 12),
                     ),
                   ],
                 ),
@@ -168,9 +220,14 @@ class _SaleTile extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(formatter.format(sale.total), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(formatter.format(sale.total),
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
                   Text(
-                    sale.isCancelled ? 'Cancelled' : (due ? '${formatter.format(sale.dueAmount)} due' : 'Paid'),
+                    sale.isCancelled
+                        ? 'Cancelled'
+                        : (due
+                            ? '${formatter.format(sale.dueAmount)} due'
+                            : 'Paid'),
                     style: TextStyle(
                       fontSize: 12,
                       color: sale.isCancelled

@@ -23,6 +23,7 @@ class PoshDashboardHome extends StatelessWidget {
     this.onOpenTransactions,
     this.onOpenCustomers,
     this.onFilter,
+    this.onTagTap,
   });
 
   final AnalyticsModel analytics;
@@ -31,6 +32,7 @@ class PoshDashboardHome extends StatelessWidget {
   final VoidCallback? onOpenTransactions;
   final VoidCallback? onOpenCustomers;
   final VoidCallback? onFilter;
+  final void Function(String tag)? onTagTap;
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +75,7 @@ class PoshDashboardHome extends StatelessWidget {
             const SizedBox(height: 16),
             twoUp(
               _PurchaseActivityCard(analytics: analytics),
-              _PopularTagsCard(tags: analytics.popularTags),
+              _PopularTagsCard(tags: analytics.popularTags, onTagTap: onTagTap),
               flexA: 3,
               flexB: 2,
             ),
@@ -208,26 +210,50 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Expanded(
-          child: Text('Dashboard',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-        ),
-        OutlinedButton.icon(
-          onPressed: onFilter,
-          icon: const Icon(Icons.filter_list, size: 18),
-          label: Text(rangeLabel == null || rangeLabel!.isEmpty
-              ? 'Filter'
-              : 'Filter · ${rangeLabel!}'),
-        ),
-        const SizedBox(width: 12),
-        ElevatedButton.icon(
-          onPressed: onAddProduct,
-          icon: const Icon(Icons.add, size: 18),
-          label: const Text('Add Product'),
-        ),
-      ],
+    final title = Text(
+      'Dashboard',
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+    );
+    final filterBtn = OutlinedButton.icon(
+      onPressed: onFilter,
+      icon: const Icon(Icons.filter_list, size: 18),
+      label: Text(rangeLabel == null || rangeLabel!.isEmpty
+          ? 'Filter'
+          : 'Filter · ${rangeLabel!}'),
+    );
+    final addBtn = ElevatedButton.icon(
+      onPressed: onAddProduct,
+      icon: const Icon(Icons.add, size: 18),
+      label: const Text('Add Product'),
+    );
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        // Narrow: stack the title above a wrapping button row so "Dashboard"
+        // is never squeezed into a one-glyph-wide column.
+        if (c.maxWidth < 520) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              title,
+              const SizedBox(height: 10),
+              Wrap(spacing: 12, runSpacing: 8, children: [filterBtn, addBtn]),
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: title),
+            filterBtn,
+            const SizedBox(width: 12),
+            addBtn,
+          ],
+        );
+      },
     );
   }
 }
@@ -607,9 +633,10 @@ class _LegendDot extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _PopularTagsCard extends StatelessWidget {
-  const _PopularTagsCard({required this.tags});
+  const _PopularTagsCard({required this.tags, this.onTagTap});
 
   final List<String> tags;
+  final void Function(String tag)? onTagTap;
 
   @override
   Widget build(BuildContext context) {
@@ -629,19 +656,29 @@ class _PopularTagsCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 for (final t in tags)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
+                  Builder(builder: (context) {
+                    final clean =
+                        t.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+                    return Material(
                       color: scheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: scheme.outlineVariant),
-                    ),
-                    child: Text(
-                      '#${t.replaceAll(RegExp(r'\s+'), '').toLowerCase()}',
-                      style: TextStyle(fontSize: 12.5, color: scheme.onSurface),
-                    ),
-                  ),
+                      child: InkWell(
+                        onTap: onTagTap == null ? null : () => onTagTap!(t),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: scheme.outlineVariant),
+                          ),
+                          child: Text('#$clean',
+                              style: TextStyle(
+                                  fontSize: 12.5, color: scheme.onSurface)),
+                        ),
+                      ),
+                    );
+                  }),
               ],
             ),
         ],

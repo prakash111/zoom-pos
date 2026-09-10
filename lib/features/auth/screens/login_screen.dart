@@ -311,20 +311,31 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
-      belowCard: Wrap(
-        alignment: WrapAlignment.center,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text(l10n.noStoreYetPrompt),
-          TextButton(
-            onPressed: auth.isBusy
-                ? null
-                : () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                    ),
-            child: Text(l10n.createOne),
-          ),
-        ],
+      belowCard: Builder(
+        builder: (context) {
+          final scheme = Theme.of(context).colorScheme;
+          return Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                l10n.noStoreYetPrompt,
+                style:
+                    TextStyle(color: scheme.onSurface.withValues(alpha: 0.7)),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(foregroundColor: scheme.primary),
+                onPressed: auth.isBusy
+                    ? null
+                    : () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const RegisterScreen()),
+                        ),
+                child: Text(l10n.createOne),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
