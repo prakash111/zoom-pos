@@ -160,6 +160,22 @@
                 </button>
             </div>
 
+            @if (config('app.demo_mode'))
+                <div class="pt-3 mt-1 border-t border-slate-200 dark:border-white/10">
+                    <div class="text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
+                        {{ __('One-click demo store (view-only)') }}
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach (['retail' => 'Retail', 'cafe' => 'Cafe & Restaurant', 'pharmacy' => 'Pharmacy', 'repair' => 'Repair', 'salon' => 'Salon & Bookings'] as $slug => $label)
+                            <a href="{{ url('/demo-login/'.$slug) }}"
+                               class="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-brand-lime hover:text-slate-950 text-slate-700 dark:text-slate-200 text-xs font-bold transition">
+                                {{ __($label) }}
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             <!-- Reciprocal Registration Box & SuperAdmin Switcher -->
             <div class="pt-4 border-t border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-3 text-center">
                 <div class="text-xs text-slate-600 dark:text-slate-300">

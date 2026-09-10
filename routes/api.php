@@ -36,6 +36,7 @@ use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Controllers\Tenant\InvoiceController;
 use App\Http\Middleware\AuthenticateTenantApi;
+use App\Http\Middleware\PreventDemoModifications;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -50,7 +51,7 @@ use Illuminate\Support\Facades\Route;
 // hosted-checkout purchase. HMAC-verified in the controller (no auth middleware).
 Route::post('/license/activate', [LicenseActivationController::class, 'activate']);
 
-Route::prefix('v1/tax')->middleware([AuthenticateTenantApi::class])->group(function () {
+Route::prefix('v1/tax')->middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
     Route::post('/calculate', [TaxApiController::class, 'calculate']);
     Route::post('/invoices', [TaxApiController::class, 'issueInvoice']);
     Route::get('/rates', [TaxApiController::class, 'getRates']);
@@ -62,13 +63,13 @@ Route::prefix('v1/tax')->middleware([AuthenticateTenantApi::class])->group(funct
 | Tenant Password Reset & Change (Mobile / Desktop)
 |--------------------------------------------------------------------------
 */
-Route::prefix('tenant/password')->group(function () {
+Route::prefix('tenant/password')->middleware([PreventDemoModifications::class])->group(function () {
     Route::post('/email', [PasswordResetController::class, 'sendResetLink']);
     Route::post('/reset', [PasswordResetController::class, 'reset']);
 });
 
 Route::post('/tenant/profile/change-password', [PasswordResetController::class, 'changePassword'])
-    ->middleware([AuthenticateTenantApi::class]);
+    ->middleware([AuthenticateTenantApi::class, PreventDemoModifications::class]);
 
 // Unauthenticated Dynamic Store Registration Metadata
 Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
@@ -104,7 +105,7 @@ Route::post('/v1/integrations/webhooks/{tenant_uuid}/orders', [EcommerceWebhookC
 Route::post('/integrations/webhooks/{tenant_uuid}/orders', [EcommerceWebhookController::class, 'handleOrders']);
 
 // Server-Driven UI Bootstrap, View Schemas, and Form Action Routes
-Route::middleware([AuthenticateTenantApi::class])->group(function () {
+Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
     Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
     Route::get('/app/translations', [LanguageApiController::class, 'appTranslations']);
     Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
@@ -369,7 +370,7 @@ Route::prefix('v1/pos')->group(function () {
     Route::get('/auth/push-config', [PushDeviceApiController::class, 'config']);
 
     // Protected POS Endpoints (Require API Key or Bearer Token)
-    Route::middleware([AuthenticateTenantApi::class])->group(function () {
+    Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
         Route::get('/auth/session', [PosSyncApiController::class, 'session']);
         Route::post('/auth/desktop-session', [PosSyncApiController::class, 'desktopWebSession']);
         Route::get('/status', [PosSyncApiController::class, 'status']);

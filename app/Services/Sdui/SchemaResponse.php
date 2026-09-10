@@ -5604,7 +5604,7 @@ class SchemaResponse
                 $schema = self::hydrateStoredBrandingColorPickers($schema, $company);
             }
 
-            return self::schemaResponse($normalized, $schema);
+            return self::schemaResponse($normalized, self::applyDemoLockdown($schema, $company, $normalized));
         }
 
         $schema = match ($normalized) {
@@ -5699,7 +5699,7 @@ class SchemaResponse
             }
         }
 
-        return self::schemaResponse($normalized, $schema);
+        return self::schemaResponse($normalized, self::applyDemoLockdown($schema, $company, $normalized));
     }
 
     private static function findNavigationItem(string $viewKey, Company $company): ?array
@@ -5836,6 +5836,90 @@ class SchemaResponse
         };
 
         $schema['components'] = $hydrate($schema['components'] ?? []);
+
+        return $schema;
+    }
+
+    /** Settings/profile-type views a demo tenant sees but cannot mutate. */
+    private const DEMO_LOCKED_VIEWS = [
+        'settings-profile', 'profile', 'settings-branding', 'branding',
+        'settings-receipts', 'receipts', 'settings-financial', 'financial',
+        'settings-localization', 'localization', 'settings-taxes', 'taxes',
+        'tax-rule-create', 'settings-api', 'api', 'api-integrations',
+        'settings-navigation', 'navigation', 'navigation-menu',
+        'settings-form-labels', 'form-labels', 'custom-form-fields',
+        'settings-notifications', 'notifications', 'custom-notifications',
+        'settings-advanced', 'advanced', 'danger-zone',
+        'settings-payment-methods', 'payment-methods', 'payment-method-create',
+        'add-payment-method', 'printer-setup', 'hardware-printer',
+        'hardware-settings', 'change-password', 'password',
+        'settings-mode', 'mode',
+    ];
+
+    /**
+     * When `DEMO_MODE` is on and this tenant is a demo account, make every
+     * settings/profile screen view-only: a top notice card, disabled Save /
+     * Update buttons, and locked file pickers. Emitted server-side so the
+     * Flutter client needs no change (it already honours `disabled` /
+     * `enabled`).
+     */
+    private static function applyDemoLockdown(array $schema, Company $company, string $view): array
+    {
+        if (! config('app.demo_mode')
+            || ! (bool) ($company->is_demo ?? false)
+            || ! in_array($view, self::DEMO_LOCKED_VIEWS, true)) {
+            return $schema;
+        }
+
+        $notice = self::card([
+            self::row([
+                self::icon('lock', ['color' => '#B45309', 'size' => 20], ['flexible' => false]),
+                self::column([
+                    self::text('Notice: Running in Demo Mode', 'label_large', ['bold' => true, 'color' => '#92400E']),
+                    self::text('Settings, file uploads, and credentials are view-only.', 'body_small', ['color' => '#B45309']),
+                ], ['expanded' => true, 'spacing' => 2]),
+            ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+        ], ['color' => '#FFFBEB', 'border_color' => '#FDE68A', 'dismissible' => true]);
+
+        $walk = static function (&$node) use (&$walk) {
+            if (! is_array($node)) {
+                return;
+            }
+            $type = $node['type'] ?? null;
+
+            if (in_array($type, ['file_upload', 'file_picker', 'image_upload'], true)) {
+                $node['enabled'] = false;
+                $node['disabled'] = true;
+                $node['disabled_reason'] = 'File uploads are disabled in Demo Mode';
+            }
+
+            if (in_array($type, ['button_primary', 'button_danger'], true)) {
+                $action = $node['action'] ?? null;
+                $actionType = is_array($action) ? ($action['type'] ?? null) : null;
+                if (in_array($actionType, ['form_submit', 'api_post'], true)
+                    || (isset($node['endpoint']) && in_array(strtoupper((string) ($node['method'] ?? 'POST')), ['POST', 'PUT', 'PATCH', 'DELETE'], true))) {
+                    $node['disabled'] = true;
+                    $node['disabled_reason'] = 'Changes cannot be saved in Demo Mode';
+                }
+            }
+
+            foreach (['components', 'children', 'tabs', 'steps'] as $key) {
+                if (isset($node[$key]) && is_array($node[$key])) {
+                    foreach ($node[$key] as &$child) {
+                        $walk($child);
+                    }
+                    unset($child);
+                }
+            }
+        };
+
+        if (isset($schema['components']) && is_array($schema['components'])) {
+            foreach ($schema['components'] as &$component) {
+                $walk($component);
+            }
+            unset($component);
+            array_unshift($schema['components'], $notice);
+        }
 
         return $schema;
     }

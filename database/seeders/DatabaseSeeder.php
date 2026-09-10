@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
             $this->call([
                 TenantDemoSeeder::class,
                 RestaurantDemoSeeder::class,
+                DemoAccountsSeeder::class,
             ]);
         } else {
             $this->command?->info('DEMO_MODE is off — skipping demo tenant seeders.');

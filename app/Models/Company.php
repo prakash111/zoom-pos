@@ -31,7 +31,7 @@ class Company extends Model
     protected $fillable = [
         'unique_account_id', 'name', 'slug', 'custom_domain', 'trade_name', 'legal_name', 'tax_id', 'tax_id_label',
         'email', 'phone', 'website', 'address', 'city', 'state', 'postal_code', 'country', 'currency',
-        'language', 'default_locale', 'timezone', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'accent_color', 'drawer_bg', 'drawer_gradient_enabled', 'drawer_gradient_start', 'drawer_gradient_end', 'drawer_gradient_direction', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'licensed_modules', 'nav_config', 'receipt_format', 'status', 'is_seeding_complete', 'is_profile_completed', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
+        'language', 'default_locale', 'timezone', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'accent_color', 'drawer_bg', 'drawer_gradient_enabled', 'drawer_gradient_start', 'drawer_gradient_end', 'drawer_gradient_direction', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'licensed_modules', 'nav_config', 'receipt_format', 'status', 'is_seeding_complete', 'is_profile_completed', 'is_demo', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
         'max_users', 'max_devices', 'pricing_mode', 'tax_api_mode', 'tax_api_key', 'tax_api_endpoint',
         'navigation_menu_customization', 'navigation_labels', 'form_field_customizations',
         'invoice_prefix', 'quotation_prefix', 'repair_prefix', 'prescription_prefix', 'salon_prefix', 'tax_settings', 'invoice_terms', 'quote_terms', 'bank_details',
@@ -50,6 +50,7 @@ class Company extends Model
             'expires_at' => 'datetime',
             'is_seeding_complete' => 'boolean',
             'is_profile_completed' => 'boolean',
+            'is_demo' => 'boolean',
             'drawer_gradient_enabled' => 'boolean',
             'tax_settings' => 'array',
             'tax_api_key' => 'encrypted',

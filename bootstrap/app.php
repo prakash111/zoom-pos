@@ -9,6 +9,7 @@ use App\Http\Middleware\EnsureTenantEmailIsVerified;
 use App\Http\Middleware\EnsureTenantPosMode;
 use App\Http\Middleware\EnsureTenantSubscriptionActive;
 use App\Http\Middleware\EnsureTenantVertical;
+use App\Http\Middleware\PreventDemoModifications;
 use App\Http\Middleware\ResolveTenantContext;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
@@ -78,6 +79,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.vertical' => EnsureTenantVertical::class,
             'tenant.subscription' => EnsureTenantSubscriptionActive::class,
             'tenant.verified' => EnsureTenantEmailIsVerified::class,
+            'demo.guard' => PreventDemoModifications::class,
         ]);
 
         // There is no single named "login" route — two separate guards each

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\SocialAuthController;
+use App\Http\Controllers\DemoLoginController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PublicContactController;
@@ -20,6 +21,13 @@ Route::middleware(EnsureAppIsInstalled::class)->get('/login', function () {
 Route::middleware(EnsureAppIsInstalled::class)->get('/register', function () {
     return redirect()->route('tenant.register');
 })->name('register');
+
+// 1-click demo sign-in (web panel). Disabled entirely unless DEMO_MODE=true.
+if (config('app.demo_mode')) {
+    Route::middleware(EnsureAppIsInstalled::class)
+        ->get('/demo-login/{type}', [DemoLoginController::class, 'login'])
+        ->name('demo.login');
+}
 
 Route::middleware(EnsureAppIsInstalled::class)->get('/page/{page:slug}', [PublicPageController::class, 'show'])->name('page.show');
 Route::middleware(EnsureAppIsInstalled::class)->get('/pages/{page:slug}', [PublicPageController::class, 'show'])->name('pages.show');

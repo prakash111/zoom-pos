@@ -36,6 +36,7 @@ use App\Services\TaxCalculationService;
 use App\Services\TaxEngineService;
 use App\Services\Tenancy\TenantProvisioningService;
 use Carbon\Carbon;
+use Database\Seeders\DemoAccountsSeeder;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -394,6 +395,19 @@ class PosSyncApiController extends Controller
             || (bool) config('services.facebook.enabled', true);
         $facebookClientId = (string) (PlatformSystem::get('social_facebook_client_id') ?: config('services.facebook.client_id', ''));
 
+        $demoMode = (bool) config('app.demo_mode');
+        $demoAccounts = [];
+        if ($demoMode) {
+            foreach (DemoAccountsSeeder::ACCOUNTS as $storeType => $meta) {
+                $demoAccounts[] = [
+                    'label' => $meta['label'],
+                    'store_type' => $storeType,
+                    'email' => $meta['email'],
+                    'password' => DemoAccountsSeeder::PASSWORD,
+                ];
+            }
+        }
+
         return response()->json([
             'success' => true,
             'social_login' => [
@@ -402,6 +416,10 @@ class PosSyncApiController extends Controller
                 'google_client_id' => $googleClientId ?: null,
                 'facebook_client_id' => $facebookClientId ?: null,
             ],
+            // Zero-Flutter-touch 1-click demo login: the client renders a
+            // quick-fill chip bar from this list and auto-submits on tap.
+            'demo_mode' => $demoMode,
+            'demo_accounts' => $demoAccounts,
         ]);
     }
 
