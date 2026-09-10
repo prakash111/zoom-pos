@@ -341,26 +341,36 @@ class PosSyncApiController extends Controller
     }
 
     /**
-     * Platform-wide (not tenant-scoped) branding for pre-auth screens —
-     * currently just the Sign In screen's logo, set by the Superadmin in
-     * Branding settings. GET /api/v1/pos/auth/branding
+     * Platform-wide (not tenant-scoped) branding + theme for the pre-auth
+     * screens (Splash / Login / Register / Forgot Password), set by the
+     * Superadmin in Branding settings. Tenants override this after sign-in.
+     *
+     * GET /api/v1/pos/auth/branding
+     * GET /api/v1/pos/auth/public-settings   (same payload, canonical name)
      */
     public function branding(): JsonResponse
     {
         $branding = PlatformBranding::current();
+        $settings = $branding->publicSettings();
 
         return response()->json([
             'success' => true,
-            'platform_name' => $branding->platform_name ?: config('app.name', 'Smart Inventory & Sales'),
-            'brand_logo_url' => $branding->getLogoPublicUrl(),
-            // The sign-in header shows the logo and title inline with no
-            // description block. `header_inline` / `show_tagline` let the
-            // client honour this without an app rebuild; the long landing
-            // tagline is intentionally not sent to the auth screen.
+            // Superadmin global defaults — the canonical nested contract.
+            'platform' => $settings['platform'],
+            'theme' => $settings['theme'],
+            // Flat aliases kept for older clients.
+            'platform_name' => $settings['platform']['name'],
+            'brand_logo_url' => $settings['platform']['logo_url'],
             'platform_tagline' => null,
             'header_inline' => true,
             'show_tagline' => false,
         ]);
+    }
+
+    /** Alias of [branding] under a clearer name. GET .../auth/public-settings */
+    public function publicSettings(): JsonResponse
+    {
+        return $this->branding();
     }
 
     /**

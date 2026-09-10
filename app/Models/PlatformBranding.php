@@ -11,6 +11,8 @@ class PlatformBranding extends Model
 
     protected $fillable = [
         'platform_name', 'logo_url', 'favicon_url', 'primary_color',
+        'secondary_color', 'accent_color', 'splash_bg_color', 'auth_bg_color',
+        'auth_headline', 'auth_description',
         'superadmin_sidebar_color', 'landing_primary_color', 'landing_accent_color',
         'support_email', 'support_phone', 'smtp_host', 'smtp_port',
         'smtp_username', 'smtp_password', 'smtp_encryption',
@@ -24,6 +26,7 @@ class PlatformBranding extends Model
         'landing_playstore_url', 'landing_playstore_enabled',
         'landing_windows_url', 'landing_windows_enabled',
         'landing_section_meta', 'landing_faqs',
+        'landing_features', 'landing_testimonials',
     ];
 
     protected function casts(): array
@@ -38,6 +41,8 @@ class PlatformBranding extends Model
             'landing_windows_enabled' => 'boolean',
             'landing_section_meta' => 'array',
             'landing_faqs' => 'array',
+            'landing_features' => 'array',
+            'landing_testimonials' => 'array',
         ];
     }
 
@@ -68,6 +73,77 @@ class PlatformBranding extends Model
         }
 
         return asset('storage/'.ltrim($cleanPath, '/'));
+    }
+
+    /** Same resolution chain as [getLogoPublicUrl] for the favicon. */
+    public function getFaviconPublicUrl(): ?string
+    {
+        if (empty($this->favicon_url)) {
+            return null;
+        }
+
+        if (str_starts_with($this->favicon_url, 'http://') || str_starts_with($this->favicon_url, 'https://') || str_starts_with($this->favicon_url, 'data:')) {
+            return $this->favicon_url;
+        }
+
+        $cleanPath = preg_replace('#^/?storage/#', '', $this->favicon_url);
+
+        if (Storage::disk('public')->exists($cleanPath)) {
+            return Storage::disk('public')->url($cleanPath);
+        }
+
+        if (str_starts_with($this->favicon_url, '/')) {
+            return asset(ltrim($this->favicon_url, '/'));
+        }
+
+        return asset('storage/'.ltrim($cleanPath, '/'));
+    }
+
+    /**
+     * A valid `#RRGGBB` hex or the given fallback. Guards against a blank /
+     * "#ffffff" / malformed value stored in the branding row producing an
+     * unreadable auth screen.
+     */
+    private function hexOr(?string $value, string $fallback): string
+    {
+        $v = trim((string) $value);
+
+        return preg_match('/^#[0-9A-Fa-f]{6}$/', $v) ? strtoupper($v) : $fallback;
+    }
+
+    /**
+     * The Superadmin global branding + theme contract consumed, unauthenticated,
+     * by the pre-auth screens (Splash / Login / Register / Forgot Password).
+     * Tenants override this after sign-in via Company::getThemeTokens().
+     *
+     * @return array{platform: array<string, mixed>, theme: array<string, string>}
+     */
+    public function publicSettings(): array
+    {
+        $primary = $this->hexOr($this->primary_color, '#F95700');
+        // A white / near-white primary is a leftover placeholder, never a
+        // deliberate brand colour — fall back to the platform default.
+        if (in_array(strtoupper($primary), ['#FFFFFF', '#FEFEFE', '#FDFDFD', '#000000'], true)) {
+            $primary = '#F95700';
+        }
+
+        return [
+            'platform' => [
+                'name' => $this->platform_name ?: config('app.name', 'POS Systems'),
+                'headline' => $this->auth_headline ?: 'Run your business smarter.',
+                'description' => $this->auth_description
+                    ?: 'Sales, inventory & orders — all in one place.',
+                'logo_url' => $this->getLogoPublicUrl(),
+                'favicon_url' => $this->getFaviconPublicUrl(),
+            ],
+            'theme' => [
+                'primary_color' => $primary,
+                'secondary_color' => $this->hexOr($this->secondary_color, '#0F172A'),
+                'accent_color' => $this->hexOr($this->accent_color, $primary),
+                'splash_bg_color' => $this->hexOr($this->splash_bg_color, '#0F172A'),
+                'auth_bg_color' => $this->hexOr($this->auth_bg_color, '#F8FAFC'),
+            ],
+        ];
     }
 
     public function landingPage()
@@ -182,11 +258,103 @@ class PlatformBranding extends Model
         }
 
         return [
-            ['q' => __('Do I need to install anything to get started?'), 'a' => __('No. The platform runs in any modern browser. Native Android and Windows apps are optional and available from the download section.')],
-            ['q' => __('Does the POS work offline?'), 'a' => __('Yes. Sales are queued locally during a network outage and sync automatically once the connection is restored.')],
-            ['q' => __('Can I run more than one store or branch?'), 'a' => __('Yes. Each workspace supports multiple locations with isolated data, shared catalogue and consolidated reporting.')],
-            ['q' => __('Is my data secure and backed up?'), 'a' => __('All data is encrypted in transit and at rest, with automated cloud redundancy and point-in-time recovery.')],
+            ['q' => __('Do I need to install anything to get started?'), 'a' => __('No. Create a workspace and start ringing up sales from any modern browser in minutes. Native Android and Windows apps are optional and add full-screen terminal mode, faster hardware access and offline-first speed.')],
+            ['q' => __('Does the POS keep working when the internet drops?'), 'a' => __('Yes. Checkout, product search, stock lookups and cash register actions all run from a local copy of your data. Sales made offline are queued safely and sync automatically the moment the connection returns — nothing is lost, and duplicates are prevented.')],
+            ['q' => __('Can I run more than one store, branch or warehouse?'), 'a' => __('Yes. A single workspace supports unlimited locations with a shared product catalogue, per-branch stock and pricing, inter-branch transfers with receiving audit trails, and consolidated reporting across the whole business.')],
+            ['q' => __('Which hardware does it support?'), 'a' => __('Any standard USB or Bluetooth barcode scanner, 80mm and 58mm thermal receipt printers, auto-kick cash drawers, EMV/NFC card readers, and Kitchen Display Screens. If it works with Windows or Android, it works here — no proprietary terminal to buy.')],
+            ['q' => __('Is it built for restaurants and cafés as well as retail?'), 'a' => __('Yes. Switch on restaurant mode for interactive dining floor plans, Kitchen Order Tickets routed to KDS screens, QR-code table ordering, per-seat items and modifiers, course pacing, and one-tap table merge or bill split.')],
+            ['q' => __('Are the tax invoices compliant?'), 'a' => __('Compliant tax invoices (VAT / GST / HSN) are generated automatically with correct tax breakdowns, sequential numbering, multi-currency pricing, and thermal or A4 PDF output that can be sent to the customer over WhatsApp or email instantly.')],
+            ['q' => __('Can I import my existing products and customers?'), 'a' => __('Yes. Bulk-import products, categories, barcodes, prices and stock from a CSV file, and add customers the same way, so you can move off spreadsheets or another POS without re-typing your catalogue.')],
+            ['q' => __('Can I control what each staff member can see and do?'), 'a' => __('Yes. Assign granular, per-module roles — for example a cashier who can sell but not edit prices or view reports — and every sensitive action is written to an audit log.')],
+            ['q' => __('Is my data secure and backed up?'), 'a' => __('Every tenant\'s data is fully isolated. All data is encrypted in transit and at rest, with automated cloud redundancy and point-in-time recovery.')],
+            ['q' => __('What do the native Android and Windows apps add?'), 'a' => __('A distraction-free full-screen till, quicker access to scanners, printers and cash drawers, remembered window size on desktop, and a hardened offline-first sync engine for busy counters and unreliable connections.')],
+            ['q' => __('Can I use my own brand, domain and pricing?'), 'a' => __('Yes. White-label the platform name, logo, favicon, colours and landing page, run it on your own custom domain, and publish your own subscription plans from the admin panel.')],
+            ['q' => __('Is there a free trial, and are there setup fees or contracts?'), 'a' => __('You can launch a workspace and evaluate the full system with no card required, no setup fee and no long-term contract. Upgrade, downgrade or cancel from the billing screen at any time.')],
         ];
+    }
+
+    /**
+     * "Feature Modules" cards for the landing page: the SuperAdmin-authored
+     * list, or the built-in default set when none has been configured.
+     *
+     * Shape: [{ icon, title, body, mockup? }]. `mockup` is an optional
+     * decorative-panel key used only by the modern theme's tabbed layout
+     * (`components/landing/features.blade.php`) — custom entries omit it and
+     * fall back to a cycling default panel.
+     *
+     * @return array<int, array{icon: string, title: string, body: string, mockup?: string}>
+     */
+    public function landingFeatures(): array
+    {
+        $configured = collect($this->landing_features ?? [])
+            ->map(fn ($row) => array_filter([
+                'icon' => trim((string) ($row['icon'] ?? '')),
+                'title' => trim((string) ($row['title'] ?? '')),
+                'body' => trim((string) ($row['body'] ?? '')),
+                'mockup' => trim((string) ($row['mockup'] ?? '')) ?: null,
+            ], fn ($v) => $v !== null))
+            ->filter(fn ($row) => ($row['title'] ?? '') !== '' && ($row['body'] ?? '') !== '')
+            ->values()
+            ->all();
+
+        if ($configured !== []) {
+            return $configured;
+        }
+
+        return [
+            ['icon' => '📦', 'title' => __('Smart Inventory & Stock Control'), 'body' => __('Real-time stock across every warehouse and branch, one-click barcode & SKU labels, batch and expiry tracking, and automatic low-stock re-order alerts — so you never oversell and shrinkage drops.'), 'mockup' => 'inventory'],
+            ['icon' => '🛒', 'title' => __('Lightning Retail POS'), 'body' => __('Sub-second barcode checkout, split cash / card / digital tender, customer credit accounts and held orders. Shorter queues at peak, and not a single lost sale.'), 'mockup' => 'pos'],
+            ['icon' => '🍽️', 'title' => __('Restaurant & Dining Service'), 'body' => __('Live floor plans, Kitchen Order Tickets routed to KDS screens, QR table ordering, per-seat modifiers, course pacing, table merge and bill split. Faster table turns with fewer kitchen mistakes.'), 'mockup' => 'restaurant'],
+            ['icon' => '🧾', 'title' => __('Finance, Tax & Invoicing'), 'body' => __('Compliant VAT / GST / HSN invoices generated automatically, multi-currency pricing, thermal and A4 receipts, instant WhatsApp or email delivery, and built-in AP / AR ledgers. Books that are always audit-ready.'), 'mockup' => 'finance'],
+            ['icon' => '⚡', 'title' => __('Offline-First Reliability'), 'body' => __('Keep selling when the internet drops. Transactions queue locally, sync automatically on reconnect, and survive a mid-sync crash without duplicates or corruption.')],
+            ['icon' => '💵', 'title' => __('Cash Register & Shift Control'), 'body' => __('Opening float, paid-in / paid-out, blind counts and automated X and Z shift reports give you tight, per-cashier cash accountability at every close.')],
+            ['icon' => '🧑‍🤝‍🧑', 'title' => __('Customers, Credit & Loyalty'), 'body' => __('Customer accounts with credit limits, statement-ready ledgers, payment histories and loyalty points — drive repeat business while keeping receivables under control.')],
+            ['icon' => '🏢', 'title' => __('Multi-Location Workspaces'), 'body' => __('Scale from one till to a nationwide franchise with isolated tenant data, a shared catalogue, per-branch pricing, consolidated reporting and your own custom domain.')],
+            ['icon' => '🔐', 'title' => __('Roles & Granular Permissions'), 'body' => __('Per-module access control — a cashier who can sell but not discount, a manager who can see reports but not payroll — with a full audit log of every sensitive action.')],
+            ['icon' => '📱', 'title' => __('Works On Every Device'), 'body' => __('The same system in any browser, plus native Android and Windows desktop apps for a full-screen till, faster hardware access and offline-first speed.')],
+        ];
+    }
+
+    /**
+     * Customer testimonials for the landing page: the SuperAdmin-authored
+     * list, or the built-in default set when none has been configured.
+     *
+     * @return array<int, array{quote: string, name: string, role: string}>
+     */
+    public function landingTestimonials(): array
+    {
+        $configured = collect($this->landing_testimonials ?? [])
+            ->map(fn ($row) => [
+                'quote' => trim((string) ($row['quote'] ?? '')),
+                'name' => trim((string) ($row['name'] ?? '')),
+                'role' => trim((string) ($row['role'] ?? '')),
+            ])
+            ->filter(fn ($row) => $row['quote'] !== '' && $row['name'] !== '')
+            ->values()
+            ->all();
+
+        if ($configured !== []) {
+            return $configured;
+        }
+
+        return [
+            ['quote' => __('We switched all our retail outlets over in one afternoon. Inventory clears immediately and end-of-day reconciliation takes seconds.'), 'name' => 'Alexander Hayes', 'role' => __('Operations Director · Apex Retail Group')],
+            ['quote' => __('The offline checkout saved us during a major fiber cut on a busy weekend. Not a single sale or customer was lost.'), 'name' => 'Elena Rostova', 'role' => __('Founder · Metro Gourmet Markets')],
+            ['quote' => __('POS, inventory and KOT kitchen displays in a single dashboard transformed our restaurant chain.'), 'name' => 'Tariq Mansour', 'role' => __('Head of Operations · Urban Dine Hospitality')],
+        ];
+    }
+
+    /** Two-letter initials for a testimonial avatar chip. */
+    public static function testimonialInitials(string $name): string
+    {
+        $parts = preg_split('/\s+/', trim($name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($parts === []) {
+            return '★';
+        }
+        $first = mb_substr($parts[0], 0, 1);
+        $last = count($parts) > 1 ? mb_substr($parts[count($parts) - 1], 0, 1) : '';
+
+        return mb_strtoupper($first.$last);
     }
 
     /**

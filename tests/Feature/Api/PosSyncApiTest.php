@@ -10,6 +10,7 @@ use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\OrderPayment;
 use App\Models\Plan;
+use App\Models\PlatformBranding;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\Supplier;
@@ -118,6 +119,47 @@ class PosSyncApiTest extends TestCase
             ->assertJsonPath('header_inline', true)
             ->assertJsonPath('show_tagline', false)
             ->assertJsonStructure(['platform_name', 'brand_logo_url']);
+    }
+
+    public function test_public_settings_returns_superadmin_platform_and_theme(): void
+    {
+        PlatformBranding::current()->update([
+            'platform_name' => 'POS Systems',
+            'auth_headline' => 'Run your business smarter.',
+            'auth_description' => 'Sales, inventory & orders — all in one place.',
+            'primary_color' => '#F95700',
+            'secondary_color' => '#0F172A',
+            'accent_color' => '#FF7A00',
+            'splash_bg_color' => '#0F172A',
+            'auth_bg_color' => '#F8FAFC',
+        ]);
+
+        foreach ([
+            '/api/v1/pos/auth/public-settings',
+            '/api/v1/pos/public/settings',
+            '/api/v1/pos/auth/branding',
+        ] as $url) {
+            $this->getJson($url)
+                ->assertOk()
+                ->assertJsonPath('platform.name', 'POS Systems')
+                ->assertJsonPath('platform.headline', 'Run your business smarter.')
+                ->assertJsonPath('platform.description', 'Sales, inventory & orders — all in one place.')
+                ->assertJsonStructure(['platform' => ['logo_url', 'favicon_url']])
+                ->assertJsonPath('theme.primary_color', '#F95700')
+                ->assertJsonPath('theme.secondary_color', '#0F172A')
+                ->assertJsonPath('theme.accent_color', '#FF7A00')
+                ->assertJsonPath('theme.splash_bg_color', '#0F172A')
+                ->assertJsonPath('theme.auth_bg_color', '#F8FAFC');
+        }
+    }
+
+    public function test_public_settings_falls_back_on_a_placeholder_white_primary(): void
+    {
+        PlatformBranding::current()->update(['primary_color' => '#ffffff']);
+
+        $this->getJson('/api/v1/pos/auth/public-settings')
+            ->assertOk()
+            ->assertJsonPath('theme.primary_color', '#F95700');
     }
 
     public function test_desktop_web_session_is_user_bound_and_one_time(): void

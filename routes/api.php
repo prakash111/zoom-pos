@@ -360,6 +360,9 @@ Route::prefix('v1/pos')->group(function () {
     Route::get('/auth/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
     Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
     Route::get('/auth/branding', [PosSyncApiController::class, 'branding']);
+    Route::get('/auth/public-settings', [PosSyncApiController::class, 'publicSettings']);
+    Route::get('/app/public-settings', [PosSyncApiController::class, 'publicSettings']);
+    Route::get('/public/settings', [PosSyncApiController::class, 'publicSettings']);
     Route::get('/auth/auth-config', [PosSyncApiController::class, 'authConfig']);
     Route::get('/auth-config', [PosSyncApiController::class, 'authConfig']);
     Route::get('/app/auth-config', [PosSyncApiController::class, 'authConfig']);
