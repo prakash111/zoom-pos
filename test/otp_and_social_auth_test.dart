@@ -39,6 +39,21 @@ class MockOtpApiClient extends Fake implements ApiClient {
           'google': true,
           'facebook': true,
         },
+        'demo_mode': true,
+        'demo_accounts': [
+          {
+            'label': 'Retail',
+            'store_type': 'RETAIL',
+            'email': 'retail@demo.com',
+            'password': 'demo1234',
+          },
+          {
+            'label': 'Pharmacy',
+            'store_type': 'PHARMACY',
+            'email': 'pharmacy@demo.com',
+            'password': 'demo1234',
+          },
+        ],
       };
     }
     return {'brand_logo_url': ''};
@@ -250,6 +265,60 @@ void main() {
       expect(find.text('Welcome back'), findsOneWidget);
       expect(find.text('Have a store account ID?'), findsOneWidget);
       expect(find.text('Forgot password?'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('renders DEMO_MODE quick-fill chips and auto-submits on tap',
+        (tester) async {
+      final preferences = FakeAppPreferences();
+      final syncEngine = FakeSyncEngine();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<ApiClient>.value(value: mockApi),
+            Provider<AppPreferences>.value(value: preferences),
+            ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
+            ChangeNotifierProvider<HeldCartsStore>.value(
+                value: HeldCartsStore()),
+            ChangeNotifierProvider<ThemeProvider>.value(value: ThemeProvider()),
+            ChangeNotifierProvider<PlatformBrandingProvider>.value(
+                value: PlatformBrandingProvider()),
+            ChangeNotifierProvider<LocaleProvider>.value(
+              value:
+                  LocaleProvider(preferences: preferences, apiClient: mockApi),
+            ),
+            ChangeNotifierProvider<NavDockProvider>.value(
+                value: NavDockProvider(preferences: preferences)),
+            ChangeNotifierProvider<SyncEngine>.value(value: syncEngine),
+            ChangeNotifierProvider<DynamicStringService>.value(
+                value: DynamicStringService.instance),
+          ],
+          child: const MaterialApp(
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            home: LoginScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Try a demo store'), findsOneWidget);
+      final chip = find.widgetWithText(ActionChip, 'Retail');
+      expect(chip, findsOneWidget);
+      expect(find.widgetWithText(ActionChip, 'Pharmacy'), findsOneWidget);
+
+      await tester.tap(chip);
+      await tester.pump();
+
+      // The tap filled the credentials (and fired _submit()).
+      expect(find.widgetWithText(TextFormField, 'retail@demo.com'),
+          findsOneWidget);
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
   });

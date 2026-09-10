@@ -33,20 +33,44 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _facebookEnabled = true;
   bool _socialLoading = false;
 
+  /// 1-click demo accounts served (only) when the platform runs `DEMO_MODE`.
+  List<Map<String, String>> _demoAccounts = const [];
+
   @override
   void initState() {
     super.initState();
     context.read<ApiClient>().get(ApiEndpoints.authConfig).then((response) {
+      if (!mounted) return;
       final social = response['social_login'];
-      if (social is Map && mounted) {
-        setState(() {
+      final rawDemo = response['demo_accounts'];
+      setState(() {
+        if (social is Map) {
           _googleEnabled = social['google'] == true;
           _facebookEnabled = social['facebook'] == true;
-        });
-      }
+        }
+        if (response['demo_mode'] == true && rawDemo is List) {
+          _demoAccounts = rawDemo
+              .whereType<Map>()
+              .map((m) => {
+                    'label': (m['label'] ?? '').toString(),
+                    'email': (m['email'] ?? '').toString(),
+                    'password': (m['password'] ?? '').toString(),
+                  })
+              .where((m) => m['email']!.isNotEmpty && m['password']!.isNotEmpty)
+              .toList();
+        }
+      });
     }).catchError((_) {
-      // Best-effort pre-auth social config fetch — default to true.
+      // Best-effort pre-auth config fetch — default to true.
     });
+  }
+
+  Future<void> _fillAndSubmitDemo(Map<String, String> account) async {
+    _emailController.text = account['email'] ?? '';
+    _passwordController.text = account['password'] ?? '';
+    _accountIdController.clear();
+    setState(() => _showAccountId = false);
+    await _submit();
   }
 
   @override
@@ -156,6 +180,24 @@ class _LoginScreenState extends State<LoginScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (_demoAccounts.isNotEmpty) ...[
+              const AuthFieldLabel('Try a demo store'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final account in _demoAccounts)
+                    ActionChip(
+                      label: Text(account['label'] ?? ''),
+                      avatar: const Icon(Icons.play_circle_outline, size: 18),
+                      onPressed: auth.isBusy
+                          ? null
+                          : () => _fillAndSubmitDemo(account),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 18),
+            ],
             AuthFieldLabel(l10n.emailOrLogin),
             TextFormField(
               controller: _emailController,
