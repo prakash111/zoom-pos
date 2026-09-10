@@ -135,16 +135,26 @@ class PlatformBrandingProvider extends ChangeNotifier {
           ? Map<String, dynamic>.from(response['theme'] as Map)
           : const <String, dynamic>{};
 
-      String? pick(String nested, String flat) {
-        final v = (platform[nested] ?? response[flat])?.toString().trim();
+      String? pick(String nested, List<String> flats) {
+        dynamic raw = platform[nested];
+        for (final f in flats) {
+          if (raw != null && raw.toString().trim().isNotEmpty) break;
+          raw = response[f];
+        }
+        final v = raw?.toString().trim();
         return (v == null || v.isEmpty) ? null : v;
       }
 
-      final name = pick('name', 'platform_name');
-      final logo = pick('logo_url', 'brand_logo_url');
-      final favicon = pick('favicon_url', 'favicon_url');
-      final head = pick('headline', 'platform_headline');
-      final desc = pick('description', 'platform_description');
+      // The Superadmin "Platform Title / App Name" under any of its aliases.
+      final name = pick('name', const [
+        'platform_name',
+        'platform_title',
+        'app_name',
+      ]);
+      final logo = pick('logo_url', const ['brand_logo_url']);
+      final favicon = pick('favicon_url', const ['favicon_url']);
+      final head = pick('headline', const ['platform_headline']);
+      final desc = pick('description', const ['platform_description']);
       final tag = response['platform_tagline']?.toString().trim();
 
       final inline = response.containsKey('header_inline')
@@ -154,9 +164,18 @@ class PlatformBrandingProvider extends ChangeNotifier {
           ? _asBool(response['show_tagline'], showTagline)
           : showTagline;
 
-      final primary = _parseHex(theme['primary_color']) ?? primaryColor;
-      final secondary = _parseHex(theme['secondary_color']) ?? secondaryColor;
-      final accent = _parseHex(theme['accent_color']) ?? accentColor;
+      // Primary colour under any of its aliases (theme.primary /
+      // theme.primary_color / brand_color / primary_color).
+      final primary = _parseHex(theme['primary'] ??
+              theme['primary_color'] ??
+              response['brand_color'] ??
+              response['primary_color']) ??
+          primaryColor;
+      final secondary =
+          _parseHex(theme['secondary_color'] ?? theme['secondary']) ??
+              secondaryColor;
+      final accent =
+          _parseHex(theme['accent_color'] ?? theme['accent']) ?? accentColor;
       final splashBg = _parseHex(theme['splash_bg_color']) ?? splashBgColor;
       final authBg = _parseHex(theme['auth_bg_color']) ?? authBgColor;
 

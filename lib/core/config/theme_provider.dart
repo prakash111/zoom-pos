@@ -21,6 +21,42 @@ class ThemeProvider extends ChangeNotifier {
   Color seedColor = AppTheme.primary;
   Color? accentColor;
 
+  /// The Superadmin platform primary (from `GET /auth/branding` →
+  /// `theme.primary` / `brand_color`). Used as the seed when this tenant has
+  /// no brand colour of its own, so a Superadmin change reflects immediately.
+  Color? platformSeedColor;
+
+  /// True once a tenant-owned colour has been applied (persisted locally, from
+  /// the bootstrap payload, or set in Settings). While false, the platform
+  /// seed drives the theme.
+  bool _tenantColorExplicit = false;
+
+  /// Safe hex → [Color] parse (`#RRGGBB` / `RRGGBB` / `#AARRGGBB`).
+  static Color hexToColor(String? hexString,
+      {Color fallback = const Color(0xFFF95700)}) {
+    if (hexString == null || hexString.trim().isEmpty) return fallback;
+    final buffer = StringBuffer();
+    final raw = hexString.replaceFirst('#', '').trim();
+    if (raw.length == 6) buffer.write('ff');
+    buffer.write(raw);
+    try {
+      return Color(int.parse(buffer.toString(), radix: 16));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  /// Applies the Superadmin platform primary as the theme seed — but only
+  /// when this tenant hasn't chosen its own brand colour. Rebuilds the app
+  /// immediately via [notifyListeners].
+  void applyPlatformSeed(Color color) {
+    platformSeedColor = color;
+    if (_tenantColorExplicit) return;
+    if (seedColor.toARGB32() == color.toARGB32()) return;
+    seedColor = color;
+    notifyListeners();
+  }
+
   /// Per-device surface overrides configured in App Preferences ▸ "Drawer &
   /// surfaces". `null` = use the theme default. All apply instantly.
   Color? drawerBg;
@@ -39,6 +75,7 @@ class ThemeProvider extends ChangeNotifier {
       final parsed = hex != null ? parseHexColor(hex) : null;
       if (parsed != null) {
         seedColor = parsed;
+        _tenantColorExplicit = true;
       }
       final accentHex = prefs.getString(_accentKey);
       if (accentHex != null) {
@@ -86,9 +123,12 @@ class ThemeProvider extends ChangeNotifier {
   Future<void> syncFromBootstrap(BootstrapTheme theme) async {
     bool changed = false;
     final primary = theme.primaryColorValue;
-    if (primary != null && primary.toARGB32() != seedColor.toARGB32()) {
-      seedColor = primary;
-      changed = true;
+    if (primary != null) {
+      _tenantColorExplicit = true;
+      if (primary.toARGB32() != seedColor.toARGB32()) {
+        seedColor = primary;
+        changed = true;
+      }
     }
     final accent = theme.accentColorValue;
     if (accent != null && accent.toARGB32() != accentColor?.toARGB32()) {
@@ -119,6 +159,7 @@ class ThemeProvider extends ChangeNotifier {
 
   Future<void> setColor(Color color) async {
     seedColor = color;
+    _tenantColorExplicit = true;
     notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();

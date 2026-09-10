@@ -34,7 +34,8 @@ void main() {
     expect(PlatformBrandingProvider.defaultDescription, isEmpty);
   });
 
-  testWidgets('login-style marketing header renders no copy when unset',
+  testWidgets(
+      'marketing header shows the platform title, not the eradicated copy',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(700, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -42,7 +43,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: ChangeNotifierProvider<PlatformBrandingProvider>.value(
-          value: PlatformBrandingProvider()..brandLogoUrl = null,
+          value: PlatformBrandingProvider()
+            ..brandLogoUrl = null
+            ..platformName = 'Sales & Inventry',
           child: const AuthScaffold(
             marketingHeader: true,
             heading: 'Welcome back',
@@ -53,10 +56,43 @@ void main() {
     );
     await tester.pump();
 
+    // The Superadmin platform title is rendered in the header.
+    expect(find.text('Sales & Inventry'), findsOneWidget);
+    // No hardcoded marketing copy.
     expect(find.text('Run your business smarter.'), findsNothing);
     expect(find.textContaining('Sales, inventory & orders'), findsNothing);
     expect(find.text('Welcome back'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  test('provider resolves the primary colour from any alias key', () async {
+    final a = PlatformBrandingProvider();
+    await a.refresh(_FakeBrandingApi({
+      'theme': {'primary': '#00A3FF'},
+    }));
+    expect(a.primaryColor, const Color(0xFF00A3FF));
+
+    final b = PlatformBrandingProvider();
+    await b.refresh(_FakeBrandingApi({'brand_color': '#EF4444'}));
+    expect(b.primaryColor, const Color(0xFFEF4444));
+
+    final c = PlatformBrandingProvider();
+    await c.refresh(_FakeBrandingApi({'primary_color': '#16A34A'}));
+    expect(c.primaryColor, const Color(0xFF16A34A));
+  });
+
+  test('provider folds platform_title / app_name into platformName', () async {
+    final b = PlatformBrandingProvider();
+    await b.refresh(_FakeBrandingApi({
+      'success': true,
+      'platform_title': 'Sales & Inventry',
+      'app_name': 'ignored-when-title-present',
+    }));
+    expect(b.platformName, 'Sales & Inventry');
+
+    final c = PlatformBrandingProvider();
+    await c.refresh(_FakeBrandingApi({'app_name': 'From App Name'}));
+    expect(c.platformName, 'From App Name');
   });
 
   test('branding refresh reads header_inline / show_tagline flags', () async {

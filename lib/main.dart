@@ -61,10 +61,16 @@ Future<void> main() async {
       LocaleProvider(preferences: preferences, apiClient: apiClient)..load();
   final navDockProvider = NavDockProvider(preferences: preferences)..load();
 
-  // SaaS-owner branding (name + logo) from the superadmin panel — load the
-  // cached copy now, refresh from the server in the background.
+  // SaaS-owner branding (name + logo + platform theme) from the superadmin
+  // panel — load the cached copy now, refresh from the server in the
+  // background. The platform primary seeds the app theme whenever this tenant
+  // has no brand colour of its own, so a Superadmin colour change reflects on
+  // the next fetch without a rebuild/restart.
   final platformBranding = PlatformBrandingProvider();
   await platformBranding.load();
+  themeProvider.applyPlatformSeed(platformBranding.primaryColor);
+  platformBranding.addListener(
+      () => themeProvider.applyPlatformSeed(platformBranding.primaryColor));
   platformBranding.refresh(apiClient);
 
   final syncEngine = SyncEngine(
