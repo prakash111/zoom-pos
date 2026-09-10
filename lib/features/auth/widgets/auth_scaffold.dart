@@ -46,41 +46,72 @@ class AuthScaffold extends StatelessWidget {
   static const _muted = Color(0xFF64748B);
 
   Widget _brand(BuildContext context) {
-    // Name + logo come from the SaaS owner's superadmin branding settings
-    // (GET /auth/branding), cached locally so this paints instantly.
+    // Name, logo and header layout come from the SaaS owner's superadmin
+    // branding settings (GET /auth/branding), cached locally so this paints
+    // instantly. `header_inline` puts the logo beside the title; `show_tagline`
+    // gates the description line.
     final branding = context.watch<PlatformBrandingProvider>();
+
+    final title = Text(
+      branding.platformName,
+      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: _ink,
+            letterSpacing: -0.5,
+          ),
+    );
+
+    final logo = branding.hasLogo
+        ? CachedNetworkImage(
+            imageUrl: branding.brandLogoUrl!,
+            height: 44,
+            fit: BoxFit.contain,
+            alignment: Alignment.centerLeft,
+            errorWidget: (_, __, ___) => const SizedBox.shrink(),
+          )
+        : null;
+
+    final Widget header = branding.headerInline
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (logo != null) ...[logo, const SizedBox(width: 12)],
+              Flexible(child: title),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (logo != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: logo,
+                ),
+              title,
+            ],
+          );
+
+    final showTagline =
+        branding.showTagline && branding.tagline.trim().isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (branding.hasLogo)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: CachedNetworkImage(
-              imageUrl: branding.brandLogoUrl!,
-              height: 44,
-              fit: BoxFit.contain,
-              alignment: Alignment.centerLeft,
-              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+        header,
+        if (showTagline) ...[
+          const SizedBox(height: 4),
+          Text(
+            branding.tagline,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: _muted,
             ),
           ),
-        Text(
-          branding.platformName,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: _ink,
-                letterSpacing: -0.5,
-              ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          branding.tagline,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: _muted,
-          ),
-        ),
+        ],
       ],
     );
   }
