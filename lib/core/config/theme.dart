@@ -27,7 +27,7 @@ class AppTheme {
   static const Color darkBg = Color(0xFF0F172A); // slate-900
   static const Color darkCard = Color(0xFF1E293B); // slate-800
   static const Color darkBorder = Color(0xFF334155); // slate-700
-  static const Color darkHeading = Color(0xFFF1F5F9); // slate-100
+  static const Color darkHeading = Color(0xFFF8FAFC); // slate-50
   static const Color darkBody = Color(0xFFCBD5E1); // slate-300
   static const Color darkMuted = Color(0xFF94A3B8); // slate-400
 
