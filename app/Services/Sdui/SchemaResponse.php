@@ -4786,6 +4786,9 @@ class SchemaResponse
                 self::textInput('inbound_webhook_url', 'Your Unique Webhook Endpoint URL', $inboundWebhookUrl, [
                     'placeholder' => $inboundWebhookUrl,
                     'read_only' => true,
+                    'copyable' => true,
+                    'copy_tooltip' => 'Copy webhook endpoint',
+                    'copy_toast' => 'Webhook URL copied to clipboard!',
                 ]),
                 self::dropdownSelect('webhook_platform', 'E-Commerce Platform', [
                     ['label' => 'Shopify (HMAC-SHA256)', 'value' => 'shopify'],
