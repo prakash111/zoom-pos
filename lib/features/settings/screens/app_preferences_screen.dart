@@ -1,16 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/config/dashboard_layout.dart';
 import '../../../core/config/nav_dock_provider.dart';
 import '../../../core/config/page_transitions.dart';
+import '../../../core/config/theme.dart';
 import '../../../core/config/theme_provider.dart';
+import '../../../core/utils/color_utils.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../auth/auth_provider.dart';
+import '../settings_repository.dart';
 
-/// Per-device workspace preferences that never touch the server: light/dark
-/// theme, the page-move animation, and where the navigation dock sits. Shown
-/// both as its own screen (opened from the dashboard app bar) and inside the
-/// Settings ▸ Appearance tab.
+/// Workspace preferences: the brand colour (applied instantly, also pushed to
+/// the tenant profile) plus the per-device dashboard layout, light/dark theme,
+/// page-move animation and navigation-dock placement. Shown both as its own
+/// screen (opened from the dashboard app bar) and inside the Settings ▸
+/// Appearance tab.
 class AppPreferencesScreen extends StatelessWidget {
   const AppPreferencesScreen({super.key});
 
@@ -69,6 +77,12 @@ class AppPreferencesBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        group(
+          'Brand colour',
+          'Applied to buttons, active menu items, badges and focus rings — '
+              'takes effect immediately.',
+          const _BrandColorGroup(),
+        ),
         group(
           'Dashboard layout',
           'Pick which design the home dashboard uses. Both show the same data.',
@@ -164,6 +178,150 @@ class AppPreferencesBody extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Preset brand-colour swatches + a hex field. Picking one recolours the whole
+/// app instantly (ThemeProvider → SharedPreferences), and is pushed to the
+/// tenant profile in the background so a later bootstrap sync doesn't revert
+/// it.
+class _BrandColorGroup extends StatefulWidget {
+  const _BrandColorGroup();
+
+  @override
+  State<_BrandColorGroup> createState() => _BrandColorGroupState();
+}
+
+class _BrandColorGroupState extends State<_BrandColorGroup> {
+  static const _swatches = <Color>[
+    Color(0xFF2563EB),
+    Color(0xFF7C3AED),
+    Color(0xFF0D9488),
+    Color(0xFF16A34A),
+    Color(0xFF65A30D),
+    Color(0xFFCA8A04),
+    Color(0xFFEA580C),
+    Color(0xFFDC2626),
+    Color(0xFFDB2777),
+    Color(0xFF0F172A),
+  ];
+
+  late final TextEditingController _hex;
+  Timer? _persistDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _hex = TextEditingController(
+        text: toHexColor(context.read<ThemeProvider>().seedColor));
+  }
+
+  @override
+  void dispose() {
+    _persistDebounce?.cancel();
+    _hex.dispose();
+    super.dispose();
+  }
+
+  void _apply(Color color) {
+    // 1. Instant local persistence + live re-theme.
+    context.read<ThemeProvider>().setColor(color);
+    _hex.text = toHexColor(color);
+    setState(() {});
+    // 2. Background server persist (debounced) so it survives bootstrap sync.
+    _persistDebounce?.cancel();
+    final company = context.read<AuthProvider>().company;
+    final repo = SettingsRepository(context.read<ApiClient>());
+    _persistDebounce = Timer(const Duration(milliseconds: 700), () async {
+      if (company == null) return;
+      try {
+        await repo.updateProfile(
+          name: company.name,
+          primaryColor: toHexColor(color),
+        );
+      } catch (_) {
+        // Best effort — the local SharedPreferences value already applied.
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = context.watch<ThemeProvider>().seedColor;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (final c in _swatches)
+                  InkWell(
+                    onTap: () => _apply(c),
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: c.toARGB32() == selected.toARGB32()
+                              ? Theme.of(context).colorScheme.onSurface
+                              : Theme.of(context).colorScheme.outlineVariant,
+                          width: c.toARGB32() == selected.toARGB32() ? 2.5 : 1,
+                        ),
+                      ),
+                      child: c.toARGB32() == selected.toARGB32()
+                          ? const Icon(Icons.check,
+                              size: 18, color: Colors.white)
+                          : null,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: selected,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _hex,
+                    decoration: const InputDecoration(
+                      labelText: 'Custom hex',
+                      isDense: true,
+                    ),
+                    onChanged: (v) {
+                      final parsed = parseHexColor(v);
+                      if (parsed != null) _apply(parsed);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () => _apply(AppTheme.primary),
+                  child: const Text('Reset'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
