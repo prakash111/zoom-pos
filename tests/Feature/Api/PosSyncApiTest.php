@@ -1122,6 +1122,23 @@ class PosSyncApiTest extends TestCase
         $this->assertCount(9, $analyticsRes->json('monthly_activity'));
         $this->assertSame(now()->format('M'), $analyticsRes->json('monthly_activity.8.month'));
 
+        // The dashboard "Filter" date range is honoured.
+        $analyticsRes->assertJsonPath('range.key', 'month')
+            ->assertJsonStructure(['range' => ['key', 'label', 'from', 'to'], 'kpis' => ['range_revenue', 'range_orders', 'prev_range_revenue', 'prev_range_orders']]);
+
+        $today = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
+            ->getJson('/api/v1/pos/analytics?range=today')
+            ->assertOk();
+        $today->assertJsonPath('range.key', 'today')
+            ->assertJsonPath('range.label', 'Today');
+        $this->assertSame(now()->startOfDay()->toDateString(),
+            \Illuminate\Support\Carbon::parse($today->json('range.from'))->toDateString());
+
+        $custom = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
+            ->getJson('/api/v1/pos/analytics?range=custom&from=2026-01-01&to=2026-01-31')
+            ->assertOk();
+        $custom->assertJsonPath('range.key', 'custom');
+
         // Subscription
         $subRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->getJson('/api/v1/pos/subscription');

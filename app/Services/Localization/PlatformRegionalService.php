@@ -167,6 +167,21 @@ class PlatformRegionalService
     }
 
     /**
+     * The full ISO 3166-1 country list (code => name) for every "choose a
+     * country" dropdown. Regional tax / currency presets still key off the
+     * same ISO2 code, so any country here links straight into them.
+     *
+     * @return array<string, string>
+     */
+    public static function countryOptions(): array
+    {
+        $list = (array) config('countries', []);
+        asort($list, SORT_FLAG_CASE | SORT_STRING);
+
+        return $list;
+    }
+
+    /**
      * Returns searchable list of standard tz database identifiers.
      * Priority timezones appear at the top, followed by all remaining standard IANA timezones.
      *

@@ -3033,6 +3033,22 @@ class PosSyncApiController extends Controller
             ->where('company_id', $company->id)
             ->where('status', '!=', 'cancelled');
 
+        // Interactive dashboard date-range filter (the "Filter" control). The
+        // range scopes the headline metric cards + the revenue trend; the
+        // rolling monthly activity / top products stay whole-history for
+        // context.
+        [$rangeStart, $rangeEnd, $rangeKey, $rangeLabel] = $this->resolveAnalyticsRange($request);
+        $rangeSpanDays = max(1, $rangeStart->diffInDays($rangeEnd) + 1);
+        $prevRangeStart = (clone $rangeStart)->subDays($rangeSpanDays);
+        $prevRangeEnd = (clone $rangeStart)->subSecond();
+
+        $rangeSales = (clone $salesBase)->whereBetween('created_at', [$rangeStart, $rangeEnd]);
+        $rangeRevenue = (float) (clone $rangeSales)->sum('total');
+        $rangeOrders = (clone $rangeSales)->count();
+        $prevRangeSales = (clone $salesBase)->whereBetween('created_at', [$prevRangeStart, $prevRangeEnd]);
+        $prevRangeRevenue = (float) (clone $prevRangeSales)->sum('total');
+        $prevRangeOrders = (clone $prevRangeSales)->count();
+
         $todaySales = (clone $salesBase)->whereDate('created_at', now()->toDateString());
         $todayRevenue = (float) (clone $todaySales)->sum('total');
         $todayOrders = (clone $todaySales)->count();
@@ -3056,21 +3072,29 @@ class PosSyncApiController extends Controller
                 'total' => (float) $row->total,
             ]);
 
-        // 7-day revenue trend
+        // Revenue trend across the selected range — daily buckets, capped at
+        // 31 points (longer ranges roll up to weekly).
+        $trendBucketDays = $rangeSpanDays > 31 ? (int) ceil($rangeSpanDays / 31) : 1;
+        $trendRows = (clone $rangeSales)
+            ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'))
+            ->groupBy('d')
+            ->pluck('t', 'd');
         $sevenDaysTrend = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $d = now()->subDays($i)->format('Y-m-d');
-            $dayRev = (float) Sale::withoutGlobalScope('company')
-                ->where('company_id', $company->id)
-                ->where('status', '!=', 'cancelled')
-                ->whereDate('created_at', $d)
-                ->sum('total');
-
+        $cursor = (clone $rangeStart);
+        while ($cursor->lte($rangeEnd)) {
+            $bucketEnd = (clone $cursor)->addDays($trendBucketDays - 1);
+            $sum = 0.0;
+            $probe = (clone $cursor);
+            while ($probe->lte($bucketEnd) && $probe->lte($rangeEnd)) {
+                $sum += (float) ($trendRows[$probe->format('Y-m-d')] ?? 0);
+                $probe->addDay();
+            }
             $sevenDaysTrend[] = [
-                'date' => $d,
-                'day' => now()->subDays($i)->format('D'),
-                'revenue' => $dayRev,
+                'date' => $cursor->format('Y-m-d'),
+                'day' => $cursor->format($trendBucketDays > 1 ? 'M d' : 'D'),
+                'revenue' => $sum,
             ];
+            $cursor->addDays($trendBucketDays);
         }
 
         // Top 5 Products by Sales
@@ -3177,9 +3201,19 @@ class PosSyncApiController extends Controller
             'success' => true,
             'currency_symbol' => $company->currency_symbol ?? '$',
             'server_time' => now()->toIso8601String(),
+            'range' => [
+                'key' => $rangeKey,
+                'label' => $rangeLabel,
+                'from' => $rangeStart->toIso8601String(),
+                'to' => $rangeEnd->toIso8601String(),
+            ],
             'kpis' => [
                 'today_revenue' => $todayRevenue,
                 'today_orders' => $todayOrders,
+                'range_revenue' => $rangeRevenue,
+                'range_orders' => $rangeOrders,
+                'prev_range_revenue' => $prevRangeRevenue,
+                'prev_range_orders' => $prevRangeOrders,
                 'month_revenue' => $monthRevenue,
                 'month_orders' => $monthOrders,
                 'prev_month_revenue' => $prevMonthRevenue,
@@ -3200,6 +3234,56 @@ class PosSyncApiController extends Controller
             'recent_customers' => $recentCustomers,
             'top_products' => $topProducts,
         ]);
+    }
+
+    /**
+     * Resolve the dashboard "Filter" date range from the request.
+     * Accepts ?range=today|yesterday|last7|last30|month|last_month|year|custom
+     * (+ ?from=Y-m-d&to=Y-m-d for custom). Defaults to the current month.
+     *
+     * @return array{0: \Illuminate\Support\Carbon, 1: \Illuminate\Support\Carbon, 2: string, 3: string}
+     */
+    private function resolveAnalyticsRange(Request $request): array
+    {
+        $key = strtolower(trim((string) $request->query('range', 'month')));
+
+        return match ($key) {
+            'today' => [now()->startOfDay(), now()->endOfDay(), 'today', 'Today'],
+            'yesterday' => [
+                now()->subDay()->startOfDay(),
+                now()->subDay()->endOfDay(),
+                'yesterday',
+                'Yesterday',
+            ],
+            'last7', 'last_7_days', '7d' => [
+                now()->subDays(6)->startOfDay(), now()->endOfDay(), 'last7', 'Last 7 Days',
+            ],
+            'last30', 'last_30_days', '30d' => [
+                now()->subDays(29)->startOfDay(), now()->endOfDay(), 'last30', 'Last 30 Days',
+            ],
+            'last_month', 'prev_month' => [
+                now()->subMonthNoOverflow()->startOfMonth(),
+                now()->subMonthNoOverflow()->endOfMonth(),
+                'last_month',
+                'Last Month',
+            ],
+            'year', 'this_year' => [
+                now()->startOfYear(), now()->endOfYear(), 'year', 'This Year',
+            ],
+            'all', 'all_time' => [
+                now()->subYears(5)->startOfDay(), now()->endOfDay(), 'all', 'All Time',
+            ],
+            'custom' => (function () use ($request) {
+                $from = rescue(fn () => \Illuminate\Support\Carbon::parse((string) $request->query('from'))->startOfDay(), null);
+                $to = rescue(fn () => \Illuminate\Support\Carbon::parse((string) $request->query('to'))->endOfDay(), null);
+                if (! $from || ! $to || $from->gt($to)) {
+                    return [now()->startOfMonth(), now()->endOfMonth(), 'month', 'This Month'];
+                }
+
+                return [$from, $to, 'custom', $from->format('d M').' – '.$to->format('d M')];
+            })(),
+            default => [now()->startOfMonth(), now()->endOfMonth(), 'month', 'This Month'],
+        };
     }
 
     /**

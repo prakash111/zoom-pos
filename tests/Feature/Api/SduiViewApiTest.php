@@ -200,6 +200,35 @@ class SduiViewApiTest extends TestCase
         );
     }
 
+    public function test_store_profile_country_dropdown_is_the_full_iso_list(): void
+    {
+        $raw = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->getJson('/api/tenant/views/settings-profile')
+            ->assertOk()
+            ->json('schema');
+
+        $country = null;
+        $walk = function ($node) use (&$walk, &$country) {
+            if (! is_array($node)) {
+                return;
+            }
+            if (($node['name'] ?? null) === 'country' && ($node['type'] ?? null) === 'dropdown_select') {
+                $country = $node;
+            }
+            foreach ($node as $child) {
+                $walk($child);
+            }
+        };
+        $walk($raw);
+
+        $this->assertNotNull($country, 'country dropdown missing from Store Profile');
+        $values = array_column($country['options'], 'value');
+        $this->assertGreaterThan(180, count($values), 'country list is not the full ISO set');
+        foreach (['BR', 'DE', 'NG', 'JP', 'AR', 'ZA'] as $code) {
+            $this->assertContains($code, $values, "missing country: {$code}");
+        }
+    }
+
     public function test_every_settings_panel_returns_a_valid_versioned_sdui_tree(): void
     {
         $token = $this->token();
