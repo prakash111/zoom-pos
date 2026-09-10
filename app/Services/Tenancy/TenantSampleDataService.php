@@ -15,7 +15,6 @@ use App\Models\Product;
 use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
 use App\Models\RepairTicketItem;
-use App\Models\RepairTicketPart;
 use App\Models\Sale;
 use App\Models\SalonAppointment;
 use App\Models\ServiceOrder;
@@ -48,8 +47,171 @@ class TenantSampleDataService
                 default => $this->seedRetail($company, $admin),
             };
 
+            // Cross-cutting business history every mode shares: more customers,
+            // a spread of dated sales (drives the dashboard charts, reports,
+            // top products & cash flow), a few on-credit invoices (receivables
+            // + customer ledger, via SaleObserver) and open quotations.
+            $this->seedShared($company, $admin, $normalizedMode);
+
             $company->update(['is_seeding_complete' => true]);
         });
+    }
+
+    /**
+     * Mode-agnostic demo history: extra customers, ~24 dated sales across the
+     * last three weeks (some part-paid / on credit), and a handful of
+     * quotations. Idempotent — keyed on stable demo document numbers.
+     */
+    public function seedShared(Company $company, ?User $admin, string $mode): void
+    {
+        $companyId = $company->id;
+        $modeTag = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '', $mode) ?: 'GEN');
+
+        foreach ([
+            ['name' => 'Priya Nair', 'email' => 'priya.nair@example.com', 'phone' => '+14155550101'],
+            ['name' => 'Daniel Kim', 'email' => 'daniel.kim@example.com', 'phone' => '+14155550102'],
+            ['name' => 'Sofia Rossi', 'email' => 'sofia.rossi@example.com', 'phone' => '+14155550103'],
+            ['name' => 'Marcus Bennett', 'email' => 'marcus.bennett@example.com', 'phone' => '+14155550104'],
+            ['name' => 'Ava Thompson', 'email' => 'ava.thompson@example.com', 'phone' => '+14155550105'],
+        ] as $c) {
+            Customer::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'name' => $c['name'],
+            ], [
+                'email' => $c['email'],
+                'phone' => $c['phone'],
+                'person_type' => 'individual',
+                'is_demo' => true,
+                'due_balance' => 0.00,
+            ]);
+        }
+
+        $customers = Customer::withoutGlobalScopes()
+            ->where('company_id', $companyId)->where('is_demo', true)
+            ->orderBy('id')->get()->values();
+        if ($customers->isEmpty()) {
+            return;
+        }
+
+        $products = Product::withoutGlobalScopes()
+            ->where('company_id', $companyId)->where('is_demo', true)->where('active', true)
+            ->orderBy('id')->get()->values();
+
+        $methods = ['cash', 'card', 'upi', 'card', 'cash'];
+
+        // [days ago, hour, line items, fraction still owed]
+        $plan = [
+            [0, 9, 2, 0.0], [0, 11, 1, 0.0], [0, 13, 3, 0.0], [0, 16, 2, 0.0], [0, 19, 1, 0.0],
+            [1, 10, 2, 0.0], [1, 15, 2, 1.0], [1, 18, 1, 0.0],
+            [2, 12, 3, 0.0], [2, 17, 1, 0.0],
+            [3, 10, 2, 0.0], [3, 14, 2, 0.4],
+            [4, 11, 1, 0.0], [4, 16, 3, 0.0],
+            [6, 13, 2, 0.0], [7, 10, 1, 0.0], [8, 15, 2, 1.0],
+            [10, 12, 3, 0.0], [12, 11, 2, 0.0], [14, 16, 1, 0.0],
+            [16, 13, 2, 0.5], [18, 10, 2, 0.0], [20, 14, 3, 0.0], [20, 18, 1, 0.0],
+        ];
+
+        foreach ($plan as $i => [$daysAgo, $hour, $lineCount, $dueFraction]) {
+            $number = sprintf('DEMO-%s-INV-%03d', $modeTag, $i + 1);
+            if (Sale::withoutGlobalScopes()->where('company_id', $companyId)->where('sale_number', $number)->exists()) {
+                continue;
+            }
+
+            $customer = $customers[$i % $customers->count()];
+            $items = [];
+            $subtotal = 0.0;
+            if ($products->isNotEmpty()) {
+                for ($k = 0; $k < $lineCount; $k++) {
+                    $p = $products[($i + $k) % $products->count()];
+                    $qty = 1 + (($i + $k) % 3);
+                    $price = round((float) ($p->sale_price ?: 1), 2);
+                    $line = round($qty * $price, 2);
+                    $subtotal += $line;
+                    $items[] = [
+                        'product_id' => $p->id,
+                        'name' => $p->name,
+                        'quantity' => $qty,
+                        'price' => $price,
+                        'total' => $line,
+                    ];
+                }
+            } else {
+                $subtotal = round(18 + $i * 6.5, 2);
+            }
+
+            $total = round($subtotal, 2);
+            $due = round($total * $dueFraction, 2);
+            $paid = round($total - $due, 2);
+            $when = now()->subDays($daysAgo)->setTime($hour, ($i * 7) % 60, 0);
+
+            $sale = Sale::withoutGlobalScopes()->create([
+                'company_id' => $companyId,
+                'sale_number' => $number,
+                'operation_type' => 'sale',
+                'customer_id' => $customer->id,
+                'customer_name' => $customer->name,
+                'user_id' => $admin?->id,
+                'total' => $total,
+                'net_amount' => $total,
+                'paid_amount' => $paid,
+                'due_amount' => $due,
+                'due_date' => $due > 0 ? now()->subDays($daysAgo)->addDays(14)->toDateString() : null,
+                'payment_method' => $due > 0 ? 'on_credit' : $methods[$i % count($methods)],
+                'payment_status' => $due > 0 ? ($paid > 0 ? 'partial' : 'due') : 'paid',
+                'status' => 'completed',
+                'is_demo' => true,
+                'items' => $items,
+            ]);
+
+            Sale::withoutGlobalScopes()->whereKey($sale->id)
+                ->update(['created_at' => $when, 'updated_at' => $when]);
+        }
+
+        // Open quotations for the Quotations module.
+        foreach (['draft', 'sent', 'sent'] as $q => $status) {
+            $number = sprintf('DEMO-%s-QUO-%02d', $modeTag, $q + 1);
+            if (Sale::withoutGlobalScopes()->where('company_id', $companyId)->where('sale_number', $number)->exists()) {
+                continue;
+            }
+
+            $customer = $customers[($q + 1) % $customers->count()];
+            $items = [];
+            $subtotal = 0.0;
+            if ($products->isNotEmpty()) {
+                for ($k = 0; $k < 2; $k++) {
+                    $p = $products[($q + $k) % $products->count()];
+                    $price = round((float) ($p->sale_price ?: 1), 2);
+                    $subtotal += $price * 2;
+                    $items[] = [
+                        'product_id' => $p->id,
+                        'name' => $p->name,
+                        'quantity' => 2,
+                        'price' => $price,
+                        'total' => round($price * 2, 2),
+                    ];
+                }
+            } else {
+                $subtotal = 110.0 + $q * 25;
+            }
+
+            Sale::withoutGlobalScopes()->create([
+                'company_id' => $companyId,
+                'sale_number' => $number,
+                'operation_type' => 'quotation',
+                'customer_id' => $customer->id,
+                'customer_name' => $customer->name,
+                'user_id' => $admin?->id,
+                'total' => round($subtotal, 2),
+                'net_amount' => round($subtotal, 2),
+                'paid_amount' => 0,
+                'due_amount' => 0,
+                'payment_method' => 'cash',
+                'payment_status' => 'pending',
+                'status' => $status,
+                'is_demo' => true,
+                'items' => $items,
+            ]);
+        }
     }
 
     /**
@@ -515,6 +677,77 @@ class TenantSampleDataService
                 'is_demo' => true,
                 'items' => $activeSale->items,
                 'kitchen_notes' => 'Extra crispy crust on the Margherita pizza.',
+            ]);
+        }
+
+        // More kitchen tickets across the KDS lifecycle so the Kitchen Display
+        // and the dine-in / takeaway / delivery queues have real depth.
+        $menuItems = Product::withoutGlobalScopes()
+            ->where('company_id', $companyId)->where('is_demo', true)->where('active', true)
+            ->orderBy('id')->get()->values();
+
+        $kotPlan = [
+            ['num' => 'KOT-DEMO-002', 'table' => 'T-04', 'type' => 'dine_in', 'status' => KitchenTicket::STATUS_PREPARING, 'offset' => -12],
+            ['num' => 'KOT-DEMO-003', 'table' => null, 'type' => 'takeaway', 'status' => KitchenTicket::STATUS_READY, 'offset' => -22],
+            ['num' => 'KOT-DEMO-004', 'table' => null, 'type' => 'delivery', 'status' => KitchenTicket::STATUS_PENDING, 'offset' => -3],
+            ['num' => 'KOT-DEMO-005', 'table' => 'T-05', 'type' => 'dine_in', 'status' => KitchenTicket::STATUS_SERVED, 'offset' => -55],
+        ];
+
+        foreach ($kotPlan as $ix => $k) {
+            if (KitchenTicket::withoutGlobalScopes()->where('company_id', $companyId)->where('kot_number', $k['num'])->exists()) {
+                continue;
+            }
+
+            $lineItems = [];
+            $lineTotal = 0.0;
+            for ($j = 0; $j < 2 && $menuItems->isNotEmpty(); $j++) {
+                $mp = $menuItems[($ix + $j) % $menuItems->count()];
+                $price = round((float) ($mp->sale_price ?: 5), 2);
+                $lineTotal += $price;
+                $lineItems[] = [
+                    'product_id' => $mp->id,
+                    'name' => $mp->name,
+                    'quantity' => 1,
+                    'price' => $price,
+                    'total' => $price,
+                    'prep_minutes' => 12,
+                ];
+            }
+
+            $isDone = $k['status'] === KitchenTicket::STATUS_SERVED;
+            $kotSale = Sale::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'sale_number' => 'DEMO-RESTAURANT-KOT-'.($ix + 2),
+            ], [
+                'operation_type' => 'sale',
+                'user_id' => $admin?->id,
+                'total' => round($lineTotal, 2),
+                'net_amount' => round($lineTotal, 2),
+                'paid_amount' => $isDone ? round($lineTotal, 2) : 0.0,
+                'due_amount' => $isDone ? 0.0 : round($lineTotal, 2),
+                'payment_status' => $isDone ? 'paid' : 'pending',
+                'status' => $isDone ? 'completed' : 'in_progress',
+                'service_type' => $k['type'],
+                'is_demo' => true,
+                'items' => $lineItems,
+            ]);
+
+            KitchenTicket::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'kot_number' => $k['num'],
+            ], [
+                'sale_id' => $kotSale->id,
+                'dining_table_id' => $k['table'] ? ($tables[$k['table']]->id ?? null) : null,
+                'table_name' => $k['table'],
+                'service_type' => $k['type'],
+                'status' => $k['status'],
+                'server_name' => $admin?->name ?? 'Head Waiter',
+                'sent_to_kitchen_at' => now()->addMinutes($k['offset']),
+                'prep_minutes' => 15,
+                'target_completion_at' => now()->addMinutes($k['offset'] + 15),
+                'alarm_at' => now()->addMinutes($k['offset'] + 15),
+                'is_demo' => true,
+                'items' => $lineItems,
             ]);
         }
 
@@ -1368,6 +1601,106 @@ class TenantSampleDataService
                 ],
             ],
         ]);
+
+        // A spread of appointments across the week & lifecycle so the calendar,
+        // the stylist schedule and the service-order board all have depth.
+        $serviceList = array_values($serviceProducts);
+        $bookingCustomers = Customer::withoutGlobalScopes()
+            ->where('company_id', $companyId)->where('is_demo', true)
+            ->orderBy('id')->get()->values();
+
+        $apptPlan = [
+            ['num' => 'APT-DEMO-002', 'dayOffset' => 0, 'hour' => 10, 'status' => 'checked_in', 'spec' => 0],
+            ['num' => 'APT-DEMO-003', 'dayOffset' => 0, 'hour' => 16, 'status' => 'scheduled', 'spec' => 1],
+            ['num' => 'APT-DEMO-004', 'dayOffset' => 1, 'hour' => 11, 'status' => 'scheduled', 'spec' => 0],
+            ['num' => 'APT-DEMO-005', 'dayOffset' => 2, 'hour' => 14, 'status' => 'scheduled', 'spec' => 1],
+            ['num' => 'APT-DEMO-006', 'dayOffset' => -1, 'hour' => 15, 'status' => 'completed', 'spec' => 0],
+            ['num' => 'APT-DEMO-007', 'dayOffset' => -2, 'hour' => 12, 'status' => 'completed', 'spec' => 1],
+        ];
+
+        foreach ($apptPlan as $ix => $a) {
+            if (SalonAppointment::withoutGlobalScopes()->where('company_id', $companyId)->where('appointment_number', $a['num'])->exists()) {
+                continue;
+            }
+
+            $svc = $serviceList[$ix % max(1, count($serviceList))] ?? null;
+            $spec = $specialistUsers[$a['spec']] ?? $primarySpecialist;
+            $cust = $bookingCustomers->isNotEmpty() ? $bookingCustomers[$ix % $bookingCustomers->count()] : $client;
+            if (! $svc || ! $spec) {
+                continue;
+            }
+
+            $startsAt = Carbon::today()->addDays($a['dayOffset'])->setTime($a['hour'], 0, 0);
+            $price = round((float) ($svc->sale_price ?: 25), 2);
+            $done = $a['status'] === 'completed';
+
+            SalonAppointment::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'appointment_number' => $a['num'],
+            ], [
+                'tenant_id' => $companyId,
+                'customer_id' => $cust->id,
+                'customer_name' => $cust->name,
+                'customer_phone' => $cust->phone,
+                'product_id' => $svc->id,
+                'specialist_id' => $spec->id,
+                'starts_at' => $startsAt,
+                'ends_at' => $startsAt->copy()->addMinutes(45),
+                'status' => $a['status'],
+                'notes' => 'Demo salon appointment ('.$a['status'].').',
+                'is_demo' => true,
+            ]);
+
+            ServiceOrder::withoutGlobalScopes()->firstOrCreate([
+                'company_id' => $companyId,
+                'order_number' => 'SRV-DEMO-'.str_pad((string) ($ix + 2), 3, '0', STR_PAD_LEFT),
+            ], [
+                'customer_id' => $cust->id,
+                'customer_name' => $cust->name,
+                'customer_phone' => $cust->phone,
+                'customer_email' => $cust->email,
+                'equipment_name' => $svc->name,
+                'reported_defect' => 'Booked service: '.$svc->name,
+                'status' => $done ? ServiceOrder::STATUS_DELIVERED_SETTLED : ServiceOrder::STATUS_RECEIVED,
+                'priority' => 'normal',
+                'technician_id' => $spec->id,
+                'received_at' => $startsAt,
+                'labor_cost' => $price,
+                'total_amount' => $price,
+                'notes' => 'Salon service order for '.$cust->name.'.',
+                'is_demo' => true,
+            ]);
+
+            if ($done) {
+                $bookingSale = Sale::withoutGlobalScopes()->firstOrCreate([
+                    'company_id' => $companyId,
+                    'sale_number' => 'DEMO-SERVICEBOOKING-BOOK-'.($ix + 2),
+                ], [
+                    'operation_type' => 'sale',
+                    'customer_id' => $cust->id,
+                    'customer_name' => $cust->name,
+                    'user_id' => $spec->id,
+                    'total' => $price,
+                    'net_amount' => $price,
+                    'paid_amount' => $price,
+                    'due_amount' => 0.0,
+                    'payment_method' => 'card',
+                    'payment_status' => 'paid',
+                    'status' => 'completed',
+                    'service_type' => 'appointment',
+                    'is_demo' => true,
+                    'items' => [[
+                        'name' => $svc->name,
+                        'quantity' => 1,
+                        'price' => $price,
+                        'total' => $price,
+                        'duration_minutes' => 45,
+                    ]],
+                ]);
+                Sale::withoutGlobalScopes()->whereKey($bookingSale->id)
+                    ->update(['created_at' => $startsAt, 'updated_at' => $startsAt]);
+            }
+        }
 
         $this->seedTaxRuleForCountry($company);
     }
