@@ -197,15 +197,28 @@ class TransactionEntry {
     required this.date,
     required this.status,
     required this.amount,
+    this.statusColor = '',
   });
 
   factory TransactionEntry.fromJson(Map<String, dynamic> json) {
+    // Prefer the explicit semantic token / machine key the API now sends
+    // (`status_color` = success|warning, `status_key` = completed|pending) so
+    // a short display label like "Paid" still resolves to the green chip.
+    final badge = json['badge'];
+    final statusColor = (json['status_color'] ??
+            json['status_key'] ??
+            (badge is Map ? badge['variant'] : null) ??
+            '')
+        .toString();
     return TransactionEntry(
       id: json['id']?.toString() ?? '',
       reference: json['reference'] as String? ?? '',
       customer: json['customer'] as String? ?? '',
       date: json['date'] as String? ?? '',
-      status: json['status'] as String? ?? 'Completed',
+      status: json['status_label'] as String? ??
+          json['status'] as String? ??
+          'Completed',
+      statusColor: statusColor,
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
     );
   }
@@ -215,9 +228,20 @@ class TransactionEntry {
   final String customer;
   final String date;
   final String status;
+
+  /// Semantic colour token from the API (`success` | `warning` | …), falling
+  /// back to the machine status key. Empty when the API sent neither.
+  final String statusColor;
   final double amount;
 
-  bool get isCompleted => status.toLowerCase() == 'completed';
+  bool get isCompleted {
+    final token = statusColor.toLowerCase();
+    if (token.isNotEmpty) {
+      return token == 'success' || token == 'completed' || token == 'paid';
+    }
+    final s = status.toLowerCase();
+    return s == 'completed' || s == 'paid' || s == 'done';
+  }
 }
 
 /// A recent customer, shown in the dashboard's "Recent Customers" panel.

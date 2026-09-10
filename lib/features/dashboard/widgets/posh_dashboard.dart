@@ -900,6 +900,9 @@ class _StatusBadge extends StatelessWidget {
       decoration:
           BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
       child: Text(label,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.visible,
           style: TextStyle(
               fontSize: 11.5, fontWeight: FontWeight.w600, color: fg)),
     );
