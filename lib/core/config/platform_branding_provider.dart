@@ -37,9 +37,11 @@ class PlatformBrandingProvider extends ChangeNotifier {
   /// Superadmin contract defaults.
   static const String defaultName = 'Sales & Inventory';
   static const String defaultTagline = 'Online inventory management system';
-  static const String defaultHeadline = 'Run your business smarter.';
-  static const String defaultDescription =
-      'Sales, inventory & orders — all in one place.';
+
+  /// Auth marketing copy is purely Superadmin-authored — there is no app-side
+  /// default. Empty means "render nothing".
+  static const String defaultHeadline = '';
+  static const String defaultDescription = '';
 
   static const Color defaultPrimary = Color(0xFFF95700);
   static const Color defaultSecondary = Color(0xFF0F172A);

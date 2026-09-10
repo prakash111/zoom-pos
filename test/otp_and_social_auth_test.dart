@@ -240,9 +240,11 @@ void main() {
       expect(find.text('Continue with Google'), findsOneWidget);
       expect(find.text('Continue with Facebook'), findsOneWidget);
 
-      // "POS SYSTEMS" reference layout: marketing header outside the card,
-      // "Welcome back" inside it, plus the store-account-ID call-to-action.
-      expect(find.text('Run your business smarter.'), findsOneWidget);
+      // "POS SYSTEMS" reference layout: "Welcome back" card + the
+      // store-account-ID call-to-action. No hardcoded marketing headline —
+      // it only appears when the Superadmin sets one.
+      expect(find.text('Run your business smarter.'), findsNothing);
+      expect(find.textContaining('Sales, inventory & orders'), findsNothing);
       expect(find.text('Welcome back'), findsOneWidget);
       expect(find.text('Have a store account ID?'), findsOneWidget);
       expect(find.text('Forgot password?'), findsOneWidget);

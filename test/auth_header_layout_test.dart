@@ -26,6 +26,39 @@ Widget _host(PlatformBrandingProvider branding) => MaterialApp(
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  test('there is no hardcoded auth marketing copy', () {
+    final b = PlatformBrandingProvider();
+    expect(b.headline, isEmpty);
+    expect(b.description, isEmpty);
+    expect(PlatformBrandingProvider.defaultHeadline, isEmpty);
+    expect(PlatformBrandingProvider.defaultDescription, isEmpty);
+  });
+
+  testWidgets('login-style marketing header renders no copy when unset',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(700, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChangeNotifierProvider<PlatformBrandingProvider>.value(
+          value: PlatformBrandingProvider()..brandLogoUrl = null,
+          child: const AuthScaffold(
+            marketingHeader: true,
+            heading: 'Welcome back',
+            form: SizedBox.shrink(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Run your business smarter.'), findsNothing);
+    expect(find.textContaining('Sales, inventory & orders'), findsNothing);
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('branding refresh reads header_inline / show_tagline flags', () async {
     final b = PlatformBrandingProvider();
     await b.refresh(_FakeBrandingApi({
@@ -59,8 +92,8 @@ void main() {
       'success': true,
       'platform': {
         'name': 'POS Systems',
-        'headline': 'Run your business smarter.',
-        'description': 'Sales, inventory & orders — all in one place.',
+        'headline': 'Sample platform headline',
+        'description': 'Sample platform description',
         'logo_url': 'https://saas.zoomnearby.com/uploads/superadmin-logo.png',
         'favicon_url': 'https://saas.zoomnearby.com/uploads/favicon.png',
       },
@@ -74,8 +107,8 @@ void main() {
     }));
 
     expect(b.platformName, 'POS Systems');
-    expect(b.headline, 'Run your business smarter.');
-    expect(b.description, 'Sales, inventory & orders — all in one place.');
+    expect(b.headline, 'Sample platform headline');
+    expect(b.description, 'Sample platform description');
     expect(b.faviconUrl, 'https://saas.zoomnearby.com/uploads/favicon.png');
     expect(b.primaryColor, const Color(0xFFF95700));
     expect(b.secondaryColor, const Color(0xFF0F172A));

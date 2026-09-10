@@ -78,11 +78,14 @@ class AuthScaffold extends StatelessWidget {
   Widget _brand(BuildContext context) {
     final branding = context.watch<PlatformBrandingProvider>();
 
-    // Marketing header used by the login / register / reset screens — logo +
-    // Superadmin headline/description (screen may override the copy).
+    // Marketing header used by the login / register / reset screens — logo,
+    // plus an optional Superadmin-authored headline / description (a screen
+    // may override the copy). Nothing is rendered when both are empty — no
+    // hardcoded fallback, no blank space.
     if (_useMarketing) {
       final headline = (brandHeadline ?? branding.headline).trim();
       final subline = (brandSubline ?? branding.description).trim();
+      final hasCopy = headline.isNotEmpty || subline.isNotEmpty;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -93,19 +96,20 @@ class AuthScaffold extends StatelessWidget {
               if (headerTrailing != null) headerTrailing!,
             ],
           ),
-          const SizedBox(height: 18),
-          Text(
-            headline.isEmpty ? branding.platformName : headline,
-            style: TextStyle(
-              fontSize: 27,
-              height: 1.15,
-              fontWeight: FontWeight.w800,
-              color: branding.secondaryColor,
-              letterSpacing: -0.5,
+          if (hasCopy) const SizedBox(height: 18),
+          if (headline.isNotEmpty)
+            Text(
+              headline,
+              style: TextStyle(
+                fontSize: 27,
+                height: 1.15,
+                fontWeight: FontWeight.w800,
+                color: branding.secondaryColor,
+                letterSpacing: -0.5,
+              ),
             ),
-          ),
           if (subline.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            if (headline.isNotEmpty) const SizedBox(height: 8),
             Text(
               subline,
               style: const TextStyle(
@@ -238,7 +242,19 @@ class AuthScaffold extends StatelessWidget {
     );
   }
 
+  /// Whether the brand header has anything to show — a logo, a header action,
+  /// or (marketing mode) some headline/description copy. When it doesn't, the
+  /// header and its spacing are omitted entirely.
+  bool _hasBrandContent(PlatformBrandingProvider branding) {
+    if (branding.hasLogo || headerTrailing != null) return true;
+    if (!_useMarketing) return true; // legacy path always shows the name
+    return (brandHeadline ?? branding.headline).trim().isNotEmpty ||
+        (brandSubline ?? branding.description).trim().isNotEmpty;
+  }
+
   Widget _formColumn(BuildContext context) {
+    final showBrand =
+        _hasBrandContent(context.watch<PlatformBrandingProvider>());
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(22, 30, 22, 40),
       child: Center(
@@ -248,14 +264,16 @@ class AuthScaffold extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _brand(context),
+              if (showBrand) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _brand(context),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 26),
+                const SizedBox(height: 26),
+              ],
               _card(context),
               if (belowCard != null) ...[
                 const SizedBox(height: 20),
