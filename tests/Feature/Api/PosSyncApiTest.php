@@ -1297,6 +1297,61 @@ class PosSyncApiTest extends TestCase
         $this->assertEqualsWithDelta(80.0, (float) $trend[6]['amount'], 0.01);
     }
 
+    public function test_analytics_recent_transactions_use_short_status_label_and_date(): void
+    {
+        $paid = Sale::create([
+            'company_id' => $this->company->id,
+            'sale_number' => 'TXN-PAID',
+            'total' => 100.00,
+            'due_amount' => 0.00,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+        ]);
+        $due = Sale::create([
+            'company_id' => $this->company->id,
+            'sale_number' => 'TXN-DUE',
+            'total' => 100.00,
+            'due_amount' => 40.00,
+            'status' => 'completed',
+            'payment_status' => 'partial',
+        ]);
+        $at = now()->subDay()->setTime(9, 0);
+        Sale::withoutGlobalScope('company')->whereIn('id', [$paid->id, $due->id])
+            ->update(['created_at' => $at, 'updated_at' => $at]);
+
+        $rows = collect($this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
+            ->getJson('/api/v1/pos/analytics')
+            ->assertOk()
+            ->json('recent_transactions'))
+            ->keyBy('reference');
+
+        // Short, single-line status labels — never the wrapping "Completed".
+        $this->assertSame('Paid', $rows['TXN-PAID']['status']);
+        $this->assertSame('Pending', $rows['TXN-DUE']['status']);
+        foreach ($rows as $row) {
+            $this->assertNotSame('Completed', $row['status']);
+        }
+
+        // Machine key stays 'completed'; label + colour tokens are separate,
+        // so a paid row can be styled green ('success') without its label
+        // being the literal "completed" string.
+        $this->assertSame('completed', $rows['TXN-PAID']['status_key']);
+        $this->assertSame('Paid', $rows['TXN-PAID']['status_label']);
+        $this->assertSame('success', $rows['TXN-PAID']['status_color']);
+        $this->assertSame('success', $rows['TXN-PAID']['badge']['variant']);
+        $this->assertSame('#10B981', $rows['TXN-PAID']['badge']['color']);
+        $this->assertSame('#E8F5E9', $rows['TXN-PAID']['badge']['background_color']);
+        $this->assertSame('nowrap', $rows['TXN-PAID']['badge']['white_space']);
+
+        $this->assertSame('pending', $rows['TXN-DUE']['status_key']);
+        $this->assertSame('warning', $rows['TXN-DUE']['status_color']);
+        $this->assertSame('#F59E0B', $rows['TXN-DUE']['badge']['color']);
+
+        // Compact "j M" date (e.g. "9 Sep"), not "09-09-2026".
+        $this->assertSame($at->format('j M'), $rows['TXN-PAID']['date']);
+        $this->assertDoesNotMatchRegularExpression('/\d{2}-\d{2}-\d{4}/', $rows['TXN-PAID']['date']);
+    }
+
     public function test_quotations_sync_pull_and_batch_ingestion(): void
     {
         // 1. Create a server-side quotation

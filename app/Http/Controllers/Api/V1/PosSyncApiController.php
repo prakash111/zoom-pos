@@ -3251,19 +3251,47 @@ class PosSyncApiController extends Controller
             ->pluck('category_name')
             ->values();
 
-        // Latest transactions table.
+        // Latest transactions table. The status chip is a fixed-width column
+        // on the mobile dashboard, so the label must stay short: "Completed"
+        // (9 chars) wrapped onto two lines, "Paid" does not. Date is the
+        // compact "10 Sep" form for the same reason.
+        //
+        // Machine key vs display label are kept separate:
+        //  - `status`        — the short display text the current client renders
+        //  - `status_key`    — stable machine key ('completed' | 'pending')
+        //  - `status_label`  — explicit display label
+        //  - `status_color`  — semantic token ('success' | 'warning')
+        //  - `badge`         — a fully resolved chip spec (text + hex colors)
+        // so a paid row can be styled green ('success') even though its label
+        // is no longer the literal string "completed".
         $recentTransactions = (clone $salesBase)
             ->latest('created_at')
             ->limit(8)
             ->get(['id', 'sale_number', 'customer_name', 'total', 'due_amount', 'status', 'created_at'])
-            ->map(fn ($s) => [
-                'id' => (string) $s->id,
-                'reference' => $s->sale_number ?: ('TR-'.str_pad((string) $s->id, 6, '0', STR_PAD_LEFT)),
-                'customer' => $s->customer_name ?: 'Walk-in',
-                'date' => optional($s->created_at)->format('d-m-Y'),
-                'status' => ((float) $s->due_amount) > 0.01 ? 'Pending' : 'Completed',
-                'amount' => (float) $s->total,
-            ])
+            ->map(function ($s) {
+                $isPaid = ((float) $s->due_amount) <= 0.01;
+                $label = $isPaid ? 'Paid' : 'Pending';
+
+                return [
+                    'id' => (string) $s->id,
+                    'reference' => $s->sale_number ?: ('TR-'.str_pad((string) $s->id, 6, '0', STR_PAD_LEFT)),
+                    'customer' => $s->customer_name ?: 'Walk-in',
+                    'date' => optional($s->created_at)->format('j M'),
+                    'status' => $label,
+                    'status_key' => $isPaid ? 'completed' : 'pending',
+                    'status_label' => $label,
+                    'status_color' => $isPaid ? 'success' : 'warning',
+                    'badge' => [
+                        'text' => $label,
+                        'variant' => $isPaid ? 'success' : 'warning',
+                        'color' => $isPaid ? '#10B981' : '#F59E0B',
+                        'background_color' => $isPaid ? '#E8F5E9' : '#FEF3C7',
+                        'text_color' => $isPaid ? '#1B5E20' : '#B45309',
+                        'white_space' => 'nowrap',
+                    ],
+                    'amount' => (float) $s->total,
+                ];
+            })
             ->values();
 
         // Recent customers — stands in for the design's "Recent Messages".
