@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zoom_pos_mobile/core/sdui/dynamic_schema_context.dart';
@@ -195,8 +196,10 @@ void main() {
       expect(tester.widget<TabBar>(find.byType(TabBar)).isScrollable, isTrue);
 
       // initial_index: 2 → the third tab's body is the visible one.
-      expect(DefaultTabController.of(tester.element(find.text('Active Batches')))
-          .index, 2);
+      expect(
+          DefaultTabController.of(tester.element(find.text('Active Batches')))
+              .index,
+          2);
       expect(find.text('ADJUST BODY'), findsOneWidget);
 
       // Each tab body is a real scroll view (never a fixed, non-scrollable
@@ -249,8 +252,56 @@ void main() {
       expect(dispatched?['fields'], ['search']);
     });
 
-    testWidgets(
-        'creatable_select binds a preset, then a typed custom reason',
+    testWidgets('read_only + copyable text_input copies to clipboard',
+        (tester) async {
+      const url = 'https://saas.zoomnearby.com/api/v1/pos/webhooks/in/abc123';
+      final clipboard = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') clipboard.add(call);
+        return null;
+      });
+      addTearDown(() => TestDefaultBinaryMessengerBinding
+          .instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: const {},
+              setFormValue: (_, __) {},
+              dispatchAction: (_) async {},
+              child: Builder(
+                builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, {
+                  'type': 'text_input',
+                  'name': 'inbound_webhook_url',
+                  'label': 'Your Unique Webhook Endpoint URL',
+                  'initial_value': url,
+                  'read_only': true,
+                  'copyable': true,
+                  'copy_tooltip': 'Copy webhook endpoint',
+                  'copy_toast': 'Webhook URL copied to clipboard!',
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final field = tester.widget<TextFormField>(find.byType(TextFormField));
+      expect(field.enabled, isTrue); // sharp + selectable, not greyed out
+
+      expect(find.byTooltip('Copy webhook endpoint'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.copy_rounded));
+      await tester.pump();
+
+      expect(clipboard, hasLength(1));
+      expect(clipboard.single.arguments['text'], url);
+      expect(find.text('Webhook URL copied to clipboard!'), findsOneWidget);
+    });
+
+    testWidgets('creatable_select binds a preset, then a typed custom reason',
         (tester) async {
       final formValues = <String, dynamic>{};
       final schema = {
@@ -262,7 +313,10 @@ void main() {
         'custom_label': '+ Other / Custom Reason',
         'initial_value': 'Damaged stock',
         'options': [
-          {'label': 'Physical audit / discrepancy', 'value': 'Physical audit / discrepancy'},
+          {
+            'label': 'Physical audit / discrepancy',
+            'value': 'Physical audit / discrepancy'
+          },
           {'label': 'Damaged stock', 'value': 'Damaged stock'},
           {'label': 'Vendor return', 'value': 'Vendor return'},
         ],
@@ -334,7 +388,10 @@ void main() {
 
       expect(find.byType(TextFormField), findsOneWidget);
       expect(
-          tester.widget<TextFormField>(find.byType(TextFormField)).controller?.text,
+          tester
+              .widget<TextFormField>(find.byType(TextFormField))
+              .controller
+              ?.text,
           'Supplier recall lot 88B');
       expect(formValues['reason'], 'Supplier recall lot 88B');
     });
@@ -363,7 +420,8 @@ void main() {
                     'clearable': true,
                     'action': {
                       'type': 'filter_view',
-                      'endpoint': '/api/tenant/views/pharmacy-batches?tab=active',
+                      'endpoint':
+                          '/api/tenant/views/pharmacy-batches?tab=active',
                       'fields': ['search'],
                     },
                   }),
@@ -746,7 +804,8 @@ void main() {
       expect(dispatched, 0, reason: 'change-due math must never hit dispatch');
     });
 
-    testWidgets('customer_selector renders lookup UI and binds customer details',
+    testWidgets(
+        'customer_selector renders lookup UI and binds customer details',
         (tester) async {
       final formValues = <String, dynamic>{};
       final schema = {
@@ -784,7 +843,8 @@ void main() {
       expect(find.text('Client / Customer Lookup'), findsOneWidget);
       expect(find.text('Client Full Name *'), findsOneWidget);
       expect(find.text('Client Phone Number *'), findsOneWidget);
-      expect(find.text('Search CRM customer by name or phone...'), findsOneWidget);
+      expect(
+          find.text('Search CRM customer by name or phone...'), findsOneWidget);
       expect(find.text('Sarah Connor'), findsOneWidget);
       expect(find.text('+1 555 123 4567'), findsOneWidget);
 
@@ -1054,7 +1114,8 @@ void main() {
       expect(find.byType(DynamicSchemaPage), findsOneWidget);
     });
 
-    test('navigate to the native "pos" key does not fall through to a schema page',
+    test(
+        'navigate to the native "pos" key does not fall through to a schema page',
         () {
       // The pharmacy "Pharmacy POS" quick action and the drawer entry both
       // navigate to the bare route key 'pos' — it must resolve to a native

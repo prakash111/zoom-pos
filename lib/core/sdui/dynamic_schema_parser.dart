@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../api/api_exception.dart';
@@ -350,8 +351,7 @@ class DynamicSchemaParser {
     if (scrollable) {
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: _parseEdgeInsets(schema['padding'],
-            fallback: EdgeInsets.zero),
+        padding: _parseEdgeInsets(schema['padding'], fallback: EdgeInsets.zero),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: _parseCrossAxis(schema['cross_axis_alignment']),
@@ -469,11 +469,11 @@ class DynamicSchemaParser {
 
     final scrollable =
         schema['is_scrollable'] == true || schema['scrollable'] == true;
-    final initialIndex = ((schema['initial_index'] ?? schema['active_index'])
-                as num?)
-            ?.toInt()
-            .clamp(0, tabItems.length - 1) ??
-        0;
+    final initialIndex =
+        ((schema['initial_index'] ?? schema['active_index']) as num?)
+                ?.toInt()
+                .clamp(0, tabItems.length - 1) ??
+            0;
 
     // The tab panel carries its own scroll, so it needs a bounded height.
     // Take most of the viewport (not a rigid 400) so a long form or list has
@@ -492,15 +492,14 @@ class DynamicSchemaParser {
         children: [
           TabBar(
             isScrollable: scrollable || tabItems.length > 3,
-            tabAlignment: (scrollable || tabItems.length > 3)
-                ? TabAlignment.start
-                : null,
+            tabAlignment:
+                (scrollable || tabItems.length > 3) ? TabAlignment.start : null,
             labelPadding: const EdgeInsets.symmetric(horizontal: 14),
             tabs: [
               for (final t in tabItems)
                 Tab(
-                  text: context.tr(
-                      (t['label'] ?? t['title'])?.toString() ?? ''),
+                  text:
+                      context.tr((t['label'] ?? t['title'])?.toString() ?? ''),
                   icon: t['icon'] != null
                       ? Icon(SduiIconRegistry.resolve(t['icon'].toString()),
                           size: 18)
@@ -714,7 +713,17 @@ class DynamicSchemaParser {
     final maxLines =
         isPassword ? 1 : ((schema['max_lines'] as num?)?.toInt() ?? 1);
     final keyboardTypeStr = schema['keyboard_type']?.toString().toLowerCase();
-    final disabled = schema['disabled'] == true || schema['read_only'] == true;
+    // `read_only` keeps the text crisp + selectable (not greyed out) and lets
+    // us hang a copy button off it; `disabled` is the fully-inert state.
+    final readOnly = schema['read_only'] == true;
+    final disabled = schema['disabled'] == true;
+    final copyable = schema['copyable'] == true ||
+        schema['copy_to_clipboard'] == true ||
+        (readOnly && initialValue.trim().isNotEmpty);
+    final copyTooltip =
+        context.tr(schema['copy_tooltip']?.toString() ?? 'Copy to clipboard');
+    final copyToast =
+        context.tr(schema['copy_toast']?.toString() ?? 'Copied to clipboard');
 
     TextInputType keyboardType = TextInputType.text;
     if (keyboardTypeStr == 'number') keyboardType = TextInputType.number;
@@ -729,22 +738,48 @@ class DynamicSchemaParser {
         ? Map<String, dynamic>.from(schema['submit_action'] as Map)
         : null;
 
+    final scheme = Theme.of(context).colorScheme;
+    final readOnlyFill = Theme.of(context).brightness == Brightness.dark
+        ? scheme.surfaceContainerHighest
+        : const Color(0xFFF1F5F9);
+
+    Widget? copyButton;
+    if (copyable) {
+      copyButton = IconButton(
+        tooltip: copyTooltip,
+        icon: const Icon(Icons.copy_rounded, size: 20),
+        onPressed: () async {
+          final value =
+              sduiContext?.formValues[name]?.toString() ?? initialValue;
+          await Clipboard.setData(ClipboardData(text: value));
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(copyToast), duration: const Duration(seconds: 2)),
+          );
+        },
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: TextFormField(
         initialValue: initialValue,
         enabled: !disabled,
+        readOnly: readOnly,
         obscureText: isPassword,
         maxLines: maxLines,
         keyboardType: keyboardType,
-        textInputAction:
-            submitAction != null ? TextInputAction.search : null,
+        textInputAction: submitAction != null ? TextInputAction.search : null,
         autovalidateMode: AutovalidateMode.onUserInteraction,
         validator: _textValidator(schema),
         decoration: InputDecoration(
           labelText: label,
           hintText: placeholder,
           border: const OutlineInputBorder(),
+          filled: readOnly,
+          fillColor: readOnly ? readOnlyFill : null,
+          suffixIcon: copyButton,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         ),
@@ -1179,7 +1214,9 @@ class DynamicSchemaParser {
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
     final isDense = schema['dense'] == true || schema['size'] == 'small';
     final isFullWidth = schema['full_width'] == true ||
-        (schema['full_width'] == null && schema['expanded'] != true && !isDense);
+        (schema['full_width'] == null &&
+            schema['expanded'] != true &&
+            !isDense);
     final enabled = schema['enabled'] != false;
     final bgColor = schema['background_color'] != null
         ? SduiIconRegistry.parseColor(schema['background_color'].toString(),
@@ -1190,7 +1227,8 @@ class DynamicSchemaParser {
             fallback: Colors.white)
         : Colors.white;
     final radius = _parseDouble(schema['border_radius']) ?? 10.0;
-    final iconSize = _parseDouble(schema['icon_size']) ?? (isDense ? 16.0 : 20.0);
+    final iconSize =
+        _parseDouble(schema['icon_size']) ?? (isDense ? 16.0 : 20.0);
 
     final btnPadding = _parseEdgeInsets(schema['padding'],
         fallback: isDense
@@ -1225,11 +1263,13 @@ class DynamicSchemaParser {
             icon: Icon(SduiIconRegistry.resolve(iconName), size: iconSize),
             label: labelWidget,
             style: buttonStyle,
-            onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
+            onPressed:
+                enabled ? () => sduiContext?.dispatchAction(action) : null,
           )
         : ElevatedButton(
             style: buttonStyle,
-            onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
+            onPressed:
+                enabled ? () => sduiContext?.dispatchAction(action) : null,
             child: labelWidget,
           );
 
@@ -1253,7 +1293,9 @@ class DynamicSchemaParser {
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
     final isDense = schema['dense'] == true || schema['size'] == 'small';
     final isFullWidth = schema['full_width'] == true ||
-        (schema['full_width'] == null && schema['expanded'] != true && !isDense);
+        (schema['full_width'] == null &&
+            schema['expanded'] != true &&
+            !isDense);
     final enabled = schema['enabled'] != false;
     final accent = schema['color'] != null
         ? SduiIconRegistry.parseColor(schema['color'].toString(),
@@ -1263,7 +1305,8 @@ class DynamicSchemaParser {
                 fallback: _outlinedButtonGreen)
             : _outlinedButtonGreen);
     final radius = _parseDouble(schema['border_radius']) ?? 10.0;
-    final iconSize = _parseDouble(schema['icon_size']) ?? (isDense ? 16.0 : 20.0);
+    final iconSize =
+        _parseDouble(schema['icon_size']) ?? (isDense ? 16.0 : 20.0);
 
     final btnPadding = _parseEdgeInsets(schema['padding'],
         fallback: isDense
@@ -1296,11 +1339,13 @@ class DynamicSchemaParser {
             icon: Icon(SduiIconRegistry.resolve(iconName), size: iconSize),
             label: labelWidget,
             style: buttonStyle,
-            onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
+            onPressed:
+                enabled ? () => sduiContext?.dispatchAction(action) : null,
           )
         : OutlinedButton(
             style: buttonStyle,
-            onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
+            onPressed:
+                enabled ? () => sduiContext?.dispatchAction(action) : null,
             child: labelWidget,
           );
 
@@ -1324,9 +1369,12 @@ class DynamicSchemaParser {
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
     final isDense = schema['dense'] == true || schema['size'] == 'small';
     final isFullWidth = schema['full_width'] == true ||
-        (schema['full_width'] == null && schema['expanded'] != true && !isDense);
+        (schema['full_width'] == null &&
+            schema['expanded'] != true &&
+            !isDense);
     final enabled = schema['enabled'] != false;
-    final iconSize = _parseDouble(schema['icon_size']) ?? (isDense ? 16.0 : 20.0);
+    final iconSize =
+        _parseDouble(schema['icon_size']) ?? (isDense ? 16.0 : 20.0);
 
     Future<void> handlePress() async {
       final confirmMessage = action['confirm_message']?.toString() ??
@@ -1807,7 +1855,14 @@ class _SduiFilePickerField extends StatefulWidget {
 
 class _SduiFilePickerFieldState extends State<_SduiFilePickerField> {
   static const _imageExtensions = {
-    'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'bmp',
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+    'heic',
+    'heif',
+    'gif',
+    'bmp',
   };
 
   String? _url;
@@ -1866,7 +1921,8 @@ class _SduiFilePickerFieldState extends State<_SduiFilePickerField> {
 
   /// Client-side gate mirroring the backend allow-list: only non-executable
   /// image / PDF types ever leave the device.
-  bool _isPermitted(String name) => _allowedExtensions.contains(_extensionOf(name));
+  bool _isPermitted(String name) =>
+      _allowedExtensions.contains(_extensionOf(name));
 
   Future<void> _showSourceSheet() async {
     if (_busy) return;
@@ -2042,7 +2098,8 @@ class _SduiFilePickerFieldState extends State<_SduiFilePickerField> {
 
   @override
   Widget build(BuildContext context) {
-    final label = context.tr(widget.schema['label']?.toString() ?? 'Attachment');
+    final label =
+        context.tr(widget.schema['label']?.toString() ?? 'Attachment');
     final hint = context.tr(widget.schema['hint']?.toString() ??
         'Upload a photo or PDF (non-executable files only)');
     final hasFile = _url?.isNotEmpty == true;
@@ -2053,7 +2110,8 @@ class _SduiFilePickerFieldState extends State<_SduiFilePickerField> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           const SizedBox(height: 6),
           if (hasFile)
             _PreviewCard(
@@ -2324,7 +2382,8 @@ class _SduiCreatableSelectState extends State<_SduiCreatableSelect> {
     _presets = ((widget.schema['options'] as List<dynamic>?) ?? const [])
         .map((o) {
           if (o is Map) {
-            final label = (o['label'] ?? o['name'] ?? o['value'] ?? '').toString();
+            final label =
+                (o['label'] ?? o['name'] ?? o['value'] ?? '').toString();
             final value = (o['value'] ?? o['code'] ?? label).toString();
             return (label: label, value: value);
           }
@@ -2336,9 +2395,9 @@ class _SduiCreatableSelectState extends State<_SduiCreatableSelect> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final sdui = DynamicSchemaContext.of(context);
-      final current = (sdui?.formValues[_name] ??
-              widget.schema['initial_value'])
-          ?.toString();
+      final current =
+          (sdui?.formValues[_name] ?? widget.schema['initial_value'])
+              ?.toString();
 
       if (current != null &&
           current.isNotEmpty &&
@@ -2423,8 +2482,7 @@ class _SduiCreatableSelectState extends State<_SduiCreatableSelect> {
                     if (val == null) return;
                     if (val == _customValue) {
                       setState(() => _custom = true);
-                      sdui?.setFormValue(
-                          _name, _customController.text.trim());
+                      sdui?.setFormValue(_name, _customController.text.trim());
                     } else {
                       setState(() {
                         _custom = false;
@@ -3308,8 +3366,7 @@ class _CustomerSelectorState extends State<_CustomerSelector> {
         if (mounted) {
           setState(() {
             _searching = false;
-            _searchResults =
-                rawList.whereType<Map<String, dynamic>>().toList();
+            _searchResults = rawList.whereType<Map<String, dynamic>>().toList();
           });
         }
       } catch (_) {
@@ -3325,8 +3382,7 @@ class _CustomerSelectorState extends State<_CustomerSelector> {
 
   void _selectCustomer(Map<String, dynamic> cust) {
     final sdui = DynamicSchemaContext.of(context);
-    final id =
-        cust['server_id']?.toString() ?? cust['id']?.toString() ?? '';
+    final id = cust['server_id']?.toString() ?? cust['id']?.toString() ?? '';
     final name = cust['name']?.toString() ?? '';
     final phone = cust['phone']?.toString() ?? '';
 
@@ -3473,8 +3529,8 @@ class _CustomerSelectorState extends State<_CustomerSelector> {
                     leading: const CircleAvatar(
                       radius: 14,
                       backgroundColor: Color(0xFFDCFCE7),
-                      child:
-                          Icon(Icons.person, size: 16, color: Color(0xFF15803D)),
+                      child: Icon(Icons.person,
+                          size: 16, color: Color(0xFF15803D)),
                     ),
                     title: Text(cName,
                         style: const TextStyle(
