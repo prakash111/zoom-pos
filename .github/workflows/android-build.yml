@@ -112,7 +112,8 @@ jobs:
           cp build/app/outputs/bundle/release/app-release.aab release-output/zoom-pos-v${{ env.APP_VERSION }}.aab
           cp build/app/outputs/bundle/release/app-release.aab release-output/zoom-pos-release.aab
 
-      - name: Upload APK artifact
+      - name: Upload APK artifact (best-effort)
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ZoomPOS-Android-APK-v${{ env.APP_VERSION }}
@@ -120,9 +121,11 @@ jobs:
             release-output/zoom-pos-v${{ env.APP_VERSION }}.apk
             release-output/zoom-pos-release.apk
             build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
+          if-no-files-found: warn
+          retention-days: 5
 
-      - name: Upload App Bundle artifact
+      - name: Upload App Bundle artifact (best-effort)
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ZoomPOS-Android-Bundle-v${{ env.APP_VERSION }}
@@ -130,13 +133,29 @@ jobs:
             release-output/zoom-pos-v${{ env.APP_VERSION }}.aab
             release-output/zoom-pos-release.aab
             build/app/outputs/bundle/release/app-release.aab
-          if-no-files-found: error
+          if-no-files-found: warn
+          retention-days: 5
 
+      # Publish the APK + AAB as GitHub Release assets — Release storage is
+      # separate from (and far larger than) the Actions artifact quota, so
+      # this is the primary distribution path. Tag pushes use their own tag;
+      # manual / branch runs get a rolling per-run pre-release tag.
       - name: Publish to GitHub Releases
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
             release-output/zoom-pos-v${{ env.APP_VERSION }}.apk
             release-output/zoom-pos-v${{ env.APP_VERSION }}.aab
-          generate_release_notes: true
+          fail_on_unmatched_files: true
+          tag_name: >-
+            ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name
+            || format('android-build-{0}', github.run_number) }}
+          name: >-
+            ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name
+            || format('Android Build {0} (build {1})', env.APP_VERSION, github.run_number) }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          make_latest: ${{ startsWith(github.ref, 'refs/tags/') }}
+          generate_release_notes: ${{ startsWith(github.ref, 'refs/tags/') }}
+          body: >-
+            Android APK + AAB built from
+            `${{ github.ref_name }}` @ ${{ github.sha }}.
