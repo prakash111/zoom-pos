@@ -6,6 +6,11 @@ class AnalyticsModel {
   AnalyticsModel({
     required this.todayRevenue,
     required this.todayOrders,
+    required this.rangeLabel,
+    required this.rangeRevenue,
+    required this.rangeOrders,
+    required this.prevRangeRevenue,
+    required this.prevRangeOrders,
     required this.monthRevenue,
     required this.monthOrders,
     required this.prevMonthRevenue,
@@ -30,6 +35,9 @@ class AnalyticsModel {
     final kpis = json['kpis'] is Map
         ? Map<String, dynamic>.from(json['kpis'] as Map)
         : <String, dynamic>{};
+    final rangeJson = json['range'] is Map
+        ? Map<String, dynamic>.from(json['range'] as Map)
+        : <String, dynamic>{};
     List<Map<String, dynamic>> list(String key) => (json[key] as List? ?? [])
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
@@ -38,6 +46,19 @@ class AnalyticsModel {
     return AnalyticsModel(
       todayRevenue: (kpis['today_revenue'] as num?)?.toDouble() ?? 0,
       todayOrders: (kpis['today_orders'] as num?)?.toInt() ?? 0,
+      rangeLabel: rangeJson['label']?.toString() ?? 'This Month',
+      rangeRevenue: (kpis['range_revenue'] as num?)?.toDouble() ??
+          (kpis['month_revenue'] as num?)?.toDouble() ??
+          0,
+      rangeOrders: (kpis['range_orders'] as num?)?.toInt() ??
+          (kpis['month_orders'] as num?)?.toInt() ??
+          0,
+      prevRangeRevenue: (kpis['prev_range_revenue'] as num?)?.toDouble() ??
+          (kpis['prev_month_revenue'] as num?)?.toDouble() ??
+          0,
+      prevRangeOrders: (kpis['prev_range_orders'] as num?)?.toInt() ??
+          (kpis['prev_month_orders'] as num?)?.toInt() ??
+          0,
       monthRevenue: (kpis['month_revenue'] as num?)?.toDouble() ?? 0,
       monthOrders: (kpis['month_orders'] as num?)?.toInt() ?? 0,
       prevMonthRevenue: (kpis['prev_month_revenue'] as num?)?.toDouble() ?? 0,
@@ -70,6 +91,16 @@ class AnalyticsModel {
 
   final double todayRevenue;
   final int todayOrders;
+
+  /// Metrics scoped to the dashboard "Filter" date range (defaults to the
+  /// current month when no filter is applied). [rangeLabel] is what the
+  /// server named the window ("Today", "Last 7 Days", "12 Jan – 18 Jan"…).
+  final String rangeLabel;
+  final double rangeRevenue;
+  final int rangeOrders;
+  final double prevRangeRevenue;
+  final int prevRangeOrders;
+
   final double monthRevenue;
   final int monthOrders;
   final double prevMonthRevenue;
@@ -89,14 +120,14 @@ class AnalyticsModel {
   final List<RecentContactEntry> recentCustomers;
   final List<TopProductEntry> topProducts;
 
-  /// Month-over-month revenue change as a fraction (0.2046 = +20.46%).
-  double get revenueDelta => prevMonthRevenue <= 0
-      ? (monthRevenue > 0 ? 1 : 0)
-      : (monthRevenue - prevMonthRevenue) / prevMonthRevenue;
+  static double _delta(num current, num previous) =>
+      previous <= 0 ? (current > 0 ? 1 : 0) : (current - previous) / previous;
 
-  double get ordersDelta => prevMonthOrders <= 0
-      ? (monthOrders > 0 ? 1 : 0)
-      : (monthOrders - prevMonthOrders) / prevMonthOrders;
+  /// Revenue change vs the equivalent previous window, as a fraction
+  /// (0.2046 = +20.46%). Follows the active dashboard date filter.
+  double get revenueDelta => _delta(rangeRevenue, prevRangeRevenue);
+
+  double get ordersDelta => _delta(rangeOrders, prevRangeOrders);
 }
 
 class PaymentBreakdownEntry {

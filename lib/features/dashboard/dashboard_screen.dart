@@ -385,15 +385,74 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late final AnalyticsRepository _analyticsRepository;
   late Future<AnalyticsModel> _analyticsFuture;
 
+  /// The dashboard "Filter" date range — drives every metric card, the
+  /// balance sparkline and the statistics deltas.
+  AnalyticsRange _range = AnalyticsRange.thisMonth;
+  DateTimeRange? _customRange;
+
   /// 0 = Home (this screen); 1..N = `_featuresFor(company)[index - 1]`.
   /// Shared by whichever nav dock is active — see [NavDockProvider].
   int _dockIndex = 0;
+
+  Future<AnalyticsModel> _loadAnalytics() =>
+      _analyticsRepository.fetchAnalytics(
+        range: _range,
+        from: _customRange?.start,
+        to: _customRange?.end,
+      );
+
+  Future<void> _pickDateRange() async {
+    final selected = await showMenu<AnalyticsRange>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+          MediaQuery.of(context).size.width - 260, 96, 24, 0),
+      items: [
+        for (final r in const [
+          AnalyticsRange.today,
+          AnalyticsRange.yesterday,
+          AnalyticsRange.last7,
+          AnalyticsRange.last30,
+          AnalyticsRange.thisMonth,
+          AnalyticsRange.lastMonth,
+          AnalyticsRange.thisYear,
+          AnalyticsRange.allTime,
+          AnalyticsRange.custom,
+        ])
+          CheckedPopupMenuItem<AnalyticsRange>(
+            value: r,
+            checked: _range == r,
+            child: Text(r.label),
+          ),
+      ],
+    );
+    if (selected == null || !mounted) return;
+
+    DateTimeRange? custom;
+    if (selected == AnalyticsRange.custom) {
+      final now = DateTime.now();
+      custom = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(now.year - 5),
+        lastDate: now,
+        initialDateRange: _customRange ??
+            DateTimeRange(
+                start: now.subtract(const Duration(days: 7)), end: now),
+      );
+      if (custom == null) return;
+    }
+
+    setState(() {
+      _range = selected;
+      _customRange = custom;
+      _analyticsFuture = _loadAnalytics();
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     _analyticsRepository = AnalyticsRepository(context.read<ApiClient>());
-    _analyticsFuture = _analyticsRepository.fetchAnalytics();
+    _analyticsFuture = _loadAnalytics();
     context
         .read<ThemeProvider>()
         .refreshFromServer(SettingsRepository(context.read<ApiClient>()));
@@ -1049,7 +1108,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               setState(() {
-                _analyticsFuture = _analyticsRepository.fetchAnalytics();
+                _analyticsFuture = _loadAnalytics();
               });
               context.read<LocaleProvider>().refreshFromServer();
             },
@@ -1092,7 +1151,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: RefreshIndicator(
               onRefresh: () async {
                 setState(() {
-                  _analyticsFuture = _analyticsRepository.fetchAnalytics();
+                  _analyticsFuture = _loadAnalytics();
                 });
               },
               child: Center(
@@ -1153,9 +1212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       label: Text(l10n.refresh),
                                       onPressed: () {
                                         setState(() {
-                                          _analyticsFuture =
-                                              _analyticsRepository
-                                                  .fetchAnalytics();
+                                          _analyticsFuture = _loadAnalytics();
                                         });
                                       },
                                     ),
@@ -1168,6 +1225,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             analytics: snapshot.data!,
                             formatter: CurrencyFormatter(
                                 company?.currencySymbol ?? '\$'),
+                            onFilter: _pickDateRange,
                           );
                         },
                       ),
@@ -1356,10 +1414,12 @@ class _DockChip extends StatelessWidget {
 /// breakdown (payment methods, complete top-products list) stays on the
 /// dedicated Analytics screen.
 class _DashboardAnalytics extends StatelessWidget {
-  const _DashboardAnalytics({required this.analytics, required this.formatter});
+  const _DashboardAnalytics(
+      {required this.analytics, required this.formatter, this.onFilter});
 
   final AnalyticsModel analytics;
   final CurrencyFormatter formatter;
+  final VoidCallback? onFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -1376,12 +1436,14 @@ class _DashboardAnalytics extends StatelessWidget {
       DashboardLayout.oroit => OroitDashboardHome(
           analytics: analytics,
           formatter: formatter,
+          onFilter: onFilter,
           onAddProduct: () => open('inventory'),
           onOpenTransactions: () => open('sales'),
         ),
       DashboardLayout.posh => PoshDashboardHome(
           analytics: analytics,
           formatter: formatter,
+          onFilter: onFilter,
           onAddProduct: () => open('inventory'),
           onOpenTransactions: () => open('sales'),
           onOpenCustomers: () => open('customers'),
@@ -1471,18 +1533,30 @@ class _ThemeModeButton extends StatelessWidget {
 }
 
 /// Actionable quick-launch shortcuts across the top of the dashboard — each
-/// pushes straight into its module. Uses [SduiComponentRegistry] so an
-/// unavailable module still resolves to a sensible placeholder.
+/// pushes straight into its module. Restaurant-only shortcuts (Pending KOTs,
+/// Tables) are hidden unless the authenticated tenant actually runs a
+/// kitchen: they never render for a retail / pharmacy / repair store.
 class _DashboardShortcutRow extends StatelessWidget {
   const _DashboardShortcutRow();
 
   @override
   Widget build(BuildContext context) {
+    // Rebuild once the bootstrap payload (mode + module features) lands.
+    context.watch<BootstrapCache>();
+    final module = BootstrapCache.instance.activeModule;
+    final mode = BootstrapCache.instance.activeMode.toLowerCase();
+    final hasKitchen = module.featureEnabled('has_kot') ||
+        mode.contains('restaurant') ||
+        mode.contains('cafe') ||
+        mode.contains('food');
+    final hasTables = module.featureEnabled('has_tables') || hasKitchen;
+
     final shortcuts = <(IconData, String, String)>[
       (Icons.point_of_sale, 'Quick Sale', 'pos'),
       (Icons.person_add_alt_1, 'New Customer', 'customers'),
       (Icons.lock_open, 'Open Register', 'cash_register'),
-      (Icons.receipt_long, 'Pending KOTs', 'kitchen_display'),
+      if (hasTables) (Icons.table_restaurant, 'Tables', 'floor_plan'),
+      if (hasKitchen) (Icons.receipt_long, 'Pending KOTs', 'kitchen_display'),
     ];
     return Wrap(
       spacing: 10,

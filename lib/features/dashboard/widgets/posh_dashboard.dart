@@ -22,6 +22,7 @@ class PoshDashboardHome extends StatelessWidget {
     this.onAddProduct,
     this.onOpenTransactions,
     this.onOpenCustomers,
+    this.onFilter,
   });
 
   final AnalyticsModel analytics;
@@ -29,6 +30,7 @@ class PoshDashboardHome extends StatelessWidget {
   final VoidCallback? onAddProduct;
   final VoidCallback? onOpenTransactions;
   final VoidCallback? onOpenCustomers;
+  final VoidCallback? onFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -53,11 +55,18 @@ class PoshDashboardHome extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _DashboardHeader(onAddProduct: onAddProduct),
+            _DashboardHeader(
+              onAddProduct: onAddProduct,
+              onFilter: onFilter,
+              rangeLabel: analytics.rangeLabel,
+            ),
             const SizedBox(height: 16),
             twoUp(
               _TotalBalanceCard(analytics: analytics, formatter: formatter),
-              _StatisticsCard(analytics: analytics, formatter: formatter),
+              _StatisticsCard(
+                  analytics: analytics,
+                  formatter: formatter,
+                  onFilter: onFilter),
               flexA: 2,
               flexB: 3,
             ),
@@ -191,9 +200,11 @@ class _DeltaChip extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader({this.onAddProduct});
+  const _DashboardHeader({this.onAddProduct, this.onFilter, this.rangeLabel});
 
   final VoidCallback? onAddProduct;
+  final VoidCallback? onFilter;
+  final String? rangeLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -204,9 +215,11 @@ class _DashboardHeader extends StatelessWidget {
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
         ),
         OutlinedButton.icon(
-          onPressed: null,
+          onPressed: onFilter,
           icon: const Icon(Icons.filter_list, size: 18),
-          label: const Text('Filter'),
+          label: Text(rangeLabel == null || rangeLabel!.isEmpty
+              ? 'Filter'
+              : 'Filter · ${rangeLabel!}'),
         ),
         const SizedBox(width: 12),
         ElevatedButton.icon(
@@ -318,10 +331,12 @@ class _TotalBalanceCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _StatisticsCard extends StatelessWidget {
-  const _StatisticsCard({required this.analytics, required this.formatter});
+  const _StatisticsCard(
+      {required this.analytics, required this.formatter, this.onFilter});
 
   final AnalyticsModel analytics;
   final CurrencyFormatter formatter;
+  final VoidCallback? onFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -329,12 +344,12 @@ class _StatisticsCard extends StatelessWidget {
     final metrics = <(String, String, Widget?)>[
       (
         'Total Earnings',
-        formatter.format(analytics.monthRevenue),
+        formatter.format(analytics.rangeRevenue),
         _DeltaChip(analytics.revenueDelta),
       ),
       (
         'Number of Sales',
-        analytics.monthOrders.toString(),
+        analytics.rangeOrders.toString(),
         _DeltaChip(analytics.ordersDelta),
       ),
       (
@@ -349,7 +364,14 @@ class _StatisticsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _PanelHeader('Statistics', trailing: const _Pill('This Month')),
+          _PanelHeader(
+            'Statistics',
+            trailing: InkWell(
+              onTap: onFilter,
+              borderRadius: BorderRadius.circular(8),
+              child: _Pill(analytics.rangeLabel),
+            ),
+          ),
           const SizedBox(height: 18),
           LayoutBuilder(
             builder: (context, c) {

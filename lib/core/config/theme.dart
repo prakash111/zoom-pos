@@ -152,6 +152,14 @@ class AppTheme {
     );
     return base.copyWith(
       pageTransitionsTheme: pageTransitions?.theme,
+      // Desktop: always-visible scrollbar thumbs (no hover-to-reveal).
+      scrollbarTheme: ScrollbarThemeData(
+        thumbVisibility: WidgetStateProperty.all(true),
+        thickness: WidgetStateProperty.all(8),
+        radius: const Radius.circular(4),
+        thumbColor: WidgetStateProperty.all(
+            colorScheme.onSurfaceVariant.withValues(alpha: 0.45)),
+      ),
       dividerColor: borderColor,
       dividerTheme:
           DividerThemeData(color: borderColor, space: 1, thickness: 1),

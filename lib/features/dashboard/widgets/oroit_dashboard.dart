@@ -15,12 +15,14 @@ class OroitDashboardHome extends StatelessWidget {
     required this.formatter,
     this.onAddProduct,
     this.onOpenTransactions,
+    this.onFilter,
   });
 
   final AnalyticsModel analytics;
   final CurrencyFormatter formatter;
   final VoidCallback? onAddProduct;
   final VoidCallback? onOpenTransactions;
+  final VoidCallback? onFilter;
 
   static const _bg = Color(0xFF0B0B12);
   static const _card = Color(0xFF15151F);
@@ -40,9 +42,9 @@ class OroitDashboardHome extends StatelessWidget {
     final activeOrders = activity.isNotEmpty ? activity.last.pending : 0;
 
     final cards = <_StatSpec>[
-      _StatSpec('Total orders', analytics.monthOrders.toString(),
+      _StatSpec('Total orders', analytics.rangeOrders.toString(),
           analytics.ordersDelta, _purple),
-      _StatSpec('Total sales', formatter.format(analytics.monthRevenue),
+      _StatSpec('Total sales', formatter.format(analytics.rangeRevenue),
           analytics.revenueDelta, _blue),
       _StatSpec('Active order', activeOrders.toString(), analytics.ordersDelta,
           _cyan),
@@ -122,7 +124,14 @@ class OroitDashboardHome extends StatelessWidget {
           child: Text('Order statistic',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
         ),
-        _pill('This period'),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onFilter,
+            borderRadius: BorderRadius.circular(8),
+            child: _pill(analytics.rangeLabel),
+          ),
+        ),
         const SizedBox(width: 10),
         _AddButton(onTap: onAddProduct),
       ],
