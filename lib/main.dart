@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +15,7 @@ import 'core/sdui/app_router.dart';
 import 'core/services/desktop/desktop_window.dart';
 import 'core/services/desktop/window_close_guard.dart';
 import 'core/services/dynamic_string_service.dart';
+import 'core/services/push_notification_service.dart';
 import 'core/services/sync/sync_engine.dart';
 import 'core/storage/app_database.dart';
 import 'core/storage/app_preferences.dart';
@@ -94,6 +97,13 @@ Future<void> main() async {
   // it's safe (online, nothing queued), so offline changes are never stranded
   // behind a login the user can't complete. No-op on Android.
   await WindowCloseGuard(authProvider, syncEngine: syncEngine).install();
+
+  // Android push notifications (delayed-order alarms + due-invoice reminders):
+  // fetch the FCM config from the backend, init Firebase from it, and register
+  // this device's token with the tenant once the user is signed in. Fire and
+  // forget — never blocks startup; a no-op on Windows/desktop.
+  unawaited(PushNotificationService.instance
+      .initialize(apiClient: apiClient, authProvider: authProvider));
 
   runApp(ZoomPosApp(
     preferences: preferences,
