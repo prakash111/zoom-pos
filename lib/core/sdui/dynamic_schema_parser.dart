@@ -13,6 +13,7 @@ import '../widgets/sdui/sdui_controls.dart';
 import 'components/navigation_tree_builder.dart';
 import 'dynamic_schema_context.dart';
 import 'sdui_icon_registry.dart';
+import 'sdui_tab_advancer.dart';
 
 /// Declarative schema parser that maps server-driven UI JSON specifications
 /// to base Flutter Material widgets.
@@ -461,72 +462,7 @@ class DynamicSchemaParser {
   static Widget _buildTabs(BuildContext context, Map<String, dynamic> schema) {
     final rawTabs = schema['tabs'] as List<dynamic>? ?? const [];
     if (rawTabs.isEmpty) return const SizedBox.shrink();
-
-    final tabItems = rawTabs
-        .whereType<Map>()
-        .map((tab) => Map<String, dynamic>.from(tab))
-        .toList();
-
-    final scrollable =
-        schema['is_scrollable'] == true || schema['scrollable'] == true;
-    final initialIndex =
-        ((schema['initial_index'] ?? schema['active_index']) as num?)
-                ?.toInt()
-                .clamp(0, tabItems.length - 1) ??
-            0;
-
-    // The tab panel carries its own scroll, so it needs a bounded height.
-    // Take most of the viewport (not a rigid 400) so a long form or list has
-    // room, then let its inner SingleChildScrollView handle the rest.
-    final mq = MediaQuery.of(context);
-    final panelHeight = (mq.size.height * 0.78).clamp(420.0, 900.0).toDouble();
-    // Clear the on-screen keyboard plus a floating-action margin, so the last
-    // field / submit button can always be scrolled fully into view.
-    final bottomInset = mq.viewInsets.bottom + 96;
-
-    return DefaultTabController(
-      length: tabItems.length,
-      initialIndex: initialIndex,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TabBar(
-            isScrollable: scrollable || tabItems.length > 3,
-            tabAlignment:
-                (scrollable || tabItems.length > 3) ? TabAlignment.start : null,
-            labelPadding: const EdgeInsets.symmetric(horizontal: 14),
-            tabs: [
-              for (final t in tabItems)
-                Tab(
-                  text:
-                      context.tr((t['label'] ?? t['title'])?.toString() ?? ''),
-                  icon: t['icon'] != null
-                      ? Icon(SduiIconRegistry.resolve(t['icon'].toString()),
-                          size: 18)
-                      : null,
-                ),
-            ],
-          ),
-          SizedBox(
-            height: panelHeight,
-            child: TabBarView(
-              children: [
-                for (final t in tabItems)
-                  SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.only(
-                        left: 16, right: 16, top: 12, bottom: bottomInset),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: buildChildren(context, _extractChildren(t)),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return _SchemaTabsView(schema: schema);
   }
 
   // ===========================================================================
@@ -1703,6 +1639,124 @@ class DynamicSchemaParser {
       default:
         return TextAlign.left;
     }
+  }
+}
+
+/// Renders a server `tabs` component with an owned [TabController] so an
+/// `ADVANCE_TAB` directive from a `form_submit` response can animate to the
+/// next tab (see [SduiTabAdvancer]). Behaviour otherwise matches the previous
+/// inline `DefaultTabController` build.
+class _SchemaTabsView extends StatefulWidget {
+  const _SchemaTabsView({required this.schema});
+
+  final Map<String, dynamic> schema;
+
+  @override
+  State<_SchemaTabsView> createState() => _SchemaTabsViewState();
+}
+
+class _SchemaTabsViewState extends State<_SchemaTabsView>
+    with SingleTickerProviderStateMixin {
+  late final List<Map<String, dynamic>> _tabItems;
+  late final TabController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabItems = (widget.schema['tabs'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((tab) => Map<String, dynamic>.from(tab))
+        .toList();
+
+    final maxIndex = _tabItems.isEmpty ? 0 : _tabItems.length - 1;
+    final initialIndex =
+        ((widget.schema['initial_index'] ?? widget.schema['active_index'])
+                    as num?)
+                ?.toInt()
+                .clamp(0, maxIndex) ??
+            0;
+
+    _controller = TabController(
+      length: _tabItems.length,
+      initialIndex: initialIndex,
+      vsync: this,
+    );
+    SduiTabAdvancer.bind(
+      advance: _advanceTo,
+      length: () => _tabItems.length,
+      currentIndex: () => _controller.index,
+    );
+  }
+
+  void _advanceTo(int index) {
+    if (!mounted) return;
+    if (index >= 0 && index < _controller.length) {
+      _controller.animateTo(index);
+    }
+  }
+
+  @override
+  void dispose() {
+    SduiTabAdvancer.unbind(_advanceTo);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_tabItems.isEmpty) return const SizedBox.shrink();
+
+    final scrollable = widget.schema['is_scrollable'] == true ||
+        widget.schema['scrollable'] == true;
+    final manyTabs = scrollable || _tabItems.length > 3;
+
+    // The tab panel carries its own scroll, so it needs a bounded height.
+    final mq = MediaQuery.of(context);
+    final panelHeight = (mq.size.height * 0.78).clamp(420.0, 900.0).toDouble();
+    // Clear the on-screen keyboard plus a floating-action margin so the last
+    // field / submit button can always be scrolled fully into view.
+    final bottomInset = mq.viewInsets.bottom + 96;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TabBar(
+          controller: _controller,
+          isScrollable: manyTabs,
+          tabAlignment: manyTabs ? TabAlignment.start : null,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+          tabs: [
+            for (final t in _tabItems)
+              Tab(
+                text: context.tr((t['label'] ?? t['title'])?.toString() ?? ''),
+                icon: t['icon'] != null
+                    ? Icon(SduiIconRegistry.resolve(t['icon'].toString()),
+                        size: 18)
+                    : null,
+              ),
+          ],
+        ),
+        SizedBox(
+          height: panelHeight,
+          child: TabBarView(
+            controller: _controller,
+            children: [
+              for (final t in _tabItems)
+                SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.only(
+                      left: 16, right: 16, top: 12, bottom: bottomInset),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: DynamicSchemaParser.buildChildren(
+                        context, DynamicSchemaParser._extractChildren(t)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 

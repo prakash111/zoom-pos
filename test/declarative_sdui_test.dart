@@ -195,11 +195,10 @@ void main() {
       expect(find.text('Stock Adjust & Returns'), findsOneWidget);
       expect(tester.widget<TabBar>(find.byType(TabBar)).isScrollable, isTrue);
 
-      // initial_index: 2 → the third tab's body is the visible one.
-      expect(
-          DefaultTabController.of(tester.element(find.text('Active Batches')))
-              .index,
-          2);
+      // initial_index: 2 → the third tab's body is the visible one. The tabs
+      // view owns its TabController (so an ADVANCE_TAB directive can drive it
+      // from the page-level context).
+      expect(tester.widget<TabBar>(find.byType(TabBar)).controller?.index, 2);
       expect(find.text('ADJUST BODY'), findsOneWidget);
 
       // Each tab body is a real scroll view (never a fixed, non-scrollable
@@ -1106,6 +1105,134 @@ void main() {
       expect(submittedData, containsPair('currency', 'USD'));
       expect(
           find.text('Financial settings updated successfully'), findsOneWidget);
+    });
+
+    Map<String, dynamic> wizardTabsSchema() => {
+          'title': 'Store Profile',
+          'layout': 'scroll_view',
+          'components': [
+            {
+              'type': 'tabs',
+              'is_scrollable': true,
+              'initial_index': 0,
+              'tabs': [
+                {
+                  'id': 'general',
+                  'label': 'General',
+                  'components': [
+                    {'type': 'text', 'text': 'GENERAL BODY'},
+                    {
+                      'type': 'button_primary',
+                      'label': 'Save & Continue',
+                      'action': {
+                        'type': 'form_submit',
+                        'endpoint': '/api/tenant/settings/profile',
+                        'method': 'POST',
+                        'payload': {'wizard_tab_index': 0, 'wizard_total_tabs': 2},
+                      },
+                    },
+                  ],
+                },
+                {
+                  'id': 'receipts',
+                  'label': 'Receipts',
+                  'components': [
+                    {'type': 'text', 'text': 'RECEIPTS BODY'},
+                    {
+                      'type': 'button_primary',
+                      'label': 'Complete Setup & Open Dashboard',
+                      'action': {
+                        'type': 'form_submit',
+                        'endpoint': '/api/tenant/settings/receipts',
+                        'method': 'POST',
+                        'payload': {'wizard_tab_index': 1, 'wizard_total_tabs': 2},
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+
+    testWidgets('ADVANCE_TAB in a form_submit response animates to the next tab',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DynamicSchemaPage(
+            schema: wizardTabsSchema(),
+            requestExecutor: (endpoint, {required method, data}) async => {
+              'success': true,
+              'message': 'General info saved',
+              'next_action': {
+                'type': 'ADVANCE_TAB',
+                'target_index': 1,
+                'is_final': false,
+                'redirect_url': null,
+              },
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<TabBar>(find.byType(TabBar)).controller?.index, 0);
+
+      await tester.tap(find.text('Save & Continue'));
+      await tester.pumpAndSettle();
+
+      // Section toast shown, then the tab advanced.
+      expect(find.text('General info saved'), findsOneWidget);
+      expect(tester.widget<TabBar>(find.byType(TabBar)).controller?.index, 1);
+      expect(find.text('RECEIPTS BODY'), findsOneWidget);
+    });
+
+    testWidgets('final ADVANCE_TAB pops back out of the schema page',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => ElevatedButton(
+                onPressed: () => Navigator.of(ctx).push(
+                  MaterialPageRoute(
+                    builder: (_) => DynamicSchemaPage(
+                      schema: wizardTabsSchema(),
+                      requestExecutor:
+                          (endpoint, {required method, data}) async => {
+                        'success': true,
+                        'message': 'Store setup completed successfully!',
+                        'is_profile_completed': true,
+                        'next_action': {
+                          'type': 'ADVANCE_TAB',
+                          'target_index': 1,
+                          'is_final': true,
+                          'redirect_url': '/dashboard',
+                        },
+                      },
+                    ),
+                  ),
+                ),
+                child: const Text('Open Profile'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Profile'));
+      await tester.pumpAndSettle();
+      expect(find.byType(DynamicSchemaPage), findsOneWidget);
+
+      // Go to the final tab and complete.
+      await tester.tap(find.text('Receipts'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Complete Setup & Open Dashboard'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Store setup completed successfully!'), findsOneWidget);
+      expect(find.byType(DynamicSchemaPage), findsNothing);
+      expect(find.text('Open Profile'), findsOneWidget);
     });
 
     testWidgets('validates server-declared required fields before submission',

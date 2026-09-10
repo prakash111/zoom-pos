@@ -17,6 +17,7 @@ import '../widgets/adaptive_sheet.dart';
 import 'dynamic_schema_context.dart';
 import 'dynamic_schema_parser.dart';
 import 'sdui_component_registry.dart';
+import 'sdui_tab_advancer.dart';
 
 /// Endpoints whose effect only exists on the server — queuing them offline
 /// would be a lie. Matched as substrings of the action endpoint.
@@ -235,6 +236,15 @@ class SduiActionDispatcher {
           showToast(message);
           if (action['reload'] == true) {
             onReload();
+          }
+
+          // Store Profile setup wizard: the server (or the action itself) can
+          // ask the client to move to the next tab, or — on the final tab —
+          // finish onboarding and drop back to the dashboard.
+          final advanceTab = _advanceTabDirective(res, action);
+          if (advanceTab != null &&
+              _handleAdvanceTab(context, advanceTab)) {
+            return;
           }
 
           if (context.mounted && _isPostSaleSheetResponse(res)) {
@@ -483,6 +493,46 @@ class SduiActionDispatcher {
         builder: (_) => SduiComponentRegistry.resolveRoute('pos'),
       ),
     );
+  }
+
+  /// Reads an `ADVANCE_TAB` directive from a `form_submit` response
+  /// (`next_action`) or, as a fallback, from the action schema itself. Returns
+  /// null when there is nothing to do.
+  static Map<String, dynamic>? _advanceTabDirective(
+    Map<String, dynamic> res,
+    Map<String, dynamic> action,
+  ) {
+    final raw = res['next_action'] ?? action['next_action'];
+    if (raw is Map &&
+        raw['type']?.toString().toUpperCase().trim() == 'ADVANCE_TAB') {
+      return Map<String, dynamic>.from(raw);
+    }
+    return null;
+  }
+
+  /// Executes an `ADVANCE_TAB` directive: animate the visible schema tabs to
+  /// `target_index`, or — when `is_final` — leave the settings stack and land
+  /// back on the dashboard. Returns true when it fully handled navigation so
+  /// the caller skips its own redirect / navigate-back branch.
+  bool _handleAdvanceTab(
+    BuildContext context,
+    Map<String, dynamic> directive,
+  ) {
+    final isFinal = directive['is_final'] == true;
+
+    if (isFinal) {
+      // The celebration toast was already shown from the response `message`.
+      if (context.mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+      return true;
+    }
+
+    final target = (directive['target_index'] as num?)?.toInt();
+    if (target != null && SduiTabAdvancer.advanceTo(target)) {
+      return true;
+    }
+    return false;
   }
 
   /// True when a form_submit / api_post response carries the native

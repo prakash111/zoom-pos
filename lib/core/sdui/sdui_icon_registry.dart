@@ -125,6 +125,10 @@ class SduiIconRegistry {
     'today': Icons.today_outlined,
     'chevron_left': Icons.chevron_left,
     'chevron_right': Icons.chevron_right,
+    'arrow_forward': Icons.arrow_forward_rounded,
+    'arrow_forward_rounded': Icons.arrow_forward_rounded,
+    'arrow_back': Icons.arrow_back_rounded,
+    'check_circle_outline': Icons.check_circle_outline,
     'add': Icons.add,
     'login': Icons.login,
   };
