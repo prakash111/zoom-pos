@@ -18,9 +18,8 @@ return new class extends Migration
             $table->string('accent_color', 32)->nullable()->default('#FF7A00')->after('secondary_color');
             $table->string('splash_bg_color', 32)->nullable()->default('#0F172A')->after('accent_color');
             $table->string('auth_bg_color', 32)->nullable()->default('#F8FAFC')->after('splash_bg_color');
-            $table->string('auth_headline', 150)->nullable()->default('Run your business smarter.')->after('auth_bg_color');
-            $table->string('auth_description', 255)->nullable()
-                ->default('Sales, inventory & orders — all in one place.')->after('auth_headline');
+            $table->string('auth_headline', 150)->nullable()->after('auth_bg_color');
+            $table->string('auth_description', 255)->nullable()->after('auth_headline');
         });
     }
 

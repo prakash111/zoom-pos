@@ -130,9 +130,10 @@ class PlatformBranding extends Model
         return [
             'platform' => [
                 'name' => $this->platform_name ?: config('app.name', 'POS Systems'),
-                'headline' => $this->auth_headline ?: 'Run your business smarter.',
-                'description' => $this->auth_description
-                    ?: 'Sales, inventory & orders — all in one place.',
+                // Purely Superadmin-authored — no app-side default marketing
+                // copy. `null` tells the client to render nothing.
+                'headline' => $this->auth_headline ?: null,
+                'description' => $this->auth_description ?: null,
                 'logo_url' => $this->getLogoPublicUrl(),
                 'favicon_url' => $this->getFaviconPublicUrl(),
             ],

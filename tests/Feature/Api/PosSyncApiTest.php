@@ -125,8 +125,8 @@ class PosSyncApiTest extends TestCase
     {
         PlatformBranding::current()->update([
             'platform_name' => 'POS Systems',
-            'auth_headline' => 'Run your business smarter.',
-            'auth_description' => 'Sales, inventory & orders — all in one place.',
+            'auth_headline' => 'Sample platform headline',
+            'auth_description' => 'Sample platform description',
             'primary_color' => '#F95700',
             'secondary_color' => '#0F172A',
             'accent_color' => '#FF7A00',
@@ -142,8 +142,8 @@ class PosSyncApiTest extends TestCase
             $this->getJson($url)
                 ->assertOk()
                 ->assertJsonPath('platform.name', 'POS Systems')
-                ->assertJsonPath('platform.headline', 'Run your business smarter.')
-                ->assertJsonPath('platform.description', 'Sales, inventory & orders — all in one place.')
+                ->assertJsonPath('platform.headline', 'Sample platform headline')
+                ->assertJsonPath('platform.description', 'Sample platform description')
                 ->assertJsonStructure(['platform' => ['logo_url', 'favicon_url']])
                 ->assertJsonPath('theme.primary_color', '#F95700')
                 ->assertJsonPath('theme.secondary_color', '#0F172A')
@@ -160,6 +160,19 @@ class PosSyncApiTest extends TestCase
         $this->getJson('/api/v1/pos/auth/public-settings')
             ->assertOk()
             ->assertJsonPath('theme.primary_color', '#F95700');
+    }
+
+    public function test_public_settings_headline_and_description_are_null_when_unset(): void
+    {
+        PlatformBranding::current()->update([
+            'auth_headline' => null,
+            'auth_description' => null,
+        ]);
+
+        $this->getJson('/api/v1/pos/auth/public-settings')
+            ->assertOk()
+            ->assertJsonPath('platform.headline', null)
+            ->assertJsonPath('platform.description', null);
     }
 
     public function test_desktop_web_session_is_user_bound_and_one_time(): void
