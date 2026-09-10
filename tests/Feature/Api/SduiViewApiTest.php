@@ -229,11 +229,28 @@ class SduiViewApiTest extends TestCase
         }
     }
 
+    public function test_app_preferences_view_has_real_controls_not_a_notice(): void
+    {
+        $body = json_encode($this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->getJson('/api/tenant/views/settings-appearance')
+            ->assertOk()
+            ->json('schema'));
+
+        $this->assertStringNotContainsString('stored on each device', $body);
+        $this->assertStringNotContainsString('Theme, animations &', $body);
+        // Functional controls are present.
+        $this->assertStringContainsString('"type":"color_picker"', $body);
+        $this->assertStringContainsString('"name":"primary_color"', $body);
+        $this->assertStringContainsString('"name":"app_theme_mode"', $body);
+        $this->assertStringContainsString('"name":"app_page_transition"', $body);
+        $this->assertStringContainsString('"name":"app_nav_dock"', $body);
+    }
+
     public function test_every_settings_panel_returns_a_valid_versioned_sdui_tree(): void
     {
         $token = $this->token();
 
-        foreach (['mode', 'profile', 'branding', 'receipts', 'financial', 'taxes', 'api', 'navigation'] as $panel) {
+        foreach (['mode', 'profile', 'branding', 'receipts', 'financial', 'taxes', 'api', 'navigation', 'appearance'] as $panel) {
             $this->withHeader('Authorization', 'Bearer '.$token)
                 ->getJson('/api/tenant/views/settings-'.$panel)
                 ->assertOk()

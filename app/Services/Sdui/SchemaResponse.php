@@ -4438,19 +4438,55 @@ class SchemaResponse
     }
 
     /**
-     * "App Preferences" — theme, page-transition animation and nav-dock
-     * placement. These are per-device settings owned by the native client
-     * (Settings ▸ Appearance / the app-bar tune button); this view is only the
-     * graceful fallback for web / preview surfaces that can't render them.
+     * "App Preferences" — the brand colour (server-persisted, applies on every
+     * device) plus the per-device theme / page-transition / dashboard-layout /
+     * nav-placement selectors. The native client renders these live; this SDUI
+     * tree is the web / preview fallback.
      */
     public static function appearanceView(Company $company): array
     {
         return self::screen('App Preferences', [
             self::card([
-                self::text('Theme, animations & layout', 'title_medium', ['bold' => true]),
-                self::text('Light / dark theme, the page-move animation and where the navigation menu sits are stored on each device.', 'body_small', ['color' => '#6b7280']),
+                self::text('Brand Colour', 'title_medium', ['bold' => true]),
+                self::text('Applied to buttons, active menu items, badges and focus rings across every device.', 'body_small', ['color' => '#6b7280']),
                 self::divider(),
-                self::text('On the desktop / mobile app, open these from the top-bar "App preferences" button or Settings ▸ Appearance.', 'body_small', ['color' => '#6b7280']),
+                self::colorPicker('primary_color', 'Primary Colour', $company->primary_color ?? '#4F46E5'),
+                self::colorPicker('accent_color', 'Accent Colour', $company->accent_color ?? '#D97706'),
+                self::buttonPrimary('Save Brand Colour', self::formSubmitAction(
+                    '/api/tenant/settings/profile',
+                    'POST',
+                    'Brand colour updated'
+                ), 'palette'),
+            ]),
+            self::card([
+                self::text('Theme Mode', 'title_medium', ['bold' => true]),
+                self::divider(),
+                self::dropdownSelect('app_theme_mode', 'Appearance', [
+                    ['label' => 'Match device', 'value' => 'system'],
+                    ['label' => 'Light', 'value' => 'light'],
+                    ['label' => 'Dark', 'value' => 'dark'],
+                ], 'system'),
+            ]),
+            self::card([
+                self::text('Page Transition', 'title_medium', ['bold' => true]),
+                self::divider(),
+                self::dropdownSelect('app_page_transition', 'When opening a link or menu item', [
+                    ['label' => 'Slide', 'value' => 'slide'],
+                    ['label' => 'Fade through', 'value' => 'fade'],
+                    ['label' => 'Zoom', 'value' => 'zoom'],
+                    ['label' => 'Instant', 'value' => 'none'],
+                ], 'slide'),
+            ]),
+            self::card([
+                self::text('Navigation Menu Placement', 'title_medium', ['bold' => true]),
+                self::divider(),
+                self::dropdownSelect('app_nav_dock', 'Menu position', [
+                    ['label' => 'Left sidebar', 'value' => 'left'],
+                    ['label' => 'Top navigation bar', 'value' => 'top'],
+                    ['label' => 'Right sidebar', 'value' => 'right'],
+                    ['label' => 'Bottom bar', 'value' => 'bottom'],
+                ], 'left'),
+                self::text('Theme mode, page transition and menu placement are stored per device — the desktop / mobile app applies them the moment you change them.', 'body_small', ['color' => '#94a3b8']),
             ]),
         ]);
     }
