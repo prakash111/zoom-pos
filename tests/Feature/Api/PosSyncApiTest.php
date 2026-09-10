@@ -17,6 +17,7 @@ use App\Models\TenantApiKey;
 use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -106,6 +107,17 @@ class PosSyncApiTest extends TestCase
             'token' => $token,
             'user_id' => $this->user->id,
         ]);
+    }
+
+    public function test_auth_branding_serves_inline_header_with_no_tagline(): void
+    {
+        $this->getJson('/api/v1/pos/auth/branding')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('platform_tagline', null)
+            ->assertJsonPath('header_inline', true)
+            ->assertJsonPath('show_tagline', false)
+            ->assertJsonStructure(['platform_name', 'brand_logo_url']);
     }
 
     public function test_desktop_web_session_is_user_bound_and_one_time(): void
@@ -1132,7 +1144,7 @@ class PosSyncApiTest extends TestCase
         $today->assertJsonPath('range.key', 'today')
             ->assertJsonPath('range.label', 'Today');
         $this->assertSame(now()->startOfDay()->toDateString(),
-            \Illuminate\Support\Carbon::parse($today->json('range.from'))->toDateString());
+            Carbon::parse($today->json('range.from'))->toDateString());
 
         $custom = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
             ->getJson('/api/v1/pos/analytics?range=custom&from=2026-01-01&to=2026-01-31')

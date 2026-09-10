@@ -353,8 +353,13 @@ class PosSyncApiController extends Controller
             'success' => true,
             'platform_name' => $branding->platform_name ?: config('app.name', 'Smart Inventory & Sales'),
             'brand_logo_url' => $branding->getLogoPublicUrl(),
-            'platform_tagline' => $branding->landing_hero_subtitle
-                ?: 'Online inventory & sales management',
+            // The sign-in header shows the logo and title inline with no
+            // description block. `header_inline` / `show_tagline` let the
+            // client honour this without an app rebuild; the long landing
+            // tagline is intentionally not sent to the auth screen.
+            'platform_tagline' => null,
+            'header_inline' => true,
+            'show_tagline' => false,
         ]);
     }
 
