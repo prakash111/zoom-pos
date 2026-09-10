@@ -13,11 +13,20 @@ class ThemeProvider extends ChangeNotifier {
   static const _colorKey = 'zoom_pos.primary_color';
   static const _accentKey = 'zoom_pos.accent_color';
   static const _drawerBgKey = 'zoom_pos.drawer_bg';
+  static const _drawerTextKey = 'zoom_pos.drawer_text';
+  static const _activeLinkKey = 'zoom_pos.active_link';
+  static const _canvasKey = 'zoom_pos.canvas_bg';
   static const _themeModeKey = 'zoom_pos.theme_mode';
 
   Color seedColor = AppTheme.primary;
   Color? accentColor;
+
+  /// Per-device surface overrides configured in App Preferences ▸ "Drawer &
+  /// surfaces". `null` = use the theme default. All apply instantly.
   Color? drawerBg;
+  Color? drawerTextColor;
+  Color? activeLinkColor;
+  Color? canvasColor;
 
   /// User-selectable light / dark / follow-system preference, persisted per
   /// device. Defaults to following the OS setting.
@@ -35,10 +44,15 @@ class ThemeProvider extends ChangeNotifier {
       if (accentHex != null) {
         accentColor = parseHexColor(accentHex);
       }
-      final drawerHex = prefs.getString(_drawerBgKey);
-      if (drawerHex != null) {
-        drawerBg = parseHexColor(drawerHex);
+      Color? hexPref(String key) {
+        final h = prefs.getString(key);
+        return h == null ? null : parseHexColor(h);
       }
+
+      drawerBg = hexPref(_drawerBgKey);
+      drawerTextColor = hexPref(_drawerTextKey);
+      activeLinkColor = hexPref(_activeLinkKey);
+      canvasColor = hexPref(_canvasKey);
       themeMode = _parseThemeMode(prefs.getString(_themeModeKey));
       notifyListeners();
     } catch (e) {
@@ -133,6 +147,49 @@ class ThemeProvider extends ChangeNotifier {
       await prefs.setString(_drawerBgKey, toHexColor(color));
     } catch (e) {
       debugPrint('ThemeProvider.setDrawerBg error: $e');
+    }
+  }
+
+  Future<void> _setOverride(
+      String key, Color? color, void Function(Color?) assign) async {
+    assign(color);
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (color == null) {
+        await prefs.remove(key);
+      } else {
+        await prefs.setString(key, toHexColor(color));
+      }
+    } catch (e) {
+      debugPrint('ThemeProvider._setOverride($key) error: $e');
+    }
+  }
+
+  Future<void> setDrawerBgOrNull(Color? c) =>
+      _setOverride(_drawerBgKey, c, (v) => drawerBg = v);
+  Future<void> setDrawerTextColor(Color? c) =>
+      _setOverride(_drawerTextKey, c, (v) => drawerTextColor = v);
+  Future<void> setActiveLinkColor(Color? c) =>
+      _setOverride(_activeLinkKey, c, (v) => activeLinkColor = v);
+  Future<void> setCanvasColor(Color? c) =>
+      _setOverride(_canvasKey, c, (v) => canvasColor = v);
+
+  Future<void> resetSurfaceOverrides() async {
+    drawerBg = drawerTextColor = activeLinkColor = canvasColor = null;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final k in const [
+        _drawerBgKey,
+        _drawerTextKey,
+        _activeLinkKey,
+        _canvasKey,
+      ]) {
+        await prefs.remove(k);
+      }
+    } catch (e) {
+      debugPrint('ThemeProvider.resetSurfaceOverrides error: $e');
     }
   }
 

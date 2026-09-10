@@ -84,6 +84,12 @@ class AppPreferencesBody extends StatelessWidget {
           const _BrandColorGroup(),
         ),
         group(
+          'Drawer & surfaces',
+          'Fine-tune the sidebar and canvas. Leave any row on "Default" to '
+              'follow the theme. Changes apply instantly.',
+          const _SurfaceColorsGroup(),
+        ),
+        group(
           'Dashboard layout',
           'Pick which design the home dashboard uses. Both show the same data.',
           RadioGroup<DashboardLayout>(
@@ -318,6 +324,119 @@ class _BrandColorGroupState extends State<_BrandColorGroup> {
                   child: const Text('Reset'),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Four optional surface colours (drawer bg / drawer text / active-link /
+/// canvas). Each row offers a small swatch palette plus a "Default" chip that
+/// clears the override. Bound straight to [ThemeProvider] — instant + local.
+class _SurfaceColorsGroup extends StatelessWidget {
+  const _SurfaceColorsGroup();
+
+  static const _palette = <Color>[
+    Color(0xFF0F172A),
+    Color(0xFF1E293B),
+    Color(0xFF334155),
+    Color(0xFF475569),
+    Color(0xFFF8FAFC),
+    Color(0xFFFFFFFF),
+    Color(0xFF2563EB),
+    Color(0xFF7C3AED),
+    Color(0xFF0D9488),
+    Color(0xFF16A34A),
+    Color(0xFFCA8A04),
+    Color(0xFFDC2626),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final tp = context.watch<ThemeProvider>();
+    final scheme = Theme.of(context).colorScheme;
+
+    Widget row(String label, Color? value, void Function(Color?) onChanged) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(label,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                ),
+                if (value != null)
+                  TextButton(
+                    onPressed: () => onChanged(null),
+                    child: const Text('Default'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final c in _palette)
+                  InkWell(
+                    onTap: () => onChanged(c),
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: value?.toARGB32() == c.toARGB32()
+                              ? scheme.onSurface
+                              : scheme.outlineVariant,
+                          width: value?.toARGB32() == c.toARGB32() ? 2.5 : 1,
+                        ),
+                      ),
+                      child: value?.toARGB32() == c.toARGB32()
+                          ? const Icon(Icons.check,
+                              size: 15, color: Colors.white)
+                          : null,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            row('Drawer background', tp.drawerBg, tp.setDrawerBgOrNull),
+            const Divider(height: 12),
+            row('Drawer text & icons', tp.drawerTextColor,
+                tp.setDrawerTextColor),
+            const Divider(height: 12),
+            row('Active link / selected', tp.activeLinkColor,
+                tp.setActiveLinkColor),
+            const Divider(height: 12),
+            row('Canvas / scaffold background', tp.canvasColor,
+                tp.setCanvasColor),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: tp.resetSurfaceOverrides,
+                icon: const Icon(Icons.restart_alt, size: 18),
+                label: const Text('Reset all to default'),
+              ),
             ),
           ],
         ),

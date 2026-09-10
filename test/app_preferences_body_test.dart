@@ -38,7 +38,8 @@ void main() {
           ChangeNotifierProvider<ThemeProvider>.value(value: ThemeProvider()),
           ChangeNotifierProvider<NavDockProvider>.value(
               value: NavDockProvider(preferences: AppPreferences())),
-          ChangeNotifierProvider<AuthProvider>.value(value: _FakeAuthProvider()),
+          ChangeNotifierProvider<AuthProvider>.value(
+              value: _FakeAuthProvider()),
         ],
         child: MaterialApp(
           localizationsDelegates: const [
@@ -84,7 +85,8 @@ void main() {
           ChangeNotifierProvider<ThemeProvider>.value(value: theme),
           ChangeNotifierProvider<NavDockProvider>.value(
               value: NavDockProvider(preferences: AppPreferences())),
-          ChangeNotifierProvider<AuthProvider>.value(value: _FakeAuthProvider()),
+          ChangeNotifierProvider<AuthProvider>.value(
+              value: _FakeAuthProvider()),
         ],
         child: MaterialApp(
           localizationsDelegates: const [
@@ -100,12 +102,16 @@ void main() {
     await tester.pumpAndSettle();
 
     final before = theme.seedColor.toARGB32();
-    // The violet preset swatch.
-    await tester.tap(find.byWidgetPredicate((w) =>
-        w is Container &&
-        w.decoration is BoxDecoration &&
-        (w.decoration as BoxDecoration).color?.toARGB32() ==
-            const Color(0xFF7C3AED).toARGB32()));
+    // The violet preset swatch in the "Brand colour" group (the first group).
+    await tester.tap(
+      find
+          .byWidgetPredicate((w) =>
+              w is Container &&
+              w.decoration is BoxDecoration &&
+              (w.decoration as BoxDecoration).color?.toARGB32() ==
+                  const Color(0xFF7C3AED).toARGB32())
+          .first,
+    );
     await tester.pump();
 
     expect(theme.seedColor.toARGB32(), const Color(0xFF7C3AED).toARGB32());

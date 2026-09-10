@@ -540,11 +540,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context, _) {
         final l10n = AppLocalizations.of(context);
 
+        final tp = context.watch<ThemeProvider>();
         final coverUrl = company?.drawerCoverUrl;
         final hasCover = coverUrl != null && coverUrl.isNotEmpty;
-        final primaryColor = bootstrap.theme.primaryColorValue ??
+        final primaryColor = tp.activeLinkColor ??
+            bootstrap.theme.primaryColorValue ??
             Theme.of(context).colorScheme.primary;
-        final drawerBgColor = bootstrap.theme.drawerBgValue ??
+        // Local App-Preferences override wins over the server branding.
+        final drawerBgColor = tp.drawerBg ??
+            bootstrap.theme.drawerBgValue ??
             Theme.of(context).drawerTheme.backgroundColor;
 
         final children = <Widget>[
@@ -796,12 +800,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final probe = drawerGradient is LinearGradient
             ? drawerGradient.colors.first
             : (drawerBgColor ?? Theme.of(context).colorScheme.surface);
-        final onDrawer = probe.computeLuminance() < 0.5
-            ? Colors.white
-            : const Color(0xFF0F172A);
+        // Explicit override wins; otherwise auto-invert against the bg.
+        final onDrawer = tp.drawerTextColor ??
+            (probe.computeLuminance() < 0.5
+                ? Colors.white
+                : const Color(0xFF0F172A));
         final baseTheme = Theme.of(context);
         final drawerTheme = baseTheme.copyWith(
           colorScheme: baseTheme.colorScheme.copyWith(
+            primary: primaryColor,
             onSurface: onDrawer,
             onSurfaceVariant: onDrawer.withValues(alpha: 0.66),
             outline: onDrawer.withValues(alpha: 0.42),

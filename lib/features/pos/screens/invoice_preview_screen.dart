@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -65,6 +66,8 @@ class InvoicePreviewData {
     required this.taxTotal,
     required this.grandTotal,
     this.customerName,
+    this.customerPhone,
+    this.customerEmail,
     this.notes,
     this.currencySymbol = '\$',
     this.taxId,
@@ -82,6 +85,8 @@ class InvoicePreviewData {
   final double taxTotal;
   final double grandTotal;
   final String? customerName;
+  final String? customerPhone;
+  final String? customerEmail;
   final String? notes;
   final String currencySymbol;
   final String? taxId;
@@ -178,8 +183,119 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
             Text(ok ? 'Sent to printer.' : 'Could not reach the printer.')));
   }
 
+  /// A plain-text summary of the draft invoice, used as the WhatsApp / SMS /
+  /// email body when dispatching straight from the preview stage.
+  String _summaryText() {
+    final data = widget.data;
+    final c = CurrencyFormatter(data.currencySymbol);
+    final b = StringBuffer()
+      ..writeln('${data.companyName} — ${data.documentType}')
+      ..writeln('');
+    for (final it in data.items) {
+      b.writeln(
+          '${it.product.name} x${_formatQty(it.quantity)}  ${c.format(it.lineTotal)}');
+    }
+    b
+      ..writeln('')
+      ..writeln('Subtotal: ${c.format(data.subtotal)}');
+    if (data.discount > 0) b.writeln('Discount: -${c.format(data.discount)}');
+    if (data.taxTotal > 0) {
+      b.writeln('${data.taxLabel}: +${c.format(data.taxTotal)}');
+    }
+    b.writeln('Total: ${c.format(data.grandTotal)}');
+    if (data.dueAmount > 0.001) {
+      b.writeln('Due: ${c.format(data.dueAmount)}');
+    }
+    if ((data.notes ?? '').isNotEmpty) b.writeln('\nNote: ${data.notes}');
+    return b.toString().trimRight();
+  }
+
+  Future<String?> _promptContact(String title, String hint,
+      {String? initial}) async {
+    final controller = TextEditingController(text: initial ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: title.toLowerCase().contains('email')
+              ? TextInputType.emailAddress
+              : TextInputType.phone,
+          decoration: InputDecoration(hintText: hint),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+    return (result == null || result.isEmpty) ? null : result;
+  }
+
+  Future<void> _launch(Uri uri, {String? failMsg}) async {
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failMsg ?? 'Could not open ${uri.scheme}.')),
+      );
+    }
+  }
+
+  Future<void> _sendWhatsApp() async {
+    var phone = widget.data.customerPhone?.trim();
+    if (phone == null || phone.isEmpty) {
+      phone = await _promptContact(
+          'Send via WhatsApp', 'Customer phone (with country code)');
+      if (phone == null) return;
+    }
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    await _launch(
+      Uri.parse(
+          'https://wa.me/$digits?text=${Uri.encodeComponent(_summaryText())}'),
+      failMsg: 'WhatsApp is not installed.',
+    );
+  }
+
+  Future<void> _sendSms() async {
+    var phone = widget.data.customerPhone?.trim();
+    if (phone == null || phone.isEmpty) {
+      phone = await _promptContact('Send via SMS', 'Customer phone number');
+      if (phone == null) return;
+    }
+    await _launch(Uri(
+      scheme: 'sms',
+      path: phone,
+      queryParameters: {'body': _summaryText()},
+    ));
+  }
+
+  Future<void> _sendEmail() async {
+    var email = widget.data.customerEmail?.trim();
+    if (email == null || email.isEmpty) {
+      email = await _promptContact('Send via Email', 'Customer email address');
+      if (email == null) return;
+    }
+    await _launch(Uri(
+      scheme: 'mailto',
+      path: email,
+      queryParameters: {
+        'subject':
+            '${widget.data.documentType} from ${widget.data.companyName}',
+        'body': _summaryText(),
+      },
+    ));
+  }
+
   /// The same unified bottom-sheet popup used after a sale is finalized —
-  /// print / thermal / share all live inside it instead of as loose buttons.
+  /// print / thermal / share / direct dispatch all live inside it.
   Future<void> _openActionsSheet() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -226,6 +342,40 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
               onTap: () {
                 Navigator.of(sheetCtx).pop();
                 _export();
+              },
+            ),
+            const Divider(height: 8),
+            ListTile(
+              leading: const Icon(Icons.chat, color: Color(0xFF25D366)),
+              title: const Text('Send via WhatsApp'),
+              subtitle: Text((widget.data.customerPhone ?? '').isNotEmpty
+                  ? 'to ${widget.data.customerPhone}'
+                  : 'Enter a phone number'),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _sendWhatsApp();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.email_outlined),
+              title: const Text('Send via Email'),
+              subtitle: Text((widget.data.customerEmail ?? '').isNotEmpty
+                  ? 'to ${widget.data.customerEmail}'
+                  : 'Enter an email address'),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _sendEmail();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.sms_outlined),
+              title: const Text('Send via SMS'),
+              subtitle: Text((widget.data.customerPhone ?? '').isNotEmpty
+                  ? 'to ${widget.data.customerPhone}'
+                  : 'Enter a phone number'),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _sendSms();
               },
             ),
             const SizedBox(height: 4),

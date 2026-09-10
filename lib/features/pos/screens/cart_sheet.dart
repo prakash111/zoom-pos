@@ -87,7 +87,9 @@ class CartSheet extends StatelessWidget {
           maxLines: 3,
           autofocus: true,
           decoration: InputDecoration(
-            hintText: l10n.text('orderNotesHint', fallback: 'e.g. Special packaging, delivery note, invoice memo'),
+            hintText: l10n.text('orderNotesHint',
+                fallback:
+                    'e.g. Special packaging, delivery note, invoice memo'),
             border: const OutlineInputBorder(),
           ),
         ),
@@ -144,7 +146,8 @@ class CartSheet extends StatelessWidget {
                 children: [
                   Expanded(
                     child: ChoiceChip(
-                      label: Text(l10n.text('fixedAmount', fallback: 'Fixed Amount')),
+                      label: Text(
+                          l10n.text('fixedAmount', fallback: 'Fixed Amount')),
                       selected: !isPercent,
                       onSelected: (_) =>
                           setDialogState(() => isPercent = false),
@@ -153,7 +156,8 @@ class CartSheet extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: ChoiceChip(
-                      label: Text(l10n.text('percentage', fallback: 'Percentage (%)')),
+                      label: Text(
+                          l10n.text('percentage', fallback: 'Percentage (%)')),
                       selected: isPercent,
                       onSelected: (_) => setDialogState(() => isPercent = true),
                     ),
@@ -317,6 +321,8 @@ class CartSheet extends StatelessWidget {
         taxTotal: pos.taxTotal,
         grandTotal: pos.grandTotal,
         customerName: pos.selectedCustomer?.name,
+        customerPhone: pos.selectedCustomer?.phone,
+        customerEmail: pos.selectedCustomer?.email,
         notes: pos.orderNotes,
         currencySymbol: company?.currencySymbol ?? '\$',
         taxId: company?.taxId,
@@ -350,13 +356,15 @@ class CartSheet extends StatelessWidget {
     if (sduiMethod != null) {
       return SduiIconRegistry.resolve(sduiMethod.icon);
     }
-    return SduiIconRegistry.resolve(code, fallback: Icons.account_balance_wallet_outlined);
+    return SduiIconRegistry.resolve(code,
+        fallback: Icons.account_balance_wallet_outlined);
   }
 
   Color _colorForMethod(String code, Color defaultPrimary) {
     final sduiMethod = BootstrapCache.instance.paymentMethodFor(code);
     if (sduiMethod != null) {
-      return SduiIconRegistry.parseColor(sduiMethod.color, fallback: defaultPrimary);
+      return SduiIconRegistry.parseColor(sduiMethod.color,
+          fallback: defaultPrimary);
     }
     return defaultPrimary;
   }
@@ -407,7 +415,8 @@ class CartSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${l10n.text('grandTotal', fallback: 'Grand Total')}: ${formatter.format(pos.grandTotal)}',
+            Text(
+                '${l10n.text('grandTotal', fallback: 'Grand Total')}: ${formatter.format(pos.grandTotal)}',
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
             const SizedBox(height: 12),
             TextField(
@@ -416,7 +425,8 @@ class CartSheet extends StatelessWidget {
                   const TextInputType.numberWithOptions(decimal: true),
               autofocus: true,
               decoration: InputDecoration(
-                labelText: l10n.text('amountPaidNow', fallback: 'Amount Paid Now'),
+                labelText:
+                    l10n.text('amountPaidNow', fallback: 'Amount Paid Now'),
                 prefixText: company?.currencySymbol ?? '\$',
                 border: const OutlineInputBorder(),
               ),
@@ -431,7 +441,8 @@ class CartSheet extends StatelessWidget {
                       controller.text = pos.grandTotal.toStringAsFixed(2),
                 ),
                 ActionChip(
-                  label: Text(l10n.text('zeroPayment', fallback: 'Zero Payment (Full Due)')),
+                  label: Text(l10n.text('zeroPayment',
+                      fallback: 'Zero Payment (Full Due)')),
                   onPressed: () => controller.text = '0',
                 ),
               ],
@@ -683,207 +694,208 @@ class CartSheet extends StatelessWidget {
           child: SafeArea(
             top: false,
             child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 44,
-                height: 5,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 44,
+                  height: 5,
                   decoration: BoxDecoration(
                       color: Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(3)),
-              ),
-              Padding(
+                ),
+                Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
                           Text(l10n.orderCart,
                               style: Theme.of(context)
                                   .textTheme
                                   .titleLarge
                                   ?.copyWith(fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 8),
-                        Container(
+                          const SizedBox(width: 8),
+                          Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: primaryColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            l10n.itemsCountBadge(pos.cartCount),
+                            decoration: BoxDecoration(
+                              color: primaryColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              l10n.itemsCountBadge(pos.cartCount),
                               style: TextStyle(
                                   color: primaryColor,
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (!pos.cartIsEmpty)
+                        TextButton.icon(
+                          onPressed: pos.clearCart,
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: Text(l10n.clearCart),
+                          style: TextButton.styleFrom(
+                              foregroundColor: Colors.red.shade600),
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+
+                if (pos.hasRxContext)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                            pos.isRepairContext
+                                ? Icons.handyman_outlined
+                                : Icons.medical_information_outlined,
+                            size: 18,
+                            color: const Color(0xFF047857)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                pos.isRepairContext
+                                    ? l10n.text('linkedRepairTicket',
+                                        fallback: 'Linked Repair Ticket')
+                                    : l10n.text('attachDoctorRxDetails',
+                                        fallback: 'Attach Doctor & Rx Details'),
+                                style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF065F46)),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                [
+                                  if ((pos.rxNumber ?? '').isNotEmpty)
+                                    '${pos.isRepairContext ? 'Ticket ' : ''}#${pos.rxNumber}',
+                                  if ((pos.rxDoctorName ?? '').isNotEmpty)
+                                    pos.rxDoctorName!,
+                                  if (!pos.isRepairContext &&
+                                      (pos.rxDoctorRegistrationNo ?? '')
+                                          .isNotEmpty)
+                                    'Reg. ${pos.rxDoctorRegistrationNo}',
+                                ].join('  ·  '),
+                                style: const TextStyle(
+                                    fontSize: 12, color: Color(0xFF047857)),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    if (!pos.cartIsEmpty)
-                      TextButton.icon(
-                        onPressed: pos.clearCart,
-                        icon: const Icon(Icons.delete_outline, size: 18),
-                        label: Text(l10n.clearCart),
-                          style: TextButton.styleFrom(
-                              foregroundColor: Colors.red.shade600),
-                      ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-
-              if (pos.hasRxContext)
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFECFDF5),
-                    border: Border.all(color: const Color(0xFFA7F3D0)),
-                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                          pos.isRepairContext
-                              ? Icons.handyman_outlined
-                              : Icons.medical_information_outlined,
-                          size: 18,
-                          color: const Color(0xFF047857)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              pos.isRepairContext
-                                  ? l10n.text('linkedRepairTicket',
-                                      fallback: 'Linked Repair Ticket')
-                                  : l10n.text('attachDoctorRxDetails',
-                                      fallback: 'Attach Doctor & Rx Details'),
-                              style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF065F46)),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              [
-                                if ((pos.rxNumber ?? '').isNotEmpty)
-                                  '${pos.isRepairContext ? 'Ticket ' : ''}#${pos.rxNumber}',
-                                if ((pos.rxDoctorName ?? '').isNotEmpty)
-                                  pos.rxDoctorName!,
-                                if (!pos.isRepairContext &&
-                                    (pos.rxDoctorRegistrationNo ?? '').isNotEmpty)
-                                  'Reg. ${pos.rxDoctorRegistrationNo}',
-                              ].join('  ·  '),
-                              style: const TextStyle(
-                                  fontSize: 12, color: Color(0xFF047857)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
 
-              // Items List + Bottom Section share one scroll view (with the
-              // sheet's own scrollController) so the cash-tender field,
-              // preset chips, totals, and Complete Sale button are never
-              // stranded below the keyboard or the sheet's bottom edge —
-              // they scroll into view instead of being clipped.
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  physics: const ClampingScrollPhysics(),
-                  child: Column(
-                    children: [
-                      pos.cartItems.isEmpty
-                          ? SizedBox(
-                              height: 260,
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
+                // Items List + Bottom Section share one scroll view (with the
+                // sheet's own scrollController) so the cash-tender field,
+                // preset chips, totals, and Complete Sale button are never
+                // stranded below the keyboard or the sheet's bottom edge —
+                // they scroll into view instead of being clipped.
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    physics: const ClampingScrollPhysics(),
+                    child: Column(
+                      children: [
+                        pos.cartItems.isEmpty
+                            ? SizedBox(
+                                height: 260,
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
                                       Icon(Icons.shopping_cart_outlined,
                                           size: 56,
                                           color: Colors.grey.shade300),
-                                    const SizedBox(height: 12),
+                                      const SizedBox(height: 12),
                                       Text(l10n.cartEmptyTitle,
                                           style: TextStyle(
                                               color: Colors.grey.shade600,
                                               fontSize: 16)),
-                                    const SizedBox(height: 4),
+                                      const SizedBox(height: 4),
                                       Text(l10n.cartEmptySubtitle,
                                           style: TextStyle(
                                               color: Colors.grey.shade400,
                                               fontSize: 12)),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            )
-                          : ListView.separated(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
+                              )
+                            : ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 8),
-                              itemCount: pos.cartItems.length,
+                                itemCount: pos.cartItems.length,
                                 separatorBuilder: (_, __) =>
                                     const Divider(height: 1),
-                              itemBuilder: (context, index) {
-                                final item = pos.cartItems[index];
-                                return Padding(
+                                itemBuilder: (context, index) {
+                                  final item = pos.cartItems[index];
+                                  return Padding(
                                     padding:
                                         const EdgeInsets.symmetric(vertical: 6),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 3,
-                                        child: Column(
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 3,
+                                          child: Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              item.product.name,
+                                            children: [
+                                              Text(
+                                                item.product.name,
                                                 style: const TextStyle(
                                                     fontWeight: FontWeight.w600,
                                                     fontSize: 14),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              '${formatter.format(item.product.salePrice)} / ${item.product.unit}',
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                '${formatter.format(item.product.salePrice)} / ${item.product.unit}',
                                                 style: TextStyle(
                                                     color: Colors.grey.shade600,
                                                     fontSize: 12),
-                                            ),
-                                            if (item.product.taxRate > 0)
-                                              Text(
-                                                '${isIndia ? 'GST' : 'Tax'} (${item.product.taxRate.toStringAsFixed(0)}%): +${formatter.format(item.taxAmount)}',
+                                              ),
+                                              if (item.product.taxRate > 0)
+                                                Text(
+                                                  '${isIndia ? 'GST' : 'Tax'} (${item.product.taxRate.toStringAsFixed(0)}%): +${formatter.format(item.taxAmount)}',
                                                   style: TextStyle(
                                                       color:
                                                           Colors.grey.shade500,
                                                       fontSize: 11),
-                                              ),
-                                          ],
+                                                ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey.shade100,
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade100,
                                             borderRadius:
                                                 BorderRadius.circular(20),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            IconButton(
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
                                                 icon: const Icon(Icons.remove,
                                                     size: 16),
                                                 padding:
@@ -895,12 +907,12 @@ class CartSheet extends StatelessWidget {
                                                 onPressed: () =>
                                                     pos.decrementQuantity(
                                                         item.product.id),
-                                            ),
-                                            Padding(
+                                              ),
+                                              Padding(
                                                 padding:
                                                     const EdgeInsets.symmetric(
                                                         horizontal: 6),
-                                              child: Text(
+                                                child: Text(
                                                   item.quantity.toStringAsFixed(
                                                       item.quantity ==
                                                               item.quantity
@@ -911,9 +923,9 @@ class CartSheet extends StatelessWidget {
                                                       fontWeight:
                                                           FontWeight.bold,
                                                       fontSize: 14),
+                                                ),
                                               ),
-                                            ),
-                                            IconButton(
+                                              IconButton(
                                                 icon: const Icon(Icons.add,
                                                     size: 16),
                                                 padding:
@@ -925,121 +937,129 @@ class CartSheet extends StatelessWidget {
                                                 onPressed: () =>
                                                     pos.incrementQuantity(
                                                         item.product.id),
-                                            ),
-                                          ],
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      SizedBox(
-                                        width: 75,
-                                        child: Text(
-                                          formatter.format(item.lineTotal),
-                                          textAlign: TextAlign.right,
+                                        const SizedBox(width: 12),
+                                        SizedBox(
+                                          width: 75,
+                                          child: Text(
+                                            formatter.format(item.lineTotal),
+                                            textAlign: TextAlign.right,
                                             style: const TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 14),
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+
+                        const Divider(height: 1),
+
+                        // Bottom Section
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Action Pills: Hold, Customer, Note, Discount / More
+                              // A Wrap instead of a horizontal scroller — same reason
+                              // as the payment method tiles below: with four pills
+                              // (plus their variable-width selected-state labels) this
+                              // reliably overflowed the 400px cart panel and left
+                              // "Note"/"Discount" clipped off-screen with no visible
+                              // scroll affordance. Wrapping to a second line keeps
+                              // every pill visible without requiring a swipe.
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  // Customer Pill
+                                  SduiActionPill(
+                                    label: pos.selectedCustomer?.name ??
+                                        l10n.addCustomer,
+                                    icon: Icons.person_outline,
+                                    isActive: pos.selectedCustomer != null,
+                                    activeColor: primaryColor,
+                                    onTap: () => _pickCustomer(context),
                                   ),
-                                );
-                              },
-                            ),
 
-                      const Divider(height: 1),
+                                  // Hold Cart Pill
+                                  SduiActionPill(
+                                    label: pos.heldCarts.isNotEmpty
+                                        ? l10n.heldChip(pos.heldCarts.length)
+                                        : l10n.hold,
+                                    icon: Icons.pause_circle_outline,
+                                    isActive: pos.heldCarts.isNotEmpty,
+                                    badgeCount: pos.heldCarts.isNotEmpty
+                                        ? pos.heldCarts.length
+                                        : null,
+                                    activeColor: Colors.orange.shade800,
+                                    onTap: () => _showHoldCartsSheet(context),
+                                  ),
 
-                      // Bottom Section
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                    // Action Pills: Hold, Customer, Note, Discount / More
-                    // A Wrap instead of a horizontal scroller — same reason
-                    // as the payment method tiles below: with four pills
-                    // (plus their variable-width selected-state labels) this
-                    // reliably overflowed the 400px cart panel and left
-                    // "Note"/"Discount" clipped off-screen with no visible
-                    // scroll affordance. Wrapping to a second line keeps
-                    // every pill visible without requiring a swipe.
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        // Customer Pill
-                        SduiActionPill(
-                          label: pos.selectedCustomer?.name ?? l10n.addCustomer,
-                          icon: Icons.person_outline,
-                          isActive: pos.selectedCustomer != null,
-                          activeColor: primaryColor,
-                          onTap: () => _pickCustomer(context),
-                        ),
+                                  // Note Pill
+                                  SduiActionPill(
+                                    label: pos.orderNotes.isNotEmpty
+                                        ? l10n.noteChecked
+                                        : l10n.note,
+                                    icon: Icons.edit_note,
+                                    isActive: pos.orderNotes.isNotEmpty,
+                                    activeColor: primaryColor,
+                                    onTap: () => _showNotesDialog(context),
+                                  ),
 
-                        // Hold Cart Pill
-                        SduiActionPill(
-                          label: pos.heldCarts.isNotEmpty
-                              ? l10n.heldChip(pos.heldCarts.length)
-                              : l10n.hold,
-                          icon: Icons.pause_circle_outline,
-                          isActive: pos.heldCarts.isNotEmpty,
-                          badgeCount: pos.heldCarts.isNotEmpty ? pos.heldCarts.length : null,
-                          activeColor: Colors.orange.shade800,
-                          onTap: () => _showHoldCartsSheet(context),
-                        ),
+                                  // Discount Pill
+                                  SduiActionPill(
+                                    label: pos.customDiscount > 0
+                                        ? l10n.discountChecked
+                                        : l10n.discount,
+                                    icon: Icons.local_offer_outlined,
+                                    isActive: pos.customDiscount > 0,
+                                    activeColor: Colors.green.shade800,
+                                    onTap: () => _showDiscountDialog(context),
+                                  ),
 
-                        // Note Pill
-                        SduiActionPill(
-                          label: pos.orderNotes.isNotEmpty
-                              ? l10n.noteChecked
-                              : l10n.note,
-                          icon: Icons.edit_note,
-                          isActive: pos.orderNotes.isNotEmpty,
-                          activeColor: primaryColor,
-                          onTap: () => _showNotesDialog(context),
-                        ),
+                                  // Split Payment Pill
+                                  if (BootstrapCache.instance.activeModule
+                                      .cartConfiguration.allowSplitPayment)
+                                    SduiActionPill(
+                                      label: pos.isSplitPayment
+                                          ? 'Split (${pos.payments.length})'
+                                          : l10n.text('splitPayment',
+                                              fallback: 'Split Payment'),
+                                      icon: Icons.call_split,
+                                      isActive: pos.isSplitPayment,
+                                      activeColor: primaryColor,
+                                      onTap: () => _openSplitPaymentEditor(
+                                          context, activeMethods),
+                                    ),
 
-                        // Discount Pill
-                        SduiActionPill(
-                          label: pos.customDiscount > 0
-                              ? l10n.discountChecked
-                              : l10n.discount,
-                          icon: Icons.local_offer_outlined,
-                          isActive: pos.customDiscount > 0,
-                          activeColor: Colors.green.shade800,
-                          onTap: () => _showDiscountDialog(context),
-                        ),
+                                  // Amount Paid Pill (only meaningful outside split mode)
+                                  if (!pos.isSplitPayment)
+                                    SduiActionPill(
+                                      label: pos.dueAmount > 0.001
+                                          ? 'Paid: ${formatter.format(pos.amountPaid)}'
+                                          : l10n.text('amountPaid',
+                                              fallback: 'Amount Paid'),
+                                      icon: Icons.price_check,
+                                      isActive: pos.dueAmount > 0.001,
+                                      activeColor: Colors.amber.shade800,
+                                      onTap: () =>
+                                          _showAmountPaidDialog(context),
+                                    ),
+                                ],
+                              ),
 
-                        // Split Payment Pill
-                        if (BootstrapCache.instance.activeModule.cartConfiguration.allowSplitPayment)
-                          SduiActionPill(
-                            label: pos.isSplitPayment
-                                ? 'Split (${pos.payments.length})'
-                                : l10n.text('splitPayment', fallback: 'Split Payment'),
-                            icon: Icons.call_split,
-                            isActive: pos.isSplitPayment,
-                            activeColor: primaryColor,
-                            onTap: () => _openSplitPaymentEditor(context, activeMethods),
-                          ),
-
-                        // Amount Paid Pill (only meaningful outside split mode)
-                        if (!pos.isSplitPayment)
-                          SduiActionPill(
-                            label: pos.dueAmount > 0.001
-                                ? 'Paid: ${formatter.format(pos.amountPaid)}'
-                                : l10n.text('amountPaid', fallback: 'Amount Paid'),
-                            icon: Icons.price_check,
-                            isActive: pos.dueAmount > 0.001,
-                            activeColor: Colors.amber.shade800,
-                            onTap: () => _showAmountPaidDialog(context),
-                          ),
-                      ],
-                    ),
-
-                    if (pos.requiresCustomerForDue)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          'Attach a customer for due, partial, or credit sales.',
+                              if (pos.requiresCustomerForDue)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    'Attach a customer for due, partial, or credit sales.',
                                     style: TextStyle(
                                         color: Colors.red.shade600,
                                         fontSize: 11,
@@ -1088,79 +1108,79 @@ class CartSheet extends StatelessWidget {
                                             ),
                                           ]),
                                     ],
-                        ),
-                      ),
+                                  ),
+                                ),
 
-                    const SizedBox(height: 12),
+                              const SizedBox(height: 12),
 
-                    // Dynamic Payment Selection Tiles
-                    if (pos.isSplitPayment)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: primaryColor.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(12),
+                              // Dynamic Payment Selection Tiles
+                              if (pos.isSplitPayment)
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: primaryColor.withValues(alpha: 0.06),
+                                    borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                         color: primaryColor.withValues(
                                             alpha: 0.25)),
-                        ),
-                        child: Column(
+                                  ),
+                                  child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
-                          children: [
+                                    children: [
                                       Text(
                                           'Split Payment (${pos.payments.length} methods)',
                                           style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               color: primaryColor,
                                               fontSize: 13)),
-                            const SizedBox(height: 4),
-                            for (final p in pos.payments)
+                                      const SizedBox(height: 4),
+                                      for (final p in pos.payments)
                                         Text(
                                             '• ${p.methodCode} — ${formatter.format(p.amount)}',
                                             style:
                                                 const TextStyle(fontSize: 12)),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: TextButton(
                                           onPressed: () =>
                                               _openSplitPaymentEditor(
                                                   context, activeMethods),
-                                child: const Text('Edit Split'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else ...[
-                      Text(
-                        l10n.paymentMethod,
+                                          child: const Text('Edit Split'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else ...[
+                                Text(
+                                  l10n.paymentMethod,
                                   style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                       color: Colors.grey.shade600),
-                      ),
-                      const SizedBox(height: 6),
-                      // A Wrap instead of a fixed-height horizontal scroller —
-                      // with 4-5 payment methods this app's default set (or a
-                      // tenant's longer custom list) doesn't reliably fit one
-                      // row width, and a scroller left the last method (e.g.
-                      // "UPI") visually clipped to a single letter with no
-                      // scroll affordance. Wrapping to a second line keeps
-                      // every method visible without requiring a swipe.
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final method in activeMethods)
-                            _PaymentMethodChip(
-                              method: method,
+                                ),
+                                const SizedBox(height: 6),
+                                // A Wrap instead of a fixed-height horizontal scroller —
+                                // with 4-5 payment methods this app's default set (or a
+                                // tenant's longer custom list) doesn't reliably fit one
+                                // row width, and a scroller left the last method (e.g.
+                                // "UPI") visually clipped to a single letter with no
+                                // scroll affordance. Wrapping to a second line keeps
+                                // every method visible without requiring a swipe.
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    for (final method in activeMethods)
+                                      _PaymentMethodChip(
+                                        method: method,
                                         isSelected: pos.paymentMethod ==
                                                 (method.code.isNotEmpty
                                                     ? method.code
                                                     : method.id) ||
-                                  pos.paymentMethod == method.id,
+                                            pos.paymentMethod == method.id,
                                         color: _colorForMethod(
                                             method.code.isNotEmpty
                                                 ? method.code
@@ -1174,127 +1194,127 @@ class CartSheet extends StatelessWidget {
                                             method.code.isNotEmpty
                                                 ? method.code
                                                 : method.id),
-                            ),
-                        ],
-                      ),
+                                      ),
+                                  ],
+                                ),
 
                                 if (_bankMetadataFor(
                                         activeMethods, pos.paymentMethod) !=
                                     null) ...[
-                        const SizedBox(height: 10),
+                                  const SizedBox(height: 10),
                                   _BankDetailsBox(
                                       metadata: _bankMetadataFor(
                                           activeMethods, pos.paymentMethod)!),
-                      ],
+                                ],
 
-                      if (pos.paymentMethod == 'cash') ...[
-                        const SizedBox(height: 12),
+                                if (pos.paymentMethod == 'cash') ...[
+                                  const SizedBox(height: 12),
                                   _CashTenderSection(
                                       payableAmount: pos.amountPaid,
                                       currencySymbol:
                                           company?.currencySymbol ?? '\$'),
-                      ],
-                    ],
+                                ],
+                              ],
 
-                    const SizedBox(height: 12),
+                              const SizedBox(height: 12),
 
-                    // Financial Summary Hierarchy
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(12),
+                              // Financial Summary Hierarchy
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12),
                                   border:
                                       Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Column(
-                        children: [
+                                ),
+                                child: Column(
+                                  children: [
                                     _TotalsRow(
                                         label: l10n.subtotal,
                                         value: formatter.format(pos.subtotal)),
-                          if (pos.discount > 0)
-                            _TotalsRow(
-                              label: l10n.discount,
+                                    if (pos.discount > 0)
+                                      _TotalsRow(
+                                        label: l10n.discount,
                                         value:
                                             '-${formatter.format(pos.discount)}',
-                              valueColor: Colors.red.shade600,
-                            ),
-                          if (pos.taxTotal > 0) ...[
-                            if (isIndia) ...[
-                              _TotalsRow(
-                                label: l10n.cgst,
+                                        valueColor: Colors.red.shade600,
+                                      ),
+                                    if (pos.taxTotal > 0) ...[
+                                      if (isIndia) ...[
+                                        _TotalsRow(
+                                          label: l10n.cgst,
                                           value:
                                               '+${formatter.format(pos.taxTotal / 2)}',
-                                isSub: true,
-                              ),
-                              _TotalsRow(
-                                label: l10n.sgst,
+                                          isSub: true,
+                                        ),
+                                        _TotalsRow(
+                                          label: l10n.sgst,
                                           value:
                                               '+${formatter.format(pos.taxTotal / 2)}',
-                                isSub: true,
-                              ),
-                            ] else
-                              _TotalsRow(
-                                label: company?.taxLabel ?? 'Tax',
+                                          isSub: true,
+                                        ),
+                                      ] else
+                                        _TotalsRow(
+                                          label: company?.taxLabel ?? 'Tax',
                                           value:
                                               '+${formatter.format(pos.taxTotal)}',
-                              ),
-                          ],
-                          const Divider(height: 12),
-                          Row(
+                                        ),
+                                    ],
+                                    const Divider(height: 12),
+                                    Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
+                                      children: [
+                                        Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
-                                children: [
+                                          children: [
                                             Text(l10n.grandTotal,
                                                 style: const TextStyle(
                                                     fontWeight: FontWeight.bold,
                                                     fontSize: 14)),
                                             if ((company?.taxId ?? '')
                                                 .isNotEmpty)
-                                    Text(
-                                      '${isIndia ? l10n.gstin : l10n.taxId}: ${company!.taxId}',
+                                              Text(
+                                                '${isIndia ? l10n.gstin : l10n.taxId}: ${company!.taxId}',
                                                 style: TextStyle(
                                                     color: Colors.grey.shade500,
                                                     fontSize: 10),
+                                              ),
+                                          ],
+                                        ),
+                                        Text(
+                                          formatter.format(pos.grandTotal),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 20,
+                                            color: primaryColor,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                ],
-                              ),
-                              Text(
-                                formatter.format(pos.grandTotal),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 20,
-                                  color: primaryColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (pos.dueAmount > 0.001) ...[
-                            const Divider(height: 12),
+                                    if (pos.dueAmount > 0.001) ...[
+                                      const Divider(height: 12),
                                       _TotalsRow(
                                           label: 'Amount Paid',
                                           value:
                                               formatter.format(pos.amountPaid)),
-                            _TotalsRow(
-                              label: 'Due Balance',
-                              value: formatter.format(pos.dueAmount),
-                              valueColor: Colors.red.shade600,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                                      _TotalsRow(
+                                        label: 'Due Balance',
+                                        value: formatter.format(pos.dueAmount),
+                                        valueColor: Colors.red.shade600,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
 
-                    const SizedBox(height: 12),
+                              const SizedBox(height: 12),
 
-                    // Checkout Button
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
+                              // Checkout Button
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 50),
                                   padding: const EdgeInsets.symmetric(
                                       vertical: 14, horizontal: 20),
                                   shape: RoundedRectangleBorder(
@@ -1303,41 +1323,41 @@ class CartSheet extends StatelessWidget {
                                 onPressed: pos.cartIsEmpty ||
                                         pos.isCheckingOut ||
                                         pos.requiresCustomerForDue
-                          ? null
-                          : () => _previewThenCheckout(context),
-                      child: pos.isCheckingOut
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
+                                    ? null
+                                    : () => _previewThenCheckout(context),
+                                child: pos.isCheckingOut
+                                    ? const SizedBox(
+                                        height: 22,
+                                        width: 22,
                                         child: CircularProgressIndicator(
                                             strokeWidth: 2.5,
                                             color: Colors.white),
-                            )
-                          : Row(
+                                      )
+                                    : Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
-                              children: [
+                                        children: [
                                           const Icon(Icons.check_circle_outline,
                                               size: 20),
-                                const SizedBox(width: 8),
-                                Text(
+                                          const SizedBox(width: 8),
+                                          Text(
                                             l10n.completeSaleButton(formatter
                                                 .format(pos.grandTotal)),
                                             style: const TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-                    ],
                   ),
                 ),
-              ),
-            ],
+              ],
             ),
           ),
         );

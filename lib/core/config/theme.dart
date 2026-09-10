@@ -60,6 +60,7 @@ class AppTheme {
     Color? seedColor,
     Color? accentColor,
     Color? drawerBg,
+    Color? canvasColor,
     AppPageTransition? pageTransitions,
   }) {
     final brand = seedColor ?? primary;
@@ -83,7 +84,7 @@ class AppTheme {
 
     return _build(
       colorScheme: colorScheme,
-      scaffoldBg: lightBg,
+      scaffoldBg: canvasColor ?? lightBg,
       cardColor: lightCard,
       borderColor: lightBorder,
       appBarBg: lightCard,
@@ -103,6 +104,7 @@ class AppTheme {
     Color? seedColor,
     Color? accentColor,
     Color? drawerBg,
+    Color? canvasColor,
     AppPageTransition? pageTransitions,
   }) {
     final brand = seedColor ?? primary;
@@ -119,7 +121,7 @@ class AppTheme {
 
     return _build(
       colorScheme: colorScheme,
-      scaffoldBg: darkBg,
+      scaffoldBg: canvasColor ?? darkBg,
       cardColor: darkCard,
       borderColor: darkBorder,
       appBarBg: darkCard,
