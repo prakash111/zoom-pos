@@ -550,6 +550,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final drawerBgColor = tp.drawerBg ??
             bootstrap.theme.drawerBgValue ??
             Theme.of(context).drawerTheme.backgroundColor;
+        final drawerGradient = bootstrap.theme.drawerGradient;
+
+        // Item colour hierarchy — derived from the *actual* background the
+        // rows sit on, so a light drawer never renders faint grey-on-white
+        // text/icons (and a dark one never renders dark-on-dark). A local
+        // "Drawer text & icon" override in App Preferences still wins.
+        final effectiveDrawerBg = drawerGradient is LinearGradient
+            ? drawerGradient.colors.first
+            : (drawerBgColor ?? Theme.of(context).colorScheme.surface);
+        final isLightDrawerBg = effectiveDrawerBg.computeLuminance() > 0.5;
+        final unselectedItemColor = tp.drawerTextColor ??
+            (isLightDrawerBg
+                ? const Color(0xFF334155) // slate-700
+                : const Color(0xFFE2E8F0)); // slate-200
+        final unselectedIconColor =
+            tp.drawerTextColor?.withValues(alpha: 0.85) ??
+                (isLightDrawerBg
+                    ? const Color(0xFF64748B) // slate-500
+                    : const Color(0xFF94A3B8)); // slate-400
+        final selectedItemColor = primaryColor;
 
         final children = <Widget>[
           Container(
@@ -658,11 +678,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     .resolveNavigationLabel(section.key, section.header!(l10n))
                     .toUpperCase(),
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.6,
-                  color: section.headerColor ??
-                      Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: section.headerColor ?? unselectedItemColor,
                 ),
               ),
             ));
@@ -681,11 +700,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               right: 12,
             );
 
+            final isSelected = _dockIndex == index;
+
             if (nested.isEmpty) {
               return ListTile(
                 key: ValueKey('drawer-item-${tile.key}'),
                 contentPadding: padding,
                 dense: depth > 0,
+                iconColor: isSelected ? selectedItemColor : unselectedIconColor,
+                textColor: isSelected ? selectedItemColor : unselectedItemColor,
+                selectedColor: selectedItemColor,
                 leading: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -693,14 +717,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Text(
                         '↳',
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.outline,
+                          color: unselectedIconColor,
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(width: 6),
                     ],
-                    Icon(tile.icon, size: depth == 0 ? 24 : 18),
+                    Icon(
+                      tile.icon,
+                      size: depth == 0 ? 24 : 18,
+                      color:
+                          isSelected ? selectedItemColor : unselectedIconColor,
+                    ),
                   ],
                 ),
                 title: Text(
@@ -708,15 +737,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       tile.key, tile.titleOf(l10n)),
                   style: TextStyle(
                     fontSize: depth > 0 ? 13 : 14,
-                    fontWeight: _dockIndex == index
+                    fontWeight: isSelected
                         ? FontWeight.w700
-                        : (depth > 0 ? FontWeight.w500 : FontWeight.normal),
-                    color: _dockIndex == index
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
+                        : (depth > 0 ? FontWeight.w500 : FontWeight.w500),
+                    color: isSelected ? selectedItemColor : unselectedItemColor,
                   ),
                 ),
-                selected: _dockIndex == index,
+                selected: isSelected,
                 onTap: () => openTile(tile),
               );
             }
@@ -727,6 +754,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               tilePadding: padding,
               childrenPadding: EdgeInsets.zero,
+              iconColor: selectedItemColor,
+              collapsedIconColor: unselectedIconColor,
+              textColor: selectedItemColor,
+              collapsedTextColor: unselectedItemColor,
               leading: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -734,14 +765,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Text(
                       '↳',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.outline,
+                        color: unselectedIconColor,
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(width: 6),
                   ],
-                  Icon(tile.icon, size: depth == 0 ? 24 : 20),
+                  Icon(
+                    tile.icon,
+                    size: depth == 0 ? 24 : 20,
+                    color: isSelected ? selectedItemColor : unselectedIconColor,
+                  ),
                 ],
               ),
               // Parent branches always mount collapsed; they open only when the
@@ -753,11 +788,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               title: Text(
                 bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
                 style: TextStyle(
-                  fontWeight:
-                      _dockIndex == index ? FontWeight.w700 : FontWeight.normal,
-                  color: _dockIndex == index
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? selectedItemColor : unselectedItemColor,
                 ),
               ),
               children: [
@@ -793,37 +825,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ));
         }
 
-        final drawerGradient = bootstrap.theme.drawerGradient;
-
-        // Contrast guard: when the drawer background is a custom brand /
-        // "match parent" colour, invert text + icons so they never vanish.
-        final probe = drawerGradient is LinearGradient
-            ? drawerGradient.colors.first
-            : (drawerBgColor ?? Theme.of(context).colorScheme.surface);
-        // Explicit override wins; otherwise auto-invert against the bg.
-        final onDrawer = tp.drawerTextColor ??
-            (probe.computeLuminance() < 0.5
-                ? Colors.white
-                : const Color(0xFF0F172A));
+        // Contrast guard: bind every drawer surface to the high-contrast
+        // item palette derived above from the real background luminance, so
+        // text/icons never wash out on a light drawer (or vanish on a dark
+        // one). `onDrawer` is the readable body colour; the faint alpha
+        // ramps are only for dividers / decoration.
+        final onDrawer = unselectedItemColor;
         final baseTheme = Theme.of(context);
         final drawerTheme = baseTheme.copyWith(
           colorScheme: baseTheme.colorScheme.copyWith(
             primary: primaryColor,
             onSurface: onDrawer,
-            onSurfaceVariant: onDrawer.withValues(alpha: 0.66),
-            outline: onDrawer.withValues(alpha: 0.42),
+            onSurfaceVariant: unselectedIconColor,
+            outline: unselectedIconColor,
           ),
-          iconTheme: IconThemeData(color: onDrawer.withValues(alpha: 0.82)),
+          iconTheme: IconThemeData(color: unselectedIconColor),
           listTileTheme: ListTileThemeData(
-            iconColor: onDrawer.withValues(alpha: 0.78),
-            textColor: onDrawer.withValues(alpha: 0.92),
-            selectedColor: primaryColor,
+            iconColor: unselectedIconColor,
+            textColor: onDrawer,
+            selectedColor: selectedItemColor,
           ),
           textTheme: baseTheme.textTheme.apply(
             bodyColor: onDrawer,
             displayColor: onDrawer,
           ),
-          dividerColor: onDrawer.withValues(alpha: 0.20),
+          dividerColor: onDrawer.withValues(alpha: 0.22),
         );
 
         return Drawer(

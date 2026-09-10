@@ -78,11 +78,15 @@ class AuthScaffold extends StatelessWidget {
   Widget _brand(BuildContext context) {
     final branding = context.watch<PlatformBrandingProvider>();
 
-    // Marketing header used by the login / register / reset screens — logo,
-    // plus an optional Superadmin-authored headline / description (a screen
-    // may override the copy). Nothing is rendered when both are empty — no
-    // hardcoded fallback, no blank space.
+    // Marketing header used by the login / register / reset screens — logo +
+    // the Superadmin "Platform Title / App Name", plus an optional
+    // Superadmin-authored headline / description (a screen may override the
+    // copy). Anything empty renders nothing — no hardcoded fallback, no blank
+    // space.
     if (_useMarketing) {
+      // settings.platformTitle ?? settings.appName ?? '' — the provider folds
+      // platform_title / app_name / platform_name into `platformName`.
+      final appTitle = branding.platformName.trim();
       final headline = (brandHeadline ?? branding.headline).trim();
       final subline = (brandSubline ?? branding.description).trim();
       final hasCopy = headline.isNotEmpty || subline.isNotEmpty;
@@ -96,7 +100,17 @@ class AuthScaffold extends StatelessWidget {
               if (headerTrailing != null) headerTrailing!,
             ],
           ),
-          if (hasCopy) const SizedBox(height: 18),
+          if (appTitle.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              appTitle,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+            ),
+          ],
+          if (hasCopy) const SizedBox(height: 14),
           if (headline.isNotEmpty)
             Text(
               headline,
@@ -248,7 +262,8 @@ class AuthScaffold extends StatelessWidget {
   bool _hasBrandContent(PlatformBrandingProvider branding) {
     if (branding.hasLogo || headerTrailing != null) return true;
     if (!_useMarketing) return true; // legacy path always shows the name
-    return (brandHeadline ?? branding.headline).trim().isNotEmpty ||
+    return branding.platformName.trim().isNotEmpty ||
+        (brandHeadline ?? branding.headline).trim().isNotEmpty ||
         (brandSubline ?? branding.description).trim().isNotEmpty;
   }
 
