@@ -60,7 +60,7 @@ class UnifiedAuthLayoutAndNavigationTest extends TestCase
             ->assertSee('Store Sign In')
             ->assertSee('Email or Username')
             ->assertSee('Password')
-            ->assertSee('Sign In to Store Register');
+            ->assertSee('Sign in to your store');
     }
 
     public function test_tenant_register_screen_renders_with_unified_layout_and_navigation(): void

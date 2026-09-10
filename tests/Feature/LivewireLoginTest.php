@@ -96,8 +96,11 @@ class LivewireLoginTest extends TestCase
         $tenantResponse = $this->get(route('tenant.login'));
         $tenantResponse->assertOk();
         $tenantResponse->assertSee('Demo Mode Active');
-        $tenantResponse->assertSee('Store Manager');
-        $tenantResponse->assertSee('Cashier Staff');
+        // Consolidated demo module switcher — the 5 store-type chips.
+        $tenantResponse->assertSee('Cafe &amp; Restaurant', false);
+        $tenantResponse->assertSee('Pharmacy');
+        $tenantResponse->assertSee(url('/demo-login/retail'));
+        $tenantResponse->assertSee(url('/demo-login/salon'));
 
         // 2. Super Admin Login Component & View in Demo Mode
         Livewire::test(PlatformLogin::class)
