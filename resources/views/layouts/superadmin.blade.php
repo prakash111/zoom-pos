@@ -1143,6 +1143,14 @@
             <!-- Main Dynamic View Container with Smooth Transition -->
             <main class="flex-1 p-3 sm:p-6 md:p-8 w-full max-w-none" id="main-app-content">
                 <div class="w-full max-w-none">
+                    @if (config('app.demo_mode'))
+                        <div class="mb-5 flex items-center gap-3 rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-amber-900 dark:text-amber-200 shadow-sm">
+                            <span class="text-lg leading-none">🔒</span>
+                            <p class="text-sm font-semibold">
+                                {{ __('Demo Mode Active: Super Admin controls are read-only. Settings cannot be edited or saved.') }}
+                            </p>
+                        </div>
+                    @endif
                     {{ $slot ?? '' }}
                     @yield('content')
                 </div>
@@ -1199,5 +1207,71 @@
 
     @livewireScripts
     @stack('scripts')
+
+    @if (config('app.demo_mode'))
+    {{-- Demo Mode UI lock: disable Save/submit controls and freeze settings
+         inputs. The real enforcement is server-side (PreventDemoModifications);
+         this keeps the panel from looking editable. --}}
+    <script>
+    (function () {
+        var SAVE_RE = /\b(save|update|store|create|add|delete|destroy|remove|suspend|activate|deactivate|reactivate|disable|enable|reset|regenerate|rotate|send|test|backup|restore|import|export|download|run|seed|purge|wipe|apply|submit|confirm|approve|reject|revoke|extend|renew|impersonate|resend|generate|publish|unpublish|deploy|migrate)\b/i;
+        var SKIP_MODEL_RE = /(search|filter|page|per[_-]?page|perpage|sort|order|tab|status|selected|expanded|show[_-]?modal|modal)/i;
+
+        function lockButton(el) {
+            if (el.dataset.demoLocked) return;
+            el.dataset.demoLocked = '1';
+            el.disabled = true;
+            el.setAttribute('aria-disabled', 'true');
+            el.classList.add('opacity-50', 'cursor-not-allowed');
+            if (!el.title) el.title = 'Saving disabled in demo mode';
+        }
+
+        function lockField(el) {
+            if (el.dataset.demoLocked) return;
+            var model = el.getAttribute('wire:model') || el.getAttribute('wire:model.live')
+                || el.getAttribute('wire:model.blur') || el.getAttribute('wire:model.lazy') || '';
+            if (model && SKIP_MODEL_RE.test(model)) return;         // search / pagination / tab
+            if (el.closest('[data-demo-allow]')) return;
+            el.dataset.demoLocked = '1';
+            var tag = el.tagName.toLowerCase();
+            if (tag === 'select' || el.type === 'file' || el.type === 'checkbox' || el.type === 'radio') {
+                el.disabled = true;
+            } else {
+                el.readOnly = true;
+            }
+            el.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
+        function apply() {
+            var root = document.getElementById('main-app-content');
+            if (!root) return;
+
+            root.querySelectorAll('button, [role="button"], a[wire\\:click]').forEach(function (el) {
+                var wc = el.getAttribute('wire:click') || '';
+                var txt = (el.textContent || '').trim();
+                if (el.type === 'submit' || SAVE_RE.test(wc) || (wc && !/goto|next|prev|page|sort|tab|search|filter|modal|close|open|cancel|refresh/i.test(wc) && SAVE_RE.test(txt))) {
+                    lockButton(el);
+                }
+            });
+
+            root.querySelectorAll('form input, form textarea, form select, [wire\\:model], [wire\\:model\\.live], [wire\\:model\\.blur], [wire\\:model\\.lazy]').forEach(function (el) {
+                if (['INPUT', 'TEXTAREA', 'SELECT'].indexOf(el.tagName) === -1) return;
+                if (el.type === 'hidden') return;
+                lockField(el);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', apply);
+        document.addEventListener('livewire:navigated', apply);
+        document.addEventListener('livewire:init', function () {
+            if (window.Livewire && Livewire.hook) {
+                Livewire.hook('morph.updated', apply);
+                Livewire.hook('commit', function (o) { o.respond(apply); });
+            }
+        });
+        apply();
+    })();
+    </script>
+    @endif
 </body>
 </html>

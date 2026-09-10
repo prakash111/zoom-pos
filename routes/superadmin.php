@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\PeriodicLicenseCheck;
+use App\Http\Middleware\PreventDemoModifications;
 use App\Livewire\Auth\PlatformLogin;
 use App\Livewire\SuperAdmin\ActivationCodes;
 use App\Livewire\SuperAdmin\AuditLogs;
@@ -32,7 +33,7 @@ Route::prefix('superadmin')->name('superadmin.')->group(function () {
         return redirect()->route('superadmin.login');
     })->middleware('auth:platform_web')->name('logout');
 
-    Route::middleware(['auth:platform_web', PeriodicLicenseCheck::class])->group(function () {
+    Route::middleware(['auth:platform_web', PeriodicLicenseCheck::class, PreventDemoModifications::class])->group(function () {
         Route::get('/', Dashboard::class)->name('dashboard');
 
         Route::get('/tenants', Tenants\Index::class)->name('tenants.index');
