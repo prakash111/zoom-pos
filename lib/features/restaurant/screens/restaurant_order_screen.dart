@@ -18,6 +18,7 @@ import '../../pos/screens/customer_picker_sheet.dart';
 import '../../pos/screens/invoice_actions_sheet.dart';
 import '../../quotations/screens/product_picker_sheet.dart';
 import '../restaurant_repository.dart';
+import '../widgets/kot_slip.dart';
 
 const _kServiceTypeLabels = {
   'dine_in': 'Dine-In',
@@ -282,8 +283,13 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
         _committedItems = result.sale.items;
         _draftItems = [];
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${result.kot.kotNumber} sent to kitchen.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${result.kot.kotNumber} sent to kitchen.'),
+        action: SnackBarAction(
+          label: 'Print KOT',
+          onPressed: () => printKitchenTicket(context, result.kot),
+        ),
+      ));
     } on ApiException catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context)
@@ -382,104 +388,104 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
         : (_kServiceTypeLabels[widget.serviceType] ?? 'Order');
 
     return Scaffold(
-        appBar: AppBar(
-          title: Text(title),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(_changed),
-          ),
+      appBar: AppBar(
+        title: Text(title),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(_changed),
         ),
-        body: _isLoading
-            ? const LoadingIndicator()
-            : _error != null
-                ? ErrorView(message: _error!, onRetry: _load)
-                : Column(
-                    children: [
-                      if (widget.table != null)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                          child: SizedBox(
-                            height: 36,
-                            child: ListView(
-                              scrollDirection: Axis.horizontal,
-                              children: [
-                                for (final seat in _seats)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: ChoiceChip(
-                                      label: Text('Seat $seat'),
-                                      selected: _activeSeat == seat,
-                                      onSelected: (_) => _setActiveSeat(seat),
-                                    ),
+      ),
+      body: _isLoading
+          ? const LoadingIndicator()
+          : _error != null
+              ? ErrorView(message: _error!, onRetry: _load)
+              : Column(
+                  children: [
+                    if (widget.table != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                        child: SizedBox(
+                          height: 36,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              for (final seat in _seats)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ChoiceChip(
+                                    label: Text('Seat $seat'),
+                                    selected: _activeSeat == seat,
+                                    onSelected: (_) => _setActiveSeat(seat),
                                   ),
-                                ActionChip(
-                                  avatar: const Icon(Icons.add, size: 16),
-                                  label: const Text('Add Seat'),
-                                  onPressed: _addSeat,
                                 ),
-                              ],
-                            ),
+                              ActionChip(
+                                avatar: const Icon(Icons.add, size: 16),
+                                label: const Text('Add Seat'),
+                                onPressed: _addSeat,
+                              ),
+                            ],
                           ),
                         ),
-                      Expanded(
-                        child: (_committedItems.isEmpty && _draftItems.isEmpty)
+                      ),
+                    Expanded(
+                      child: (_committedItems.isEmpty && _draftItems.isEmpty)
                           ? const Center(
                               child: Text(
                                   'No items yet. Tap "Add Item" to start the order.'))
-                            : ListView(
-                                padding: const EdgeInsets.all(16),
-                                children: [
-                                  if (_committedItems.isNotEmpty) ...[
+                          : ListView(
+                              padding: const EdgeInsets.all(16),
+                              children: [
+                                if (_committedItems.isNotEmpty) ...[
                                   Text('Sent to Kitchen',
                                       style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.grey.shade600,
                                           fontSize: 12)),
-                                    const SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   for (final item in _committedItems)
                                     _OrderItemRow(
                                         item: item, formatter: formatter),
-                                    const Divider(height: 20),
-                                  ],
-                                  if (_draftItems.isNotEmpty) ...[
+                                  const Divider(height: 20),
+                                ],
+                                if (_draftItems.isNotEmpty) ...[
                                   Text('New Items (not yet sent)',
                                       style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.grey.shade600,
                                           fontSize: 12)),
-                                    const SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   for (var index = 0;
                                       index < _draftItems.length;
                                       index++)
-                                      _OrderItemRow(
-                                        item: _draftItems[index],
-                                        formatter: formatter,
-                                        onIncrement: () => _incrementItem(index),
-                                        onDecrement: () => _decrementItem(index),
+                                    _OrderItemRow(
+                                      item: _draftItems[index],
+                                      formatter: formatter,
+                                      onIncrement: () => _incrementItem(index),
+                                      onDecrement: () => _decrementItem(index),
                                       onEditPrice: canOverridePrice
                                           ? () => _editPrice(index)
                                           : null,
-                                      ),
-                                  ],
+                                    ),
                                 ],
-                              ),
-                      ),
-                      SafeArea(
-                        top: false,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              OutlinedButton.icon(
-                                onPressed: _addItem,
-                                icon: const Icon(Icons.add),
-                                label: const Text('Add Item'),
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
+                              ],
+                            ),
+                    ),
+                    SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _addItem,
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Item'),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
                                 const Text('Subtotal',
                                     style:
                                         TextStyle(fontWeight: FontWeight.bold)),
@@ -487,32 +493,32 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16)),
-                                ],
-                              ),
-                              if (_draftItems.isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Send new items to kitchen before settling the bill.',
+                              ],
+                            ),
+                            if (_draftItems.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Send new items to kitchen before settling the bill.',
                                 style: TextStyle(
                                     color: Colors.orange.shade800,
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600),
-                                ),
-                              ],
-                              const SizedBox(height: 10),
-                              if (_draftItems.isNotEmpty) ...[
-                                Row(
-                                  children: [
+                              ),
+                            ],
+                            const SizedBox(height: 10),
+                            if (_draftItems.isNotEmpty) ...[
+                              Row(
+                                children: [
                                   Text('Prep time',
                                       style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
                                           color: Colors.grey.shade700)),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Wrap(
-                                        spacing: 6,
-                                        children: [
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Wrap(
+                                      spacing: 6,
+                                      children: [
                                         for (final mins in const [
                                           5,
                                           10,
@@ -520,13 +526,13 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
                                           20,
                                           30
                                         ])
-                                            ChoiceChip(
+                                          ChoiceChip(
                                             label: Text('${mins}m',
                                                 style: const TextStyle(
                                                     fontSize: 11)),
                                             visualDensity:
                                                 VisualDensity.compact,
-                                              selected: _prepMinutes == mins,
+                                            selected: _prepMinutes == mins,
                                             onSelected: (_) => setState(
                                                 () => _prepMinutes = mins),
                                           ),
@@ -563,50 +569,50 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
                                                 _intimationMinutes == option.$1,
                                             onSelected: (_) => setState(() =>
                                                 _intimationMinutes = option.$1),
-                                            ),
-                                        ],
-                                      ),
+                                          ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                              ],
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton(
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
                                     onPressed:
                                         (_draftItems.isEmpty || _isSending)
                                             ? null
                                             : _sendToKitchen,
-                                      child: _isSending
+                                    child: _isSending
                                         ? const SizedBox(
                                             height: 18,
                                             width: 18,
                                             child: CircularProgressIndicator(
                                                 strokeWidth: 2))
-                                          : const Text('Send to Kitchen'),
-                                    ),
+                                        : const Text('Send to Kitchen'),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: FilledButton(
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: FilledButton(
                                     onPressed: (_saleId == null ||
                                             _committedItems.isEmpty ||
                                             _draftItems.isNotEmpty)
                                         ? null
                                         : _settleBill,
-                                      child: const Text('Settle Bill'),
-                                    ),
+                                    child: const Text('Settle Bill'),
                                   ),
-                                ],
-                              ),
-                            ],
-                          ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
     );
   }
 }

@@ -10,6 +10,7 @@ import '../../../core/services/sound_alert_service.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../restaurant_repository.dart';
+import '../widgets/kot_slip.dart';
 
 /// Kitchen Display System: live board of open kitchen tickets grouped by
 /// status, refreshed on a short interval so the kitchen sees new orders
@@ -167,6 +168,9 @@ class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
     }
   }
 
+  void _printKot(KitchenTicketModel ticket) =>
+      printKitchenTicket(context, ticket);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -199,6 +203,7 @@ class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
                     tickets: pending,
                     onAdvance: _advance,
                     onCancel: _cancel,
+                    onPrint: _printKot,
                     onDismissAlarm: _dismissAlarm),
                 const SizedBox(height: 16),
                 _KotSection(
@@ -206,6 +211,7 @@ class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
                     tickets: preparing,
                     onAdvance: _advance,
                     onCancel: _cancel,
+                    onPrint: _printKot,
                     onDismissAlarm: _dismissAlarm),
                 const SizedBox(height: 16),
                 _KotSection(
@@ -213,6 +219,7 @@ class _RestaurantKdsScreenState extends State<RestaurantKdsScreen> {
                     tickets: ready,
                     onAdvance: _advance,
                     onCancel: _cancel,
+                    onPrint: _printKot,
                     onDismissAlarm: _dismissAlarm),
               ],
             ),
@@ -229,12 +236,14 @@ class _KotSection extends StatelessWidget {
       required this.tickets,
       required this.onAdvance,
       required this.onCancel,
+      required this.onPrint,
       required this.onDismissAlarm});
 
   final String title;
   final List<KitchenTicketModel> tickets;
   final ValueChanged<KitchenTicketModel> onAdvance;
   final ValueChanged<KitchenTicketModel> onCancel;
+  final ValueChanged<KitchenTicketModel> onPrint;
   final ValueChanged<KitchenTicketModel> onDismissAlarm;
 
   String _actionLabel(String status) => switch (status) {
@@ -292,6 +301,16 @@ class _KotSection extends StatelessWidget {
                               style:
                                   const TextStyle(fontWeight: FontWeight.bold)),
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.print_outlined, size: 20),
+                          tooltip: 'Print KOT',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints:
+                              const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () => onPrint(ticket),
+                        ),
+                        const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
