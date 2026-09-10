@@ -301,6 +301,69 @@ void main() {
       expect(find.text('Webhook URL copied to clipboard!'), findsOneWidget);
     });
 
+    testWidgets('searchable dropdown_select filters and binds the pick',
+        (tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final formValues = <String, dynamic>{};
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: formValues,
+              setFormValue: (k, v) => formValues[k] = v,
+              dispatchAction: (_) async {},
+              child: Builder(
+                builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, {
+                  'type': 'dropdown_select',
+                  'name': 'timezone',
+                  'label': 'Store Timezone',
+                  'searchable': true,
+                  'search_hint': 'Search city or region',
+                  'initial_value': 'UTC',
+                  'options': [
+                    for (final tz in const [
+                      'UTC',
+                      'Asia/Kolkata',
+                      'America/New_York',
+                      'Europe/London',
+                      'America/Sao_Paulo',
+                      'Australia/Sydney',
+                    ])
+                      {'label': tz, 'value': tz},
+                  ],
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+      expect(find.text('UTC'), findsOneWidget);
+
+      await tester.tap(find.text('UTC'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(TextField, 'Search city or region'),
+          findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'kolkata');
+      await tester.pumpAndSettle();
+      expect(find.text('Asia/Kolkata'), findsOneWidget);
+      expect(find.text('Europe/London'), findsNothing);
+
+      await tester.tap(find.text('Asia/Kolkata'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TextField), findsNothing);
+      expect(formValues['timezone'], 'Asia/Kolkata');
+      expect(find.text('Asia/Kolkata'), findsOneWidget);
+    });
+
     testWidgets('creatable_select binds a preset, then a typed custom reason',
         (tester) async {
       final formValues = <String, dynamic>{};

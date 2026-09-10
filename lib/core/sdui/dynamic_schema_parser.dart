@@ -805,6 +805,14 @@ class DynamicSchemaParser {
     final currentVal = sduiContext?.formValues[name]?.toString() ??
         schema['initial_value']?.toString();
 
+    // Long option lists (timezones, countries…) get a searchable picker
+    // instead of an unfilterable native menu.
+    final searchable = schema['searchable'] == true ||
+        (schema['searchable'] != false && rawOptions.length > 12);
+    if (searchable) {
+      return _SduiSearchableSelect(schema: schema);
+    }
+
     final options = <DropdownMenuItem<String>>[];
     for (final opt in rawOptions) {
       if (opt is Map) {
@@ -2518,6 +2526,255 @@ class _SduiCreatableSelectState extends State<_SduiCreatableSelect> {
           ],
         ],
       ),
+    );
+  }
+}
+
+typedef _Opt = ({String label, String value});
+
+/// `dropdown_select` with `searchable: true` (or > 12 options). Renders a
+/// tappable field that opens a searchable picker — a centred dialog on
+/// tablet/desktop, a bottom sheet on phones — instead of an unfilterable
+/// native menu. The pick binds to `formValues[name]` exactly like the plain
+/// dropdown.
+class _SduiSearchableSelect extends StatefulWidget {
+  const _SduiSearchableSelect({required this.schema});
+
+  final Map<String, dynamic> schema;
+
+  @override
+  State<_SduiSearchableSelect> createState() => _SduiSearchableSelectState();
+}
+
+class _SduiSearchableSelectState extends State<_SduiSearchableSelect> {
+  late final List<_Opt> _options;
+  String? _value;
+
+  String get _name => widget.schema['name']?.toString() ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    _options = ((widget.schema['options'] as List<dynamic>?) ?? const [])
+        .map<_Opt>((o) {
+      if (o is Map) {
+        final label = (o['label'] ?? o['name'] ?? o['value'] ?? '').toString();
+        final value = (o['value'] ?? o['code'] ?? label).toString();
+        return (label: label, value: value);
+      }
+      return (label: o.toString(), value: o.toString());
+    }).toList();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final sdui = DynamicSchemaContext.of(context);
+      final current = (sdui?.formValues[_name] ??
+              widget.schema['initial_value'] ??
+              (_options.isNotEmpty ? _options.first.value : null))
+          ?.toString();
+      if (current != null && current.isNotEmpty) {
+        setState(() => _value = current);
+        sdui?.setFormValue(_name, current);
+      }
+    });
+  }
+
+  String get _currentLabel {
+    for (final o in _options) {
+      if (o.value == _value) return o.label;
+    }
+    return _value ?? '';
+  }
+
+  Future<void> _openPicker() async {
+    final label = context.tr(widget.schema['label']?.toString() ?? 'Select');
+    final sheet = _SearchableOptionSheet(
+      title: label,
+      options: _options,
+      selected: _value,
+      searchHint:
+          context.tr(widget.schema['search_hint']?.toString() ?? 'Search…'),
+    );
+    final wide = MediaQuery.sizeOf(context).width >= 720;
+    final picked = wide
+        ? await showDialog<String>(
+            context: context,
+            builder: (_) => Dialog(
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 480,
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+                ),
+                child: sheet,
+              ),
+            ),
+          )
+        : await showModalBottomSheet<String>(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            showDragHandle: true,
+            builder: (_) => SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.78,
+              child: sheet,
+            ),
+          );
+
+    if (picked == null || !mounted) return;
+    setState(() => _value = picked);
+    DynamicSchemaContext.of(context)?.setFormValue(_name, picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = context.tr(widget.schema['label']?.toString() ?? '');
+    final disabled = widget.schema['disabled'] == true;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: InkWell(
+        onTap: disabled ? null : _openPicker,
+        borderRadius: BorderRadius.circular(4),
+        child: InputDecorator(
+          isEmpty: _currentLabel.isEmpty,
+          decoration: InputDecoration(
+            labelText: label,
+            border: const OutlineInputBorder(),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            suffixIcon: const Icon(Icons.arrow_drop_down),
+          ),
+          child:
+              Text(_currentLabel, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    );
+  }
+}
+
+/// The searchable list body shared by the dialog and bottom-sheet
+/// presentations. Pops the picked option's value.
+class _SearchableOptionSheet extends StatefulWidget {
+  const _SearchableOptionSheet({
+    required this.title,
+    required this.options,
+    required this.selected,
+    required this.searchHint,
+  });
+
+  final String title;
+  final List<_Opt> options;
+  final String? selected;
+  final String searchHint;
+
+  @override
+  State<_SearchableOptionSheet> createState() => _SearchableOptionSheetState();
+}
+
+class _SearchableOptionSheetState extends State<_SearchableOptionSheet> {
+  final _controller = TextEditingController();
+  final _focus = FocusNode();
+  late List<_Opt> _filtered;
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = widget.options;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _onQuery(String raw) {
+    final q = raw.trim().toLowerCase();
+    setState(() {
+      _filtered = q.isEmpty
+          ? widget.options
+          : widget.options
+              .where((o) =>
+                  o.label.toLowerCase().contains(q) ||
+                  o.value.toLowerCase().contains(q))
+              .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(widget.title,
+                    style: Theme.of(context).textTheme.titleMedium),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: TextField(
+            controller: _controller,
+            focusNode: _focus,
+            autofocus: true,
+            onChanged: _onQuery,
+            decoration: InputDecoration(
+              hintText: widget.searchHint,
+              prefixIcon: const Icon(Icons.search),
+              isDense: true,
+              border: const OutlineInputBorder(),
+              suffixIcon: _controller.text.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _controller.clear();
+                        _onQuery('');
+                      },
+                    ),
+            ),
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: _filtered.isEmpty
+              ? Center(
+                  child: Text('No matches',
+                      style: TextStyle(color: scheme.onSurfaceVariant)))
+              : ListView.builder(
+                  itemCount: _filtered.length,
+                  itemBuilder: (context, i) {
+                    final o = _filtered[i];
+                    final selected = o.value == widget.selected;
+                    return ListTile(
+                      dense: true,
+                      selected: selected,
+                      selectedTileColor: scheme.primary.withValues(alpha: 0.10),
+                      title: Text(o.label),
+                      trailing: selected
+                          ? Icon(Icons.check, color: scheme.primary, size: 20)
+                          : null,
+                      onTap: () => Navigator.of(context).pop(o.value),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }
