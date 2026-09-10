@@ -358,9 +358,15 @@ class PosSyncApiController extends Controller
             // Superadmin global defaults — the canonical nested contract.
             'platform' => $settings['platform'],
             'theme' => $settings['theme'],
-            // Flat aliases kept for older clients.
+            // Flat aliases kept for older clients — the Superadmin "Platform
+            // Title / App Name" under every name the pre-auth screens read.
             'platform_name' => $settings['platform']['name'],
+            'platform_title' => $settings['platform']['name'],
+            'app_name' => $settings['platform']['name'],
             'brand_logo_url' => $settings['platform']['logo_url'],
+            // Primary colour under every name a client might parse.
+            'primary_color' => $settings['theme']['primary_color'],
+            'brand_color' => $settings['theme']['primary_color'],
             'platform_tagline' => null,
             'header_inline' => true,
             'show_tagline' => false,

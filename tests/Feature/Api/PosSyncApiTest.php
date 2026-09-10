@@ -19,6 +19,7 @@ use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -142,10 +143,17 @@ class PosSyncApiTest extends TestCase
             $this->getJson($url)
                 ->assertOk()
                 ->assertJsonPath('platform.name', 'POS Systems')
+                ->assertJsonPath('platform_name', 'POS Systems')
+                ->assertJsonPath('platform_title', 'POS Systems')
+                ->assertJsonPath('app_name', 'POS Systems')
                 ->assertJsonPath('platform.headline', 'Sample platform headline')
                 ->assertJsonPath('platform.description', 'Sample platform description')
                 ->assertJsonStructure(['platform' => ['logo_url', 'favicon_url']])
+                // The primary colour under every alias a client might parse.
                 ->assertJsonPath('theme.primary_color', '#F95700')
+                ->assertJsonPath('theme.primary', '#F95700')
+                ->assertJsonPath('primary_color', '#F95700')
+                ->assertJsonPath('brand_color', '#F95700')
                 ->assertJsonPath('theme.secondary_color', '#0F172A')
                 ->assertJsonPath('theme.accent_color', '#FF7A00')
                 ->assertJsonPath('theme.splash_bg_color', '#0F172A')
@@ -160,6 +168,20 @@ class PosSyncApiTest extends TestCase
         $this->getJson('/api/v1/pos/auth/public-settings')
             ->assertOk()
             ->assertJsonPath('theme.primary_color', '#F95700');
+    }
+
+    public function test_saving_branding_forgets_the_public_settings_cache(): void
+    {
+        Cache::put('public_settings', ['stale' => true], 600);
+
+        PlatformBranding::current()->update(['primary_color' => '#123456']);
+
+        $this->assertFalse(Cache::has('public_settings'));
+
+        $this->getJson('/api/v1/pos/auth/public-settings')
+            ->assertOk()
+            ->assertJsonPath('theme.primary', '#123456')
+            ->assertJsonPath('brand_color', '#123456');
     }
 
     public function test_public_settings_headline_and_description_are_null_when_unset(): void

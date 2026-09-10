@@ -3,11 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 class PlatformBranding extends Model
 {
     protected $table = 'platform_branding';
+
+    protected static function booted(): void
+    {
+        // Any Superadmin save of the branding row invalidates a public-config
+        // response cache so the pre-auth clients see the new colours on their
+        // next fetch.
+        static::saved(fn () => Cache::forget('public_settings'));
+        static::deleted(fn () => Cache::forget('public_settings'));
+    }
 
     protected $fillable = [
         'platform_name', 'logo_url', 'favicon_url', 'primary_color',
@@ -139,6 +149,8 @@ class PlatformBranding extends Model
             ],
             'theme' => [
                 'primary_color' => $primary,
+                // Alias so a client keyed on `theme.primary` still resolves it.
+                'primary' => $primary,
                 'secondary_color' => $this->hexOr($this->secondary_color, '#0F172A'),
                 'accent_color' => $this->hexOr($this->accent_color, $primary),
                 'splash_bg_color' => $this->hexOr($this->splash_bg_color, '#0F172A'),
