@@ -3113,29 +3113,71 @@ class PosSyncApiController extends Controller
                 'total' => (float) $row->total,
             ]);
 
-        // Revenue trend across the selected range — daily buckets, capped at
-        // 31 points (longer ranges roll up to weekly).
-        $trendBucketDays = $rangeSpanDays > 31 ? (int) ceil($rangeSpanDays / 31) : 1;
-        $trendRows = (clone $rangeSales)
-            ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'))
-            ->groupBy('d')
-            ->pluck('t', 'd');
-        $sevenDaysTrend = [];
-        $cursor = (clone $rangeStart);
-        while ($cursor->lte($rangeEnd)) {
-            $bucketEnd = (clone $cursor)->addDays($trendBucketDays - 1);
-            $sum = 0.0;
-            $probe = (clone $cursor);
-            while ($probe->lte($bucketEnd) && $probe->lte($rangeEnd)) {
-                $sum += (float) ($trendRows[$probe->format('Y-m-d')] ?? 0);
-                $probe->addDay();
+        // Revenue trend across the selected range. A single-day view ("Today" /
+        // "Yesterday" / a one-day custom range) grouped by DATE() collapses to
+        // one point, which fl_chart treats as empty ("No revenue yet") — so a
+        // single day is bucketed into 24 zero-filled hourly intervals in the
+        // tenant's timezone instead. Multi-day ranges keep daily buckets
+        // (capped at 31 points; longer ranges roll up to weekly), with every
+        // calendar day in between zero-filled so the line never breaks.
+        if ($rangeStart->isSameDay($rangeEnd)) {
+            $tz = $company->resolveTimezone();
+            $localDay = ($rangeKey === 'yesterday')
+                ? Carbon::now($tz)->subDay()->startOfDay()
+                : (($rangeKey === 'today')
+                    ? Carbon::now($tz)->startOfDay()
+                    : Carbon::parse($rangeStart)->setTimezone($tz)->startOfDay());
+
+            $hourTotals = array_fill(0, 24, 0.0);
+            (clone $rangeSales)
+                ->select('created_at', 'total')
+                ->get()
+                ->each(function ($row) use (&$hourTotals, $tz) {
+                    $hour = (int) Carbon::parse($row->created_at)->setTimezone($tz)->format('G');
+                    $hourTotals[$hour] += (float) $row->total;
+                });
+
+            $sevenDaysTrend = [];
+            for ($h = 0; $h < 24; $h++) {
+                $label = sprintf('%02d:00', $h);
+                $amount = round($hourTotals[$h], 2);
+                $slot = $localDay->copy()->addHours($h);
+                $sevenDaysTrend[] = [
+                    'date' => $slot->toDateString(),
+                    'day' => $label,
+                    'label' => $label,
+                    'revenue' => $amount,
+                    'amount' => $amount,
+                    'timestamp' => $slot->timestamp,
+                ];
             }
-            $sevenDaysTrend[] = [
-                'date' => $cursor->format('Y-m-d'),
-                'day' => $cursor->format($trendBucketDays > 1 ? 'M d' : 'D'),
-                'revenue' => $sum,
-            ];
-            $cursor->addDays($trendBucketDays);
+        } else {
+            $trendBucketDays = $rangeSpanDays > 31 ? (int) ceil($rangeSpanDays / 31) : 1;
+            $trendRows = (clone $rangeSales)
+                ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'))
+                ->groupBy('d')
+                ->pluck('t', 'd');
+            $sevenDaysTrend = [];
+            $cursor = (clone $rangeStart);
+            while ($cursor->lte($rangeEnd)) {
+                $bucketEnd = (clone $cursor)->addDays($trendBucketDays - 1);
+                $sum = 0.0;
+                $probe = (clone $cursor);
+                while ($probe->lte($bucketEnd) && $probe->lte($rangeEnd)) {
+                    $sum += (float) ($trendRows[$probe->format('Y-m-d')] ?? 0);
+                    $probe->addDay();
+                }
+                $label = $cursor->format($trendBucketDays > 1 ? 'M d' : 'D');
+                $sum = round($sum, 2);
+                $sevenDaysTrend[] = [
+                    'date' => $cursor->format('Y-m-d'),
+                    'day' => $label,
+                    'label' => $label,
+                    'revenue' => $sum,
+                    'amount' => $sum,
+                ];
+                $cursor->addDays($trendBucketDays);
+            }
         }
 
         // Top 5 Products by Sales
@@ -3269,6 +3311,9 @@ class PosSyncApiController extends Controller
             ],
             'payment_breakdown' => $paymentMethods,
             'revenue_trend' => $sevenDaysTrend,
+            // Alias of revenue_trend under the schema key some clients expect;
+            // each point carries both {revenue} and {amount}, {day} and {label}.
+            'chart_data' => $sevenDaysTrend,
             'monthly_activity' => $monthlyActivity,
             'popular_tags' => $popularTags,
             'recent_transactions' => $recentTransactions,

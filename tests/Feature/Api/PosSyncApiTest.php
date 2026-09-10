@@ -1237,6 +1237,66 @@ class PosSyncApiTest extends TestCase
             ->assertJsonPath('subscription.plan_name', 'trial');
     }
 
+    private function saleAt(string $number, float $total, Carbon $at, string $status = 'completed'): void
+    {
+        $sale = Sale::create([
+            'company_id' => $this->company->id,
+            'sale_number' => $number,
+            'total' => $total,
+            'status' => $status,
+            'payment_status' => $status === 'cancelled' ? 'void' : 'paid',
+            'items' => [['name' => 'Item', 'price' => $total, 'quantity' => 1]],
+        ]);
+        Sale::withoutGlobalScope('company')->whereKey($sale->id)
+            ->update(['created_at' => $at, 'updated_at' => $at]);
+    }
+
+    public function test_analytics_revenue_trend_is_hourly_for_single_day_ranges(): void
+    {
+        $this->company->update(['timezone' => 'UTC']);
+
+        // Two sales in the 09:00 hour today + a cancelled one that must be ignored.
+        $this->saleAt('S-0930', 343.78, now()->startOfDay()->addHours(9)->addMinutes(30));
+        $this->saleAt('S-0905', 56.22, now()->startOfDay()->addHours(9)->addMinutes(5));
+        $this->saleAt('S-VOID', 999.00, now()->startOfDay()->addHours(14), 'cancelled');
+
+        $res = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
+            ->getJson('/api/v1/pos/analytics?range=today')
+            ->assertOk();
+
+        $trend = $res->json('revenue_trend');
+        $this->assertCount(24, $trend, 'a single-day range must return 24 hourly buckets');
+        $this->assertSame('00:00', $trend[0]['label']);
+        $this->assertSame('09:00', $trend[9]['label']);
+        $this->assertSame('23:00', $trend[23]['label']);
+        $this->assertSame($trend, $res->json('chart_data'));
+
+        // Both 09:xx sales land in the 09:00 bucket; the cancelled sale nowhere.
+        $this->assertEqualsWithDelta(400.0, (float) $trend[9]['amount'], 0.01);
+        $this->assertEqualsWithDelta(400.0, (float) $trend[9]['revenue'], 0.01);
+        $this->assertEqualsWithDelta(0.0, (float) $trend[14]['amount'], 0.01);
+
+        // >= 2 points so fl_chart draws a line instead of "No revenue yet".
+        $this->assertGreaterThanOrEqual(2, count($trend));
+        $this->assertEqualsWithDelta(400.0, array_sum(array_map('floatval', array_column($trend, 'amount'))), 0.01);
+    }
+
+    public function test_analytics_revenue_trend_stays_daily_and_gap_filled_for_multi_day_ranges(): void
+    {
+        $this->saleAt('S-D6', 120.00, now()->subDays(6)->setTime(10, 0));
+        $this->saleAt('S-D0', 80.00, now()->setTime(11, 0));
+
+        $trend = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
+            ->getJson('/api/v1/pos/analytics?range=last7')
+            ->assertOk()
+            ->json('revenue_trend');
+
+        $this->assertCount(7, $trend, 'last7 keeps 7 contiguous daily buckets');
+        $this->assertEqualsWithDelta(120.0, (float) $trend[0]['amount'], 0.01);
+        $this->assertEqualsWithDelta(0.0, (float) $trend[3]['amount'], 0.01);
+        $this->assertEqualsWithDelta(80.0, (float) $trend[6]['amount'], 0.01);
+    }
+
     public function test_quotations_sync_pull_and_batch_ingestion(): void
     {
         // 1. Create a server-side quotation
