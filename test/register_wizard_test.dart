@@ -124,11 +124,13 @@ void main() {
     expect(find.text('Create store'), findsNothing);
 
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'Your name'), 'Ada Lovelace');
+        find.widgetWithText(TextFormField, 'Enter your full name'),
+        'Ada Lovelace');
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'Email'), 'ada@corner.test');
+        find.widgetWithText(TextFormField, 'Enter your email address'),
+        'ada@corner.test');
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'Password'), 'sup3rsecret');
+        find.widgetWithText(TextFormField, 'Create a password'), 'sup3rsecret');
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
@@ -136,7 +138,8 @@ void main() {
     expect(find.text('Step 2 of 3'), findsOneWidget);
     expect(find.text('Store profile'), findsOneWidget);
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'Store name'), 'Corner Cafe');
+        find.widgetWithText(TextFormField, 'Enter your business name'),
+        'Corner Cafe');
     await tester.tap(find.text('Restaurant'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Continue'));
@@ -156,8 +159,7 @@ void main() {
     // Pick a country from the searchable sheet.
     await tester.tap(find.byKey(const ValueKey<String>('picker_Country')));
     await tester.pumpAndSettle();
-    await tester.enterText(
-        find.byType(TextField).last, 'Brazil');
+    await tester.enterText(find.byType(TextField).last, 'Brazil');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Brazil (BR)').last);
     await tester.pumpAndSettle();

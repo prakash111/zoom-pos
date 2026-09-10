@@ -60,8 +60,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
-      heading: 'Reset password',
-      headerIcon: Icons.lock_reset_outlined,
+      brandHeadline: 'Reset your password',
+      brandSubline: "We'll email you a secure link to set a new one.",
+      headerTrailing: TextButton.icon(
+        onPressed: () => Navigator.of(context).maybePop(),
+        icon: const Icon(Icons.arrow_back, size: 16),
+        label: const Text('Back to login'),
+        style: TextButton.styleFrom(
+          foregroundColor: AuthColors.link,
+          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
+      ),
+      heading: 'Forgot password?',
       subheading:
           "Enter your account email and we'll send you a link to reset your password.",
       form: Form(
@@ -70,12 +80,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
+            const AuthFieldLabel('Email address'),
             TextFormField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
               decoration: authInputDecoration(
-                hint: 'Email address',
+                hint: 'Enter your email address',
                 icon: Icons.mail_outline,
               ),
               validator: (value) =>
@@ -103,19 +114,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ],
             const SizedBox(height: 22),
             AuthPrimaryButton(
-              label: 'Send Reset Link',
+              label: 'Send reset link',
               busy: _isSending,
               onPressed: _isSending ? null : _submit,
             ),
           ],
         ),
       ),
-      belowCard: Align(
-        alignment: Alignment.center,
-        child: TextButton(
-          onPressed: () => Navigator.of(context).maybePop(),
-          child: const Text('Back to sign in'),
-        ),
+      belowCard: const Text(
+        'You can request a new link every few minutes.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 12.5, color: AuthColors.muted),
       ),
     );
   }

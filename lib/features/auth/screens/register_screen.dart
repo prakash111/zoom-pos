@@ -267,8 +267,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final isLastStep = _step == 2;
 
     return AuthScaffold(
-      heading: 'Create your store',
-      subheading: 'Set up your workspace in a minute — no card required.',
+      brandHeadline: 'Create your account',
+      brandSubline: 'Start managing your business today.',
+      headerTrailing: TextButton.icon(
+        onPressed: auth.isBusy ? null : () => Navigator.of(context).maybePop(),
+        icon: const Icon(Icons.arrow_back, size: 16),
+        label: const Text('Back to login'),
+        style: TextButton.styleFrom(
+          foregroundColor: AuthColors.link,
+          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
+      ),
       maxCardWidth: 520,
       form: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -281,7 +290,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 2),
@@ -310,7 +322,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Expanded(
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
+                      minimumSize: const Size.fromHeight(54),
+                      foregroundColor: AuthColors.ink,
+                      side: const BorderSide(
+                          color: AuthColors.border, width: 1.2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     onPressed: auth.isBusy ? null : _back,
                     child: const Text('Back'),
@@ -322,21 +340,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: AuthPrimaryButton(
                   label: isLastStep ? 'Create store' : 'Continue',
                   busy: auth.isBusy,
-                  onPressed: auth.isBusy ? null : (isLastStep ? _submit : _next),
+                  onPressed:
+                      auth.isBusy ? null : (isLastStep ? _submit : _next),
                 ),
               ),
             ],
           ),
         ],
       ),
-      belowCard: Wrap(
-        alignment: WrapAlignment.center,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      belowCard: Column(
         children: [
-          const Text('Already have a store?'),
-          TextButton(
-            onPressed: () => Navigator.of(context).maybePop(),
-            child: const Text('Sign in'),
+          AuthInfoCard(
+            icon: Icons.person_add_alt_1_outlined,
+            title: const Text('Already have an account?'),
+            subtitle: const Text('Sign in to your existing workspace'),
+            trailing: const Icon(Icons.arrow_forward, color: AuthColors.link),
+            onTap: auth.isBusy ? null : () => Navigator.of(context).maybePop(),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Together, we build better businesses.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: AuthColors.muted),
           ),
         ],
       ),
@@ -352,24 +377,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
+          const AuthFieldLabel('Your name'),
           TextFormField(
             controller: _ownerNameController,
             textInputAction: TextInputAction.next,
             decoration: authInputDecoration(
-              hint: 'Your name',
+              hint: 'Enter your full name',
               icon: Icons.person_outline,
             ),
             validator: (value) =>
                 (value == null || value.trim().isEmpty) ? 'Required' : null,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+          const AuthFieldLabel('Email address'),
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
             autocorrect: false,
             textInputAction: TextInputAction.next,
             decoration: authInputDecoration(
-              hint: 'Email',
+              hint: 'Enter your email address',
               icon: Icons.mail_outline,
             ),
             validator: (value) {
@@ -378,13 +405,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               return null;
             },
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+          const AuthFieldLabel('Password'),
           TextFormField(
             controller: _passwordController,
             obscureText: _obscurePassword,
             textInputAction: TextInputAction.next,
             decoration: authInputDecoration(
-              hint: 'Password',
+              hint: 'Create a password',
               icon: Icons.lock_outline,
               suffixIcon: IconButton(
                 icon: Icon(
@@ -392,7 +420,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ? Icons.visibility_outlined
                       : Icons.visibility_off_outlined,
                   size: 20,
-                  color: const Color(0xFF94A3B8),
+                  color: AuthColors.faint,
                 ),
                 onPressed: () =>
                     setState(() => _obscurePassword = !_obscurePassword),
@@ -402,12 +430,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ? 'At least 6 characters'
                 : null,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+          const AuthFieldLabel('Phone number'),
           TextFormField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
             decoration: authInputDecoration(
-              hint: 'Phone (optional)',
+              hint: 'Enter your phone (optional)',
               icon: Icons.phone_outlined,
             ),
           ),
@@ -425,23 +454,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
+          const AuthFieldLabel('Business name'),
           TextFormField(
             controller: _storeNameController,
             textInputAction: TextInputAction.next,
             decoration: authInputDecoration(
-              hint: 'Store name',
+              hint: 'Enter your business name',
               icon: Icons.storefront_outlined,
             ),
             validator: (value) =>
                 (value == null || value.trim().isEmpty) ? 'Required' : null,
           ),
-          const SizedBox(height: 20),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Store type',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 18),
+          const AuthFieldLabel('Store type'),
+          const SizedBox(height: 2),
           if (_loadingModules)
             const Center(child: CircularProgressIndicator())
           else if (_moduleLoadError != null)
@@ -465,7 +491,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ? constraints.maxWidth
                             : cardWidth,
                         child: _StoreTypeCard(
-                          icon: SduiIconRegistry.resolve(mod['icon']?.toString()),
+                          icon:
+                              SduiIconRegistry.resolve(mod['icon']?.toString()),
                           label: mod['title']?.toString() ??
                               mod['key']?.toString() ??
                               mod['id']?.toString() ??
@@ -477,8 +504,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               (mod['key']?.toString() ??
                                   mod['id']?.toString() ??
                                   ''),
-                          onTap: () => setState(() => _posMode =
-                              (mod['key'] ?? mod['id']).toString()),
+                          onTap: () => setState(() =>
+                              _posMode = (mod['key'] ?? mod['id']).toString()),
                         ),
                       ),
                   ],
@@ -511,6 +538,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
+          const AuthFieldLabel('Country'),
           _SearchablePicker(
             label: 'Country',
             icon: Icons.public_outlined,
@@ -520,7 +548,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             validator: (v) =>
                 (v == null || v.isEmpty) ? 'Select a country' : null,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+          const AuthFieldLabel('Currency'),
           _SearchablePicker(
             label: 'Currency',
             icon: Icons.payments_outlined,
@@ -528,7 +557,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             options: currencyOptions,
             onChanged: (v) => setState(() => _currency = v),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+          const AuthFieldLabel('Timezone'),
           _SearchablePicker(
             label: 'Timezone',
             icon: Icons.schedule_outlined,
@@ -619,7 +649,8 @@ class _SearchablePicker extends FormField<String> {
               },
               child: InputDecorator(
                 isEmpty: !hasValue,
-                decoration: authInputDecoration(hint: label, icon: icon).copyWith(
+                decoration:
+                    authInputDecoration(hint: label, icon: icon).copyWith(
                   errorText: state.errorText,
                   suffixIcon: const Icon(Icons.expand_more, size: 22),
                 ),
@@ -670,7 +701,8 @@ class _PickerSheetState extends State<_PickerSheet> {
             .toList();
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.72,
         child: Column(
@@ -759,24 +791,24 @@ class _StoreTypeCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? primaryColor.withValues(alpha: 0.08)
-              : const Color(0xFFF8FAFC),
+              : AuthColors.fieldFill,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-              color: selected ? primaryColor : Colors.grey.shade300,
-              width: selected ? 2 : 1),
+              color: selected ? primaryColor : AuthColors.border,
+              width: selected ? 2 : 1.2),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: selected ? primaryColor : Colors.grey.shade700),
+            Icon(icon, color: selected ? primaryColor : AuthColors.muted),
             const SizedBox(height: 6),
             Text(label,
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: selected ? primaryColor : Colors.grey.shade900)),
+                    color: selected ? primaryColor : AuthColors.ink)),
             const SizedBox(height: 2),
             Text(description,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                style: const TextStyle(fontSize: 11, color: AuthColors.muted)),
           ],
         ),
       ),

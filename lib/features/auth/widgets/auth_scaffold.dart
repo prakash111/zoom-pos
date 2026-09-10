@@ -4,36 +4,51 @@ import 'package:provider/provider.dart';
 
 import '../../../core/config/platform_branding_provider.dart';
 import 'auth_illustration.dart';
+import 'auth_widgets.dart';
 
-/// Split-screen shell shared by every pre-login screen (login, register,
-/// forgot-password, OTP), matching the reference "E-Inventory" design:
+/// Shell shared by every pre-login screen (login, register, forgot-password,
+/// OTP), matching the "POS SYSTEMS" reference mock:
 ///
-///  * a large brand wordmark + tagline in the top-left,
-///  * an elevated white card holding the screen's heading and form,
-///  * on desktop widths, a branded illustration panel on the right.
+///  * a blue-tinted page with soft decorative shapes,
+///  * a brand header — logo, a marketing headline ([brandHeadline]) and
+///    subline ([brandSubline]) — sitting above
+///  * an elevated white card holding the screen's [heading]/[subheading] and
+///    [form] body.
 ///
-/// On narrow (phone) widths it collapses to a single scrolling column and
-/// the illustration is dropped. Screens only supply their [heading],
-/// optional [subheading] and the [form] body — all auth logic stays in the
-/// screen.
+/// On desktop widths a branded illustration panel is shown on the right.
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({
     super.key,
-    required this.heading,
     required this.form,
+    this.heading,
     this.subheading,
     this.headerIcon,
+    this.brandHeadline,
+    this.brandSubline,
+    this.headerTrailing,
     this.belowCard,
     this.onServerSettings,
     this.maxCardWidth = 460,
   });
 
-  final String heading;
+  /// Card title ("Welcome back", "Create your account", "Forgot password?").
+  final String? heading;
   final String? subheading;
   final IconData? headerIcon;
+
+  /// Big marketing line above the card. Falls back to the platform name.
+  final String? brandHeadline;
+
+  /// Muted line under [brandHeadline]. Falls back to the platform tagline
+  /// when the server enables it.
+  final String? brandSubline;
+
+  /// Optional action on the top-right of the header (e.g. "Back to login").
+  final Widget? headerTrailing;
+
   final Widget form;
 
-  /// Extra content rendered under the card (e.g. "Don't have a store yet?").
+  /// Extra content rendered under the card.
   final Widget? belowCard;
 
   /// Opens the server-address screen from a discreet top-right button.
@@ -41,37 +56,70 @@ class AuthScaffold extends StatelessWidget {
 
   final double maxCardWidth;
 
-  static const _pageBg = Color(0xFFEDEFF3);
-  static const _ink = Color(0xFF0F172A);
-  static const _muted = Color(0xFF64748B);
+  Widget _logo(PlatformBrandingProvider branding) => branding.hasLogo
+      ? CachedNetworkImage(
+          imageUrl: branding.brandLogoUrl!,
+          height: 40,
+          fit: BoxFit.contain,
+          alignment: Alignment.centerLeft,
+          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+        )
+      : const SizedBox.shrink();
 
   Widget _brand(BuildContext context) {
-    // Name, logo and header layout come from the SaaS owner's superadmin
-    // branding settings (GET /auth/branding), cached locally so this paints
-    // instantly. `header_inline` puts the logo beside the title; `show_tagline`
-    // gates the description line.
     final branding = context.watch<PlatformBrandingProvider>();
 
+    // Marketing header layout used by the login / register / reset screens.
+    if (brandHeadline != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(child: _logo(branding)),
+              if (headerTrailing != null) headerTrailing!,
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            brandHeadline!,
+            style: const TextStyle(
+              fontSize: 27,
+              height: 1.15,
+              fontWeight: FontWeight.w800,
+              color: AuthColors.ink,
+              letterSpacing: -0.5,
+            ),
+          ),
+          if ((brandSubline ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              brandSubline!,
+              style: const TextStyle(
+                fontSize: 14.5,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+                color: AuthColors.muted,
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    // Legacy inline/stacked brand (logo + platform name + optional tagline),
+    // driven by GET /auth/branding's `header_inline` / `show_tagline`.
     final title = Text(
       branding.platformName,
       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w800,
-            color: _ink,
+            color: AuthColors.ink,
             letterSpacing: -0.5,
           ),
     );
-
-    final logo = branding.hasLogo
-        ? CachedNetworkImage(
-            imageUrl: branding.brandLogoUrl!,
-            height: 44,
-            fit: BoxFit.contain,
-            alignment: Alignment.centerLeft,
-            errorWidget: (_, __, ___) => const SizedBox.shrink(),
-          )
-        : null;
-
-    final Widget header = branding.headerInline
+    final logo = branding.hasLogo ? _logo(branding) : null;
+    final header = branding.headerInline
         ? Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
@@ -86,16 +134,12 @@ class AuthScaffold extends StatelessWidget {
             children: [
               if (logo != null)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: logo,
-                ),
+                    padding: const EdgeInsets.only(bottom: 14), child: logo),
               title,
             ],
           );
-
     final showTagline =
         branding.showTagline && branding.tagline.trim().isNotEmpty;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -108,7 +152,7 @@ class AuthScaffold extends StatelessWidget {
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: _muted,
+              color: AuthColors.muted,
             ),
           ),
         ],
@@ -121,59 +165,61 @@ class AuthScaffold extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 40,
-            offset: const Offset(0, 18),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+            blurRadius: 44,
+            offset: const Offset(0, 20),
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(30, 28, 30, 32),
+      padding: const EdgeInsets.fromLTRB(26, 26, 26, 30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              if (canPop)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.arrow_back, size: 22),
-                    onPressed: () => Navigator.of(context).maybePop(),
+          if (heading != null) ...[
+            Row(
+              children: [
+                if (canPop && brandHeadline == null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: const Icon(Icons.arrow_back, size: 22),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
+                  ),
+                if (headerIcon != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: Icon(headerIcon, size: 24, color: AuthColors.orange),
+                  ),
+                Expanded(
+                  child: Text(
+                    heading!,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: AuthColors.ink,
+                    ),
                   ),
                 ),
-              if (headerIcon != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 10),
-                  child: Icon(headerIcon,
-                      size: 26, color: Theme.of(context).colorScheme.primary),
-                ),
-              Expanded(
-                child: Text(
-                  heading,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: _ink,
-                      ),
-                ),
+              ],
+            ),
+            if (subheading != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                subheading!,
+                style: const TextStyle(
+                    fontSize: 13.5, color: AuthColors.muted, height: 1.45),
               ),
             ],
-          ),
-          if (subheading != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              subheading!,
-              style:
-                  const TextStyle(fontSize: 13.5, color: _muted, height: 1.45),
-            ),
+            const SizedBox(height: 22),
           ],
-          const SizedBox(height: 22),
           form,
         ],
       ),
@@ -182,7 +228,7 @@ class AuthScaffold extends StatelessWidget {
 
   Widget _formColumn(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(28, 36, 28, 40),
+      padding: const EdgeInsets.fromLTRB(22, 30, 22, 40),
       child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxCardWidth),
@@ -190,11 +236,17 @@ class AuthScaffold extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Align(alignment: Alignment.centerLeft, child: _brand(context)),
-              const SizedBox(height: 34),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _brand(context),
+                ),
+              ),
+              const SizedBox(height: 26),
               _card(context),
               if (belowCard != null) ...[
-                const SizedBox(height: 22),
+                const SizedBox(height: 20),
                 belowCard!,
               ],
             ],
@@ -204,89 +256,108 @@ class AuthScaffold extends StatelessWidget {
     );
   }
 
-  /// The auth flow is a fixed light "E-Inventory" design. Pin a light
-  /// [ThemeData] over it so form inputs, hint text, borders and the
-  /// "Don't have an account?" footer keep their contrast even when the app is
-  /// running in dark mode. Primary follows the tenant brand.
-  ThemeData _authTheme(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
     final brand = Theme.of(context).colorScheme.primary;
     final scheme = ColorScheme.fromSeed(
       seedColor: brand,
       brightness: Brightness.light,
     ).copyWith(
-      primary: brand,
+      primary: AuthColors.orange,
       surface: Colors.white,
-      onSurface: _ink,
-      onSurfaceVariant: _muted,
+      onSurface: AuthColors.ink,
+      onSurfaceVariant: AuthColors.muted,
     );
-    return ThemeData(
+    final theme = ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: scheme,
-      scaffoldBackgroundColor: _pageBg,
+      scaffoldBackgroundColor: AuthColors.pageTop,
       textTheme: ThemeData(brightness: Brightness.light)
           .textTheme
-          .apply(bodyColor: _ink, displayColor: _ink),
+          .apply(bodyColor: AuthColors.ink, displayColor: AuthColors.ink),
       inputDecorationTheme: const InputDecorationTheme(
         filled: true,
-        fillColor: Color(0xFFF8FAFC),
-        hintStyle: TextStyle(color: Color(0xFF94A3B8)),
-        labelStyle: TextStyle(color: _muted),
+        fillColor: AuthColors.fieldFill,
+        hintStyle: TextStyle(color: AuthColors.faint),
+        labelStyle: TextStyle(color: AuthColors.muted),
       ),
-      iconTheme: const IconThemeData(color: _muted),
+      iconTheme: const IconThemeData(color: AuthColors.muted),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: AuthColors.link),
+      ),
     );
-  }
 
-  @override
-  Widget build(BuildContext context) {
     return Theme(
-      data: _authTheme(context),
+      data: theme,
       child: Scaffold(
-        backgroundColor: _pageBg,
-        body: SafeArea(
+        backgroundColor: AuthColors.pageTop,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [AuthColors.pageTop, AuthColors.pageBottom],
+            ),
+          ),
           child: Stack(
             children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final wide = constraints.maxWidth >= 900;
-                  if (!wide) {
-                    return _formColumn(context);
-                  }
-                  return Center(
-                    child: Container(
-                      margin: const EdgeInsets.all(24),
-                      constraints:
-                          const BoxConstraints(maxWidth: 1180, maxHeight: 820),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 60,
-                            offset: const Offset(0, 24),
-                          ),
-                        ],
+              // Soft decorative shapes behind the content.
+              Positioned(
+                top: -90,
+                right: -70,
+                child: _blob(210, Colors.white.withValues(alpha: 0.55)),
+              ),
+              Positioned(
+                bottom: -110,
+                left: -80,
+                child: _blob(240, Colors.white.withValues(alpha: 0.35)),
+              ),
+              SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final wide = constraints.maxWidth >= 900;
+                    if (!wide) return _formColumn(context);
+                    return Center(
+                      child: Container(
+                        margin: const EdgeInsets.all(24),
+                        constraints: const BoxConstraints(
+                            maxWidth: 1180, maxHeight: 840),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0F172A)
+                                  .withValues(alpha: 0.10),
+                              blurRadius: 60,
+                              offset: const Offset(0, 24),
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Row(
+                          children: [
+                            Expanded(flex: 5, child: _formColumn(context)),
+                            const Expanded(flex: 5, child: AuthIllustration()),
+                          ],
+                        ),
                       ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Row(
-                        children: [
-                          Expanded(flex: 5, child: _formColumn(context)),
-                          const Expanded(flex: 5, child: AuthIllustration()),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
               if (onServerSettings != null)
                 Positioned(
                   top: 8,
                   right: 12,
-                  child: IconButton(
-                    tooltip: 'Server address',
-                    icon: const Icon(Icons.dns_outlined, color: _muted),
-                    onPressed: onServerSettings,
+                  child: SafeArea(
+                    child: IconButton(
+                      tooltip: 'Server address',
+                      icon: const Icon(Icons.dns_outlined,
+                          color: AuthColors.muted),
+                      onPressed: onServerSettings,
+                    ),
                   ),
                 ),
             ],
@@ -295,4 +366,10 @@ class AuthScaffold extends StatelessWidget {
       ),
     );
   }
+
+  static Widget _blob(double size, Color color) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
 }

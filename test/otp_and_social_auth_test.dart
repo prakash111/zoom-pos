@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:zoom_pos_mobile/core/api/api_client.dart';
 import 'package:zoom_pos_mobile/core/config/app_config.dart';
-import 'package:zoom_pos_mobile/core/config/bootstrap_cache.dart';
 import 'package:zoom_pos_mobile/core/config/locale_provider.dart';
 import 'package:zoom_pos_mobile/core/config/nav_dock_provider.dart';
 import 'package:zoom_pos_mobile/core/config/platform_branding_provider.dart';
@@ -240,6 +239,14 @@ void main() {
       expect(find.text('Or continue with'), findsOneWidget);
       expect(find.text('Continue with Google'), findsOneWidget);
       expect(find.text('Continue with Facebook'), findsOneWidget);
+
+      // "POS SYSTEMS" reference layout: marketing header outside the card,
+      // "Welcome back" inside it, plus the store-account-ID call-to-action.
+      expect(find.text('Run your business smarter.'), findsOneWidget);
+      expect(find.text('Welcome back'), findsOneWidget);
+      expect(find.text('Have a store account ID?'), findsOneWidget);
+      expect(find.text('Forgot password?'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

@@ -144,7 +144,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final hasSocial = _googleEnabled || _facebookEnabled;
 
     return AuthScaffold(
-      heading: 'Login',
+      brandHeadline: 'Run your business smarter.',
+      brandSubline: 'Sales, inventory & orders — all in one place.',
+      heading: 'Welcome back',
+      subheading: 'Sign in to your account',
       onServerSettings: _openServerSettings,
       form: Form(
         key: _formKey,
@@ -152,24 +155,26 @@ class _LoginScreenState extends State<LoginScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
+            AuthFieldLabel(l10n.emailOrLogin),
             TextFormField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
               decoration: authInputDecoration(
-                hint: l10n.emailOrLogin,
+                hint: 'Enter your email or username',
                 icon: Icons.person_outline,
               ),
               validator: (value) => (value == null || value.trim().isEmpty)
                   ? l10n.required
                   : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
+            AuthFieldLabel(l10n.password),
             TextFormField(
               controller: _passwordController,
               obscureText: _obscurePassword,
               decoration: authInputDecoration(
-                hint: l10n.password,
+                hint: 'Enter your password',
                 icon: Icons.lock_outline,
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -177,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined,
                     size: 20,
-                    color: const Color(0xFF94A3B8),
+                    color: AuthColors.faint,
                   ),
                   onPressed: () =>
                       setState(() => _obscurePassword = !_obscurePassword),
@@ -190,6 +195,10 @@ class _LoginScreenState extends State<LoginScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: AuthColors.orange,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                ),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
                       builder: (_) => const ForgotPasswordScreen()),
@@ -199,23 +208,18 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             if (_showAccountId) ...[
               const SizedBox(height: 6),
+              AuthFieldLabel(l10n.storeAccountIdOptional),
               TextFormField(
                 controller: _accountIdController,
                 autocorrect: false,
                 decoration: authInputDecoration(
                   hint: l10n.storeAccountIdOptional,
-                  icon: Icons.badge_outlined,
+                  icon: Icons.storefront_outlined,
                 ),
               ),
+              const SizedBox(height: 16),
             ] else
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => setState(() => _showAccountId = true),
-                  child: Text(l10n.iHaveAccountId),
-                ),
-              ),
-            const SizedBox(height: 14),
+              const SizedBox(height: 6),
             AuthPrimaryButton(
               label: l10n.signIn,
               busy: auth.isBusy,
@@ -223,160 +227,63 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             if (hasSocial) ...[
               const SizedBox(height: 22),
-              Row(
-                children: [
-                  Expanded(child: Divider(color: Colors.grey.shade300)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'Or continue with',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  Expanded(child: Divider(color: Colors.grey.shade300)),
-                ],
-              ),
+              const AuthOrDivider(),
               const SizedBox(height: 16),
               if (_googleEnabled)
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF1F2937),
-                    side: BorderSide(color: Colors.grey.shade300, width: 1.2),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                AuthSocialButton(
+                  label: 'Continue with Google',
+                  leading: const AuthGoogleLogo(),
                   onPressed: (_socialLoading || auth.isBusy)
                       ? null
                       : () => _handleSocialLogin('google'),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CustomPaint(painter: _GoogleGPainter()),
-                      ),
-                      SizedBox(width: 10),
-                      Text(
-                        'Continue with Google',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1F2937),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               if (_googleEnabled && _facebookEnabled)
                 const SizedBox(height: 12),
               if (_facebookEnabled)
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1877F2),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                AuthSocialButton(
+                  label: 'Continue with Facebook',
+                  foreground: AuthColors.facebook,
+                  leading: const Icon(Icons.facebook,
+                      size: 22, color: AuthColors.facebook),
                   onPressed: (_socialLoading || auth.isBusy)
                       ? null
                       : () => _handleSocialLogin('facebook'),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.facebook, size: 22, color: Colors.white),
-                      SizedBox(width: 10),
-                      Text(
-                        'Continue with Facebook',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
+            ],
+            if (!_showAccountId) ...[
+              const SizedBox(height: 18),
+              AuthInfoCard(
+                icon: Icons.storefront_outlined,
+                title: const Text('Have a store account ID?'),
+                subtitle: const Text('Connect your store to get started'),
+                onTap: () => setState(() => _showAccountId = true),
+              ),
             ],
           ],
         ),
       ),
-      belowCard: Builder(
-        builder: (context) {
-          final scheme = Theme.of(context).colorScheme;
-          return Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                l10n.noStoreYetPrompt,
-                style:
-                    TextStyle(color: scheme.onSurface.withValues(alpha: 0.7)),
-              ),
-              TextButton(
-                style: TextButton.styleFrom(foregroundColor: scheme.primary),
-                onPressed: auth.isBusy
-                    ? null
-                    : () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const RegisterScreen()),
-                        ),
-                child: Text(l10n.createOne),
-              ),
-            ],
-          );
-        },
+      belowCard: Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            l10n.noStoreYetPrompt,
+            style: const TextStyle(color: AuthColors.muted),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: AuthColors.link,
+              textStyle: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            onPressed: auth.isBusy
+                ? null
+                : () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                    ),
+            child: Text(l10n.createOne),
+          ),
+        ],
       ),
     );
   }
-}
-
-/// The multi-colour Google "G", drawn small so it never clips inside the
-/// social-sign-in button the way a scaled text glyph did.
-class _GoogleGPainter extends CustomPainter {
-  const _GoogleGPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r = size.width / 2;
-    final c = Offset(r, r);
-    final stroke = size.width * 0.28;
-    final rect = Rect.fromCircle(center: c, radius: r - stroke / 2);
-    final p = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.butt;
-
-    // Four coloured arcs around the ring.
-    p.color = const Color(0xFF4285F4); // blue  (right)
-    canvas.drawArc(rect, -0.55, 1.6, false, p);
-    p.color = const Color(0xFF34A853); // green (bottom)
-    canvas.drawArc(rect, 1.15, 1.5, false, p);
-    p.color = const Color(0xFFFBBC05); // yellow (bottom-left)
-    canvas.drawArc(rect, 2.55, 1.1, false, p);
-    p.color = const Color(0xFFEA4335); // red   (top-left)
-    canvas.drawArc(rect, 3.6, 1.6, false, p);
-
-    // The horizontal bar of the G.
-    p
-      ..style = PaintingStyle.fill
-      ..color = const Color(0xFF4285F4);
-    canvas.drawRect(
-      Rect.fromLTWH(c.dx, c.dy - stroke / 2, r - stroke / 2, stroke),
-      p,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
