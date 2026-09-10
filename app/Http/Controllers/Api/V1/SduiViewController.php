@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Company;
 use App\Models\Configuration;
 use App\Services\Auth\PermissionChecker;
+use App\Services\Notifications\CustomChannelDispatcherService;
 use App\Services\Sdui\SchemaResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,11 +33,12 @@ class SduiViewController extends Controller
             try {
                 $company = $this->resolveCompany($request);
             } catch (\Throwable $e) {
-                $company = \App\Models\Company::query()->first() ?? new \App\Models\Company([
+                $company = Company::query()->first() ?? new Company([
                     'name' => config('app.name', 'ZoomNearby POS'),
                     'currency_symbol' => '$',
                 ]);
             }
+
             return SchemaResponse::renderView($view, $company);
         }
 
@@ -74,13 +77,13 @@ class SduiViewController extends Controller
         switch ($normSection) {
             case 'profile':
             case 'localization':
-                return $settingsController->updateProfile($request);
+                return $this->maybeWizardAdvance($settingsController->updateProfile($request), $request, $company, $user);
 
             case 'branding':
-                return $settingsController->updateBranding($request);
+                return $this->maybeWizardAdvance($settingsController->updateBranding($request), $request, $company, $user);
 
             case 'receipts':
-                return $settingsController->updateReceipts($request);
+                return $this->maybeWizardAdvance($settingsController->updateReceipts($request), $request, $company, $user);
 
             case 'repair-checklist':
             case 'repair-checklist-settings':
@@ -140,10 +143,18 @@ class SduiViewController extends Controller
                 $validated = $validator->validated();
 
                 $outboundEvents = [];
-                if ($request->boolean('event_order_created')) $outboundEvents[] = 'order.created';
-                if ($request->boolean('event_order_settled')) $outboundEvents[] = 'order.settled';
-                if ($request->boolean('event_order_cancelled')) $outboundEvents[] = 'order.cancelled';
-                if ($request->boolean('event_stock_low_alert')) $outboundEvents[] = 'stock.low_alert';
+                if ($request->boolean('event_order_created')) {
+                    $outboundEvents[] = 'order.created';
+                }
+                if ($request->boolean('event_order_settled')) {
+                    $outboundEvents[] = 'order.settled';
+                }
+                if ($request->boolean('event_order_cancelled')) {
+                    $outboundEvents[] = 'order.cancelled';
+                }
+                if ($request->boolean('event_stock_low_alert')) {
+                    $outboundEvents[] = 'stock.low_alert';
+                }
                 if ($request->has('outbound_events') && is_array($request->input('outbound_events'))) {
                     $outboundEvents = array_values(array_unique(array_merge($outboundEvents, $request->input('outbound_events'))));
                 }
@@ -157,7 +168,9 @@ class SduiViewController extends Controller
                 }
 
                 foreach ($validated as $key => $value) {
-                    if (str_starts_with($key, 'event_')) continue;
+                    if (str_starts_with($key, 'event_')) {
+                        continue;
+                    }
                     Configuration::withoutGlobalScopes()->updateOrCreate(
                         ['company_id' => $company->id, 'key' => $key],
                         ['value' => is_bool($value) ? ($value ? '1' : '0') : $value]
@@ -169,7 +182,7 @@ class SduiViewController extends Controller
 
             case 'notifications':
             case 'custom-notifications':
-                return $settingsController->testNotificationChannel($request, app(\App\Services\Notifications\CustomChannelDispatcherService::class));
+                return $settingsController->testNotificationChannel($request, app(CustomChannelDispatcherService::class));
 
             case 'mode':
                 return response()->json([
@@ -180,5 +193,51 @@ class SduiViewController extends Controller
             default:
                 return response()->json(['success' => false, 'error' => 'Settings section not found.'], 404);
         }
+    }
+
+    /**
+     * When a Store Profile setup-wizard tab submits (it POSTs a
+     * `wizard_tab_index`), append the SDUI `next_action` directive the client
+     * uses to auto-advance to the next tab. On the final tab it also flags the
+     * company profile complete and hands back a dashboard redirect. A plain
+     * (non-wizard) settings save from the standalone screens is returned
+     * untouched, and a validation failure never advances.
+     */
+    private function maybeWizardAdvance(
+        JsonResponse $response,
+        Request $request,
+        ?Company $company,
+        $user
+    ): JsonResponse {
+        if (! $request->filled('wizard_tab_index')) {
+            return $response;
+        }
+
+        $payload = $response->getData(true);
+        if (($payload['success'] ?? false) !== true) {
+            return $response;
+        }
+
+        $index = max(0, (int) $request->input('wizard_tab_index'));
+        $total = max(1, (int) $request->input('wizard_total_tabs', 4));
+        $isFinal = $index >= $total - 1;
+
+        if ($isFinal && $company instanceof Company) {
+            if (! $company->is_profile_completed) {
+                $company->forceFill(['is_profile_completed' => true])->save();
+                AuditLog::record('company.profile_completed', $company->id, $user?->id, ['via' => 'store_profile_wizard']);
+            }
+            $payload['message'] = 'Store setup completed successfully!';
+            $payload['is_profile_completed'] = true;
+        }
+
+        $payload['next_action'] = [
+            'type' => 'ADVANCE_TAB',
+            'target_index' => $isFinal ? $index : $index + 1,
+            'is_final' => $isFinal,
+            'redirect_url' => $isFinal ? '/dashboard' : null,
+        ];
+
+        return response()->json($payload, $response->getStatusCode());
     }
 }

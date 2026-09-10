@@ -229,6 +229,211 @@ class SduiViewApiTest extends TestCase
         }
     }
 
+    public function test_store_profile_view_is_a_tabbed_screen_with_four_sections(): void
+    {
+        $schema = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->getJson('/api/tenant/views/settings-profile')
+            ->assertOk()
+            ->assertJsonPath('schema.title', 'Store Profile')
+            ->json('schema');
+
+        $tabs = collect($schema['components'])->firstWhere('type', 'tabs');
+        $this->assertIsArray($tabs, 'Store Profile is not a tabbed screen');
+        $this->assertSame(
+            ['General Info', 'Address & Localization', 'Branding & Appearance', 'Receipt & Invoicing'],
+            collect($tabs['tabs'])->pluck('label')->all()
+        );
+        $this->assertTrue($tabs['is_scrollable'] ?? false);
+
+        // Field keys and form_submit endpoints are unchanged — the tabs are a
+        // presentational regroup only.
+        $body = json_encode($schema, JSON_UNESCAPED_SLASHES);
+        foreach (['"name"', '"trade_name"', '"email"', '"phone"', '"website"',
+            '"address"', '"city"', '"state"', '"postal_code"', '"country"', '"timezone"',
+            '"logo"',
+            '"invoice_prefix"', '"quotation_prefix"', '"invoice_terms"', '"bank_details"'] as $key) {
+            $this->assertStringContainsString($key, $body, "profile field {$key} disappeared");
+        }
+        $this->assertStringContainsString('/api/tenant/settings/profile', $body);
+        $this->assertStringContainsString('/api/tenant/settings/receipts', $body);
+
+        // The tabs themselves carry no icon field (per product decision).
+        foreach ($tabs['tabs'] as $tab) {
+            $this->assertArrayNotHasKey('icon', $tab);
+        }
+
+        // Wizard action buttons: intermediate tabs continue, the last one
+        // completes and opens the dashboard.
+        $buttonOf = function (array $tab): array {
+            foreach ($tab['components'] as $c) {
+                if (($c['type'] ?? null) === 'button_primary') {
+                    return $c;
+                }
+            }
+
+            return [];
+        };
+        $general = $buttonOf($tabs['tabs'][0]);
+        $final = $buttonOf($tabs['tabs'][3]);
+        $this->assertSame('Save & Continue', $general['label']);
+        $this->assertSame('arrow_forward', $general['icon']);
+        $this->assertSame(0, $general['action']['payload']['wizard_tab_index']);
+        $this->assertSame('Complete Setup & Open Dashboard', $final['label']);
+        $this->assertSame('check_circle', $final['icon']);
+        $this->assertSame(3, $final['action']['payload']['wizard_tab_index']);
+        $this->assertSame(4, $final['action']['payload']['wizard_total_tabs']);
+    }
+
+    public function test_store_profile_wizard_intermediate_save_returns_advance_tab(): void
+    {
+        $response = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->postJson('/api/tenant/settings/profile', [
+                'name' => 'Apex Mart',
+                'wizard_tab_index' => 0,
+                'wizard_total_tabs' => 4,
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('next_action.type', 'ADVANCE_TAB')
+            ->assertJsonPath('next_action.target_index', 1)
+            ->assertJsonPath('next_action.is_final', false);
+
+        $this->assertNull($response->json('next_action.redirect_url'));
+        $this->assertFalse((bool) $this->company->fresh()->is_profile_completed);
+    }
+
+    public function test_store_profile_wizard_final_save_completes_onboarding_and_redirects(): void
+    {
+        $this->assertFalse((bool) $this->company->fresh()->is_profile_completed);
+
+        $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->postJson('/api/tenant/settings/receipts', [
+                'invoice_prefix' => 'INV-',
+                'wizard_tab_index' => 3,
+                'wizard_total_tabs' => 4,
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('next_action.type', 'ADVANCE_TAB')
+            ->assertJsonPath('next_action.is_final', true)
+            ->assertJsonPath('next_action.target_index', 3)
+            ->assertJsonPath('next_action.redirect_url', '/dashboard')
+            ->assertJsonPath('is_profile_completed', true)
+            ->assertJsonFragment(['message' => 'Store setup completed successfully!']);
+
+        $this->assertTrue((bool) $this->company->fresh()->is_profile_completed);
+    }
+
+    public function test_plain_settings_save_carries_no_wizard_directive(): void
+    {
+        $response = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->postJson('/api/tenant/settings/profile', ['name' => 'Apex Mart'])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertArrayNotHasKey('next_action', $response->json());
+        $this->assertFalse((bool) $this->company->fresh()->is_profile_completed);
+    }
+
+    public function test_store_profile_wizard_does_not_advance_on_validation_failure(): void
+    {
+        // `name` is required-when-present; an empty string fails validation.
+        $response = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->postJson('/api/tenant/settings/profile', [
+                'name' => '',
+                'wizard_tab_index' => 0,
+                'wizard_total_tabs' => 4,
+            ])
+            ->assertStatus(422);
+
+        $this->assertArrayNotHasKey('next_action', $response->json());
+        $this->assertFalse((bool) $this->company->fresh()->is_profile_completed);
+    }
+
+    public function test_store_profile_branding_tab_has_no_colour_pickers(): void
+    {
+        $schema = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->getJson('/api/tenant/views/settings-profile')
+            ->assertOk()
+            ->json('schema');
+
+        $branding = collect(collect($schema['components'])->firstWhere('type', 'tabs')['tabs'])
+            ->firstWhere('id', 'branding_appearance');
+
+        $types = [];
+        $names = [];
+        $walk = function ($node) use (&$walk, &$types, &$names) {
+            if (! is_array($node)) {
+                return;
+            }
+            if (isset($node['type'])) {
+                $types[] = $node['type'];
+            }
+            if (isset($node['name'])) {
+                $names[] = $node['name'];
+            }
+            foreach ($node as $child) {
+                $walk($child);
+            }
+        };
+        $walk($branding);
+
+        // Colour customisation now lives only under App Preferences.
+        $this->assertNotContains('color_picker', $types);
+        $this->assertNotContains('primary_color', $names);
+        $this->assertNotContains('accent_color', $names);
+        // Logo upload is still here and wired to its own endpoint.
+        $this->assertContains('file_upload', $types);
+        $this->assertContains('logo', $names);
+        $brandingJson = json_encode($branding, JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('/api/v1/pos/settings/profile/logo', $brandingJson);
+
+        // The "Theme & Colours" pointer card is gone — logo card, then the
+        // wizard button, nothing else.
+        $this->assertStringNotContainsString('Theme & Colours', $brandingJson);
+        $this->assertStringNotContainsString('Open Branding & Colors', $brandingJson);
+        $this->assertStringNotContainsString('/api/tenant/views/settings-branding', $brandingJson);
+        $this->assertSame(
+            ['card', 'button_primary'],
+            array_column($branding['components'], 'type')
+        );
+    }
+
+    public function test_store_profile_receipt_tab_ends_on_the_complete_button(): void
+    {
+        $schema = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->getJson('/api/tenant/views/settings-profile')
+            ->assertOk()
+            ->json('schema');
+
+        $receipt = collect(collect($schema['components'])->firstWhere('type', 'tabs')['tabs'])
+            ->firstWhere('id', 'receipt_invoicing');
+
+        $receiptJson = json_encode($receipt, JSON_UNESCAPED_SLASHES);
+        $this->assertStringNotContainsString('Thermal Receipt & Printer Rules', $receiptJson);
+        $this->assertStringNotContainsString('Printer & Hardware Setup', $receiptJson);
+        $this->assertStringNotContainsString('printer_setup', $receiptJson);
+
+        // The primary action is the clean terminal element.
+        $components = $receipt['components'];
+        $last = end($components);
+        $this->assertSame('button_primary', $last['type']);
+        $this->assertSame('Complete Setup & Open Dashboard', $last['label']);
+    }
+
+    public function test_store_profile_view_tab_query_param_selects_the_initial_tab(): void
+    {
+        foreach (['general' => 0, 'address' => 1, 'branding' => 2, 'receipts' => 3] as $param => $index) {
+            $tabs = collect($this->withHeader('Authorization', 'Bearer '.$this->token())
+                ->getJson("/api/tenant/views/settings-profile?tab={$param}")
+                ->assertOk()
+                ->json('schema.components'))
+                ->firstWhere('type', 'tabs');
+
+            $this->assertSame($index, $tabs['initial_index'], "tab={$param} should open tab index {$index}");
+        }
+    }
+
     public function test_app_preferences_view_has_real_controls_not_a_notice(): void
     {
         $body = json_encode($this->withHeader('Authorization', 'Bearer '.$this->token())

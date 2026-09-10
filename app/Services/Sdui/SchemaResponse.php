@@ -1043,41 +1043,83 @@ class SchemaResponse
         ]);
     }
 
+    /** Number of tabs in the Store Profile setup wizard. */
+    private const PROFILE_WIZARD_TAB_COUNT = 4;
+
+    /**
+     * Store Profile — an icon-free Tabbed View driven as a setup wizard. Each
+     * tab keeps its own submit button pointed at the same settings endpoint it
+     * always used, so every field key (`name`, `country`, `timezone`,
+     * `invoice_prefix`, …) stays backward-compatible; the tabs are a
+     * presentational regroup. Every intermediate tab's button reads
+     * "Save & Continue" and, on a 200, the response carries a
+     * `next_action: { type: ADVANCE_TAB, ... }` directive so the client moves
+     * to the next tab; the final tab reads "Complete Setup & Open Dashboard",
+     * flags `is_profile_completed`, and routes to the dashboard.
+     *
+     * `?tab=address|branding|receipts` deep-links straight to a tab.
+     */
     public static function profileView(Company $company): array
     {
+        $tabParam = strtolower(trim((string) request('tab', '')));
+        $initialIndex = match ($tabParam) {
+            'address', 'localization', 'location', 'address-localization' => 1,
+            'branding', 'appearance', 'colors', 'brand' => 2,
+            'receipt', 'receipts', 'invoicing', 'invoice' => 3,
+            default => 0,
+        };
+
         return self::screen('Store Profile', [
+            self::tabs([
+                ['id' => 'general_info', 'label' => 'General Info', 'components' => self::profileGeneralTab($company)],
+                ['id' => 'address_localization', 'label' => 'Address & Localization', 'components' => self::profileAddressTab($company)],
+                ['id' => 'branding_appearance', 'label' => 'Branding & Appearance', 'components' => self::profileBrandingTab($company)],
+                ['id' => 'receipt_invoicing', 'label' => 'Receipt & Invoicing', 'components' => self::profileReceiptTab($company)],
+            ], ['initial_index' => $initialIndex, 'is_scrollable' => true]),
+        ]);
+    }
+
+    /**
+     * The wizard submit button for one Store Profile tab. Intermediate tabs
+     * read "Save & Continue" (forward arrow); the last tab reads
+     * "Complete Setup & Open Dashboard" (check). The `wizard_tab_index` /
+     * `wizard_total_tabs` payload tells `SduiViewController::submitSettings`
+     * to return the `ADVANCE_TAB` directive after a successful save.
+     */
+    private static function profileWizardSaveButton(int $tabIndex, string $endpoint, string $intermediateToast): array
+    {
+        $isFinal = $tabIndex >= self::PROFILE_WIZARD_TAB_COUNT - 1;
+
+        return self::buttonPrimary(
+            $isFinal ? 'Complete Setup & Open Dashboard' : 'Save & Continue',
+            self::formSubmitAction($endpoint, 'POST', $isFinal ? 'Store setup completed successfully!' : $intermediateToast, payload: [
+                'wizard_tab_index' => $tabIndex,
+                'wizard_total_tabs' => self::PROFILE_WIZARD_TAB_COUNT,
+            ]),
+            $isFinal ? 'check_circle' : 'arrow_forward',
+        );
+    }
+
+    /**
+     * Tab 1 — store identity + contact. Saves to /settings/profile.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function profileGeneralTab(Company $company): array
+    {
+        return [
             self::card([
                 self::text('Store Identity', 'title_medium', ['bold' => true]),
-                self::text('Configure your business trade name, tax registration number, and address.', 'body_small', ['color' => '#6b7280']),
+                self::text('Your public trading name, tax registration ID, and contact details.', 'body_small', ['color' => '#6b7280']),
                 self::divider(),
                 self::textInput('name', 'Business Name', $company->name, ['required' => true]),
                 self::textInput('trade_name', 'Trading Name (DBA)', $company->trade_name),
                 self::textInput('tax_id', 'Tax ID / GSTIN / VAT', $company->tax_id),
-                self::fileUpload('logo', 'Store Logo', $company->getLogoUrl(), '/api/v1/pos/settings/profile/logo', [
-                    'delete_endpoint' => '/api/v1/pos/settings/profile/logo',
-                    'accept' => ['image/png', 'image/jpeg', 'image/webp'],
-                    'response_url_path' => 'logo_url',
-                ]),
                 self::textInput('email', 'Store Email', $company->email, ['keyboard_type' => 'email']),
                 self::textInput('phone', 'Store Phone', $company->phone, ['keyboard_type' => 'phone']),
                 self::textInput('website', 'Store Website', $company->website),
             ]),
-            self::card([
-                self::text('Address & Localization', 'title_medium', ['bold' => true]),
-                self::divider(),
-                self::textInput('address', 'Street Address', $company->address),
-                self::textInput('city', 'City', $company->city),
-                self::textInput('state', 'State / Province', $company->state),
-                self::textInput('postal_code', 'Postal / Zip Code', $company->postal_code),
-                self::dropdownSelect('country', 'Country', PlatformRegionalService::countryOptions(), $company->country ?? 'US'),
-                self::dropdownSelect('default_locale', 'Store Primary Language', PlatformRegionalService::languageOptions(), $company->default_locale ?: ($company->language ?: 'en')),
-                self::dropdownSelect('timezone', 'Store Timezone', PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone(), ['searchable' => true, 'search_hint' => 'Search city or region (e.g. Kolkata, New_York, Sao_Paulo)']),
-            ]),
-            self::buttonPrimary('Save Store Profile', self::formSubmitAction(
-                '/api/tenant/settings/profile',
-                'POST',
-                'Store profile updated successfully'
-            ), 'save'),
+            self::profileWizardSaveButton(0, '/api/tenant/settings/profile', 'General info saved'),
             self::card([
                 self::text('Demo Data Reset', 'title_medium', ['bold' => true, 'color' => '#dc2626']),
                 self::text('Clear all auto-seeded sample products, categories, floor plans, and sample transactions. Your store profile and configuration will remain untouched.', 'body_small', ['color' => '#6b7280']),
@@ -1091,7 +1133,116 @@ class SchemaResponse
                     'reload' => true,
                 ], 'delete_forever'),
             ], ['color' => '#fef2f2', 'border_color' => '#fecaca']),
-        ]);
+        ];
+    }
+
+    /**
+     * Tab 2 — address lines + searchable country / language / timezone.
+     * Saves to /settings/profile.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function profileAddressTab(Company $company): array
+    {
+        return [
+            self::card([
+                self::text('Address', 'title_medium', ['bold' => true]),
+                self::divider(),
+                self::textInput('address', 'Street Address', $company->address),
+                self::textInput('city', 'City', $company->city),
+                self::textInput('state', 'State / Province', $company->state),
+                self::textInput('postal_code', 'Postal / Zip Code', $company->postal_code),
+            ]),
+            self::card([
+                self::text('Localization', 'title_medium', ['bold' => true]),
+                self::divider(),
+                self::dropdownSelect('country', 'Country', PlatformRegionalService::countryOptions(), $company->country ?? 'US', ['searchable' => true, 'search_hint' => 'Search country name or ISO code']),
+                self::dropdownSelect('default_locale', 'Store Primary Language', PlatformRegionalService::languageOptions(), $company->default_locale ?: ($company->language ?: 'en')),
+                self::dropdownSelect('timezone', 'Store Timezone', PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone(), ['searchable' => true, 'search_hint' => 'Search city or region (e.g. Kolkata, New_York, Sao_Paulo)']),
+            ]),
+            self::profileWizardSaveButton(1, '/api/tenant/settings/profile', 'Address & localization saved'),
+        ];
+    }
+
+    /**
+     * Tab 3 — store logo only, followed immediately by the wizard's
+     * "Save & Continue" button. The logo uploads through its own endpoint on
+     * pick. Brand / accent colours and full theme customisation live entirely
+     * under App Preferences ▸ Appearance and the dedicated Branding & Colors
+     * screen, so nothing else is surfaced here.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function profileBrandingTab(Company $company): array
+    {
+        return [
+            self::card([
+                self::text('Store Logo', 'title_medium', ['bold' => true]),
+                self::text('Shown on receipts, invoices and the app drawer header. Uploads as soon as you pick a file.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::fileUpload('logo', 'Store Logo', $company->getLogoUrl(), '/api/v1/pos/settings/profile/logo', [
+                    'delete_endpoint' => '/api/v1/pos/settings/profile/logo',
+                    'accept' => ['image/png', 'image/jpeg', 'image/webp'],
+                    'response_url_path' => 'logo_url',
+                ]),
+            ]),
+            self::profileWizardSaveButton(2, '/api/tenant/settings/profile', 'Branding saved'),
+        ];
+    }
+
+    /**
+     * Tab 4 — invoice/quote numbering + header/footer terms, then the wizard's
+     * terminal "Complete Setup & Open Dashboard" button. Mirrors the standalone
+     * Receipt Settings screen; saves to /settings/receipts with the same field
+     * keys. Thermal-printer pairing stays on its own dedicated screen.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function profileReceiptTab(Company $company): array
+    {
+        $hasPharmacy = $company->hasModule('pharmacy');
+        $hasRepair = $company->hasModule('repair_technician');
+        $hasSalon = $company->hasModule('service_booking');
+
+        $numbering = [
+            self::text('Invoice & Quote Numbering', 'title_medium', ['bold' => true]),
+            self::text('Prefix tags used when generating official customer documents.', 'body_small', ['color' => '#6b7280']),
+            self::divider(),
+            self::textInput('invoice_prefix', 'Invoice Prefix', $company->invoice_prefix ?? 'INV-', ['placeholder' => 'INV-']),
+            self::textInput('quotation_prefix', 'Quotation Prefix', $company->quotation_prefix ?? 'QUO-', ['placeholder' => 'QUO-']),
+        ];
+        if ($hasPharmacy) {
+            $numbering[] = self::textInput('prescription_prefix', 'Prescription / Rx Prefix', $company->prescription_prefix ?? 'RX-', ['placeholder' => 'RX-']);
+        }
+        if ($hasRepair) {
+            $numbering[] = self::textInput('repair_prefix', 'Repair Ticket Prefix', $company->repair_prefix ?? 'REP-', ['placeholder' => 'REP-']);
+        }
+        if ($hasSalon) {
+            $numbering[] = self::textInput('salon_prefix', 'Salon Booking Prefix', $company->salon_prefix ?? 'SAL-', ['placeholder' => 'SAL-']);
+        }
+
+        $terms = [
+            self::text('Invoice Header, Footer & Terms', 'title_medium', ['bold' => true]),
+            self::divider(),
+            self::textInput('invoice_terms', 'Invoice Terms & Conditions (footer)', $company->invoice_terms, ['max_lines' => 4, 'keyboard_type' => 'multiline']),
+            self::textInput('quote_terms', 'Quotation Terms & Conditions', $company->quote_terms, ['max_lines' => 3, 'keyboard_type' => 'multiline']),
+        ];
+        if ($hasPharmacy) {
+            $terms[] = self::textInput('dispensing_disclaimer', 'Prescription / Drug Dispensing Disclaimer & Policies', $company->dispensing_disclaimer, ['max_lines' => 3, 'keyboard_type' => 'multiline']);
+        }
+        if ($hasRepair) {
+            $terms[] = self::textInput('repair_warranty_terms', 'Equipment Repair Warranty Disclaimer', $company->repair_warranty_terms, ['max_lines' => 3, 'keyboard_type' => 'multiline']);
+        }
+        if ($hasSalon) {
+            $terms[] = self::textInput('salon_policy_terms', 'Salon Cancellation & Service Policies', $company->salon_policy_terms, ['max_lines' => 3, 'keyboard_type' => 'multiline']);
+        }
+        $terms[] = self::textInput('bank_details', 'Bank Account & Settlement Details', $company->bank_details, ['max_lines' => 3, 'keyboard_type' => 'multiline']);
+
+        return [
+            self::card($numbering),
+            self::card($terms),
+            self::profileWizardSaveButton(3, '/api/tenant/settings/receipts', 'Receipt settings saved'),
+        ];
     }
 
     public static function brandingView(Company $company): array
