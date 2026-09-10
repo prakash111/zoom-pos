@@ -1071,7 +1071,7 @@ class SchemaResponse
                 self::textInput('postal_code', 'Postal / Zip Code', $company->postal_code),
                 self::dropdownSelect('country', 'Country', PlatformRegionalService::countryOptions(), $company->country ?? 'US'),
                 self::dropdownSelect('default_locale', 'Store Primary Language', PlatformRegionalService::languageOptions(), $company->default_locale ?: ($company->language ?: 'en')),
-                self::dropdownSelect('timezone', 'Store Timezone', PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone()),
+                self::dropdownSelect('timezone', 'Store Timezone', PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone(), ['searchable' => true, 'search_hint' => 'Search city or region (e.g. Kolkata, New_York, Sao_Paulo)']),
             ]),
             self::buttonPrimary('Save Store Profile', self::formSubmitAction(
                 '/api/tenant/settings/profile',
@@ -4499,7 +4499,7 @@ class SchemaResponse
                 self::text('Configure primary store language and operating timezone inherited or overridden from platform baseline.', 'body_small', ['color' => '#6b7280']),
                 self::divider(),
                 self::dropdownSelect('default_locale', 'Store Primary Language', PlatformRegionalService::languageOptions(), $company->default_locale ?: ($company->language ?: 'en')),
-                self::dropdownSelect('timezone', 'Store Operating Timezone', PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone()),
+                self::dropdownSelect('timezone', 'Store Operating Timezone', PlatformRegionalService::timezoneOptions(), $company->timezone ?: $company->resolveTimezone(), ['searchable' => true, 'search_hint' => 'Search city or region (e.g. Kolkata, New_York, Sao_Paulo)']),
             ]),
             self::buttonPrimary('Save Localization Settings', self::formSubmitAction(
                 '/api/tenant/settings/profile',
