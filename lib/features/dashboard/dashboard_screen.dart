@@ -25,6 +25,7 @@ import '../../core/widgets/coming_soon_screen.dart';
 import '../../core/widgets/tappable_scale.dart';
 import '../../l10n/app_localizations.dart';
 import '../analytics/analytics_repository.dart';
+import 'widgets/dock_rail_slot.dart';
 import 'widgets/oroit_dashboard.dart';
 import 'widgets/posh_dashboard.dart';
 import '../auth/auth_provider.dart';
@@ -887,9 +888,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// At desktop widths it renders a full hierarchical sidebar (nested items
   /// sit under their parent, exactly like the slide-out drawer) rather than
   /// the flat Material `NavigationRail`, which has no notion of sub-menus.
-  Widget _buildRail(BuildContext context) {
+  /// Rail body for a [DockRailSlot], picked by viewport: the full
+  /// hierarchical sidebar at desktop widths, a compact icon+label
+  /// [NavigationRail] on tablet widths. [width] is the slot's already
+  /// viewport-clamped width (see [dockRailWidth]).
+  Widget _buildRailContent(BuildContext context, double width) {
     final extended = MediaQuery.sizeOf(context).width >= Breakpoints.desktop;
-    if (extended) return _buildRailTree(context);
+    return extended
+        ? _buildRailTree(context)
+        : _buildCompactRail(context, width);
+  }
+
+  Widget _buildCompactRail(BuildContext context, double width) {
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -898,6 +908,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: IntrinsicHeight(
               child: NavigationRail(
                 extended: false,
+                // Never wider than the clamped slot, never below 72dp.
+                minWidth: math.min(width, 72).toDouble(),
                 selectedIndex: _dockIndex,
                 onDestinationSelected: (index) =>
                     _onDockItemSelected(context, index),
@@ -1041,14 +1053,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
-    return SizedBox(
-      width: 264,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: rows,
-        ),
+    // Width is owned by the enclosing [DockRailSlot] (viewport-clamped);
+    // this just fills it.
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: rows,
       ),
     );
   }
@@ -1120,27 +1131,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final dock = context.watch<NavDockProvider>().position;
     final wide = isWide(context);
 
-    // Exactly one of these ends up set, per the active dock position —
-    // never duplicated across a drawer/rail/bar at the same time.
+    // Exactly one dock rendering is live per position — never duplicated
+    // across a drawer / rail / bar at the same time. The Left/Right rails are
+    // both mounted (as `DockRailSlot`s in the body Row) but only the active
+    // side expands; the other collapses to zero width, so switching Left <->
+    // Right can animate and never strands a stale rail on the far edge.
     Widget? drawer;
     Widget? endDrawer;
     Widget? bottomBar;
     PreferredSizeWidget? appBarBottom;
-    Widget? leftRail;
-    Widget? rightRail;
+
+    final railOnLeft = wide && dock == NavDockPosition.left;
+    final railOnRight = wide && dock == NavDockPosition.right;
 
     switch (dock) {
       case NavDockPosition.left:
-        if (wide) {
-          leftRail = _buildRail(context);
-        } else {
+        if (!wide) {
           drawer = _buildDrawer(context, company, auth.user, bootstrap);
         }
         break;
       case NavDockPosition.right:
-        if (wide) {
-          rightRail = _buildRail(context);
-        } else {
+        if (!wide) {
           endDrawer = _buildDrawer(context, company, auth.user, bootstrap);
         }
         break;
@@ -1208,7 +1219,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       bottomNavigationBar: bottomBar,
       body: Row(
         children: [
-          if (leftRail != null) ...[leftRail, const VerticalDivider(width: 1)],
+          // Left rail slot — expands only when docked left on a wide viewport,
+          // otherwise animates to zero width (250ms).
+          DockRailSlot(
+            side: NavDockPosition.left,
+            active: railOnLeft,
+            builder: _buildRailContent,
+          ),
           Expanded(
             // Scoped to just the scrollable content, not the whole Row —
             // otherwise a scrollable left/right rail sitting in the same
@@ -1219,92 +1236,107 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _analyticsFuture = _loadAnalytics();
                 });
               },
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      FutureBuilder<AnalyticsModel>(
-                        future: _analyticsFuture,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 48),
-                              child: Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            );
-                          }
-                          if (snapshot.hasError || !snapshot.hasData) {
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 16),
-                              child: Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.storefront,
-                                        size: 48,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      company?.tradeName ??
-                                          company?.name ??
-                                          'Sales & Inventory',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                              fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Open the drawer to access POS, Sales, Products & Settings.',
-                                      textAlign: TextAlign.center,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                              color: Colors.grey.shade600),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    OutlinedButton.icon(
-                                      icon: const Icon(Icons.refresh),
-                                      label: Text(l10n.refresh),
-                                      onPressed: () {
-                                        setState(() {
-                                          _analyticsFuture = _loadAnalytics();
-                                        });
-                                      },
-                                    ),
-                                  ],
+              child: AnimatedPadding(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                // A small breathing gap on the docked edge so content and
+                // form controls never butt up against the rail divider; it
+                // slides with the rail when the dock position changes.
+                padding: EdgeInsets.only(
+                  left: railOnLeft ? 8 : 0,
+                  right: railOnRight ? 8 : 0,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        FutureBuilder<AnalyticsModel>(
+                          future: _analyticsFuture,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 48),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
                                 ),
-                              ),
+                              );
+                            }
+                            if (snapshot.hasError || !snapshot.hasData) {
+                              return Card(
+                                margin:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.storefront,
+                                          size: 48,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        company?.tradeName ??
+                                            company?.name ??
+                                            'Sales & Inventory',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Open the drawer to access POS, Sales, Products & Settings.',
+                                        textAlign: TextAlign.center,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                                color: Colors.grey.shade600),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      OutlinedButton.icon(
+                                        icon: const Icon(Icons.refresh),
+                                        label: Text(l10n.refresh),
+                                        onPressed: () {
+                                          setState(() {
+                                            _analyticsFuture = _loadAnalytics();
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+                            return _DashboardAnalytics(
+                              analytics: snapshot.data!,
+                              formatter: CurrencyFormatter(
+                                  company?.currencySymbol ?? '\$'),
+                              onFilter: _pickDateRange,
                             );
-                          }
-                          return _DashboardAnalytics(
-                            analytics: snapshot.data!,
-                            formatter: CurrencyFormatter(
-                                company?.currencySymbol ?? '\$'),
-                            onFilter: _pickDateRange,
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                    ],
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-          if (rightRail != null) ...[
-            const VerticalDivider(width: 1),
-            rightRail
-          ],
+          // Right rail slot — mirror of the left slot; expands only when
+          // docked right on a wide viewport.
+          DockRailSlot(
+            side: NavDockPosition.right,
+            active: railOnRight,
+            builder: _buildRailContent,
+          ),
         ],
       ),
     );
