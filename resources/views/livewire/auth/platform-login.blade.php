@@ -74,7 +74,7 @@
                         <input type="email"
                                wire:model="email"
                                wire:keydown.enter="login"
-                               placeholder="admin@zoomnearby.com"
+                               placeholder="admin@yourdomain.com"
                                class="w-full border-none bg-transparent text-xs sm:text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-500 focus:ring-0 py-3 pr-3">
                     </div>
                     @error('email') <p class="text-rose-400 text-[11px] mt-0.5">{{ $message }}</p> @enderror

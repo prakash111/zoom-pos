@@ -420,7 +420,7 @@
 
                 <!-- Subdomain / Slug -->
                 @php
-                    $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?? 'saas.zoomnearby.com';
+                    $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?? 'yourdomain.com';
                 @endphp
                 <div x-data="{ slugValue: @js($slug) }">
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Store Subdomain / Slug') }}</label>

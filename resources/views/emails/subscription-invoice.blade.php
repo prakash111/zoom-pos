@@ -61,7 +61,7 @@
 
         <!-- Footer -->
         <div style="border-top: 1px solid #f1f5f9; padding-top: 16px; font-size: 12px; color: #94a3b8; text-align: center;">
-            <p style="margin: 0;">Have questions? Contact our team at <a href="mailto:{{ $invoice->seller_details['support_email'] ?? 'support@saas.zoomnearby.com' }}" style="color: #2563eb;">{{ $invoice->seller_details['support_email'] ?? 'support@saas.zoomnearby.com' }}</a></p>
+            <p style="margin: 0;">Have questions? Contact our team at <a href="mailto:{{ $invoice->seller_details['support_email'] ?? 'support@example.com' }}" style="color: #2563eb;">{{ $invoice->seller_details['support_email'] ?? 'support@example.com' }}</a></p>
             <p style="margin: 4px 0 0 0;">© {{ date('Y') }} {{ $invoice->seller_details['company_name'] ?? config('app.name') }}. All rights reserved.</p>
         </div>
 

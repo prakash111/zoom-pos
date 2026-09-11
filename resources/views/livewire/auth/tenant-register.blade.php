@@ -260,7 +260,7 @@
 
                 <!-- Domain & Subdomain Setup (Optional Accordion) -->
                 @php
-                    $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?? 'saas.zoomnearby.com';
+                    $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?? 'yourdomain.com';
                 @endphp
                 <div class="pt-1 space-y-2">
                     <button type="button"

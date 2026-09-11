@@ -375,7 +375,7 @@ class AuthApiController extends Controller
         $username = $branding?->smtp_username;
         $password = $branding?->smtp_password;
         $encryption = $branding?->smtp_encryption ?? 'tls';
-        $fromAddress = $branding?->smtp_from_address ?: config('mail.from.address', 'noreply@zoomnearby.com');
+        $fromAddress = $branding?->smtp_from_address ?: config('mail.from.address', 'noreply@example.com');
         $fromName = $branding?->smtp_from_name ?: ($branding?->platform_name ?: config('mail.from.name', 'ZoomNearby'));
 
         if (! empty($host)) {

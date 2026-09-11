@@ -658,11 +658,11 @@
 
             <div class="footer-text">
                 <div>{{ __("Thank you for your visit & business!") }}</div>
-                <div>{{ $company->website ?: (config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'saas.zoomnearby.com') }}</div>
+                <div>{{ $company->website ?: (config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'yourdomain.com') }}</div>
                 @php
                     $platformBranding = \App\Models\PlatformBranding::current();
                     $platformName = $platformBranding?->platform_name ?? config('app.name');
-                    $platformDomain = config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'saas.zoomnearby.com';
+                    $platformDomain = config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'yourdomain.com';
                 @endphp
                 @if (setting('show_powered_by', true))
                 <div style="font-size: {{ $subSize }}; color: #64748b; margin-top: 4px; border-top: 1px dashed #cbd5e1; padding-top: 4px;">

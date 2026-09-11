@@ -145,7 +145,7 @@
                                 </div>
                                 <div>
                                     <div class="font-bold text-slate-900 dark:text-white">{{ $tenant->name }}</div>
-                                    <div class="text-[11px] text-slate-400 font-mono">{{ $tenant->slug ?? 'default' }}.{{ parse_url(config('app.url'), PHP_URL_HOST) ?? 'saas.zoomnearby.com' }}</div>
+                                    <div class="text-[11px] text-slate-400 font-mono">{{ $tenant->slug ?? 'default' }}.{{ parse_url(config('app.url'), PHP_URL_HOST) ?? 'yourdomain.com' }}</div>
                                 </div>
                             </td>
 
