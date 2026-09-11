@@ -106,6 +106,10 @@ class DemoAccountsSeeder extends Seeder
                     // Lock it for every demo store EXCEPT the cafe one, which
                     // must show the Cafe & Restaurant navigation.
                     'restaurant_mode_locked' => $meta['pos_mode'] !== 'restaurant',
+                    // Every self-service demo store runs on India time so the
+                    // dashboard's "today" hourly chart and KOT/alarm timers
+                    // line up with when people actually try the demo.
+                    'timezone' => 'Asia/Kolkata',
                 ])->save();
 
                 $user->forceFill([
@@ -139,6 +143,7 @@ class DemoAccountsSeeder extends Seeder
             'pos_mode' => $posMode,
             // Show the Cafe & Restaurant nav only for the restaurant demo.
             'restaurant_mode_locked' => $posMode !== 'restaurant',
+            'timezone' => 'Asia/Kolkata',
         ])->save();
     }
 }
