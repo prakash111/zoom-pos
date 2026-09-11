@@ -99,7 +99,13 @@ return [
 
     'cipher' => 'AES-256-CBC',
 
-    'key' => env('APP_KEY', 'base64:GlHpilNGMd2mfdyW9A1laCmeWqa3gWkBwd6kAtpxzxc='),
+    // No hardcoded fallback here (Laravel's own stock config/app.php has
+    // none either) — a baked-in default key would mean every fresh
+    // CodeCanyon install that never gets `key:generate` to actually run
+    // (e.g. it silently fails, as FinishStep's try/catch lets it) shares
+    // the exact same, publicly-known encryption key instead of failing
+    // loudly and obviously.
+    'key' => env('APP_KEY'),
 
     'previous_keys' => [
         ...array_filter(
