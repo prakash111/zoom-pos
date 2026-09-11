@@ -36,14 +36,18 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
 
   Future<void> _openTable(DiningTableModel table) async {
     final changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => RestaurantOrderScreen(repository: _repository, table: table)),
+      MaterialPageRoute(
+          builder: (_) =>
+              RestaurantOrderScreen(repository: _repository, table: table)),
     );
     if (changed == true) _reload();
   }
 
   Future<void> _startTakeawayOrDelivery(String serviceType) async {
     final changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => RestaurantOrderScreen(repository: _repository, serviceType: serviceType)),
+      MaterialPageRoute(
+          builder: (_) => RestaurantOrderScreen(
+              repository: _repository, serviceType: serviceType)),
     );
     if (changed == true) _reload();
   }
@@ -54,10 +58,18 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Add Floor / Area'),
-        content: TextField(controller: controller, decoration: const InputDecoration(labelText: 'Name (e.g. Main Hall, Patio)')),
+        content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+                labelText: 'Name (e.g. Main Hall, Patio)')),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(controller.text.trim()), child: const Text('Add')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('Add')),
         ],
       ),
     );
@@ -67,7 +79,9 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
       await _repository.saveFloor(name: name);
       _reload();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -76,10 +90,15 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Delete "${floor.name}"?'),
-        content: const Text('Tables on this floor will need to be reassigned or deleted separately.'),
+        content: const Text(
+            'Tables on this floor will need to be reassigned or deleted separately.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -89,14 +108,21 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
       await _repository.deleteFloor(floor.id);
       _reload();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
-  Future<void> _openTableForm(List<DiningFloorModel> floors, {DiningTableModel? table, String? defaultFloorId}) async {
-    final numberController = TextEditingController(text: table?.tableNumber ?? '');
-    final capacityController = TextEditingController(text: (table?.seatingCapacity ?? 4).toString());
-    String? floorId = table?.diningFloorId ?? defaultFloorId ?? (floors.isNotEmpty ? floors.first.id : null);
+  Future<void> _openTableForm(List<DiningFloorModel> floors,
+      {DiningTableModel? table, String? defaultFloorId}) async {
+    final numberController =
+        TextEditingController(text: table?.tableNumber ?? '');
+    final capacityController =
+        TextEditingController(text: (table?.seatingCapacity ?? 4).toString());
+    String? floorId = table?.diningFloorId ??
+        defaultFloorId ??
+        (floors.isNotEmpty ? floors.first.id : null);
     String status = table?.status ?? 'available';
 
     final saved = await showDialog<bool>(
@@ -108,18 +134,25 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(controller: numberController, decoration: const InputDecoration(labelText: 'Table Number')),
+                TextField(
+                    controller: numberController,
+                    decoration:
+                        const InputDecoration(labelText: 'Table Number')),
                 const SizedBox(height: 12),
                 TextField(
                   controller: capacityController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Seating Capacity'),
+                  decoration:
+                      const InputDecoration(labelText: 'Seating Capacity'),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: floorId,
                   decoration: const InputDecoration(labelText: 'Floor / Area'),
-                  items: [for (final f in floors) DropdownMenuItem(value: f.id, child: Text(f.name))],
+                  items: [
+                    for (final f in floors)
+                      DropdownMenuItem(value: f.id, child: Text(f.name))
+                  ],
                   onChanged: (v) => setDialogState(() => floorId = v),
                 ),
                 if (table != null) ...[
@@ -127,16 +160,25 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
                   DropdownButtonFormField<String>(
                     initialValue: status,
                     decoration: const InputDecoration(labelText: 'Status'),
-                    items: [for (final s in kDiningTableStatuses) DropdownMenuItem(value: s, child: Text(kDiningTableStatusLabels[s]!))],
-                    onChanged: (v) => setDialogState(() => status = v ?? status),
+                    items: [
+                      for (final s in kDiningTableStatuses)
+                        DropdownMenuItem(
+                            value: s, child: Text(kDiningTableStatusLabels[s]!))
+                    ],
+                    onChanged: (v) =>
+                        setDialogState(() => status = v ?? status),
                   ),
                 ],
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-            TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Save')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Save')),
           ],
         ),
       ),
@@ -157,7 +199,9 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
       );
       _reload();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -165,7 +209,10 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
     final company = context.read<AuthProvider>().company;
     showDialog(
       context: context,
-      builder: (_) => QrStandDialog(table: table, businessName: company?.tradeName ?? company?.name ?? 'Restaurant Business'),
+      builder: (_) => QrStandDialog(
+          table: table,
+          businessName:
+              company?.tradeName ?? company?.name ?? 'Restaurant Business'),
     );
   }
 
@@ -176,8 +223,12 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
         title: Text('Delete table ${table.tableNumber}?'),
         content: const Text('This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -187,7 +238,9 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
       await _repository.deleteTable(table.id);
       _reload();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -205,10 +258,13 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
               if (value == 'add_floor') _addFloor();
             },
             itemBuilder: (context) => const [
-              PopupMenuItem(value: 'takeaway', child: Text('New Takeaway Order')),
-              PopupMenuItem(value: 'delivery', child: Text('New Delivery Order')),
+              PopupMenuItem(
+                  value: 'takeaway', child: Text('New Takeaway Order')),
+              PopupMenuItem(
+                  value: 'delivery', child: Text('New Delivery Order')),
               PopupMenuDivider(),
-              PopupMenuItem(value: 'add_floor', child: Text('Add Floor / Area')),
+              PopupMenuItem(
+                  value: 'add_floor', child: Text('Add Floor / Area')),
             ],
           ),
         ],
@@ -218,7 +274,9 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
         builder: (context, snapshot) {
           final floors = snapshot.data ?? [];
           if (floors.isEmpty) return const SizedBox.shrink();
-          return FloatingActionButton(onPressed: () => _openTableForm(floors), child: const Icon(Icons.add));
+          return FloatingActionButton(
+              onPressed: () => _openTableForm(floors),
+              child: const Icon(Icons.add));
         },
       ),
       body: RefreshIndicator(
@@ -226,8 +284,11 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
         child: FutureBuilder<List<DiningFloorModel>>(
           future: _future,
           builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) return const LoadingIndicator();
-            if (snapshot.hasError) return ErrorView(message: 'Could not load tables.', onRetry: _reload);
+            if (snapshot.connectionState != ConnectionState.done)
+              return const LoadingIndicator();
+            if (snapshot.hasError)
+              return ErrorView(
+                  message: 'Could not load tables.', onRetry: _reload);
 
             final floors = snapshot.data ?? [];
             if (floors.isEmpty) {
@@ -236,7 +297,10 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
                   const SizedBox(height: 80),
                   const Center(child: Text('No floors yet.')),
                   const SizedBox(height: 12),
-                  Center(child: OutlinedButton(onPressed: _addFloor, child: const Text('Add your first floor'))),
+                  Center(
+                      child: OutlinedButton(
+                          onPressed: _addFloor,
+                          child: const Text('Add your first floor'))),
                 ],
               );
             }
@@ -247,7 +311,10 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
                 for (final floor in floors) ...[
                   Row(
                     children: [
-                      Expanded(child: Text(floor.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                      Expanded(
+                          child: Text(floor.name,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 16))),
                       IconButton(
                         icon: const Icon(Icons.delete_outline, size: 20),
                         onPressed: () => _deleteFloor(floor),
@@ -281,7 +348,12 @@ class _RestaurantTablesScreenState extends State<RestaurantTablesScreen> {
 }
 
 class _TableCard extends StatelessWidget {
-  const _TableCard({required this.table, required this.onTap, required this.onEdit, required this.onDelete, required this.onQrStand});
+  const _TableCard(
+      {required this.table,
+      required this.onTap,
+      required this.onEdit,
+      required this.onDelete,
+      required this.onQrStand});
 
   final DiningTableModel table;
   final VoidCallback onTap;
@@ -289,43 +361,53 @@ class _TableCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onQrStand;
 
+  void _openActionsSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.qr_code_2_outlined),
+              title: const Text('QR Stand'),
+              onTap: () {
+                Navigator.of(context).pop();
+                onQrStand();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit table'),
+              onTap: () {
+                Navigator.of(context).pop();
+                onEdit();
+              },
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+              title: const Text('Delete table',
+                  style: TextStyle(color: Color(0xFFEF4444))),
+              onTap: () {
+                Navigator.of(context).pop();
+                onDelete();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      onLongPress: () => showModalBottomSheet(
-        context: context,
-        builder: (context) => SafeArea(
-          child: Wrap(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.qr_code_2_outlined),
-                title: const Text('QR Stand'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  onQrStand();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Edit table'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  onEdit();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Delete table'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  onDelete();
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+      // Long-press still opens the sheet (muscle memory / larger hit target),
+      // but it was previously the *only* way in — undiscoverable. The
+      // TableActionsMenuButton below gives every card a visible, tappable
+      // entry point to the same sheet.
+      onLongPress: () => _openActionsSheet(context),
       borderRadius: BorderRadius.circular(14),
       child: Container(
         width: 110,
@@ -338,20 +420,63 @@ class _TableCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(table.tableNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(table.tableNumber,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
+                TableActionsMenuButton(
+                    onPressed: () => _openActionsSheet(context)),
+              ],
+            ),
             const SizedBox(height: 4),
-            Text('${table.seatingCapacity} seats', style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+            Text('${table.seatingCapacity} seats',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: table.statusColor, borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(
+                  color: table.statusColor,
+                  borderRadius: BorderRadius.circular(20)),
               child: Text(
                 table.statusLabel,
-                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The compact 3-dot menu icon in a table card's top-right corner —
+/// a standard-tap entry point to the "QR Stand / Edit table / Delete
+/// table" sheet, so it's discoverable without needing a long-press.
+class TableActionsMenuButton extends StatelessWidget {
+  const TableActionsMenuButton({super.key, required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 22,
+      height: 22,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+        iconSize: 16,
+        icon: const Icon(Icons.more_vert, color: Color(0xFF94A3B8)),
+        tooltip: 'Table actions',
+        onPressed: onPressed,
       ),
     );
   }
