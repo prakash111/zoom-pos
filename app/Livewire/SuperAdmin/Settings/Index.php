@@ -61,6 +61,13 @@ class Index extends Component
     /** @var array<int, string> */
     public array $enabledRegistrationModules = [];
 
+    // When on (the existing default), a new tenant signup is auto-seeded
+    // with sample products/categories/tables/transactions unless the
+    // caller explicitly opts out per-request (seed_demo_data: false). When
+    // off, TenantProvisioningService::registerTenant() skips seeding
+    // regardless of what the caller sent, so every new tenant starts clean.
+    public bool $autoSeedDemoDataOnRegistration = true;
+
     // Platform-wide AI Product Image Generation
     public bool $aiImageEnabled = false;
 
@@ -254,6 +261,7 @@ class Index extends Component
         $this->minClientBuildVersion = (string) PlatformSystem::get('min_client_build_version', '0');
         $this->appVersion = (string) PlatformSystem::get('app_version', '1.0.0');
         $this->showPoweredBy = filter_var(PlatformSystem::get('show_powered_by', true), FILTER_VALIDATE_BOOLEAN);
+        $this->autoSeedDemoDataOnRegistration = filter_var(PlatformSystem::get('auto_seed_demo_data_on_registration', true), FILTER_VALIDATE_BOOLEAN);
         $guard = $this->moduleGovernance();
         $this->enabledRegistrationModules = array_values(array_filter(
             ModuleRegistry::enabledRegistrationModes(),
@@ -562,11 +570,13 @@ class Index extends Component
             'aiImageOpenaiApiKey' => ['nullable', 'string', 'max:500'],
             'aiImageGeminiApiKey' => ['nullable', 'string', 'max:500'],
             'aiImageClaudeApiKey' => ['nullable', 'string', 'max:500'],
+            'autoSeedDemoDataOnRegistration' => ['boolean'],
         ]);
 
         $before = [
             'maintenance_mode' => PlatformSystem::get('maintenance_mode', '0'),
             'min_client_build_version' => PlatformSystem::get('min_client_build_version', '0'),
+            'auto_seed_demo_data_on_registration' => PlatformSystem::get('auto_seed_demo_data_on_registration', '1'),
         ];
 
         $this->allowedRegistrationModes = in_array('restaurant', $this->enabledRegistrationModules, true) && in_array('retail', $this->enabledRegistrationModules, true) ? 'both' : (in_array('restaurant', $this->enabledRegistrationModules, true) ? 'restaurant_only' : 'retail_only');
@@ -598,6 +608,7 @@ class Index extends Component
         PlatformSystem::set('min_client_build_version', $this->minClientBuildVersion);
         PlatformSystem::set('app_version', $this->appVersion);
         PlatformSystem::set('show_powered_by', $this->showPoweredBy ? '1' : '0');
+        PlatformSystem::set('auto_seed_demo_data_on_registration', $this->autoSeedDemoDataOnRegistration ? '1' : '0');
         // Never persist a key that is no longer a real store type — an
         // uninstalled / deactivated package module must not linger in this
         // list even if it was somehow still in the posted payload.
@@ -629,6 +640,7 @@ class Index extends Component
             'after' => [
                 'maintenance_mode' => $this->maintenanceMode ? '1' : '0',
                 'min_client_build_version' => $this->minClientBuildVersion,
+                'auto_seed_demo_data_on_registration' => $this->autoSeedDemoDataOnRegistration ? '1' : '0',
             ],
         ]);
 

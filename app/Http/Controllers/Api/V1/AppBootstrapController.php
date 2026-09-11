@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\PlatformSystem;
 use App\Models\PushNotificationSetting;
 use App\Services\Localization\LocalizationService;
 use App\Services\Modular\ModuleRegistry;
@@ -35,8 +36,16 @@ class AppBootstrapController extends Controller
         $company = $this->resolveCompany($request);
 
         if (! $company->is_seeding_complete) {
-            app(TenantSampleDataService::class)->seed($company, $company->pos_mode ?: 'general');
-            $company->refresh();
+            // Same platform-wide "Auto-Seed Demo Data on Signup" toggle that
+            // gates seeding at registration time (TenantProvisioningService)
+            // — a tenant that skipped seeding there must not get silently
+            // seeded the moment its app first calls bootstrap either.
+            if (filter_var(PlatformSystem::get('auto_seed_demo_data_on_registration', true), FILTER_VALIDATE_BOOLEAN)) {
+                app(TenantSampleDataService::class)->seed($company, $company->pos_mode ?: 'general');
+                $company->refresh();
+            } else {
+                $company->update(['is_seeding_complete' => true]);
+            }
         }
 
         $locale = strtolower(trim((string) $request->query('locale', '')));

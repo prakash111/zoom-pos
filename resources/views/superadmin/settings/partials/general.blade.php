@@ -170,6 +170,25 @@
             </div>
         </div>
 
+        <!-- Auto-Seed Demo Data on Tenant Signup -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/80 dark:border-slate-800 space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>📦</span> {{ __('Auto-Seed Demo Data on Signup') }}
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
+                        {{ __('When enabled, a newly registered tenant automatically has their store populated with sample products, categories, floor tables, and demo transactions. When disabled, new tenants start with a completely clean, empty store — regardless of what the signup form itself requested.') }}
+                    </p>
+                </div>
+
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" wire:model.live="autoSeedDemoDataOnRegistration" class="sr-only peer">
+                    <div class="w-12 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-600"></div>
+                </label>
+            </div>
+        </div>
+
         <!-- Allowed Registration Modes & Module Governance -->
         <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/80 dark:border-slate-800 space-y-5">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">

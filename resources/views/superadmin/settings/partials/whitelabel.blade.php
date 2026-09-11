@@ -110,7 +110,7 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="space-y-2">
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Public Support Email') }}</label>
-                    <input type="email" wire:model="supportEmail" placeholder="support@zoomnearby.com" class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white">
+                    <input type="email" wire:model="supportEmail" placeholder="support@yourdomain.com" class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white">
                 </div>
 
                 <div class="space-y-2">
