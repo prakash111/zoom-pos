@@ -51,6 +51,96 @@ List<String> kitchenTicketSlipLines(KitchenTicketModel kot) {
   return lines;
 }
 
+/// A dismissible bottom sheet that shows the KOT as a monospace thermal
+/// ticket (white paper facsimile, dashed rules) with **Print KOT** and
+/// **Close** — replaces the transient "sent to kitchen" snackbar.
+Future<void> showKotTicketSheet(BuildContext context, KitchenTicketModel kot) {
+  final lines = kitchenTicketSlipLines(kot);
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.receipt_long, size: 20),
+                const SizedBox(width: 8),
+                Text('Kitchen Order Ticket',
+                    style: Theme.of(sheetContext).textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white, // a thermal receipt is white paper
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+              ),
+              child: DefaultTextStyle(
+                style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontFamilyFallback: ['Courier', 'monospace'],
+                    fontSize: 12.5,
+                    height: 1.5,
+                    color: Color(0xFF0F172A)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Center(
+                        child: Text('KITCHEN ORDER TICKET',
+                            style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold))),
+                    Center(
+                        child: Text(kot.kotNumber,
+                            style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold))),
+                    const Text('--------------------------------'),
+                    for (final l in lines) Text(l.isEmpty ? ' ' : l),
+                    const Text('--------------------------------'),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    child: const Text('Close'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      printKitchenTicket(context, kot);
+                    },
+                    icon: const Icon(Icons.print_outlined, size: 18),
+                    label: const Text('Print KOT'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 /// Prints [kot] to the saved Bluetooth thermal printer and reports the outcome
 /// through the nearest [ScaffoldMessenger]. Safe to call from any screen that
 /// has a Scaffold above it.

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -283,13 +285,10 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
         _committedItems = result.sale.items;
         _draftItems = [];
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('${result.kot.kotNumber} sent to kitchen.'),
-        action: SnackBarAction(
-          label: 'Print KOT',
-          onPressed: () => printKitchenTicket(context, result.kot),
-        ),
-      ));
+      // Open the KOT as a modal thermal-ticket preview (Print KOT / Close)
+      // instead of a transient snackbar. Not awaited — `_isSending` is reset
+      // in `finally` and the sheet outlives this method.
+      unawaited(showKotTicketSheet(context, result.kot));
     } on ApiException catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context)
@@ -1166,51 +1165,55 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                 Text('Total due: ${widget.formatter.format(widget.total)}',
                     style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 12),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12)),
-                  child: Row(
-                    children: [
-                      Icon(Icons.person_outline,
-                          size: 18, color: Colors.grey.shade700),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _selectedCustomer == null
-                            ? const Text('No customer assigned',
-                                style: TextStyle(fontSize: 13))
-                            : Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(_selectedCustomer!.name,
-                                      style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600)),
-                                  if (_selectedCustomer!.phone.isNotEmpty)
-                                    Text(_selectedCustomer!.phone,
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey.shade600)),
-                                ],
-                              ),
-                      ),
-                      if (_selectedCustomer != null)
-                        TextButton(
-                          onPressed: () =>
-                              setState(() => _selectedCustomer = null),
-                          child: const Text('Remove'),
-                        )
-                      else
-                        TextButton.icon(
-                          onPressed: _pickCustomer,
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Add Customer'),
+                Builder(builder: (context) {
+                  final scheme = Theme.of(context).colorScheme;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: scheme.outlineVariant)),
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_outline,
+                            size: 18, color: scheme.onSurfaceVariant),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _selectedCustomer == null
+                              ? const Text('No customer assigned',
+                                  style: TextStyle(fontSize: 13))
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(_selectedCustomer!.name,
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600)),
+                                    if (_selectedCustomer!.phone.isNotEmpty)
+                                      Text(_selectedCustomer!.phone,
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              color: scheme.onSurfaceVariant)),
+                                  ],
+                                ),
                         ),
-                    ],
-                  ),
-                ),
+                        if (_selectedCustomer != null)
+                          TextButton(
+                            onPressed: () =>
+                                setState(() => _selectedCustomer = null),
+                            child: const Text('Remove'),
+                          )
+                        else
+                          TextButton.icon(
+                            onPressed: _pickCustomer,
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Add Customer'),
+                          ),
+                      ],
+                    ),
+                  );
+                }),
                 const SizedBox(height: 16),
                 if (_error != null) ...[
                   Text(_error!, style: TextStyle(color: Colors.red.shade700)),

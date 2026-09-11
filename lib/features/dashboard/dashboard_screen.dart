@@ -547,9 +547,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final primaryColor = tp.activeLinkColor ??
             bootstrap.theme.primaryColorValue ??
             Theme.of(context).colorScheme.primary;
-        // Local App-Preferences override wins over the server branding.
+        // Local App-Preferences override wins over the server branding. The
+        // server `drawer_bg` is a single mode-agnostic value, so in dark mode
+        // a light branding colour (e.g. the default cream) is dropped in
+        // favour of the dark theme's own drawer surface — otherwise the
+        // drawer renders white under a dark scaffold.
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        final brandedDrawerBg = bootstrap.theme.drawerBgValue;
+        final brandedDrawerBgForMode = brandedDrawerBg == null
+            ? null
+            : ((brandedDrawerBg.computeLuminance() > 0.5) == !isDarkMode
+                ? brandedDrawerBg
+                : null);
         final drawerBgColor = tp.drawerBg ??
-            bootstrap.theme.drawerBgValue ??
+            brandedDrawerBgForMode ??
             Theme.of(context).drawerTheme.backgroundColor;
         final drawerGradient = bootstrap.theme.drawerGradient;
 

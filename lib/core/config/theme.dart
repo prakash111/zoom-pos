@@ -40,6 +40,16 @@ class AppTheme {
           ? Colors.white
           : Colors.black;
 
+  /// Only honour a server-/user-configured surface override (`drawer_bg`,
+  /// canvas) when it actually reads on the active [brightness]. `drawer_bg` is
+  /// a single mode-agnostic value, so without this guard a pale cream drawer
+  /// colour would paint a light drawer under the dark scaffold (and vice
+  /// versa). `null` falls back to the mode's own surface.
+  static Color? _overrideFor(Color? c, Brightness brightness) {
+    if (c == null) return null;
+    return ThemeData.estimateBrightnessForColor(c) == brightness ? c : null;
+  }
+
   /// Builds a [ColorScheme] for [brightness] with [primary]/[secondary] pinned
   /// to the exact tenant-chosen colours on top of the `fromSeed` tonal ramp.
   static ColorScheme _scheme({
@@ -84,13 +94,13 @@ class AppTheme {
 
     return _build(
       colorScheme: colorScheme,
-      scaffoldBg: canvasColor ?? lightBg,
+      scaffoldBg: _overrideFor(canvasColor, Brightness.light) ?? lightBg,
       cardColor: lightCard,
       borderColor: lightBorder,
       appBarBg: lightCard,
       appBarFg: lightHeading,
       inputFill: lightCard,
-      drawerBg: drawerBg ?? lightCard,
+      drawerBg: _overrideFor(drawerBg, Brightness.light) ?? lightCard,
       bodyColor: lightBody,
       headingColor: lightHeading,
       pageTransitions: pageTransitions,
@@ -121,13 +131,13 @@ class AppTheme {
 
     return _build(
       colorScheme: colorScheme,
-      scaffoldBg: canvasColor ?? darkBg,
+      scaffoldBg: _overrideFor(canvasColor, Brightness.dark) ?? darkBg,
       cardColor: darkCard,
       borderColor: darkBorder,
       appBarBg: darkCard,
       appBarFg: darkHeading,
       inputFill: darkCard,
-      drawerBg: drawerBg ?? darkCard,
+      drawerBg: _overrideFor(drawerBg, Brightness.dark) ?? darkCard,
       bodyColor: darkBody,
       headingColor: darkHeading,
       pageTransitions: pageTransitions,
@@ -256,6 +266,37 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: borderColor),
+        ),
+      ),
+      // Transient surfaces (toasts, dialogs, bottom sheets) — M3's defaults
+      // pull from `inverseSurface` / a tinted `surface`, which render pale in
+      // dark mode. Pin them to the mode's own container colours instead.
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: colorScheme.brightness == Brightness.dark
+            ? darkBorder // slate-700 — sits above the dark scaffold/cards
+            : headingColor, // slate-900 — the familiar dark toast in light mode
+        contentTextStyle: TextStyle(
+          color: colorScheme.brightness == Brightness.dark
+              ? darkHeading
+              : Colors.white,
+          fontSize: 13.5,
+        ),
+        actionTextColor: colorScheme.brightness == Brightness.dark
+            ? colorScheme.primary
+            : colorScheme.secondary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: cardColor,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: cardColor,
+        surfaceTintColor: Colors.transparent,
+        showDragHandle: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zoom_pos_mobile/core/models/restaurant_models.dart';
 import 'package:zoom_pos_mobile/features/restaurant/widgets/kot_slip.dart';
@@ -65,5 +66,36 @@ void main() {
     expect(lines.any((l) => l.startsWith('Prep target:')), isFalse);
     // Items still render.
     expect(lines, contains('2 x Truffle Mushroom Burger'));
+  });
+
+  testWidgets('showKotTicketSheet renders a modal ticket with Print / Close',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () => showKotTicketSheet(context, _kot(const {})),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kitchen Order Ticket'), findsOneWidget);
+    expect(find.text('KITCHEN ORDER TICKET'), findsOneWidget); // slip header
+    expect(find.text('KOT-DEMO-002'), findsOneWidget);
+    expect(find.text('2 x Truffle Mushroom Burger'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Print KOT'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Close'), findsOneWidget);
+
+    // No transient snackbar for the KOT feedback.
+    expect(find.byType(SnackBar), findsNothing);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Kitchen Order Ticket'), findsNothing);
   });
 }

@@ -3,32 +3,49 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zoom_pos_mobile/core/config/theme.dart';
 
 void main() {
-  test('brand seed colour is used verbatim as colorScheme.primary', () {
-    const brand = Color(0xFF16A34A); // a green the tenant picked
-    final theme = AppTheme.light(seedColor: brand);
+  group('AppTheme transient surfaces', () {
+    test('dark theme gives toasts / dialogs / sheets dark container colours',
+        () {
+      final t = AppTheme.dark();
 
-    // Material 3 fromSeed would tonally remap this; we pin it instead so the
-    // chosen brand colour is the one buttons / FABs / links actually paint.
-    expect(theme.colorScheme.primary, brand);
-    expect(
-        theme.elevatedButtonTheme.style?.backgroundColor
-            ?.resolve(<WidgetState>{}),
-        brand);
-    // onPrimary stays readable on a mid-tone green.
-    expect(theme.colorScheme.onPrimary, Colors.white);
+      expect(t.snackBarTheme.backgroundColor, isNotNull);
+      // Not the pale M3 inverseSurface default.
+      expect(
+          t.snackBarTheme.backgroundColor, isNot(t.colorScheme.inverseSurface));
+      expect(t.snackBarTheme.contentTextStyle?.color, AppTheme.darkHeading);
+
+      expect(t.dialogTheme.backgroundColor, AppTheme.darkCard);
+      expect(t.bottomSheetTheme.backgroundColor, AppTheme.darkCard);
+    });
+
+    test('light theme still gets an explicit snackbar theme', () {
+      final t = AppTheme.light();
+      expect(t.snackBarTheme.backgroundColor, AppTheme.lightHeading);
+      expect(t.snackBarTheme.contentTextStyle?.color, Colors.white);
+    });
   });
 
-  test('accent colour becomes colorScheme.secondary', () {
-    const brand = Color(0xFF2563EB);
-    const accent = Color(0xFFD7F24E); // pale lime -> needs dark onSecondary
-    final theme = AppTheme.light(seedColor: brand, accentColor: accent);
+  group('AppTheme drawer/canvas override guard', () {
+    test('a pale drawer_bg is ignored in dark mode', () {
+      // e.g. the server default #FFF7ED cream.
+      const cream = Color(0xFFFFF7ED);
+      final dark = AppTheme.dark(drawerBg: cream, canvasColor: cream);
 
-    expect(theme.colorScheme.primary, brand);
-    expect(theme.colorScheme.secondary, accent);
-    expect(theme.colorScheme.onSecondary, Colors.black);
-  });
+      expect(dark.drawerTheme.backgroundColor, AppTheme.darkCard);
+      expect(dark.scaffoldBackgroundColor, AppTheme.darkBg);
+    });
 
-  test('falls back to the default brand when no seed is given', () {
-    expect(AppTheme.light().colorScheme.primary, AppTheme.primary);
+    test('a genuinely dark drawer_bg is still honoured in dark mode', () {
+      const navy = Color(0xFF111827);
+      final dark = AppTheme.dark(drawerBg: navy);
+      expect(dark.drawerTheme.backgroundColor, navy);
+    });
+
+    test('a very dark override is ignored in light mode', () {
+      const navy = Color(0xFF0B1220);
+      final light = AppTheme.light(drawerBg: navy, canvasColor: navy);
+      expect(light.drawerTheme.backgroundColor, AppTheme.lightCard);
+      expect(light.scaffoldBackgroundColor, AppTheme.lightBg);
+    });
   });
 }
