@@ -21,6 +21,7 @@ import '../../pos/screens/invoice_actions_sheet.dart';
 import '../../quotations/screens/product_picker_sheet.dart';
 import '../restaurant_repository.dart';
 import '../widgets/kot_slip.dart';
+import '../widgets/minutes_chip_row.dart';
 
 const _kServiceTypeLabels = {
   'dine_in': 'Dine-In',
@@ -506,73 +507,30 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
                             ],
                             const SizedBox(height: 10),
                             if (_draftItems.isNotEmpty) ...[
-                              Row(
-                                children: [
-                                  Text('Prep time',
-                                      style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.grey.shade700)),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Wrap(
-                                      spacing: 6,
-                                      children: [
-                                        for (final mins in const [
-                                          5,
-                                          10,
-                                          15,
-                                          20,
-                                          30
-                                        ])
-                                          ChoiceChip(
-                                            label: Text('${mins}m',
-                                                style: const TextStyle(
-                                                    fontSize: 11)),
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                            selected: _prepMinutes == mins,
-                                            onSelected: (_) => setState(
-                                                () => _prepMinutes = mins),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
+                              MinutesChipRow(
+                                label: 'Prep time',
+                                presets: const [
+                                  (5, '5m'),
+                                  (10, '10m'),
+                                  (15, '15m'),
+                                  (20, '20m'),
+                                  (30, '30m'),
                                 ],
+                                value: _prepMinutes,
+                                onChanged: (mins) =>
+                                    setState(() => _prepMinutes = mins),
                               ),
                               const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Text('Alert',
-                                      style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.grey.shade700)),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Wrap(
-                                      spacing: 6,
-                                      children: [
-                                        for (final option in const [
-                                          (0, 'At expiry'),
-                                          (2, '2m before'),
-                                          (5, '5m before')
-                                        ])
-                                          ChoiceChip(
-                                            label: Text(option.$2,
-                                                style: const TextStyle(
-                                                    fontSize: 11)),
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                            selected:
-                                                _intimationMinutes == option.$1,
-                                            onSelected: (_) => setState(() =>
-                                                _intimationMinutes = option.$1),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
+                              MinutesChipRow(
+                                label: 'Alert',
+                                presets: const [
+                                  (0, 'At expiry'),
+                                  (2, '2m before'),
+                                  (5, '5m before'),
                                 ],
+                                value: _intimationMinutes,
+                                onChanged: (mins) =>
+                                    setState(() => _intimationMinutes = mins),
                               ),
                               const SizedBox(height: 10),
                             ],

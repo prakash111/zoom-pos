@@ -8,6 +8,7 @@ import '../../../core/widgets/loading_indicator.dart';
 import '../../auth/auth_provider.dart';
 import '../cash_register_provider.dart';
 import '../cash_register_repository.dart';
+import '../widgets/cash_register_status_card.dart';
 import 'cash_movement_sheet.dart';
 import 'close_register_sheet.dart';
 import 'open_register_sheet.dart';
@@ -24,7 +25,9 @@ class CashRegisterScreen extends StatelessWidget {
     final apiClient = context.read<ApiClient>();
 
     return ChangeNotifierProvider(
-      create: (_) => CashRegisterProvider(repository: CashRegisterRepository(apiClient))..loadCurrent(),
+      create: (_) =>
+          CashRegisterProvider(repository: CashRegisterRepository(apiClient))
+            ..loadCurrent(),
       child: const _CashRegisterScreenBody(),
     );
   }
@@ -34,7 +37,8 @@ class _CashRegisterScreenBody extends StatefulWidget {
   const _CashRegisterScreenBody();
 
   @override
-  State<_CashRegisterScreenBody> createState() => _CashRegisterScreenBodyState();
+  State<_CashRegisterScreenBody> createState() =>
+      _CashRegisterScreenBodyState();
 }
 
 class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
@@ -46,7 +50,8 @@ class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
       setState(() => _metrics = null);
       return;
     }
-    final detail = await CashRegisterRepository(context.read<ApiClient>()).fetchDetail(current.id);
+    final detail = await CashRegisterRepository(context.read<ApiClient>())
+        .fetchDetail(current.id);
     if (mounted) setState(() => _metrics = detail.metrics);
   }
 
@@ -57,7 +62,8 @@ class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
 
     if (_metrics == null && register.current != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshMetrics(register));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _refreshMetrics(register));
     }
 
     return Scaffold(
@@ -83,7 +89,9 @@ class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
           return const LoadingIndicator();
         }
         if (register.status == CashRegisterStatus.error) {
-          return ErrorView(message: register.error ?? 'Could not load cash register.', onRetry: register.loadCurrent);
+          return ErrorView(
+              message: register.error ?? 'Could not load cash register.',
+              onRetry: register.loadCurrent);
         }
 
         final current = register.current;
@@ -94,7 +102,8 @@ class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.point_of_sale_outlined, size: 48, color: Colors.grey),
+                  const Icon(Icons.point_of_sale_outlined,
+                      size: 48, color: Colors.grey),
                   const SizedBox(height: 12),
                   const Text('No cash register is open.'),
                   const SizedBox(height: 16),
@@ -103,7 +112,8 @@ class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
                     label: const Text('Open register'),
                     onPressed: () => showDialog(
                       context: context,
-                      builder: (_) => ChangeNotifierProvider.value(value: register, child: const OpenRegisterSheet()),
+                      builder: (_) => ChangeNotifierProvider.value(
+                          value: register, child: const OpenRegisterSheet()),
                     ),
                   ),
                 ],
@@ -112,7 +122,8 @@ class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
           );
         }
 
-        final expectedCash = (_metrics?['expected_cash'] as num?)?.toDouble() ?? current.openingBalance;
+        final expectedCash = (_metrics?['expected_cash'] as num?)?.toDouble() ??
+            current.openingBalance;
         final cashIn = (_metrics?['cash_in'] as num?)?.toDouble() ?? 0;
         final cashOut = (_metrics?['cash_out'] as num?)?.toDouble() ?? 0;
         final totalSales = (_metrics?['total_sales'] as num?)?.toDouble() ?? 0;
@@ -125,30 +136,19 @@ class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Card(
-                color: Colors.green.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.check_circle, color: Colors.green),
-                          const SizedBox(width: 8),
-                          Text('${current.terminalId} — Open', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _MetricRow(label: 'Opening float', value: formatter.format(current.openingBalance)),
-                      _MetricRow(label: 'Sales this shift', value: formatter.format(totalSales)),
-                      _MetricRow(label: 'Cash in', value: formatter.format(cashIn)),
-                      _MetricRow(label: 'Cash out', value: formatter.format(cashOut)),
-                      const Divider(),
-                      _MetricRow(label: 'Expected cash', value: formatter.format(expectedCash), bold: true),
-                    ],
-                  ),
-                ),
+              // The card used a fixed light-green fill (Colors.green.shade50)
+              // with theme-default text — legible in light mode, but in dark
+              // mode the card stayed pale while the surrounding text/icon
+              // colors flipped light-on-light, making every value here
+              // unreadable. CashRegisterStatusCard drives its colors off the
+              // current brightness instead.
+              CashRegisterStatusCard(
+                terminalId: current.terminalId,
+                openingFloat: formatter.format(current.openingBalance),
+                salesThisShift: formatter.format(totalSales),
+                cashIn: formatter.format(cashIn),
+                cashOut: formatter.format(cashOut),
+                expectedCash: formatter.format(expectedCash),
               ),
               const SizedBox(height: 16),
               Row(
@@ -159,8 +159,9 @@ class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
                       label: const Text('Cash in'),
                       onPressed: () => showDialog(
                         context: context,
-                        builder: (_) =>
-                            ChangeNotifierProvider.value(value: register, child: const CashMovementSheet(type: 'cash_in')),
+                        builder: (_) => ChangeNotifierProvider.value(
+                            value: register,
+                            child: const CashMovementSheet(type: 'cash_in')),
                       ).then((_) => _refreshMetrics(register)),
                     ),
                   ),
@@ -171,8 +172,9 @@ class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
                       label: const Text('Cash out'),
                       onPressed: () => showDialog(
                         context: context,
-                        builder: (_) =>
-                            ChangeNotifierProvider.value(value: register, child: const CashMovementSheet(type: 'cash_out')),
+                        builder: (_) => ChangeNotifierProvider.value(
+                            value: register,
+                            child: const CashMovementSheet(type: 'cash_out')),
                       ).then((_) => _refreshMetrics(register)),
                     ),
                   ),
@@ -186,7 +188,8 @@ class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
                   context: context,
                   builder: (_) => ChangeNotifierProvider.value(
                     value: register,
-                    child: CloseRegisterSheet(expectedCash: expectedCash, formatter: formatter),
+                    child: CloseRegisterSheet(
+                        expectedCash: expectedCash, formatter: formatter),
                   ),
                 ).then((_) => setState(() => _metrics = null)),
               ),
@@ -194,26 +197,6 @@ class _CashRegisterScreenBodyState extends State<_CashRegisterScreenBody> {
           ),
         );
       }),
-    );
-  }
-}
-
-class _MetricRow extends StatelessWidget {
-  const _MetricRow({required this.label, required this.value, this.bold = false});
-
-  final String label;
-  final String value;
-  final bool bold;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [Text(label, style: style), Text(value, style: style)],
-      ),
     );
   }
 }
