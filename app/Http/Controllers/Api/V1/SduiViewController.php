@@ -85,6 +85,9 @@ class SduiViewController extends Controller
             case 'receipts':
                 return $this->maybeWizardAdvance($settingsController->updateReceipts($request), $request, $company, $user);
 
+            case 'notification-sounds':
+                return $this->maybeWizardAdvance($settingsController->updateNotificationSounds($request), $request, $company, $user);
+
             case 'repair-checklist':
             case 'repair-checklist-settings':
                 return $settingsController->updateRepairChecklist($request);

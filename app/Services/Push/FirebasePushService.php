@@ -2,6 +2,7 @@
 
 namespace App\Services\Push;
 
+use App\Models\Configuration;
 use App\Models\PushDevice;
 use App\Models\PushNotificationSetting;
 use Illuminate\Support\Facades\Cache;
@@ -46,6 +47,7 @@ class FirebasePushService
             'invoice_sound' => $settings->invoice_sound,
             'alarm_repeat_seconds' => (string) $settings->alarm_repeat_seconds,
         ];
+        $payload += $this->tenantSoundPayload($companyId);
 
         if ($settings->fcm_service_account_json && $settings->fcm_project_id) {
             return $this->sendHttpV1($settings, $devices, $payload);
@@ -94,6 +96,7 @@ class FirebasePushService
             'invoice_sound' => $settings->invoice_sound,
             'alarm_repeat_seconds' => (string) $settings->alarm_repeat_seconds,
         ];
+        $payload += $this->tenantSoundPayload($companyId);
 
         if ($settings->fcm_service_account_json && $settings->fcm_project_id) {
             return $this->sendHttpV1($settings, $devices, $payload);
@@ -129,6 +132,7 @@ class FirebasePushService
 
             if ($response->successful()) {
                 $delivered++;
+
                 continue;
             }
 
@@ -203,6 +207,37 @@ class FirebasePushService
     private function base64Url(string $value): string
     {
         return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+    }
+
+    /**
+     * The tenant's own sound preferences from Store Profile ▸ Notifications
+     * & Sounds (SettingsApiController::updateNotificationSounds), merged
+     * into every data-only push payload alongside the platform-wide
+     * high-importance channel settings above. Falls back to sane defaults
+     * for a tenant that never visited the tab, so this is a no-op for every
+     * existing caller/consumer until a client actually reads the new keys.
+     *
+     * @return array<string, string>
+     */
+    private function tenantSoundPayload(string $companyId): array
+    {
+        $configs = Configuration::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->whereIn('key', ['order_sound_preset', 'order_sound_custom_url', 'delayed_order_sound', 'sound_vibration_enabled'])
+            ->pluck('value', 'key')
+            ->all();
+
+        $preset = $configs['order_sound_preset'] ?? 'chime';
+        $customUrl = $configs['order_sound_custom_url'] ?? '';
+        $sound = ($preset === 'custom' && $customUrl !== '') ? $customUrl : $preset;
+
+        return [
+            'tenant_order_sound' => $sound,
+            'tenant_order_sound_preset' => $preset,
+            'tenant_order_sound_custom_url' => $customUrl,
+            'tenant_delayed_order_sound' => $configs['delayed_order_sound'] ?? 'alarm',
+            'tenant_sound_vibration_enabled' => ($configs['sound_vibration_enabled'] ?? '1') === '1' ? 'true' : 'false',
+        ];
     }
 
     private function stringValue(mixed $value): string

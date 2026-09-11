@@ -229,7 +229,7 @@ class SduiViewApiTest extends TestCase
         }
     }
 
-    public function test_store_profile_view_is_a_tabbed_screen_with_four_sections(): void
+    public function test_store_profile_view_is_a_tabbed_screen_with_five_sections(): void
     {
         $schema = $this->withHeader('Authorization', 'Bearer '.$this->token())
             ->getJson('/api/tenant/views/settings-profile')
@@ -240,7 +240,7 @@ class SduiViewApiTest extends TestCase
         $tabs = collect($schema['components'])->firstWhere('type', 'tabs');
         $this->assertIsArray($tabs, 'Store Profile is not a tabbed screen');
         $this->assertSame(
-            ['General Info', 'Address & Localization', 'Branding & Appearance', 'Receipt & Invoicing'],
+            ['General Info', 'Address & Localization', 'Branding & Appearance', 'Receipt & Invoicing', 'Notifications & Sounds'],
             collect($tabs['tabs'])->pluck('label')->all()
         );
         $this->assertTrue($tabs['is_scrollable'] ?? false);
@@ -251,11 +251,13 @@ class SduiViewApiTest extends TestCase
         foreach (['"name"', '"trade_name"', '"email"', '"phone"', '"website"',
             '"address"', '"city"', '"state"', '"postal_code"', '"country"', '"timezone"',
             '"logo"',
-            '"invoice_prefix"', '"quotation_prefix"', '"invoice_terms"', '"bank_details"'] as $key) {
+            '"invoice_prefix"', '"quotation_prefix"', '"invoice_terms"', '"bank_details"',
+            '"order_sound_preset"', '"order_sound_custom_url"', '"delayed_order_sound"', '"sound_vibration_enabled"'] as $key) {
             $this->assertStringContainsString($key, $body, "profile field {$key} disappeared");
         }
         $this->assertStringContainsString('/api/tenant/settings/profile', $body);
         $this->assertStringContainsString('/api/tenant/settings/receipts', $body);
+        $this->assertStringContainsString('/api/tenant/settings/notification-sounds', $body);
 
         // The tabs themselves carry no icon field (per product decision).
         foreach ($tabs['tabs'] as $tab) {
@@ -274,14 +276,18 @@ class SduiViewApiTest extends TestCase
             return [];
         };
         $general = $buttonOf($tabs['tabs'][0]);
-        $final = $buttonOf($tabs['tabs'][3]);
+        $receipts = $buttonOf($tabs['tabs'][3]);
+        $final = $buttonOf($tabs['tabs'][4]);
         $this->assertSame('Save & Continue', $general['label']);
         $this->assertSame('arrow_forward', $general['icon']);
         $this->assertSame(0, $general['action']['payload']['wizard_tab_index']);
+        // Receipt & Invoicing is no longer the last tab — it now continues.
+        $this->assertSame('Save & Continue', $receipts['label']);
+        $this->assertSame(3, $receipts['action']['payload']['wizard_tab_index']);
         $this->assertSame('Complete Setup & Open Dashboard', $final['label']);
         $this->assertSame('check_circle', $final['icon']);
-        $this->assertSame(3, $final['action']['payload']['wizard_tab_index']);
-        $this->assertSame(4, $final['action']['payload']['wizard_total_tabs']);
+        $this->assertSame(4, $final['action']['payload']['wizard_tab_index']);
+        $this->assertSame(5, $final['action']['payload']['wizard_total_tabs']);
     }
 
     public function test_store_profile_wizard_intermediate_save_returns_advance_tab(): void
@@ -302,7 +308,7 @@ class SduiViewApiTest extends TestCase
         $this->assertFalse((bool) $this->company->fresh()->is_profile_completed);
     }
 
-    public function test_store_profile_wizard_final_save_completes_onboarding_and_redirects(): void
+    public function test_store_profile_wizard_receipts_save_is_no_longer_final(): void
     {
         $this->assertFalse((bool) $this->company->fresh()->is_profile_completed);
 
@@ -310,13 +316,33 @@ class SduiViewApiTest extends TestCase
             ->postJson('/api/tenant/settings/receipts', [
                 'invoice_prefix' => 'INV-',
                 'wizard_tab_index' => 3,
-                'wizard_total_tabs' => 4,
+                'wizard_total_tabs' => 5,
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('next_action.type', 'ADVANCE_TAB')
+            ->assertJsonPath('next_action.is_final', false)
+            ->assertJsonPath('next_action.target_index', 4);
+
+        $this->assertFalse((bool) $this->company->fresh()->is_profile_completed);
+    }
+
+    public function test_store_profile_wizard_final_save_completes_onboarding_and_redirects(): void
+    {
+        $this->assertFalse((bool) $this->company->fresh()->is_profile_completed);
+
+        $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->postJson('/api/tenant/settings/notification-sounds', [
+                'order_sound_preset' => 'chime',
+                'delayed_order_sound' => 'alarm',
+                'wizard_tab_index' => 4,
+                'wizard_total_tabs' => 5,
             ])
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('next_action.type', 'ADVANCE_TAB')
             ->assertJsonPath('next_action.is_final', true)
-            ->assertJsonPath('next_action.target_index', 3)
+            ->assertJsonPath('next_action.target_index', 4)
             ->assertJsonPath('next_action.redirect_url', '/dashboard')
             ->assertJsonPath('is_profile_completed', true)
             ->assertJsonFragment(['message' => 'Store setup completed successfully!']);
@@ -342,7 +368,7 @@ class SduiViewApiTest extends TestCase
             ->postJson('/api/tenant/settings/profile', [
                 'name' => '',
                 'wizard_tab_index' => 0,
-                'wizard_total_tabs' => 4,
+                'wizard_total_tabs' => 5,
             ])
             ->assertStatus(422);
 
@@ -399,7 +425,7 @@ class SduiViewApiTest extends TestCase
         );
     }
 
-    public function test_store_profile_receipt_tab_ends_on_the_complete_button(): void
+    public function test_store_profile_receipt_tab_ends_on_a_continue_button(): void
     {
         $schema = $this->withHeader('Authorization', 'Bearer '.$this->token())
             ->getJson('/api/tenant/views/settings-profile')
@@ -414,8 +440,27 @@ class SduiViewApiTest extends TestCase
         $this->assertStringNotContainsString('Printer & Hardware Setup', $receiptJson);
         $this->assertStringNotContainsString('printer_setup', $receiptJson);
 
-        // The primary action is the clean terminal element.
+        // Receipt & Invoicing now continues to the Notifications & Sounds
+        // tab rather than completing the wizard.
         $components = $receipt['components'];
+        $last = end($components);
+        $this->assertSame('button_primary', $last['type']);
+        $this->assertSame('Save & Continue', $last['label']);
+    }
+
+    public function test_store_profile_sounds_tab_ends_on_the_complete_button(): void
+    {
+        $schema = $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->getJson('/api/tenant/views/settings-profile')
+            ->assertOk()
+            ->json('schema');
+
+        $sounds = collect(collect($schema['components'])->firstWhere('type', 'tabs')['tabs'])
+            ->firstWhere('id', 'notifications_sounds');
+
+        $this->assertNotNull($sounds, 'notifications_sounds tab missing from Store Profile');
+
+        $components = $sounds['components'];
         $last = end($components);
         $this->assertSame('button_primary', $last['type']);
         $this->assertSame('Complete Setup & Open Dashboard', $last['label']);
@@ -423,7 +468,7 @@ class SduiViewApiTest extends TestCase
 
     public function test_store_profile_view_tab_query_param_selects_the_initial_tab(): void
     {
-        foreach (['general' => 0, 'address' => 1, 'branding' => 2, 'receipts' => 3] as $param => $index) {
+        foreach (['general' => 0, 'address' => 1, 'branding' => 2, 'receipts' => 3, 'sounds' => 4] as $param => $index) {
             $tabs = collect($this->withHeader('Authorization', 'Bearer '.$this->token())
                 ->getJson("/api/tenant/views/settings-profile?tab={$param}")
                 ->assertOk()

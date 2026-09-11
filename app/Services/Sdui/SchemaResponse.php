@@ -2,6 +2,7 @@
 
 namespace App\Services\Sdui;
 
+use App\Http\Controllers\Api\V1\SettingsApiController;
 use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Company;
@@ -1044,7 +1045,7 @@ class SchemaResponse
     }
 
     /** Number of tabs in the Store Profile setup wizard. */
-    private const PROFILE_WIZARD_TAB_COUNT = 4;
+    private const PROFILE_WIZARD_TAB_COUNT = 5;
 
     /**
      * Store Profile — an icon-free Tabbed View driven as a setup wizard. Each
@@ -1066,6 +1067,7 @@ class SchemaResponse
             'address', 'localization', 'location', 'address-localization' => 1,
             'branding', 'appearance', 'colors', 'brand' => 2,
             'receipt', 'receipts', 'invoicing', 'invoice' => 3,
+            'sounds', 'notifications', 'notification-sounds', 'notifications-sounds', 'alerts' => 4,
             default => 0,
         };
 
@@ -1075,6 +1077,7 @@ class SchemaResponse
                 ['id' => 'address_localization', 'label' => 'Address & Localization', 'components' => self::profileAddressTab($company)],
                 ['id' => 'branding_appearance', 'label' => 'Branding & Appearance', 'components' => self::profileBrandingTab($company)],
                 ['id' => 'receipt_invoicing', 'label' => 'Receipt & Invoicing', 'components' => self::profileReceiptTab($company)],
+                ['id' => 'notifications_sounds', 'label' => 'Notifications & Sounds', 'components' => self::profileSoundsTab($company)],
             ], ['initial_index' => $initialIndex, 'is_scrollable' => true]),
         ]);
     }
@@ -1242,6 +1245,60 @@ class SchemaResponse
             self::card($numbering),
             self::card($terms),
             self::profileWizardSaveButton(3, '/api/tenant/settings/receipts', 'Receipt settings saved'),
+        ];
+    }
+
+    /**
+     * Tab 5 — per-tenant push-alert sound preferences, then the wizard's
+     * terminal "Complete Setup & Open Dashboard" button. Saves to
+     * /settings/notification-sounds. Consumed by
+     * FirebasePushService::sendToCompany()/sendToUser(), which merge these
+     * into every data-only FCM push payload alongside the platform's global
+     * high-importance channel settings (SuperAdmin ▸ Push Notifications).
+     *
+     * The custom-URL field has no way to hide itself when a non-"custom"
+     * preset is picked — this schema has no conditional-field-visibility
+     * primitive — so it stays always visible with its placeholder/caption
+     * explaining it's only used for the "Custom Audio URL" preset.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function profileSoundsTab(Company $company): array
+    {
+        $configs = Configuration::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->whereIn('key', ['order_sound_preset', 'order_sound_custom_url', 'delayed_order_sound', 'sound_vibration_enabled'])
+            ->pluck('value', 'key')
+            ->all();
+        $sounds = SettingsApiController::presentNotificationSounds($configs);
+
+        return [
+            self::card([
+                self::text('Order & KDS Sound Alerts', 'title_medium', ['bold' => true]),
+                self::text('Customize the sound alert for incoming orders and for delayed/overdue order reminders.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::dropdownSelect('order_sound_preset', 'New Order Alert Sound', [
+                    ['label' => 'Default System Ringtone', 'value' => 'ringtone'],
+                    ['label' => 'Standard Kitchen Chime', 'value' => 'chime'],
+                    ['label' => 'High-Priority Alarm', 'value' => 'alarm'],
+                    ['label' => 'Subtle Bell', 'value' => 'bell'],
+                    ['label' => 'Custom Audio URL', 'value' => 'custom'],
+                ], $sounds['order_sound_preset']),
+                self::textInput('order_sound_custom_url', 'Custom Audio MP3/WAV URL', $sounds['order_sound_custom_url'], [
+                    'placeholder' => 'https://your-domain.com/sounds/kitchen-alert.mp3',
+                    'keyboard_type' => 'url',
+                ]),
+                self::text('Used only when "New Order Alert Sound" above is set to Custom Audio URL — a direct link to a short MP3/WAV file.', 'body_small', ['color' => '#6b7280']),
+                self::divider(),
+                self::dropdownSelect('delayed_order_sound', 'Delayed Order Alert Sound', [
+                    ['label' => 'Continuous Alarm', 'value' => 'alarm'],
+                    ['label' => 'Urgent Siren', 'value' => 'siren'],
+                    ['label' => 'Loud Double Beep', 'value' => 'beep'],
+                    ['label' => 'System Default', 'value' => 'default'],
+                ], $sounds['delayed_order_sound']),
+                self::toggleSwitch('sound_vibration_enabled', 'Haptic / Vibration Alert', (bool) $sounds['sound_vibration_enabled']),
+            ]),
+            self::profileWizardSaveButton(4, '/api/tenant/settings/notification-sounds', 'Sound preferences saved'),
         ];
     }
 

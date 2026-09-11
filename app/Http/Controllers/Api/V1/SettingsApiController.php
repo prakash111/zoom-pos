@@ -502,6 +502,60 @@ class SettingsApiController extends Controller
         ]);
     }
 
+    /**
+     * Store Profile ▸ "Notifications & Sounds" tab. Per-tenant push-alert
+     * sound preferences — which preset (or custom audio URL) plays for a new
+     * order vs. a delayed order, and whether the alert also vibrates.
+     * Consumed by FirebasePushService::sendToCompany()/sendToUser(), which
+     * merge these into every data-only FCM payload alongside the platform's
+     * global high-importance channel settings.
+     */
+    public function updateNotificationSounds(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'order_sound_preset' => ['required', 'string', 'in:ringtone,chime,alarm,bell,custom'],
+            'order_sound_custom_url' => ['required_if:order_sound_preset,custom', 'nullable', 'string', 'max:500', 'url'],
+            'delayed_order_sound' => ['required', 'string', 'in:alarm,siren,beep,default'],
+            'sound_vibration_enabled' => ['nullable', 'boolean'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+
+        $this->putConfig($company, 'order_sound_preset', (string) $data['order_sound_preset']);
+        // Custom URL only makes sense (and is only validated) alongside the
+        // "custom" preset — clear it whenever another preset is chosen so a
+        // stale URL can never linger and get picked up if the tenant later
+        // switches back to "custom" without re-entering it.
+        $this->putConfig(
+            $company,
+            'order_sound_custom_url',
+            $data['order_sound_preset'] === 'custom' ? (string) ($data['order_sound_custom_url'] ?? '') : ''
+        );
+        $this->putConfig($company, 'delayed_order_sound', (string) $data['delayed_order_sound']);
+        $this->putConfig($company, 'sound_vibration_enabled', $request->boolean('sound_vibration_enabled') ? '1' : '0');
+
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'notification_sounds']);
+
+        $configs = Configuration::withoutGlobalScopes()->where('company_id', $company->id)->pluck('value', 'key')->all();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notification and sound alert preferences saved successfully.',
+            'notification_sounds' => $this->presentNotificationSounds($configs),
+        ]);
+    }
+
     public function testEmail(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
@@ -779,6 +833,20 @@ class SettingsApiController extends Controller
                 'sound_preset' => $configs['restaurant_alert_sound_preset'] ?? 'chime',
                 'sound_url' => $configs['restaurant_alert_sound_url'] ?? '',
             ],
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $configs
+     * @return array<string, mixed>
+     */
+    public static function presentNotificationSounds(array $configs): array
+    {
+        return [
+            'order_sound_preset' => $configs['order_sound_preset'] ?? 'chime',
+            'order_sound_custom_url' => $configs['order_sound_custom_url'] ?? '',
+            'delayed_order_sound' => $configs['delayed_order_sound'] ?? 'alarm',
+            'sound_vibration_enabled' => ($configs['sound_vibration_enabled'] ?? '1') === '1',
         ];
     }
 
