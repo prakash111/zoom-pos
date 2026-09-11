@@ -7,8 +7,10 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/models/sale_model.dart';
 import '../../../core/services/tenant_time_service.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
+import '../../../core/widgets/responsive/desktop_content_area.dart';
 import '../../auth/auth_provider.dart';
 import '../../pos/sales_repository.dart';
 import 'sale_detail_screen.dart';
@@ -64,113 +66,291 @@ class _SalesScreenState extends State<SalesScreen> {
   Widget build(BuildContext context) {
     final company = context.watch<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
+    final desktop = MediaQuery.sizeOf(context).width >= Breakpoints.desktop;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Sales')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() {
-                _query = value.trim().toLowerCase();
-                _tagFilter = null;
-              }),
-              decoration: InputDecoration(
-                hintText: 'Search sale #, customer or item',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _query.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _query = '';
-                            _tagFilter = null;
-                          });
-                        },
-                      ),
-              ),
-            ),
-          ),
-          if (_tagFilter != null)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                child: InputChip(
-                  avatar: const Icon(Icons.local_offer_outlined, size: 16),
-                  label: Text('Filtered by #$_tagFilter'),
-                  onDeleted: () => setState(() {
+      body: DesktopContentArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: DesktopBoundedField(
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) => setState(() {
+                    _query = value.trim().toLowerCase();
                     _tagFilter = null;
-                    _query = '';
                   }),
+                  decoration: InputDecoration(
+                    hintText: 'Search sale #, customer or item',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _query = '';
+                                _tagFilter = null;
+                              });
+                            },
+                          ),
+                  ),
                 ),
               ),
             ),
-          Expanded(
-            child: FutureBuilder<List<SaleModel>>(
-              future: _future,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done) {
-                  return const LoadingIndicator();
-                }
-                if (snapshot.hasError) {
-                  final message = snapshot.error is ApiException
-                      ? (snapshot.error as ApiException).message
-                      : 'Could not load sales.';
-                  return ErrorView(message: message, onRetry: _reload);
-                }
-
-                final sales = (snapshot.data ?? []).where((s) {
-                  if (_query.isEmpty) return true;
-                  if (s.saleNumber.toLowerCase().contains(_query) ||
-                      (s.customerName ?? '').toLowerCase().contains(_query)) {
-                    return true;
-                  }
-                  return s.items.any((it) {
-                    final name = (it['name'] ?? it['product_name'] ?? '')
-                        .toString()
-                        .toLowerCase();
-                    final cat = (it['category_name'] ?? it['category'] ?? '')
-                        .toString()
-                        .toLowerCase()
-                        .replaceAll(RegExp(r'\s+'), '');
-                    return name.contains(_query) ||
-                        cat.contains(_query.replaceAll(RegExp(r'\s+'), ''));
-                  });
-                }).toList();
-
-                if (sales.isEmpty) {
-                  return const Center(child: Text('No sales found.'));
-                }
-
-                return RefreshIndicator(
-                  onRefresh: () async => _reload(),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    itemCount: sales.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final sale = sales[index];
-                      return _SaleTile(
-                        sale: sale,
-                        formatter: formatter,
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => SaleDetailScreen(
-                                  sale: sale, formatter: formatter)),
-                        ),
-                      );
-                    },
+            if (_tagFilter != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: InputChip(
+                    avatar: const Icon(Icons.local_offer_outlined, size: 16),
+                    label: Text('Filtered by #$_tagFilter'),
+                    onDeleted: () => setState(() {
+                      _tagFilter = null;
+                      _query = '';
+                    }),
                   ),
-                );
-              },
+                ),
+              ),
+            Expanded(
+              child: FutureBuilder<List<SaleModel>>(
+                future: _future,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const LoadingIndicator();
+                  }
+                  if (snapshot.hasError) {
+                    final message = snapshot.error is ApiException
+                        ? (snapshot.error as ApiException).message
+                        : 'Could not load sales.';
+                    return ErrorView(message: message, onRetry: _reload);
+                  }
+
+                  final sales = (snapshot.data ?? []).where((s) {
+                    if (_query.isEmpty) return true;
+                    if (s.saleNumber.toLowerCase().contains(_query) ||
+                        (s.customerName ?? '').toLowerCase().contains(_query)) {
+                      return true;
+                    }
+                    return s.items.any((it) {
+                      final name = (it['name'] ?? it['product_name'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      final cat = (it['category_name'] ?? it['category'] ?? '')
+                          .toString()
+                          .toLowerCase()
+                          .replaceAll(RegExp(r'\s+'), '');
+                      return name.contains(_query) ||
+                          cat.contains(_query.replaceAll(RegExp(r'\s+'), ''));
+                    });
+                  }).toList();
+
+                  if (sales.isEmpty) {
+                    return const Center(child: Text('No sales found.'));
+                  }
+
+                  void openSale(SaleModel sale) => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => SaleDetailScreen(
+                                sale: sale, formatter: formatter)),
+                      );
+
+                  return RefreshIndicator(
+                    onRefresh: () async => _reload(),
+                    child: desktop
+                        ? _DesktopSalesTable(
+                            sales: sales, formatter: formatter, onTap: openSale)
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                            itemCount: sales.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              final sale = sales[index];
+                              return _SaleTile(
+                                sale: sale,
+                                formatter: formatter,
+                                onTap: () => openSale(sale),
+                              );
+                            },
+                          ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Desktop composition for the sales list: a compact header + data rows
+/// (Sale # | Customer | Date | Status | Amount) instead of stretching the
+/// mobile card list edge-to-edge. Falls back to [_SaleTile] cards below the
+/// desktop breakpoint.
+class _DesktopSalesTable extends StatelessWidget {
+  const _DesktopSalesTable(
+      {required this.sales, required this.formatter, required this.onTap});
+
+  final List<SaleModel> sales;
+  final CurrencyFormatter formatter;
+  final void Function(SaleModel) onTap;
+
+  static const _headerStyle =
+      TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5);
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
+      itemCount: sales.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+                border:
+                    Border(bottom: BorderSide(color: scheme.outlineVariant))),
+            child: Row(
+              children: [
+                Expanded(
+                    flex: 3,
+                    child: Text('SALE #',
+                        style: _headerStyle.copyWith(
+                            color: scheme.onSurfaceVariant))),
+                Expanded(
+                    flex: 4,
+                    child: Text('CUSTOMER',
+                        style: _headerStyle.copyWith(
+                            color: scheme.onSurfaceVariant))),
+                Expanded(
+                    flex: 3,
+                    child: Text('DATE',
+                        style: _headerStyle.copyWith(
+                            color: scheme.onSurfaceVariant))),
+                Expanded(
+                    flex: 2,
+                    child: Text('STATUS',
+                        style: _headerStyle.copyWith(
+                            color: scheme.onSurfaceVariant))),
+                Expanded(
+                    flex: 2,
+                    child: Text('AMOUNT',
+                        textAlign: TextAlign.end,
+                        style: _headerStyle.copyWith(
+                            color: scheme.onSurfaceVariant))),
+                const SizedBox(width: 36),
+              ],
+            ),
+          );
+        }
+
+        final sale = sales[index - 1];
+        final due = sale.dueAmount > 0;
+
+        return InkWell(
+          onTap: () => onTap(sale),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border(
+                  bottom: BorderSide(
+                      color: scheme.outlineVariant.withValues(alpha: 0.5))),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text('#${sale.saleNumber}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13.5)),
+                ),
+                Expanded(
+                  flex: 4,
+                  child: Text(
+                    (sale.customerName ?? '').isEmpty
+                        ? '—'
+                        : sale.customerName!,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13.5),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    sale.createdAt != null
+                        ? _dateFormat.format(TenantTimeService.instance
+                            .toTenantTime(sale.createdAt!))
+                        : '—',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 12.5, color: scheme.onSurfaceVariant),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child:
+                      _SaleStatusBadge(cancelled: sale.isCancelled, due: due),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    formatter.format(sale.total),
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 13.5),
+                  ),
+                ),
+                SizedBox(
+                    width: 36,
+                    child: Icon(Icons.chevron_right,
+                        size: 18, color: scheme.onSurfaceVariant)),
+              ],
             ),
           ),
-        ],
+        );
+      },
+    );
+  }
+}
+
+class _SaleStatusBadge extends StatelessWidget {
+  const _SaleStatusBadge({required this.cancelled, required this.due});
+
+  final bool cancelled;
+  final bool due;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = cancelled
+        ? ('Cancelled', Colors.grey)
+        : due
+            ? ('Due', Colors.red)
+            : ('Paid', Colors.green);
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: color.shade700),
+        ),
       ),
     );
   }
