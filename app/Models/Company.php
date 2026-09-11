@@ -565,9 +565,22 @@ class Company extends Model
         return $this->accent_color ?: '#D97706';
     }
 
+    /**
+     * The drawer/sidebar background sent in the bootstrap theme payload.
+     * A blank column, or one that literally stores raw white (however a
+     * tenant record ended up with it — a cleared colour picker, a stray
+     * import, etc.), is treated the same as "not configured" and falls back
+     * to the platform's cream default, never a bare white hex. This is
+     * distinct from a tenant's own deliberately-chosen dark/light drawer
+     * colour, which is always returned as-is.
+     */
     public function getDrawerBg(): string
     {
-        return $this->drawer_bg ?: '#FFF7ED';
+        $raw = trim((string) $this->drawer_bg);
+        $isUnconfiguredOrWhite = $raw === ''
+            || in_array(strtolower($raw), ['#ffffff', '#fff', 'ffffff', 'fff', 'white'], true);
+
+        return $isUnconfiguredOrWhite ? '#FFF7ED' : $raw;
     }
 
     public function getThemeTokens(): array
