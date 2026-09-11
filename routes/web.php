@@ -6,6 +6,7 @@ use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PublicContactController;
 use App\Http\Controllers\PublicPageController;
+use App\Http\Controllers\Webhooks\SubscriptionWebhookController;
 use App\Http\Middleware\EnsureAppIsInstalled;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -41,6 +42,12 @@ Route::middleware(EnsureAppIsInstalled::class)->group(function () {
     Route::get('/auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])->name('social.redirect');
     Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback'])->name('social.callback');
 });
+
+// Browser return URL after a hosted subscription checkout (Razorpay / PayPal
+// / Paystack / Flutterwave redirect flows). Shown, copyable, on the gateway
+// card in Super Admin ▸ Payment Gateways.
+Route::get('/subscription/payment/callback/{gateway}', [SubscriptionWebhookController::class, 'callback'])
+    ->name('subscription.payment.callback');
 
 Route::get('/pos-standalone', function () {
     return view('pos-standalone');

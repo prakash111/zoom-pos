@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\V1\UserApiController;
 use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Controllers\Tenant\InvoiceController;
+use App\Http\Controllers\Webhooks\SubscriptionWebhookController;
 use App\Http\Middleware\AuthenticateTenantApi;
 use App\Http\Middleware\PreventDemoModifications;
 use Illuminate\Support\Facades\Route;
@@ -103,6 +104,17 @@ Route::get('/tenant/receipt/{sale}/pdf', [InvoiceController::class, 'signedPdf']
 // Inbound Two-Way E-Commerce Webhook Receiver (Shopify / WooCommerce / Generic)
 Route::post('/v1/integrations/webhooks/{tenant_uuid}/orders', [EcommerceWebhookController::class, 'handleOrders']);
 Route::post('/integrations/webhooks/{tenant_uuid}/orders', [EcommerceWebhookController::class, 'handleOrders']);
+
+// Subscription payment gateway webhooks — the URL for each is shown, copyable,
+// on its Super Admin ▸ Payment Gateways card. Signature is checked against the
+// gateway's stored webhook secret; the event is written to the audit log.
+Route::post('/v1/webhooks/{gateway}', [SubscriptionWebhookController::class, 'handle'])
+    ->name('webhooks.gateway');
+foreach (SubscriptionWebhookController::GATEWAYS as $gw) {
+    Route::post("/v1/webhooks/{$gw}", [SubscriptionWebhookController::class, 'handle'])
+        ->defaults('gateway', $gw)
+        ->name("webhooks.{$gw}");
+}
 
 // Server-Driven UI Bootstrap, View Schemas, and Form Action Routes
 Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
