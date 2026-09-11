@@ -293,7 +293,10 @@ class RestaurantApiController extends Controller
             'discount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'prep_minutes' => ['nullable', 'integer', 'min:1', 'max:240'],
-            'intimation_minutes' => ['nullable', 'integer', 'in:0,2,5'],
+            // Any custom alert lead time is accepted (was previously capped to
+            // the 0/2/5 quick-chip presets); it's clamped to <= prep_minutes
+            // below so an alert can never fire before the order was sent.
+            'intimation_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable'],
             'items.*.name' => ['required', 'string', 'max:255'],
@@ -357,7 +360,7 @@ class RestaurantApiController extends Controller
             $existingSale = $table->currentSale;
         }
 
-        [$sale, $kot] = DB::transaction(function () use ($company, $user, $existingSale, $items, $subtotal, $discount, $total, $serviceType, $table, $tableName, $data) {
+        [$sale, $kot] = DB::transaction(function () use ($company, $user, $existingSale, $items, $discount, $total, $serviceType, $table, $tableName, $data) {
             if ($existingSale) {
                 $mergedItems = array_merge($existingSale->items ?? [], $items);
                 $mergedSubtotal = array_sum(array_map(fn ($i) => (float) $i['price'] * (float) $i['quantity'], $mergedItems));
@@ -514,7 +517,7 @@ class RestaurantApiController extends Controller
 
         $saleNumber = 'INV-'.sprintf('%04d', Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1);
 
-        $sale = DB::transaction(function () use ($sale, $saleNumber, $total, $discount, $isSplit, $paidAmount, $dueAmount, $paymentStatus, $data, $splitPayments, $company, $user, $customer, $cashRegisterId) {
+        $sale = DB::transaction(function () use ($sale, $saleNumber, $total, $discount, $isSplit, $paidAmount, $dueAmount, $paymentStatus, $data, $splitPayments, $company, $customer, $cashRegisterId) {
             $sale->update([
                 'sale_number' => $saleNumber,
                 'total' => $total,
