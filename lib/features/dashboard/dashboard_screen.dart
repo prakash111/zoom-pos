@@ -547,19 +547,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final primaryColor = tp.activeLinkColor ??
             bootstrap.theme.primaryColorValue ??
             Theme.of(context).colorScheme.primary;
-        // Local App-Preferences override wins over the server branding. The
-        // server `drawer_bg` is a single mode-agnostic value, so in dark mode
-        // a light branding colour (e.g. the default cream) is dropped in
-        // favour of the dark theme's own drawer surface — otherwise the
-        // drawer renders white under a dark scaffold.
+        // An explicit per-device pick (App Preferences ▸ "Drawer background")
+        // always wins, exactly as set — that's a deliberate user choice.
+        // Anything else (unset, "Default", or the tenant's server-synced
+        // colour) is a single mode-agnostic value, so it's only honoured when
+        // it actually reads on the *active* brightness; otherwise the dark
+        // theme's own drawer surface applies instead of rendering a light
+        // drawer under a dark scaffold (or vice versa in light mode).
         final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-        final brandedDrawerBg = bootstrap.theme.drawerBgValue;
-        final brandedDrawerBgForMode = brandedDrawerBg == null
+        Color? modeMatched(Color? c) => c == null
             ? null
-            : ((brandedDrawerBg.computeLuminance() > 0.5) == !isDarkMode
-                ? brandedDrawerBg
-                : null);
-        final drawerBgColor = tp.drawerBg ??
+            : ((c.computeLuminance() > 0.5) == !isDarkMode ? c : null);
+        final brandedDrawerBgForMode =
+            modeMatched(bootstrap.theme.drawerBgValue);
+        final drawerBgColor = (tp.isDrawerBgUserOverride
+                ? tp.drawerBg
+                : modeMatched(tp.drawerBg)) ??
             brandedDrawerBgForMode ??
             Theme.of(context).drawerTheme.backgroundColor;
         final drawerGradient = bootstrap.theme.drawerGradient;

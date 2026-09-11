@@ -12,7 +12,14 @@ import 'theme.dart';
 class ThemeProvider extends ChangeNotifier {
   static const _colorKey = 'zoom_pos.primary_color';
   static const _accentKey = 'zoom_pos.accent_color';
+  // `_drawerBgKey` holds the tenant's *server-synced* drawer colour
+  // (bootstrap `theme.drawer_bg`) — refreshed on every dashboard/bootstrap
+  // refresh. `_drawerBgOverrideKey` is the separate, App-Preferences-driven
+  // *per-device* choice; keeping these in two slots is what lets a dashboard
+  // refresh update the former without ever touching (or persisting over) the
+  // latter. See [syncFromBootstrap] / [setDrawerBgOrNull].
   static const _drawerBgKey = 'zoom_pos.drawer_bg';
+  static const _drawerBgOverrideKey = 'zoom_pos.drawer_bg_override';
   static const _drawerTextKey = 'zoom_pos.drawer_text';
   static const _activeLinkKey = 'zoom_pos.active_link';
   static const _canvasKey = 'zoom_pos.canvas_bg';
@@ -64,6 +71,14 @@ class ThemeProvider extends ChangeNotifier {
   Color? activeLinkColor;
   Color? canvasColor;
 
+  /// True when [drawerBg] came from the user's own "Drawer & surfaces" pick
+  /// (App Preferences), not from the tenant's server-synced theme. Consumers
+  /// should honour an explicit override unconditionally (even if it doesn't
+  /// contrast well with the active light/dark mode — that's the user's
+  /// deliberate choice), and only fall back to a mode-matched default
+  /// otherwise. See dashboard_screen.dart's drawer background resolution.
+  bool isDrawerBgUserOverride = false;
+
   /// User-selectable light / dark / follow-system preference, persisted per
   /// device. Defaults to following the OS setting.
   ThemeMode themeMode = ThemeMode.system;
@@ -86,7 +101,9 @@ class ThemeProvider extends ChangeNotifier {
         return h == null ? null : parseHexColor(h);
       }
 
-      drawerBg = hexPref(_drawerBgKey);
+      final overrideDrawerBg = hexPref(_drawerBgOverrideKey);
+      isDrawerBgUserOverride = overrideDrawerBg != null;
+      drawerBg = overrideDrawerBg ?? hexPref(_drawerBgKey);
       drawerTextColor = hexPref(_drawerTextKey);
       activeLinkColor = hexPref(_activeLinkKey);
       canvasColor = hexPref(_canvasKey);
@@ -120,8 +137,15 @@ class ThemeProvider extends ChangeNotifier {
     }
   }
 
+  /// Applies the tenant's server bootstrap theme. Runs on every app start
+  /// *and* on every dashboard/pull-to-refresh (via BootstrapCache.refresh),
+  /// so it must never clobber a per-device App Preferences override:
+  /// `drawerBg` is only touched here when [isDrawerBgUserOverride] is false —
+  /// an explicit local pick always wins and is never reset or overwritten in
+  /// SharedPreferences by a refresh.
   Future<void> syncFromBootstrap(BootstrapTheme theme) async {
     bool changed = false;
+    bool drawerChanged = false;
     final primary = theme.primaryColorValue;
     if (primary != null) {
       _tenantColorExplicit = true;
@@ -136,9 +160,12 @@ class ThemeProvider extends ChangeNotifier {
       changed = true;
     }
     final drawer = theme.drawerBgValue;
-    if (drawer != null && drawer.toARGB32() != drawerBg?.toARGB32()) {
+    if (!isDrawerBgUserOverride &&
+        drawer != null &&
+        drawer.toARGB32() != drawerBg?.toARGB32()) {
       drawerBg = drawer;
       changed = true;
+      drawerChanged = true;
     }
     if (changed) {
       notifyListeners();
@@ -148,7 +175,8 @@ class ThemeProvider extends ChangeNotifier {
         if (accentColor != null) {
           await prefs.setString(_accentKey, toHexColor(accentColor!));
         }
-        if (drawerBg != null) {
+        // Only the server-synced slot — never the per-device override key.
+        if (drawerChanged && drawerBg != null) {
           await prefs.setString(_drawerBgKey, toHexColor(drawerBg!));
         }
       } catch (e) {
@@ -180,16 +208,11 @@ class ThemeProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> setDrawerBg(Color color) async {
-    drawerBg = color;
-    notifyListeners();
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_drawerBgKey, toHexColor(color));
-    } catch (e) {
-      debugPrint('ThemeProvider.setDrawerBg error: $e');
-    }
-  }
+  /// Sets the per-device drawer override (App Preferences ▸ "Drawer
+  /// background"). Written to [_drawerBgOverrideKey] — a separate slot from
+  /// the tenant's server-synced colour — so it's immune to
+  /// [syncFromBootstrap] on the next refresh.
+  Future<void> setDrawerBg(Color color) => setDrawerBgOrNull(color);
 
   Future<void> _setOverride(
       String key, Color? color, void Function(Color?) assign) async {
@@ -207,8 +230,26 @@ class ThemeProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> setDrawerBgOrNull(Color? c) =>
-      _setOverride(_drawerBgKey, c, (v) => drawerBg = v);
+  Future<void> setDrawerBgOrNull(Color? c) async {
+    isDrawerBgUserOverride = c != null;
+    if (c != null) {
+      await _setOverride(_drawerBgOverrideKey, c, (v) => drawerBg = v);
+      return;
+    }
+    // Clearing the override: fall back to whatever the tenant's own synced
+    // theme has (not necessarily null) rather than the theme default.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_drawerBgOverrideKey);
+      final synced = prefs.getString(_drawerBgKey);
+      drawerBg = synced != null ? parseHexColor(synced) : null;
+    } catch (e) {
+      debugPrint('ThemeProvider.setDrawerBgOrNull(null) error: $e');
+      drawerBg = null;
+    }
+    notifyListeners();
+  }
+
   Future<void> setDrawerTextColor(Color? c) =>
       _setOverride(_drawerTextKey, c, (v) => drawerTextColor = v);
   Future<void> setActiveLinkColor(Color? c) =>
@@ -217,18 +258,22 @@ class ThemeProvider extends ChangeNotifier {
       _setOverride(_canvasKey, c, (v) => canvasColor = v);
 
   Future<void> resetSurfaceOverrides() async {
-    drawerBg = drawerTextColor = activeLinkColor = canvasColor = null;
+    drawerTextColor = activeLinkColor = canvasColor = null;
+    isDrawerBgUserOverride = false;
     notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
+      final synced = prefs.getString(_drawerBgKey);
+      drawerBg = synced != null ? parseHexColor(synced) : null;
       for (final k in const [
-        _drawerBgKey,
+        _drawerBgOverrideKey,
         _drawerTextKey,
         _activeLinkKey,
         _canvasKey,
       ]) {
         await prefs.remove(k);
       }
+      notifyListeners();
     } catch (e) {
       debugPrint('ThemeProvider.resetSurfaceOverrides error: $e');
     }

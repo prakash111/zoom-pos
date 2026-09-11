@@ -1222,10 +1222,14 @@ class CartSheet extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey.shade50,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest,
                                   borderRadius: BorderRadius.circular(12),
-                                  border:
-                                      Border.all(color: Colors.grey.shade200),
+                                  border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outlineVariant),
                                 ),
                                 child: Column(
                                   children: [
@@ -1278,7 +1282,9 @@ class CartSheet extends StatelessWidget {
                                               Text(
                                                 '${isIndia ? l10n.gstin : l10n.taxId}: ${company!.taxId}',
                                                 style: TextStyle(
-                                                    color: Colors.grey.shade500,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
                                                     fontSize: 10),
                                               ),
                                           ],
@@ -1434,6 +1440,7 @@ class _TotalsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.symmetric(vertical: isSub ? 1 : 2),
       child: Row(
@@ -1442,7 +1449,7 @@ class _TotalsRow extends StatelessWidget {
           Text(
             isSub ? '  └ $label' : label,
             style: TextStyle(
-              color: isSub ? Colors.grey.shade500 : Colors.grey.shade700,
+              color: scheme.onSurfaceVariant,
               fontSize: isSub ? 11 : 13,
             ),
           ),
@@ -1450,7 +1457,7 @@ class _TotalsRow extends StatelessWidget {
             value,
             style: TextStyle(
               color: valueColor ??
-                  (isSub ? Colors.grey.shade600 : Colors.grey.shade900),
+                  (isSub ? scheme.onSurfaceVariant : scheme.onSurface),
               fontWeight: isSub ? FontWeight.normal : FontWeight.w600,
               fontSize: isSub ? 11 : 13,
             ),
