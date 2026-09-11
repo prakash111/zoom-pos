@@ -49,11 +49,17 @@ class ModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        if (! Schema::hasTable('sdui_modules')) {
-            return;
-        }
-
         try {
+            // Schema::hasTable() itself opens a DB connection — on a fresh
+            // install (no database configured/migrated yet, e.g. before the
+            // /install wizard has run, or the DB is briefly unreachable) this
+            // throws rather than returning false, which would otherwise crash
+            // every single request app-wide (including /install itself) since
+            // this provider boots on every bootstrap, HTTP or console.
+            if (! Schema::hasTable('sdui_modules')) {
+                return;
+            }
+
             $activeModules = SduiModule::query()
                 ->where('source_type', 'package')
                 ->where('is_active', true)
