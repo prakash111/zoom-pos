@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\Tenancy\TenantProvisioningService;
+use App\Services\Tenancy\TenantSampleDataService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -138,12 +139,22 @@ class DemoAccountsSeeder extends Seeder
 
         $posMode = self::ACCOUNTS[$storeType]['pos_mode'];
         $company = Company::query()->withoutGlobalScopes()->find($user->company_id);
-        $company?->forceFill([
+        if (! $company) {
+            return;
+        }
+
+        $company->forceFill([
             'is_demo' => true,
             'pos_mode' => $posMode,
             // Show the Cafe & Restaurant nav only for the restaurant demo.
             'restaurant_mode_locked' => $posMode !== 'restaurant',
             'timezone' => 'Asia/Kolkata',
         ])->save();
+
+        // Re-apply the store profile, T&C / bank details and placeholder logo
+        // for an already-provisioned demo tenant (a plain refresh otherwise
+        // only touches auth/flags).
+        app(TenantSampleDataService::class)
+            ->seedBusinessProfile($company, $posMode);
     }
 }

@@ -24,6 +24,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class TenantSampleDataService
@@ -47,6 +48,11 @@ class TenantSampleDataService
                 default => $this->seedRetail($company, $admin),
             };
 
+            // Store profile, document prefixes, T&C / bank details and a
+            // placeholder brand logo — everything the receipt/invoice/quote
+            // templates and the drawer header render.
+            $this->seedBusinessProfile($company, $normalizedMode);
+
             // Cross-cutting business history every mode shares: more customers,
             // a spread of dated sales (drives the dashboard charts, reports,
             // top products & cash flow), a few on-credit invoices (receivables
@@ -55,6 +61,174 @@ class TenantSampleDataService
 
             $company->update(['is_seeding_complete' => true]);
         });
+    }
+
+    /**
+     * Store identity, document number prefixes, Terms & Conditions / bank
+     * details and a generated placeholder logo/favicon/cover — populated so a
+     * fresh demo tenant's invoices, quotes and receipts are not blank.
+     * Overwrites (demo data), safe to re-run.
+     */
+    public function seedBusinessProfile(Company $company, string $mode): void
+    {
+        $profiles = [
+            'retail' => [
+                'trade' => 'Metro Retail Mart', 'emoji' => '🛒', 'color' => '#2563EB',
+                'inv' => 'INV', 'quo' => 'QUO',
+                'address' => '14 Market Street, MG Road', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'postal' => '560001',
+                'phone' => '+91 80 4000 1200', 'website' => 'https://metromart.demo',
+            ],
+            'restaurant' => [
+                'trade' => 'The Copper Kettle Café', 'emoji' => '🍽️', 'color' => '#D97706',
+                'inv' => 'BILL', 'quo' => 'PARTY',
+                'address' => '2 Brigade Lane, Indiranagar', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'postal' => '560038',
+                'phone' => '+91 80 4111 8080', 'website' => 'https://copperkettle.demo',
+            ],
+            'pharmacy' => [
+                'trade' => 'CareFirst Pharmacy', 'emoji' => '💊', 'color' => '#059669',
+                'inv' => 'RX', 'quo' => 'EST',
+                'address' => '7 Health Avenue, Jayanagar', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'postal' => '560011',
+                'phone' => '+91 80 2233 4455', 'website' => 'https://carefirst.demo',
+            ],
+            'repair_technician' => [
+                'trade' => 'FixPoint Device Repairs', 'emoji' => '🔧', 'color' => '#0284C7',
+                'inv' => 'RPR', 'quo' => 'RQT',
+                'address' => '19 Tech Park Road, Koramangala', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'postal' => '560095',
+                'phone' => '+91 80 5566 7788', 'website' => 'https://fixpoint.demo',
+            ],
+            'service_booking' => [
+                'trade' => 'Lumière Salon & Spa', 'emoji' => '✂️', 'color' => '#7C3AED',
+                'inv' => 'SAL', 'quo' => 'PKG',
+                'address' => '5 Boulevard Court, HSR Layout', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'postal' => '560102',
+                'phone' => '+91 80 6677 9900', 'website' => 'https://lumiere.demo',
+            ],
+        ];
+
+        $p = $profiles[$mode] ?? $profiles['retail'];
+        $legal = $p['trade'].' Pvt. Ltd.';
+        $slug = Str::slug($p['trade']);
+
+        $invoiceTerms = implode("\n", [
+            '1. Payment is due within 14 days of the invoice date unless otherwise agreed in writing.',
+            '2. Goods once sold may be returned within 7 days with the original receipt and intact packaging.',
+            '3. All prices are inclusive of applicable taxes unless stated otherwise.',
+            '4. Warranty, where applicable, is as per the manufacturer / service terms overleaf.',
+            '5. All disputes are subject to '.$p['city'].' jurisdiction.',
+        ]);
+
+        $quoteTerms = implode("\n", [
+            'This quotation is valid for 15 days from the date of issue; prices are subject to change thereafter.',
+            'A 50% advance is required to confirm the order. Balance is payable on delivery / completion.',
+            'Delivery / completion timelines are indicative and begin from the date of confirmed advance.',
+            'Taxes will be charged as applicable on the final invoice.',
+        ]);
+
+        $bankDetails = implode("\n", [
+            'Account Name: '.$legal,
+            'Bank: Demo Bank of India, MG Road Branch',
+            'A/C No: 0000 1111 2222 4021',
+            'IFSC: DEMO0001234',
+            'UPI: '.$slug.'@demobank',
+            'Please quote the invoice number as the payment reference.',
+        ]);
+
+        // Fill only what the tenant hasn't set — never clobber a real
+        // (or test-provided) trade name, address, logo, terms, etc.
+        $fillIfBlank = [
+            'trade_name' => $p['trade'],
+            'legal_name' => $legal,
+            'tax_id' => '29ABCDE1234F1Z5',
+            'tax_id_label' => 'GSTIN',
+            'phone' => $p['phone'],
+            'website' => $p['website'],
+            'address' => $p['address'],
+            'city' => $p['city'],
+            'state' => $p['state'],
+            'postal_code' => $p['postal'],
+            'invoice_prefix' => $p['inv'],
+            'quotation_prefix' => $p['quo'],
+            'repair_prefix' => 'RPR',
+            'prescription_prefix' => 'RX',
+            'salon_prefix' => 'APT',
+            'invoice_terms' => $invoiceTerms,
+            'quote_terms' => $quoteTerms,
+            'bank_details' => $bankDetails,
+            'primary_color' => $p['color'],
+            'logo' => fn () => $this->putDemoAsset("{$mode}-logo.svg", $this->demoBrandSvg($p['emoji'], $p['color'], 512, 512)),
+            'favicon' => fn () => $this->putDemoAsset("{$mode}-favicon.svg", $this->demoBrandSvg($p['emoji'], $p['color'], 96, 96)),
+            'drawer_cover' => fn () => $this->putDemoAsset("{$mode}-cover.svg", $this->demoCoverSvg($p['color'])),
+        ];
+
+        if ($mode === 'pharmacy') {
+            $fillIfBlank['dispensing_disclaimer'] = implode("\n", [
+                'Prescription (Schedule H / H1 / X) medicines are dispensed only against a valid prescription from a registered medical practitioner.',
+                'Please read the package insert before use and complete the full course as advised.',
+                'Medicines once sold are not returnable except for a manufacturing defect verified by the store.',
+                'Store below 25°C, away from direct sunlight and out of reach of children.',
+            ]);
+        } elseif (in_array($mode, ['repair', 'repair_technician'], true)) {
+            $fillIfBlank['repair_warranty_terms'] = implode("\n", [
+                'Repairs carry a 30-day warranty covering only the replaced part and the workmanship performed.',
+                'Physical damage, liquid ingress or third-party tampering after service voids the warranty.',
+                'The store is not responsible for data loss — please back up your device before handing it over.',
+                'Devices not collected within 30 days of the completion notice may attract storage charges.',
+            ]);
+        } elseif ($mode === 'service_booking') {
+            $fillIfBlank['salon_policy_terms'] = implode("\n", [
+                'Please arrive 10 minutes before your scheduled appointment.',
+                'Cancellations within 4 hours of the appointment, and no-shows, are charged 50% of the service value.',
+                'Prepaid packages are non-transferable and valid for 6 months from the date of purchase.',
+                'A patch test is recommended at least 24 hours before any colour or chemical service.',
+            ]);
+        }
+
+        $updates = [];
+        foreach ($fillIfBlank as $column => $value) {
+            if (blank($company->{$column})) {
+                $updates[$column] = is_callable($value) ? $value() : $value;
+            }
+        }
+        if ($updates !== []) {
+            $company->forceFill($updates)->save();
+        }
+    }
+
+    /**
+     * Write a generated demo brand asset to the public disk and return the
+     * short relative path stored on the company (the `logo` column is only
+     * varchar(255), so a data: URI won't fit). getLogoUrl()/getFaviconUrl()
+     * resolve it to /storage/demo-branding/<name>.
+     */
+    private function putDemoAsset(string $name, string $svg): string
+    {
+        $path = 'demo-branding/'.$name;
+        Storage::disk('public')->put($path, $svg);
+
+        return $path;
+    }
+
+    /** Inline square brand badge SVG. */
+    private function demoBrandSvg(string $emoji, string $bg, int $w, int $h): string
+    {
+        $fs = (int) round(min($w, $h) * 0.52);
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'.$w.'" height="'.$h.'" viewBox="0 0 '.$w.' '.$h.'">'
+            .'<rect width="'.$w.'" height="'.$h.'" rx="'.(int) round($w * 0.18).'" fill="'.$bg.'"/>'
+            .'<text x="50%" y="50%" dy="0.06em" font-size="'.$fs.'" text-anchor="middle" dominant-baseline="central">'.$emoji.'</text>'
+            .'</svg>';
+
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
+    }
+
+    /** Wide gradient cover banner (data: URI) for the drawer header. */
+    private function demoCoverSvg(string $bg): string
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400">'
+            .'<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+            .'<stop offset="0" stop-color="'.$bg.'"/><stop offset="1" stop-color="#0F172A"/>'
+            .'</linearGradient></defs><rect width="1200" height="400" fill="url(#g)"/>'
+            .'</svg>';
+
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 
     /**
