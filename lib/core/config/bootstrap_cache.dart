@@ -145,6 +145,10 @@ class BootstrapCache extends ChangeNotifier {
       ? tenant!.availableModes
       : modules.keys.toList(growable: false);
 
+  String? get logoUrl => config['logo_url']?.toString();
+  String? get faviconUrl => config['favicon_url']?.toString();
+  String? get drawerCoverUrl => config['drawer_cover_url']?.toString();
+
   ModuleSchema get activeModule {
     final mode = activeMode;
     return modules[mode] ??

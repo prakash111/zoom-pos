@@ -1,13 +1,16 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/config/bootstrap_cache.dart';
 import '../../../core/models/analytics_model.dart';
 import '../../../core/sdui/sdui_component_registry.dart';
 import '../../../core/widgets/dashboard_kit.dart';
 import '../../../core/widgets/dashboard_shell.dart';
 import '../../analytics/analytics_repository.dart';
+import '../../auth/auth_provider.dart';
 
 /// Windows desktop dashboard modelled on the green inventory-analytics
 /// reference: an icon rail, a "Sales Performance Overview" of tinted stat
@@ -61,10 +64,33 @@ class _DashboardLayoutScreenState extends State<DashboardLayoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AuthProvider? auth;
+    try {
+      auth = Provider.of<AuthProvider>(context);
+    } catch (_) {
+      auth = null;
+    }
+    final company = auth?.company;
+    final bootstrap = BootstrapCache.instance;
+    final logoUrl = company?.logoUrl ?? bootstrap.logoUrl;
+    final brandMark = (logoUrl != null && logoUrl.isNotEmpty)
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: CachedNetworkImage(
+              imageUrl: logoUrl,
+              width: 36,
+              height: 36,
+              fit: BoxFit.contain,
+              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          )
+        : null;
+
     return DashboardShell(
       destinations: [for (final r in _rail) r.$1],
       selectedIndex: 0,
       onSelect: _onSelect,
+      brandMark: brandMark,
       child: _analytics == null
           ? const _Overview()
           : FutureBuilder<AnalyticsModel>(

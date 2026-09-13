@@ -638,7 +638,9 @@ class CartSheet extends StatelessWidget {
     final company = context.watch<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
     final isIndia = company?.isIndia ?? false;
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.colorScheme.primary;
     final l10n = AppLocalizations.of(context);
 
     // Load active payment methods dynamically
@@ -700,7 +702,9 @@ class CartSheet extends StatelessWidget {
                   width: 44,
                   height: 5,
                   decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(3)),
                 ),
                 Padding(
@@ -753,8 +757,13 @@ class CartSheet extends StatelessWidget {
                     margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
-                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                      color: isDark
+                          ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                          : const Color(0xFFECFDF5),
+                      border: Border.all(
+                          color: isDark
+                              ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                              : const Color(0xFFA7F3D0)),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
@@ -765,7 +774,9 @@ class CartSheet extends StatelessWidget {
                                 ? Icons.handyman_outlined
                                 : Icons.medical_information_outlined,
                             size: 18,
-                            color: const Color(0xFF047857)),
+                            color: isDark
+                                ? const Color(0xFF34D399)
+                                : const Color(0xFF047857)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
@@ -777,10 +788,12 @@ class CartSheet extends StatelessWidget {
                                         fallback: 'Linked Repair Ticket')
                                     : l10n.text('attachDoctorRxDetails',
                                         fallback: 'Attach Doctor & Rx Details'),
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF065F46)),
+                                    color: isDark
+                                        ? const Color(0xFF6EE7B7)
+                                        : const Color(0xFF065F46)),
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -794,8 +807,11 @@ class CartSheet extends StatelessWidget {
                                           .isNotEmpty)
                                     'Reg. ${pos.rxDoctorRegistrationNo}',
                                 ].join('  ·  '),
-                                style: const TextStyle(
-                                    fontSize: 12, color: Color(0xFF047857)),
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? const Color(0xFF34D399)
+                                        : const Color(0xFF047857)),
                               ),
                             ],
                           ),
@@ -846,7 +862,7 @@ class CartSheet extends StatelessWidget {
                                     horizontal: 16, vertical: 8),
                                 itemCount: pos.cartItems.length,
                                 separatorBuilder: (_, __) =>
-                                    const Divider(height: 1),
+                                     Divider(height: 1, color: isDark ? const Color(0xFF334155) : null),
                                 itemBuilder: (context, index) {
                                   final item = pos.cartItems[index];
                                   return Padding(
@@ -862,9 +878,10 @@ class CartSheet extends StatelessWidget {
                                             children: [
                                               Text(
                                                 item.product.name,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                     fontWeight: FontWeight.w600,
-                                                    fontSize: 14),
+                                                    fontSize: 14,
+                                                    color: isDark ? const Color(0xFFF8FAFC) : null),
                                                 maxLines: 2,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -872,15 +889,14 @@ class CartSheet extends StatelessWidget {
                                               Text(
                                                 '${formatter.format(item.product.salePrice)} / ${item.product.unit}',
                                                 style: TextStyle(
-                                                    color: Colors.grey.shade600,
+                                                    color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
                                                     fontSize: 12),
                                               ),
                                               if (item.product.taxRate > 0)
                                                 Text(
                                                   '${isIndia ? 'GST' : 'Tax'} (${item.product.taxRate.toStringAsFixed(0)}%): +${formatter.format(item.taxAmount)}',
                                                   style: TextStyle(
-                                                      color:
-                                                          Colors.grey.shade500,
+                                                      color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500,
                                                       fontSize: 11),
                                                 ),
                                             ],
@@ -888,9 +904,17 @@ class CartSheet extends StatelessWidget {
                                         ),
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: Colors.grey.shade100,
+                                            color: isDark
+                                                ? const Color(0xFF1E293B)
+                                                : Colors.white,
                                             borderRadius:
                                                 BorderRadius.circular(20),
+                                            border: Border.all(
+                                              color: isDark
+                                                  ? const Color(0xFF334155)
+                                                  : const Color(0xFFCBD5E1),
+                                              width: 1,
+                                            ),
                                           ),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
@@ -898,6 +922,13 @@ class CartSheet extends StatelessWidget {
                                               IconButton(
                                                 icon: const Icon(Icons.remove,
                                                     size: 16),
+                                                color: item.quantity > 1
+                                                    ? (isDark
+                                                        ? const Color(0xFFF8FAFC)
+                                                        : const Color(0xFF0F172A))
+                                                    : (isDark
+                                                        ? const Color(0xFF64748B)
+                                                        : const Color(0xFF94A3B8)),
                                                 padding:
                                                     const EdgeInsets.all(4),
                                                 constraints:
@@ -919,15 +950,22 @@ class CartSheet extends StatelessWidget {
                                                                   .roundToDouble()
                                                           ? 0
                                                           : 2),
-                                                  style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 14),
+                                                  style: TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.w600,
+                                                    fontSize: 14,
+                                                    color: isDark
+                                                        ? const Color(0xFFF8FAFC)
+                                                        : const Color(0xFF0F172A),
+                                                  ),
                                                 ),
                                               ),
                                               IconButton(
                                                 icon: const Icon(Icons.add,
                                                     size: 16),
+                                                color: isDark
+                                                    ? const Color(0xFFF8FAFC)
+                                                    : const Color(0xFF0F172A),
                                                 padding:
                                                     const EdgeInsets.all(4),
                                                 constraints:
@@ -947,9 +985,10 @@ class CartSheet extends StatelessWidget {
                                           child: Text(
                                             formatter.format(item.lineTotal),
                                             textAlign: TextAlign.right,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontWeight: FontWeight.bold,
-                                                fontSize: 14),
+                                                fontSize: 14,
+                                                color: isDark ? const Color(0xFFF8FAFC) : null),
                                           ),
                                         ),
                                       ],
@@ -1072,9 +1111,13 @@ class CartSheet extends StatelessWidget {
                                   margin: const EdgeInsets.only(top: 10),
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: Colors.amber.shade50,
+                                    color: isDark
+                                        ? const Color(0xFFF59E0B).withValues(alpha: 0.12)
+                                        : Colors.amber.shade50,
                                     border: Border.all(
-                                        color: Colors.amber.shade200),
+                                        color: isDark
+                                            ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
+                                            : Colors.amber.shade200),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Column(
@@ -1159,7 +1202,9 @@ class CartSheet extends StatelessWidget {
                                   style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.grey.shade600),
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : Colors.grey.shade600),
                                 ),
                                 const SizedBox(height: 6),
                                 // A Wrap instead of a fixed-height horizontal scroller —
@@ -1389,33 +1434,45 @@ class _PaymentMethodChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return InkWell(
-      borderRadius: BorderRadius.circular(10),
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color:
-              isSelected ? color.withValues(alpha: 0.15) : Colors.grey.shade100,
+          color: isSelected
+              ? const Color(0xFF10B981).withValues(alpha: 0.15)
+              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? color : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
+            color: isSelected
+                ? const Color(0xFF10B981)
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+            width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 18, color: isSelected ? color : Colors.grey.shade700),
-            const SizedBox(width: 6),
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected
+                  ? const Color(0xFF34D399)
+                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+            ),
+            const SizedBox(width: 8),
             Text(
               method.name,
               style: TextStyle(
-                color: isSelected ? color : Colors.grey.shade800,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                fontSize: 13,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: isSelected
+                    ? const Color(0xFF34D399)
+                    : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A)),
               ),
             ),
           ],
@@ -1478,6 +1535,9 @@ class _BankDetailsBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     final rows = <String, String>{
       if ((metadata['bank_name'] ?? '').toString().isNotEmpty)
         'Bank': metadata['bank_name'].toString(),
@@ -1496,9 +1556,15 @@ class _BankDetailsBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.teal.shade50,
+        color: isDark
+            ? const Color(0xFF0D9488).withValues(alpha: 0.15)
+            : Colors.teal.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.teal.shade200),
+        border: Border.all(
+          color: isDark
+              ? const Color(0xFF0D9488).withValues(alpha: 0.3)
+              : Colors.teal.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1507,7 +1573,9 @@ class _BankDetailsBox extends StatelessWidget {
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
-                  color: Colors.teal.shade800)),
+                  color: isDark
+                      ? const Color(0xFF5EEAD4)
+                      : Colors.teal.shade800)),
           const SizedBox(height: 6),
           for (final entry in rows.entries)
             Padding(
@@ -1516,11 +1584,16 @@ class _BankDetailsBox extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(entry.key,
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.teal.shade700)),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : Colors.teal.shade700)),
                   Text(entry.value,
-                      style: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w600)),
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFFF8FAFC) : null)),
                 ],
               ),
             ),
@@ -1582,6 +1655,8 @@ class _CashTenderSectionState extends State<_CashTenderSection> {
     final pos = context.watch<PosProvider>();
     final formatter = CurrencyFormatter(widget.currencySymbol);
     final presets = _presetAmounts(widget.payableAmount);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1591,15 +1666,39 @@ class _CashTenderSectionState extends State<_CashTenderSection> {
           style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600),
+              color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600),
         ),
         const SizedBox(height: 6),
         TextField(
           controller: _controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: TextStyle(color: isDark ? const Color(0xFFF8FAFC) : null),
           decoration: InputDecoration(
             prefixText: widget.currencySymbol,
-            border: const OutlineInputBorder(),
+            prefixStyle: TextStyle(
+                color: isDark ? const Color(0xFF94A3B8) : null,
+                fontWeight: FontWeight.w600),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFCBD5E1)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFCBD5E1)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide:
+                  const BorderSide(color: Color(0xFF10B981), width: 1.5),
+            ),
+            filled: isDark,
+            fillColor: isDark ? const Color(0xFF0F172A) : null,
             isDense: true,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1608,25 +1707,41 @@ class _CashTenderSectionState extends State<_CashTenderSection> {
         ),
         const SizedBox(height: 10),
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: Colors.green.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.green.shade200),
+            color: isDark
+                ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                : const Color(0xFFECFDF5),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isDark
+                  ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                  : const Color(0xFFA7F3D0),
+              width: 1,
+            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('CHANGE DUE TO CUSTOMER',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green.shade800,
-                      fontSize: 11)),
-              Text(formatter.format(pos.changeDue),
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green.shade800,
-                      fontSize: 16)),
+              Text(
+                'CHANGE DUE TO CUSTOMER',
+                style: TextStyle(
+                  fontSize: 12,
+                  letterSpacing: 0.5,
+                  fontWeight: FontWeight.w600,
+                  color:
+                      isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46),
+                ),
+              ),
+              Text(
+                formatter.format(pos.changeDue),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color:
+                      isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                ),
+              ),
             ],
           ),
         ),
@@ -1637,6 +1752,16 @@ class _CashTenderSectionState extends State<_CashTenderSection> {
           children: [
             for (final preset in presets)
               ActionChip(
+                backgroundColor: isDark ? const Color(0xFF1E293B) : null,
+                side: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFCBD5E1),
+                ),
+                labelStyle: TextStyle(
+                  color: isDark ? const Color(0xFFF8FAFC) : null,
+                  fontWeight: FontWeight.w600,
+                ),
                 label: Text(preset == presets.first
                     ? 'Exact'
                     : formatter.format(preset)),

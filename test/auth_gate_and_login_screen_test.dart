@@ -115,6 +115,17 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
 
   @override
   Future<void> refreshSessionIfOffline() async {}
+
+  @override
+  void updateCompany(CompanyModel Function(CompanyModel current) updater) {
+    if (_company != null) {
+      _company = updater(_company!);
+      notifyListeners();
+    }
+  }
+
+  @override
+  Future<void> reloadSession() async {}
 }
 
 class FakeApiClient extends Fake implements ApiClient {

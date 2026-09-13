@@ -50,7 +50,9 @@ class SduiCartSummary extends StatelessWidget {
               _SummaryRow(
                 label: customDiscountLabel ?? 'Discount',
                 value: '-${formatter.format(discount)}',
-                textColor: Colors.green.shade700,
+                textColor: theme.brightness == Brightness.dark
+                    ? const Color(0xFF34D399)
+                    : Colors.green.shade700,
               ),
             ],
             if (tax > 0) ...[

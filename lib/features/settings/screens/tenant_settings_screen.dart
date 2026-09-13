@@ -15,6 +15,7 @@ import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../taxes/screens/taxes_screen.dart';
+import '../../auth/auth_provider.dart';
 import '../settings_repository.dart';
 import '../../../core/sdui/components/navigation_tree_builder.dart';
 import '../../../core/sdui/screens/dynamic_schema_page.dart';
@@ -312,7 +313,11 @@ class _ProfileTabState extends State<_ProfileTab> {
     try {
       final bytes = await picked.readAsBytes();
       final url = await widget.repository.uploadLogo(bytes, picked.name);
-      if (mounted) setState(() => _logoUrl = url);
+      if (mounted) {
+        setState(() => _logoUrl = url);
+        context.read<AuthProvider>().updateCompany((c) => c.copyWith(logoUrl: url));
+        context.read<AuthProvider>().reloadSession();
+      }
     } on ApiException catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context)
@@ -326,7 +331,11 @@ class _ProfileTabState extends State<_ProfileTab> {
     setState(() => _uploadingLogo = true);
     try {
       await widget.repository.removeLogo();
-      if (mounted) setState(() => _logoUrl = null);
+      if (mounted) {
+        setState(() => _logoUrl = null);
+        context.read<AuthProvider>().updateCompany((c) => c.copyWith(clearLogoUrl: true));
+        context.read<AuthProvider>().reloadSession();
+      }
     } on ApiException catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context)
@@ -345,7 +354,11 @@ class _ProfileTabState extends State<_ProfileTab> {
     try {
       final bytes = await picked.readAsBytes();
       final url = await widget.repository.uploadFavicon(bytes, picked.name);
-      if (mounted) setState(() => _faviconUrl = url);
+      if (mounted) {
+        setState(() => _faviconUrl = url);
+        context.read<AuthProvider>().updateCompany((c) => c.copyWith(faviconUrl: url));
+        context.read<AuthProvider>().reloadSession();
+      }
     } on ApiException catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context)
@@ -359,7 +372,11 @@ class _ProfileTabState extends State<_ProfileTab> {
     setState(() => _uploadingFavicon = true);
     try {
       await widget.repository.removeFavicon();
-      if (mounted) setState(() => _faviconUrl = null);
+      if (mounted) {
+        setState(() => _faviconUrl = null);
+        context.read<AuthProvider>().updateCompany((c) => c.copyWith(clearFaviconUrl: true));
+        context.read<AuthProvider>().reloadSession();
+      }
     } on ApiException catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context)
@@ -378,7 +395,11 @@ class _ProfileTabState extends State<_ProfileTab> {
     try {
       final bytes = await picked.readAsBytes();
       final url = await widget.repository.uploadDrawerCover(bytes, picked.name);
-      if (mounted) setState(() => _drawerCoverUrl = url);
+      if (mounted) {
+        setState(() => _drawerCoverUrl = url);
+        context.read<AuthProvider>().updateCompany((c) => c.copyWith(drawerCoverUrl: url));
+        context.read<AuthProvider>().reloadSession();
+      }
     } on ApiException catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context)
@@ -392,7 +413,11 @@ class _ProfileTabState extends State<_ProfileTab> {
     setState(() => _uploadingDrawerCover = true);
     try {
       await widget.repository.removeDrawerCover();
-      if (mounted) setState(() => _drawerCoverUrl = null);
+      if (mounted) {
+        setState(() => _drawerCoverUrl = null);
+        context.read<AuthProvider>().updateCompany((c) => c.copyWith(clearDrawerCoverUrl: true));
+        context.read<AuthProvider>().reloadSession();
+      }
     } on ApiException catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context)
@@ -434,6 +459,7 @@ class _ProfileTabState extends State<_ProfileTab> {
         // Keep the live theme locked to what was just persisted, so a
         // background bootstrap sync can't roll it back to the previous colour.
         context.read<ThemeProvider>().setColor(_primaryColor);
+        context.read<AuthProvider>().reloadSession();
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(AppLocalizations.of(context).profileSaved)));
       }

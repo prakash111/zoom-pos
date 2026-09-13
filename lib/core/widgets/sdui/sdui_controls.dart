@@ -92,18 +92,25 @@ class SduiStepCounter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(8),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+          width: 1,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
             icon: const Icon(Icons.remove, size: 16),
+            color: value > min
+                ? (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A))
+                : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
             onPressed: value > min ? () => onChanged(value - 1) : null,
             visualDensity: VisualDensity.compact,
             padding: const EdgeInsets.all(4),
@@ -113,11 +120,16 @@ class SduiStepCounter extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Text(
               '$value',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+              ),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.add, size: 16),
+            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
             onPressed: value < max ? () => onChanged(value + 1) : null,
             visualDensity: VisualDensity.compact,
             padding: const EdgeInsets.all(4),

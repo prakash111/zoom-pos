@@ -170,6 +170,36 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Reloads session and refreshed company/user details from the server,
+  /// updating SessionCache and BootstrapCache.
+  Future<void> reloadSession() async {
+    if (_status != AuthStatus.authenticated) return;
+    try {
+      final result = await _authRepository.session();
+      _user = result.user;
+      _applyCompany(result.company);
+      await SessionCache.instance
+          .save(user: result.user, company: result.company);
+      try {
+        await BootstrapCache.instance
+            .hydrate(forceRefresh: true, client: _apiClient);
+      } catch (_) {}
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Mutates the active company in memory immediately (e.g. after uploading a logo)
+  /// and persists it to SessionCache so changes reflect in the UI instantly.
+  void updateCompany(CompanyModel Function(CompanyModel current) updater) {
+    if (_company == null) return;
+    final updated = updater(_company!);
+    _applyCompany(updated);
+    if (_user != null) {
+      SessionCache.instance.save(user: _user, company: updated);
+    }
+    notifyListeners();
+  }
+
   /// Set when a valid email+password belongs to an account that never
   /// completed email OTP verification. The login screen reads this (on a
   /// `false` return from [login]) and pushes the verify screen instead of

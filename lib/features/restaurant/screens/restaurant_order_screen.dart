@@ -1088,6 +1088,8 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Padding(
       padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom + 20),
@@ -1196,21 +1198,55 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                       controller: _tenderedController,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                          labelText: 'Cash Tendered by Customer'),
+                      style: TextStyle(color: isDark ? const Color(0xFFF8FAFC) : null),
+                      decoration: InputDecoration(
+                        labelText: 'Cash Tendered by Customer',
+                        labelStyle: TextStyle(
+                            color: isDark ? const Color(0xFF94A3B8) : null),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFCBD5E1)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFCBD5E1)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide:
+                              const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                        ),
+                        filled: isDark,
+                        fillColor: isDark ? const Color(0xFF0F172A) : null,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
-                        color: _tenderedAmount >= widget.total
-                            ? Colors.green.shade50
-                            : Colors.orange.shade50,
-                        borderRadius: BorderRadius.circular(12),
+                        color: isDark
+                            ? (_tenderedAmount >= widget.total
+                                ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                : const Color(0xFFF59E0B).withValues(alpha: 0.12))
+                            : (_tenderedAmount >= widget.total
+                                ? const Color(0xFFECFDF5)
+                                : const Color(0xFFFFFBEB)),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                            color: _tenderedAmount >= widget.total
-                                ? Colors.green.shade200
-                                : Colors.orange.shade200),
+                            color: isDark
+                                ? (_tenderedAmount >= widget.total
+                                    ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                                    : const Color(0xFFF59E0B).withValues(alpha: 0.3))
+                                : (_tenderedAmount >= widget.total
+                                    ? const Color(0xFFA7F3D0)
+                                    : const Color(0xFFFDE68A))),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1220,11 +1256,16 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                                 ? 'CHANGE DUE TO CUSTOMER'
                                 : 'REMAINING DUE BALANCE',
                             style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _tenderedAmount >= widget.total
-                                  ? Colors.green.shade800
-                                  : Colors.orange.shade800,
-                              fontSize: 11,
+                              letterSpacing: 0.5,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? (_tenderedAmount >= widget.total
+                                      ? const Color(0xFF6EE7B7)
+                                      : const Color(0xFFFCD34D))
+                                  : (_tenderedAmount >= widget.total
+                                      ? const Color(0xFF065F46)
+                                      : const Color(0xFFB45309)),
+                              fontSize: 12,
                             ),
                           ),
                           Text(
@@ -1234,9 +1275,13 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                                     : _remainingDue),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: _tenderedAmount >= widget.total
-                                  ? Colors.green.shade800
-                                  : Colors.orange.shade800,
+                              color: isDark
+                                  ? (_tenderedAmount >= widget.total
+                                      ? const Color(0xFF34D399)
+                                      : const Color(0xFFFBBF24))
+                                  : (_tenderedAmount >= widget.total
+                                      ? const Color(0xFF059669)
+                                      : const Color(0xFFD97706)),
                               fontSize: 16,
                             ),
                           ),

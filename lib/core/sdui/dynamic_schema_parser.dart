@@ -66,6 +66,9 @@ class DynamicSchemaParser {
         return _buildIcon(context, schema);
       case 'divider':
         return _buildDivider(context, schema);
+      case 'code_snippet':
+      case 'code_block':
+        return _buildCodeSnippet(context, schema);
 
       // Forms & Inputs
       case 'text_input':
@@ -100,6 +103,14 @@ class DynamicSchemaParser {
         return _buildTableGrid(context, schema);
       case 'step_counter':
         return _buildStepCounter(context, schema);
+      case 'entity_record_card':
+        return _buildEntityRecordCard(context, schema);
+      case 'pipeline_stage_tracker':
+        return _buildPipelineStageTracker(context, schema);
+      case 'progress_bar_stat':
+        return _buildProgressBarStat(context, schema);
+      case 'segmented_filter_chips':
+        return _buildSegmentedFilterChips(context, schema);
 
       // Actions
       case 'button_primary':
@@ -109,6 +120,7 @@ class DynamicSchemaParser {
       case 'button_danger':
         return _buildButtonDanger(context, schema);
       case 'fab':
+      case 'fab_action':
         return _buildFab(context, schema);
       case 'action_sheet_trigger':
         return _buildActionSheetTrigger(context, schema);
@@ -170,18 +182,53 @@ class DynamicSchemaParser {
 
   static Widget _buildContainer(
       BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final children = _extractChildren(schema);
     final padding = _parseEdgeInsets(schema['padding']);
     final margin = _parseEdgeInsets(schema['margin']);
     final width = _parseDouble(schema['width']);
     final height = _parseDouble(schema['height']);
-    final color = schema['color'] != null
-        ? SduiIconRegistry.parseColor(schema['color'].toString())
-        : null;
+
+    Color? color;
+    final rawColor = schema['color']?.toString().trim();
+    if (rawColor != null && rawColor.isNotEmpty) {
+      if (rawColor == 'surface' || rawColor == 'card' || rawColor == 'theme.surface') {
+        color = theme.colorScheme.surface;
+      } else {
+        final parsed = SduiIconRegistry.parseColor(rawColor);
+        if (isDark &&
+            schema['force_light'] != true &&
+            ThemeData.estimateBrightnessForColor(parsed) == Brightness.light) {
+          color = theme.colorScheme.surface;
+        } else {
+          color = parsed;
+        }
+      }
+    }
+
     final borderRadius = _parseDouble(schema['border_radius']);
-    final borderColor = schema['border_color'] != null
-        ? SduiIconRegistry.parseColor(schema['border_color'].toString())
-        : null;
+
+    Color? borderColor;
+    final rawBorderColor = schema['border_color']?.toString().trim();
+    if (rawBorderColor != null && rawBorderColor.isNotEmpty) {
+      if (rawBorderColor == 'outline' ||
+          rawBorderColor == 'border' ||
+          rawBorderColor == 'theme.outlineVariant') {
+        borderColor = isDark
+            ? const Color(0xFF334155)
+            : theme.colorScheme.outlineVariant;
+      } else {
+        final parsedBorder = SduiIconRegistry.parseColor(rawBorderColor);
+        if (isDark &&
+            schema['force_light'] != true &&
+            ThemeData.estimateBrightnessForColor(parsedBorder) == Brightness.light) {
+          borderColor = const Color(0xFF334155);
+        } else {
+          borderColor = parsedBorder;
+        }
+      }
+    }
     final borderWidth = _parseDouble(schema['border_width']) ?? 1.0;
 
     return Container(
@@ -212,6 +259,7 @@ class DynamicSchemaParser {
 
   static Widget _buildCard(BuildContext context, Map<String, dynamic> schema) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final children = _extractChildren(schema);
     final padding =
         _parseEdgeInsets(schema['padding'], fallback: const EdgeInsets.all(16));
@@ -219,12 +267,46 @@ class DynamicSchemaParser {
         fallback: const EdgeInsets.only(bottom: 12));
     final elevation = _parseDouble(schema['elevation']) ?? 0.0;
     final borderRadius = _parseDouble(schema['border_radius']) ?? 12.0;
-    final color = schema['color'] != null
-        ? SduiIconRegistry.parseColor(schema['color'].toString())
-        : theme.colorScheme.surface;
-    final borderColor = schema['border_color'] != null
-        ? SduiIconRegistry.parseColor(schema['border_color'].toString())
-        : theme.colorScheme.outlineVariant.withValues(alpha: 0.5);
+
+    Color color;
+    final rawColor = schema['color']?.toString().trim();
+    if (rawColor == null ||
+        rawColor.isEmpty ||
+        rawColor == 'surface' ||
+        rawColor == 'card' ||
+        rawColor == 'theme.surface') {
+      color = theme.colorScheme.surface;
+    } else {
+      final parsed = SduiIconRegistry.parseColor(rawColor);
+      if (isDark &&
+          schema['force_light'] != true &&
+          ThemeData.estimateBrightnessForColor(parsed) == Brightness.light) {
+        color = theme.colorScheme.surface;
+      } else {
+        color = parsed;
+      }
+    }
+
+    Color borderColor;
+    final rawBorderColor = schema['border_color']?.toString().trim();
+    if (rawBorderColor == null ||
+        rawBorderColor.isEmpty ||
+        rawBorderColor == 'outline' ||
+        rawBorderColor == 'border' ||
+        rawBorderColor == 'theme.outlineVariant') {
+      borderColor = isDark
+          ? const Color(0xFF334155)
+          : theme.colorScheme.outlineVariant.withValues(alpha: 0.5);
+    } else {
+      final parsedBorder = SduiIconRegistry.parseColor(rawBorderColor);
+      if (isDark &&
+          schema['force_light'] != true &&
+          ThemeData.estimateBrightnessForColor(parsedBorder) == Brightness.light) {
+        borderColor = const Color(0xFF334155);
+      } else {
+        borderColor = parsedBorder;
+      }
+    }
 
     return Container(
       margin: margin,
@@ -471,13 +553,30 @@ class DynamicSchemaParser {
 
   static Widget _buildText(BuildContext context, Map<String, dynamic> schema) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final text = context.tr(schema['text']?.toString() ?? '');
     final styleKey = schema['style']?.toString().toLowerCase();
     final isBold = schema['bold'] == true;
     final isItalic = schema['italic'] == true;
-    final color = schema['color'] != null
+    Color? color = schema['color'] != null
         ? SduiIconRegistry.parseColor(schema['color'].toString())
         : null;
+
+    // In dark mode, ensure low-contrast muted grays are boosted to slate-400 (#94a3b8)
+    // and dark texts like #111827 are inverted to slate-50 (#f8fafc).
+    if (isDark && schema['color'] != null) {
+      final rawHex = schema['color'].toString().toLowerCase().trim();
+      if (rawHex == '#6b7280' || rawHex == '#64748b' || rawHex == '#4b5563') {
+        color = const Color(0xFF94A3B8);
+      } else if (rawHex == '#111827' ||
+          rawHex == '#1e293b' ||
+          rawHex == '#0f172a' ||
+          rawHex == '#000000' ||
+          rawHex == '#000') {
+        color = const Color(0xFFF8FAFC);
+      }
+    }
+
     final maxLines = (schema['max_lines'] as num?)?.toInt();
     final textAlign = _parseTextAlign(schema['align']);
 
@@ -528,7 +627,7 @@ class DynamicSchemaParser {
 
     final computedStyle = (baseStyle ?? const TextStyle()).copyWith(
       color: color,
-      fontWeight: isBold ? FontWeight.bold : null,
+      fontWeight: isBold ? FontWeight.w700 : null,
       fontStyle: isItalic ? FontStyle.italic : null,
     );
 
@@ -630,6 +729,79 @@ class DynamicSchemaParser {
     return Divider(height: height, thickness: thickness, color: color);
   }
 
+  static Widget _buildCodeSnippet(
+      BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final code =
+        schema['code']?.toString() ?? schema['text']?.toString() ?? '';
+    final description =
+        schema['description']?.toString() ?? schema['subtitle']?.toString();
+    final copyToast = context
+        .tr(schema['copy_toast']?.toString() ?? 'Endpoint copied to clipboard!');
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SelectableText(
+                  code,
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? const Color(0xFFF8FAFC)
+                        : const Color(0xFF0F172A),
+                  ),
+                ),
+                if (description != null && description.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    context.tr(description),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            tooltip: context.tr('Copy Endpoint'),
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: code));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(copyToast),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   // ===========================================================================
   // Forms & Inputs
   // ===========================================================================
@@ -674,10 +846,17 @@ class DynamicSchemaParser {
         ? Map<String, dynamic>.from(schema['submit_action'] as Map)
         : null;
 
-    final scheme = Theme.of(context).colorScheme;
-    final readOnlyFill = Theme.of(context).brightness == Brightness.dark
-        ? scheme.surfaceContainerHighest
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final readOnlyFill = isDark
+        ? const Color(0xFF1E293B)
         : const Color(0xFFF1F5F9);
+    final defaultInputBorderColor =
+        isDark ? const Color(0xFF334155) : scheme.outlineVariant;
+    final inputFill = isDark
+        ? (readOnly ? const Color(0xFF1E293B) : const Color(0xFF0F172A))
+        : (readOnly ? readOnlyFill : null);
 
     Widget? copyButton;
     if (copyable) {
@@ -709,12 +888,36 @@ class DynamicSchemaParser {
         textInputAction: submitAction != null ? TextInputAction.search : null,
         autovalidateMode: AutovalidateMode.onUserInteraction,
         validator: _textValidator(schema),
+        style: TextStyle(
+          color: isDark ? const Color(0xFFF8FAFC) : null,
+          fontSize: 14,
+        ),
         decoration: InputDecoration(
           labelText: label,
+          labelStyle: TextStyle(
+            color: isDark ? const Color(0xFF94A3B8) : null,
+          ),
           hintText: placeholder,
-          border: const OutlineInputBorder(),
-          filled: readOnly,
-          fillColor: readOnly ? readOnlyFill : null,
+          hintStyle: TextStyle(
+            color: isDark ? const Color(0xFF64748B) : null,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: defaultInputBorderColor),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: defaultInputBorderColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(
+              color: isDark ? const Color(0xFF10B981) : scheme.primary,
+              width: 1.5,
+            ),
+          ),
+          filled: isDark || readOnly,
+          fillColor: inputFill,
           suffixIcon: copyButton,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -734,6 +937,11 @@ class DynamicSchemaParser {
 
   static Widget _buildDropdownSelect(
       BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final defaultInputBorderColor =
+        isDark ? const Color(0xFF334155) : scheme.outlineVariant;
     final sduiContext = DynamicSchemaContext.of(context);
     final name = schema['name']?.toString() ?? '';
     final label = context.tr(schema['label']?.toString() ?? '');
@@ -772,6 +980,11 @@ class DynamicSchemaParser {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: DropdownButtonFormField<String>(
         initialValue: effectiveValue,
+        dropdownColor: isDark ? const Color(0xFF1E293B) : null,
+        style: TextStyle(
+          color: isDark ? const Color(0xFFF8FAFC) : null,
+          fontSize: 14,
+        ),
         autovalidateMode: AutovalidateMode.onUserInteraction,
         validator: (value) {
           if (_isRequired(schema) && (value == null || value.isEmpty)) {
@@ -781,7 +994,26 @@ class DynamicSchemaParser {
         },
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
+          labelStyle: TextStyle(
+            color: isDark ? const Color(0xFF94A3B8) : null,
+          ),
+          filled: isDark,
+          fillColor: isDark ? const Color(0xFF0F172A) : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: defaultInputBorderColor),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: defaultInputBorderColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(
+              color: isDark ? const Color(0xFF10B981) : scheme.primary,
+              width: 1.5,
+            ),
+          ),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         ),
@@ -1140,6 +1372,811 @@ class DynamicSchemaParser {
     );
   }
 
+  static Widget _buildEntityRecordCard(
+      BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final sduiContext = DynamicSchemaContext.of(context);
+
+    final title = context.tr(schema['title']?.toString() ??
+        schema['name']?.toString() ??
+        schema['heading']?.toString() ??
+        '');
+    final subtitle = schema['subtitle']?.toString() ??
+        schema['company']?.toString() ??
+        schema['company_name']?.toString();
+
+    // Derive avatar monogram initials if not directly supplied
+    var avatarText = schema['avatar_text']?.toString() ??
+        schema['initials']?.toString();
+    if ((avatarText == null || avatarText.isEmpty) && title.isNotEmpty) {
+      final words = title.trim().split(RegExp(r'\s+'));
+      if (words.length >= 2) {
+        avatarText = '${words[0][0]}${words[1][0]}'.toUpperCase();
+      } else if (words.isNotEmpty && words[0].isNotEmpty) {
+        avatarText = words[0].substring(0, words[0].length >= 2 ? 2 : 1).toUpperCase();
+      }
+    }
+    avatarText ??= 'L';
+
+    final avatarBg = schema['avatar_bg'] != null
+        ? SduiIconRegistry.parseColor(schema['avatar_bg'].toString())
+        : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0));
+    final avatarFg = schema['avatar_fg'] != null
+        ? SduiIconRegistry.parseColor(schema['avatar_fg'].toString())
+        : (isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E));
+
+    // Priority stripe (Red = Urgent/High, Amber = Medium, Blue = Normal/Low)
+    Color? stripeColor;
+    final rawStripe = schema['stripe_color'] ??
+        schema['priority_color'] ??
+        schema['accent_color'];
+    if (rawStripe != null && rawStripe.toString().isNotEmpty) {
+      stripeColor = SduiIconRegistry.parseColor(rawStripe.toString());
+    } else {
+      final priority = schema['priority']?.toString().toLowerCase();
+      if (priority == 'urgent' || priority == 'high') {
+        stripeColor = const Color(0xFFEF4444);
+      } else if (priority == 'medium') {
+        stripeColor = const Color(0xFFF59E0B);
+      } else if (priority == 'low' || priority == 'normal') {
+        stripeColor = const Color(0xFF3B82F6);
+      }
+    }
+
+    final badgeText = schema['badge_text']?.toString() ??
+        schema['status_text']?.toString() ??
+        schema['stage']?.toString() ??
+        schema['status']?.toString();
+    final badgeColor = schema['badge_color'] != null
+        ? SduiIconRegistry.parseColor(schema['badge_color'].toString())
+        : (schema['status_color'] != null
+            ? SduiIconRegistry.parseColor(schema['status_color'].toString())
+            : const Color(0xFF2DD4BF));
+
+    final amountText = schema['amount_text']?.toString() ??
+        schema['amount']?.toString() ??
+        schema['value']?.toString();
+
+    final phone = schema['phone']?.toString();
+    final email = schema['email']?.toString();
+
+    final rawMeta = schema['meta_items'] as List<dynamic>? ??
+        schema['tags'] as List<dynamic>? ??
+        const [];
+
+    final note = schema['note']?.toString() ?? schema['description']?.toString();
+
+    final rawActions = schema['actions'] as List<dynamic>? ??
+        schema['buttons'] as List<dynamic>? ??
+        schema['footer_actions'] as List<dynamic>? ??
+        const [];
+
+    final cardAction = schema['action'] as Map<String, dynamic>? ??
+        schema['on_click'] as Map<String, dynamic>?;
+
+    final cardRadius = _parseDouble(schema['border_radius']) ?? 16.0;
+    final cardBg = schema['background_color'] != null
+        ? SduiIconRegistry.parseColor(schema['background_color'].toString())
+        : (isDark ? const Color(0xFF161F30) : theme.colorScheme.surface);
+    final cardBorder = schema['border_color'] != null
+        ? SduiIconRegistry.parseColor(schema['border_color'].toString())
+        : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0));
+
+    final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return Container(
+      margin: _parseEdgeInsets(schema['margin'],
+          fallback: const EdgeInsets.symmetric(vertical: 6)),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(cardRadius),
+        border: Border.all(color: cardBorder, width: 1.0),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (stripeColor != null)
+              Container(
+                width: 4.0,
+                color: stripeColor,
+              ),
+            Expanded(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: cardAction != null
+                      ? () => sduiContext?.dispatchAction(cardAction)
+                      : null,
+                  child: Padding(
+                    padding: _parseEdgeInsets(schema['padding'],
+                        fallback: const EdgeInsets.all(14)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header row: Avatar + Name/Company + Badge/Amount
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: avatarBg,
+                              child: Text(
+                                avatarText,
+                                style: TextStyle(
+                                  color: avatarFg,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                      color: isDark
+                                          ? const Color(0xFFF8FAFC)
+                                          : const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  if (subtitle != null && subtitle.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      context.tr(subtitle),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: mutedColor,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                if (badgeText != null && badgeText.isNotEmpty)
+                                  SduiStatusBadge(
+                                    label: context.tr(badgeText),
+                                    color: badgeColor,
+                                    isSolid: schema['badge_style'] == 'solid',
+                                  ),
+                                if (amountText != null && amountText.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    amountText,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark
+                                          ? const Color(0xFF2DD4BF)
+                                          : const Color(0xFF0F766E),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+
+                        // Contact items & Meta row
+                        if ((phone != null && phone.isNotEmpty) ||
+                            (email != null && email.isNotEmpty) ||
+                            rawMeta.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (phone != null && phone.isNotEmpty)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.phone_outlined,
+                                        size: 13, color: mutedColor),
+                                    const SizedBox(width: 4),
+                                    Text(phone,
+                                        style: TextStyle(
+                                            fontSize: 12, color: mutedColor)),
+                                  ],
+                                ),
+                              if (email != null && email.isNotEmpty)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.email_outlined,
+                                        size: 13, color: mutedColor),
+                                    const SizedBox(width: 4),
+                                    Text(email,
+                                        style: TextStyle(
+                                            fontSize: 12, color: mutedColor)),
+                                  ],
+                                ),
+                              for (final m in rawMeta)
+                                if (m is Map)
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (m['icon'] != null) ...[
+                                        Icon(
+                                          SduiIconRegistry.resolve(
+                                              m['icon'].toString()),
+                                          size: 13,
+                                          color: mutedColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                      ],
+                                      Text(
+                                        context.tr((m['text'] ??
+                                                m['label'] ??
+                                                m['value'])
+                                            ?.toString() ??
+                                            ''),
+                                        style: TextStyle(
+                                            fontSize: 12, color: mutedColor),
+                                      ),
+                                    ],
+                                  )
+                                else if (m != null)
+                                  Text(
+                                    context.tr(m.toString()),
+                                    style: TextStyle(
+                                        fontSize: 12, color: mutedColor),
+                                  ),
+                            ],
+                          ),
+                        ],
+
+                        // Note / callout snippet
+                        if (note != null && note.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF0B0F19)
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.notes_outlined,
+                                    size: 14, color: mutedColor),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    note,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 12, color: mutedColor),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // Arbitrary nested children if defined
+                        if (schema['children'] is List) ...[
+                          const SizedBox(height: 8),
+                          ...buildChildren(context, schema['children']),
+                        ],
+
+                        // Footer Action Buttons
+                        if (rawActions.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              for (var i = 0; i < rawActions.length; i++) ...[
+                                if (i > 0) const SizedBox(width: 8),
+                                Expanded(
+                                  child: _buildRecordCardAction(
+                                    context,
+                                    rawActions[i],
+                                    isDark,
+                                    sduiContext,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildRecordCardAction(
+    BuildContext context,
+    dynamic rawAction,
+    bool isDark,
+    DynamicSchemaContext? sduiContext,
+  ) {
+    if (rawAction is! Map) {
+      return const SizedBox.shrink();
+    }
+    final actMap = Map<String, dynamic>.from(rawAction);
+
+    // If it is a full SDUI component schema with 'type'
+    if (actMap.containsKey('type')) {
+      return buildComponent(context, actMap);
+    }
+
+    final label = context.tr(actMap['label']?.toString() ?? 'Action');
+    final iconName = actMap['icon']?.toString();
+    final action = actMap['action'] as Map<String, dynamic>? ?? const {};
+    final isOutlined = actMap['variant'] == 'outlined' ||
+        actMap['outlined'] == true ||
+        actMap['style'] == 'outlined';
+
+    if (isOutlined) {
+      final borderColor = isDark
+          ? const Color(0xFF334155)
+          : const Color(0xFFCBD5E1);
+      final textColor = isDark
+          ? const Color(0xFFF8FAFC)
+          : const Color(0xFF0F172A);
+
+      return OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          side: BorderSide(color: borderColor),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          foregroundColor: textColor,
+        ),
+        onPressed: () => sduiContext?.dispatchAction(action),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (iconName != null) ...[
+              Icon(SduiIconRegistry.resolve(iconName), size: 14, color: textColor),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Filled primary button (Mint / Emerald accent)
+    final btnBg = actMap['color'] != null
+        ? SduiIconRegistry.parseColor(actMap['color'].toString())
+        : (isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E));
+    final btnFg = isDark ? const Color(0xFF0F172A) : Colors.white;
+
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        elevation: 0,
+        backgroundColor: btnBg,
+        foregroundColor: btnFg,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      onPressed: () => sduiContext?.dispatchAction(action),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (iconName != null) ...[
+            Icon(SduiIconRegistry.resolve(iconName), size: 14, color: btnFg),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: btnFg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildPipelineStageTracker(
+      BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final sduiContext = DynamicSchemaContext.of(context);
+
+    final rawStages = schema['stages'] as List<dynamic>? ?? const [
+      'New', 'Contacted', 'Qualified', 'Proposal', 'Won'
+    ];
+    if (rawStages.isEmpty) return const SizedBox.shrink();
+
+    final stageItems = <Map<String, dynamic>>[];
+    for (final s in rawStages) {
+      if (s is Map<String, dynamic>) {
+        stageItems.add(s);
+      } else if (s is Map) {
+        stageItems.add(Map<String, dynamic>.from(s));
+      } else {
+        stageItems.add({'label': s.toString(), 'key': s.toString().toLowerCase()});
+      }
+    }
+
+    final currentStageRaw = schema['current_stage']?.toString().toLowerCase() ??
+        schema['active_stage']?.toString().toLowerCase() ??
+        '';
+    int currentIndex = -1;
+    if (schema['current_step'] is num) {
+      currentIndex = (schema['current_step'] as num).toInt();
+    } else {
+      for (var i = 0; i < stageItems.length; i++) {
+        final key = (stageItems[i]['key'] ?? stageItems[i]['label'])
+            ?.toString()
+            .toLowerCase();
+        final label = stageItems[i]['label']?.toString().toLowerCase();
+        if (key == currentStageRaw || label == currentStageRaw) {
+          currentIndex = i;
+          break;
+        }
+      }
+    }
+    if (currentIndex < 0) currentIndex = 0;
+
+    final activeColor = schema['active_color'] != null
+        ? SduiIconRegistry.parseColor(schema['active_color'].toString())
+        : const Color(0xFF2DD4BF); // Mint teal
+    final completedColor = schema['completed_color'] != null
+        ? SduiIconRegistry.parseColor(schema['completed_color'].toString())
+        : const Color(0xFF10B981); // Emerald
+    final inactiveColor = schema['inactive_color'] != null
+        ? SduiIconRegistry.parseColor(schema['inactive_color'].toString())
+        : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1));
+
+    final margin = _parseEdgeInsets(schema['margin'],
+        fallback: const EdgeInsets.symmetric(vertical: 8));
+
+    return Container(
+      margin: margin,
+      padding: _parseEdgeInsets(schema['padding'],
+          fallback: const EdgeInsets.symmetric(vertical: 10, horizontal: 8)),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            for (var i = 0; i < stageItems.length; i++) ...[
+              if (i > 0)
+                Container(
+                  width: 20,
+                  height: 2,
+                  color: i <= currentIndex ? completedColor : inactiveColor,
+                ),
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: stageItems[i]['action'] != null
+                    ? () => sduiContext?.dispatchAction(
+                        Map<String, dynamic>.from(stageItems[i]['action'] as Map))
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Node
+                      if (i < currentIndex)
+                        Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: completedColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.check, size: 12, color: Colors.white),
+                        )
+                      else if (i == currentIndex)
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: activeColor.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: activeColor, width: 2),
+                          ),
+                          child: Center(
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: activeColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: Colors.transparent,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: inactiveColor, width: 1.5),
+                          ),
+                        ),
+                      const SizedBox(height: 6),
+                      // Label
+                      Text(
+                        context.tr(stageItems[i]['label']?.toString() ?? ''),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: i == currentIndex
+                              ? FontWeight.w700
+                              : (i < currentIndex ? FontWeight.w600 : FontWeight.normal),
+                          color: i == currentIndex
+                              ? activeColor
+                              : (i < currentIndex
+                                  ? (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A))
+                                  : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8))),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildProgressBarStat(
+      BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final label = context.tr(schema['label']?.toString() ?? '');
+    final count = schema['count']?.toString() ?? schema['count_text']?.toString();
+    final value = schema['value']?.toString() ??
+        schema['value_text']?.toString() ??
+        schema['amount']?.toString();
+
+    double progress = 0.0;
+    if (schema['progress'] is num) {
+      progress = (schema['progress'] as num).toDouble();
+    } else if (schema['percentage'] is num) {
+      progress = (schema['percentage'] as num).toDouble();
+    }
+    if (progress > 1.0) {
+      progress = progress / 100.0;
+    }
+    progress = progress.clamp(0.0, 1.0);
+
+    final barColor = schema['bar_color'] != null
+        ? SduiIconRegistry.parseColor(schema['bar_color'].toString())
+        : (schema['color'] != null
+            ? SduiIconRegistry.parseColor(schema['color'].toString())
+            : const Color(0xFF2DD4BF));
+
+    final trackColor = schema['track_color'] != null
+        ? SduiIconRegistry.parseColor(schema['track_color'].toString())
+        : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0));
+
+    final subtitle = schema['subtitle']?.toString();
+    final margin = _parseEdgeInsets(schema['margin'],
+        fallback: const EdgeInsets.symmetric(vertical: 6));
+
+    return Container(
+      margin: margin,
+      padding: _parseEdgeInsets(schema['padding'],
+          fallback: const EdgeInsets.symmetric(vertical: 4)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                ),
+              ),
+              if (count != null && count.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    count,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              ],
+              const Spacer(),
+              if (value != null && value.isNotEmpty)
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 7,
+              backgroundColor: trackColor,
+              valueColor: AlwaysStoppedAnimation<Color>(barColor),
+            ),
+          ),
+          if (subtitle != null && subtitle.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              context.tr(subtitle),
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildSegmentedFilterChips(
+      BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final sduiContext = DynamicSchemaContext.of(context);
+
+    final rawChips = schema['chips'] as List<dynamic>? ??
+        schema['options'] as List<dynamic>? ??
+        schema['items'] as List<dynamic>? ??
+        const [];
+    if (rawChips.isEmpty) return const SizedBox.shrink();
+
+    final selectedId = schema['selected_id']?.toString() ??
+        schema['selected_value']?.toString() ??
+        schema['active_id']?.toString();
+
+    final activeColor = schema['active_color'] != null
+        ? SduiIconRegistry.parseColor(schema['active_color'].toString())
+        : const Color(0xFF2DD4BF);
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      padding: _parseEdgeInsets(schema['padding'],
+          fallback: const EdgeInsets.symmetric(horizontal: 4, vertical: 8)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < rawChips.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            _buildSingleFilterChip(
+              context: context,
+              chip: rawChips[i] is Map
+                  ? Map<String, dynamic>.from(rawChips[i] as Map)
+                  : {'label': rawChips[i].toString()},
+              selectedId: selectedId,
+              activeColor: activeColor,
+              isDark: isDark,
+              sduiContext: sduiContext,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildSingleFilterChip({
+    required BuildContext context,
+    required Map<String, dynamic> chip,
+    required String? selectedId,
+    required Color activeColor,
+    required bool isDark,
+    required DynamicSchemaContext? sduiContext,
+  }) {
+    final chipId = chip['id']?.toString() ?? chip['value']?.toString();
+    final isSelected = chip['selected'] == true ||
+        chip['is_selected'] == true ||
+        (selectedId != null && chipId == selectedId);
+
+    final rawLabel = context.tr(chip['label']?.toString() ?? '');
+    final count = chip['count']?.toString();
+    final text = (count != null && count.isNotEmpty)
+        ? '$rawLabel · $count'
+        : rawLabel;
+
+    final action = chip['action'] as Map<String, dynamic>?;
+
+    final bg = isSelected
+        ? (isDark
+            ? activeColor.withValues(alpha: 0.15)
+            : activeColor.withValues(alpha: 0.1))
+        : (isDark ? const Color(0xFF161F30) : Colors.white);
+
+    final border = isSelected
+        ? activeColor
+        : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+
+    final textColor = isSelected
+        ? (isDark ? activeColor : const Color(0xFF0F766E))
+        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B));
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: action != null ? () => sduiContext?.dispatchAction(action) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: border, width: isSelected ? 1.5 : 1.0),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: textColor,
+          ),
+        ),
+      ),
+    );
+  }
+
   // ===========================================================================
   // Actions
   // ===========================================================================
@@ -1241,13 +2278,16 @@ class DynamicSchemaParser {
             schema['expanded'] != true &&
             !isDense);
     final enabled = schema['enabled'] != false;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final defaultGreen = isDark ? const Color(0xFF10B981) : _outlinedButtonGreen;
     final accent = schema['color'] != null
         ? SduiIconRegistry.parseColor(schema['color'].toString(),
-            fallback: _outlinedButtonGreen)
+            fallback: defaultGreen)
         : (schema['border_color'] != null
             ? SduiIconRegistry.parseColor(schema['border_color'].toString(),
-                fallback: _outlinedButtonGreen)
-            : _outlinedButtonGreen);
+                fallback: defaultGreen)
+            : defaultGreen);
     final radius = _parseDouble(schema['border_radius']) ?? 10.0;
     final iconSize =
         _parseDouble(schema['icon_size']) ?? (isDense ? 16.0 : 20.0);
@@ -1271,25 +2311,58 @@ class DynamicSchemaParser {
 
     final buttonStyle = OutlinedButton.styleFrom(
       foregroundColor: accent,
-      side: BorderSide(color: accent.withValues(alpha: 0.6)),
+      side: BorderSide(
+        color: isDark ? accent : accent.withValues(alpha: 0.6),
+        width: 1.2,
+      ),
       padding: btnPadding,
       visualDensity: isDense ? VisualDensity.compact : VisualDensity.standard,
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
     );
 
+    Future<void> handlePress() async {
+      final confirmMessage = action['confirm_message']?.toString() ??
+          schema['confirm_message']?.toString();
+      if (confirmMessage != null && confirmMessage.isNotEmpty) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogCtx) => AlertDialog(
+            title: Text(context.tr(action['confirm_title']?.toString() ??
+                schema['confirm_title']?.toString() ??
+                'Confirm Action')),
+            content: Text(context.tr(confirmMessage)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(false),
+                child: Text(context.tr('Cancel')),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: accent,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => Navigator.of(dialogCtx).pop(true),
+                child: Text(context.tr('Proceed')),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+      }
+      sduiContext?.dispatchAction(action);
+    }
+
     Widget btn = (iconName != null && iconName.isNotEmpty)
         ? OutlinedButton.icon(
             icon: Icon(SduiIconRegistry.resolve(iconName), size: iconSize),
             label: labelWidget,
             style: buttonStyle,
-            onPressed:
-                enabled ? () => sduiContext?.dispatchAction(action) : null,
+            onPressed: enabled ? handlePress : null,
           )
         : OutlinedButton(
             style: buttonStyle,
-            onPressed:
-                enabled ? () => sduiContext?.dispatchAction(action) : null,
+            onPressed: enabled ? handlePress : null,
             child: labelWidget,
           );
 
@@ -1406,16 +2479,29 @@ class DynamicSchemaParser {
     final label =
         schema['label'] == null ? null : context.tr(schema['label'].toString());
     final action = schema['action'] as Map<String, dynamic>? ?? const {};
+    final bgColor = schema['background_color'] != null
+        ? SduiIconRegistry.parseColor(schema['background_color'].toString())
+        : const Color(0xFF2DD4BF);
+    final fgColor = schema['foreground_color'] != null
+        ? SduiIconRegistry.parseColor(schema['foreground_color'].toString())
+        : const Color(0xFF0F172A);
 
     if (label != null && label.isNotEmpty) {
       return FloatingActionButton.extended(
+        backgroundColor: bgColor,
+        foregroundColor: fgColor,
         onPressed: () => sduiContext?.dispatchAction(action),
         icon: Icon(SduiIconRegistry.resolve(iconName)),
-        label: Text(label),
+        label: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
       );
     }
 
     return FloatingActionButton(
+      backgroundColor: bgColor,
+      foregroundColor: fgColor,
       onPressed: () => sduiContext?.dispatchAction(action),
       child: Icon(SduiIconRegistry.resolve(iconName)),
     );
@@ -3477,6 +4563,8 @@ class _CashTenderedFieldState extends State<_CashTenderedField> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final label = context
         .tr(widget.schema['label']?.toString() ?? 'Cash Tendered by Customer');
     final chips =
@@ -3490,10 +4578,34 @@ class _CashTenderedFieldState extends State<_CashTenderedField> {
           child: TextField(
             controller: _controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: TextStyle(color: isDark ? const Color(0xFFF8FAFC) : null),
             decoration: InputDecoration(
               labelText: label,
-              prefixIcon: const Icon(Icons.payments_outlined),
-              border: const OutlineInputBorder(),
+              labelStyle: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : null),
+              prefixIcon: Icon(Icons.payments_outlined,
+                  color: isDark ? const Color(0xFF94A3B8) : null),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFCBD5E1)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFCBD5E1)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    const BorderSide(color: Color(0xFF10B981), width: 1.5),
+              ),
+              filled: isDark,
+              fillColor: isDark ? const Color(0xFF0F172A) : null,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             ),
@@ -3502,39 +4614,54 @@ class _CashTenderedFieldState extends State<_CashTenderedField> {
         ),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFECFDF5),
-            border: Border.all(color: const Color(0xFF86EFAC)),
+            color: isDark
+                ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                : const Color(0xFFECFDF5),
+            border: Border.all(
+              color: isDark
+                  ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                  : const Color(0xFFA7F3D0),
+            ),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'CHANGE DUE TO CUSTOMER',
                       style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          color: Color(0xFF166534)),
+                          letterSpacing: 0.5,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          color: isDark
+                              ? const Color(0xFF6EE7B7)
+                              : const Color(0xFF065F46)),
                     ),
                     Text(
                       'Change Due to Customer',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF15803D)),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF15803D)),
                     ),
                   ],
                 ),
               ),
               Text(
                 '$_currency${_changeDue.toStringAsFixed(2)}',
-                style: const TextStyle(
+                style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                    color: Color(0xFF166534)),
+                    fontSize: 20,
+                    color: isDark
+                        ? const Color(0xFF34D399)
+                        : const Color(0xFF059669)),
               ),
             ],
           ),

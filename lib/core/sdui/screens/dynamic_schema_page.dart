@@ -294,7 +294,10 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
     }
 
     final showBackButton = appBarConfig?['show_back_button'] != false;
-    final fabConfig = _schema?['fab'] as Map<String, dynamic>?;
+    final rawFab = _schema?['fab'] ??
+        _schema?['floating_action_button'] ??
+        _schema?['fab_action'];
+    final fabConfig = rawFab is Map ? Map<String, dynamic>.from(rawFab) : null;
 
     return DynamicSchemaContext(
       formValues: _formValues,

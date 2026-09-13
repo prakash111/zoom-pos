@@ -17,6 +17,8 @@ class CompanyModel {
     this.posMode = 'general',
     this.restaurantModeLocked = false,
     this.drawerCoverUrl,
+    this.logoUrl,
+    this.faviconUrl,
     this.timezone = 'UTC',
   });
 
@@ -39,6 +41,8 @@ class CompanyModel {
       posMode: json['pos_mode']?.toString() ?? 'general',
       restaurantModeLocked: json['restaurant_mode_locked'] as bool? ?? false,
       drawerCoverUrl: json['drawer_cover_url']?.toString(),
+      logoUrl: (json['logo_url'] ?? json['logo'])?.toString(),
+      faviconUrl: (json['favicon_url'] ?? json['favicon'])?.toString(),
       // Always the *resolved* zone (Company::resolveTimezone() server-side)
       // — a manual override if the store set one, else a default derived
       // from `country`. Never empty.
@@ -63,7 +67,58 @@ class CompanyModel {
   final String posMode;
   final bool restaurantModeLocked;
   final String? drawerCoverUrl;
+  final String? logoUrl;
+  final String? faviconUrl;
   final String timezone;
+
+  CompanyModel copyWith({
+    String? id,
+    String? name,
+    String? tradeName,
+    String? currency,
+    String? currencySymbol,
+    String? planName,
+    String? country,
+    String? taxId,
+    String? address,
+    String? city,
+    String? state,
+    String? postalCode,
+    String? phone,
+    String? email,
+    String? posMode,
+    bool? restaurantModeLocked,
+    String? drawerCoverUrl,
+    bool clearDrawerCoverUrl = false,
+    String? logoUrl,
+    bool clearLogoUrl = false,
+    String? faviconUrl,
+    bool clearFaviconUrl = false,
+    String? timezone,
+  }) {
+    return CompanyModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      tradeName: tradeName ?? this.tradeName,
+      currency: currency ?? this.currency,
+      currencySymbol: currencySymbol ?? this.currencySymbol,
+      planName: planName ?? this.planName,
+      country: country ?? this.country,
+      taxId: taxId ?? this.taxId,
+      address: address ?? this.address,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      postalCode: postalCode ?? this.postalCode,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      posMode: posMode ?? this.posMode,
+      restaurantModeLocked: restaurantModeLocked ?? this.restaurantModeLocked,
+      drawerCoverUrl: clearDrawerCoverUrl ? null : (drawerCoverUrl ?? this.drawerCoverUrl),
+      logoUrl: clearLogoUrl ? null : (logoUrl ?? this.logoUrl),
+      faviconUrl: clearFaviconUrl ? null : (faviconUrl ?? this.faviconUrl),
+      timezone: timezone ?? this.timezone,
+    );
+  }
 
   /// Snake-case shape [fromJson] round-trips — used to cache the signed-in
   /// company for offline session restore (see SessionCache).
@@ -85,6 +140,8 @@ class CompanyModel {
         'pos_mode': posMode,
         'restaurant_mode_locked': restaurantModeLocked,
         'drawer_cover_url': drawerCoverUrl,
+        'logo_url': logoUrl,
+        'favicon_url': faviconUrl,
         'timezone': timezone,
       };
 

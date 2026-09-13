@@ -542,7 +542,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final l10n = AppLocalizations.of(context);
 
         final tp = context.watch<ThemeProvider>();
-        final coverUrl = company?.drawerCoverUrl;
+        final coverUrl = company?.drawerCoverUrl ?? bootstrap.drawerCoverUrl;
+        final logoUrl = company?.logoUrl ?? bootstrap.logoUrl;
         final hasCover = coverUrl != null && coverUrl.isNotEmpty;
         final primaryColor = tp.activeLinkColor ??
             bootstrap.theme.primaryColorValue ??
@@ -614,6 +615,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (logoUrl != null && logoUrl.isNotEmpty) ...[
+                  Container(
+                    width: 50,
+                    height: 50,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.18),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: CachedNetworkImage(
+                        imageUrl: logoUrl,
+                        fit: BoxFit.contain,
+                        placeholder: (_, __) => const SizedBox.shrink(),
+                        errorWidget: (_, __, ___) => const Icon(
+                          Icons.storefront,
+                          color: Colors.grey,
+                          size: 26,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 Text(
                   company?.tradeName ?? company?.name ?? 'Sales & Inventory',
                   style: const TextStyle(
@@ -1180,7 +1213,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: Text(company?.tradeName ?? company?.name ?? 'Sales & Inventory'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if ((company?.logoUrl ?? BootstrapCache.instance.logoUrl) != null &&
+                (company?.logoUrl ?? BootstrapCache.instance.logoUrl)!.isNotEmpty) ...[
+              Container(
+                width: 32,
+                height: 32,
+                margin: const EdgeInsets.only(right: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                padding: const EdgeInsets.all(2),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: CachedNetworkImage(
+                    imageUrl: (company?.logoUrl ?? BootstrapCache.instance.logoUrl)!,
+                    fit: BoxFit.contain,
+                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            ],
+            Flexible(
+              child: Text(
+                company?.tradeName ?? company?.name ?? 'Sales & Inventory',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         elevation: 0,
         bottom: appBarBottom,
         actions: [
@@ -1200,6 +1264,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               setState(() {
                 _analyticsFuture = _loadAnalytics();
               });
+              context.read<AuthProvider>().reloadSession();
               context.read<LocaleProvider>().refreshFromServer();
             },
           ),
