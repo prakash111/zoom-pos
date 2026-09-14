@@ -132,9 +132,16 @@ class TenantNavRegistry
                 // Lead Management is a separate vertical module (lead_ops) and must NEVER be mixed inside core cashier/sales or other sections
                 if ($currentSecKey !== 'lead_ops' && (
                     $key === 'lead_management'
+                    || $key === 'leads'
+                    || str_starts_with($key, 'lead_')
                     || $component === 'lead_management'
+                    || $component === 'leads'
+                    || str_starts_with($component, 'lead_')
                     || $target === '/api/tenant/views/leads'
+                    || $target === '/tenant/views/leads'
                     || str_starts_with($target, '/api/tenant/lead-module')
+                    || str_contains($key, 'lead')
+                    || str_contains($title, 'lead')
                 )) {
                     continue;
                 }
@@ -627,12 +634,20 @@ class TenantNavRegistry
             if ($secKey === 'cashier_sales') {
                 $flattened = [];
                 foreach ($decoratedItems as $it) {
+                    $itKey = strtolower((string) ($it['key'] ?? ''));
+                    if ($itKey === 'lead_management' || $itKey === 'leads' || str_starts_with($itKey, 'lead_') || str_contains($itKey, 'lead')) {
+                        continue;
+                    }
                     if (($it['key'] ?? '') === 'pos' && ! empty($it['children'])) {
                         $children = $it['children'];
                         $it['children'] = [];
                         $it['type'] = 'link';
                         $flattened[] = $it;
                         foreach ($children as $ch) {
+                            $chKey = strtolower((string) ($ch['key'] ?? ''));
+                            if ($chKey === 'lead_management' || $chKey === 'leads' || str_starts_with($chKey, 'lead_') || str_contains($chKey, 'lead')) {
+                                continue;
+                            }
                             $ch['parent'] = null;
                             $ch['parent_id'] = null;
                             $ch['level'] = 0;

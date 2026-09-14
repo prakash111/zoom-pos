@@ -1,13 +1,3 @@
-{{-- Tenant Cashier & Sales Drawer Item Partial for Lead Management --}}
-@if ($canLeads ?? false)
-    <x-nav.drawer-item 
-        item-key="lead_management" 
-        :route="route('tenant.leads.index')" 
-        title="{{ __('Lead Management') }}" 
-        subtitle="{{ __('Pipeline, follow-ups & auto-sync CRM') }}">
-        🎯
-    </x-nav.drawer-item>
-@endif
 
 @if (auth()->check())
 <div class="mt-auto border-t border-slate-200 dark:border-slate-800 p-3 flex items-center justify-between">
