@@ -62,13 +62,16 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       setState(() {
-        final typeIndex = prefs.getInt(ThermalPrinterService.connectionTypePrefKey) ?? 0;
-        _selectedType = PrinterConnectionType
-            .values[typeIndex.clamp(0, PrinterConnectionType.values.length - 1)];
-        _paperSize = prefs.getString(ThermalPrinterService.paperSizePrefKey) ?? '58mm';
+        final typeIndex =
+            prefs.getInt(ThermalPrinterService.connectionTypePrefKey) ?? 0;
+        _selectedType = PrinterConnectionType.values[
+            typeIndex.clamp(0, PrinterConnectionType.values.length - 1)];
+        _paperSize =
+            prefs.getString(ThermalPrinterService.paperSizePrefKey) ?? '58mm';
         _connectedDeviceName = prefs.getString('printer_name');
         _connectedDeviceAddress = prefs.getString('printer_address');
-        _ipController.text = prefs.getString(ThermalPrinterService.networkIpPrefKey) ?? '';
+        _ipController.text =
+            prefs.getString(ThermalPrinterService.networkIpPrefKey) ?? '';
         _portController.text =
             prefs.getString(ThermalPrinterService.networkPortPrefKey) ?? '9100';
       });
@@ -82,8 +85,7 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(
           ThermalPrinterService.connectionTypePrefKey, _selectedType.index);
-      await prefs.setString(
-          ThermalPrinterService.paperSizePrefKey, _paperSize);
+      await prefs.setString(ThermalPrinterService.paperSizePrefKey, _paperSize);
       if (name != null) await prefs.setString('printer_name', name);
       if (address != null) await prefs.setString('printer_address', address);
       if (_selectedType == PrinterConnectionType.network) {
@@ -125,6 +127,11 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
     if (!_isMobile) return;
     setState(() => _isScanning = true);
     try {
+      if (!await ThermalPrinterService.requestBluetoothPermission()) {
+        _toast('Nearby devices permission is required for Bluetooth printers.',
+            ok: false);
+        return;
+      }
       if (!await _service.bluetoothEnabled) {
         if (mounted) setState(() => _btDevices = []);
         _toast('Turn on Bluetooth in your device settings, then re-scan.',

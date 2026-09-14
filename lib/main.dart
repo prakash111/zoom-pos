@@ -17,6 +17,7 @@ import 'core/services/desktop/window_close_guard.dart';
 import 'core/services/dynamic_string_service.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/sync/sync_engine.dart';
+import 'core/services/thermal/thermal_printer_service.dart';
 import 'core/storage/app_database.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/storage/secure_storage_service.dart';
@@ -116,6 +117,13 @@ Future<void> main() async {
     platformBranding: platformBranding,
     syncEngine: syncEngine,
   ));
+
+  // Android cannot grant Bluetooth access silently at install time. Ask on
+  // the first rendered frame instead, so the user sees the system prompt once
+  // during onboarding rather than repeatedly inside Printer Setup.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(ThermalPrinterService.requestBluetoothPermission());
+  });
 }
 
 class ZoomPosApp extends StatelessWidget {

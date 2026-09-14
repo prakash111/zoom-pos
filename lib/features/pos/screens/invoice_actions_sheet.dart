@@ -147,15 +147,43 @@ class _InvoiceActionsSheetContentState
               ? 'sale'
               : 'invoice';
       final documentId = Uri.encodeComponent(widget.data.documentId);
-      final endpoint =
-          '/api/v1/tenant/documents/$normalizedType/$documentId/preview-modal';
-      final response = await widget.apiClient.requestAbsolute(
-        endpoint,
-        method: 'GET',
-      );
-      final rawSchema = response['schema'] is Map
-          ? Map<String, dynamic>.from(response['schema'] as Map)
-          : response;
+      // The actions-sheet endpoint is the stable SDUI contract for document
+      // dispatch. Keep preview-modal as a compatibility fallback because
+      // older deployments may only expose the multi-format preview route.
+      final legacyActionsPath = normalizedType == 'quotation'
+          ? '/api/v1/tenant/quotations/$documentId/actions-sheet'
+          : '/api/v1/tenant/invoices/$documentId/actions-sheet';
+      final endpoints = [
+        // These are the established invoice/quotation SDUI routes used by
+        // existing tenants and older server deployments.
+        legacyActionsPath,
+        // Generic document routes support newly-added document types.
+        '/api/v1/tenant/documents/$normalizedType/$documentId/actions-sheet',
+        '/api/v1/tenant/documents/$normalizedType/$documentId/preview-modal',
+      ];
+      Map<String, dynamic>? rawSchema;
+      Object? lastError;
+      for (final endpoint in endpoints) {
+        try {
+          final response = await widget.apiClient.requestAbsolute(
+            endpoint,
+            method: 'GET',
+          );
+          final candidate = response['schema'] is Map
+              ? Map<String, dynamic>.from(response['schema'] as Map)
+              : response;
+          if (candidate['components'] is List) {
+            rawSchema = candidate;
+            break;
+          }
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (rawSchema == null) {
+        throw lastError ?? const FormatException('No SDUI actions returned.');
+      }
+
       final rawComponents = rawSchema['components'];
       final channels = <Map<String, dynamic>>[];
 
@@ -165,18 +193,11 @@ class _InvoiceActionsSheetContentState
           final component = Map<String, dynamic>.from(raw);
           if (component['type']?.toString() != 'list_tile') continue;
 
-          final action = component['action'];
-          final actionMap =
-              action is Map ? Map<String, dynamic>.from(action) : const {};
           final channel = component['channel']?.toString().trim() ?? '';
-          final endpoint = actionMap['endpoint']?.toString() ?? '';
-          final actionType = (actionMap['type'] ?? component['action_type'])
-              ?.toString()
-              .toUpperCase();
-
-          if (channel.isNotEmpty ||
-              endpoint.contains('/dispatch/') ||
-              actionType == 'OPEN_URL') {
+          // Preview/print rows are rendered by this native sheet above. Only
+          // keep registry rows here; this makes all future server channels
+          // appear once without duplicating standard document utilities.
+          if (channel.isNotEmpty) {
             channels.add(component);
           }
         }

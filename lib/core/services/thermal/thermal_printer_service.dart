@@ -6,7 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// A line item on a printed receipt.
 class ReceiptLine {
-  ReceiptLine({required this.name, required this.quantity, required this.unitPrice, required this.lineTotal});
+  ReceiptLine(
+      {required this.name,
+      required this.quantity,
+      required this.unitPrice,
+      required this.lineTotal});
 
   final String name;
   final double quantity;
@@ -29,6 +33,19 @@ class ThermalPrinterService {
   static const connectionTypePrefKey = 'printer_type';
   static const networkIpPrefKey = 'printer_ip';
   static const networkPortPrefKey = 'printer_port';
+
+  /// Requests Android's Nearby devices permission once, after the first app
+  /// frame. The print plugin owns the platform request and returns immediately
+  /// on iOS, Windows, and already-authorized devices.
+  static Future<bool> requestBluetoothPermission() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      return await PrintBluetoothThermal.isPermissionBluetoothGranted
+          .timeout(const Duration(seconds: 8), onTimeout: () => false);
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Receipt paper width the operator picked in Printer & Hardware Setup.
   /// Defaults to 80mm (the previous hard-coded value) when unset.
@@ -82,7 +99,8 @@ class ThermalPrinterService {
 
   Future<bool> connect(String macAddress) async {
     try {
-      return await PrintBluetoothThermal.connect(macPrinterAddress: macAddress).timeout(
+      return await PrintBluetoothThermal.connect(macPrinterAddress: macAddress)
+          .timeout(
         const Duration(seconds: 6),
         onTimeout: () => false,
       );
@@ -117,7 +135,8 @@ class ThermalPrinterService {
   /// quotations — the same data already shown on the PDF/preview.
   Future<bool> printReceipt({
     required String companyName,
-    required String documentLabel, // e.g. "Sale #POS-1234" or "Quotation #Q-1234"
+    required String
+        documentLabel, // e.g. "Sale #POS-1234" or "Quotation #Q-1234"
     required List<ReceiptLine> lines,
     required double subtotal,
     required double discount,
@@ -148,21 +167,31 @@ class ThermalPrinterService {
 
     bytes.addAll(generator.text(
       companyName,
-      styles: const PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2),
+      styles: const PosStyles(
+          align: PosAlign.center,
+          bold: true,
+          height: PosTextSize.size2,
+          width: PosTextSize.size2),
     ));
     if (taxId != null && taxId.isNotEmpty) {
-      bytes.addAll(generator.text('${isIndia ? 'GSTIN' : 'Tax ID'}: $taxId', styles: const PosStyles(align: PosAlign.center)));
+      bytes.addAll(generator.text('${isIndia ? 'GSTIN' : 'Tax ID'}: $taxId',
+          styles: const PosStyles(align: PosAlign.center)));
     }
-    bytes.addAll(generator.text(documentLabel, styles: const PosStyles(align: PosAlign.center)));
+    bytes.addAll(generator.text(documentLabel,
+        styles: const PosStyles(align: PosAlign.center)));
     if (customerName != null && customerName.isNotEmpty) {
       bytes.addAll(generator.text('Customer: $customerName'));
     }
     bytes.addAll(generator.hr());
 
     for (final line in lines) {
-      bytes.addAll(generator.text(line.name, styles: const PosStyles(bold: true)));
+      bytes.addAll(
+          generator.text(line.name, styles: const PosStyles(bold: true)));
       bytes.addAll(generator.row([
-        PosColumn(text: '${line.quantity.toStringAsFixed(line.quantity == line.quantity.roundToDouble() ? 0 : 2)} x $currencySymbol${line.unitPrice.toStringAsFixed(2)}', width: 8),
+        PosColumn(
+            text:
+                '${line.quantity.toStringAsFixed(line.quantity == line.quantity.roundToDouble() ? 0 : 2)} x $currencySymbol${line.unitPrice.toStringAsFixed(2)}',
+            width: 8),
         PosColumn(
           text: '$currencySymbol${line.lineTotal.toStringAsFixed(2)}',
           width: 4,
@@ -173,31 +202,42 @@ class ThermalPrinterService {
 
     bytes.addAll(generator.hr());
     bytes.addAll(_totalsRow(generator, 'Subtotal', subtotal, currencySymbol));
-    if (discount > 0) bytes.addAll(_totalsRow(generator, 'Discount', -discount, currencySymbol));
+    if (discount > 0)
+      bytes
+          .addAll(_totalsRow(generator, 'Discount', -discount, currencySymbol));
     if (tax > 0) {
       if (isIndia && taxRate > 0) {
         final halfTax = tax / 2;
         final halfRate = taxRate / 2;
-        bytes.addAll(_totalsRow(generator, 'CGST (${halfRate.toStringAsFixed(1)}%)', halfTax, currencySymbol));
-        bytes.addAll(_totalsRow(generator, 'SGST (${halfRate.toStringAsFixed(1)}%)', halfTax, currencySymbol));
+        bytes.addAll(_totalsRow(generator,
+            'CGST (${halfRate.toStringAsFixed(1)}%)', halfTax, currencySymbol));
+        bytes.addAll(_totalsRow(generator,
+            'SGST (${halfRate.toStringAsFixed(1)}%)', halfTax, currencySymbol));
       } else {
         bytes.addAll(_totalsRow(generator, taxLabel, tax, currencySymbol));
       }
     }
-    bytes.addAll(_totalsRow(generator, 'Total', total, currencySymbol, emphasize: true));
+    bytes.addAll(
+        _totalsRow(generator, 'Total', total, currencySymbol, emphasize: true));
 
     if (dueAmount > 0.001) {
       bytes.addAll(generator.hr());
-      bytes.addAll(_totalsRow(generator, 'Amount Paid', paidAmount ?? total, currencySymbol));
-      bytes.addAll(_totalsRow(generator, 'Due Balance', dueAmount, currencySymbol, emphasize: true));
+      bytes.addAll(_totalsRow(
+          generator, 'Amount Paid', paidAmount ?? total, currencySymbol));
+      bytes.addAll(_totalsRow(
+          generator, 'Due Balance', dueAmount, currencySymbol,
+          emphasize: true));
     } else if (cashTendered != null) {
       bytes.addAll(generator.hr());
-      bytes.addAll(_totalsRow(generator, 'Cash Tendered', cashTendered, currencySymbol));
-      bytes.addAll(_totalsRow(generator, 'Change Due', changeDue, currencySymbol));
+      bytes.addAll(
+          _totalsRow(generator, 'Cash Tendered', cashTendered, currencySymbol));
+      bytes.addAll(
+          _totalsRow(generator, 'Change Due', changeDue, currencySymbol));
     }
 
     bytes.addAll(generator.feed(2));
-    bytes.addAll(generator.text('Thank you!', styles: const PosStyles(align: PosAlign.center)));
+    bytes.addAll(generator.text('Thank you!',
+        styles: const PosStyles(align: PosAlign.center)));
     bytes.addAll(generator.cut());
 
     try {
@@ -325,12 +365,16 @@ class ThermalPrinterService {
     }
   }
 
-  List<int> _totalsRow(Generator generator, String label, double value, String currencySymbol, {bool emphasize = false}) {
+  List<int> _totalsRow(
+      Generator generator, String label, double value, String currencySymbol,
+      {bool emphasize = false}) {
     return generator.row([
       PosColumn(
         text: label,
         width: 8,
-        styles: PosStyles(bold: emphasize, height: emphasize ? PosTextSize.size2 : PosTextSize.size1),
+        styles: PosStyles(
+            bold: emphasize,
+            height: emphasize ? PosTextSize.size2 : PosTextSize.size1),
       ),
       PosColumn(
         text: '$currencySymbol${value.toStringAsFixed(2)}',

@@ -17,7 +17,8 @@ final _dateFormat = DateFormat('MMM d, y');
 /// convert-to-sale / delete actions. Sending (email/WhatsApp) reuses the
 /// existing POST /send-delivery endpoint with document_type=quotation.
 class QuotationDetailScreen extends StatefulWidget {
-  const QuotationDetailScreen({super.key, required this.quotation, required this.formatter});
+  const QuotationDetailScreen(
+      {super.key, required this.quotation, required this.formatter});
 
   final QuotationModel quotation;
   final CurrencyFormatter formatter;
@@ -32,10 +33,15 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Convert to sale?'),
-        content: const Text('This creates a completed sale from this quotation and deducts stock.'),
+        content: const Text(
+            'This creates a completed sale from this quotation and deducts stock.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Convert')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Convert')),
         ],
       ),
     );
@@ -46,9 +52,11 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
     if (!mounted) return;
     if (success) {
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quotation converted to sale.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Quotation converted to sale.')));
     } else if (quotations.actionError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(quotations.actionError!)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(quotations.actionError!)));
     }
   }
 
@@ -59,8 +67,12 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
         title: const Text('Delete quotation?'),
         content: const Text('This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -72,7 +84,8 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
     if (success) {
       Navigator.of(context).pop();
     } else if (quotations.actionError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(quotations.actionError!)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(quotations.actionError!)));
     }
   }
 
@@ -94,11 +107,17 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
       taxId: company?.taxId,
       taxLabel: company?.taxLabel ?? 'Tax',
       isIndia: company?.isIndia ?? false,
-      taxRate: (quote.subtotal - quote.discount) > 0 ? quote.tax / (quote.subtotal - quote.discount) * 100 : 0,
+      taxRate: (quote.subtotal - quote.discount) > 0
+          ? quote.tax / (quote.subtotal - quote.discount) * 100
+          : 0,
       lines: quote.items.map((item) {
         final qty = (item['quantity'] as num?)?.toDouble() ?? 0;
         final price = (item['price'] as num?)?.toDouble() ?? 0;
-        return ReceiptLine(name: item['name']?.toString() ?? 'Item', quantity: qty, unitPrice: price, lineTotal: qty * price);
+        return ReceiptLine(
+            name: item['name']?.toString() ?? 'Item',
+            quantity: qty,
+            unitPrice: price,
+            lineTotal: qty * price);
       }).toList(),
     );
   }
@@ -120,7 +139,16 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
           IconButton(
             tooltip: 'Preview, print, or share',
             icon: const Icon(Icons.ios_share_outlined),
-            onPressed: () => showInvoiceActionsSheet(context, _actionsData(quote)),
+            onPressed: () async {
+              await showInvoiceActionsSheet(context, _actionsData(quote));
+              // Dispatch actions update quotation status on the server. Reload
+              // the shared provider after the sheet closes so the detail chip
+              // reflects SENT immediately instead of retaining a stale DRAFT
+              // model that was passed when this screen opened.
+              if (mounted) {
+                await context.read<QuotationsProvider>().loadQuotations();
+              }
+            },
           ),
           IconButton(
             tooltip: 'Delete',
@@ -135,7 +163,8 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(quote.customerName, style: Theme.of(context).textTheme.titleMedium),
+              Text(quote.customerName,
+                  style: Theme.of(context).textTheme.titleMedium),
               Chip(label: Text(quote.status.toUpperCase())),
             ],
           ),
@@ -159,7 +188,9 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
                       children: [
-                        Expanded(child: Text('${item['name']} × ${qty.toStringAsFixed(qty.truncateToDouble() == qty ? 0 : 2)}')),
+                        Expanded(
+                            child: Text(
+                                '${item['name']} × ${qty.toStringAsFixed(qty.truncateToDouble() == qty ? 0 : 2)}')),
                         Text(widget.formatter.format(qty * price)),
                       ],
                     ),
@@ -169,16 +200,27 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          _TotalsRow(label: 'Subtotal', value: widget.formatter.format(quote.subtotal)),
-          _TotalsRow(label: 'Discount', value: '-${widget.formatter.format(quote.discount)}'),
+          _TotalsRow(
+              label: 'Subtotal',
+              value: widget.formatter.format(quote.subtotal)),
+          _TotalsRow(
+              label: 'Discount',
+              value: '-${widget.formatter.format(quote.discount)}'),
           if (quote.tax > 0)
             if (isIndia) ...[
-              _TotalsRow(label: 'CGST', value: widget.formatter.format(quote.tax / 2)),
-              _TotalsRow(label: 'SGST', value: widget.formatter.format(quote.tax / 2)),
+              _TotalsRow(
+                  label: 'CGST', value: widget.formatter.format(quote.tax / 2)),
+              _TotalsRow(
+                  label: 'SGST', value: widget.formatter.format(quote.tax / 2)),
             ] else
-              _TotalsRow(label: company?.taxLabel ?? 'Tax', value: widget.formatter.format(quote.tax)),
+              _TotalsRow(
+                  label: company?.taxLabel ?? 'Tax',
+                  value: widget.formatter.format(quote.tax)),
           const Divider(),
-          _TotalsRow(label: 'Total', value: widget.formatter.format(quote.total), bold: true),
+          _TotalsRow(
+              label: 'Total',
+              value: widget.formatter.format(quote.total),
+              bold: true),
           if (quote.notes.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text('Notes', style: Theme.of(context).textTheme.titleSmall),
@@ -203,7 +245,8 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
 }
 
 class _TotalsRow extends StatelessWidget {
-  const _TotalsRow({required this.label, required this.value, this.bold = false});
+  const _TotalsRow(
+      {required this.label, required this.value, this.bold = false});
 
   final String label;
   final String value;
@@ -211,7 +254,9 @@ class _TotalsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal, fontSize: bold ? 16 : 14);
+    final style = TextStyle(
+        fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+        fontSize: bold ? 16 : 14);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(

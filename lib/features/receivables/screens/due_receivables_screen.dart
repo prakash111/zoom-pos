@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/receivable_model.dart';
+import '../../../core/sdui/sdui_action_dispatcher.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
@@ -12,7 +12,7 @@ import '../../auth/auth_provider.dart';
 import '../receivables_repository.dart';
 
 /// Due Payments / Receivables: every unpaid or partially-paid sale, with a
-/// per-row scheduled push reminder and manual WhatsApp / email actions.
+/// per-row scheduled push reminder and registry-driven dispatch actions.
 class DueReceivablesScreen extends StatefulWidget {
   const DueReceivablesScreen({super.key});
 
@@ -35,60 +35,34 @@ class _DueReceivablesScreenState extends State<DueReceivablesScreen> {
     setState(() => _future = _repository.fetchDueReceivables());
   }
 
-  Future<void> _pickChannelAndRemind(ReceivableModel receivable) async {
-    final channel = await showModalBottomSheet<String>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (sheetCtx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Send Reminder',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.chat, color: Colors.green),
-              title: const Text('WhatsApp'),
-              onTap: () => Navigator.of(sheetCtx).pop('whatsapp'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.email_outlined, color: Colors.blue),
-              title: const Text('Email'),
-              onTap: () => Navigator.of(sheetCtx).pop('email'),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+  Future<void> _openReminderSheet(ReceivableModel receivable) async {
+    if (!mounted) return;
+
+    final dispatcher = SduiActionDispatcher(
+      resolveApiClient: () => context.read<ApiClient>(),
+      formKey: GlobalKey<FormState>(),
+      formValues: <String, dynamic>{},
+      setFormValue: (_, __) {},
+      onReload: _refresh,
+      showToast: (message, {isError = false}) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? Colors.red.shade700 : null,
+        ));
+      },
     );
 
-    if (channel == null || !mounted) return;
-
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final result =
-          await _repository.sendReminder(receivable.saleId, channel: channel);
-      if (!mounted) return;
-
-      final fallbackUrl = result['fallback_url'] as String?;
-      final fallbackMailto = result['fallback_mailto'] as String?;
-
-      if (fallbackUrl != null) {
-        final uri = Uri.parse(fallbackUrl);
-        if (await canLaunchUrl(uri))
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else if (fallbackMailto != null) {
-        final uri = Uri.parse(fallbackMailto);
-        if (await canLaunchUrl(uri)) await launchUrl(uri);
-      } else {
-        messenger.showSnackBar(const SnackBar(content: Text('Reminder sent.')));
-      }
-    } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    }
+    // The endpoint returns the complete SDUI sheet. The dispatcher renders
+    // every configured channel (SMS, WhatsApp Business, SMTP, webhooks, and
+    // future tenant-defined channels) without a client-side tile list.
+    await dispatcher.dispatch(context, {
+      'type': 'OPEN_BOTTOM_SHEET',
+      'action_type': 'OPEN_BOTTOM_SHEET',
+      'title': 'Send Payment Reminder',
+      'endpoint':
+          '/api/v1/tenant/receivables/${Uri.encodeComponent(receivable.saleId)}/reminder-sheet',
+    });
   }
 
   Future<void> _scheduleReminder(ReceivableModel receivable) async {
@@ -215,7 +189,7 @@ class _DueReceivablesScreenState extends State<DueReceivablesScreen> {
                                 color: Colors.red.shade600,
                                 fontWeight: FontWeight.bold)),
                       ],
-                        ),
+                    ),
                     subtitle: Text(
                         '${r.saleNumber} • Total ${formatter.format(r.total)} • Paid ${formatter.format(r.paidAmount)}${r.dueReminderAt == null ? '' : '\n🔔 ${r.dueReminderAt!.toLocal()}'}',
                         style: const TextStyle(fontSize: 12)),
@@ -225,7 +199,7 @@ class _DueReceivablesScreenState extends State<DueReceivablesScreen> {
                         if (action == 'schedule') {
                           _scheduleReminder(r);
                         } else {
-                          _pickChannelAndRemind(r);
+                          _openReminderSheet(r);
                         }
                       },
                       itemBuilder: (_) => const [
@@ -233,8 +207,7 @@ class _DueReceivablesScreenState extends State<DueReceivablesScreen> {
                             value: 'schedule',
                             child: Text('Schedule push reminder')),
                         PopupMenuItem(
-                            value: 'send',
-                            child: Text('Send WhatsApp / email')),
+                            value: 'send', child: Text('Send Reminder')),
                       ],
                     ),
                   ),

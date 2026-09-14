@@ -45,6 +45,7 @@ class _PrinterSelectionDialogState extends State<PrinterSelectionDialog> {
   List<BluetoothInfo> _devices = [];
   bool _isLoading = true;
   bool _bluetoothOff = false;
+  bool _permissionDenied = false;
   String? _savedAddress;
 
   @override
@@ -57,9 +58,20 @@ class _PrinterSelectionDialogState extends State<PrinterSelectionDialog> {
     setState(() {
       _isLoading = true;
       _bluetoothOff = false;
+      _permissionDenied = false;
     });
     try {
       _savedAddress = await _service.savedDeviceAddress();
+      if (!await ThermalPrinterService.requestBluetoothPermission()) {
+        if (mounted) {
+          setState(() {
+            _permissionDenied = true;
+            _bluetoothOff = true;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
       if (!await _service.bluetoothEnabled) {
         if (mounted) {
           setState(() {
@@ -142,8 +154,11 @@ class _PrinterSelectionDialogState extends State<PrinterSelectionDialog> {
     if (_bluetoothOff) {
       return _EmptyState(
         icon: Icons.bluetooth_disabled,
-        message: 'Bluetooth is turned off. Enable it in your device settings, '
-            'then re-scan.',
+        message: _permissionDenied
+            ? 'Nearby devices permission is required. Allow it in the system '
+                'prompt or Android Settings, then re-scan.'
+            : 'Bluetooth is turned off. Enable it in your device settings, '
+                'then re-scan.',
         onRetry: _loadPairedDevices,
       );
     }
@@ -165,9 +180,8 @@ class _PrinterSelectionDialogState extends State<PrinterSelectionDialog> {
           leading: Icon(Icons.print, color: isSaved ? _green : null),
           title: Text(device.name.isEmpty ? 'Unknown device' : device.name),
           subtitle: Text(device.macAdress),
-          trailing: isSaved
-              ? const Icon(Icons.check_circle, color: _green)
-              : null,
+          trailing:
+              isSaved ? const Icon(Icons.check_circle, color: _green) : null,
           onTap: () => _select(device),
         );
       },
