@@ -266,11 +266,14 @@ class _InvoiceActionsSheetContentState
             '';
 
     if (actionType == 'OPEN_URL') {
-      final uri = Uri.tryParse(
-          action['url']?.toString() ?? channel['url']?.toString() ?? '');
-      if (uri == null) return;
+      final rawUrl = (action['url'] ?? channel['url'])?.toString().trim() ?? '';
+      if (rawUrl.isEmpty) return;
+      final uri = Uri.tryParse(rawUrl);
+      if (uri == null || !uri.hasScheme || uri.scheme.isEmpty) return;
       Navigator.of(sheetContext).pop();
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      try {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {}
       return;
     }
 
@@ -330,10 +333,14 @@ class _InvoiceActionsSheetContentState
       messenger.showSnackBar(SnackBar(content: Text(message)));
 
       final returnedUrl =
-          response['whatsapp_url']?.toString() ?? response['url']?.toString();
-      final uri = Uri.tryParse(returnedUrl ?? '');
-      if (uri != null) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+          (response['whatsapp_url'] ?? response['url'])?.toString().trim();
+      if (returnedUrl != null && returnedUrl.isNotEmpty) {
+        final uri = Uri.tryParse(returnedUrl);
+        if (uri != null && uri.hasScheme && uri.scheme.isNotEmpty) {
+          try {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } catch (_) {}
+        }
       }
     } catch (error) {
       messenger.showSnackBar(
