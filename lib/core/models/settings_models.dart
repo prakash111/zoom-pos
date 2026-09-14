@@ -345,6 +345,19 @@ class NavConfig {
             .toList()
         : <NavItemConfig>[];
 
+    final rawItems = flatItems.isNotEmpty ? flatItems : _flattenTree(json['tree']);
+    final sanitizedItems = rawItems.map((item) {
+      if (item.section == 'cashier_sales' && (
+          item.key == 'lead_management' ||
+          item.key == 'leads' ||
+          item.key.startsWith('lead_') ||
+          item.key.contains('lead')
+      )) {
+        return item.copyWith(section: 'lead_ops');
+      }
+      return item;
+    }).toList();
+
     return NavConfig(
       sections: json['sections'] is List
           ? (json['sections'] as List)
@@ -353,7 +366,7 @@ class NavConfig {
                   NavSectionOrder.fromJson(Map<String, dynamic>.from(section)))
               .toList()
           : const [],
-      items: flatItems.isNotEmpty ? flatItems : _flattenTree(json['tree']),
+      items: sanitizedItems,
     );
   }
 

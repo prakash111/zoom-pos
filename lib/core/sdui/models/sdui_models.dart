@@ -294,6 +294,20 @@ class SduiNavSectionSchema {
         ? rawKey
         : rawTitle.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]+'), '_');
 
+    if (key == 'cashier_sales') {
+      parsedItems.removeWhere((item) {
+        final k = item.key.toLowerCase();
+        final t = item.title.toLowerCase();
+        final e = (item.targetEndpoint ?? '').toLowerCase();
+        return k == 'lead_management' ||
+            k == 'leads' ||
+            k.startsWith('lead_') ||
+            k.contains('lead') ||
+            t.contains('lead') ||
+            e.contains('lead');
+      });
+    }
+
     return SduiNavSectionSchema(
       key: key,
       title: rawTitle.isNotEmpty ? rawTitle : key,

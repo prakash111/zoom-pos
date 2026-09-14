@@ -128,6 +128,19 @@ List<_NavSection> _serverDrivenSections() {
             }
             if (!seenKeys.add(item.key)) continue;
 
+            // Lead Management is a separate vertical module (lead_ops) and must NEVER be inside cashier_sales
+            if (section.key == 'cashier_sales' && (
+                item.key == 'lead_management' ||
+                item.key == 'leads' ||
+                item.key.startsWith('lead_') ||
+                item.key.contains('lead') ||
+                item.targetEndpoint == '/tenant/views/leads' ||
+                item.targetEndpoint == '/api/tenant/views/leads' ||
+                item.title.toLowerCase().contains('lead')
+            )) {
+              continue;
+            }
+
             tiles.add(_FeatureTile(
               item.key,
               (l10n) => BootstrapCache.instance.resolveNavigationLabel(
@@ -219,6 +232,18 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
               sectionMetaByKey.containsKey(override!.section)
           ? override.section!
           : section.key;
+
+      // CRITICAL: Lead Management is a separate vertical module (lead_ops)
+      // and must NEVER be placed into Cashier & Sales, even via custom placement/overrides
+      if (targetSection == 'cashier_sales' && (
+          tile.key == 'lead_management' ||
+          tile.key == 'leads' ||
+          tile.key.startsWith('lead_') ||
+          tile.key.contains('lead')
+      )) {
+        continue;
+      }
+
       (tilesBySection[targetSection] ??= []).add((
         order: override?.order ?? index,
         fallback: fallback++,
@@ -240,6 +265,12 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
   }
 
   final cashierRows = tilesBySection['cashier_sales'] ??= [];
+  // Ensure any lead management items are completely purged from cashierRows
+  cashierRows.removeWhere((r) =>
+      r.tile.key == 'lead_management' ||
+      r.tile.key == 'leads' ||
+      r.tile.key.startsWith('lead_') ||
+      r.tile.key.contains('lead'));
   final existingCashierKeys = {for (final r in cashierRows) r.tile.key};
 
   final coreCashierItems = <({
