@@ -1,7 +1,21 @@
 <?php
 
+use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DispatchController;
+use App\Http\Controllers\Api\DocumentActionController;
+use App\Http\Controllers\Api\DocumentPreviewController;
+use App\Http\Controllers\Api\InvoiceController as ApiInvoiceController;
+use App\Http\Controllers\Api\InvoicePreviewController;
+use App\Http\Controllers\Api\LeadController;
 use App\Http\Controllers\Api\LicenseActivationController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\QuotationController;
+use App\Http\Controllers\Api\ReceivablesController;
+use App\Http\Controllers\Api\TenantSettingsController;
+use App\Http\Controllers\Api\UnifiedDispatchController;
 use App\Http\Controllers\Api\V1\AiImageApiController;
+use App\Http\Controllers\Api\V1\ApiIntegrationsController;
 use App\Http\Controllers\Api\V1\AppBootstrapController;
 use App\Http\Controllers\Api\V1\AuthApiController;
 use App\Http\Controllers\Api\V1\CashRegisterApiController;
@@ -29,16 +43,21 @@ use App\Http\Controllers\Api\V1\SduiViewController;
 use App\Http\Controllers\Api\V1\ServiceOrderApiController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
 use App\Http\Controllers\Api\V1\TaxApiController;
+use App\Http\Controllers\Api\V1\TenantAppPreferencesController;
 use App\Http\Controllers\Api\V1\TenantDemoDataController;
 use App\Http\Controllers\Api\V1\UploadApiController;
 use App\Http\Controllers\Api\V1\UserApiController;
 use App\Http\Controllers\Auth\SocialAuthController;
+use App\Http\Controllers\StoreProfileController;
 use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Controllers\Tenant\InvoiceController;
 use App\Http\Controllers\Webhooks\SubscriptionWebhookController;
 use App\Http\Middleware\AuthenticateTenantApi;
 use App\Http\Middleware\PreventDemoModifications;
+use App\Services\Auth\PermissionChecker;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Modules\leadmanagement\Http\Controllers\LeadModuleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -110,10 +129,13 @@ Route::post('/integrations/webhooks/{tenant_uuid}/orders', [EcommerceWebhookCont
 // gateway's stored webhook secret; the event is written to the audit log.
 Route::post('/v1/webhooks/{gateway}', [SubscriptionWebhookController::class, 'handle'])
     ->name('webhooks.gateway');
+Route::post('/webhooks/{gateway}', [SubscriptionWebhookController::class, 'handle']);
 foreach (SubscriptionWebhookController::GATEWAYS as $gw) {
     Route::post("/v1/webhooks/{$gw}", [SubscriptionWebhookController::class, 'handle'])
         ->defaults('gateway', $gw)
         ->name("webhooks.{$gw}");
+    Route::post("/webhooks/{$gw}", [SubscriptionWebhookController::class, 'handle'])
+        ->defaults('gateway', $gw);
 }
 
 // Server-Driven UI Bootstrap, View Schemas, and Form Action Routes
@@ -122,9 +144,244 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::get('/app/translations', [LanguageApiController::class, 'appTranslations']);
     Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
 
+    // Dashboard chrome and its notification feed are server-driven so badge
+    // counts and action endpoints can evolve without a client release.
+    Route::get('/tenant/views/dashboard', [DashboardController::class, 'show']);
+    Route::get('/app/views/dashboard', [DashboardController::class, 'show']);
+    Route::get('/v1/tenant/views/dashboard', [DashboardController::class, 'show']);
+    Route::get('/tenant/notifications/feed', [NotificationController::class, 'feed']);
+    Route::get('/v1/tenant/notifications/feed', [NotificationController::class, 'feed']);
+    Route::get('/tenant/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::get('/v1/tenant/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+
+    // Unified multi-format preview for invoices, sales receipts and quotes.
+    Route::get('/tenant/documents/{type}/{id}/preview-modal', [DocumentPreviewController::class, 'previewModal']);
+    Route::get('/v1/tenant/documents/{type}/{id}/preview-modal', [DocumentPreviewController::class, 'previewModal']);
+    Route::get('/tenant/documents/{type}/{id}/render-html', [DocumentPreviewController::class, 'renderHtml']);
+    Route::get('/v1/tenant/documents/{type}/{id}/render-html', [DocumentPreviewController::class, 'renderHtml']);
+
+    // Stable per-channel action endpoints consumed by SDUI channel tiles.
+    Route::post('/tenant/dispatch/sms', [DispatchController::class, 'dispatchSms'])->middleware('tenant.api.permission:pos,create');
+    Route::post('/v1/tenant/dispatch/sms', [DispatchController::class, 'dispatchSms'])->middleware('tenant.api.permission:pos,create');
+    Route::post('/tenant/dispatch/email', [DispatchController::class, 'dispatchEmail'])->middleware('tenant.api.permission:pos,create');
+    Route::post('/v1/tenant/dispatch/email', [DispatchController::class, 'dispatchEmail'])->middleware('tenant.api.permission:pos,create');
+
+    // Quotations SDUI View & Pre-population Schemas
+    Route::get('/tenant/views/quotations/create', [QuotationController::class, 'createSchema'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/quotations/create', [QuotationController::class, 'createSchema'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/views/quotations/create', [QuotationController::class, 'createSchema'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/create', [QuotationController::class, 'createSchema'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/pos/quotations/create', [QuotationController::class, 'createSchema'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/quotations/create', [QuotationController::class, 'createSchema'])->middleware('tenant.api.permission:quotes,view');
+    // Quotations SDUI Sheet & Dispatch Actions (Placed before wildcard {id} routes)
+    Route::get('/tenant/views/quotations/actions-sheet/{id?}', [QuotationController::class, 'actionsSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/views/quotations/actions-sheet/{id?}', [QuotationController::class, 'actionsSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/quotations/actions-sheet/{id?}', [QuotationController::class, 'actionsSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/actions-sheet/{id?}', [QuotationController::class, 'actionsSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/quotations/actions-sheet/{id?}', [QuotationController::class, 'actionsSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/views/quotations/{id}/actions-sheet', [QuotationController::class, 'actionsSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/views/quotations/{id}/actions-sheet', [QuotationController::class, 'actionsSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/quotations/{id}/actions-sheet', [QuotationController::class, 'actionsSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/{id}/actions-sheet', [QuotationController::class, 'actionsSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/quotations/{id}/actions-sheet', [QuotationController::class, 'actionsSheet'])->middleware('tenant.api.permission:quotes,view');
+
+    Route::get('/tenant/views/quotations/preview-sheet/{id?}', [QuotationController::class, 'previewSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/views/quotations/preview-sheet/{id?}', [QuotationController::class, 'previewSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/quotations/preview-sheet/{id?}', [QuotationController::class, 'previewSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/preview-sheet/{id?}', [QuotationController::class, 'previewSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/quotations/preview-sheet/{id?}', [QuotationController::class, 'previewSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/views/quotations/{id}/preview-sheet', [QuotationController::class, 'previewSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/views/quotations/{id}/preview-sheet', [QuotationController::class, 'previewSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/quotations/{id}/preview-sheet', [QuotationController::class, 'previewSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/{id}/preview-sheet', [QuotationController::class, 'previewSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/quotations/{id}/preview-sheet', [QuotationController::class, 'previewSheet'])->middleware('tenant.api.permission:quotes,view');
+
+    Route::get('/tenant/views/quotations/send-sheet/{id?}', [QuotationController::class, 'sendSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/views/quotations/send-sheet/{id?}', [QuotationController::class, 'sendSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/quotations/send-sheet/{id?}', [QuotationController::class, 'sendSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/send-sheet/{id?}', [QuotationController::class, 'sendSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/quotations/send-sheet/{id?}', [QuotationController::class, 'sendSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/views/quotations/{id}/send-sheet', [QuotationController::class, 'sendSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/views/quotations/{id}/send-sheet', [QuotationController::class, 'sendSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/quotations/{id}/send-sheet', [QuotationController::class, 'sendSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/{id}/send-sheet', [QuotationController::class, 'sendSheet'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/quotations/{id}/send-sheet', [QuotationController::class, 'sendSheet'])->middleware('tenant.api.permission:quotes,view');
+
+    // Quotations SDUI Screen Views (via NAVIGATE_TO)
+    Route::get('/tenant/views/quotations/{id}/preview', [QuotationController::class, 'previewView'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/views/quotations/{id}/preview', [QuotationController::class, 'previewView'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/quotations/{id}/preview', [QuotationController::class, 'previewView'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/{id}/preview', [QuotationController::class, 'previewView'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/quotations/{id}/preview', [QuotationController::class, 'previewView'])->middleware('tenant.api.permission:quotes,view');
+
+    Route::get('/tenant/views/quotations/{id}/send', [QuotationController::class, 'sendView'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/views/quotations/{id}/send', [QuotationController::class, 'sendView'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/quotations/{id}/send', [QuotationController::class, 'sendView'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/{id}/send', [QuotationController::class, 'sendView'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/quotations/{id}/send', [QuotationController::class, 'sendView'])->middleware('tenant.api.permission:quotes,view');
+
+    Route::get('/tenant/quotations/{id}/pdf', [QuotationApiController::class, 'pdf'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/{id}/pdf', [QuotationApiController::class, 'pdf'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/views/quotations/{id}/pdf', [QuotationApiController::class, 'pdf'])->middleware('tenant.api.permission:quotes,view');
+
+    // Quotations Show Schema
+    Route::get('/tenant/views/quotations/{id}', [QuotationController::class, 'showSchema'])->whereNumber('id')->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/views/quotations/{id}', [QuotationController::class, 'showSchema'])->whereNumber('id')->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/quotations/{id}', [QuotationController::class, 'showSchema'])->whereNumber('id')->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/{id}', [QuotationController::class, 'showSchema'])->whereNumber('id')->middleware('tenant.api.permission:quotes,view');
+    Route::get('/quotations/{id}', [QuotationController::class, 'showSchema'])->whereNumber('id')->middleware('tenant.api.permission:quotes,view');
+
+    Route::post('/tenant/quotations/{id}/dispatch', [QuotationController::class, 'dispatchQuotation'])->middleware('tenant.api.permission:quotes,create');
+    Route::post('/v1/tenant/quotations/{id}/dispatch', [QuotationController::class, 'dispatchQuotation'])->middleware('tenant.api.permission:quotes,create');
+    Route::post('/quotations/{id}/dispatch', [QuotationController::class, 'dispatchQuotation'])->middleware('tenant.api.permission:quotes,create');
+
+    Route::post('/tenant/quotations', [QuotationController::class, 'store'])->middleware('tenant.api.permission:quotes,create');
+    Route::post('/v1/tenant/quotations', [QuotationController::class, 'store'])->middleware('tenant.api.permission:quotes,create');
+
+    // Invoices SDUI View & Creation Schemas
+    Route::get('/tenant/views/invoices/create', [ApiInvoiceController::class, 'createSchema']);
+    Route::get('/tenant/invoices/create', [ApiInvoiceController::class, 'createSchema']);
+    Route::get('/v1/tenant/views/invoices/create', [ApiInvoiceController::class, 'createSchema']);
+    Route::get('/v1/tenant/invoices/create', [ApiInvoiceController::class, 'createSchema']);
+    Route::get('/invoices/create', [ApiInvoiceController::class, 'createSchema']);
+    Route::post('/tenant/invoices', [ApiInvoiceController::class, 'store']);
+    Route::post('/v1/tenant/invoices', [ApiInvoiceController::class, 'store']);
+
+    Route::get('/tenant/views/invoices/{id}/actions-sheet', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/v1/tenant/views/invoices/{id}/actions-sheet', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/tenant/views/invoices/actions-sheet/{id?}', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/v1/tenant/views/invoices/actions-sheet/{id?}', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/tenant/invoices/{id}/actions-sheet', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/v1/tenant/invoices/{id}/actions-sheet', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/tenant/invoices/actions-sheet/{id?}', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/v1/tenant/invoices/actions-sheet/{id?}', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/invoices/{id}/actions-sheet', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/invoices/actions-sheet/{id?}', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
+
+    // Due Receivables Payment Reminder Bottom Sheet
+    Route::get('/tenant/receivables/{id}/reminder-sheet', [ReceivablesController::class, 'reminderSheet'])->middleware('tenant.api.permission:customers,view');
+    Route::get('/v1/tenant/receivables/{id}/reminder-sheet', [ReceivablesController::class, 'reminderSheet'])->middleware('tenant.api.permission:customers,view');
+    Route::get('/receivables/{id}/reminder-sheet', [ReceivablesController::class, 'reminderSheet'])->middleware('tenant.api.permission:customers,view');
+
+    // Unified Document Dispatch (SMS, WhatsApp, Email, Custom Webhook)
+    Route::post('/tenant/dispatch/{type}/{id}', [DispatchController::class, 'dispatchDocument'])->middleware('tenant.api.permission:pos,create');
+    Route::post('/v1/tenant/dispatch/{type}/{id}', [DispatchController::class, 'dispatchDocument'])->middleware('tenant.api.permission:pos,create');
+    Route::post('/dispatch/{type}/{id}', [DispatchController::class, 'dispatchDocument'])->middleware('tenant.api.permission:pos,create');
+
+    // Central Unified Dispatch Route & Handlers
+    Route::post('/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
+    Route::post('/v1/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
+    Route::post('/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
+
+    // Document Action & Invoice Preview Bottom Sheets
+    Route::get('/tenant/documents/{type}/{id}/actions-sheet', [DocumentActionController::class, 'actionsSheet']);
+    Route::get('/v1/tenant/documents/{type}/{id}/actions-sheet', [DocumentActionController::class, 'actionsSheet']);
+    Route::get('/tenant/documents/{type}/actions-sheet/{id?}', [DocumentActionController::class, 'actionsSheet']);
+    Route::get('/v1/tenant/documents/{type}/actions-sheet/{id?}', [DocumentActionController::class, 'actionsSheet']);
+
+    Route::get('/tenant/invoices/preview-sheet/{id?}', [InvoicePreviewController::class, 'previewSheet']);
+    Route::get('/v1/tenant/invoices/preview-sheet/{id?}', [InvoicePreviewController::class, 'previewSheet']);
+    Route::get('/tenant/invoices/{id}/preview-sheet', [InvoicePreviewController::class, 'previewSheet']);
+    Route::get('/v1/tenant/invoices/{id}/preview-sheet', [InvoicePreviewController::class, 'previewSheet']);
+    Route::get('/invoices/preview-sheet/{id?}', [InvoicePreviewController::class, 'previewSheet']);
+    Route::get('/invoices/{id}/preview-sheet', [InvoicePreviewController::class, 'previewSheet']);
+
+    // Lead Management SDUI Views & Schemas
+    Route::get('/tenant/views/leads', [LeadController::class, 'dashboard'])->middleware('tenant.api.permission:leads,view');
+    Route::get('/tenant/views/lead-management', [LeadController::class, 'dashboard'])->middleware('tenant.api.permission:leads,view');
+    Route::get('/v1/tenant/views/leads', [LeadController::class, 'dashboard'])->middleware('tenant.api.permission:leads,view');
+    Route::get('/v1/tenant/views/lead-management', [LeadController::class, 'dashboard'])->middleware('tenant.api.permission:leads,view');
+    Route::get('/tenant/views/create-lead', [LeadController::class, 'createSchema']);
+    Route::get('/tenant/leads/create', [LeadController::class, 'createSchema']);
+    Route::get('/v1/tenant/views/create-lead', [LeadController::class, 'createSchema']);
+    Route::get('/v1/tenant/leads/create', [LeadController::class, 'createSchema']);
+    Route::get('/leads/create', [LeadController::class, 'createSchema']);
+    Route::get('/tenant/leads/list', [LeadController::class, 'leadsList'])->middleware('tenant.api.permission:leads,view');
+    Route::get('/v1/tenant/leads/list', [LeadController::class, 'leadsList'])->middleware('tenant.api.permission:leads,view');
+    Route::get('/tenant/leads/followups', [LeadController::class, 'followups'])->middleware('tenant.api.permission:leads,view');
+    Route::get('/v1/tenant/leads/followups', [LeadController::class, 'followups'])->middleware('tenant.api.permission:leads,view');
+
+    // Customer Live Autocomplete & Deep Search
+    Route::get('/tenant/customers/search', [CustomerController::class, 'search'])->middleware('tenant.api.permission:customers,view');
+    Route::get('/v1/tenant/customers/search', [CustomerController::class, 'search'])->middleware('tenant.api.permission:customers,view');
+    Route::get('/app/customers/search', [CustomerController::class, 'search'])->middleware('tenant.api.permission:customers,view');
+    Route::get('/customers/search', [CustomerController::class, 'search'])->middleware('tenant.api.permission:customers,view');
+
     // Server-Driven UI Dynamic Schema Views
     Route::get('/tenant/views/{view}', [SduiViewController::class, 'show']);
     Route::get('/app/views/{view}', [SduiViewController::class, 'show']);
+
+    // Catch-all for multi-segment and double-slash SDUI view requests (e.g. /tenant/views//quotations/create, /tenant/views//create-lead, /tenant/views//invoices/create)
+    Route::get('/tenant/views/{subpath}', function (Request $request, string $subpath, PermissionChecker $permissions) {
+        $trimmed = ltrim($subpath, '/');
+        if (preg_match('#(?:^|/)quotations/([A-Za-z0-9\-_]+)/preview(?:-sheet)?$#', $trimmed, $m)) {
+            return app(QuotationController::class)->previewView($request, $m[1]);
+        }
+        if (preg_match('#(?:^|/)quotations/([A-Za-z0-9\-_]+)/send(?:-sheet)?$#', $trimmed, $m)) {
+            return app(QuotationController::class)->sendView($request, $m[1]);
+        }
+        if (preg_match('#(?:^|/)quotations/([A-Za-z0-9\-_]+)$#', $trimmed, $m)) {
+            return app(QuotationController::class)->showSchema($request, $m[1]);
+        }
+        if ($trimmed === 'quotations/create' || str_ends_with($trimmed, 'quotations/create')) {
+            return app(QuotationController::class)->createSchema($request);
+        }
+        if (str_contains($trimmed, 'invoices/create') || str_ends_with($trimmed, 'invoices/create')) {
+            return app(ApiInvoiceController::class)->createSchema($request);
+        }
+        if (preg_match('#(?:^|/)leads/([A-Za-z0-9\-_]+)#', $trimmed, $m)) {
+            $request->merge(['id' => $m[1]]);
+
+            return app(LeadController::class)->showSchema($request, $m[1]);
+        }
+        if ($trimmed === 'lead-detail' || str_ends_with($trimmed, 'lead-detail')) {
+            return app(LeadController::class)->leadDetail($request);
+        }
+        if ($trimmed === 'create-lead' || str_ends_with($trimmed, 'create-lead') || $trimmed === 'leads/create' || str_ends_with($trimmed, 'leads/create')) {
+            return app(LeadController::class)->createSchema($request);
+        }
+        if ($trimmed === 'leads' || $trimmed === 'lead-management' || $trimmed === 'leadmanagement' || str_ends_with($trimmed, 'views/leads') || str_ends_with($trimmed, 'lead-management')) {
+            return app(LeadController::class)->dashboard($request);
+        }
+
+        return app(SduiViewController::class)->show($request, $trimmed, $permissions);
+    })->where('subpath', '.*');
+
+    Route::get('/app/views/{subpath}', function (Request $request, string $subpath, PermissionChecker $permissions) {
+        $trimmed = ltrim($subpath, '/');
+        if (preg_match('#(?:^|/)quotations/([A-Za-z0-9\-_]+)/preview(?:-sheet)?$#', $trimmed, $m)) {
+            return app(QuotationController::class)->previewView($request, $m[1]);
+        }
+        if (preg_match('#(?:^|/)quotations/([A-Za-z0-9\-_]+)/send(?:-sheet)?$#', $trimmed, $m)) {
+            return app(QuotationController::class)->sendView($request, $m[1]);
+        }
+        if (preg_match('#(?:^|/)quotations/([A-Za-z0-9\-_]+)$#', $trimmed, $m)) {
+            return app(QuotationController::class)->showSchema($request, $m[1]);
+        }
+        if ($trimmed === 'quotations/create' || str_ends_with($trimmed, 'quotations/create')) {
+            return app(QuotationController::class)->createSchema($request);
+        }
+        if (str_contains($trimmed, 'invoices/create') || str_ends_with($trimmed, 'invoices/create')) {
+            return app(ApiInvoiceController::class)->createSchema($request);
+        }
+        if (preg_match('#(?:^|/)leads/([A-Za-z0-9\-_]+)#', $trimmed, $m)) {
+            $request->merge(['id' => $m[1]]);
+
+            return app(LeadController::class)->showSchema($request, $m[1]);
+        }
+        if ($trimmed === 'lead-detail' || str_ends_with($trimmed, 'lead-detail')) {
+            return app(LeadController::class)->leadDetail($request);
+        }
+        if ($trimmed === 'create-lead' || str_ends_with($trimmed, 'create-lead') || $trimmed === 'leads/create' || str_ends_with($trimmed, 'leads/create')) {
+            return app(LeadController::class)->createSchema($request);
+        }
+        if ($trimmed === 'leads' || $trimmed === 'lead-management' || $trimmed === 'leadmanagement' || str_ends_with($trimmed, 'views/leads') || str_ends_with($trimmed, 'lead-management')) {
+            return app(LeadController::class)->dashboard($request);
+        }
+
+        return app(SduiViewController::class)->show($request, $trimmed, $permissions);
+    })->where('subpath', '.*');
 
     // Universal POS Checkout & Drawer Endpoints
     Route::get('/tenant/pos/checkout-sheet', [SaleApiController::class, 'checkoutSheet'])->middleware('tenant.api.permission:pos,view');
@@ -165,6 +422,33 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::post('/tenant/settings/tax-rules/{id}/toggle', [PosSyncApiController::class, 'taxRulesToggle'])->middleware('tenant.api.permission:settings,edit');
     Route::post('/tenant/settings/tax-rules/{id}/delete', [PosSyncApiController::class, 'taxRulesDestroy'])->middleware('tenant.api.permission:settings,edit');
     Route::delete('/tenant/settings/tax-rules/{id}', [PosSyncApiController::class, 'taxRulesDestroy'])->middleware('tenant.api.permission:settings,edit');
+
+    // Customer search endpoints (Headless CRM / SDUI auto-linking)
+    Route::get('/tenant/customers/search', [PosSyncApiController::class, 'customersSearch'])->middleware('tenant.api.permission:customers,view');
+    Route::get('/v1/tenant/customers/search', [PosSyncApiController::class, 'customersSearch'])->middleware('tenant.api.permission:customers,view');
+
+    // Sales Reps endpoints
+    Route::get('/tenant/staff/sales-reps', [LeadModuleController::class, 'salesReps'])->middleware('tenant.api.permission:users,view');
+    Route::get('/v1/tenant/staff/sales-reps', [LeadModuleController::class, 'salesReps'])->middleware('tenant.api.permission:users,view');
+
+    // Lead Management SDUI Schema and RESTful API endpoints
+    Route::get('/tenant/leads/schema', [LeadModuleController::class, 'createSchema'])->middleware('tenant.api.permission:leads,view');
+    Route::get('/v1/tenant/leads/schema', [LeadModuleController::class, 'createSchema'])->middleware('tenant.api.permission:leads,view');
+
+    Route::get('/tenant/leads', [LeadModuleController::class, 'leadsIndex'])->middleware('tenant.api.permission:leads,view');
+    Route::get('/v1/tenant/leads', [LeadModuleController::class, 'leadsIndex'])->middleware('tenant.api.permission:leads,view');
+    Route::post('/tenant/leads', [LeadModuleController::class, 'leadsStore'])->middleware('tenant.api.permission:leads,create');
+    Route::post('/v1/tenant/leads', [LeadModuleController::class, 'leadsStore'])->middleware('tenant.api.permission:leads,create');
+    Route::get('/tenant/leads/{id}', [LeadModuleController::class, 'leadsShow'])->middleware('tenant.api.permission:leads,view');
+    Route::get('/v1/tenant/leads/{id}', [LeadModuleController::class, 'leadsShow'])->middleware('tenant.api.permission:leads,view');
+    Route::match(['put', 'patch'], '/tenant/leads/{id}', [LeadModuleController::class, 'leadsUpdate'])->middleware('tenant.api.permission:leads,edit');
+    Route::match(['put', 'patch'], '/v1/tenant/leads/{id}', [LeadModuleController::class, 'leadsUpdate'])->middleware('tenant.api.permission:leads,edit');
+    Route::post('/tenant/leads/{id}/convert-to-invoice', [LeadModuleController::class, 'leadConvertToInvoice'])->middleware('tenant.api.permission:leads,convert');
+    Route::post('/v1/tenant/leads/{id}/convert-to-invoice', [LeadModuleController::class, 'leadConvertToInvoice'])->middleware('tenant.api.permission:leads,convert');
+    Route::post('/tenant/leads/{id}/convert', [LeadModuleController::class, 'leadConvert'])->middleware('tenant.api.permission:leads,convert');
+    Route::post('/v1/tenant/leads/{id}/convert', [LeadModuleController::class, 'leadConvert'])->middleware('tenant.api.permission:leads,convert');
+    Route::post('/tenant/leads/{id}/reminders', [LeadModuleController::class, 'leadAddReminder'])->middleware('tenant.api.permission:leads,edit');
+    Route::post('/v1/tenant/leads/{id}/reminders', [LeadModuleController::class, 'leadAddReminder'])->middleware('tenant.api.permission:leads,edit');
 
     // Native mobile cash-register contract. These unversioned tenant URLs
     // are emitted by SchemaResponse and intentionally coexist with the
@@ -266,6 +550,27 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
         Route::post('/services/{id}/delete', [SalonApiController::class, 'servicesDestroy'])->middleware('tenant.api.permission:service_orders,edit');
     });
 
+    // Restaurant & Cafe POS Module Routes
+    Route::prefix('tenant/restaurant')->group(function () {
+        Route::get('/floors', [RestaurantApiController::class, 'floorsIndex'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/floors', [RestaurantApiController::class, 'floorsStore'])->middleware('tenant.api.permission:pos,edit');
+        Route::put('/floors/{id}', [RestaurantApiController::class, 'floorsUpdate'])->middleware('tenant.api.permission:pos,edit');
+        Route::delete('/floors/{id}', [RestaurantApiController::class, 'floorsDestroy'])->middleware('tenant.api.permission:pos,edit');
+        Route::get('/tables', [RestaurantApiController::class, 'tablesIndex'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/tables', [RestaurantApiController::class, 'tablesStore'])->middleware('tenant.api.permission:pos,edit');
+        Route::get('/tables/{id}', [RestaurantApiController::class, 'tableShow'])->middleware('tenant.api.permission:pos,view');
+        Route::get('/tables/{id}/actions-sheet', [RestaurantApiController::class, 'tableActionsSheet'])->middleware('tenant.api.permission:pos,view');
+        Route::put('/tables/{id}', [RestaurantApiController::class, 'tablesUpdate'])->middleware('tenant.api.permission:pos,edit');
+        Route::post('/tables/{id}/status', [RestaurantApiController::class, 'tablesSetStatus'])->middleware('tenant.api.permission:pos,edit');
+        Route::delete('/tables/{id}', [RestaurantApiController::class, 'tablesDestroy'])->middleware('tenant.api.permission:pos,edit');
+        Route::post('/orders/send-to-kitchen', [RestaurantApiController::class, 'sendToKitchen'])->middleware('tenant.api.permission:pos,create');
+        Route::post('/orders/{saleId}/settle', [RestaurantApiController::class, 'settle'])->middleware('tenant.api.permission:pos,create');
+        Route::get('/kot', [RestaurantApiController::class, 'kotIndex'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/kot/{id}/status', [RestaurantApiController::class, 'kotUpdateStatus'])->middleware('tenant.api.permission:pos,edit');
+        Route::post('/kot/{id}/dismiss-alarm', [RestaurantApiController::class, 'kotDismissAlarm'])->middleware('tenant.api.permission:pos,edit');
+        Route::post('/kot/{id}/print', [RestaurantApiController::class, 'kotPrint'])->middleware('tenant.api.permission:pos,view');
+    });
+
     // One-Click Demo Data Purge
     Route::delete('/tenant/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
     Route::delete('/app/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
@@ -281,6 +586,26 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::get('/app/navigation/drawer', [SettingsApiController::class, 'getDrawerNavigation']);
     Route::get('/tenant/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
     Route::get('/app/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+    Route::get('/ui/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+    Route::get('/v1/ui/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+    Route::get('/tenant/ui/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+    Route::get('/v1/tenant/ui/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+    Route::get('/v1/tenant/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+
+    // Dynamic Theme Tokens & Zero-White-Leak Surface
+    Route::get('/tenant/theme', [SettingsApiController::class, 'getTheme']);
+    Route::get('/v1/tenant/theme', [SettingsApiController::class, 'getTheme']);
+    Route::get('/app/theme', [SettingsApiController::class, 'getTheme']);
+    Route::get('/v1/theme', [SettingsApiController::class, 'getTheme']);
+    Route::get('/theme', [SettingsApiController::class, 'getTheme']);
+
+    // Store Profile Management & Real-Time Cache Invalidation
+    Route::get('/tenant/store-profile', [StoreProfileController::class, 'show'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/v1/tenant/store-profile', [StoreProfileController::class, 'show'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/app/store-profile', [StoreProfileController::class, 'show'])->middleware('tenant.api.permission:settings,view');
+    Route::match(['post', 'put'], '/tenant/store-profile', [StoreProfileController::class, 'update'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/v1/tenant/store-profile', [StoreProfileController::class, 'update'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/app/store-profile', [StoreProfileController::class, 'update'])->middleware('tenant.api.permission:settings,edit');
 
     // Form Field Labels & Dynamic Custom Fields
     Route::get('/tenant/settings/form-labels', [SettingsApiController::class, 'getFormLabels'])->middleware('tenant.api.permission:settings,view');
@@ -288,12 +613,62 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::get('/app/settings/form-labels', [SettingsApiController::class, 'getFormLabels'])->middleware('tenant.api.permission:settings,view');
     Route::post('/app/settings/form-labels', [SettingsApiController::class, 'updateFormLabels'])->middleware('tenant.api.permission:settings,edit');
 
+    // Tenant App Preferences: Notifications & Audio Alerts
+    Route::get('/tenant/settings/notifications-audio', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/app/settings/notifications-audio', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/v1/tenant/settings/notifications-audio', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
+    Route::match(['post', 'put'], '/tenant/settings/notifications-audio', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/app/settings/notifications-audio', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/v1/tenant/settings/notifications-audio', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/tenant/settings/auto-reminders', [TenantAppPreferencesController::class, 'saveAutoReminders'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/v1/tenant/settings/auto-reminders', [TenantAppPreferencesController::class, 'saveAutoReminders'])->middleware('tenant.api.permission:settings,edit');
+
+    Route::get('/tenant/settings/app-preferences/notifications', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/app/settings/app-preferences/notifications', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/v1/tenant/settings/app-preferences/notifications', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/tenant/settings/app-preferences', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/v1/tenant/settings/app-preferences', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
+    Route::match(['post', 'put'], '/tenant/settings/app-preferences/notifications', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/app/settings/app-preferences/notifications', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/v1/tenant/settings/app-preferences/notifications', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/tenant/settings/app-preferences', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/v1/tenant/settings/app-preferences', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/tenant/settings/app-preferences/notifications/upload-audio', [TenantAppPreferencesController::class, 'uploadAudio'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/app/settings/app-preferences/notifications/upload-audio', [TenantAppPreferencesController::class, 'uploadAudio'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/v1/tenant/settings/app-preferences/notifications/upload-audio', [TenantAppPreferencesController::class, 'uploadAudio'])->middleware('tenant.api.permission:settings,edit');
+
     Route::delete('/tenant/products/{id}', [PosSyncApiController::class, 'inventoryDestroyProduct'])->middleware('tenant.api.permission:products,edit');
     Route::delete('/app/products/{id}', [PosSyncApiController::class, 'inventoryDestroyProduct'])->middleware('tenant.api.permission:products,edit');
+
+    // Tenant Notification Gateways & SDUI API Integrations
+    Route::get('/tenant/api-integrations', [ApiIntegrationsController::class, 'index'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/app/api-integrations', [ApiIntegrationsController::class, 'index'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/v1/tenant/api-integrations', [ApiIntegrationsController::class, 'index'])->middleware('tenant.api.permission:settings,view');
+    Route::match(['post', 'put'], '/tenant/api-integrations/{channel}', [ApiIntegrationsController::class, 'saveChannel'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/app/api-integrations/{channel}', [ApiIntegrationsController::class, 'saveChannel'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/v1/tenant/api-integrations/{channel}', [ApiIntegrationsController::class, 'saveChannel'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/tenant/api-integrations/{channel}/test', [ApiIntegrationsController::class, 'testChannel'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/app/api-integrations/{channel}/test', [ApiIntegrationsController::class, 'testChannel'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/v1/tenant/api-integrations/{channel}/test', [ApiIntegrationsController::class, 'testChannel'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/tenant/notifications/dispatch', [ApiIntegrationsController::class, 'dispatchDocument'])->middleware('tenant.api.permission:pos,create');
+    Route::post('/app/notifications/dispatch', [ApiIntegrationsController::class, 'dispatchDocument'])->middleware('tenant.api.permission:pos,create');
+    Route::post('/v1/tenant/notifications/dispatch', [ApiIntegrationsController::class, 'dispatchDocument'])->middleware('tenant.api.permission:pos,create');
+    Route::post('/tenant/api-keys/regenerate', [ApiIntegrationsController::class, 'regenerateApiKey'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/app/api-keys/regenerate', [ApiIntegrationsController::class, 'regenerateApiKey'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/v1/tenant/api-keys/regenerate', [ApiIntegrationsController::class, 'regenerateApiKey'])->middleware('tenant.api.permission:settings,edit');
+
+    // Direct SMS Gateway Settings & Test Dispatch Endpoints
+    Route::post('/tenant/settings/sms-gateway', [TenantSettingsController::class, 'saveSmsCredentials'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/app/settings/sms-gateway', [TenantSettingsController::class, 'saveSmsCredentials'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/v1/tenant/settings/sms-gateway', [TenantSettingsController::class, 'saveSmsCredentials'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/tenant/settings/sms-gateway/test', [TenantSettingsController::class, 'sendTestSms'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/app/settings/sms-gateway/test', [TenantSettingsController::class, 'sendTestSms'])->middleware('tenant.api.permission:settings,edit');
+    Route::post('/v1/tenant/settings/sms-gateway/test', [TenantSettingsController::class, 'sendTestSms'])->middleware('tenant.api.permission:settings,edit');
 
     // Server-Driven UI Declarative Form Submissions
     Route::match(['post', 'put'], '/tenant/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
     Route::match(['post', 'put'], '/app/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
+    Route::match(['post', 'put'], '/v1/tenant/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
 
     // Post-Checkout Invoicing & Sales History Actions
     Route::post('/tenant/sales/{id}/send-invoice', [SaleApiController::class, 'sendInvoice']);
@@ -334,14 +709,14 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     // Centralized Customers & CRM (Mobile SDUI & API)
     Route::prefix('tenant/customers')->group(function () {
         Route::get('/', [PosSyncApiController::class, 'customersIndex'])->middleware('tenant.api.permission:customers,view');
-        Route::get('/search', [PosSyncApiController::class, 'customersSearch'])->middleware('tenant.api.permission:customers,view');
+        Route::get('/search', [CustomerController::class, 'search'])->middleware('tenant.api.permission:customers,view');
         Route::post('/', [PosSyncApiController::class, 'customersStore'])->middleware('tenant.api.permission:customers,create');
         Route::get('/{id}/ledger', [PosSyncApiController::class, 'customerLedger'])->middleware('tenant.api.permission:customers,view');
         Route::post('/{id}/payment', [PosSyncApiController::class, 'customerRecordPayment'])->middleware('tenant.api.permission:finance,edit');
     });
     Route::prefix('app/customers')->group(function () {
         Route::get('/', [PosSyncApiController::class, 'customersIndex'])->middleware('tenant.api.permission:customers,view');
-        Route::get('/search', [PosSyncApiController::class, 'customersSearch'])->middleware('tenant.api.permission:customers,view');
+        Route::get('/search', [CustomerController::class, 'search'])->middleware('tenant.api.permission:customers,view');
         Route::post('/', [PosSyncApiController::class, 'customersStore'])->middleware('tenant.api.permission:customers,create');
         Route::get('/{id}/ledger', [PosSyncApiController::class, 'customerLedger'])->middleware('tenant.api.permission:customers,view');
         Route::post('/{id}/payment', [PosSyncApiController::class, 'customerRecordPayment'])->middleware('tenant.api.permission:finance,edit');
@@ -428,8 +803,10 @@ Route::prefix('v1/pos')->group(function () {
 
         // Due Payments / Receivables dashboard panel
         Route::get('/receivables/due', [PosSyncApiController::class, 'dueReceivables'])->middleware('tenant.api.permission:customers,view');
-        Route::post('/receivables/{sale}/remind', [PosSyncApiController::class, 'remindReceivable'])->middleware('tenant.api.permission:finance,edit');
+        Route::match(['get', 'post'], '/receivables/{sale}/remind', [PosSyncApiController::class, 'remindReceivable'])->middleware('tenant.api.permission:finance,edit');
+        Route::get('/receivables/{sale}/reminder-sheet', [ReceivablesController::class, 'reminderSheet'])->middleware('tenant.api.permission:customers,view');
         Route::put('/receivables/{sale}/reminder', [PosSyncApiController::class, 'scheduleReceivableReminder'])->middleware('tenant.api.permission:finance,edit');
+        Route::post('/dispatch/{type}/{id}', [DispatchController::class, 'dispatchDocument'])->middleware('tenant.api.permission:pos,create');
 
         // Analytics & Reports
         Route::get('/analytics', [PosSyncApiController::class, 'analytics'])->middleware('tenant.api.permission:reports,view');
@@ -455,6 +832,7 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/settings/navigation-labels', [SettingsApiController::class, 'updateNavigationLabels'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/navigation/drawer', [SettingsApiController::class, 'getDrawerNavigation']);
         Route::get('/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+        Route::get('/ui/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
         Route::get('/settings/form-labels', [SettingsApiController::class, 'getFormLabels'])->middleware('tenant.api.permission:settings,view');
         Route::post('/settings/form-labels', [SettingsApiController::class, 'updateFormLabels'])->middleware('tenant.api.permission:settings,edit');
 
@@ -543,7 +921,13 @@ Route::prefix('v1/pos')->group(function () {
         Route::post('/settings/payment-methods/{id}/delete', [SettingsApiController::class, 'paymentMethodsDestroy'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/payment-methods/{id}/toggle', [SettingsApiController::class, 'paymentMethodsToggle'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/settings/payment-methods/{id}/transactions', [SettingsApiController::class, 'paymentMethodTransactions'])->middleware('tenant.api.permission:settings,view');
-        Route::get('/settings/payment-methods/{id}/transactions/export', [SettingsApiController::class, 'paymentMethodTransactionsExport'])->middleware('tenant.api.permission:settings,view');
+        Route::get('/settings/notifications-audio', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
+        Route::match(['post', 'put'], '/settings/notifications-audio', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/settings/app-preferences/notifications', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
+        Route::match(['post', 'put'], '/settings/app-preferences/notifications', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/settings/app-preferences', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
+        Route::match(['post', 'put'], '/settings/app-preferences', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/settings/app-preferences/notifications/upload-audio', [TenantAppPreferencesController::class, 'uploadAudio'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
 
         // Consignments (draft -> dispatched -> reconciled -> finalized)
@@ -572,6 +956,9 @@ Route::prefix('v1/pos')->group(function () {
 
         Route::post('/restaurant/tables', [RestaurantApiController::class, 'tablesStore'])->middleware('tenant.api.permission:pos,edit');
         Route::get('/restaurant/tables/{id}', [RestaurantApiController::class, 'tableShow'])->middleware('tenant.api.permission:pos,view');
+        Route::get('/restaurant/tables/{id}/actions-sheet', [RestaurantApiController::class, 'tableActionsSheet'])->middleware('tenant.api.permission:pos,view');
+        Route::get('/tables/{id}/actions-sheet', [RestaurantApiController::class, 'tableActionsSheet'])->middleware('tenant.api.permission:pos,view');
+        Route::get('/tenant/tables/{id}/actions-sheet', [RestaurantApiController::class, 'tableActionsSheet'])->middleware('tenant.api.permission:pos,view');
         Route::put('/restaurant/tables/{id}', [RestaurantApiController::class, 'tablesUpdate'])->middleware('tenant.api.permission:pos,edit');
         Route::post('/restaurant/tables/{id}/status', [RestaurantApiController::class, 'tablesSetStatus'])->middleware('tenant.api.permission:pos,edit');
         Route::delete('/restaurant/tables/{id}', [RestaurantApiController::class, 'tablesDestroy'])->middleware('tenant.api.permission:pos,edit');
@@ -582,6 +969,8 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/restaurant/kot', [RestaurantApiController::class, 'kotIndex'])->middleware('tenant.api.permission:pos,view');
         Route::post('/restaurant/kot/{id}/status', [RestaurantApiController::class, 'kotUpdateStatus'])->middleware('tenant.api.permission:pos,edit');
         Route::post('/restaurant/kot/{id}/dismiss-alarm', [RestaurantApiController::class, 'kotDismissAlarm'])->middleware('tenant.api.permission:pos,edit');
+        Route::post('/restaurant/kot/{id}/print', [RestaurantApiController::class, 'kotPrint'])->middleware('tenant.api.permission:pos,view');
+        Route::post('/kot/{id}/print', [RestaurantApiController::class, 'kotPrint'])->middleware('tenant.api.permission:pos,view');
 
         // Pharmacy POS Module Aliases
         Route::prefix('pharmacy')->group(function () {
@@ -704,4 +1093,15 @@ Route::prefix('v1/pos')->group(function () {
         });
         Route::get('/views/{view}', [SduiViewController::class, 'show']);
     });
+});
+
+Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
+    Route::post('/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
+    Route::post('/v1/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
+
+    Route::post('/tenant/settings/sms-gateway', [TenantSettingsController::class, 'saveSmsCredentials']);
+    Route::post('/v1/tenant/settings/sms-gateway', [TenantSettingsController::class, 'saveSmsCredentials']);
+
+    Route::post('/tenant/settings/sms-gateway/test', [TenantSettingsController::class, 'sendTestSms']);
+    Route::post('/v1/tenant/settings/sms-gateway/test', [TenantSettingsController::class, 'sendTestSms']);
 });

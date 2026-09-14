@@ -31,6 +31,16 @@ class ResolveTenantContext
      */
     public function handle(Request $request, Closure $next): Response
     {
+        $installedFile = storage_path('installed');
+        $legacyInstalledFile = storage_path('--installed');
+        if (! file_exists($installedFile) && file_exists($legacyInstalledFile)) {
+            @copy($legacyInstalledFile, $installedFile);
+        }
+
+        if (! file_exists($installedFile) || $request->is('install*')) {
+            return $next($request);
+        }
+
         $user = Auth::guard('web')->user() ?? Auth::guard('tenant_api')->user();
         $companyId = $user?->company_id ?? $this->resolveCompanyIdFromHost($request);
 
@@ -45,22 +55,26 @@ class ResolveTenantContext
 
     protected function resolveCompanyIdFromHost(Request $request): ?string
     {
-        $host = strtolower($request->getHost());
-        $baseHost = parse_url(config('app.url'), PHP_URL_HOST);
+        try {
+            $host = strtolower($request->getHost());
+            $baseHost = parse_url(config('app.url'), PHP_URL_HOST);
 
-        if ($baseHost && str_ends_with($host, '.'.$baseHost)) {
-            $slug = substr($host, 0, -(strlen($baseHost) + 1));
-            if ($slug && ! in_array($slug, Company::RESERVED_SLUGS, true)) {
-                return Company::withoutGlobalScopes()->where('slug', $slug)->value('id');
+            if ($baseHost && str_ends_with($host, '.'.$baseHost)) {
+                $slug = substr($host, 0, -(strlen($baseHost) + 1));
+                if ($slug && ! in_array($slug, Company::RESERVED_SLUGS, true)) {
+                    return Company::withoutGlobalScopes()->where('slug', $slug)->value('id');
+                }
+
+                return null;
+            }
+
+            if ($baseHost && $host !== $baseHost && $host !== 'localhost' && $host !== '127.0.0.1') {
+                return Company::withoutGlobalScopes()->where('custom_domain', $host)->value('id');
             }
 
             return null;
+        } catch (\Throwable) {
+            return null;
         }
-
-        if ($baseHost && $host !== $baseHost && $host !== 'localhost' && $host !== '127.0.0.1') {
-            return Company::withoutGlobalScopes()->where('custom_domain', $host)->value('id');
-        }
-
-        return null;
     }
 }

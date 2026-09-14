@@ -15,7 +15,17 @@ class EnsureAppIsInstalled
             return $next($request);
         }
 
-        if (! file_exists(storage_path('installed')) && ! $request->is('install*')) {
+        $installedFile = storage_path('installed');
+        $legacyInstalledFile = storage_path('--installed');
+
+        // Older deployments accidentally persisted the installation marker as
+        // `storage/--installed`. Treat it as the same marker and repair the
+        // canonical filename so API requests are not redirected to /install.
+        if (! file_exists($installedFile) && file_exists($legacyInstalledFile)) {
+            @copy($legacyInstalledFile, $installedFile);
+        }
+
+        if (! file_exists($installedFile) && ! $request->is('install*')) {
             return redirect('/install');
         }
 

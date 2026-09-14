@@ -10,7 +10,7 @@ class EnsureNotInstalled
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (file_exists(storage_path('installed'))) {
+        if (file_exists(storage_path('installed')) || file_exists(storage_path('--installed'))) {
             abort(403, 'This application is already installed.');
         }
 

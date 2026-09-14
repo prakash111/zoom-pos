@@ -30,6 +30,7 @@ use App\Services\Delivery\WebhookDispatchService;
 use App\Services\Financial\CustomerLedgerService;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Modular\ModuleRegistry;
+use App\Services\Notifications\TenantNotificationDispatcherService;
 use App\Services\Payment\SubscriptionPaymentGatewayService;
 use App\Services\Sdui\SchemaResponse;
 use App\Services\TaxCalculationService;
@@ -239,10 +240,16 @@ class PosSyncApiController extends Controller
                 'company_id' => $user->company_id,
                 'permissions' => $this->desktopPermissions($user),
             ],
+            'drawer_header' => $company->getDrawerHeaderPayload(),
+            'header' => $company->getDrawerHeaderPayload(),
             'company' => [
                 'id' => $company->id,
-                'name' => $company->name,
-                'trade_name' => $company->trade_name ?? $company->name,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $company->getEffectiveTradeName(),
+                'trading_name' => $company->getEffectiveTradeName(),
+                'store_name' => $company->display_name,
+                'display_name' => $company->display_name,
                 'slug' => $company->slug,
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
@@ -261,6 +268,10 @@ class PosSyncApiController extends Controller
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
+                'logo_url' => $company->getLogoUrl(),
+                'favicon_url' => $company->getFaviconUrl(),
+                'drawer_header' => $company->getDrawerHeaderPayload(),
+                'header' => $company->getDrawerHeaderPayload(),
             ],
             // Only present when the tenant is actually on a plan — lets a fresh
             // desktop device provision a local mirror of both rows (companies.plan_name
@@ -566,6 +577,8 @@ class PosSyncApiController extends Controller
                     'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                     'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                     'drawer_cover_url' => $company->getDrawerCoverUrl(),
+                    'logo_url' => $company->getLogoUrl(),
+                    'favicon_url' => $company->getFaviconUrl(),
                 ],
                 'plan' => $company->plan ? $company->plan->only([
                     'name', 'display_name', 'billing_cycle', 'duration_days', 'price', 'currency', 'features', 'limits', 'active',
@@ -605,10 +618,16 @@ class PosSyncApiController extends Controller
                 'company_id' => $user->company_id,
                 'permissions' => $this->desktopPermissions($user),
             ] : null,
+            'drawer_header' => $company->getDrawerHeaderPayload(),
+            'header' => $company->getDrawerHeaderPayload(),
             'company' => [
                 'id' => $company->id,
-                'name' => $company->name,
-                'trade_name' => $company->trade_name ?? $company->name,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $company->getEffectiveTradeName(),
+                'trading_name' => $company->getEffectiveTradeName(),
+                'store_name' => $company->display_name,
+                'display_name' => $company->display_name,
                 'slug' => $company->slug,
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
@@ -627,8 +646,12 @@ class PosSyncApiController extends Controller
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
+                'logo_url' => $company->getLogoUrl(),
+                'favicon_url' => $company->getFaviconUrl(),
                 'navigation_labels' => $company->navigation_labels ?? new \stdClass,
                 'form_field_customizations' => $company->form_field_customizations ?? new \stdClass,
+                'drawer_header' => $company->getDrawerHeaderPayload(),
+                'header' => $company->getDrawerHeaderPayload(),
             ],
         ]);
     }
@@ -676,10 +699,16 @@ class PosSyncApiController extends Controller
             'success' => true,
             'status' => 'online',
             'server_time' => now()->toIso8601String(),
+            'header' => $company->getDrawerHeaderPayload(),
+            'drawer_header' => $company->getDrawerHeaderPayload(),
             'company' => [
                 'id' => $company->id,
-                'name' => $company->name,
-                'trade_name' => $company->trade_name ?? $company->name,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $company->getEffectiveTradeName(),
+                'trading_name' => $company->getEffectiveTradeName(),
+                'store_name' => $company->display_name,
+                'display_name' => $company->display_name,
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
                 'tax_number' => $company->document ?? $company->tax_id ?? '',
@@ -689,6 +718,11 @@ class PosSyncApiController extends Controller
                 'state' => $company->state ?? '',
                 'phone' => $company->phone ?? '',
                 'receipt_footer_note' => $company->receipt_footer_note ?? 'Thank you for your business!',
+                'logo_url' => $company->getLogoUrl(),
+                'favicon_url' => $company->getFaviconUrl(),
+                'drawer_cover_url' => $company->getDrawerCoverUrl(),
+                'drawer_header' => $company->getDrawerHeaderPayload(),
+                'header' => $company->getDrawerHeaderPayload(),
             ],
             'features' => [
                 'offline_sync' => true,
@@ -976,6 +1010,9 @@ class PosSyncApiController extends Controller
             'invoice_terms' => $company->invoice_terms,
             'quote_terms' => $company->quote_terms,
             'bank_details' => $company->bank_details,
+            'logo_url' => $company->getLogoUrl(),
+            'favicon_url' => $company->getFaviconUrl(),
+            'drawer_cover_url' => $company->getDrawerCoverUrl(),
         ];
 
         // Tombstones: rows deleted (by a delta-only client's queued offline
@@ -2754,31 +2791,66 @@ class PosSyncApiController extends Controller
                         ->orWhere('email', 'like', "%{$query}%")
                         ->orWhere('document', 'like', "%{$query}%")
                         ->orWhere('tax_id', 'like', "%{$query}%")
-                        ->orWhere('gstin', 'like', "%{$query}%");
+                        ->orWhere('gstin', 'like', "%{$query}%")
+                        ->orWhere('custom_fields->company_name', 'like', "%{$query}%");
                 });
             })
             ->orderBy('name')
             ->limit(50)
             ->get()
-            ->map(fn (Customer $c) => [
-                'id' => (string) ($c->external_id ?: $c->id),
-                'server_id' => $c->id,
-                'name' => $c->name,
-                'phone' => $c->phone ?? '',
-                'email' => $c->email ?? '',
-                'document' => $c->document ?? $c->tax_id ?? '',
-                'balance_due' => (float) ($c->due_balance ?? 0),
-                'age' => $c->age,
-                'gender' => $c->gender,
-                'allergies' => $c->allergies,
-                'prescribing_doctor' => $c->prescribing_doctor,
-                'doctor_registration_no' => $c->doctor_registration_no,
-                'custom_fields' => $c->custom_fields ?? (object) [],
-            ]);
+            ->map(function (Customer $c) {
+                $companyName = $c->company_name ?? ($c->custom_fields['company_name'] ?? '');
+                $label = $c->name;
+                if ($c->phone) {
+                    $label .= " ({$c->phone})";
+                }
+                if ($companyName && $companyName !== $c->name) {
+                    $label .= " - {$companyName}";
+                }
+
+                return [
+                    'id' => (string) ($c->external_id ?: $c->id),
+                    'server_id' => $c->id,
+                    'value' => $c->id,
+                    'label' => $label,
+                    'name' => $c->name,
+                    'title' => $c->name,
+                    'subtitle' => $c->phone ?: ($c->email ?: ''),
+                    'phone' => $c->phone ?? '',
+                    'email' => $c->email ?? '',
+                    'company_name' => $companyName,
+                    'due_amount' => $c->due_balance > 0 ? 'Due: ' . number_format((float) $c->due_balance, 2) : null,
+                    'avatar_icon' => 'person',
+                    'badge_due_bg' => 'rgba(239, 68, 68, 0.15)',
+                    'badge_due_tx' => '#F87171',
+                    'document' => $c->document ?? $c->tax_id ?? '',
+                    'balance_due' => (float) ($c->due_balance ?? 0),
+                    'age' => $c->age,
+                    'gender' => $c->gender,
+                    'allergies' => $c->allergies,
+                    'prescribing_doctor' => $c->prescribing_doctor,
+                    'doctor_registration_no' => $c->doctor_registration_no,
+                    'custom_fields' => $c->custom_fields ?? (object) [],
+                ];
+            });
 
         return response()->json([
             'success' => true,
             'count' => $customers->count(),
+            'theme' => [
+                'container_bg'     => '#1E293B',    // High-contrast slate surface
+                'dropdown_surface' => '#1E293B',
+                'popup_background' => '#1E293B',
+                'surface'          => '#1E293B',
+                'card'             => '#1E293B',
+                'border_color'     => '#334155',    // Slate divider
+                'title_color'      => '#F8FAFC',    // High-contrast white
+                'sub_color'        => '#94A3B8',    // Slate-400
+                'text_color'       => '#F8FAFC',
+                'badge_due_bg'     => 'rgba(239, 68, 68, 0.15)',
+                'badge_due_tx'     => '#F87171',
+            ],
+            'data' => $customers,
             'customers' => $customers,
         ]);
     }
@@ -3709,7 +3781,7 @@ class PosSyncApiController extends Controller
         $user = $this->resolveUser($request, $company);
 
         $validator = Validator::make($request->all(), [
-            'type' => ['required', 'string', 'in:email,whatsapp,custom'],
+            'type' => ['required', 'string', 'in:email,whatsapp,sms,custom'],
             'document_type' => ['required', 'string', 'in:invoice,quotation'],
             'recipient' => ['required_unless:type,custom', 'nullable', 'string'],
             'channel_id' => ['required_if:type,custom', 'nullable', 'integer'],
@@ -3814,7 +3886,53 @@ class PosSyncApiController extends Controller
                 ]);
             }
 
+            $dispatcher = app(TenantNotificationDispatcherService::class);
+
+            if ($type === 'sms') {
+                $smsResult = $docType === 'quotation'
+                    ? $dispatcher->dispatchQuotation($company, $sale, ['sms'], $recipient)
+                    : $dispatcher->dispatchReceipt($company, $sale, ['sms'], $recipient);
+
+                AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
+                    'type' => 'sms',
+                    'document_type' => $docType,
+                    'recipient' => $recipient,
+                    'document_number' => $sale->sale_number,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'status' => 'sent',
+                    'message' => $smsResult['sms']['message'] ?? "SMS sent successfully to {$recipient}.",
+                    'document_number' => $sale->sale_number,
+                    'sent_at' => now()->toIso8601String(),
+                ]);
+            }
+
             if ($type === 'email') {
+                $dispatchResult = $docType === 'quotation'
+                    ? $dispatcher->dispatchQuotation($company, $sale, ['email'], null, $recipient)
+                    : $dispatcher->dispatchReceipt($company, $sale, ['email'], null, $recipient);
+
+                $emailRes = $dispatchResult['email'] ?? [];
+                if (! empty($emailRes['success'])) {
+                    AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
+                        'type' => 'email',
+                        'document_type' => $docType,
+                        'recipient' => $recipient,
+                        'document_number' => $sale->sale_number,
+                        'status' => 'sent',
+                    ]);
+
+                    return response()->json([
+                        'success' => true,
+                        'status' => 'sent',
+                        'message' => $emailRes['message'] ?? "Email sent successfully to {$recipient}.",
+                        'document_number' => $sale->sale_number,
+                        'sent_at' => now()->toIso8601String(),
+                    ]);
+                }
+
                 $result = $messageQueue->sendOrQueueEmail($sale, $recipient, $customMessage, true);
 
                 AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
@@ -3835,6 +3953,33 @@ class PosSyncApiController extends Controller
                     'sent_at' => $result['status'] === 'sent' ? now()->toIso8601String() : null,
                 ]);
             } else {
+                $dispatchResult = $docType === 'quotation'
+                    ? $dispatcher->dispatchQuotation($company, $sale, ['whatsapp'], $recipient)
+                    : $dispatcher->dispatchReceipt($company, $sale, ['whatsapp'], $recipient);
+
+                $wa = $dispatchResult['whatsapp'] ?? [];
+                $status = $wa['status'] ?? null;
+                $url = $wa['url'] ?? $wa['whatsapp_url'] ?? null;
+
+                if ($status === 'sent') {
+                    AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
+                        'type' => 'whatsapp',
+                        'document_type' => $docType,
+                        'recipient' => $recipient,
+                        'document_number' => $sale->sale_number,
+                        'status' => 'sent',
+                    ]);
+
+                    return response()->json([
+                        'success' => true,
+                        'status' => 'sent',
+                        'message' => $wa['message'] ?? "WhatsApp message sent successfully to {$recipient}.",
+                        'whatsapp_url' => $url,
+                        'document_number' => $sale->sale_number,
+                        'sent_at' => now()->toIso8601String(),
+                    ]);
+                }
+
                 $result = $messageQueue->sendOrQueueWhatsApp($sale, $recipient, $customMessage);
 
                 AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
@@ -3853,7 +3998,7 @@ class PosSyncApiController extends Controller
                         'queued' => "No connection right now — queued and will send to {$recipient} automatically once back online.",
                         default => "WhatsApp message prepared for {$recipient}.",
                     },
-                    'whatsapp_url' => $result['url'] ?? null,
+                    'whatsapp_url' => $url ?? $result['url'] ?? null,
                     'document_number' => $sale->sale_number,
                     'sent_at' => $result['status'] === 'sent' ? now()->toIso8601String() : null,
                 ]);
@@ -4256,6 +4401,30 @@ class PosSyncApiController extends Controller
                 'paid_amount' => (float) $sale->paid_amount,
                 'due_amount' => (float) $sale->due_amount,
                 'status' => $sale->payment_status,
+                // SDUI row actions. The reminder action deliberately opens the
+                // same registry-backed sheet used by POS document previews.
+                'actions' => [
+                    [
+                        'label' => 'Schedule push reminder',
+                        'icon' => 'schedule',
+                        'action' => [
+                            'type' => 'OPEN_DIALOG',
+                            'action_type' => 'OPEN_DIALOG',
+                            'title' => 'Schedule push reminder',
+                            'endpoint' => "/api/v1/tenant/receivables/{$sale->id}/reminder",
+                        ],
+                    ],
+                    [
+                        'label' => 'Send Reminder',
+                        'icon' => 'send',
+                        'action' => [
+                            'type' => 'OPEN_BOTTOM_SHEET',
+                            'action_type' => 'OPEN_BOTTOM_SHEET',
+                            'title' => 'Send Payment Reminder',
+                            'endpoint' => "/api/v1/tenant/receivables/{$sale->id}/reminder-sheet",
+                        ],
+                    ],
+                ],
             ])->values(),
             'total' => $sales->total(),
             'current_page' => $sales->currentPage(),
@@ -4271,8 +4440,12 @@ class PosSyncApiController extends Controller
     {
         $company = $this->resolveCompany($request);
 
+        if ($request->isMethod('get')) {
+            return app(\App\Http\Controllers\Api\ReceivablesController::class)->reminderSheet($request, $sale);
+        }
+
         $validator = Validator::make($request->all(), [
-            'channel' => ['required', 'string', 'in:whatsapp,email,custom'],
+            'channel' => ['required', 'string', 'in:whatsapp,email,sms,custom'],
         ]);
 
         if ($validator->fails()) {
@@ -4291,6 +4464,39 @@ class PosSyncApiController extends Controller
 
         $delivery = app(InvoiceDeliveryService::class);
         $channel = $request->input('channel');
+
+        if ($channel === 'sms') {
+            $phone = preg_replace('/[^0-9+]/', '', (string) ($saleModel->customer?->phone ?? $saleModel->customer_phone ?? ''));
+            if (empty($phone)) {
+                return response()->json(['success' => false, 'error' => 'This customer has no phone number on file.'], 422);
+            }
+
+            $smsBody = $delivery->buildDueReminderMessage($saleModel);
+            $res = \App\Services\SmsGatewayService::send($phone, $smsBody, $company->id);
+
+            AuditLog::record('pos.delivery_dispatched', $company->id, $this->resolveUser($request, $company)?->id, [
+                'type' => 'sms',
+                'document_type' => 'receivable_reminder',
+                'recipient' => $phone,
+                'document_number' => $saleModel->sale_number,
+                'status' => ($res['success'] ?? false) ? 'sent' : 'failed',
+            ]);
+
+            if (! ($res['success'] ?? false)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $res['error'] ?? 'Failed to send SMS reminder.',
+                    'details' => $res['body'] ?? null,
+                ], 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'status' => 'sent',
+                'message' => 'Payment reminder sent via SMS (Text Message).',
+                'document_number' => $saleModel->sale_number,
+            ]);
+        }
 
         if ($channel === 'whatsapp') {
             $phone = $saleModel->customer?->phone;
