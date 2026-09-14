@@ -246,4 +246,104 @@ class LeadManagementPackageTest extends TestCase
         $this->assertFalse(Schema::hasTable('lead_mod_leads'), 'lead_mod_leads should be dropped');
         $this->assertFalse(Schema::hasTable('lead_mod_activities'), 'lead_mod_activities should be dropped');
     }
+
+    public function test_lead_management_module_navigation_isolation_and_permission_gating(): void
+    {
+        SduiModule::create([
+            'name' => 'Lead Management System',
+            'slug' => 'leadmanagement',
+            'source_type' => 'package',
+            'package_path' => 'leadmanagement',
+            'is_active' => true,
+            'requires_license' => true,
+            'navigation' => [
+                [
+                    'key' => 'lead_ops',
+                    'title' => 'Lead Management',
+                    'icon' => 'leaderboard',
+                    'items' => [
+                        ['key' => 'lead_dashboard', 'title' => 'Leads Dashboard', 'icon' => 'dashboard', 'target_endpoint' => '/api/tenant/lead-module/views/dashboard'],
+                        ['key' => 'lead_pipeline', 'title' => 'Leads Pipeline', 'icon' => 'view_kanban', 'target_endpoint' => '/api/tenant/lead-module/views/leads'],
+                    ],
+                ],
+            ],
+        ]);
+
+        // 1. Tenant with no leadmanagement licensed
+        $unlicensedTenant = Company::create([
+            'id' => 'crm_unlicensed_001',
+            'name' => 'Unlicensed Retail Store',
+            'slug' => 'unlicensed-retail',
+            'status' => 'active',
+            'pos_mode' => 'retail',
+            'licensed_modules' => ['retail', 'restaurant'],
+        ]);
+
+        $navUnlicensed = TenantNavRegistry::getEffectiveNavForTenant($unlicensedTenant);
+        $unlicensedSections = collect($navUnlicensed)->keyBy('key');
+
+        $this->assertFalse($unlicensedSections->has('lead_ops'), 'Unlicensed tenant must not have lead_ops section');
+        $cashierSalesItems = collect($unlicensedSections->get('cashier_sales')['items'] ?? [])->pluck('key')->all();
+        $this->assertNotContains('lead_management', $cashierSalesItems, 'Unlicensed tenant must not have lead_management in cashier_sales');
+        $this->assertSame(['pos', 'sales', 'quotations', 'consignments', 'customers'], $cashierSalesItems);
+
+        $featuresUnlicensed = ModuleRegistry::activeFeaturesFor($unlicensedTenant);
+        $this->assertFalse($featuresUnlicensed['leads']);
+        $this->assertFalse($featuresUnlicensed['lead_management']);
+
+        // 2. Tenant with leadmanagement licensed
+        $licensedTenant = Company::create([
+            'id' => 'crm_licensed_001',
+            'name' => 'Licensed CRM Store',
+            'slug' => 'licensed-crm',
+            'status' => 'active',
+            'pos_mode' => 'retail',
+            'licensed_modules' => ['retail', 'leadmanagement'],
+        ]);
+
+        $navLicensed = TenantNavRegistry::getEffectiveNavForTenant($licensedTenant);
+        $licensedSections = collect($navLicensed)->keyBy('key');
+
+        $this->assertTrue($licensedSections->has('lead_ops'), 'Licensed tenant must have standalone lead_ops section');
+        $leadOpsItems = collect($licensedSections->get('lead_ops')['items'] ?? [])->pluck('key')->all();
+        $this->assertContains('lead_dashboard', $leadOpsItems);
+        $this->assertContains('lead_pipeline', $leadOpsItems);
+
+        // Crucial: Lead Management must NOT be mixed into cashier_sales even when licensed
+        $licensedCashierItems = collect($licensedSections->get('cashier_sales')['items'] ?? [])->pluck('key')->all();
+        $this->assertNotContains('lead_management', $licensedCashierItems, 'Licensed tenant must not have lead_management mixed in cashier_sales');
+
+        $featuresLicensed = ModuleRegistry::activeFeaturesFor($licensedTenant);
+        $this->assertTrue($featuresLicensed['leads']);
+        $this->assertTrue($featuresLicensed['lead_management']);
+
+        // 3. Custom navigation tree with rogue/stray lead_management in cashier_sales
+        $unlicensedTenant->update([
+            'navigation_menu_customization' => [
+                'tree' => [
+                    [
+                        'key' => 'cashier_sales',
+                        'items' => [
+                            ['key' => 'pos'],
+                            ['key' => 'sales'],
+                            ['key' => 'lead_management'],
+                            ['key' => 'customers'],
+                        ],
+                    ],
+                    [
+                        'key' => 'lead_ops',
+                        'items' => [
+                            ['key' => 'lead_dashboard'],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $customNav = TenantNavRegistry::getEffectiveNavForTenant($unlicensedTenant->fresh());
+        $customSections = collect($customNav)->keyBy('key');
+        $this->assertFalse($customSections->has('lead_ops'), 'Saved lead_ops must be purged for unlicensed tenant');
+        $customCashierItems = collect($customSections->get('cashier_sales')['items'] ?? [])->pluck('key')->all();
+        $this->assertNotContains('lead_management', $customCashierItems, 'Saved lead_management in cashier_sales must be purged');
+    }
 }

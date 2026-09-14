@@ -74,7 +74,7 @@ class TenantNavigationComposer
             'isPosScreen' => $this->request->routeIs('tenant.sales.create') || $this->request->routeIs('tenant.restaurant.pos'),
 
             'canQuotes' => $allows('quotes'),
-            'canLeads' => $allows('leads'),
+            'canLeads' => $isLeadManagement && $allows('leads'),
             'canSales' => $allows('sales'),
             'canConsignments' => $allows('consignments'),
             'canServiceOrders' => $allows('service_orders'),

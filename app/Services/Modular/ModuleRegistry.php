@@ -88,6 +88,36 @@ class ModuleRegistry
                 ],
                 'cart_configuration' => $cart,
             ],
+            'leadmanagement' => [
+                'id' => 'leadmanagement',
+                'title' => 'Lead Management System',
+                'subtitle' => 'Lead pipeline, follow-ups, attribution, auto-sync CRM',
+                'description' => 'Standalone CRM lead management vertical: lead pipeline, activity tracking, source attribution, and customer conversion.',
+                'layout_type' => 'standard_grid',
+                'icon' => 'leaderboard',
+                'features' => [
+                    'has_tables' => false, 'has_kot' => false, 'has_barcode_scanner' => false,
+                    'has_due_reminders' => true, 'prep_timer' => false, 'order_alerts' => false,
+                    'has_leads' => true, 'has_activities' => true, 'has_quotations_linking' => true,
+                    'has_invoices_linking' => true, 'has_customer_autoprovision' => true,
+                    'leads' => true, 'lead_management' => true,
+                ],
+                'navigation' => [
+                    [
+                        'key' => 'lead_ops',
+                        'title' => 'Lead Management',
+                        'icon' => 'leaderboard',
+                        'items' => [
+                            ['key' => 'lead_dashboard', 'title' => 'Leads Dashboard', 'icon' => 'dashboard', 'target_endpoint' => '/api/tenant/lead-module/views/dashboard'],
+                            ['key' => 'lead_create', 'title' => 'Capture Lead', 'icon' => 'person_add', 'target_endpoint' => '/api/tenant/lead-module/views/create-lead'],
+                            ['key' => 'lead_pipeline', 'title' => 'Leads Pipeline', 'icon' => 'view_kanban', 'target_endpoint' => '/api/tenant/lead-module/views/leads'],
+                            ['key' => 'lead_activities', 'title' => 'Follow-ups & Activities', 'icon' => 'event_note', 'target_endpoint' => '/api/tenant/lead-module/views/activities'],
+                            ['key' => 'lead_sources', 'title' => 'Lead Sources', 'icon' => 'source', 'target_endpoint' => '/api/tenant/lead-module/views/sources'],
+                        ],
+                    ],
+                ],
+                'cart_configuration' => $cart,
+            ],
         ];
     }
 
@@ -418,15 +448,23 @@ class ModuleRegistry
             }
         }
 
-        // Guarantee core cashier & sales feature flags are always present and enabled
         $merged['pos'] = true;
         $merged['sales'] = true;
         $merged['quotes'] = true;
         $merged['quotations'] = true;
-        $merged['leads'] = true;
-        $merged['lead_management'] = true;
         $merged['consignments'] = true;
         $merged['customers'] = true;
+
+        $hasLead = in_array('leadmanagement', $keys, true)
+            || in_array('lead_management', $keys, true)
+            || in_array('leads', $keys, true)
+            || $company->hasModule('leadmanagement')
+            || $company->hasModule('lead_management')
+            || $company->hasModule('leads');
+
+        $merged['leads'] = $hasLead;
+        $merged['lead_management'] = $hasLead;
+        $merged['has_leads'] = $hasLead;
 
         return $merged;
     }
@@ -724,7 +762,6 @@ class ModuleRegistry
                 ['key' => 'point_of_sale', 'group' => 'cashier_sales', 'label' => 'Restaurant POS', 'icon' => 'restaurant', 'route' => 'tenant.restaurant.pos'],
                 ['key' => 'sales_invoices', 'group' => 'cashier_sales', 'label' => 'Sales & Invoices', 'icon' => 'receipt_long', 'route' => 'tenant.sales.index'],
                 ['key' => 'quotations', 'group' => 'cashier_sales', 'label' => 'Quotations & Party Orders', 'icon' => 'description', 'route' => 'tenant.quotes.index'],
-                ['key' => 'lead_management', 'group' => 'cashier_sales', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'route' => 'tenant.leads.index'],
                 ['key' => 'crm_customers', 'group' => 'cashier_sales', 'label' => 'Customers & CRM', 'icon' => 'people', 'route' => 'tenant.customers.index'],
                 ['key' => 'tables_floor_plan', 'group' => 'restaurant_operations', 'label' => 'Floor Plan & Tables', 'icon' => 'table_restaurant', 'route' => 'tenant.restaurant.tables'],
                 ['key' => 'kot_orders', 'group' => 'restaurant_operations', 'label' => 'KOT Orders & Live Queue', 'icon' => 'receipt', 'route' => 'tenant.sales.index'],
@@ -751,7 +788,6 @@ class ModuleRegistry
                 ['key' => 'batch_inventory', 'group' => 'pharmacy_management', 'label' => 'Drug Batches & Expiry Tracker', 'icon' => 'inventory_2', 'route' => 'tenant.pharmacy.batches'],
                 ['key' => 'sales_invoices', 'group' => 'cashier_sales', 'label' => 'Sales & Invoices History', 'icon' => 'receipt_long', 'route' => 'tenant.sales.index'],
                 ['key' => 'quotations', 'group' => 'cashier_sales', 'label' => 'Quotations & Estimates', 'icon' => 'description', 'route' => 'tenant.quotes.index'],
-                ['key' => 'lead_management', 'group' => 'cashier_sales', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'route' => 'tenant.leads.index'],
                 ['key' => 'crm_customers', 'group' => 'cashier_sales', 'label' => 'Patients & Doctors', 'icon' => 'people', 'route' => 'tenant.customers.index'],
                 ['key' => 'cash_register', 'group' => 'financial_management', 'label' => 'Cash Register', 'icon' => 'savings', 'route' => 'tenant.financials.cash_register'],
                 ['key' => 'reports', 'group' => 'financial_management', 'label' => 'Reports', 'icon' => 'insights', 'route' => 'tenant.reports.index'],
@@ -767,7 +803,6 @@ class ModuleRegistry
                 ['key' => 'service_catalog', 'group' => 'salon_bookings', 'label' => 'Service Catalog & Rates', 'icon' => 'format_list_bulleted', 'route' => 'tenant.salon.services'],
                 ['key' => 'service_stylists', 'group' => 'salon_bookings', 'label' => 'Stylists & Staff Assignments', 'icon' => 'badge', 'route' => 'tenant.salon.stylists'],
                 ['key' => 'sales_invoices', 'group' => 'cashier_sales', 'label' => 'Sales & Invoices History', 'icon' => 'receipt_long', 'route' => 'tenant.sales.index'],
-                ['key' => 'lead_management', 'group' => 'cashier_sales', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'route' => 'tenant.leads.index'],
                 ['key' => 'crm_customers', 'group' => 'cashier_sales', 'label' => 'Clients & CRM', 'icon' => 'people', 'route' => 'tenant.customers.index'],
                 ['key' => 'cash_register', 'group' => 'financial_management', 'label' => 'Cash Register', 'icon' => 'savings', 'route' => 'tenant.financials.cash_register'],
                 ['key' => 'reports', 'group' => 'financial_management', 'label' => 'Reports', 'icon' => 'insights', 'route' => 'tenant.reports.index'],
@@ -782,7 +817,6 @@ class ModuleRegistry
                 ['key' => 'repair_tickets', 'group' => 'repair_service', 'label' => 'Repair Ticket Register', 'icon' => 'receipt_long', 'route' => 'tenant.repair.tickets'],
                 ['key' => 'repair_categories', 'group' => 'repair_service', 'label' => 'Device Categories', 'icon' => 'devices', 'route' => 'tenant.repair.categories'],
                 ['key' => 'sales_invoices', 'group' => 'cashier_sales', 'label' => 'Sales & Invoices History', 'icon' => 'receipt_long', 'route' => 'tenant.sales.index'],
-                ['key' => 'lead_management', 'group' => 'cashier_sales', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'route' => 'tenant.leads.index'],
                 ['key' => 'crm_customers', 'group' => 'cashier_sales', 'label' => 'Customers & CRM', 'icon' => 'people', 'route' => 'tenant.customers.index'],
                 ['key' => 'cash_register', 'group' => 'financial_management', 'label' => 'Cash Register', 'icon' => 'savings', 'route' => 'tenant.financials.cash_register'],
                 ['key' => 'reports', 'group' => 'financial_management', 'label' => 'Reports', 'icon' => 'insights', 'route' => 'tenant.reports.index'],
@@ -806,7 +840,6 @@ class ModuleRegistry
             ['key' => 'batch_tracking', 'group' => 'cashier_sales', 'label' => 'Batch & Expiry Tracking', 'icon' => 'batch_prediction', 'route' => 'tenant.products.index'],
             ['key' => 'sales_invoices', 'group' => 'cashier_sales', 'label' => 'Sales & Invoices', 'icon' => 'receipt_long', 'route' => 'tenant.sales.index'],
             ['key' => 'quotations', 'group' => 'cashier_sales', 'label' => 'Quotations & Proposals', 'icon' => 'description', 'route' => 'tenant.quotes.index'],
-            ['key' => 'lead_management', 'group' => 'cashier_sales', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'route' => 'tenant.leads.index'],
             ['key' => 'crm_customers', 'group' => 'cashier_sales', 'label' => 'Customers & CRM', 'icon' => 'people', 'route' => 'tenant.customers.index'],
             ['key' => 'cash_register', 'group' => 'financial_management', 'label' => 'Cash Register', 'icon' => 'savings', 'route' => 'tenant.financials.cash_register'],
             ['key' => 'accounts_receivable', 'group' => 'financial_management', 'label' => 'Accounts Receivable', 'icon' => 'notifications_active', 'route' => 'tenant.financials.receivables'],

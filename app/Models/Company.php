@@ -511,6 +511,7 @@ class Company extends Model
                 'repair', 'repairs', 'technician', 'repair_technician', 'repairtechnician', 'automotive', 'electronics_service' => 'repair_technician',
                 'salon', 'spa', 'wellness', 'beauty', 'salon_wellness', 'service_booking', 'service', 'services' => 'service_booking',
                 'pharmacy', 'pharmacy_pos', 'chemist' => 'pharmacy',
+                'lead', 'leads', 'leadmanagement', 'lead_management' => 'leadmanagement',
                 default => $canonical,
             };
             if ($key !== '') {
@@ -529,10 +530,20 @@ class Company extends Model
 
     public function hasModule(string $moduleKey): bool
     {
-        $canonical = \App\Services\Modular\ModuleRegistry::canonicalKey(strtolower(trim($moduleKey)));
+        $clean = strtolower(trim($moduleKey));
+        $canonical = \App\Services\Modular\ModuleRegistry::canonicalKey($clean);
+        $norm = match ($canonical) {
+            'general', 'general_retail', 'retail' => 'retail',
+            'food_restaurant', 'restaurant' => 'restaurant',
+            'repair', 'repairs', 'technician', 'repair_technician', 'repairtechnician', 'automotive', 'electronics_service' => 'repair_technician',
+            'salon', 'spa', 'wellness', 'beauty', 'salon_wellness', 'service_booking', 'service', 'services' => 'service_booking',
+            'pharmacy', 'pharmacy_pos', 'chemist' => 'pharmacy',
+            'lead', 'leads', 'leadmanagement', 'lead_management' => 'leadmanagement',
+            default => $canonical,
+        };
         $licensed = $this->licensedModuleKeys();
 
-        return in_array($canonical, $licensed, true) || in_array(strtolower(trim($moduleKey)), $licensed, true);
+        return in_array($norm, $licensed, true) || in_array($canonical, $licensed, true) || in_array($clean, $licensed, true);
     }
 
     /**

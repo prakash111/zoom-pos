@@ -36,7 +36,7 @@ class NavigationMenuBuilderTest extends TestCase
 
                 return $cashierSales
                     && $cashierSales['label'] === 'Cashier & Sales'
-                    && collect($cashierSales['items'])->pluck('key')->all() === ['pos', 'barcode_printing', 'batch_tracking', 'sales', 'quotations', 'lead_management', 'consignments', 'customers']
+                    && collect($cashierSales['items'])->pluck('key')->all() === ['pos', 'barcode_printing', 'batch_tracking', 'sales', 'quotations', 'consignments', 'customers']
                     && collect($cashierSales['items'])->every(fn ($i) => $i['visible'] === true);
             });
     }

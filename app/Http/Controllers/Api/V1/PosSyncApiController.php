@@ -56,6 +56,9 @@ class PosSyncApiController extends Controller
 
     protected function desktopPermissions(User $user): array
     {
+        $company = $user->company;
+        $hasLeadMod = (bool) ($company && ($company->hasModule('leadmanagement') || $company->hasModule('lead_management') || $company->hasModule('leads')));
+
         $permissions = [
             'pos' => true,
             'pos.view' => true,
@@ -67,10 +70,10 @@ class PosSyncApiController extends Controller
             'quotes.view' => $user->hasPermission('quotes', 'view'),
             'quotations' => $user->hasPermission('quotes', 'view'),
             'quotations.view' => $user->hasPermission('quotes', 'view'),
-            'leads' => $user->hasPermission('leads', 'view'),
-            'leads.view' => $user->hasPermission('leads', 'view'),
-            'lead_management' => $user->hasPermission('leads', 'view'),
-            'lead_management.view' => $user->hasPermission('leads', 'view'),
+            'leads' => $hasLeadMod && $user->hasPermission('leads', 'view'),
+            'leads.view' => $hasLeadMod && $user->hasPermission('leads', 'view'),
+            'lead_management' => $hasLeadMod && $user->hasPermission('leads', 'view'),
+            'lead_management.view' => $hasLeadMod && $user->hasPermission('leads', 'view'),
             'consignments' => $user->hasPermission('consignments', 'view'),
             'consignments.view' => $user->hasPermission('consignments', 'view'),
             'products.view' => $user->hasPermission('products', 'view'),

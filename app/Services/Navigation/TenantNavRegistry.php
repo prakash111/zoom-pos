@@ -64,6 +64,7 @@ class TenantNavRegistry
                     'food_restaurant' => 'restaurant',
                     'repair', 'repairs', 'technician', 'repair_technician', 'repairtechnician' => 'repair_technician',
                     'salon', 'service_booking' => 'service_booking',
+                    'lead', 'leads', 'lead_management' => 'leadmanagement',
                     default => $norm,
                 };
                 if ($norm !== '') {
@@ -102,7 +103,22 @@ class TenantNavRegistry
             }
         }
 
-        $filterItems = function (array $items) use (&$filterItems, $isRepair, $isSalon): array {
+        $hasModuleWhitelist = $tenant instanceof Company && ! empty($tenant->licensed_modules);
+        $isLeadManagement = false;
+        foreach ($modes as $m) {
+            if (in_array($m, ['leadmanagement', 'lead_management', 'leads'], true)) {
+                $isLeadManagement = true;
+                break;
+            }
+        }
+        if (! $isLeadManagement && $tenant instanceof Company) {
+            $isLeadManagement = $tenant->hasModule('leadmanagement') || $tenant->hasModule('lead_management') || $tenant->hasModule('leads');
+        }
+        if (! $isLeadManagement && ! $hasModuleWhitelist) {
+            $isLeadManagement = ModuleRegistry::isActive('leadmanagement');
+        }
+
+        $filterItems = function (array $items, string $currentSecKey = '') use (&$filterItems, $isRepair, $isSalon, $isLeadManagement): array {
             $filtered = [];
             foreach ($items as $item) {
                 if (! is_array($item)) {
@@ -112,6 +128,29 @@ class TenantNavRegistry
                 $component = strtolower(trim((string) ($item['component'] ?? '')));
                 $target = strtolower(trim((string) ($item['target_endpoint'] ?? '')));
                 $title = strtolower(trim((string) ($item['title'] ?? $item['label'] ?? '')));
+
+                // Lead Management is a separate vertical module (lead_ops) and must NEVER be mixed inside core cashier/sales or other sections
+                if ($currentSecKey !== 'lead_ops' && (
+                    $key === 'lead_management'
+                    || $component === 'lead_management'
+                    || $target === '/api/tenant/views/leads'
+                    || str_starts_with($target, '/api/tenant/lead-module')
+                )) {
+                    continue;
+                }
+
+                // If tenant does not license Lead Management, strip any lead items anywhere
+                if (! $isLeadManagement) {
+                    if ($key === 'lead_management'
+                        || str_starts_with($key, 'lead_')
+                        || $component === 'lead_management'
+                        || str_starts_with($component, 'lead_')
+                        || str_starts_with($target, '/api/tenant/lead-module')
+                        || $target === '/api/tenant/views/leads'
+                    ) {
+                        continue;
+                    }
+                }
 
                 // Service orders (equipment/warranty repair tickets) are strictly gated to repair workbenches
                 if (! $isRepair) {
@@ -134,7 +173,7 @@ class TenantNavRegistry
                 }
 
                 if (! empty($item['children']) && is_array($item['children'])) {
-                    $item['children'] = $filterItems($item['children']);
+                    $item['children'] = $filterItems($item['children'], $currentSecKey);
                 }
 
                 $filtered[] = $item;
@@ -152,8 +191,11 @@ class TenantNavRegistry
             if ($isSalon && ! $isRepair && in_array($secKey, ['repair_operations', 'repair_service', 'spare_parts_inventory'], true)) {
                 continue;
             }
+            if (! $isLeadManagement && ($secKey === 'lead_ops' || str_starts_with($secKey, 'lead_'))) {
+                continue;
+            }
             if (isset($section['items']) && is_array($section['items'])) {
-                $section['items'] = $filterItems($section['items']);
+                $section['items'] = $filterItems($section['items'], $secKey);
             }
             if (empty($section['items']) && ! in_array($secKey, ['administration', 'settings'], true)) {
                 continue;
@@ -246,6 +288,7 @@ class TenantNavRegistry
                     'food_restaurant' => 'restaurant',
                     'repair', 'repairs', 'technician', 'repair_technician', 'repairtechnician' => 'repair_technician',
                     'salon', 'service_booking' => 'service_booking',
+                    'lead', 'leads', 'lead_management' => 'leadmanagement',
                     default => $norm,
                 };
                 if ($norm !== '') {
@@ -601,7 +644,7 @@ class TenantNavRegistry
                     }
                 }
                 $existingKeys = array_column($flattened, 'key');
-                foreach (['pos', 'sales', 'quotations', 'lead_management', 'consignments', 'customers'] as $coreKey) {
+                foreach (['pos', 'sales', 'quotations', 'consignments', 'customers'] as $coreKey) {
                     if (! in_array($coreKey, $existingKeys, true) && isset($catalogItems[$coreKey])) {
                         $flattened[] = $catalogItems[$coreKey];
                     }
@@ -740,7 +783,6 @@ class TenantNavRegistry
                 ['key' => 'pos', 'label' => 'Point of Sale', 'title' => 'Point of Sale', 'icon' => 'point_of_sale', 'component' => 'pos', 'permission' => 'pos', 'target_endpoint' => '/api/tenant/views/pos'],
                 ['key' => 'sales', 'label' => 'Sales & Invoices', 'title' => 'Sales & Invoices', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales', 'target_endpoint' => '/api/tenant/views/sales'],
                 ['key' => 'quotations', 'label' => 'Quotations & Proposals', 'title' => 'Quotations & Proposals', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes', 'target_endpoint' => '/api/tenant/views/quotations'],
-                ['key' => 'lead_management', 'label' => 'Lead Management', 'title' => 'Lead Management', 'icon' => 'leaderboard', 'component' => 'lead_management', 'permission' => 'leads', 'target_endpoint' => '/api/tenant/views/leads'],
                 ['key' => 'consignments', 'label' => 'Consignments', 'title' => 'Consignments', 'icon' => 'local_shipping', 'component' => 'consignments', 'permission' => 'consignments', 'target_endpoint' => '/api/tenant/views/consignments'],
                 ['key' => 'customers', 'label' => 'Customers & CRM', 'title' => 'Customers & CRM', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'target_endpoint' => '/api/tenant/views/customers'],
             ],
@@ -1690,7 +1732,6 @@ class TenantNavRegistry
                     ['key' => 'batch_tracking', 'label' => 'Batch & Expiry Tracking', 'icon' => 'batch_prediction', 'component' => 'inventory', 'permission' => 'products'],
                     ['key' => 'sales', 'label' => 'Sales & Invoices', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales'],
                     ['key' => 'quotations', 'label' => 'Quotations & Proposals', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes'],
-                    ['key' => 'lead_management', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'component' => 'lead_management', 'permission' => 'leads'],
                     ['key' => 'consignments', 'label' => 'Consignments', 'icon' => 'local_shipping', 'component' => 'consignments', 'permission' => 'consignments'],
                     ['key' => 'customers', 'label' => 'Customers & CRM', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers'],
                 ],
@@ -1747,7 +1788,6 @@ class TenantNavRegistry
                     ['key' => 'dining_history', 'label' => 'Dining & Sales History', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales'],
                     ['key' => 'sales', 'label' => 'Sales & Invoices History', 'icon' => 'receipt', 'component' => 'sales', 'permission' => 'sales'],
                     ['key' => 'quotations', 'label' => 'Quotations & Party Orders', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes'],
-                    ['key' => 'lead_management', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'component' => 'lead_management', 'permission' => 'leads'],
                     ['key' => 'customers', 'label' => 'Customers & CRM', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers'],
                     ['key' => 'cash_register', 'label' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register'],
                 ],
@@ -1794,7 +1834,6 @@ class TenantNavRegistry
                     ['key' => 'batch_inventory', 'id' => 'batch_inventory', 'label' => 'Drug Batches & Expiry Tracker', 'title' => 'Drug Batches & Expiry Tracker', 'icon' => 'inventory_2', 'component' => 'pharmacy_batches', 'permission' => 'products', 'route' => '/api/tenant/views/pharmacy-batches', 'target_endpoint' => '/api/tenant/views/pharmacy-batches'],
                     ['key' => 'sales', 'id' => 'sales', 'label' => 'Dispensed Prescriptions', 'title' => 'Dispensed Prescriptions', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales', 'route' => '/api/tenant/views/sales', 'target_endpoint' => '/api/tenant/views/sales'],
                     ['key' => 'quotations', 'id' => 'quotations', 'label' => 'Quotations & Estimates', 'title' => 'Quotations & Estimates', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes', 'route' => '/api/tenant/views/quotations', 'target_endpoint' => '/api/tenant/views/quotations'],
-                    ['key' => 'lead_management', 'id' => 'lead_management', 'label' => 'Lead Management', 'title' => 'Lead Management', 'icon' => 'leaderboard', 'component' => 'lead_management', 'permission' => 'leads', 'route' => '/api/tenant/views/leads', 'target_endpoint' => '/api/tenant/views/leads'],
                     ['key' => 'customers', 'id' => 'customers', 'label' => 'Patients & Doctors', 'title' => 'Patients & Doctors', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'route' => '/api/tenant/views/customers', 'target_endpoint' => '/api/tenant/views/customers'],
                     ['key' => 'cash_register', 'id' => 'cash_register', 'label' => 'Cash Register', 'title' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register', 'route' => '/api/tenant/views/cash-register', 'target_endpoint' => '/api/tenant/views/cash-register'],
                 ],
@@ -1840,7 +1879,6 @@ class TenantNavRegistry
                     ['key' => 'booking_calendar', 'id' => 'booking_calendar', 'label' => 'Service Booking Calendar', 'title' => 'Service Booking Calendar', 'icon' => 'calendar_month', 'component' => 'service_calendar', 'permission' => 'service_orders', 'route' => '/api/tenant/views/salon-calendar', 'target_endpoint' => '/api/tenant/views/salon-calendar'],
                     ['key' => 'sales', 'id' => 'sales', 'label' => 'Sales & Invoices History', 'title' => 'Sales & Invoices History', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales', 'route' => '/api/tenant/views/sales', 'target_endpoint' => '/api/tenant/views/sales'],
                     ['key' => 'quotations', 'id' => 'quotations', 'label' => 'Quotations & Estimates', 'title' => 'Quotations & Estimates', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes', 'route' => '/api/tenant/views/quotations', 'target_endpoint' => '/api/tenant/views/quotations'],
-                    ['key' => 'lead_management', 'id' => 'lead_management', 'label' => 'Lead Management', 'title' => 'Lead Management', 'icon' => 'leaderboard', 'component' => 'lead_management', 'permission' => 'leads', 'route' => '/api/tenant/views/leads', 'target_endpoint' => '/api/tenant/views/leads'],
                     ['key' => 'customers', 'id' => 'customers', 'label' => 'Clients & Memberships', 'title' => 'Clients & Memberships', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'route' => '/api/tenant/views/customers', 'target_endpoint' => '/api/tenant/views/customers'],
                     ['key' => 'cash_register', 'id' => 'cash_register', 'label' => 'Cash Register', 'title' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register', 'route' => '/api/tenant/views/cash-register', 'target_endpoint' => '/api/tenant/views/cash-register'],
                 ],
@@ -1884,7 +1922,6 @@ class TenantNavRegistry
                     ['key' => 'repair_tickets', 'label' => 'Repair Ticket Register', 'icon' => 'receipt_long', 'component' => 'repair_tickets', 'permission' => 'repair', 'target_endpoint' => '/api/tenant/views/repair-tickets'],
                     ['key' => 'sales', 'label' => 'Sales & Invoices', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales', 'target_endpoint' => '/api/tenant/views/sales'],
                     ['key' => 'quotations', 'label' => 'Quotations & Proposals', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes', 'target_endpoint' => '/api/tenant/views/quotations'],
-                    ['key' => 'lead_management', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'component' => 'lead_management', 'permission' => 'leads', 'target_endpoint' => '/api/tenant/views/leads'],
                     ['key' => 'customers', 'label' => 'Customers & CRM', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'target_endpoint' => '/api/tenant/views/customers'],
                 ],
             ],
