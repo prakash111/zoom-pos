@@ -129,15 +129,14 @@ List<_NavSection> _serverDrivenSections() {
             if (!seenKeys.add(item.key)) continue;
 
             // Lead Management is a separate vertical module (lead_ops) and must NEVER be inside cashier_sales
-            if (section.key == 'cashier_sales' && (
-                item.key == 'lead_management' ||
-                item.key == 'leads' ||
-                item.key.startsWith('lead_') ||
-                item.key.contains('lead') ||
-                item.targetEndpoint == '/tenant/views/leads' ||
-                item.targetEndpoint == '/api/tenant/views/leads' ||
-                item.title.toLowerCase().contains('lead')
-            )) {
+            if (section.key == 'cashier_sales' &&
+                (item.key == 'lead_management' ||
+                    item.key == 'leads' ||
+                    item.key.startsWith('lead_') ||
+                    item.key.contains('lead') ||
+                    item.targetEndpoint == '/tenant/views/leads' ||
+                    item.targetEndpoint == '/api/tenant/views/leads' ||
+                    item.title.toLowerCase().contains('lead'))) {
               continue;
             }
 
@@ -235,12 +234,11 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
 
       // CRITICAL: Lead Management is a separate vertical module (lead_ops)
       // and must NEVER be placed into Cashier & Sales, even via custom placement/overrides
-      if (targetSection == 'cashier_sales' && (
-          tile.key == 'lead_management' ||
-          tile.key == 'leads' ||
-          tile.key.startsWith('lead_') ||
-          tile.key.contains('lead')
-      )) {
+      if (targetSection == 'cashier_sales' &&
+          (tile.key == 'lead_management' ||
+              tile.key == 'leads' ||
+              tile.key.startsWith('lead_') ||
+              tile.key.contains('lead'))) {
         continue;
       }
 
@@ -959,26 +957,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         for (final section in navSections) {
-          if (section.header != null) {
-            children.add(Padding(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
-              child: Text(
-                bootstrap
-                    .resolveNavigationLabel(section.key, section.header!(l10n))
-                    .toUpperCase(),
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
-                  color: section.headerColor ?? unselectedItemColor,
-                ),
-              ),
-            ));
-          }
-
           final childrenByParent = <String?, List<_FeatureTile>>{};
+          final firstItem = section.tiles.first;
           for (final tile in section.tiles) {
-            (childrenByParent[section.parentByKey[tile.key]] ??= []).add(tile);
+            final parent = tile.key == firstItem.key
+                ? null
+                : section.parentByKey[tile.key];
+            (childrenByParent[parent] ??= []).add(tile);
           }
 
           Widget buildBranch(_FeatureTile tile, int depth) {
@@ -1091,8 +1076,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
           }
 
-          for (final root in childrenByParent[null] ?? const <_FeatureTile>[]) {
-            children.add(buildBranch(root, 0));
+          final sectionChildren = section.tiles
+              .where((tile) =>
+                  tile.key != firstItem.key &&
+                  (section.parentByKey[tile.key] == null ||
+                      section.parentByKey[tile.key] == firstItem.key))
+              .toList();
+          final firstIndex = indexByKey[firstItem.key]!;
+          final firstSelected = _dockIndex == firstIndex;
+          final firstHasKids =
+              (childrenByParent[firstItem.key] ?? const <_FeatureTile>[]).isNotEmpty;
+
+          children.add(Padding(
+            key: ValueKey('drawer-section-divider-${section.key}'),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.18),
+            ),
+          ));
+
+          if (firstHasKids) {
+            children.add(buildBranch(firstItem, 0));
+          } else {
+            children.add(ListTile(
+              key: ValueKey('drawer-item-${firstItem.key}'),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              leading: Icon(
+                firstItem.icon,
+                size: 22,
+                color: const Color(0xFFF97316),
+              ),
+              title: Text(
+                bootstrap.resolveNavigationLabel(
+                    firstItem.key, firstItem.titleOf(l10n)),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                  color: firstSelected ? selectedItemColor : unselectedItemColor,
+                ),
+              ),
+              trailing: sectionChildren.isNotEmpty
+                  ? Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 18,
+                      color: unselectedIconColor,
+                    )
+                  : null,
+              selected: firstSelected,
+              onTap: () => openTile(firstItem),
+            ));
+
+            for (final child in sectionChildren) {
+              children.add(buildBranch(child, 1));
+            }
           }
         }
 
@@ -1356,27 +1396,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     for (final section in navSections) {
-      if (section.header != null) {
-        rows.add(Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 12, 4),
-          child: Text(
-            bootstrap
-                .resolveNavigationLabel(section.key, section.header!(l10n))
-                .toUpperCase(),
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-              color: section.headerColor ??
-                  Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ));
-      }
-
       final childrenByParent = <String?, List<_FeatureTile>>{};
+      final firstItem = section.tiles.first;
       for (final tile in section.tiles) {
-        (childrenByParent[section.parentByKey[tile.key]] ??= []).add(tile);
+        final parent =
+            tile.key == firstItem.key ? null : section.parentByKey[tile.key];
+        (childrenByParent[parent] ??= []).add(tile);
       }
 
       Widget branch(_FeatureTile tile, int depth) {
@@ -1428,8 +1453,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
 
-      for (final root in childrenByParent[null] ?? const <_FeatureTile>[]) {
-        rows.add(branch(root, 0));
+      final sectionChildren = section.tiles
+          .where((tile) =>
+              tile.key != firstItem.key &&
+              (section.parentByKey[tile.key] == null ||
+                  section.parentByKey[tile.key] == firstItem.key))
+          .toList();
+      final firstIndex = indexByKey[firstItem.key]!;
+      final firstSelected = _dockIndex == firstIndex;
+
+      final firstHasKids =
+          (childrenByParent[firstItem.key] ?? const <_FeatureTile>[]).isNotEmpty;
+
+      rows.add(Padding(
+        key: ValueKey('rail-section-divider-${section.key}'),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Divider(
+          height: 1,
+          thickness: 1,
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.18),
+        ),
+      ));
+
+      if (firstHasKids) {
+        rows.add(branch(firstItem, 0));
+      } else {
+        rows.add(ListTile(
+          key: ValueKey('rail-item-${firstItem.key}'),
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          leading: Icon(
+            firstItem.icon,
+            size: 22,
+            color: const Color(0xFFF97316),
+          ),
+          title: Text(
+            bootstrap.resolveNavigationLabel(
+                firstItem.key, firstItem.titleOf(l10n)),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+              color: firstSelected ? Theme.of(context).colorScheme.primary : null,
+            ),
+          ),
+          trailing: sectionChildren.isNotEmpty
+              ? Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                )
+              : null,
+          selected: firstSelected,
+          onTap: () => _onDockItemSelected(context, firstIndex),
+        ));
+
+        for (final child in sectionChildren) {
+          rows.add(branch(child, 1));
+        }
       }
     }
 

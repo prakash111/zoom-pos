@@ -118,10 +118,11 @@ Future<void> main() async {
     syncEngine: syncEngine,
   ));
 
-  // Android cannot grant Bluetooth access silently at install time. Ask on
-  // the first rendered frame instead, so the user sees the system prompt once
-  // during onboarding rather than repeatedly inside Printer Setup.
+  // Android cannot grant notification or Bluetooth access silently at install time.
+  // Ask on the first rendered frame instead, so the user sees the runtime prompts
+  // immediately upon onboarding instead of having to configure them manually in system settings.
   WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(PushNotificationService.instance.promptNotificationPermissionOnLaunch());
     unawaited(ThermalPrinterService.requestBluetoothPermission());
   });
 }

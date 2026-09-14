@@ -8,6 +8,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/config/bootstrap_cache.dart';
 import '../../core/models/company_model.dart';
 import '../../core/models/user_model.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../core/services/tenant_time_service.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../../core/storage/session_cache.dart';
@@ -222,6 +223,7 @@ class AuthProvider extends ChangeNotifier {
         email: email,
         password: password,
         accountId: accountId,
+        fcmToken: PushNotificationService.instance.token,
       );
 
       if (result.requiresOtp) {

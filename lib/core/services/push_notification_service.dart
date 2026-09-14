@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -18,6 +19,7 @@ import '../config/app_config.dart';
 import '../utils/currency_formatter.dart';
 
 const _pushConfigCacheKey = 'zoom_pos.push_config';
+const _cachedFcmTokenKey = 'zoom_pos.cached_fcm_token';
 const _dismissAction = 'dismiss_alarm';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -175,10 +177,48 @@ class PushNotificationService {
 
   final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
+  bool _localInitialized = false;
   ApiClient? _apiClient;
   AuthProvider? _authProvider;
   String? _token;
+  String? get token => _token;
   bool _ready = false;
+
+  Future<void> _ensureLocalInitialized() async {
+    if (_localInitialized) return;
+    await _local.initialize(
+      settings: const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+      onDidReceiveNotificationResponse: _onLocalResponse,
+      onDidReceiveBackgroundNotificationResponse:
+          localNotificationBackgroundResponse,
+    );
+    _localInitialized = true;
+  }
+
+  /// Immediately prompts the user for notification permissions on app launch (Android 13+)
+  /// without waiting for remote configs or backend roundtrips.
+  Future<void> promptNotificationPermissionOnLaunch() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _ensureLocalInitialized();
+      final androidNotifications = _local.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await androidNotifications?.requestNotificationsPermission();
+      await androidNotifications?.requestFullScreenIntentPermission();
+
+      if (Firebase.apps.isNotEmpty) {
+        await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+          criticalAlert: true,
+        );
+      }
+    } catch (e) {
+      debugPrint('PushNotificationService promptNotificationPermissionOnLaunch error: $e');
+    }
+  }
 
   Future<void> initialize(
       {required ApiClient apiClient,
@@ -188,19 +228,37 @@ class PushNotificationService {
     _authProvider = authProvider;
     FirebaseMessaging.onBackgroundMessage(firebasePushBackgroundHandler);
 
-    await _local.initialize(
-      settings: const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher')),
-      onDidReceiveNotificationResponse: _onLocalResponse,
-      onDidReceiveBackgroundNotificationResponse:
-          localNotificationBackgroundResponse,
-    );
+    // 1. Immediately initialize local notifications plugin and ask runtime permission
+    await _ensureLocalInitialized();
+    unawaited(promptNotificationPermissionOnLaunch());
+
+    // 2. Immediately restore cached FCM token if present (preserves token across reinstalls/restarts)
+    final preferences = await SharedPreferences.getInstance();
+    final cachedToken = preferences.getString(_cachedFcmTokenKey);
+    if (cachedToken != null && cachedToken.isNotEmpty) {
+      _token = cachedToken;
+    }
+
+    // 3. Attach auth listeners so registration occurs as soon as user is authenticated
+    authProvider.addListener(_registerIfAuthenticated);
+    authProvider.onBeforeLogout = unregister;
+
+    // 4. Try early initialization of Firebase from cached push config if available
+    await _initializeFirebaseFromCache();
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        final existingToken = await FirebaseMessaging.instance.getToken();
+        if (existingToken != null && existingToken.isNotEmpty) {
+          _token = existingToken;
+          await preferences.setString(_cachedFcmTokenKey, existingToken);
+        }
+      } catch (_) {}
+    }
 
     try {
       final response = await apiClient.get(ApiEndpoints.pushConfig);
       final config =
           Map<String, dynamic>.from(response['push'] as Map? ?? const {});
-      final preferences = await SharedPreferences.getInstance();
       await preferences.setString(_pushConfigCacheKey, jsonEncode(config));
       if (config['enabled'] != true) return;
 
@@ -214,32 +272,33 @@ class PushNotificationService {
       if (Firebase.apps.isEmpty) return;
 
       await _createConfiguredChannels(config);
-      final androidNotifications = _local.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      await androidNotifications?.requestNotificationsPermission();
-      await androidNotifications?.requestFullScreenIntentPermission();
-      await FirebaseMessaging.instance.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        criticalAlert: true,
-      );
+      await promptNotificationPermissionOnLaunch();
+
       FirebaseMessaging.onMessage
           .listen((message) => _handleIncoming(message.data));
       FirebaseMessaging.onMessageOpenedApp
           .listen((message) => _openPayload(message.data));
       final initial = await FirebaseMessaging.instance.getInitialMessage();
-      if (initial != null)
+      if (initial != null) {
         Future<void>.delayed(const Duration(milliseconds: 800),
             () => _openPayload(initial.data));
+      }
 
-      _token = await FirebaseMessaging.instance.getToken();
-      FirebaseMessaging.instance.onTokenRefresh.listen((token) {
-        _token = token;
-        _registerIfAuthenticated();
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        _token = fcmToken;
+        await preferences.setString(_cachedFcmTokenKey, fcmToken);
+      }
+
+      FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+        if (token.isNotEmpty) {
+          _token = token;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_cachedFcmTokenKey, token);
+          _registerIfAuthenticated();
+        }
       });
-      authProvider.addListener(_registerIfAuthenticated);
-      authProvider.onBeforeLogout = unregister;
+
       _ready = true;
       await _registerIfAuthenticated();
     } catch (error) {
@@ -310,8 +369,9 @@ class PushNotificationService {
 
   Future<void> _registerIfAuthenticated() async {
     final token = _token;
-    if (token == null || _authProvider?.status != AuthStatus.authenticated)
+    if (token == null || token.isEmpty || _authProvider?.status != AuthStatus.authenticated) {
       return;
+    }
     try {
       await _apiClient?.post(ApiEndpoints.pushDevices, data: {
         'token': token,

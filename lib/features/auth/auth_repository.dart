@@ -60,11 +60,13 @@ class AuthRepository {
     required String email,
     required String password,
     String? accountId,
+    String? fcmToken,
   }) async {
     final response = await _client.post(ApiEndpoints.login, data: {
       'email': email,
       'password': password,
       if (accountId != null && accountId.isNotEmpty) 'account_id': accountId,
+      if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
     });
 
     return _authOutcome(response, email);

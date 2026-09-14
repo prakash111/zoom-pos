@@ -32,7 +32,8 @@ class TenantSchema {
       resolvedFeatures = const [];
     }
 
-    final rawMode = json['active_mode']?.toString() ?? json['pos_mode']?.toString() ?? '';
+    final rawMode =
+        json['active_mode']?.toString() ?? json['pos_mode']?.toString() ?? '';
     final resolvedType = (json['business_type'] ??
             (rawMode.isNotEmpty && rawMode.toLowerCase() != 'general'
                 ? rawMode
@@ -41,7 +42,10 @@ class TenantSchema {
 
     return TenantSchema(
       id: json['id']?.toString() ?? '',
-      businessName: (json['business_name'] ?? json['store_name'] ?? json['name'])?.toString() ?? '',
+      businessName:
+          (json['business_name'] ?? json['store_name'] ?? json['name'])
+                  ?.toString() ??
+              '',
       activeMode: rawMode,
       availableModes: (json['available_modes'] as List<dynamic>?)
               ?.map((e) => e.toString())
@@ -209,11 +213,15 @@ class SduiNavItemSchema {
     }
 
     final rawKey = json['key']?.toString() ?? json['id']?.toString() ?? '';
-    final rawTitle = json['label']?.toString() ?? json['title']?.toString() ?? '';
+    final rawTitle =
+        json['label']?.toString() ?? json['title']?.toString() ?? '';
     final key = rawKey.isNotEmpty
         ? rawKey
         : (json['component']?.toString() ??
-            rawTitle.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]+'), '_'));
+            rawTitle
+                .trim()
+                .toLowerCase()
+                .replaceAll(RegExp(r'[^a-z0-9_]+'), '_'));
 
     return SduiNavItemSchema(
       key: key,
@@ -225,8 +233,9 @@ class SduiNavItemSchema {
       parentId: rawParent,
       type: json['type']?.toString() ??
           (parsedChildren.isNotEmpty ? 'accordion' : 'link'),
-      targetEndpoint:
-          json['target_endpoint']?.toString() ?? json['endpoint']?.toString() ?? json['route']?.toString(),
+      targetEndpoint: json['target_endpoint']?.toString() ??
+          json['endpoint']?.toString() ??
+          json['route']?.toString(),
       children: parsedChildren,
     );
   }
@@ -262,6 +271,10 @@ class SduiNavSectionSchema {
   final String? color;
   final List<SduiNavItemSchema> items;
 
+  SduiNavItemSchema? get firstItem => items.isEmpty ? null : items.first;
+  List<SduiNavItemSchema> get subItems =>
+      items.length < 2 ? const [] : items.sublist(1);
+
   factory SduiNavSectionSchema.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'] ?? json['children'];
     final parsedItems = <SduiNavItemSchema>[];
@@ -288,8 +301,39 @@ class SduiNavSectionSchema {
           'Bootstrap navigation: expected items to be a list for section ${json['key'] ?? '(unknown)'}, got ${rawItems.runtimeType}.');
     }
 
+    // Newer backends explicitly identify the actionable section parent and
+    // its children. Prefer that hierarchy while retaining any legacy items
+    // that are not present in the explicit contract.
+    final explicitItems = <SduiNavItemSchema>[];
+    final rawFirstItem = json['first_item'];
+    if (rawFirstItem is Map) {
+      explicitItems.add(SduiNavItemSchema.fromJson(
+        Map<String, dynamic>.from(rawFirstItem),
+      ));
+    }
+    final rawSubItems = json['sub_items'];
+    if (rawSubItems is List) {
+      for (final item in rawSubItems) {
+        if (item is Map) {
+          explicitItems.add(SduiNavItemSchema.fromJson(
+            Map<String, dynamic>.from(item),
+          ));
+        }
+      }
+    }
+    if (explicitItems.isNotEmpty) {
+      final explicitKeys = explicitItems.map((item) => item.key).toSet();
+      explicitItems.addAll(
+        parsedItems.where((item) => !explicitKeys.contains(item.key)),
+      );
+      parsedItems
+        ..clear()
+        ..addAll(explicitItems);
+    }
+
     final rawKey = json['key']?.toString() ?? json['id']?.toString() ?? '';
-    final rawTitle = json['label']?.toString() ?? json['title']?.toString() ?? '';
+    final rawTitle =
+        json['label']?.toString() ?? json['title']?.toString() ?? '';
     final key = rawKey.isNotEmpty
         ? rawKey
         : rawTitle.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]+'), '_');
@@ -323,6 +367,16 @@ class SduiNavSectionSchema {
         'label': title,
         if (color != null) 'color': color,
         'items': items.map((i) => i.toJson()).toList(),
+        if (firstItem != null) 'first_item': firstItem!.toJson(),
+        'sub_items': subItems.map((i) => i.toJson()).toList(),
+        'show_top_divider': true,
+        'divider_style': const {
+          'color': 'theme.divider',
+          'alpha': 0.12,
+          'thickness': 1,
+          'horizontal_padding': 16,
+          'vertical_padding': 8,
+        },
       };
 }
 

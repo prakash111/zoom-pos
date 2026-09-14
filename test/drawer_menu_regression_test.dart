@@ -67,7 +67,9 @@ class _FakeAuthProvider extends ChangeNotifier implements AuthProvider {
 
   @override
   Future<bool> loginWithToken(String token,
-          {UserModel? user, CompanyModel? company, Map<String, dynamic>? rawUser}) async =>
+          {UserModel? user,
+          CompanyModel? company,
+          Map<String, dynamic>? rawUser}) async =>
       true;
 
   @override
@@ -231,22 +233,33 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     BootstrapCache.instance.menuStructure = [];
-    BootstrapCache.instance.navConfig = const NavConfig(sections: [], items: []);
+    BootstrapCache.instance.navConfig =
+        const NavConfig(sections: [], items: []);
   });
 
   tearDown(() {
     BootstrapCache.instance.menuStructure = [];
-    BootstrapCache.instance.navConfig = const NavConfig(sections: [], items: []);
+    BootstrapCache.instance.navConfig =
+        const NavConfig(sections: [], items: []);
   });
 
   group('Drawer Menu & SDUI Resolution Tests', () {
-    test('CompanyModel and TenantSchema round-trip businessType and planFeatures', () {
+    test(
+        'CompanyModel and TenantSchema round-trip businessType and planFeatures',
+        () {
       final company = CompanyModel.fromJson({
         'id': 'c1',
         'name': 'ZoomNearby',
         'plan_name': 'Pro',
         'business_type': 'RETAIL',
-        'plan_features': ['pos', 'sales', 'quotes', 'leads', 'consignments', 'customers'],
+        'plan_features': [
+          'pos',
+          'sales',
+          'quotes',
+          'leads',
+          'consignments',
+          'customers'
+        ],
       });
 
       expect(company.businessType, 'RETAIL');
@@ -261,6 +274,40 @@ void main() {
       });
       expect(tenant.businessType, 'RETAIL');
       expect(tenant.planFeatures, contains('quotes'));
+    });
+
+    test('section schema prioritizes backend first_item parent hierarchy', () {
+      final section = SduiNavSectionSchema.fromJson({
+        'key': 'lead_ops',
+        'title': 'Lead Management',
+        'items': [
+          {
+            'key': 'legacy_lead_page',
+            'title': 'Legacy Lead Page',
+            'target_endpoint': '/api/tenant/views/legacy-leads',
+          },
+        ],
+        'first_item': {
+          'key': 'lead_dashboard',
+          'title': 'Lead Dashboard',
+          'icon': 'grid_view',
+          'route': '/api/tenant/lead-module/views/dashboard',
+        },
+        'sub_items': [
+          {
+            'key': 'lead_pipeline',
+            'title': 'All Leads Pipeline',
+            'route': '/api/tenant/lead-module/views/leads',
+          },
+        ],
+      });
+
+      expect(section.firstItem?.key, 'lead_dashboard');
+      expect(section.firstItem?.title, 'Lead Dashboard');
+      expect(
+          section.firstItem?.route, '/api/tenant/lead-module/views/dashboard');
+      expect(section.subItems.map((item) => item.key),
+          containsAllInOrder(['lead_pipeline', 'legacy_lead_page']));
     });
 
     test('UserModel.can handles permission aliases and admin bypass', () {
@@ -314,7 +361,8 @@ void main() {
       expect(disabledLeadAdmin.can('pos.view'), isTrue);
     });
 
-    test('BootstrapCache defaults activeMode and activeModule gracefully', () async {
+    test('BootstrapCache defaults activeMode and activeModule gracefully',
+        () async {
       final cache = BootstrapCache.instance;
       expect(cache.activeMode, 'retail');
       expect(cache.activeModule.title, 'Retail');
@@ -323,17 +371,20 @@ void main() {
       final fallbacks = cache.effectiveSections;
       final cashierSec = fallbacks.firstWhere((s) => s.key == 'cashier_sales');
       final itemKeys = cashierSec.items.map((i) => i.key).toList();
-      expect(itemKeys, containsAll([
-        'pos',
-        'sales',
-        'quotations',
-        'consignments',
-        'customers',
-      ]));
+      expect(
+          itemKeys,
+          containsAll([
+            'pos',
+            'sales',
+            'quotations',
+            'consignments',
+            'customers',
+          ]));
       expect(itemKeys, isNot(contains('lead_management')));
     });
 
-    testWidgets('Drawer renders all 5 core cashier items without lead_management, RETAIL badge, and user avatar',
+    testWidgets(
+        'Drawer renders all 5 core cashier items without lead_management, RETAIL badge, and user avatar',
         (tester) async {
       tester.view.physicalSize = const Size(400, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -364,7 +415,12 @@ void main() {
       BootstrapCache.instance.navConfig = NavConfig(
         sections: const [NavSectionOrder(key: 'cashier_sales', order: 0)],
         items: [
-          const NavItemConfig(key: 'pos', section: 'cashier_sales', level: 0, order: 0, visible: true),
+          const NavItemConfig(
+              key: 'pos',
+              section: 'cashier_sales',
+              level: 0,
+              order: 0,
+              visible: true),
           NavItemConfig.fromJson({
             'key': 'quotations',
             'section': 'cashier_sales',
@@ -407,13 +463,35 @@ void main() {
       // 2. Verify all 5 core Cashier & Sales items are present as ListTiles and lead_management is absent
       expect(find.byKey(const ValueKey('drawer-item-pos')), findsOneWidget);
       expect(find.byKey(const ValueKey('drawer-item-sales')), findsOneWidget);
-      expect(find.byKey(const ValueKey('drawer-item-quotations')), findsOneWidget);
-      expect(find.byKey(const ValueKey('drawer-item-consignments')), findsOneWidget);
-      expect(find.byKey(const ValueKey('drawer-item-customers')), findsOneWidget);
-      expect(find.byKey(const ValueKey('drawer-item-lead_management')), findsNothing);
+      expect(
+          find.byKey(const ValueKey('drawer-item-quotations')), findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-consignments')),
+          findsOneWidget);
+      expect(
+          find.byKey(const ValueKey('drawer-item-customers')), findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-lead_management')),
+          findsNothing);
+
+      // The old static category heading is gone. Point of Sale is now the
+      // actionable first-item parent and a divider introduces its section.
+      expect(find.text('Cashier & Sales'), findsNothing);
+      expect(find.byKey(const ValueKey('drawer-section-divider-cashier_sales')),
+          findsOneWidget);
+      final pointOfSaleParent = tester
+          .widget<ListTile>(find.byKey(const ValueKey('drawer-item-pos')));
+      expect(pointOfSaleParent.onTap, isNotNull);
+      expect(pointOfSaleParent.trailing, isA<Icon>());
+
+      final salesChild = tester
+          .widget<ListTile>(find.byKey(const ValueKey('drawer-item-sales')));
+      expect(salesChild.contentPadding,
+          const EdgeInsets.only(left: 46, right: 12));
 
       // 3. Verify Point of Sale is NOT an ExpansionTile
-      expect(find.byKey(const PageStorageKey<String>('drawer-branch-cashier_sales-pos')), findsNothing);
+      expect(
+          find.byKey(
+              const PageStorageKey<String>('drawer-branch-cashier_sales-pos')),
+          findsNothing);
 
       // 4. Verify user avatar and logout button are rendered
       expect(find.text('prakash'), findsOneWidget);
