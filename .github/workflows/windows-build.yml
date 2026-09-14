@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - feat/windows-offline-sync
     tags:
       - "v*.*.*"
       - "mobile-v*"
