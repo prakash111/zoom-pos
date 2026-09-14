@@ -376,6 +376,7 @@ class SduiActionDispatcher {
         break;
 
       case 'open_remote_sheet':
+      case 'open_quotation_modal':
         await _openRemoteSheet(context, action, client);
         break;
 
@@ -412,6 +413,8 @@ class SduiActionDispatcher {
       'navigate_to' => 'navigate',
       'submit_form' => 'form_submit',
       'open_bottom_sheet' => 'open_remote_sheet',
+      'show_bottom_sheet' => 'open_remote_sheet',
+      'show_quotation_sheet' => 'open_quotation_modal',
       'reload_component' => 'refresh_sheet',
       _ => type,
     };
@@ -639,6 +642,7 @@ class SduiActionDispatcher {
   ) async {
     final sheetEndpoint = action['sheet_endpoint']?.toString() ??
         action['endpoint']?.toString() ??
+        action['url']?.toString() ??
         '';
     if (sheetEndpoint.isEmpty) {
       showToast('This action is missing a sheet endpoint.', isError: true);
@@ -669,16 +673,31 @@ class SduiActionDispatcher {
     if (sheetEndpoint.contains('quotations/create-modal') ||
         sheetSchema['sheet_type'] == 'native_quotation' ||
         sheetSchema['modal'] == 'quotation') {
+      final rawActionData = action['data'];
+      final actionData = rawActionData is Map
+          ? Map<String, dynamic>.from(rawActionData)
+          : const <String, dynamic>{};
       final company = context.read<AuthProvider?>()?.company;
       final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
       final quotations = context.read<QuotationsProvider>();
-      final custId = sheetSchema['customer_id']?.toString() ?? action['customer_id']?.toString();
+      final custId = sheetSchema['customer_id']?.toString() ??
+          actionData['customer_id']?.toString() ??
+          action['customer_id']?.toString();
       final custName = sheetSchema['customer_name']?.toString() ??
-          (sheetSchema['customer'] is Map ? sheetSchema['customer']['name']?.toString() : null) ??
+          (sheetSchema['customer'] is Map
+              ? sheetSchema['customer']['name']?.toString()
+              : null) ??
+          actionData['customer_name']?.toString() ??
           action['customer_name']?.toString();
-      final leadId = sheetSchema['lead_id']?.toString() ?? action['lead_id']?.toString();
-      final notes = sheetSchema['notes']?.toString();
-      final terms = sheetSchema['terms']?.toString();
+      final leadId = sheetSchema['lead_id']?.toString() ??
+          actionData['lead_id']?.toString() ??
+          action['lead_id']?.toString();
+      final notes = actionData['notes']?.toString() ??
+          sheetSchema['notes']?.toString() ??
+          action['notes']?.toString();
+      final terms = actionData['terms']?.toString() ??
+          sheetSchema['terms']?.toString() ??
+          action['terms']?.toString();
 
       await showModalBottomSheet(
         context: context,

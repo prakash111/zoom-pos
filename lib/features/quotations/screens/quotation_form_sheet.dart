@@ -66,11 +66,16 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
   void initState() {
     super.initState();
     final quote = widget.quotation;
-    _discountController = TextEditingController(text: (quote?.discount ?? 0).toStringAsFixed(2));
-    _notesController = TextEditingController(text: quote?.notes ?? widget.initialNotes ?? '');
-    _termsController = TextEditingController(text: quote?.terms ?? widget.initialTerms ?? '');
-    _items = quote?.items.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
-    _fallbackCustomerName = quote?.customerName ?? widget.initialCustomerName ?? '';
+    _discountController =
+        TextEditingController(text: (quote?.discount ?? 0).toStringAsFixed(2));
+    _notesController =
+        TextEditingController(text: quote?.notes ?? widget.initialNotes ?? '');
+    _termsController =
+        TextEditingController(text: quote?.terms ?? widget.initialTerms ?? '');
+    _items =
+        quote?.items.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
+    _fallbackCustomerName =
+        quote?.customerName ?? widget.initialCustomerName ?? '';
     if (quote?.customerId != null) {
       _selectedCustomer = CustomerModel(
         id: quote!.customerId!,
@@ -84,7 +89,8 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
         balanceDue: 0,
         loyaltyPoints: 0,
       );
-    } else if (widget.initialCustomerId != null && widget.initialCustomerId!.isNotEmpty) {
+    } else if (widget.initialCustomerId != null &&
+        widget.initialCustomerId!.isNotEmpty) {
       _selectedCustomer = CustomerModel(
         id: widget.initialCustomerId!,
         name: widget.initialCustomerName ?? 'Customer',
@@ -165,14 +171,17 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
     return qty * price * _itemTaxRate(item) / 100;
   }
 
-  double get _taxTotal => _items.fold(0.0, (sum, item) => sum + _itemTaxAmount(item));
+  double get _taxTotal =>
+      _items.fold(0.0, (sum, item) => sum + _itemTaxAmount(item));
 
   Future<void> _pickCustomer() async {
     final customer = await showModalBottomSheet<CustomerModel>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => CustomerPickerSheet(customersRepository: _customersRepository),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) =>
+          CustomerPickerSheet(customersRepository: _customersRepository),
     );
     if (customer != null) {
       setState(() => _selectedCustomer = customer);
@@ -183,8 +192,10 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
     final product = await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => ProductPickerSheet(inventoryRepository: InventoryRepository(context.read<ApiClient>())),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => ProductPickerSheet(
+          inventoryRepository: InventoryRepository(context.read<ApiClient>())),
     );
 
     if (product == null) return;
@@ -210,7 +221,8 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
           children: [
             const Padding(
               padding: EdgeInsets.all(16),
-              child: Text('Tax rate for this item', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('Tax rate for this item',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             ListTile(
               title: const Text('No tax (0%)'),
@@ -219,7 +231,8 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
             for (final rule in _taxRules)
               ListTile(
                 title: Text(rule.name),
-                trailing: Text('${rule.rate.toStringAsFixed(rule.rate.truncateToDouble() == rule.rate ? 0 : 2)}%'),
+                trailing: Text(
+                    '${rule.rate.toStringAsFixed(rule.rate.truncateToDouble() == rule.rate ? 0 : 2)}%'),
                 onTap: () => Navigator.of(sheetCtx).pop(rule.rate),
               ),
             const SizedBox(height: 8),
@@ -234,16 +247,20 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
   Future<void> _submit() async {
     final customerName = _selectedCustomer?.name ?? _fallbackCustomerName;
     if (customerName.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a customer.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Select a customer.')));
       return;
     }
     if (_items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add at least one item.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Add at least one item.')));
       return;
     }
 
     final quotations = context.read<QuotationsProvider>();
-    final itemsToSend = _items.map((item) => {...item, 'tax_rate': _itemTaxRate(item)}).toList();
+    final itemsToSend = _items
+        .map((item) => {...item, 'tax_rate': _itemTaxRate(item)})
+        .toList();
     final success = await quotations.saveQuotation(
       id: widget.quotation?.id,
       customerId: _selectedCustomer?.id,
@@ -260,7 +277,8 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
     if (success) {
       Navigator.of(context).pop();
     } else if (quotations.actionError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(quotations.actionError!)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(quotations.actionError!)));
     }
   }
 
@@ -273,7 +291,8 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
     final customerName = _selectedCustomer?.name ?? _fallbackCustomerName;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: DraggableScrollableSheet(
         initialChildSize: 0.9,
         minChildSize: 0.5,
@@ -286,16 +305,21 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(_isEditing ? 'Edit quotation' : 'New quotation', style: Theme.of(context).textTheme.titleLarge),
+                Text(_isEditing ? 'Edit quotation' : 'New quotation',
+                    style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 16),
                 InkWell(
                   borderRadius: BorderRadius.circular(8),
                   onTap: _pickCustomer,
                   child: InputDecorator(
-                    decoration: const InputDecoration(labelText: 'Customer', suffixIcon: Icon(Icons.search)),
+                    decoration: const InputDecoration(
+                        labelText: 'Customer', suffixIcon: Icon(Icons.search)),
                     child: Text(
                       customerName.isEmpty ? 'Select customer' : customerName,
-                      style: TextStyle(color: customerName.isEmpty ? Colors.grey.shade600 : null),
+                      style: TextStyle(
+                          color: customerName.isEmpty
+                              ? Colors.grey.shade600
+                              : null),
                     ),
                   ),
                 ),
@@ -303,7 +327,8 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Items', style: Theme.of(context).textTheme.titleMedium),
+                    Text('Items',
+                        style: Theme.of(context).textTheme.titleMedium),
                     TextButton.icon(
                       onPressed: _addProduct,
                       icon: const Icon(Icons.add),
@@ -314,7 +339,8 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
                 if (_items.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text('No items yet.', style: TextStyle(color: Colors.grey)),
+                    child: Text('No items yet.',
+                        style: TextStyle(color: Colors.grey)),
                   )
                 else
                   ..._items.asMap().entries.map((entry) {
@@ -335,10 +361,12 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
                               children: [
                                 Expanded(
                                   flex: 3,
-                                  child: Text(item['name'] as String? ?? 'Item', overflow: TextOverflow.ellipsis),
+                                  child: Text(item['name'] as String? ?? 'Item',
+                                      overflow: TextOverflow.ellipsis),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline, size: 20),
+                                  icon: const Icon(Icons.remove_circle_outline,
+                                      size: 20),
                                   onPressed: () => setState(() {
                                     if (qty > 1) {
                                       item['quantity'] = qty - 1;
@@ -347,32 +375,45 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
                                     }
                                   }),
                                 ),
-                                Text(qty.toStringAsFixed(qty.truncateToDouble() == qty ? 0 : 2)),
+                                Text(qty.toStringAsFixed(
+                                    qty.truncateToDouble() == qty ? 0 : 2)),
                                 IconButton(
-                                  icon: const Icon(Icons.add_circle_outline, size: 20),
-                                  onPressed: () => setState(() => item['quantity'] = qty + 1),
+                                  icon: const Icon(Icons.add_circle_outline,
+                                      size: 20),
+                                  onPressed: () => setState(
+                                      () => item['quantity'] = qty + 1),
                                 ),
                                 SizedBox(
                                   width: 70,
                                   child: Text(
                                     widget.formatter.format(qty * price),
                                     textAlign: TextAlign.right,
-                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w600),
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
-                                  onPressed: () => setState(() => _items.removeAt(index)),
+                                  icon: const Icon(Icons.delete_outline,
+                                      size: 20, color: Colors.redAccent),
+                                  onPressed: () =>
+                                      setState(() => _items.removeAt(index)),
                                 ),
                               ],
                             ),
                             Padding(
                               padding: const EdgeInsets.only(left: 4),
                               child: InkWell(
-                                onTap: _taxRuleOverride != null ? null : () => _overrideItemTaxRate(index),
+                                onTap: _taxRuleOverride != null
+                                    ? null
+                                    : () => _overrideItemTaxRate(index),
                                 child: Text(
-                                  rate > 0 ? 'Tax: ${rate.toStringAsFixed(rate.truncateToDouble() == rate ? 0 : 2)}%' : 'No tax · tap to set',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600, decoration: TextDecoration.underline),
+                                  rate > 0
+                                      ? 'Tax: ${rate.toStringAsFixed(rate.truncateToDouble() == rate ? 0 : 2)}%'
+                                      : 'No tax · tap to set',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600,
+                                      decoration: TextDecoration.underline),
                                 ),
                               ),
                             ),
@@ -384,7 +425,8 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _discountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(labelText: 'Discount'),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -396,11 +438,13 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
                     helperText: 'Auto uses each item\'s own product tax rate',
                   ),
                   items: [
-                    const DropdownMenuItem<TaxRuleModel?>(value: null, child: Text('Auto (per item)')),
+                    const DropdownMenuItem<TaxRuleModel?>(
+                        value: null, child: Text('Auto (per item)')),
                     for (final rule in _taxRules)
                       DropdownMenuItem<TaxRuleModel?>(
                         value: rule,
-                        child: Text('${rule.name} (${rule.rate.toStringAsFixed(rule.rate.truncateToDouble() == rule.rate ? 0 : 2)}%)'),
+                        child: Text(
+                            '${rule.name} (${rule.rate.toStringAsFixed(rule.rate.truncateToDouble() == rule.rate ? 0 : 2)}%)'),
                       ),
                   ],
                   onChanged: (rule) => setState(() => _taxRuleOverride = rule),
@@ -408,35 +452,57 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _notesController,
-                  decoration: const InputDecoration(labelText: 'Notes (optional)'),
+                  decoration:
+                      const InputDecoration(labelText: 'Notes (optional)'),
                   maxLines: 2,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _termsController,
-                  decoration: const InputDecoration(labelText: 'Terms (optional)'),
+                  decoration:
+                      const InputDecoration(labelText: 'Terms (optional)'),
                   maxLines: 2,
                 ),
                 const SizedBox(height: 16),
-                _SummaryRow(label: 'Subtotal', value: widget.formatter.format(_subtotal)),
-                if (discount > 0) _SummaryRow(label: 'Discount', value: '-${widget.formatter.format(discount)}'),
-                if (tax > 0) _SummaryRow(label: 'Tax', value: '+${widget.formatter.format(tax)}'),
+                _SummaryRow(
+                    label: 'Subtotal',
+                    value: widget.formatter.format(_subtotal)),
+                if (discount > 0)
+                  _SummaryRow(
+                      label: 'Discount',
+                      value: '-${widget.formatter.format(discount)}'),
+                if (tax > 0)
+                  _SummaryRow(
+                      label: 'Tax', value: '+${widget.formatter.format(tax)}'),
                 const Divider(),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    Text(widget.formatter.format(total), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Total',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(widget.formatter.format(total),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                   ],
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: quotations.isSaving ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF84CC16),
+                    foregroundColor: Colors.black,
+                    disabledBackgroundColor:
+                        const Color(0xFF84CC16).withValues(alpha: 0.55),
+                    disabledForegroundColor: Colors.black54,
+                    textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   child: quotations.isSaving
                       ? const SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : Text(_isEditing ? 'Save changes' : 'Create quotation'),
                 ),
