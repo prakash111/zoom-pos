@@ -18,6 +18,188 @@ class QuotationController extends Controller
     use ResolvesTenantSyncContext;
 
     /**
+     * Standard Native / SDUI Quotation Creation Modal (Image 1000591051.jpg).
+     * GET /api/v1/tenant/quotations/create-modal
+     * GET /api/tenant/views/quotations/create-modal
+     * GET /quotations/create-modal
+     */
+    public function createModal(Request $request): JsonResponse
+    {
+        $company = null;
+        try {
+            $company = $this->resolveCompany($request);
+        } catch (\Throwable $e) {
+            $companyId = auth()->user()?->company_id ?? auth()->user()?->tenant_id ?? app('tenant.company_id');
+            if ($companyId) {
+                $company = Company::find($companyId);
+            }
+        }
+
+        $tenantId = $company?->id ?? auth()->user()?->company_id ?? auth()->user()?->tenant_id;
+        $leadId = $request->query('lead_id') ?: $request->input('lead_id');
+        $customerId = $request->query('customer_id') ?: $request->input('customer_id');
+
+        $lead = null;
+        if ($leadId) {
+            $lead = Lead::query()
+                ->where(function ($q) use ($tenantId) {
+                    if ($tenantId) {
+                        $q->where('company_id', $tenantId);
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                            $q->orWhere('tenant_id', $tenantId);
+                        }
+                    }
+                })
+                ->where(function ($q) use ($leadId) {
+                    $q->where('id', $leadId)->orWhere('lead_code', $leadId);
+                })
+                ->first();
+
+            if (! $lead && is_numeric($leadId)) {
+                $lead = Lead::find($leadId);
+            }
+        }
+
+        // Resolve pre-selected customer if passed from customer_id or lead
+        $selectedCustomer = null;
+        if ($customerId) {
+            $selectedCustomer = Customer::withoutGlobalScope('company')
+                ->where(function ($q) use ($tenantId) {
+                    if ($tenantId) {
+                        $q->where('company_id', $tenantId);
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('customers', 'tenant_id')) {
+                            $q->orWhere('tenant_id', $tenantId);
+                        }
+                    }
+                })
+                ->find($customerId);
+        } elseif ($lead && $lead->customer_id) {
+            $selectedCustomer = Customer::withoutGlobalScope('company')
+                ->where(function ($q) use ($tenantId) {
+                    if ($tenantId) {
+                        $q->where('company_id', $tenantId);
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('customers', 'tenant_id')) {
+                            $q->orWhere('tenant_id', $tenantId);
+                        }
+                    }
+                })
+                ->find($lead->customer_id);
+        }
+
+        $defaultNotes = $company?->bank_details ?: ($company?->quote_notes ?: 'Account Name: Metro Retail Mart Pvt. Ltd.');
+        $defaultTerms = $company?->quote_terms ?: 'This quotation is valid for 15 days from the date of issue; prices are subject to change.';
+
+        $resolvedLeadId = $lead ? $lead->id : $leadId;
+        $customerDisplay = $selectedCustomer ? "{$selectedCustomer->name} (#{$selectedCustomer->id})" : null;
+
+        return response()->json([
+            'success'       => true,
+            'type'          => 'bottom_sheet',
+            'sheet_type'    => 'native_quotation',
+            'modal'         => 'quotation',
+            'title'         => 'New quotation',
+            'lead_id'       => $resolvedLeadId,
+            'lead_code'     => $lead?->lead_code ?? ($leadId ? "LD-{$leadId}" : null),
+            'customer_id'   => $selectedCustomer?->id,
+            'customer_name' => $selectedCustomer ? "{$selectedCustomer->name} (#{$selectedCustomer->id})" : null,
+            'customer'      => $selectedCustomer ? [
+                'id'    => $selectedCustomer->id,
+                'name'  => $selectedCustomer->name,
+                'phone' => $selectedCustomer->phone,
+                'email' => $selectedCustomer->email,
+            ] : null,
+            'notes'         => $defaultNotes,
+            'terms'         => $defaultTerms,
+            'components'    => [
+                // Hidden lead tracker
+                [
+                    'type'  => 'hidden_field',
+                    'name'  => 'lead_id',
+                    'value' => $resolvedLeadId,
+                ],
+
+                // Customer Selector (Pre-populated)
+                [
+                    'type'        => 'customer_picker',
+                    'component_type' => 'customer_selector',
+                    'name'        => 'customer_id',
+                    'label'       => 'Customer',
+                    'placeholder' => 'Select customer',
+                    'value'       => $selectedCustomer?->id,
+                    'initial_value' => $selectedCustomer?->id,
+                    'display'     => $customerDisplay,
+                    'selectedText'=> $customerDisplay,
+                    'endpoint'    => '/api/v1/tenant/customers/search',
+                    'search_endpoint' => '/api/tenant/customers/search',
+                ],
+
+                // Product Item Builder
+                [
+                    'type'        => 'item_collection_picker',
+                    'name'        => 'items',
+                    'label'       => 'Items',
+                    'add_label'   => '+ Add product',
+                    'empty_state' => 'No items yet.',
+                ],
+
+                // Discount Input
+                [
+                    'type'        => 'text_field',
+                    'name'        => 'discount',
+                    'label'       => 'Discount',
+                    'value'       => '0.00',
+                    'keyboard'    => 'decimal',
+                ],
+
+                // Tax Rule Dropdown
+                [
+                    'type'        => 'select',
+                    'name'        => 'tax_rule',
+                    'label'       => 'Tax rule',
+                    'value'       => 'auto',
+                    'options'     => [
+                        ['label' => 'Auto (per item)', 'value' => 'auto'],
+                        ['label' => 'No Tax (0%)', 'value' => 'exempt'],
+                        ['label' => 'Standard GST (18%)', 'value' => 'gst_18'],
+                    ],
+                    'helper_text' => 'Auto uses each item\'s own product tax rate',
+                ],
+
+                // Notes
+                [
+                    'type'        => 'text_area',
+                    'name'        => 'notes',
+                    'label'       => 'Notes (optional)',
+                    'value'       => $defaultNotes,
+                ],
+
+                // Terms
+                [
+                    'type'        => 'text_area',
+                    'name'        => 'terms',
+                    'label'       => 'Terms (optional)',
+                    'value'       => $defaultTerms,
+                ],
+
+                // Submit Button
+                [
+                    'type'        => 'button',
+                    'label'       => 'Create quotation',
+                    'variant'     => 'primary',
+                    'action_type' => 'SUBMIT_FORM',
+                    'action'      => [
+                        'type'     => 'SUBMIT_FORM',
+                        'endpoint' => '/api/v1/tenant/quotations',
+                        'method'   => 'POST',
+                        'feedback' => 'Quotation generated successfully',
+                        'reload'   => true,
+                    ],
+                ],
+            ],
+        ]);
+    }
+
+    /**
      * Pre-populated SDUI Schema for creating a Quotation from a Lead or Customer.
      * GET /api/tenant/views/quotations/create
      * GET /api/tenant/quotations/create

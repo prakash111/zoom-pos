@@ -187,6 +187,11 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::post('/v1/tenant/dispatch/email', [DispatchController::class, 'dispatchEmail'])->middleware('tenant.api.permission:pos,create');
 
     // Quotations SDUI View & Pre-population Schemas
+    Route::get('/tenant/quotations/create-modal', [QuotationController::class, 'createModal'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/quotations/create-modal', [QuotationController::class, 'createModal'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/tenant/views/quotations/create-modal', [QuotationController::class, 'createModal'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/v1/tenant/views/quotations/create-modal', [QuotationController::class, 'createModal'])->middleware('tenant.api.permission:quotes,view');
+    Route::get('/quotations/create-modal', [QuotationController::class, 'createModal'])->middleware('tenant.api.permission:quotes,view');
     Route::get('/tenant/views/quotations/create', [QuotationController::class, 'createSchema'])->middleware('tenant.api.permission:quotes,view');
     Route::get('/tenant/quotations/create', [QuotationController::class, 'createSchema'])->middleware('tenant.api.permission:quotes,view');
     Route::get('/v1/tenant/views/quotations/create', [QuotationController::class, 'createSchema'])->middleware('tenant.api.permission:quotes,view');
@@ -343,6 +348,9 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
         if (preg_match('#(?:^|/)quotations/([A-Za-z0-9\-_]+)$#', $trimmed, $m)) {
             return app(QuotationController::class)->showSchema($request, $m[1]);
         }
+        if ($trimmed === 'quotations/create-modal' || str_ends_with($trimmed, 'quotations/create-modal')) {
+            return app(QuotationController::class)->createModal($request);
+        }
         if ($trimmed === 'quotations/create' || str_ends_with($trimmed, 'quotations/create')) {
             return app(QuotationController::class)->createSchema($request);
         }
@@ -377,6 +385,9 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
         }
         if (preg_match('#(?:^|/)quotations/([A-Za-z0-9\-_]+)$#', $trimmed, $m)) {
             return app(QuotationController::class)->showSchema($request, $m[1]);
+        }
+        if ($trimmed === 'quotations/create-modal' || str_ends_with($trimmed, 'quotations/create-modal')) {
+            return app(QuotationController::class)->createModal($request);
         }
         if ($trimmed === 'quotations/create' || str_ends_with($trimmed, 'quotations/create')) {
             return app(QuotationController::class)->createSchema($request);

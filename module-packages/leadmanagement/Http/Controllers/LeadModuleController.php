@@ -486,18 +486,30 @@ class LeadModuleController extends Controller
         // Downstream Action Buttons (Quotations, Invoices, Conversion)
         $actionButtons = [];
 
-        // 1. Create Quotation deep-link
-        $quotationRoute = '/api/tenant/views/quotations/create?lead_id='.$lead->id.'&customer_id='.($lead->customer_id ?? '');
-        $actionButtons[] = S::buttonOutlined('Create Quotation',
-            [
-                'type' => 'navigate',
-                'target' => 'dynamic_page',
-                'endpoint' => $quotationRoute,
-                'route' => $quotationRoute,
-                'target_endpoint' => $quotationRoute,
-                'title' => 'New Quotation',
+        // 1. Create Quotation modal
+        $quotationModalEndpoint = '/api/v1/tenant/quotations/create-modal?' . http_build_query([
+            'lead_id'     => $lead->id,
+            'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+            'customer_id' => $lead->customer_id ?? '',
+            'subject'     => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
+            'notes'       => $lead->notes ?? '',
+        ]);
+        $actionButtons[] = [
+            'type'        => 'button',
+            'label'       => 'Create Quotation',
+            'icon'        => 'description',
+            'variant'     => 'outline_primary',
+            'action_type' => 'OPEN_BOTTOM_SHEET',
+            'action'      => [
+                'type'           => 'OPEN_BOTTOM_SHEET',
+                'title'          => 'New quotation',
+                'endpoint'       => $quotationModalEndpoint,
+                'sheet_endpoint' => $quotationModalEndpoint,
+                'lead_id'        => $lead->id,
+                'lead_code'      => $lead->lead_code ?? "LD-{$lead->id}",
+                'customer_id'    => $lead->customer_id,
             ],
-            'request_quote');
+        ];
 
         // 2. 1-Tap Convert to Invoice
         $actionButtons[] = S::buttonPrimary('Convert to Tax Invoice',

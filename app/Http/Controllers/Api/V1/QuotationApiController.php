@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\Lead;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Services\TaxEngineService;
@@ -107,9 +108,9 @@ class QuotationApiController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'customer_id' => ['nullable', 'string'],
+            'customer_id' => ['nullable'],
             'customer_name' => ['nullable', 'string', 'max:150'],
-            'lead_id' => ['nullable', 'integer'],
+            'lead_id' => ['nullable'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['nullable'],
             'items.*.product_id' => ['nullable'],
@@ -134,6 +135,34 @@ class QuotationApiController extends Controller
         }
 
         $data = $validator->validated();
+
+        $resolvedLeadId = null;
+        $lead = null;
+        if (! empty($data['lead_id'])) {
+            $rawLeadId = $data['lead_id'];
+            $lead = Lead::query()
+                ->where(function ($q) use ($company) {
+                    $q->where('company_id', $company->id);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                        $q->orWhere('tenant_id', $company->id);
+                    }
+                })
+                ->where(function ($q) use ($rawLeadId) {
+                    $q->where('id', $rawLeadId)->orWhere('lead_code', $rawLeadId);
+                })
+                ->first();
+
+            if (! $lead && is_numeric($rawLeadId)) {
+                $lead = Lead::find($rawLeadId);
+            }
+
+            if ($lead) {
+                $resolvedLeadId = $lead->id;
+            } elseif (is_numeric($rawLeadId)) {
+                $resolvedLeadId = (int) $rawLeadId;
+            }
+        }
+
         [$customerId, $customerName] = $this->resolveCustomer($company, $data);
 
         $items = $this->resolveItems($company, $data['items']);
@@ -148,7 +177,7 @@ class QuotationApiController extends Controller
             'sale_number' => $this->nextQuoteNumber($company),
             'user_id' => $user?->id,
             'customer_id' => $customerId,
-            'lead_id' => $data['lead_id'] ?? null,
+            'lead_id' => $resolvedLeadId,
             'customer_name' => $customerName,
             'total' => $total,
             'net_amount' => max(0, $total - $discount),
@@ -167,17 +196,16 @@ class QuotationApiController extends Controller
             'items' => $items,
         ]);
 
-        if (! empty($data['lead_id'])) {
-            $lead = \App\Models\Lead::find($data['lead_id']);
-            if ($lead) {
-                $lead->update(['stage' => 'proposal_sent']);
+        if ($lead) {
+            $lead->update(['stage' => 'proposal_sent']);
+            if (class_exists('\Modules\leadmanagement\Models\LeadActivity')) {
                 \Modules\leadmanagement\Models\LeadActivity::create([
-                    'company_id' => $company->id,
-                    'lead_id' => $lead->id,
-                    'type' => 'note',
-                    'title' => 'Quotation Created',
-                    'description' => "Quotation #{$quote->sale_number} generated from lead.",
-                    'status' => 'completed',
+                    'company_id'   => $company->id,
+                    'lead_id'      => $lead->id,
+                    'type'         => 'note',
+                    'title'        => 'Quotation Created',
+                    'description'  => "Quotation #{$quote->sale_number} generated from lead.",
+                    'status'       => 'completed',
                     'completed_at' => now(),
                 ]);
             }
@@ -457,14 +485,31 @@ class QuotationApiController extends Controller
         }
 
         if (! $customerId && ! empty($data['lead_id'])) {
+            $rawLeadId = $data['lead_id'];
             $lead = \App\Models\Lead::query()
-                ->where('company_id', $company->id)
-                ->find($data['lead_id']);
+                ->where(function ($q) use ($company) {
+                    $q->where('company_id', $company->id);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                        $q->orWhere('tenant_id', $company->id);
+                    }
+                })
+                ->where(function ($q) use ($rawLeadId) {
+                    $q->where('id', $rawLeadId)->orWhere('lead_code', $rawLeadId);
+                })
+                ->first();
+            if (! $lead && is_numeric($rawLeadId)) {
+                $lead = \App\Models\Lead::find($rawLeadId);
+            }
             if ($lead) {
                 if ($lead->customer_id) {
                     $customer = Customer::query()
                         ->withoutGlobalScope('company')
-                        ->where('company_id', $company->id)
+                        ->where(function ($q) use ($company) {
+                            $q->where('company_id', $company->id);
+                            if (\Illuminate\Support\Facades\Schema::hasColumn('customers', 'tenant_id')) {
+                                $q->orWhere('tenant_id', $company->id);
+                            }
+                        })
                         ->find($lead->customer_id);
                     if ($customer) {
                         $customerId = $customer->id;
