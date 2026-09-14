@@ -9,6 +9,7 @@ import '../../features/auth/auth_provider.dart';
 import '../../features/pos/rx_cart_handoff.dart';
 import '../../features/pos/screens/invoice_actions_sheet.dart';
 import '../../features/quotations/quotations_provider.dart';
+import '../../features/quotations/quotations_repository.dart';
 import '../../features/quotations/screens/quotation_form_sheet.dart';
 import '../../features/repair/ticket_share_sheet.dart';
 import '../api/api_client.dart';
@@ -679,7 +680,18 @@ class SduiActionDispatcher {
           : const <String, dynamic>{};
       final company = context.read<AuthProvider?>()?.company;
       final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
-      final quotations = context.read<QuotationsProvider>();
+      QuotationsProvider? inheritedQuotations;
+      try {
+        inheritedQuotations = context.read<QuotationsProvider>();
+      } catch (_) {
+        // Lead views do not own a QuotationsProvider. A sheet-local provider
+        // is created below so the native composer works from any SDUI screen.
+      }
+      if (inheritedQuotations == null && client == null) {
+        showToast('Unable to open quotation: API client is unavailable.',
+            isError: true);
+        return;
+      }
       final custId = sheetSchema['customer_id']?.toString() ??
           actionData['customer_id']?.toString() ??
           action['customer_id']?.toString();
@@ -704,17 +716,30 @@ class SduiActionDispatcher {
         isScrollControlled: true,
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-        builder: (_) => ChangeNotifierProvider.value(
-          value: quotations,
-          child: QuotationFormSheet(
+        builder: (_) {
+          final sheet = QuotationFormSheet(
             formatter: formatter,
             initialCustomerId: custId,
             initialCustomerName: custName,
             initialLeadId: leadId,
             initialNotes: notes,
             initialTerms: terms,
-          ),
-        ),
+          );
+
+          if (inheritedQuotations != null) {
+            return ChangeNotifierProvider.value(
+              value: inheritedQuotations,
+              child: sheet,
+            );
+          }
+
+          return ChangeNotifierProvider(
+            create: (_) => QuotationsProvider(
+              repository: QuotationsRepository(client!),
+            ),
+            child: sheet,
+          );
+        },
       );
       return;
     }

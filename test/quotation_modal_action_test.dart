@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:zoom_pos_mobile/core/api/api_client.dart';
+import 'package:zoom_pos_mobile/core/sdui/dynamic_schema_context.dart';
+import 'package:zoom_pos_mobile/core/sdui/dynamic_schema_parser.dart';
 import 'package:zoom_pos_mobile/core/sdui/sdui_action_dispatcher.dart';
 import 'package:zoom_pos_mobile/features/auth/auth_provider.dart';
-import 'package:zoom_pos_mobile/features/quotations/quotations_provider.dart';
-import 'package:zoom_pos_mobile/features/quotations/quotations_repository.dart';
 import 'package:zoom_pos_mobile/features/quotations/screens/quotation_form_sheet.dart';
 
 void main() {
@@ -15,8 +15,6 @@ void main() {
     const endpoint =
         '/api/v1/tenant/quotations/create-modal?lead_id=17&customer_id=29';
     final apiClient = _FakeApiClient();
-    final quotations =
-        QuotationsProvider(repository: QuotationsRepository(apiClient));
     late SduiActionDispatcher dispatcher;
     String? requestedEndpoint;
 
@@ -49,23 +47,41 @@ void main() {
         providers: [
           Provider<ApiClient>.value(value: apiClient),
           Provider<AuthProvider?>.value(value: null),
-          ChangeNotifierProvider<QuotationsProvider>.value(value: quotations),
         ],
         child: MaterialApp(
           home: Builder(
             builder: (context) => Scaffold(
-              body: ElevatedButton(
-                onPressed: () => dispatcher.dispatch(context, {
-                  'type': 'OPEN_QUOTATION_MODAL',
-                  'action_type': 'OPEN_QUOTATION_MODAL',
-                  'endpoint': endpoint,
-                  'data': {
-                    'lead_id': 17,
-                    'customer_id': 29,
-                    'notes': 'Lead requested barcode scanner support.',
-                  },
-                }),
-                child: const Text('Create quote'),
+              body: DynamicSchemaContext(
+                formValues: const {},
+                setFormValue: (_, __) {},
+                dispatchAction: (action) =>
+                    dispatcher.dispatch(context, action),
+                apiClient: apiClient,
+                child: Builder(
+                  builder: (cardContext) =>
+                      DynamicSchemaParser.buildComponent(cardContext, {
+                    'type': 'entity_record_card',
+                    'title': 'Prakash Kumar Singh',
+                    'actions': [
+                      {
+                        'label': 'Create quote',
+                        'variant': 'primary',
+                        'action_type': 'OPEN_QUOTATION_MODAL',
+                        'endpoint': endpoint,
+                        'action': {
+                          'type': 'OPEN_QUOTATION_MODAL',
+                          'action_type': 'OPEN_QUOTATION_MODAL',
+                          'endpoint': endpoint,
+                          'data': {
+                            'lead_id': 17,
+                            'customer_id': 29,
+                            'notes': 'Lead requested barcode scanner support.',
+                          },
+                        },
+                      },
+                    ],
+                  }),
+                ),
               ),
             ),
           ),
