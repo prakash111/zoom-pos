@@ -29,9 +29,9 @@ class PushNotificationSetting extends Model
     {
         return [
             'enabled' => 'boolean',
-            'fcm_service_account_json' => 'encrypted',
-            'fcm_server_key' => 'encrypted',
-            'android_api_key' => 'encrypted',
+            'fcm_service_account_json' => \App\Casts\SafeEncryptedString::class,
+            'fcm_server_key' => \App\Casts\SafeEncryptedString::class,
+            'android_api_key' => \App\Casts\SafeEncryptedString::class,
             'alarm_repeat_seconds' => 'integer',
         ];
     }

@@ -52,7 +52,7 @@ class PlatformBranding extends Model
     protected function casts(): array
     {
         return [
-            'smtp_password' => 'encrypted',
+            'smtp_password' => \App\Casts\SafeEncryptedString::class,
             'expiration_reminder_thresholds' => 'array',
             'otp_registration_enabled' => 'boolean',
             'landing_page_enabled' => 'boolean',

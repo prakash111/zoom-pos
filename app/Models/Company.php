@@ -60,7 +60,7 @@ class Company extends Model
             'is_demo' => 'boolean',
             'drawer_gradient_enabled' => 'boolean',
             'tax_settings' => 'array',
-            'tax_api_key' => 'encrypted',
+            'tax_api_key' => \App\Casts\SafeEncryptedString::class,
             'currency_decimals' => 'integer',
             'other_currencies' => 'array',
             'restaurant_mode_locked' => 'boolean',

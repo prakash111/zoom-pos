@@ -52,7 +52,7 @@ class SduiModule extends Model
             'sort_order' => 'integer',
             'installed_at' => 'datetime',
             'requires_license' => 'boolean',
-            'license_key_encrypted' => 'encrypted',
+            'license_key_encrypted' => \App\Casts\SafeEncryptedString::class,
             'license_verified_at' => 'datetime',
             'license_expires_at' => 'datetime',
         ];

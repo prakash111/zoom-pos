@@ -25,7 +25,7 @@ class CustomNotificationChannel extends Model
             'headers' => 'array',
             'event_types' => 'array',
             'is_active' => 'boolean',
-            'auth_value' => 'encrypted',
+            'auth_value' => \App\Casts\SafeEncryptedString::class,
         ];
     }
 

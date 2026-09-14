@@ -35,7 +35,7 @@ class TenantNotificationGateway extends Model
     {
         return [
             'is_enabled' => 'boolean',
-            'credentials' => 'encrypted:array',
+            'credentials' => \App\Casts\SafeEncryptedArray::class,
         ];
     }
 

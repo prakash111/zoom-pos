@@ -29,7 +29,9 @@ class FinishStep extends Component
     public function finish(): void
     {
         try {
-            Artisan::call('key:generate', ['--force' => true]);
+            if (empty(config('app.key'))) {
+                Artisan::call('key:generate', ['--force' => true]);
+            }
         } catch (\Throwable $e) {
             Log::warning('Installer key:generate failed: '.$e->getMessage());
         }
