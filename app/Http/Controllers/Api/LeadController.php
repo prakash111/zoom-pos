@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Company;
 use App\Models\Lead;
+use App\Services\Auth\PermissionChecker;
 use App\Services\Sdui\SchemaResponse as S;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Modules\leadmanagement\Http\Controllers\LeadModuleController;
 
 /**
@@ -37,27 +39,27 @@ class LeadController extends LeadModuleController
         if ($tenantId) {
             $query->where(function ($q) use ($tenantId) {
                 $q->where('company_id', $tenantId)
-                  ->orWhereNull('company_id');
-                if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                    ->orWhereNull('company_id');
+                if (Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
                     $q->orWhere('tenant_id', $tenantId);
                 }
             });
         }
 
         // Filter out deleted if column exists
-        if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'deleted_at')) {
+        if (Schema::hasColumn('lead_mod_leads', 'deleted_at')) {
             $query->whereNull('deleted_at');
         }
 
         $leads = $query->latest()->get();
 
         return response()->json([
-            'success'        => true,
-            'data'           => $leads,
-            'leads'          => $leads,
+            'success' => true,
+            'data' => $leads,
+            'leads' => $leads,
             'pipeline_count' => $leads->count(),
             'pipeline_value' => (float) ($leads->sum('opportunity_value') ?: ($leads->sum('expected_value') ?: ($leads->sum('estimated_value') ?: 0))),
-            'components'     => $this->buildLeadListComponents($leads),
+            'components' => $this->buildLeadListComponents($leads),
         ]);
     }
 
@@ -156,13 +158,13 @@ class LeadController extends LeadModuleController
             ->where(function ($q) use ($tenantId) {
                 if ($tenantId) {
                     $q->where('company_id', $tenantId)
-                      ->orWhereNull('company_id');
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                        ->orWhereNull('company_id');
+                    if (Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
                         $q->orWhere('tenant_id', $tenantId);
                     }
                 }
             })
-            ->when(\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'deleted_at'), function ($q) {
+            ->when(Schema::hasColumn('lead_mod_leads', 'deleted_at'), function ($q) {
                 $q->whereNull('deleted_at');
             })
             ->when($stage !== 'all', function ($q) use ($stage) {
@@ -170,7 +172,7 @@ class LeadController extends LeadModuleController
                     $sq->where('stage', $stage)->orWhere('status', $stage);
                 });
             })
-            ->when(!empty($query), function ($q) use ($query) {
+            ->when(! empty($query), function ($q) use ($query) {
                 $q->where(function ($sub) use ($query) {
                     $sub->where('lead_code', 'LIKE', "%{$query}%")
                         ->orWhere('title', 'LIKE', "%{$query}%")
@@ -180,15 +182,15 @@ class LeadController extends LeadModuleController
                         ->orWhere('company_name', 'LIKE', "%{$query}%")
                         ->orWhereHas('customer', function ($cq) use ($query) {
                             $cq->where('name', 'LIKE', "%{$query}%")
-                               ->orWhere('phone', 'LIKE', "%{$query}%")
-                               ->orWhere('company_name', 'LIKE', "%{$query}%");
+                                ->orWhere('phone', 'LIKE', "%{$query}%")
+                                ->orWhere('company_name', 'LIKE', "%{$query}%");
                         });
                 });
             })
             ->orderBy('created_at', 'desc');
 
         $user = auth()->user();
-        if ($user && ! \App\Services\Auth\PermissionChecker::can($user, 'leads', 'view_any')) {
+        if ($user && ! PermissionChecker::can($user, 'leads', 'view_any')) {
             $leadsQuery->where('assigned_to', $user->id);
         }
 
@@ -207,11 +209,11 @@ class LeadController extends LeadModuleController
                 default => '#06B6D4',
             };
             $stageLabel = ucfirst(str_replace('_', ' ', $stage));
-            $val = $currency . number_format((float) ($lead->expected_value ?: $lead->estimated_value ?: 0), 2);
+            $val = $currency.number_format((float) ($lead->expected_value ?: $lead->estimated_value ?: 0), 2);
             $leadTitle = $lead->customer?->name ?? ($lead->name ?: ($lead->title ?? 'Unnamed Lead'));
             $companyName = $lead->customer?->company_name ?? ($lead->company_name ?: '');
             $orgSuffix = $companyName ? "  ·  {$companyName}" : '';
-            $contactInfo = trim(($lead->phone ?: '') . ($lead->email ? "  ·  {$lead->email}" : ''));
+            $contactInfo = trim(($lead->phone ?: '').($lead->email ? "  ·  {$lead->email}" : ''));
             $repName = $lead->assignedUser?->name ?: ($lead->assigned_to ?: 'Unassigned');
 
             $items[] = array_merge($lead->toArray(), [
@@ -237,10 +239,10 @@ class LeadController extends LeadModuleController
                     ]),
                     S::text("{$leadTitle}{$orgSuffix}", 'title_medium', ['bold' => true]),
                     $contactInfo ? S::text($contactInfo, 'body_small') : S::text('No phone/email provided', 'body_small'),
-                    S::text("Rep: {$repName}  ·  Priority: " . ucfirst($lead->priority ?? 'medium'), 'body_small'),
+                    S::text("Rep: {$repName}  ·  Priority: ".ucfirst($lead->priority ?? 'medium'), 'body_small'),
                     S::row([
                         S::buttonOutlined('View Details',
-                            S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $lead->id, 'dynamic_page', $lead->lead_code)),
+                            S::navigateAction('/api/tenant/lead-module/views/lead-detail?id='.$lead->id, 'dynamic_page', $lead->lead_code)),
                         $this->quotationButton($lead, 'Create quote'),
                     ]),
                 ],
@@ -314,10 +316,10 @@ class LeadController extends LeadModuleController
                 'contacted' => '#8B5CF6',
                 default => '#06B6D4',
             };
-            $val = '₹' . number_format((float) ($lead->expected_value ?: ($lead->estimated_value ?: 0)), 2);
+            $val = '₹'.number_format((float) ($lead->expected_value ?: ($lead->estimated_value ?: 0)), 2);
             $leadTitle = $lead->customer?->name ?? ($lead->name ?: ($lead->title ?? 'Unnamed Lead'));
             $companyName = $lead->customer?->company_name ?? ($lead->company_name ?: '');
-            $contactInfo = trim(($lead->phone ?: '') . ($lead->email ? "  ·  {$lead->email}" : ''));
+            $contactInfo = trim(($lead->phone ?: '').($lead->email ? "  ·  {$lead->email}" : ''));
 
             $components[] = [
                 'type' => 'card',
@@ -327,50 +329,54 @@ class LeadController extends LeadModuleController
                         S::badge(ucfirst(str_replace('_', ' ', $stage)), $stageColor),
                         S::text($val, 'body_medium', ['bold' => true]),
                     ]),
-                    S::text($leadTitle . ($companyName ? "  ·  {$companyName}" : ''), 'title_medium', ['bold' => true]),
+                    S::text($leadTitle.($companyName ? "  ·  {$companyName}" : ''), 'title_medium', ['bold' => true]),
                     $contactInfo ? S::text($contactInfo, 'body_small') : S::text('No phone/email provided', 'body_small'),
                     S::row([
                         S::buttonOutlined('View Details',
-                            S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $lead->id, 'dynamic_page', $lead->lead_code)),
+                            S::navigateAction('/api/tenant/lead-module/views/lead-detail?id='.$lead->id, 'dynamic_page', $lead->lead_code)),
                         $this->quotationButton($lead, 'Create quote'),
                     ]),
                 ],
             ];
         }
+
         return $components;
     }
 
     /**
-     * Standard lead-to-quotation SDUI action used by every REST lead list.
+     * Standard lead-to-quotation native modal used by every REST lead list.
      */
-    private function quotationButton(Lead $lead, string $label): array
+    private function quotationButton(\Modules\leadmanagement\Models\Lead $lead, string $label): array
     {
-        $endpoint = '/api/v1/tenant/quotations/create-modal?' . http_build_query([
-            'lead_id'     => $lead->id,
-            'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+        $modalEndpoint = '/api/v1/tenant/quotations/create-modal?'.http_build_query([
+            'lead_id' => $lead->id,
             'customer_id' => $lead->customer_id ?? '',
-            'subject'     => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
-            'notes'       => $lead->notes ?? '',
         ]);
-
-        $action = S::openBottomSheetAction($endpoint, 'New quotation', [
-            'lead_id'     => $lead->id,
-            'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+        $modalData = [
+            'lead_id' => $lead->id,
+            'lead_code' => $lead->lead_code ?? "LD-{$lead->id}",
             'customer_id' => $lead->customer_id,
-        ]);
+            'notes' => $lead->notes ?? '',
+        ];
+        $action = S::openQuotationModalAction($modalEndpoint, $modalData);
 
         return S::buttonPrimary($label, $action, 'add_circle_outline', [
-            'variant'          => 'primary',
-            'action_type'      => 'OPEN_BOTTOM_SHEET',
-            'background_color' => '#166534',
-            'foreground_color' => '#FFFFFF',
-            'border_radius'    => 10,
-            'expanded'         => true,
-            'style'            => [
-                'backgroundColor' => '#166534',
-                'textColor'       => '#FFFFFF',
-                'borderRadius'    => 10,
-                'flex'            => 1,
+            'variant' => 'primary',
+            'action_type' => 'OPEN_QUOTATION_MODAL',
+            'endpoint' => $modalEndpoint,
+            'sheet_endpoint' => $modalEndpoint,
+            'data' => $modalData,
+            'background_color' => '#84CC16',
+            'foreground_color' => '#000000',
+            'font_weight' => 'bold',
+            'border_radius' => 10,
+            'expanded' => true,
+            'style' => [
+                'backgroundColor' => '#84CC16',
+                'textColor' => '#000000',
+                'fontWeight' => 'bold',
+                'borderRadius' => 10,
+                'flex' => 1,
             ],
         ]);
     }

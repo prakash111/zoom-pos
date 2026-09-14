@@ -10,7 +10,6 @@ use App\Models\TenantApiKey;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Modules\leadmanagement\Models\LeadActivity;
 use Tests\TestCase;
 
 class LeadQuotationModalRoutingTest extends TestCase
@@ -32,7 +31,7 @@ class LeadQuotationModalRoutingTest extends TestCase
         parent::setUp();
 
         $this->artisan('migrate', [
-            '--path'     => base_path('module-packages/leadmanagement/Database/Migrations'),
+            '--path' => base_path('module-packages/leadmanagement/Database/Migrations'),
             '--realpath' => true,
         ]);
 
@@ -113,14 +112,14 @@ class LeadQuotationModalRoutingTest extends TestCase
         $this->assertNotNull($createQuotation);
         $this->assertNotNull($convertToInvoice);
         $this->assertSame('button_primary', $createQuotation['type']);
-        $this->assertSame('#166534', $createQuotation['background_color']);
-        $this->assertSame('#FFFFFF', $createQuotation['foreground_color']);
-        $this->assertSame('OPEN_BOTTOM_SHEET', $createQuotation['action_type']);
+        $this->assertSame('#84CC16', $createQuotation['background_color']);
+        $this->assertSame('#000000', $createQuotation['foreground_color']);
+        $this->assertSame('OPEN_QUOTATION_MODAL', $createQuotation['action_type']);
         $this->assertQuotationModalAction($createQuotation['action']);
         $this->assertSame('button_outlined', $convertToInvoice['type']);
     }
 
-    public function test_all_leads_card_create_quote_uses_the_standard_modal_action_and_primary_color(): void
+    public function test_all_leads_card_create_quote_opens_the_native_modal_with_primary_color(): void
     {
         $response = $this->withToken($this->token)
             ->getJson('/api/tenant/views/leads?tab=all_leads');
@@ -130,9 +129,9 @@ class LeadQuotationModalRoutingTest extends TestCase
         $createQuote = $this->findNodeByLabel($response->json(), 'Create quote');
         $this->assertNotNull($createQuote);
         $this->assertSame('primary', $createQuote['variant']);
-        $this->assertSame('#166534', $createQuote['color']);
-        $this->assertSame('#FFFFFF', $createQuote['style']['textColor']);
-        $this->assertSame('OPEN_BOTTOM_SHEET', $createQuote['action_type']);
+        $this->assertSame('#84CC16', $createQuote['color']);
+        $this->assertSame('#000000', $createQuote['style']['textColor']);
+        $this->assertSame('OPEN_QUOTATION_MODAL', $createQuote['action_type']);
         $this->assertQuotationModalAction($createQuote['action']);
     }
 
@@ -146,8 +145,23 @@ class LeadQuotationModalRoutingTest extends TestCase
         $createQuote = $this->findNodeByLabel($response->json(), 'Create quote');
         $this->assertNotNull($createQuote);
         $this->assertSame('button_primary', $createQuote['type']);
-        $this->assertSame('#166534', $createQuote['background_color']);
-        $this->assertSame('OPEN_BOTTOM_SHEET', $createQuote['action_type']);
+        $this->assertSame('#84CC16', $createQuote['background_color']);
+        $this->assertSame('#000000', $createQuote['foreground_color']);
+        $this->assertSame('OPEN_QUOTATION_MODAL', $createQuote['action_type']);
+        $this->assertQuotationModalAction($createQuote['action']);
+    }
+
+    public function test_v1_leads_response_exposes_the_actionable_create_quote_card(): void
+    {
+        $response = $this->withToken($this->token)
+            ->getJson('/api/v1/tenant/leads');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true);
+
+        $createQuote = $this->findNodeByLabel($response->json('components'), 'Create quote');
+        $this->assertNotNull($createQuote);
+        $this->assertSame('OPEN_QUOTATION_MODAL', $createQuote['action_type']);
         $this->assertQuotationModalAction($createQuote['action']);
     }
 
@@ -206,22 +220,22 @@ class LeadQuotationModalRoutingTest extends TestCase
     public function test_quotation_store_links_lead_and_updates_stage_and_activity(): void
     {
         $payload = [
-            'lead_id'       => $this->lead->id,
-            'customer_id'   => $this->customer->id,
+            'lead_id' => $this->lead->id,
+            'customer_id' => $this->customer->id,
             'customer_name' => $this->customer->name,
-            'discount'      => 500.00,
-            'notes'         => 'Account Name: Metro Retail Mart Pvt. Ltd.',
-            'terms'         => 'Valid for 15 days.',
-            'items'         => [
+            'discount' => 500.00,
+            'notes' => 'Account Name: Metro Retail Mart Pvt. Ltd.',
+            'terms' => 'Valid for 15 days.',
+            'items' => [
                 [
-                    'name'     => 'Thermal Receipt Printer 80mm',
-                    'price'    => 4500.00,
+                    'name' => 'Thermal Receipt Printer 80mm',
+                    'price' => 4500.00,
                     'quantity' => 1,
                     'tax_rate' => 18,
                 ],
                 [
-                    'name'     => 'Handheld 2D Barcode Scanner',
-                    'price'    => 2500.00,
+                    'name' => 'Handheld 2D Barcode Scanner',
+                    'price' => 2500.00,
                     'quantity' => 2,
                     'tax_rate' => 18,
                 ],
@@ -236,10 +250,10 @@ class LeadQuotationModalRoutingTest extends TestCase
 
         $this->assertNotEmpty($quoteData);
         $this->assertDatabaseHas('sales', [
-            'company_id'     => $this->company->id,
+            'company_id' => $this->company->id,
             'operation_type' => 'quotation',
-            'customer_id'    => $this->customer->id,
-            'lead_id'        => $this->lead->id,
+            'customer_id' => $this->customer->id,
+            'lead_id' => $this->lead->id,
         ]);
 
         // Verify lead stage updated to proposal_sent
@@ -249,8 +263,8 @@ class LeadQuotationModalRoutingTest extends TestCase
         // Verify activity log recorded
         $this->assertDatabaseHas('lead_mod_activities', [
             'company_id' => $this->company->id,
-            'lead_id'    => $this->lead->id,
-            'title'      => 'Quotation Created',
+            'lead_id' => $this->lead->id,
+            'title' => 'Quotation Created',
         ]);
 
         // Verify lead has linked quotations
@@ -259,15 +273,21 @@ class LeadQuotationModalRoutingTest extends TestCase
 
     private function assertQuotationModalAction(array $action): void
     {
-        $this->assertSame('OPEN_BOTTOM_SHEET', $action['type']);
-        $this->assertSame('OPEN_BOTTOM_SHEET', $action['action_type']);
+        $this->assertSame('OPEN_QUOTATION_MODAL', $action['type']);
+        $this->assertSame('OPEN_QUOTATION_MODAL', $action['action_type']);
         $this->assertSame('New quotation', $action['title']);
         $this->assertSame($action['endpoint'], $action['sheet_endpoint']);
+        $this->assertSame($action['endpoint'], $action['url']);
         $this->assertStringStartsWith('/api/v1/tenant/quotations/create-modal?', $action['endpoint']);
+        $this->assertArrayNotHasKey('route', $action);
 
         parse_str((string) parse_url($action['endpoint'], PHP_URL_QUERY), $query);
         $this->assertSame((string) $this->lead->id, $query['lead_id']);
         $this->assertSame((string) $this->customer->id, $query['customer_id']);
+        $this->assertSame($this->lead->id, $action['data']['lead_id']);
+        $this->assertSame($this->lead->lead_code, $action['data']['lead_code']);
+        $this->assertSame($this->customer->id, $action['data']['customer_id']);
+        $this->assertSame($this->lead->notes, $action['data']['notes']);
     }
 
     private function findNodeByLabel(mixed $node, string $label): ?array

@@ -2,16 +2,20 @@
 
 namespace Modules\leadmanagement\Http\Controllers;
 
+use App\Http\Controllers\Api\LeadController;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Customer;
-use App\Models\Sale;
+use App\Models\Reminder;
 use App\Models\User;
 use App\Services\Auth\PermissionChecker;
 use App\Services\Sdui\SchemaResponse as S;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Modules\leadmanagement\Models\Lead;
 use Modules\leadmanagement\Models\LeadActivity;
 use Modules\leadmanagement\Models\LeadSource;
@@ -28,8 +32,7 @@ class LeadModuleController extends Controller
 
     public function __construct(
         protected LeadService $leadService,
-    ) {
-    }
+    ) {}
 
     /**
      * Executive Overview Dashboard with Native SDUI Tabbed Layout (Store Profile standard).
@@ -94,7 +97,7 @@ class LeadModuleController extends Controller
             ->limit(50)
             ->get();
 
-        $reminders = \App\Models\Reminder::withoutGlobalScope('company')
+        $reminders = Reminder::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('status', 'pending')
             ->with('customer')
@@ -106,7 +109,7 @@ class LeadModuleController extends Controller
         foreach ($reminders as $rem) {
             $notes = $rem->notes ?: ($rem->description ?: $rem->call_script);
             $dueAt = $rem->due_at ?: $rem->due_date;
-            $dueStr = $dueAt ? \Carbon\Carbon::parse($dueAt)->format('M d, Y H:i') : 'N/A';
+            $dueStr = $dueAt ? Carbon::parse($dueAt)->format('M d, Y H:i') : 'N/A';
             $subject = $rem->subject ?: ($rem->title ?: 'Follow-up Call');
 
             $components = [
@@ -124,7 +127,7 @@ class LeadModuleController extends Controller
                 ],
                 [
                     'type' => 'text',
-                    'text' => 'Due: ' . $dueStr,
+                    'text' => 'Due: '.$dueStr,
                     'style' => 'body_small',
                     'variant' => 'bodySmall',
                 ],
@@ -134,12 +137,12 @@ class LeadModuleController extends Controller
                 $components[] = [
                     'type' => 'callout',
                     'component_type' => 'callout',
-                    'text' => '📝 ' . $notes,
+                    'text' => '📝 '.$notes,
                     'variant' => 'accent',
                     'components' => [
                         [
                             'type' => 'text',
-                            'text' => '📝 ' . $notes,
+                            'text' => '📝 '.$notes,
                             'style' => 'body_small',
                             'variant' => 'bodySmall',
                             'bold' => true,
@@ -286,8 +289,8 @@ class LeadModuleController extends Controller
                     $query->where('id', (int) $idStr)->orWhere('lead_code', $idStr);
                 } else {
                     $query->where('lead_code', $idStr)
-                          ->orWhere('lead_code', 'LD-' . $idStr)
-                          ->orWhere('lead_code', 'LD-' . $cleanId);
+                        ->orWhere('lead_code', 'LD-'.$idStr)
+                        ->orWhere('lead_code', 'LD-'.$cleanId);
                     if (! empty($cleanId) && is_numeric($cleanId)) {
                         $query->orWhere('id', (int) $cleanId);
                     }
@@ -296,8 +299,8 @@ class LeadModuleController extends Controller
             ->where(function ($query) use ($tenantId) {
                 if ($tenantId) {
                     $query->where('company_id', $tenantId)
-                          ->orWhereNull('company_id');
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                        ->orWhereNull('company_id');
+                    if (Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
                         $query->orWhere('tenant_id', $tenantId);
                     }
                 }
@@ -312,8 +315,8 @@ class LeadModuleController extends Controller
                         $query->where('id', (int) $idStr)->orWhere('lead_code', $idStr);
                     } else {
                         $query->where('lead_code', $idStr)
-                              ->orWhere('lead_code', 'LD-' . $idStr)
-                              ->orWhere('lead_code', 'LD-' . $cleanId);
+                            ->orWhere('lead_code', 'LD-'.$idStr)
+                            ->orWhere('lead_code', 'LD-'.$cleanId);
                         if (! empty($cleanId) && is_numeric($cleanId)) {
                             $query->orWhere('id', (int) $cleanId);
                         }
@@ -331,11 +334,11 @@ class LeadModuleController extends Controller
 
         // 4. Fallback search via reminder table if lead was referenced in a reminder
         if (! $lead) {
-            $reminder = \App\Models\Reminder::withoutGlobalScope('company')
+            $reminder = Reminder::withoutGlobalScope('company')
                 ->where(function ($q) use ($idStr, $cleanId) {
                     $q->where('notes', 'LIKE', "%{$idStr}%")
-                      ->orWhere('notes', 'LIKE', "%{$cleanId}%")
-                      ->orWhere('remindable_id', $idStr);
+                        ->orWhere('notes', 'LIKE', "%{$cleanId}%")
+                        ->orWhere('remindable_id', $idStr);
                 })
                 ->first();
             if ($reminder && $reminder->remindable_id) {
@@ -344,7 +347,7 @@ class LeadModuleController extends Controller
         }
 
         if (! $lead) {
-            throw (new \Illuminate\Database\Eloquent\ModelNotFoundException)->setModel(Lead::class, [$id]);
+            throw (new ModelNotFoundException)->setModel(Lead::class, [$id]);
         }
 
         // 5. Un-delete any mistakenly soft-deleted lead
@@ -452,15 +455,15 @@ class LeadModuleController extends Controller
             S::row([
                 S::badge($lead->lead_code, '#0284C7'),
                 S::badge(ucfirst(str_replace('_', ' ', $stage)), $stageColor),
-                S::text($currency . number_format((float) ($lead->expected_value ?: $lead->estimated_value ?: 0), 0), 'title_medium', ['bold' => true]),
+                S::text($currency.number_format((float) ($lead->expected_value ?: $lead->estimated_value ?: 0), 0), 'title_medium', ['bold' => true]),
             ]),
             S::text($lead->name, 'title_large', ['bold' => true]),
             $tracker,
             S::divider(),
-            S::text('Company: ' . ($lead->company_name ?: 'Individual / Direct'), 'body_medium'),
-            S::text('Contact: ' . trim(($lead->phone ?: '') . '  ·  ' . ($lead->email ?: '')), 'body_small'),
-            S::text('Source: ' . ($lead->source_name ?: ($lead->source ?: 'Direct')), 'body_small'),
-            S::text('Priority: ' . ucfirst($lead->priority ?? 'medium') . '  ·  Rep: ' . ($lead->assignedUser?->name ?: ($lead->assigned_to ?: 'Unassigned')), 'body_small'),
+            S::text('Company: '.($lead->company_name ?: 'Individual / Direct'), 'body_medium'),
+            S::text('Contact: '.trim(($lead->phone ?: '').'  ·  '.($lead->email ?: '')), 'body_small'),
+            S::text('Source: '.($lead->source_name ?: ($lead->source ?: 'Direct')), 'body_small'),
+            S::text('Priority: '.ucfirst($lead->priority ?? 'medium').'  ·  Rep: '.($lead->assignedUser?->name ?: ($lead->assigned_to ?: 'Unassigned')), 'body_small'),
         ];
 
         if ($lead->title) {
@@ -468,7 +471,7 @@ class LeadModuleController extends Controller
         }
 
         if ($lead->requirement_summary ?: $lead->notes) {
-            $overviewComponents[] = S::callout('Requirements: ' . ($lead->requirement_summary ?: $lead->notes), 'accent');
+            $overviewComponents[] = S::callout('Requirements: '.($lead->requirement_summary ?: $lead->notes), 'accent');
         }
 
         if ($lead->customer_id) {
@@ -487,29 +490,36 @@ class LeadModuleController extends Controller
         $actionButtons = [];
 
         // 1. Create Quotation modal
-        $quotationModalEndpoint = '/api/v1/tenant/quotations/create-modal?' . http_build_query([
-            'lead_id'     => $lead->id,
-            'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+        $quotationModalEndpoint = '/api/v1/tenant/quotations/create-modal?'.http_build_query([
+            'lead_id' => $lead->id,
+            'lead_code' => $lead->lead_code ?? "LD-{$lead->id}",
             'customer_id' => $lead->customer_id ?? '',
-            'subject'     => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
-            'notes'       => $lead->notes ?? '',
+            'subject' => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
+            'notes' => $lead->notes ?? '',
         ]);
-        $quotationAction = S::openBottomSheetAction($quotationModalEndpoint, 'New quotation', [
-            'lead_id'     => $lead->id,
-            'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+        $quotationData = [
+            'lead_id' => $lead->id,
+            'lead_code' => $lead->lead_code ?? "LD-{$lead->id}",
             'customer_id' => $lead->customer_id,
-        ]);
+            'notes' => $lead->notes ?? '',
+        ];
+        $quotationAction = S::openQuotationModalAction($quotationModalEndpoint, $quotationData);
         $actionButtons[] = S::buttonPrimary('Create Quotation', $quotationAction, 'description', [
-            'variant'          => 'primary',
-            'action_type'      => 'OPEN_BOTTOM_SHEET',
-            'background_color' => '#166534',
-            'foreground_color' => '#FFFFFF',
-            'border_radius'    => 10,
-            'style'            => [
-                'backgroundColor' => '#166534',
-                'textColor'       => '#FFFFFF',
-                'borderRadius'    => 10,
-                'marginVertical'  => 6,
+            'variant' => 'primary',
+            'action_type' => 'OPEN_QUOTATION_MODAL',
+            'endpoint' => $quotationModalEndpoint,
+            'sheet_endpoint' => $quotationModalEndpoint,
+            'data' => $quotationData,
+            'background_color' => '#84CC16',
+            'foreground_color' => '#000000',
+            'font_weight' => 'bold',
+            'border_radius' => 10,
+            'style' => [
+                'backgroundColor' => '#84CC16',
+                'textColor' => '#000000',
+                'fontWeight' => 'bold',
+                'borderRadius' => 10,
+                'marginVertical' => 6,
             ],
         ]);
 
@@ -517,12 +527,12 @@ class LeadModuleController extends Controller
         $actionButtons[] = S::buttonOutlined('Convert to Tax Invoice',
             S::apiPostAction(self::BASE.'/leads/'.$lead->id.'/convert-to-invoice', [], 'Lead converted to draft invoice.', reload: true),
             'receipt_long', [
-                'variant'       => 'outline',
+                'variant' => 'outline',
                 'border_radius' => 10,
-                'style'         => [
-                    'textColor'      => '#15803D',
-                    'borderColor'    => '#15803D',
-                    'borderRadius'   => 10,
+                'style' => [
+                    'textColor' => '#15803D',
+                    'borderColor' => '#15803D',
+                    'borderRadius' => 10,
                     'marginVertical' => 6,
                 ],
             ]);
@@ -590,8 +600,8 @@ class LeadModuleController extends Controller
                     S::text("Due: {$dueStr}  ·  Status: ".ucfirst($rem->status ?: 'pending'), 'body_small'),
                 ];
 
-                if (!empty($noteText)) {
-                    $cardItems[] = S::callout('📝 ' . $noteText, 'accent');
+                if (! empty($noteText)) {
+                    $cardItems[] = S::callout('📝 '.$noteText, 'accent');
                 }
 
                 $remTiles[] = S::container($cardItems, [
@@ -610,13 +620,13 @@ class LeadModuleController extends Controller
             $docTiles = [S::text('Linked Financial Documents', 'title_small', ['bold' => true])];
             foreach ($quotes as $q) {
                 $lines = [];
-                if (!empty($q->items) && is_array($q->items)) {
+                if (! empty($q->items) && is_array($q->items)) {
                     foreach ($q->items as $item) {
                         $qty = (float) ($item['quantity'] ?? $item['qty'] ?? 1);
                         $price = (float) ($item['price'] ?? $item['unit_price'] ?? 0);
                         $lines[] = [
-                            'name'       => (string) ($item['name'] ?? $item['product_name'] ?? 'Item'),
-                            'quantity'   => $qty,
+                            'name' => (string) ($item['name'] ?? $item['product_name'] ?? 'Item'),
+                            'quantity' => $qty,
                             'unit_price' => $price,
                             'line_total' => (float) ($item['total'] ?? ($qty * $price)),
                         ];
@@ -624,39 +634,39 @@ class LeadModuleController extends Controller
                 }
                 if (empty($lines)) {
                     $lines[] = [
-                        'name'       => 'Quote #' . $q->sale_number,
-                        'quantity'   => 1,
+                        'name' => 'Quote #'.$q->sale_number,
+                        'quantity' => 1,
                         'unit_price' => (float) $q->total,
                         'line_total' => (float) $q->total,
                     ];
                 }
 
                 $sheetAction = [
-                    'type'        => 'show_post_sale_sheet',
+                    'type' => 'show_post_sale_sheet',
                     'action_type' => 'show_post_sale_sheet',
-                    'data'        => [
-                        'sale_id'            => $q->id,
-                        'sale_number'        => $q->sale_number,
-                        'invoice_number'     => $q->sale_number,
-                        'operation_type'     => 'quotation',
-                        'customer_name'      => $q->customer?->name ?? 'Walk-in Customer',
-                        'customer_phone'     => $q->customer?->phone ?? '',
-                        'customer_email'     => $q->customer?->email ?? '',
-                        'total'              => (float) $q->total,
-                        'subtotal'           => (float) ($q->subtotal ?? $q->total),
-                        'tax'                => (float) ($q->tax_amount ?? 0),
-                        'discount'           => (float) ($q->discount_amount ?? 0),
-                        'formatted_total'    => $currency.number_format((float) $q->total, 2),
+                    'data' => [
+                        'sale_id' => $q->id,
+                        'sale_number' => $q->sale_number,
+                        'invoice_number' => $q->sale_number,
+                        'operation_type' => 'quotation',
+                        'customer_name' => $q->customer?->name ?? 'Walk-in Customer',
+                        'customer_phone' => $q->customer?->phone ?? '',
+                        'customer_email' => $q->customer?->email ?? '',
+                        'total' => (float) $q->total,
+                        'subtotal' => (float) ($q->subtotal ?? $q->total),
+                        'tax' => (float) ($q->tax_amount ?? 0),
+                        'discount' => (float) ($q->discount_amount ?? 0),
+                        'formatted_total' => $currency.number_format((float) $q->total, 2),
                         'formatted_subtotal' => $currency.number_format((float) ($q->subtotal ?? $q->total), 2),
-                        'date'               => $q->created_at?->toIso8601String() ?? now()->toIso8601String(),
-                        'created_at'         => $q->created_at?->format('d M Y, h:i A') ?? now()->format('d M Y, h:i A'),
-                        'pdf_url'            => url("/tenant/quotations/{$q->id}/print"),
-                        'print_url'          => url("/tenant/quotations/{$q->id}/print"),
-                        'view_url'           => url("/tenant/quotations/{$q->id}"),
-                        'share_url'          => url("/tenant/quotations/{$q->id}/print"),
-                        'share_text'         => "Quotation #{$q->sale_number} from {$company->name}: {$currency}".number_format((float) $q->total, 2),
-                        'whatsapp_text'      => "Hello, here is your quotation #{$q->sale_number} for {$currency}".number_format((float) $q->total, 2).': '.url("/tenant/quotations/{$q->id}/print"),
-                        'items'              => $lines,
+                        'date' => $q->created_at?->toIso8601String() ?? now()->toIso8601String(),
+                        'created_at' => $q->created_at?->format('d M Y, h:i A') ?? now()->format('d M Y, h:i A'),
+                        'pdf_url' => url("/tenant/quotations/{$q->id}/print"),
+                        'print_url' => url("/tenant/quotations/{$q->id}/print"),
+                        'view_url' => url("/tenant/quotations/{$q->id}"),
+                        'share_url' => url("/tenant/quotations/{$q->id}/print"),
+                        'share_text' => "Quotation #{$q->sale_number} from {$company->name}: {$currency}".number_format((float) $q->total, 2),
+                        'whatsapp_text' => "Hello, here is your quotation #{$q->sale_number} for {$currency}".number_format((float) $q->total, 2).': '.url("/tenant/quotations/{$q->id}/print"),
+                        'items' => $lines,
                     ],
                 ];
 
@@ -665,13 +675,13 @@ class LeadModuleController extends Controller
                     'Total: '.$currency.number_format((float) $q->total, 2).'  ·  Status: '.ucfirst($q->status),
                     'request_quote',
                     [
-                        'type'            => 'navigate',
-                        'target'          => 'dynamic_page',
-                        'endpoint'        => "/api/tenant/views/quotations/{$q->id}",
-                        'route'           => "/api/tenant/views/quotations/{$q->id}",
+                        'type' => 'navigate',
+                        'target' => 'dynamic_page',
+                        'endpoint' => "/api/tenant/views/quotations/{$q->id}",
+                        'route' => "/api/tenant/views/quotations/{$q->id}",
                         'target_endpoint' => "/api/tenant/views/quotations/{$q->id}",
-                        'title'           => "Quote #{$q->sale_number}",
-                        'action_type'     => 'navigate',
+                        'title' => "Quote #{$q->sale_number}",
+                        'action_type' => 'navigate',
                     ]
                 );
 
@@ -680,17 +690,17 @@ class LeadModuleController extends Controller
                     $sheetAction,
                     'share',
                     [
-                        'dense'            => true,
+                        'dense' => true,
                         'background_color' => '#0284c7',
-                        'margin'           => [0, 2, 0, 8],
+                        'margin' => [0, 2, 0, 8],
                     ]
                 );
             }
             foreach ($invoices as $inv) {
                 $invSheetAction = [
-                    'type'        => 'show_post_sale_sheet',
+                    'type' => 'show_post_sale_sheet',
                     'action_type' => 'show_post_sale_sheet',
-                    'data'        => S::postSaleActionData($inv),
+                    'data' => S::postSaleActionData($inv),
                 ];
                 $docTiles[] = S::lineItemTile(
                     "Tax Invoice #{$inv->sale_number}",
@@ -703,9 +713,9 @@ class LeadModuleController extends Controller
                     $invSheetAction,
                     'share',
                     [
-                        'dense'            => true,
+                        'dense' => true,
                         'background_color' => '#166534',
-                        'margin'           => [0, 2, 0, 8],
+                        'margin' => [0, 2, 0, 8],
                     ]
                 );
             }
@@ -762,8 +772,8 @@ class LeadModuleController extends Controller
             ->where(function ($q) use ($tenantId) {
                 if ($tenantId) {
                     $q->where('company_id', $tenantId)
-                      ->orWhereNull('company_id');
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                        ->orWhereNull('company_id');
+                    if (Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
                         $q->orWhere('tenant_id', $tenantId);
                     }
                 }
@@ -771,7 +781,7 @@ class LeadModuleController extends Controller
             ->with(['source', 'customer', 'assignedUser', 'reminders', 'quotations', 'invoices'])
             ->latest('created_at');
 
-        if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'deleted_at')) {
+        if (Schema::hasColumn('lead_mod_leads', 'deleted_at')) {
             $query->whereNull('deleted_at');
         }
 
@@ -780,7 +790,7 @@ class LeadModuleController extends Controller
         }
 
         $search = trim((string) ($request->input('q') ?: $request->input('search') ?: $request->input('search_leads') ?: ''));
-        if (!empty($search)) {
+        if (! empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('lead_code', 'like', "%{$search}%")
@@ -810,19 +820,26 @@ class LeadModuleController extends Controller
             ->where(function ($q) use ($tenantId) {
                 if ($tenantId) {
                     $q->where('company_id', $tenantId)->orWhereNull('company_id');
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                    if (Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
                         $q->orWhere('tenant_id', $tenantId);
                     }
                 }
             })
-            ->when(\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'))
+            ->when(Schema::hasColumn('lead_mod_leads', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'))
             ->whereNotIn('stage', ['lost'])
             ->sum('expected_value') ?: 0);
+
+        // Include the same backend-driven card components used by the All
+        // Leads screen so REST consumers receive its actionable quotation
+        // modal contract, not only raw lead records.
+        $components = app(LeadController::class)
+            ->buildLeadListComponents($leads->items());
 
         return response()->json([
             'success' => true,
             'data' => $leads->items(),
             'leads' => $leads->items(),
+            'components' => $components,
             'pipeline_count' => $leads->total(),
             'pipeline_value' => $pipelineValue,
             'meta' => [
@@ -1090,7 +1107,7 @@ class LeadModuleController extends Controller
                     'phone' => $c->phone ?? '',
                     'email' => $c->email ?? '',
                     'company_name' => $companyName,
-                    'due_amount' => $c->due_balance > 0 ? 'Due: ' . number_format((float) $c->due_balance, 2) : null,
+                    'due_amount' => $c->due_balance > 0 ? 'Due: '.number_format((float) $c->due_balance, 2) : null,
                     'avatar_icon' => 'person',
                     'badge_due_bg' => 'rgba(239, 68, 68, 0.15)',
                     'badge_due_tx' => '#F87171',
@@ -1104,17 +1121,17 @@ class LeadModuleController extends Controller
             'success' => true,
             'count' => $customers->count(),
             'theme' => [
-                'container_bg'     => S::themeToken('theme.surface', $request),
+                'container_bg' => S::themeToken('theme.surface', $request),
                 'dropdown_surface' => S::themeToken('theme.surface', $request),
                 'popup_background' => S::themeToken('theme.surface', $request),
-                'surface'          => S::themeToken('theme.surface', $request),
-                'card'             => S::themeToken('theme.surface', $request),
-                'border_color'     => S::themeToken('theme.divider', $request),
-                'title_color'      => S::themeToken('theme.textPrimary', $request),
-                'sub_color'        => S::themeToken('theme.textSecondary', $request),
-                'text_color'       => S::themeToken('theme.textPrimary', $request),
-                'badge_due_bg'     => 'rgba(239, 68, 68, 0.15)',
-                'badge_due_tx'     => '#F87171',
+                'surface' => S::themeToken('theme.surface', $request),
+                'card' => S::themeToken('theme.surface', $request),
+                'border_color' => S::themeToken('theme.divider', $request),
+                'title_color' => S::themeToken('theme.textPrimary', $request),
+                'sub_color' => S::themeToken('theme.textSecondary', $request),
+                'text_color' => S::themeToken('theme.textPrimary', $request),
+                'badge_due_bg' => 'rgba(239, 68, 68, 0.15)',
+                'badge_due_tx' => '#F87171',
             ],
             'data' => $customers,
             'customers' => $customers,

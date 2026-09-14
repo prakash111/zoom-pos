@@ -13,9 +13,6 @@ use App\Services\Auth\PermissionChecker;
 use App\Services\Notifications\TenantNotificationDispatcherService;
 use App\Services\Push\FirebasePushService;
 use App\Services\Sdui\SchemaResponse as S;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -28,8 +25,7 @@ class LeadService
     public function __construct(
         protected TenantNotificationDispatcherService $notificationDispatcher,
         protected FirebasePushService $pushService,
-    ) {
-    }
+    ) {}
 
     /**
      * Search existing customers for linking to a lead.
@@ -465,7 +461,7 @@ class LeadService
             'lead_id' => $lead->id,
             'type' => 'task',
             'title' => 'Follow-up Reminder Scheduled',
-            'description' => "Reminder set for {$reminder->due_date?->format('Y-m-d H:i')}: {$reminder->title}".($noteText ? " — {$noteText}" : ""),
+            'description' => "Reminder set for {$reminder->due_date?->format('Y-m-d H:i')}: {$reminder->title}".($noteText ? " — {$noteText}" : ''),
             'due_date' => $reminder->due_date,
             'status' => 'pending',
         ]);
@@ -537,8 +533,8 @@ class LeadService
                 };
                 $pushBody = match ($event) {
                     'lead_created' => "New lead captured with estimated value {$formattedVal}.",
-                    'lead_stage_updated' => "Lead stage changed to ".ucfirst(str_replace('_', ' ', $lead->stage)).".",
-                    'lead_converted' => "Lead won and converted successfully!",
+                    'lead_stage_updated' => 'Lead stage changed to '.ucfirst(str_replace('_', ' ', $lead->stage)).'.',
+                    'lead_converted' => 'Lead won and converted successfully!',
                     default => "Update on lead {$lead->lead_code}.",
                 };
 
@@ -569,7 +565,7 @@ class LeadService
                 'name' => $u->name,
                 'email' => $u->email,
                 'role' => $u->role,
-                'label' => "{$u->name} (".ucfirst($u->role).")",
+                'label' => "{$u->name} (".ucfirst($u->role).')',
                 'value' => (string) $u->id,
             ])
             ->values()
@@ -648,24 +644,24 @@ class LeadService
                 'selectedText' => $existingLead && $existingLead->customer ? "{$existingLead->customer->name} ({$existingLead->customer->phone})" : null,
                 'required' => true,
                 'autofill_targets' => [
-                    'customer_id'   => 'id',
-                    'contact_name'  => 'name',
-                    'client_name'   => 'name',
-                    'name'          => 'name',
-                    'phone_number'  => 'phone',
-                    'phone'         => 'phone',
+                    'customer_id' => 'id',
+                    'contact_name' => 'name',
+                    'client_name' => 'name',
+                    'name' => 'name',
+                    'phone_number' => 'phone',
+                    'phone' => 'phone',
                     'email_address' => 'email',
-                    'email'         => 'email',
-                    'company_name'  => 'company_name',
+                    'email' => 'email',
+                    'company_name' => 'company_name',
                 ],
                 'style' => [
                     'dropdownBackgroundColor' => 'theme.surface',
-                    'dropdownItemHover'       => 'theme.surfaceVariant',
-                    'borderColor'             => 'theme.divider',
-                    'backgroundColor'         => 'theme.surface',
-                    'titleColor'              => 'theme.textPrimary',
-                    'subtitleColor'           => 'theme.textSecondary',
-                    'dueColor'                => '#EF4444',
+                    'dropdownItemHover' => 'theme.surfaceVariant',
+                    'borderColor' => 'theme.divider',
+                    'backgroundColor' => 'theme.surface',
+                    'titleColor' => 'theme.textPrimary',
+                    'subtitleColor' => 'theme.textSecondary',
+                    'dueColor' => '#EF4444',
                 ],
             ],
 
@@ -739,14 +735,14 @@ class LeadService
             ->where(function ($q) use ($tenantId) {
                 if ($tenantId) {
                     $q->where('company_id', $tenantId)
-                      ->orWhereNull('company_id');
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                        ->orWhereNull('company_id');
+                    if (Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
                         $q->orWhere('tenant_id', $tenantId);
                     }
                 }
             });
 
-        if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'deleted_at')) {
+        if (Schema::hasColumn('lead_mod_leads', 'deleted_at')) {
             $query->whereNull('deleted_at');
         }
 
@@ -798,13 +794,13 @@ class LeadService
                 'type' => 'card',
                 'component_type' => 'metric_card',
                 'label' => 'Pipeline Value',
-                'value' => $currency . number_format($pipelineValue, 0),
+                'value' => $currency.number_format($pipelineValue, 0),
                 'components' => [
                     S::row([
                         S::icon('monetization_on', ['color' => '#10B981', 'size' => 24]),
                         S::column([
                             S::text('Pipeline Value', 'body_small', ['variant' => 'bodySmall']),
-                            S::text($currency . number_format($pipelineValue, 0), 'title_medium', ['bold' => true, 'variant' => 'titleMedium']),
+                            S::text($currency.number_format($pipelineValue, 0), 'title_medium', ['bold' => true, 'variant' => 'titleMedium']),
                             S::badge('↑ 12% vs last mo.', '#10B981', 'subtle'),
                         ]),
                     ]),
@@ -830,13 +826,13 @@ class LeadService
                 'type' => 'card',
                 'component_type' => 'metric_card',
                 'label' => 'Conversion Rate',
-                'value' => $conversionRate . '%',
+                'value' => $conversionRate.'%',
                 'components' => [
                     S::row([
                         S::icon('trending_up', ['color' => '#8B5CF6', 'size' => 24]),
                         S::column([
                             S::text('Conversion Rate', 'body_small', ['variant' => 'bodySmall']),
-                            S::text($conversionRate . '%', 'title_large', ['bold' => true, 'variant' => 'titleLarge']),
+                            S::text($conversionRate.'%', 'title_large', ['bold' => true, 'variant' => 'titleLarge']),
                             S::badge('↓ 3% vs last mo.', '#8B5CF6', 'subtle'),
                         ]),
                     ]),
@@ -861,7 +857,7 @@ class LeadService
             $stageCount = (clone $query)->where('stage', $sc['key'])->count();
             $stageSum = (float) (clone $query)->where('stage', $sc['key'])->sum('expected_value');
             $pct = $totalLeads > 0 ? round(($stageCount / $totalLeads) * 100, 1) : 0.0;
-            $valStr = $stageSum > 0 ? ($currency . number_format($stageSum, 0)) : "{$pct}%";
+            $valStr = $stageSum > 0 ? ($currency.number_format($stageSum, 0)) : "{$pct}%";
             $stageBars[] = S::progressBarStat(
                 $sc['label'],
                 $pct,
@@ -880,11 +876,13 @@ class LeadService
         $hasRepsWithLeads = false;
         foreach ($reps as $r) {
             $repId = $r['value'];
-            if (!$repId) continue;
+            if (! $repId) {
+                continue;
+            }
             $repCount = (clone $query)->where('assigned_to', $repId)->count();
             $repSum = (float) (clone $query)->where('assigned_to', $repId)->sum('expected_value');
             $words = explode(' ', trim($r['label']));
-            $initials = count($words) >= 2 ? strtoupper(substr($words[0], 0, 1) . substr($words[1], 0, 1)) : strtoupper(substr($words[0] ?? 'R', 0, 2));
+            $initials = count($words) >= 2 ? strtoupper(substr($words[0], 0, 1).substr($words[1], 0, 1)) : strtoupper(substr($words[0] ?? 'R', 0, 2));
 
             $repCards[] = S::row([
                 S::container([
@@ -896,12 +894,12 @@ class LeadService
                 ]),
                 S::column([
                     S::text($r['label'], 'body_medium', ['bold' => true]),
-                    S::text("{$repCount} leads assigned  ·  {$currency}" . number_format($repSum, 0), 'body_small'),
+                    S::text("{$repCount} leads assigned  ·  {$currency}".number_format($repSum, 0), 'body_small'),
                 ]),
             ]);
             $hasRepsWithLeads = true;
         }
-        if (!$hasRepsWithLeads) {
+        if (! $hasRepsWithLeads) {
             $unassignedCount = (clone $query)->whereNull('assigned_to')->count();
             $repCards[] = S::text("{$unassignedCount} unassigned leads in system", 'body_small');
         }
@@ -918,7 +916,7 @@ class LeadService
         $searchQuery = trim((string) (request('q') ?: request('search') ?: request('search_leads') ?: ''));
         $filterStage = (string) (request('stage') ?: request('status') ?: 'all');
 
-        if (!empty($searchQuery) && empty($activeTab)) {
+        if (! empty($searchQuery) && empty($activeTab)) {
             $activeTab = 'all_leads';
         }
 
@@ -930,7 +928,7 @@ class LeadService
             });
         }
 
-        if (!empty($searchQuery)) {
+        if (! empty($searchQuery)) {
             $leadsListQuery->where(function ($sub) use ($searchQuery) {
                 $sub->where('lead_code', 'LIKE', "%{$searchQuery}%")
                     ->orWhere('title', 'LIKE', "%{$searchQuery}%")
@@ -949,7 +947,7 @@ class LeadService
         $leadRows = $leadsListQuery->orderByDesc('created_at')->limit(50)->get();
         $totalInView = $leadRows->count();
         $sumInView = (float) ($leadRows->sum('expected_value') ?: ($leadRows->sum('estimated_value') ?: 0));
-        $summaryText = "{$totalInView} leads in view  ·  {$currency}" . number_format($sumInView, 0) . " pipeline value";
+        $summaryText = "{$totalInView} leads in view  ·  {$currency}".number_format($sumInView, 0).' pipeline value';
 
         $leadItems = [];
         foreach ($leadRows as $lead) {
@@ -963,7 +961,7 @@ class LeadService
                 default => '#2DD4BF',
             };
             $stageLabel = ucfirst(str_replace('_', ' ', $stage ?: 'new'));
-            $val = $currency . number_format((float) ($lead->expected_value ?: $lead->estimated_value ?: 0), 0);
+            $val = $currency.number_format((float) ($lead->expected_value ?: $lead->estimated_value ?: 0), 0);
             $leadTitle = $lead->customer?->name ?? ($lead->name ?: ($lead->title ?? 'Unnamed Lead'));
             $companyName = $lead->customer?->company_name ?? ($lead->company_name ?: '');
             $leadPhone = $lead->customer?->phone ?? $lead->phone;
@@ -972,7 +970,7 @@ class LeadService
 
             // Monogram Initials
             $words = explode(' ', trim($leadTitle));
-            $initials = count($words) >= 2 ? strtoupper(substr($words[0], 0, 1) . substr($words[1], 0, 1)) : strtoupper(substr($words[0] ?? 'L', 0, 2));
+            $initials = count($words) >= 2 ? strtoupper(substr($words[0], 0, 1).substr($words[1], 0, 1)) : strtoupper(substr($words[0] ?? 'L', 0, 2));
 
             // Priority stripe color (Urgent = Red #EF4444, Medium = Amber #F59E0B, Normal/Low = Blue #3B82F6)
             $priority = strtolower((string) ($lead->priority ?? 'medium'));
@@ -983,18 +981,17 @@ class LeadService
             };
 
             $noteSnippet = $lead->requirement_summary ? Str::limit($lead->requirement_summary, 80) : ($lead->notes ? Str::limit($lead->notes, 80) : null);
-            $quotationModalEndpoint = '/api/v1/tenant/quotations/create-modal?' . http_build_query([
-                'lead_id'     => $lead->id,
-                'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+            $quotationModalEndpoint = '/api/v1/tenant/quotations/create-modal?'.http_build_query([
+                'lead_id' => $lead->id,
                 'customer_id' => $lead->customer_id ?? '',
-                'subject'     => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
-                'notes'       => $lead->notes ?? '',
             ]);
-            $quotationAction = S::openBottomSheetAction($quotationModalEndpoint, 'New quotation', [
-                'lead_id'     => $lead->id,
-                'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+            $quotationData = [
+                'lead_id' => $lead->id,
+                'lead_code' => $lead->lead_code ?? "LD-{$lead->id}",
                 'customer_id' => $lead->customer_id,
-            ]);
+                'notes' => $lead->notes ?? '',
+            ];
+            $quotationAction = S::openQuotationModalAction($quotationModalEndpoint, $quotationData);
 
             $leadItems[] = S::entityRecordCard([
                 'title' => $leadTitle,
@@ -1020,30 +1017,34 @@ class LeadService
                         'label' => 'View details',
                         'variant' => 'outlined',
                         'icon' => 'visibility',
-                        'action' => S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $lead->id, 'dynamic_page', $lead->lead_code),
+                        'action' => S::navigateAction('/api/tenant/lead-module/views/lead-detail?id='.$lead->id, 'dynamic_page', $lead->lead_code),
                     ],
                     [
-                        'label'       => 'Create quote',
-                        'variant'     => 'primary',
-                        'color'       => '#166534',
-                        'icon'        => 'add_circle_outline',
-                        'action_type' => 'OPEN_BOTTOM_SHEET',
-                        'action'      => $quotationAction,
-                        'style'       => [
-                            'backgroundColor' => '#166534',
-                            'textColor'       => '#FFFFFF',
-                            'borderRadius'    => 10,
-                            'flex'            => 1,
+                        'label' => 'Create quote',
+                        'variant' => 'primary',
+                        'color' => '#84CC16',
+                        'icon' => 'add_circle_outline',
+                        'action_type' => 'OPEN_QUOTATION_MODAL',
+                        'endpoint' => $quotationModalEndpoint,
+                        'sheet_endpoint' => $quotationModalEndpoint,
+                        'data' => $quotationData,
+                        'action' => $quotationAction,
+                        'style' => [
+                            'backgroundColor' => '#84CC16',
+                            'textColor' => '#000000',
+                            'fontWeight' => 'bold',
+                            'borderRadius' => 10,
+                            'flex' => 1,
                         ],
                     ],
                 ],
-                'action' => S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $lead->id, 'dynamic_page', $lead->lead_code),
+                'action' => S::navigateAction('/api/tenant/lead-module/views/lead-detail?id='.$lead->id, 'dynamic_page', $lead->lead_code),
             ]);
         }
 
         if (empty($leadItems)) {
-            $emptyTitle = !empty($searchQuery) ? 'No leads match "' . $searchQuery . '"' : 'No leads found in this view.';
-            $emptySubtitle = !empty($searchQuery) ? 'Check spelling or clear search filter.' : 'Switch to "Capture Lead" tab to create your first sales lead.';
+            $emptyTitle = ! empty($searchQuery) ? 'No leads match "'.$searchQuery.'"' : 'No leads found in this view.';
+            $emptySubtitle = ! empty($searchQuery) ? 'Check spelling or clear search filter.' : 'Switch to "Capture Lead" tab to create your first sales lead.';
 
             $leadItems[] = S::card([
                 S::column([
@@ -1111,21 +1112,21 @@ class LeadService
                     'phone_label' => 'Client Phone Number *',
                     'required' => true,
                     'autofill_targets' => [
-                        'customer_id'   => 'id',
-                        'client_name'   => 'name',
-                        'contact_name'  => 'name',
-                        'phone_number'  => 'phone',
+                        'customer_id' => 'id',
+                        'client_name' => 'name',
+                        'contact_name' => 'name',
+                        'phone_number' => 'phone',
                         'email_address' => 'email',
-                        'company_name'  => 'company_name',
+                        'company_name' => 'company_name',
                     ],
                     'style' => [
                         'dropdownBackgroundColor' => 'theme.surface',
-                        'dropdownItemHover'       => 'theme.surfaceVariant',
-                        'borderColor'             => 'theme.divider',
-                        'backgroundColor'         => 'theme.surface',
-                        'titleColor'              => 'theme.textPrimary',
-                        'subtitleColor'           => 'theme.textSecondary',
-                        'dueColor'                => '#EF4444',
+                        'dropdownItemHover' => 'theme.surfaceVariant',
+                        'borderColor' => 'theme.divider',
+                        'backgroundColor' => 'theme.surface',
+                        'titleColor' => 'theme.textPrimary',
+                        'subtitleColor' => 'theme.textSecondary',
+                        'dueColor' => '#EF4444',
                     ],
                 ],
                 S::textInput('company_name', 'Company / Organization Name', '', [
@@ -1156,7 +1157,7 @@ class LeadService
                     ['label' => 'High Priority', 'value' => 'high'],
                     ['label' => 'Urgent Priority', 'value' => 'urgent'],
                 ], 'medium'),
-                S::textInput('expected_value', 'Expected Value (' . $currency . ')', '0.00', [
+                S::textInput('expected_value', 'Expected Value ('.$currency.')', '0.00', [
                     'icon' => 'monetization_on',
                     'keyboard_type' => 'number',
                 ]),
@@ -1270,7 +1271,7 @@ class LeadService
             ];
 
             if ($act->description) {
-                $components[] = S::callout('📝 ' . $act->description, 'accent');
+                $components[] = S::callout('📝 '.$act->description, 'accent');
             }
 
             $targetLeadId = $act->lead_id ?: ($act->lead?->lead_code ?: null);
@@ -1279,7 +1280,7 @@ class LeadService
             }
             if ($targetLeadId) {
                 $components[] = S::buttonOutlined('View Lead',
-                    S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $targetLeadId, 'dynamic_page', 'Lead'));
+                    S::navigateAction('/api/tenant/lead-module/views/lead-detail?id='.$targetLeadId, 'dynamic_page', 'Lead'));
             }
 
             $followupCards[] = [
@@ -1302,8 +1303,8 @@ class LeadService
                 S::text("Client: {$custName}", 'body_small'),
             ];
 
-            if (!empty($noteText)) {
-                $remChildren[] = S::callout('📝 ' . $noteText, 'accent');
+            if (! empty($noteText)) {
+                $remChildren[] = S::callout('📝 '.$noteText, 'accent');
             }
 
             $targetLeadId = $rem->remindable_id;
@@ -1312,7 +1313,7 @@ class LeadService
             }
             if ($targetLeadId) {
                 $remChildren[] = S::buttonOutlined('View Lead',
-                    S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $targetLeadId, 'dynamic_page', 'Lead'));
+                    S::navigateAction('/api/tenant/lead-module/views/lead-detail?id='.$targetLeadId, 'dynamic_page', 'Lead'));
             }
 
             $followupCards[] = [

@@ -2,7 +2,11 @@
 
 namespace App\Services\Sdui;
 
+use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\LeadController;
+use App\Http\Controllers\Api\QuotationController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
+use App\Http\Controllers\Api\V1\TenantAppPreferencesController;
 use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Company;
@@ -36,8 +40,10 @@ use App\Services\Navigation\TenantNavRegistry;
 use App\Services\TaxCalculationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Modules\leadmanagement\Services\LeadService;
 
 /**
  * Centralized Server-Driven UI (SDUI) Schema Response Builder.
@@ -92,42 +98,51 @@ class SchemaResponse
     // Dynamic Theme Tokens & Mode Resolution
     // =========================================================================
 
-    public static function isDarkMode(?\Illuminate\Http\Request $request = null): bool
+    public static function isDarkMode(?Request $request = null): bool
     {
         $req = $request ?: request();
         if ($req) {
             $header = strtolower((string) ($req->header('X-App-Theme') ?: ($req->header('X-Theme') ?: '')));
-            if ($header === 'dark') return true;
-            if ($header === 'light') return false;
+            if ($header === 'dark') {
+                return true;
+            }
+            if ($header === 'light') {
+                return false;
+            }
 
             $param = strtolower((string) ($req->query('theme') ?: ($req->input('theme') ?: '')));
-            if ($param === 'dark') return true;
-            if ($param === 'light') return false;
+            if ($param === 'dark') {
+                return true;
+            }
+            if ($param === 'light') {
+                return false;
+            }
         }
+
         return false;
     }
 
-    public static function themeToken(string $token, ?\Illuminate\Http\Request $request = null): string
+    public static function themeToken(string $token, ?Request $request = null): string
     {
         return match ($token) {
             'canvas', 'theme.canvas', 'background', 'theme.background' => 'theme.background',
-            'surface', 'theme.surface', 'card_bg'                      => 'theme.surface',
-            'surfaceVariant', 'theme.surfaceVariant', 'note_bg'        => 'theme.surfaceVariant',
-            'divider', 'theme.divider', 'border', 'theme.border'       => 'theme.divider',
+            'surface', 'theme.surface', 'card_bg' => 'theme.surface',
+            'surfaceVariant', 'theme.surfaceVariant', 'note_bg' => 'theme.surfaceVariant',
+            'divider', 'theme.divider', 'border', 'theme.border' => 'theme.divider',
             'textPrimary', 'theme.textPrimary', 'text_primary', 'onSurface', 'theme.onSurface' => 'theme.onSurface',
-            'textSecondary', 'theme.textSecondary', 'text_secondary'   => 'theme.textSecondary',
+            'textSecondary', 'theme.textSecondary', 'text_secondary' => 'theme.textSecondary',
             'accentText', 'theme.accentText', 'noteText', 'theme.noteText', 'note_text' => 'theme.accentText',
             default => $token,
         };
     }
 
-    public static function themeColors(?\Illuminate\Http\Request $request = null): array
+    public static function themeColors(?Request $request = null): array
     {
         return [
-            'surface'    => 'theme.surface',
+            'surface' => 'theme.surface',
             'background' => 'theme.background',
             'on_surface' => 'theme.onSurface',
-            'divider'    => 'theme.divider',
+            'divider' => 'theme.divider',
         ];
     }
 
@@ -143,6 +158,7 @@ class SchemaResponse
         if (isset($props['border_color']) && (str_starts_with((string) $props['border_color'], 'theme.') || in_array($props['border_color'], ['border', 'divider']))) {
             unset($props['border_color']);
         }
+
         return array_merge([
             'type' => 'container',
             'components' => $components,
@@ -164,6 +180,7 @@ class SchemaResponse
                 unset($props['style']);
             }
         }
+
         return array_merge([
             'type' => 'card',
             'components' => $components,
@@ -249,6 +266,7 @@ class SchemaResponse
         if (isset($props['color']) && (str_starts_with((string) $props['color'], 'theme.') || in_array($props['color'], ['text_primary', 'text_secondary', 'textPrimary', 'textSecondary', 'onSurface']))) {
             unset($props['color']);
         }
+
         return array_merge([
             'type' => 'text',
             'text' => (string) ($text ?? ''),
@@ -288,6 +306,7 @@ class SchemaResponse
         if ($color && str_starts_with($color, 'theme.')) {
             $color = null;
         }
+
         return array_merge([
             'type' => 'badge',
             'label' => (string) ($label ?? ''),
@@ -301,6 +320,7 @@ class SchemaResponse
         if (isset($props['color']) && str_starts_with((string) $props['color'], 'theme.')) {
             unset($props['color']);
         }
+
         return array_merge([
             'type' => 'icon',
             'icon' => (string) ($icon ?? 'widgets') ?: 'widgets',
@@ -317,6 +337,7 @@ class SchemaResponse
     public static function codeSnippet(string $code, ?string $description = null, array $props = []): array
     {
         $fieldId = 'endpoint_'.substr(md5($code), 0, 8);
+
         return self::textInput($fieldId, $description ?: $code, $code, array_merge([
             'read_only' => true,
             'copyable' => true,
@@ -558,21 +579,21 @@ class SchemaResponse
             'fields' => $fields,
             'placeholder' => 'Search existing client by name, phone or email...',
             'autofill_targets' => [
-                'customer_id'   => 'id',
-                'contact_name'  => 'name',
-                'client_name'   => 'name',
-                'phone_number'  => 'phone',
+                'customer_id' => 'id',
+                'contact_name' => 'name',
+                'client_name' => 'name',
+                'phone_number' => 'phone',
                 'email_address' => 'email',
-                'company_name'  => 'company_name',
+                'company_name' => 'company_name',
             ],
             'style' => [
                 'dropdownBackgroundColor' => 'theme.surface',
-                'dropdown_surface'        => '#1E293B',
-                'popup_background'        => '#1E293B',
-                'dropdownItemHover'       => 'theme.surfaceVariant',
-                'borderColor'             => 'theme.divider',
-                'border_color'            => '#334155',
-                'backgroundColor'         => 'theme.surface',
+                'dropdown_surface' => '#1E293B',
+                'popup_background' => '#1E293B',
+                'dropdownItemHover' => 'theme.surfaceVariant',
+                'borderColor' => 'theme.divider',
+                'border_color' => '#334155',
+                'backgroundColor' => 'theme.surface',
             ],
         ], $props);
     }
@@ -1007,6 +1028,27 @@ class SchemaResponse
             'title' => $title,
             'endpoint' => $endpoint,
             'sheet_endpoint' => $endpoint,
+        ], $props);
+    }
+
+    /**
+     * Opens the app's native quotation composer while keeping lead/customer
+     * prefill data server-driven.  The explicit action token prevents clients
+     * from treating quotation creation as an ordinary page navigation.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $props
+     */
+    public static function openQuotationModalAction(string $endpoint, array $data = [], array $props = []): array
+    {
+        return array_merge([
+            'type' => 'OPEN_QUOTATION_MODAL',
+            'action_type' => 'OPEN_QUOTATION_MODAL',
+            'title' => 'New quotation',
+            'endpoint' => $endpoint,
+            'sheet_endpoint' => $endpoint,
+            'url' => $endpoint,
+            'data' => $data,
         ], $props);
     }
 
@@ -4246,7 +4288,8 @@ class SchemaResponse
                         $enabled = [];
                         try {
                             $enabled = app(TenantNotificationDispatcherService::class)->getEnabledChannels($company);
-                        } catch (\Throwable) {}
+                        } catch (\Throwable) {
+                        }
 
                         $channelCheckboxes = [];
                         if (! empty($enabled['whatsapp'])) {
@@ -4415,7 +4458,8 @@ class SchemaResponse
                         $enabled = [];
                         try {
                             $enabled = app(TenantNotificationDispatcherService::class)->getEnabledChannels($company);
-                        } catch (\Throwable) {}
+                        } catch (\Throwable) {
+                        }
 
                         $remindChannels = [];
                         if (! empty($enabled['whatsapp'])) {
@@ -4429,7 +4473,7 @@ class SchemaResponse
                         }
 
                         $remindModal = [
-                            self::text("Send Payment Due Reminder", 'title_medium', ['bold' => true]),
+                            self::text('Send Payment Due Reminder', 'title_medium', ['bold' => true]),
                             self::text("Customer: {$c->name}", 'body_medium'),
                             self::text("Outstanding Due: {$currency}".number_format($due, 2), 'body_large', ['bold' => true, 'color' => '#dc2626']),
                             self::divider(),
@@ -6898,7 +6942,7 @@ class SchemaResponse
             'payment-method-create', 'add-payment-method', 'new-payment-method' => self::paymentMethodCreateView($company),
             'settings-localization', 'localization' => self::localizationView($company),
             'settings-appearance', 'appearance', 'app-preferences', 'preferences' => self::appearanceView($company),
-            'settings-notification-sounds', 'notification-sounds', 'app-preferences-notifications', 'notifications-audio', 'settings-notifications-audio', 'settings-audio-notifications' => \App\Http\Controllers\Api\V1\TenantAppPreferencesController::buildSduiSchema($company, \App\Http\Controllers\Api\V1\TenantAppPreferencesController::getEffectivePreferences($company)),
+            'settings-notification-sounds', 'notification-sounds', 'app-preferences-notifications', 'notifications-audio', 'settings-notifications-audio', 'settings-audio-notifications' => TenantAppPreferencesController::buildSduiSchema($company, TenantAppPreferencesController::getEffectivePreferences($company)),
             'settings-taxes', 'taxes' => self::taxesView($company),
             'tax-rule-create', 'add-tax-rule', 'new-tax-rule' => self::taxRuleCreateView($company),
             'settings-api', 'api', 'api-integrations' => self::apiView($company),
@@ -6939,7 +6983,7 @@ class SchemaResponse
             'sales', 'invoices', 'sales-invoices', 'pos-sales' => self::salesView($company),
             'quotations', 'quotes', 'estimates' => self::quotationsView($company),
             'customers', 'crm', 'clients' => self::customersView($company),
-            'leads', 'lead-management', 'leadmanagement', 'lead-module' => app(\Modules\leadmanagement\Services\LeadService::class)->getTabbedLeadManagementSchema($company, request()->user(), request('tab')),
+            'leads', 'lead-management', 'leadmanagement', 'lead-module' => app(LeadService::class)->getTabbedLeadManagementSchema($company, request()->user(), request('tab')),
             'cash-register', 'cash_register', 'register' => self::cashRegisterView($company),
             'devices', 'device-sessions', 'terminals' => self::devicesView($company),
             'categories', 'product-categories', 'inventory-categories' => self::categoriesView($company),
@@ -6950,23 +6994,23 @@ class SchemaResponse
         };
 
         if ($schema === null && preg_match('#(?:^|/)quotations/(\d+)#', $normalized, $qm)) {
-            return app(\App\Http\Controllers\Api\QuotationController::class)->showSchema(request(), $qm[1]);
+            return app(QuotationController::class)->showSchema(request(), $qm[1]);
         }
 
         if ($schema === null && (str_contains($normalized, 'invoices/create') || str_contains($normalized, 'invoices-create'))) {
-            return app(\App\Http\Controllers\Api\InvoiceController::class)->createSchema(request());
+            return app(InvoiceController::class)->createSchema(request());
         }
 
         if ($schema === null && preg_match('#(?:^|/)leads/([A-Za-z0-9\-_]+)#', $normalized, $lm)) {
-            return app(\App\Http\Controllers\Api\LeadController::class)->showSchema(request(), $lm[1]);
+            return app(LeadController::class)->showSchema(request(), $lm[1]);
         }
 
         if ($schema === null && ($normalized === 'lead-detail' || str_ends_with($normalized, 'lead-detail'))) {
-            return app(\App\Http\Controllers\Api\LeadController::class)->leadDetail(request());
+            return app(LeadController::class)->leadDetail(request());
         }
 
         if ($schema === null && ($normalized === 'create-lead' || str_ends_with($normalized, 'create-lead') || str_contains($normalized, 'leads/create'))) {
-            return app(\App\Http\Controllers\Api\LeadController::class)->createSchema(request());
+            return app(LeadController::class)->createSchema(request());
         }
 
         if ($schema === null && str_ends_with($normalized, '-pos')) {
