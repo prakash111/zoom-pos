@@ -309,13 +309,13 @@ void main() {
         'pos',
         'sales',
         'quotations',
-        'lead_management',
         'consignments',
         'customers',
       ]));
+      expect(itemKeys, isNot(contains('lead_management')));
     });
 
-    testWidgets('Drawer renders all 6 cashier items, RETAIL badge, and user avatar',
+    testWidgets('Drawer renders all 5 core cashier items without lead_management, RETAIL badge, and user avatar',
         (tester) async {
       tester.view.physicalSize = const Size(400, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -379,13 +379,13 @@ void main() {
       // 1. Verify tenant business type badge renders RETAIL (not empty oval)
       expect(find.text('RETAIL'), findsOneWidget);
 
-      // 2. Verify all 6 Cashier & Sales items are present as ListTiles
+      // 2. Verify all 5 core Cashier & Sales items are present as ListTiles and lead_management is absent
       expect(find.byKey(const ValueKey('drawer-item-pos')), findsOneWidget);
       expect(find.byKey(const ValueKey('drawer-item-sales')), findsOneWidget);
       expect(find.byKey(const ValueKey('drawer-item-quotations')), findsOneWidget);
-      expect(find.byKey(const ValueKey('drawer-item-lead_management')), findsOneWidget);
       expect(find.byKey(const ValueKey('drawer-item-consignments')), findsOneWidget);
       expect(find.byKey(const ValueKey('drawer-item-customers')), findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-lead_management')), findsNothing);
 
       // 3. Verify Point of Sale is NOT an ExpansionTile
       expect(find.byKey(const PageStorageKey<String>('drawer-branch-cashier_sales-pos')), findsNothing);

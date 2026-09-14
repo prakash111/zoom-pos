@@ -275,14 +275,6 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
       endpoint: '/tenant/views/quotations'
     ),
     (
-      key: 'lead_management',
-      title: 'Lead Management',
-      icon: 'leaderboard',
-      component: 'lead_management',
-      permission: 'leads',
-      endpoint: '/tenant/views/leads'
-    ),
-    (
       key: 'consignments',
       title: 'Consignments',
       icon: 'local_shipping',
@@ -303,6 +295,9 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
   for (var i = 0; i < coreCashierItems.length; i++) {
     final core = coreCashierItems[i];
     if (!existingCashierKeys.contains(core.key)) {
+      final override = itemOverrides[core.key];
+      if (override != null && !override.visible) continue;
+
       final tile = _FeatureTile(
         core.key,
         (l10n) => BootstrapCache.instance.resolveNavigationLabel(

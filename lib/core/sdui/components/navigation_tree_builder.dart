@@ -152,7 +152,6 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
           NavTileDescriptor('pos', 'Point of Sale'),
           NavTileDescriptor('sales', 'Sales & Invoices'),
           NavTileDescriptor('quotations', 'Quotations & Proposals'),
-          NavTileDescriptor('lead_management', 'Lead Management'),
           NavTileDescriptor('consignments', 'Consignments'),
           NavTileDescriptor('customers', 'Customers & CRM'),
         ]),

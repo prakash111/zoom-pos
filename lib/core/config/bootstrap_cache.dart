@@ -683,14 +683,6 @@ class BootstrapCache extends ChangeNotifier {
               targetEndpoint: '/tenant/views/quotations',
             ),
             SduiNavItemSchema(
-              key: 'lead_management',
-              title: 'Lead Management',
-              icon: 'leaderboard',
-              component: 'lead_management',
-              permission: 'leads',
-              targetEndpoint: '/tenant/views/leads',
-            ),
-            SduiNavItemSchema(
               key: 'consignments',
               title: 'Consignments',
               icon: 'local_shipping',
