@@ -73,6 +73,7 @@ class QuotationsRepository with OfflineWriteable {
     String? id,
     String? customerId,
     required String customerName,
+    String? leadId,
     required List<Map<String, dynamic>> items,
     required double discount,
     required double tax,
@@ -83,6 +84,7 @@ class QuotationsRepository with OfflineWriteable {
     final data = {
       if (customerId != null) 'customer_id': customerId,
       'customer_name': customerName,
+      if (leadId != null && leadId.isNotEmpty) 'lead_id': leadId,
       'items': items,
       'discount': discount,
       'tax': tax,

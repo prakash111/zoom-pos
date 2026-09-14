@@ -99,6 +99,7 @@ class DynamicSchemaParser {
         return _SduiFilePickerField(schema: schema);
       case 'cash_tendered_field':
         return _CashTenderedField(schema: schema);
+      case 'customer_picker':
       case 'customer_selector':
         return _CustomerSelector(schema: schema);
 

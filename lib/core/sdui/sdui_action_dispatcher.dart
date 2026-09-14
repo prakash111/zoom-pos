@@ -1,11 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../features/auth/auth_provider.dart';
 import '../../features/pos/rx_cart_handoff.dart';
 import '../../features/pos/screens/invoice_actions_sheet.dart';
+import '../../features/quotations/quotations_provider.dart';
+import '../../features/quotations/screens/quotation_form_sheet.dart';
 import '../../features/repair/ticket_share_sheet.dart';
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
@@ -13,6 +17,7 @@ import '../config/app_config.dart';
 import '../config/bootstrap_cache.dart';
 import '../services/sync/sync_engine.dart';
 import '../services/thermal/thermal_printer_service.dart' show ReceiptLine;
+import '../utils/currency_formatter.dart';
 import '../widgets/adaptive_sheet.dart';
 import 'dynamic_schema_context.dart';
 import 'dynamic_schema_parser.dart';
@@ -659,6 +664,41 @@ class SduiActionDispatcher {
     }
 
     if (!context.mounted) return;
+
+    // Intercept native quotation creation modal (prefilled with Lead and Customer)
+    if (sheetEndpoint.contains('quotations/create-modal') ||
+        sheetSchema['sheet_type'] == 'native_quotation' ||
+        sheetSchema['modal'] == 'quotation') {
+      final company = context.read<AuthProvider?>()?.company;
+      final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
+      final quotations = context.read<QuotationsProvider>();
+      final custId = sheetSchema['customer_id']?.toString() ?? action['customer_id']?.toString();
+      final custName = sheetSchema['customer_name']?.toString() ??
+          (sheetSchema['customer'] is Map ? sheetSchema['customer']['name']?.toString() : null) ??
+          action['customer_name']?.toString();
+      final leadId = sheetSchema['lead_id']?.toString() ?? action['lead_id']?.toString();
+      final notes = sheetSchema['notes']?.toString();
+      final terms = sheetSchema['terms']?.toString();
+
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        builder: (_) => ChangeNotifierProvider.value(
+          value: quotations,
+          child: QuotationFormSheet(
+            formatter: formatter,
+            initialCustomerId: custId,
+            initialCustomerName: custName,
+            initialLeadId: leadId,
+            initialNotes: notes,
+            initialTerms: terms,
+          ),
+        ),
+      );
+      return;
+    }
 
     // Fire-and-forget: this returns after the sheet is shown; callers that
     // need to wait for dismissal (the keep_parent_sheet flow) await

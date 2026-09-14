@@ -23,10 +23,24 @@ import 'product_picker_sheet.dart';
 /// an optional tax-rule override applied uniformly to the whole quotation —
 /// instead of a manual flat amount.
 class QuotationFormSheet extends StatefulWidget {
-  const QuotationFormSheet({super.key, this.quotation, required this.formatter});
+  const QuotationFormSheet({
+    super.key,
+    this.quotation,
+    required this.formatter,
+    this.initialCustomerId,
+    this.initialCustomerName,
+    this.initialLeadId,
+    this.initialNotes,
+    this.initialTerms,
+  });
 
   final QuotationModel? quotation;
   final CurrencyFormatter formatter;
+  final String? initialCustomerId;
+  final String? initialCustomerName;
+  final String? initialLeadId;
+  final String? initialNotes;
+  final String? initialTerms;
 
   @override
   State<QuotationFormSheet> createState() => _QuotationFormSheetState();
@@ -53,14 +67,27 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
     super.initState();
     final quote = widget.quotation;
     _discountController = TextEditingController(text: (quote?.discount ?? 0).toStringAsFixed(2));
-    _notesController = TextEditingController(text: quote?.notes ?? '');
-    _termsController = TextEditingController(text: quote?.terms ?? '');
+    _notesController = TextEditingController(text: quote?.notes ?? widget.initialNotes ?? '');
+    _termsController = TextEditingController(text: quote?.terms ?? widget.initialTerms ?? '');
     _items = quote?.items.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
-    _fallbackCustomerName = quote?.customerName ?? '';
+    _fallbackCustomerName = quote?.customerName ?? widget.initialCustomerName ?? '';
     if (quote?.customerId != null) {
       _selectedCustomer = CustomerModel(
         id: quote!.customerId!,
         name: quote.customerName,
+        phone: '',
+        email: '',
+        document: '',
+        address: '',
+        city: '',
+        state: '',
+        balanceDue: 0,
+        loyaltyPoints: 0,
+      );
+    } else if (widget.initialCustomerId != null && widget.initialCustomerId!.isNotEmpty) {
+      _selectedCustomer = CustomerModel(
+        id: widget.initialCustomerId!,
+        name: widget.initialCustomerName ?? 'Customer',
         phone: '',
         email: '',
         document: '',
@@ -221,6 +248,7 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
       id: widget.quotation?.id,
       customerId: _selectedCustomer?.id,
       customerName: customerName.trim(),
+      leadId: widget.initialLeadId,
       items: itemsToSend,
       discount: double.tryParse(_discountController.text) ?? 0,
       tax: _taxTotal,
