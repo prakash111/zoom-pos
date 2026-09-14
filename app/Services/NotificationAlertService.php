@@ -40,6 +40,7 @@ class NotificationAlertService
             $due = (float) ($invoice->due_amount ?? $invoice->total ?? 0);
             $alerts->push([
                 'type' => 'notification_item',
+                'id' => (string) $invoice->id,
                 'category' => 'invoice',
                 'icon' => 'receipt_long',
                 'icon_color' => '#EF4444',
@@ -63,6 +64,7 @@ class NotificationAlertService
             $dueAt = $reminder->due_at ?? $reminder->due_date;
             $alerts->push([
                 'type' => 'notification_item',
+                'id' => (string) $reminder->id,
                 'category' => 'lead',
                 'icon' => 'person_pin',
                 'icon_color' => '#38BDF8',
@@ -98,6 +100,7 @@ class NotificationAlertService
 
             $alerts->push(array_filter([
                 'type' => 'notification_item',
+                'id' => (string) $notification->id,
                 'category' => $category,
                 'icon' => $icon,
                 'icon_color' => '#F59E0B',
@@ -125,7 +128,7 @@ class NotificationAlertService
         return $this->dueInvoicesQuery($companyId)
             ->with(['customer', 'company'])
             ->orderBy('due_date')
-            ->limit(5)
+            ->limit(10)
             ->get();
     }
 
@@ -137,7 +140,7 @@ class NotificationAlertService
 
         return $this->leadRemindersQuery($companyId)
             ->orderByRaw('COALESCE(due_at, due_date) asc')
-            ->limit(5)
+            ->limit(10)
             ->get();
     }
 
@@ -156,32 +159,73 @@ class NotificationAlertService
     private function dueInvoicesQuery(mixed $companyId): Builder
     {
         return Sale::withoutGlobalScope('company')
-            ->where('company_id', $companyId)
+            ->where(function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+                if (Schema::hasColumn('sales', 'tenant_id')) {
+                    $q->orWhere('tenant_id', $companyId);
+                }
+            })
             ->where(function ($query) {
                 $query->where('operation_type', 'sale')->orWhereNull('operation_type');
             })
             ->where('due_amount', '>', 0)
             ->whereNotNull('due_date')
-            ->whereDate('due_date', '<=', now());
+            ->whereDate('due_date', '<=', now())
+            ->when(Schema::hasColumn('sales', 'due_reminder_dismissed_at'), function ($q) {
+                $q->whereNull('due_reminder_dismissed_at');
+            })
+            ->when(Schema::hasTable('dismissed_notifications'), function ($query) use ($companyId) {
+                $query->whereNotIn('id', function ($sub) use ($companyId) {
+                    $sub->select('notification_id')
+                        ->from('dismissed_notifications')
+                        ->where('company_id', $companyId)
+                        ->where('notification_type', 'invoice');
+                });
+            });
     }
 
     private function leadRemindersQuery(mixed $companyId): Builder
     {
         return Reminder::withoutGlobalScope('company')
-            ->where('company_id', $companyId)
+            ->where(function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+                if (Schema::hasColumn('reminders', 'tenant_id')) {
+                    $q->orWhere('tenant_id', $companyId);
+                }
+            })
             ->where('status', Reminder::STATUS_PENDING)
             ->where(function ($query) {
                 $query->where('due_at', '<=', now()->addDay())
                     ->orWhere(function ($fallback) {
                         $fallback->whereNull('due_at')->where('due_date', '<=', now()->addDay());
                     });
+            })
+            ->when(Schema::hasTable('dismissed_notifications'), function ($query) use ($companyId) {
+                $query->whereNotIn('id', function ($sub) use ($companyId) {
+                    $sub->select('notification_id')
+                        ->from('dismissed_notifications')
+                        ->where('company_id', $companyId)
+                        ->where('notification_type', 'lead');
+                });
             });
     }
 
     private function storedNotificationsQuery(mixed $companyId): Builder
     {
         return TenantNotification::withoutGlobalScope('company')
-            ->where('company_id', $companyId)
-            ->where('read_status', false);
+            ->where(function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+                if (Schema::hasColumn('tenant_notifications', 'tenant_id')) {
+                    $q->orWhere('tenant_id', $companyId);
+                }
+            })
+            ->where('read_status', false)
+            ->when(Schema::hasTable('dismissed_notifications'), function ($query) use ($companyId) {
+                $query->whereNotIn('id', function ($sub) use ($companyId) {
+                    $sub->select('notification_id')
+                        ->from('dismissed_notifications')
+                        ->where('company_id', $companyId);
+                });
+            });
     }
 }

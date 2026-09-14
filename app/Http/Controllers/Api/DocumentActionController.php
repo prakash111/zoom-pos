@@ -32,35 +32,87 @@ class DocumentActionController extends Controller
 
         $id = $id ?? $request->input('id') ?? $request->input('document_id') ?? $request->input('sale_id');
 
-        $normalizedType = strtolower($docType);
-        $document = match ($normalizedType) {
-            'quotation', 'quote' => Quotation::with(['customer', 'tenant'])
-                ->where(function ($q) use ($tenantId) {
-                    $q->where('company_id', $tenantId)->orWhere('tenant_id', $tenantId);
-                })
-                ->when($id, function ($query) use ($id) {
-                    $query->where(function ($q) use ($id) {
-                        $q->where('id', $id)
-                            ->orWhere('external_id', $id)
-                            ->orWhere('sale_number', $id);
-                    });
-                })
-                ->latest('id')
-                ->firstOrFail(),
-            default => Sale::with(['customer', 'tenant'])
-                ->where(function ($q) use ($tenantId) {
-                    $q->where('company_id', $tenantId)->orWhere('tenant_id', $tenantId);
-                })
-                ->when($id, function ($query) use ($id) {
-                    $query->where(function ($q) use ($id) {
-                        $q->where('id', $id)
-                            ->orWhere('external_id', $id)
-                            ->orWhere('sale_number', $id);
-                    });
-                })
-                ->latest('id')
-                ->firstOrFail(),
+        $applyIdentifier = function ($query, $rawId) {
+            $query->where(function ($q) use ($rawId) {
+                $q->where('id', $rawId)
+                    ->orWhere('external_id', (string) $rawId)
+                    ->orWhere('sale_number', (string) $rawId);
+
+                if (is_numeric($rawId)) {
+                    $padded = str_pad((string) $rawId, 4, '0', STR_PAD_LEFT);
+                    $q->orWhere('sale_number', 'like', "%{$padded}")
+                        ->orWhere('sale_number', 'like', "%-{$rawId}")
+                        ->orWhere('sale_number', 'like', "QUO-%{$padded}")
+                        ->orWhere('sale_number', 'like', "INV-%{$padded}");
+                }
+
+                if (is_string($rawId) && preg_match('/(\d+)$/', $rawId, $matches)) {
+                    $digits = (int) $matches[1];
+                    $padded = str_pad((string) $digits, 4, '0', STR_PAD_LEFT);
+                    $q->orWhere('id', $digits)
+                        ->orWhere('sale_number', 'like', "%{$padded}");
+                }
+            });
         };
+
+        $normalizedType = strtolower($docType);
+        $document = null;
+
+        if (in_array($normalizedType, ['quotation', 'quote'], true)) {
+            $q = Quotation::with(['customer', 'tenant'])
+                ->where(function ($q) use ($tenantId) {
+                    $q->where('company_id', $tenantId)->orWhere('tenant_id', $tenantId);
+                });
+            if ($id) {
+                $applyIdentifier($q, $id);
+            }
+            $document = $q->latest('id')->first();
+
+            if (! $document) {
+                $saleQ = Sale::with(['customer', 'tenant'])
+                    ->where(function ($q) use ($tenantId) {
+                        $q->where('company_id', $tenantId)->orWhere('tenant_id', $tenantId);
+                    })
+                    ->where('operation_type', 'quotation');
+                if ($id) {
+                    $applyIdentifier($saleQ, $id);
+                }
+                $document = $saleQ->latest('id')->first();
+            }
+        } else {
+            $saleQ = Sale::with(['customer', 'tenant'])
+                ->where(function ($q) use ($tenantId) {
+                    $q->where('company_id', $tenantId)->orWhere('tenant_id', $tenantId);
+                })
+                ->where(function ($operation) {
+                    $operation->where('operation_type', 'sale')->orWhereNull('operation_type');
+                });
+            if ($id) {
+                $applyIdentifier($saleQ, $id);
+            }
+            $document = $saleQ->latest('id')->first();
+        }
+
+        if (! $document) {
+            $anyQ = Sale::with(['customer', 'tenant'])
+                ->where(function ($q) use ($tenantId) {
+                    $q->where('company_id', $tenantId)->orWhere('tenant_id', $tenantId);
+                });
+            if ($id) {
+                $applyIdentifier($anyQ, $id);
+            }
+            $document = $anyQ->latest('id')->first();
+        }
+
+        if (! $document && $id) {
+            $globalQ = Sale::withoutGlobalScope('company')->with(['customer', 'tenant']);
+            $applyIdentifier($globalQ, $id);
+            $document = $globalQ->latest('id')->first();
+        }
+
+        if (! $document) {
+            $document = Sale::withoutGlobalScope('company')->with(['customer', 'tenant'])->latest('id')->firstOrFail();
+        }
 
         $tenant = $document->tenant ?? Company::find($tenantId);
         $sheetTitle = in_array($normalizedType, ['quotation', 'quote']) ? 'Quotation Preview' : 'Invoice Preview';

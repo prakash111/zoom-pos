@@ -90,36 +90,93 @@ class DispatchController extends Controller
         $isQuote = in_array(strtolower($type), ['quotation', 'quote'], true);
         $isReminder = in_array(strtolower($type), ['reminder', 'invoice_reminder', 'due_reminder', 'receivable'], true);
 
-        // Find document in Sale model (which backs invoices, quotes, receipts, receivables)
-        $doc = Sale::withoutGlobalScope('company')
-            ->where(function ($q) use ($companyId) {
-                $q->where('company_id', $companyId);
-                if (Schema::hasColumn('sales', 'tenant_id')) {
-                    $q->orWhere('tenant_id', $companyId);
-                }
-            })
-            ->where(function ($q) use ($id) {
-                $q->where('id', $id)
-                    ->orWhere('external_id', $id)
-                    ->orWhere('sale_number', $id);
-                if (is_numeric($id)) {
-                    $padded = str_pad((string) $id, 4, '0', STR_PAD_LEFT);
+        $applyIdentifier = function ($query, $rawId) {
+            $query->where(function ($q) use ($rawId) {
+                $q->where('id', $rawId)
+                    ->orWhere('external_id', (string) $rawId)
+                    ->orWhere('sale_number', (string) $rawId);
+
+                if (is_numeric($rawId)) {
+                    $padded = str_pad((string) $rawId, 4, '0', STR_PAD_LEFT);
                     $q->orWhere('sale_number', 'like', "%{$padded}")
-                        ->orWhere('sale_number', 'like', "%-{$id}");
+                        ->orWhere('sale_number', 'like', "%-{$rawId}")
+                        ->orWhere('sale_number', 'like', "QUO-%{$padded}")
+                        ->orWhere('sale_number', 'like', "INV-%{$padded}");
                 }
-            })
-            ->when($isQuote, fn ($query) => $query->where('operation_type', 'quotation'))
-            ->when(! $isQuote && ! $isReminder, fn ($query) => $query->where(function ($operation) {
-                $operation->where('operation_type', 'sale')->orWhereNull('operation_type');
-            }))
-            ->with(['customer', 'company'])
-            ->first();
+
+                if (is_string($rawId) && preg_match('/(\d+)$/', $rawId, $matches)) {
+                    $digits = (int) $matches[1];
+                    $padded = str_pad((string) $digits, 4, '0', STR_PAD_LEFT);
+                    $q->orWhere('id', $digits)
+                        ->orWhere('sale_number', 'like', "%{$padded}");
+                }
+            });
+        };
+
+        $baseQuery = function () use ($companyId, $applyIdentifier, $id) {
+            $query = Sale::withoutGlobalScope('company')
+                ->where(function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                    if (Schema::hasColumn('sales', 'tenant_id')) {
+                        $q->orWhere('tenant_id', $companyId);
+                    }
+                })
+                ->with(['customer', 'company']);
+            $applyIdentifier($query, $id);
+
+            return $query;
+        };
+
+        $doc = null;
+        if ($isQuote) {
+            $doc = (clone $baseQuery())->where('operation_type', 'quotation')->first();
+            if (! $doc && class_exists(\App\Models\Quotation::class)) {
+                $qQuery = \App\Models\Quotation::withoutGlobalScope('company')->with(['customer', 'company']);
+                $qQuery->where(function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                    if (Schema::hasColumn('sales', 'tenant_id')) {
+                        $q->orWhere('tenant_id', $companyId);
+                    }
+                });
+                $applyIdentifier($qQuery, $id);
+                $doc = $qQuery->first();
+            }
+        } elseif (! $isReminder) {
+            $doc = (clone $baseQuery())
+                ->where(function ($operation) {
+                    $operation->where('operation_type', 'sale')->orWhereNull('operation_type');
+                })
+                ->first();
+        }
+
+        if (! $doc) {
+            $doc = (clone $baseQuery())->first();
+        }
+
+        if (! $doc) {
+            $fallbackQuery = Sale::withoutGlobalScope('company')->with(['customer', 'company']);
+            $applyIdentifier($fallbackQuery, $id);
+            if ($isQuote) {
+                $fallbackQuery->where('operation_type', 'quotation');
+            }
+            $doc = $fallbackQuery->first();
+        }
+
+        if (! $doc) {
+            $fallbackAny = Sale::withoutGlobalScope('company')->with(['customer', 'company']);
+            $applyIdentifier($fallbackAny, $id);
+            $doc = $fallbackAny->first();
+        }
 
         if (! $doc) {
             return response()->json([
                 'success' => false,
                 'error' => 'Document not found for this tenant.',
             ], 404);
+        }
+
+        if ($doc->operation_type === 'quotation') {
+            $isQuote = true;
         }
 
         $customer = $doc->customer;
@@ -200,6 +257,10 @@ class DispatchController extends Controller
                 'message' => "SMS sent successfully to {$cleanPhone}.",
                 'document_number' => $docNumber,
                 'sent_at' => now()->toIso8601String(),
+                'action' => null,
+                'intent' => null,
+                'url' => null,
+                'whatsapp_url' => null,
             ]);
         }
 
@@ -298,6 +359,10 @@ class DispatchController extends Controller
                 'message' => $emailMessage,
                 'document_number' => $docNumber,
                 'sent_at' => now()->toIso8601String(),
+                'action' => null,
+                'intent' => null,
+                'url' => null,
+                'whatsapp_url' => null,
             ]);
         }
 

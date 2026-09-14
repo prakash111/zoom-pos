@@ -397,6 +397,8 @@ class InvoiceController extends Controller
         $currency = $sale->company?->currency_symbol ?: (auth()->user()?->company?->currency_symbol ?: '₹');
         $totalAmount = (float) ($sale->total ?? 0);
 
+        $docType = $sale->operation_type === 'quotation' ? 'quotation' : 'invoice';
+
         // Keep the top 3 document utilities:
         $baseActions = [
             [
@@ -404,7 +406,7 @@ class InvoiceController extends Controller
                 'title'    => 'Preview & Print',
                 'subtitle' => 'View the PDF, print, or share the file',
                 'leading'  => ['type' => 'icon', 'icon' => 'picture_as_pdf', 'size' => 22],
-                'action'   => ['type' => 'OPEN_URL', 'url' => "/tenant/documents/invoice/{$sale->id}/pdf"],
+                'action'   => ['type' => 'OPEN_URL', 'url' => "/tenant/documents/{$docType}/{$sale->id}/pdf"],
             ],
             [
                 'type'     => 'list_tile',
@@ -418,7 +420,7 @@ class InvoiceController extends Controller
                 'title'    => 'Share as PDF file',
                 'subtitle' => 'Send the invoice PDF via any app',
                 'leading'  => ['type' => 'icon', 'icon' => 'share', 'size' => 22],
-                'action'   => ['type' => 'SYSTEM_SHARE_FILE', 'url' => "/tenant/documents/invoice/{$sale->id}/pdf"],
+                'action'   => ['type' => 'SYSTEM_SHARE_FILE', 'url' => "/tenant/documents/{$docType}/{$sale->id}/pdf"],
             ],
         ];
 
@@ -427,7 +429,7 @@ class InvoiceController extends Controller
             $sale->tenant_id ?? $sale->company_id ?? $tenantId,
             [
                 'id'        => $sale->id,
-                'type'      => 'invoice',
+                'type'      => $docType,
                 'reference' => $sale->sale_number ?? "DOC-{$sale->id}",
                 'phone'     => $phone,
                 'email'     => $email,
@@ -439,7 +441,7 @@ class InvoiceController extends Controller
 
         return response()->json([
             'type'       => 'bottom_sheet',
-            'title'      => 'Invoice Preview',
+            'title'      => ($docType === 'quotation' ? 'Quotation Preview' : 'Invoice Preview'),
             'header'     => [
                 'title'    => $sale->sale_number,
                 'subtitle' => 'GSTIN: ' . $gstin,

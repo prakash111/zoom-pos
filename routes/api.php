@@ -157,6 +157,23 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::get('/v1/tenant/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
 
+    // Notification dismissal & clear-all endpoints
+    Route::post('/tenant/notifications/clear-all', [NotificationController::class, 'clearAll']);
+    Route::post('/v1/tenant/notifications/clear-all', [NotificationController::class, 'clearAll']);
+    Route::post('/notifications/clear-all', [NotificationController::class, 'clearAll']);
+    Route::post('/tenant/notifications/dismiss', [NotificationController::class, 'dismiss']);
+    Route::post('/v1/tenant/notifications/dismiss', [NotificationController::class, 'dismiss']);
+    Route::post('/notifications/dismiss', [NotificationController::class, 'dismiss']);
+    Route::post('/tenant/notifications/{type}/{id}/dismiss', [NotificationController::class, 'dismiss']);
+    Route::post('/v1/tenant/notifications/{type}/{id}/dismiss', [NotificationController::class, 'dismiss']);
+    Route::post('/notifications/{type}/{id}/dismiss', [NotificationController::class, 'dismiss']);
+    Route::post('/tenant/notifications/{id}/dismiss', [NotificationController::class, 'dismiss']);
+    Route::post('/v1/tenant/notifications/{id}/dismiss', [NotificationController::class, 'dismiss']);
+    Route::post('/notifications/{id}/dismiss', [NotificationController::class, 'dismiss']);
+    Route::delete('/tenant/notifications/{id}', [NotificationController::class, 'dismiss']);
+    Route::delete('/v1/tenant/notifications/{id}', [NotificationController::class, 'dismiss']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'dismiss']);
+
     // Unified multi-format preview for invoices, sales receipts and quotes.
     Route::get('/tenant/documents/{type}/{id}/preview-modal', [DocumentPreviewController::class, 'previewModal']);
     Route::get('/v1/tenant/documents/{type}/{id}/preview-modal', [DocumentPreviewController::class, 'previewModal']);
