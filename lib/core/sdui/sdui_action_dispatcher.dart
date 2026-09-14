@@ -114,7 +114,7 @@ class SduiActionDispatcher {
       return;
     }
 
-    final type = _canonicalActionType(action['type']);
+    final type = _canonicalActionType(action['type'] ?? action['action_type']);
     final client = resolveApiClient();
 
     switch (type) {
@@ -785,7 +785,8 @@ class SduiActionDispatcher {
             formValues: formValues,
             setFormValue: setFormValue,
             dispatchAction: (modalAction) async {
-              final t = _canonicalActionType(modalAction['type']);
+              final t = _canonicalActionType(
+                  modalAction['type'] ?? modalAction['action_type']);
 
               // A pop/back inside a sheet closes THAT sheet only — it must
               // never bubble to the page underneath.

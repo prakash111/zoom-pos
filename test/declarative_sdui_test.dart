@@ -2,11 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zoom_pos_mobile/core/api/api_client.dart';
 import 'package:zoom_pos_mobile/core/sdui/dynamic_schema_context.dart';
 import 'package:zoom_pos_mobile/core/sdui/dynamic_schema_parser.dart';
 import 'package:zoom_pos_mobile/core/sdui/screens/dynamic_schema_page.dart';
 import 'package:zoom_pos_mobile/core/sdui/sdui_component_registry.dart';
 import 'package:zoom_pos_mobile/features/settings/screens/global_printer_setup_screen.dart';
+
+class _CustomerSearchApiClient extends Fake implements ApiClient {
+  @override
+  Future<Map<String, dynamic>> getAbsolute(
+    String path, {
+    Map<String, dynamic>? query,
+  }) async {
+    return {
+      'success': true,
+      'customers': [
+        {
+          'id': '41',
+          'server_id': 41,
+          'name': 'Prakash Kumar Singh',
+          'phone': '+91 98765 43210',
+          'balance_due': 875.50,
+        },
+      ],
+    };
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -912,6 +934,120 @@ void main() {
 
       expect(formValues['customer_name'], 'Sarah Connor');
       expect(formValues['customer_phone'], '+1 555 123 4567');
+    });
+
+    testWidgets(
+        'customer search results use the active dark card and readable colors',
+        (tester) async {
+      const cardColor = Color(0xFF1E293B);
+      const titleColor = Color(0xFFF8FAFC);
+      const subtitleColor = Color(0xFF94A3B8);
+      final darkTheme = ThemeData.dark().copyWith(
+        cardColor: cardColor,
+        colorScheme: ThemeData.dark().colorScheme.copyWith(
+              surface: cardColor,
+              onSurface: titleColor,
+              onSurfaceVariant: subtitleColor,
+            ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: darkTheme,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: DynamicSchemaContext(
+                formValues: <String, dynamic>{},
+                setFormValue: (_, __) {},
+                dispatchAction: (_) async {},
+                apiClient: _CustomerSearchApiClient(),
+                child: Builder(
+                  builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, {
+                    'type': 'customer_selector',
+                    'name': 'customer_id',
+                    'currency_symbol': '₹',
+                    'style': {
+                      'dropdownBackgroundColor': 'theme.surface',
+                      'borderColor': 'theme.divider',
+                      'titleColor': 'theme.textPrimary',
+                      'subtitleColor': 'theme.textSecondary',
+                      'dueColor': '#EF4444',
+                    },
+                  }),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final searchField = find.byWidgetPredicate((widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText ==
+              'Search CRM customer by name or phone...');
+      await tester.enterText(searchField, 'Prakash');
+      await tester.pump(const Duration(milliseconds: 301));
+      await tester.pump();
+
+      final results = tester.widget<Container>(
+          find.byKey(const ValueKey('customer-search-results')));
+      final decoration = results.decoration! as BoxDecoration;
+      expect(decoration.color, cardColor);
+
+      final title = tester.widget<Text>(find.text('Prakash Kumar Singh'));
+      final phone = tester.widget<Text>(find.text('+91 98765 43210'));
+      final due = tester.widget<Text>(find.text('Due: ₹875.50'));
+      expect(title.style?.color, titleColor);
+      expect(phone.style?.color, subtitleColor);
+      expect(due.style?.color, const Color(0xFFEF4444));
+    });
+
+    testWidgets('generic backend button binds action_type to a tap',
+        (tester) async {
+      Map<String, dynamic>? dispatchedAction;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DynamicSchemaContext(
+              formValues: const {},
+              setFormValue: (_, __) {},
+              dispatchAction: (action) async => dispatchedAction = action,
+              child: Builder(
+                builder: (ctx) => DynamicSchemaParser.buildComponent(ctx, {
+                  'type': 'button',
+                  'label': 'Create Quotation',
+                  'variant': 'primary',
+                  'action_type': 'OPEN_BOTTOM_SHEET',
+                  'style': {
+                    'backgroundColor': '#166534',
+                    'textColor': '#FFFFFF',
+                    'borderRadius': 10,
+                  },
+                  'action': {
+                    'action_type': 'OPEN_BOTTOM_SHEET',
+                    'endpoint':
+                        '/api/v1/tenant/quotations/create-modal?lead_id=12',
+                  },
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Create Quotation'), findsOneWidget);
+      final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+      expect(button.style?.backgroundColor?.resolve(<WidgetState>{}),
+          const Color(0xFF166534));
+
+      await tester.tap(find.text('Create Quotation'));
+      await tester.pump();
+
+      expect(dispatchedAction?['type'], 'OPEN_BOTTOM_SHEET');
+      expect(dispatchedAction?['action_type'], 'OPEN_BOTTOM_SHEET');
+      expect(
+          dispatchedAction?['endpoint'], contains('quotations/create-modal'));
     });
 
     testWidgets('file_picker renders the upload card, not a raw URL text field',

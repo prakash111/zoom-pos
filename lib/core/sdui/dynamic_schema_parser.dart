@@ -126,6 +126,8 @@ class DynamicSchemaParser {
         return _buildSegmentedTabs(context, schema);
 
       // Actions
+      case 'button':
+        return _buildGenericButton(context, schema);
       case 'button_primary':
         return _buildButtonPrimary(context, schema);
       case 'button_outlined':
@@ -2234,16 +2236,28 @@ class DynamicSchemaParser {
 
     final label = context.tr(actMap['label']?.toString() ?? 'Action');
     final iconName = actMap['icon']?.toString();
-    final action = actMap['action'] as Map<String, dynamic>? ?? const {};
+    final action = _componentAction(actMap) ?? const {};
+    final rawStyle = actMap['style'];
+    final actionStyle = rawStyle is Map
+        ? Map<String, dynamic>.from(rawStyle)
+        : const <String, dynamic>{};
     final isOutlined = actMap['variant'] == 'outlined' ||
+        actMap['variant'] == 'outline' ||
+        actMap['variant'] == 'outline_primary' ||
         actMap['outlined'] == true ||
         actMap['style'] == 'outlined';
 
     if (isOutlined) {
-      final borderColor =
-          isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
-      final textColor =
-          isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+      final borderColor = _semanticColor(
+        context,
+        actionStyle['borderColor'] ?? actMap['border_color'],
+        fallback: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+      );
+      final textColor = _semanticColor(
+        context,
+        actionStyle['textColor'] ?? actMap['foreground_color'],
+        fallback: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+      );
 
       return OutlinedButton(
         style: OutlinedButton.styleFrom(
@@ -2278,11 +2292,18 @@ class DynamicSchemaParser {
       );
     }
 
-    // Filled primary button (Mint / Emerald accent)
-    final btnBg = actMap['color'] != null
-        ? SduiIconRegistry.parseColor(actMap['color'].toString())
-        : (isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E));
-    final btnFg = isDark ? const Color(0xFF0F172A) : Colors.white;
+    final btnBg = _semanticColor(
+      context,
+      actionStyle['backgroundColor'] ??
+          actMap['background_color'] ??
+          actMap['color'],
+      fallback: _primaryButtonGreen,
+    );
+    final btnFg = _semanticColor(
+      context,
+      actionStyle['textColor'] ?? actMap['foreground_color'],
+      fallback: Colors.white,
+    );
 
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
@@ -2777,12 +2798,39 @@ class DynamicSchemaParser {
   static const Color _primaryButtonGreen = Color(0xFF166534);
   static const Color _outlinedButtonGreen = Color(0xFF15803D);
 
+  /// Accept the generic backend button schema and route it through the same
+  /// themed renderers as the canonical button component types.
+  static Widget _buildGenericButton(
+      BuildContext context, Map<String, dynamic> schema) {
+    final rawStyle = schema['style'];
+    final style = rawStyle is Map
+        ? Map<String, dynamic>.from(rawStyle)
+        : const <String, dynamic>{};
+    final normalized = Map<String, dynamic>.from(schema)
+      ..['background_color'] =
+          schema['background_color'] ?? style['backgroundColor']
+      ..['foreground_color'] = schema['foreground_color'] ?? style['textColor']
+      ..['border_color'] = schema['border_color'] ?? style['borderColor']
+      ..['border_radius'] = schema['border_radius'] ?? style['borderRadius'];
+    final variant = schema['variant']?.toString().toLowerCase().trim();
+
+    if (variant == 'outline' ||
+        variant == 'outlined' ||
+        variant == 'outline_primary') {
+      return _buildButtonOutlined(context, normalized);
+    }
+    if (variant == 'danger' || variant == 'destructive') {
+      return _buildButtonDanger(context, normalized);
+    }
+    return _buildButtonPrimary(context, normalized);
+  }
+
   static Widget _buildButtonPrimary(
       BuildContext context, Map<String, dynamic> schema) {
     final sduiContext = DynamicSchemaContext.of(context);
     final label = context.tr(schema['label']?.toString() ?? 'Submit');
     final iconName = schema['icon']?.toString();
-    final action = schema['action'] as Map<String, dynamic>? ?? const {};
+    final action = _componentAction(schema) ?? const {};
     final isDense = schema['dense'] == true || schema['size'] == 'small';
     final isFullWidth = schema['full_width'] == true ||
         (schema['full_width'] == null &&
@@ -2861,7 +2909,7 @@ class DynamicSchemaParser {
     final sduiContext = DynamicSchemaContext.of(context);
     final label = context.tr(schema['label']?.toString() ?? '');
     final iconName = schema['icon']?.toString();
-    final action = schema['action'] as Map<String, dynamic>? ?? const {};
+    final action = _componentAction(schema) ?? const {};
     final isDense = schema['dense'] == true || schema['size'] == 'small';
     final isFullWidth = schema['full_width'] == true ||
         (schema['full_width'] == null &&
@@ -2974,7 +3022,7 @@ class DynamicSchemaParser {
     final sduiContext = DynamicSchemaContext.of(context);
     final label = context.tr(schema['label']?.toString() ?? 'Delete');
     final iconName = schema['icon']?.toString();
-    final action = schema['action'] as Map<String, dynamic>? ?? const {};
+    final action = _componentAction(schema) ?? const {};
     final isDense = schema['dense'] == true || schema['size'] == 'small';
     final isFullWidth = schema['full_width'] == true ||
         (schema['full_width'] == null &&
@@ -3069,7 +3117,7 @@ class DynamicSchemaParser {
     final iconName = schema['icon']?.toString() ?? 'add';
     final label =
         schema['label'] == null ? null : context.tr(schema['label'].toString());
-    final action = schema['action'] as Map<String, dynamic>? ?? const {};
+    final action = _componentAction(schema) ?? const {};
     final bgColor = schema['background_color'] != null
         ? SduiIconRegistry.parseColor(schema['background_color'].toString())
         : const Color(0xFF2DD4BF);
@@ -3155,14 +3203,39 @@ class DynamicSchemaParser {
 
   static Map<String, dynamic>? _componentAction(Map<String, dynamic> schema) {
     final raw = schema['action'] ?? schema['on_tap'] ?? schema['on_click'];
-    if (raw is Map) return Map<String, dynamic>.from(raw);
+    if (raw is Map) {
+      final action = Map<String, dynamic>.from(raw);
+      final actionType =
+          action['type'] ?? action['action_type'] ?? schema['action_type'];
+      if (actionType != null && actionType.toString().isNotEmpty) {
+        action['type'] ??= actionType;
+        action['action_type'] ??= actionType;
+      }
+      for (final key in [
+        'endpoint',
+        'sheet_endpoint',
+        'route',
+        'url',
+        'method',
+        'data',
+        'payload',
+      ]) {
+        if (action[key] == null && schema[key] != null) {
+          action[key] = schema[key];
+        }
+      }
+      return action;
+    }
 
     final type = schema['action_type']?.toString();
     if (type == null || type.isEmpty) return null;
 
     return <String, dynamic>{
       'type': type,
+      'action_type': type,
       if (schema['endpoint'] != null) 'endpoint': schema['endpoint'],
+      if (schema['sheet_endpoint'] != null)
+        'sheet_endpoint': schema['sheet_endpoint'],
       if (schema['route'] != null) 'route': schema['route'],
       if (schema['url'] != null) 'url': schema['url'],
       if (schema['method'] != null) 'method': schema['method'],
@@ -5500,6 +5573,37 @@ class _CustomerSelectorState extends State<_CustomerSelector> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final rawStyle = widget.schema['style'];
+    final schemaStyle = rawStyle is Map
+        ? Map<String, dynamic>.from(rawStyle)
+        : const <String, dynamic>{};
+    final dropdownBackground = DynamicSchemaParser._semanticColor(
+      context,
+      schemaStyle['dropdownBackgroundColor'] ?? schemaStyle['popup_background'],
+      fallback: theme.cardColor,
+    );
+    final dropdownBorder = DynamicSchemaParser._semanticColor(
+      context,
+      schemaStyle['borderColor'] ?? schemaStyle['border_color'],
+      fallback: theme.dividerColor,
+    );
+    final titleColor = DynamicSchemaParser._semanticColor(
+      context,
+      schemaStyle['titleColor'],
+      fallback: theme.textTheme.bodyLarge?.color ?? theme.colorScheme.onSurface,
+    );
+    final subtitleColor = DynamicSchemaParser._semanticColor(
+      context,
+      schemaStyle['subtitleColor'],
+      fallback: theme.textTheme.bodyMedium?.color ??
+          theme.colorScheme.onSurfaceVariant,
+    );
+    final dueColor = DynamicSchemaParser._semanticColor(
+      context,
+      schemaStyle['dueColor'],
+      fallback: const Color(0xFFEF4444),
+    );
     final label = widget.schema['label']?.toString() ?? 'Client / Customer';
     final nameLabel =
         widget.schema['name_label']?.toString() ?? 'Client Full Name *';
@@ -5511,9 +5615,9 @@ class _CustomerSelectorState extends State<_CustomerSelector> {
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -5582,51 +5686,67 @@ class _CustomerSelectorState extends State<_CustomerSelector> {
           if (_searchResults.isNotEmpty) ...[
             const SizedBox(height: 6),
             Container(
+              key: const ValueKey('customer-search-results'),
               constraints: const BoxConstraints(maxHeight: 200),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
+                color: dropdownBackground,
+                borderRadius: BorderRadius.circular(10),
+                border:
+                    Border.all(color: dropdownBorder.withValues(alpha: 0.15)),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0x14000000),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: _searchResults.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, __) => Divider(
+                  height: 1,
+                  color: theme.dividerColor.withValues(alpha: 0.35),
+                ),
                 itemBuilder: (context, i) {
                   final cust = _searchResults[i];
                   final cName = cust['name']?.toString() ?? 'Unnamed';
                   final cPhone = cust['phone']?.toString() ?? '';
                   final due = (cust['balance_due'] as num?)?.toDouble() ?? 0.0;
+                  final currency = cust['currency_symbol']?.toString() ??
+                      widget.schema['currency_symbol']?.toString() ??
+                      '\$';
 
-                  return ListTile(
-                    dense: true,
-                    leading: const CircleAvatar(
-                      radius: 14,
-                      backgroundColor: Color(0xFFDCFCE7),
-                      child: Icon(Icons.person,
-                          size: 16, color: Color(0xFF15803D)),
+                  return Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      dense: true,
+                      leading: const CircleAvatar(
+                        radius: 14,
+                        backgroundColor: Color(0xFFDCFCE7),
+                        child: Icon(Icons.person,
+                            size: 16, color: Color(0xFF15803D)),
+                      ),
+                      title: Text(cName,
+                          style: TextStyle(
+                              color: titleColor,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13)),
+                      subtitle: cPhone.isNotEmpty
+                          ? Text(cPhone,
+                              style: TextStyle(
+                                  color: subtitleColor, fontSize: 12))
+                          : null,
+                      trailing: due > 0
+                          ? Text('Due: $currency${due.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                  color: dueColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold))
+                          : Icon(Icons.arrow_forward_ios,
+                              size: 12, color: subtitleColor),
+                      onTap: () => _selectCustomer(cust),
                     ),
-                    title: Text(cName,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 13)),
-                    subtitle: cPhone.isNotEmpty
-                        ? Text(cPhone, style: const TextStyle(fontSize: 12))
-                        : null,
-                    trailing: due > 0
-                        ? Text('Due: \$${due.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold))
-                        : const Icon(Icons.arrow_forward_ios, size: 12),
-                    onTap: () => _selectCustomer(cust),
                   );
                 },
               ),
