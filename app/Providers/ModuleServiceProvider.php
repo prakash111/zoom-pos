@@ -92,7 +92,10 @@ class ModuleServiceProvider extends ServiceProvider
     {
         $base = base_path('modules/'.$packagePath);
         if ($packagePath === '' || ! is_dir($base)) {
-            return;
+            $base = base_path('module-packages/'.$packagePath);
+            if ($packagePath === '' || ! is_dir($base)) {
+                return;
+            }
         }
 
         $key = basename($packagePath);

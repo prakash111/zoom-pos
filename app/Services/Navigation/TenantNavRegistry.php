@@ -1566,7 +1566,10 @@ class TenantNavRegistry
 
         $base = base_path('modules/'.$path);
         if (! File::isDirectory($base)) {
-            return false;
+            $base = base_path('module-packages/'.$path);
+            if (! File::isDirectory($base)) {
+                return false;
+            }
         }
 
         foreach (['routes.php', 'routes/api.php', 'routes/web.php', 'module.json'] as $marker) {
