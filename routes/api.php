@@ -141,6 +141,8 @@ foreach (SubscriptionWebhookController::GATEWAYS as $gw) {
 // Server-Driven UI Bootstrap, View Schemas, and Form Action Routes
 Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
     Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
+    Route::get('/tenant/bootstrap', [AppBootstrapController::class, 'bootstrap']);
+    Route::get('/v1/tenant/bootstrap', [AppBootstrapController::class, 'bootstrap']);
     Route::get('/app/translations', [LanguageApiController::class, 'appTranslations']);
     Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
 
@@ -759,6 +761,8 @@ Route::prefix('v1/pos')->group(function () {
     // Protected POS Endpoints (Require API Key or Bearer Token)
     Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
         Route::get('/auth/session', [PosSyncApiController::class, 'session']);
+        Route::get('/auth/me', [PosSyncApiController::class, 'session']);
+        Route::get('/v1/auth/me', [PosSyncApiController::class, 'session']);
         Route::post('/auth/desktop-session', [PosSyncApiController::class, 'desktopWebSession']);
         Route::get('/status', [PosSyncApiController::class, 'status']);
         Route::post('/push-devices', [PushDeviceApiController::class, 'store']);

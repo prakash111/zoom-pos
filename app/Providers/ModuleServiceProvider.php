@@ -43,6 +43,8 @@ class ModuleServiceProvider extends ServiceProvider
 
             if (is_file($path)) {
                 require $path;
+            } elseif (is_file(base_path('module-packages/'.$relative))) {
+                require base_path('module-packages/'.$relative);
             }
         });
     }

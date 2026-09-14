@@ -57,11 +57,26 @@ class PosSyncApiController extends Controller
     protected function desktopPermissions(User $user): array
     {
         $permissions = [
+            'pos' => true,
+            'pos.view' => true,
             'pos.create' => $user->hasPermission('pos', 'create'),
             'pos.edit' => $user->hasPermission('pos', 'edit'),
+            'sales' => true,
+            'sales.view' => $user->hasPermission('sales', 'view'),
+            'quotes' => $user->hasPermission('quotes', 'view'),
+            'quotes.view' => $user->hasPermission('quotes', 'view'),
+            'quotations' => $user->hasPermission('quotes', 'view'),
+            'quotations.view' => $user->hasPermission('quotes', 'view'),
+            'leads' => $user->hasPermission('leads', 'view'),
+            'leads.view' => $user->hasPermission('leads', 'view'),
+            'lead_management' => $user->hasPermission('leads', 'view'),
+            'lead_management.view' => $user->hasPermission('leads', 'view'),
+            'consignments' => $user->hasPermission('consignments', 'view'),
+            'consignments.view' => $user->hasPermission('consignments', 'view'),
             'products.view' => $user->hasPermission('products', 'view'),
             'products.create' => $user->hasPermission('products', 'create'),
             'products.edit' => $user->hasPermission('products', 'edit'),
+            'customers' => $user->hasPermission('customers', 'view'),
             'customers.view' => $user->hasPermission('customers', 'view'),
             'customers.create' => $user->hasPermission('customers', 'create'),
             'customers.edit' => $user->hasPermission('customers', 'edit'),
@@ -69,12 +84,17 @@ class PosSyncApiController extends Controller
             'settings.view' => $user->hasPermission('settings', 'view'),
         ];
 
+        if ($user->isPrivilegedRole()) {
+            $permissions['*'] = true;
+        }
+
         // A `.view` flag for every remaining module (mirrors
         // PermissionChecker::MODULES exactly) so the mobile drawer/menu can
         // gate each feature tile by the user's own authorized modules
         // instead of showing every module to every role.
         foreach (array_keys(PermissionChecker::MODULES) as $module) {
             $permissions["{$module}.view"] ??= $user->hasPermission($module, 'view');
+            $permissions[$module] ??= $permissions["{$module}.view"];
         }
 
         return $permissions;
@@ -228,9 +248,15 @@ class PosSyncApiController extends Controller
             ->latest('started_at')
             ->first();
 
+        $businessType = strtoupper($company->pos_mode ?: 'RETAIL');
+        $activeFeatures = ModuleRegistry::activeFeaturesFor($company);
+
         return response()->json([
             'success' => true,
             'token' => $apiKey->token,
+            'business_type' => $businessType,
+            'plan_features' => $activeFeatures,
+            'features' => $activeFeatures,
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -242,6 +268,18 @@ class PosSyncApiController extends Controller
             ],
             'drawer_header' => $company->getDrawerHeaderPayload(),
             'header' => $company->getDrawerHeaderPayload(),
+            'tenant' => [
+                'id' => (string) $company->id,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $company->getEffectiveTradeName(),
+                'trading_name' => $company->getEffectiveTradeName(),
+                'business_type' => $businessType,
+                'plan_features' => $activeFeatures,
+                'features' => $activeFeatures,
+                'active_mode' => strtolower(trim(ModuleRegistry::resolveActiveMode($company))),
+                'available_modes' => ModuleRegistry::availableModes($company),
+            ],
             'company' => [
                 'id' => $company->id,
                 'name' => $company->display_name,
@@ -266,6 +304,9 @@ class PosSyncApiController extends Controller
                 'plan_name' => $company->plan_name ?? 'trial',
                 'expires_at' => $company->expires_at?->toIso8601String(),
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
+                'business_type' => $businessType,
+                'plan_features' => $activeFeatures,
+                'features' => $activeFeatures,
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
                 'logo_url' => $company->getLogoUrl(),
@@ -608,8 +649,14 @@ class PosSyncApiController extends Controller
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
+        $businessType = strtoupper($company->pos_mode ?: 'RETAIL');
+        $activeFeatures = ModuleRegistry::activeFeaturesFor($company);
+
         return response()->json([
             'success' => true,
+            'business_type' => $businessType,
+            'plan_features' => $activeFeatures,
+            'features' => $activeFeatures,
             'user' => $user ? [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -620,6 +667,18 @@ class PosSyncApiController extends Controller
             ] : null,
             'drawer_header' => $company->getDrawerHeaderPayload(),
             'header' => $company->getDrawerHeaderPayload(),
+            'tenant' => [
+                'id' => (string) $company->id,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $company->getEffectiveTradeName(),
+                'trading_name' => $company->getEffectiveTradeName(),
+                'business_type' => $businessType,
+                'plan_features' => $activeFeatures,
+                'features' => $activeFeatures,
+                'active_mode' => strtolower(trim(ModuleRegistry::resolveActiveMode($company))),
+                'available_modes' => ModuleRegistry::availableModes($company),
+            ],
             'company' => [
                 'id' => $company->id,
                 'name' => $company->display_name,
@@ -644,6 +703,9 @@ class PosSyncApiController extends Controller
                 'plan_name' => $company->plan_name ?? 'trial',
                 'expires_at' => $company->expires_at?->toIso8601String(),
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
+                'business_type' => $businessType,
+                'plan_features' => $activeFeatures,
+                'features' => $activeFeatures,
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
                 'logo_url' => $company->getLogoUrl(),

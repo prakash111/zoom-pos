@@ -63,11 +63,24 @@ class AppBootstrapController extends Controller
         $effectiveTradeName = $company->getEffectiveTradeName();
         $drawerHeader = $company->getDrawerHeaderPayload();
 
+        $businessType = strtoupper($company->pos_mode ?: 'RETAIL');
+        $activeFeatures = ModuleRegistry::activeFeaturesFor($company);
+
+        $pushConfig = ['enabled' => false];
+        try {
+            $pushConfig = PushNotificationSetting::current()->publicConfig($company->id);
+        } catch (\Throwable $e) {
+            Log::warning("Bootstrap push config failure: {$e->getMessage()}");
+        }
+
         return response()->json([
             'success' => true,
             'locale' => $locale,
             'header' => $drawerHeader,
             'drawer_header' => $drawerHeader,
+            'business_type' => $businessType,
+            'plan_features' => $activeFeatures,
+            'features' => $activeFeatures,
             'tenant' => [
                 'id' => (string) $company->id,
                 'name' => $company->display_name,
@@ -85,6 +98,9 @@ class AppBootstrapController extends Controller
                 'default_locale' => $company->default_locale ?: ($company->language ?: 'en'),
                 'active_mode' => $activeMode,
                 'available_modes' => $availableModes,
+                'business_type' => $businessType,
+                'plan_features' => $activeFeatures,
+                'features' => $activeFeatures,
                 'is_seeding_complete' => (bool) $company->is_seeding_complete,
                 'navigation_labels' => $company->navigation_labels ?? new \stdClass,
                 'form_field_customizations' => $company->form_field_customizations ?? new \stdClass,
@@ -96,7 +112,7 @@ class AppBootstrapController extends Controller
             'active_module' => $activeModule,
             // Zero-touch feature/store-type contract for the mobile app: purely
             // derived from currently licensed + active modules.
-            'active_features' => ModuleRegistry::activeFeaturesFor($company),
+            'active_features' => $activeFeatures,
             'store_types' => $availableModes,
             'menu_structure' => $menuStructure,
             'navigation' => $menuStructure,
@@ -115,6 +131,9 @@ class AppBootstrapController extends Controller
             'push' => PushNotificationSetting::current()->publicConfig($company->id),
             'config' => [
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
+                'business_type' => $businessType,
+                'plan_features' => $activeFeatures,
+                'features' => $activeFeatures,
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                 'name' => $company->display_name,
                 'business_name' => $company->display_name,

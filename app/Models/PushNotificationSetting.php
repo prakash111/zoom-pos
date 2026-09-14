@@ -81,10 +81,17 @@ class PushNotificationSetting extends Model
             }
         }
 
+        $androidApiKey = null;
+        try {
+            $androidApiKey = $this->android_api_key;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to decrypt android_api_key in PushNotificationSetting: {$e->getMessage()}");
+        }
+
         return [
-            'enabled' => $this->enabled,
+            'enabled' => (bool) $this->enabled,
             'project_id' => $this->fcm_project_id,
-            'android_api_key' => $this->android_api_key,
+            'android_api_key' => $androidApiKey,
             'android_app_id' => $this->android_app_id,
             'messaging_sender_id' => $this->messaging_sender_id,
             'order_channel' => [

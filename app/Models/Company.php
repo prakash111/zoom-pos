@@ -741,12 +741,12 @@ class Company extends Model
      */
     public function getDisplayNameAttribute(): string
     {
-        if (!empty($this->business_name)) {
-            return $this->business_name;
-        }
-
         if (!empty($this->trading_name)) {
             return $this->trading_name;
+        }
+
+        if (!empty($this->business_name)) {
+            return $this->business_name;
         }
 
         return $this->name ?? 'Store';

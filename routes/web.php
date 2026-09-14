@@ -84,12 +84,15 @@ Route::get('/desktop/session/{token}', function (string $token) {
 Route::redirect('/admin/settings/general', '/superadmin/settings?tab=general');
 Route::redirect('/admin/settings/regional', '/superadmin/settings?tab=general');
 
+Route::get('/tenant/views/quotations/create', function (\Illuminate\Http\Request $request) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->createSchema($request);
+});
 Route::get('/tenant/views/quotations/{id}', function (\Illuminate\Http\Request $request, $id) {
     return app(\App\Http\Controllers\Api\QuotationController::class)->showSchema($request, $id);
-});
+})->where('id', '^(?!create$).+');
 Route::get('/tenant/quotations/{id}', function (\Illuminate\Http\Request $request, $id) {
     return app(\App\Http\Controllers\Api\QuotationController::class)->showSchema($request, $id);
-});
+})->where('id', '^(?!create$).+');
 Route::get('/tenant/views/quotations/{id}/preview', function (\Illuminate\Http\Request $request, $id) {
     return app(\App\Http\Controllers\Api\QuotationController::class)->previewView($request, $id);
 });

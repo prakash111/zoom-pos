@@ -581,6 +581,34 @@ class TenantNavRegistry
                 }
             }
 
+            if ($secKey === 'cashier_sales') {
+                $flattened = [];
+                foreach ($decoratedItems as $it) {
+                    if (($it['key'] ?? '') === 'pos' && ! empty($it['children'])) {
+                        $children = $it['children'];
+                        $it['children'] = [];
+                        $it['type'] = 'link';
+                        $flattened[] = $it;
+                        foreach ($children as $ch) {
+                            $ch['parent'] = null;
+                            $ch['parent_id'] = null;
+                            $ch['level'] = 0;
+                            $ch['type'] = 'link';
+                            $flattened[] = $ch;
+                        }
+                    } else {
+                        $flattened[] = $it;
+                    }
+                }
+                $existingKeys = array_column($flattened, 'key');
+                foreach (['pos', 'sales', 'quotations', 'lead_management', 'consignments', 'customers'] as $coreKey) {
+                    if (! in_array($coreKey, $existingKeys, true) && isset($catalogItems[$coreKey])) {
+                        $flattened[] = $catalogItems[$coreKey];
+                    }
+                }
+                $decoratedItems = $flattened;
+            }
+
             if (! empty($decoratedItems)) {
                 $customSections[] = array_merge($meta, [
                     'id' => $secKey,

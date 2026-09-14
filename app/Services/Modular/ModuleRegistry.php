@@ -418,6 +418,16 @@ class ModuleRegistry
             }
         }
 
+        // Guarantee core cashier & sales feature flags are always present and enabled
+        $merged['pos'] = true;
+        $merged['sales'] = true;
+        $merged['quotes'] = true;
+        $merged['quotations'] = true;
+        $merged['leads'] = true;
+        $merged['lead_management'] = true;
+        $merged['consignments'] = true;
+        $merged['customers'] = true;
+
         return $merged;
     }
 

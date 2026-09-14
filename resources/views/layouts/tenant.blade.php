@@ -780,9 +780,6 @@
                                     </x-nav.drawer-item>
                                 @endif
 
-                                @if ($canQuotes)
-                                    <x-nav.drawer-item item-key="quotations" :route="route('tenant.quotes.index')" title="{{ __('Quotations & Party Orders') }}" subtitle="{{ __('Party orders, catering & estimates') }}">📑</x-nav.drawer-item>
-                                @endif
 
                                 @if ($canLeads)
                                     <x-nav.drawer-item item-key="lead_management" :route="route('tenant.leads.index')" title="{{ __('Lead Management') }}" subtitle="{{ __('Pipeline, follow-ups & auto-sync CRM') }}">🎯</x-nav.drawer-item>
