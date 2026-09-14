@@ -86,6 +86,12 @@ class SduiViewController extends Controller
                 return $this->maybeWizardAdvance($settingsController->updateReceipts($request), $request, $company, $user);
 
             case 'notification-sounds':
+            case 'notifications-audio':
+            case 'app-preferences-notifications':
+            case 'audio-notifications':
+                if ($request->has('channels') || $request->has('channel_id')) {
+                    return $this->maybeWizardAdvance(app(\App\Http\Controllers\Api\V1\TenantAppPreferencesController::class)->update($request), $request, $company, $user);
+                }
                 return $this->maybeWizardAdvance($settingsController->updateNotificationSounds($request), $request, $company, $user);
 
             case 'repair-checklist':
@@ -122,8 +128,45 @@ class SduiViewController extends Controller
 
                 return response()->json(['success' => true, 'message' => 'Tax settings updated successfully.']);
 
+            case 'api-integrations-whatsapp':
+                return app(ApiIntegrationsController::class)->saveChannel($request, 'whatsapp');
+
+            case 'api-integrations-sms':
+                return app(ApiIntegrationsController::class)->saveChannel($request, 'sms');
+
+            case 'api-integrations-email':
+            case 'api-integrations-smtp':
+                return app(ApiIntegrationsController::class)->saveChannel($request, 'email');
+
+            case 'api-integrations-custom-webhook':
+            case 'api-integrations-webhook':
+                return app(ApiIntegrationsController::class)->saveChannel($request, 'custom_webhook');
+
+            case 'ai-studio':
+            case 'ai_studio':
+            case 'ai-vision':
+            case 'api-integrations-ai':
+                return app(ApiIntegrationsController::class)->saveChannel($request, 'ai');
+
+            case 'api-keys-regenerate':
+            case 'api-keys/regenerate':
+                return app(ApiIntegrationsController::class)->regenerateApiKey($request);
+
             case 'api':
             case 'api-integrations':
+                if ($request->has('whatsapp_provider') || $request->has('meta_phone_number_id') || $request->has('whatsapp_is_enabled')) {
+                    return app(ApiIntegrationsController::class)->saveChannel($request, 'whatsapp');
+                }
+                if ($request->has('sms_provider') || $request->has('sms_twilio_sid') || $request->has('sms_is_enabled')) {
+                    return app(ApiIntegrationsController::class)->saveChannel($request, 'sms');
+                }
+                if ($request->has('smtp_host') || $request->has('smtp_is_enabled')) {
+                    return app(ApiIntegrationsController::class)->saveChannel($request, 'email');
+                }
+                if ($request->has('webhook_is_enabled') && ($request->has('trigger_receipt_generated') || $request->has('webhook_secret'))) {
+                    return app(ApiIntegrationsController::class)->saveChannel($request, 'custom_webhook');
+                }
+
                 $validator = Validator::make($request->all(), [
                     'webhook_url' => ['nullable', 'url', 'max:255'],
                     'outbound_webhook_url' => ['nullable', 'url', 'max:255'],
@@ -225,13 +268,47 @@ class SduiViewController extends Controller
         $total = max(1, (int) $request->input('wizard_total_tabs', 4));
         $isFinal = $index >= $total - 1;
 
-        if ($isFinal && $company instanceof Company) {
-            if (! $company->is_profile_completed) {
-                $company->forceFill(['is_profile_completed' => true])->save();
-                AuditLog::record('company.profile_completed', $company->id, $user?->id, ['via' => 'store_profile_wizard']);
+        if ($company instanceof Company) {
+            $fresh = $company->fresh();
+            $fresh->flushTenantCaches();
+            $drawerHeader = $fresh->getDrawerHeaderPayload();
+            $payload['header'] = $drawerHeader;
+            $payload['drawer_header'] = $drawerHeader;
+            $payload['store_name'] = $fresh->display_name;
+            $payload['business_name'] = $fresh->display_name;
+            $payload['trading_name'] = $fresh->getEffectiveTradeName();
+            $payload['display_name'] = $fresh->display_name;
+            $payload['company'] = [
+                'id' => $fresh->id,
+                'name' => $fresh->display_name,
+                'business_name' => $fresh->display_name,
+                'trade_name' => $fresh->getEffectiveTradeName(),
+                'trading_name' => $fresh->getEffectiveTradeName(),
+                'store_name' => $fresh->display_name,
+                'display_name' => $fresh->display_name,
+                'drawer_header' => $drawerHeader,
+                'header' => $drawerHeader,
+            ];
+            $payload['tenant'] = [
+                'id' => (string) $fresh->id,
+                'name' => $fresh->display_name,
+                'business_name' => $fresh->display_name,
+                'trade_name' => $fresh->getEffectiveTradeName(),
+                'trading_name' => $fresh->getEffectiveTradeName(),
+                'display_name' => $fresh->display_name,
+                'store_name' => $fresh->display_name,
+                'drawer_header' => $drawerHeader,
+                'header' => $drawerHeader,
+            ];
+
+            if ($isFinal) {
+                if (! $fresh->is_profile_completed) {
+                    $fresh->forceFill(['is_profile_completed' => true])->save();
+                    AuditLog::record('company.profile_completed', $fresh->id, $user?->id, ['via' => 'store_profile_wizard']);
+                }
+                $payload['message'] = 'Store setup completed successfully!';
+                $payload['is_profile_completed'] = true;
             }
-            $payload['message'] = 'Store setup completed successfully!';
-            $payload['is_profile_completed'] = true;
         }
 
         $payload['next_action'] = [

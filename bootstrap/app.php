@@ -19,6 +19,10 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+if (! file_exists(dirname(__DIR__).'/.env') && file_exists(dirname(__DIR__).'/.env.example')) {
+    @copy(dirname(__DIR__).'/.env.example', dirname(__DIR__).'/.env');
+}
+
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
@@ -65,7 +69,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // across visitors, so its embedded CSRF token is not per-session. The
         // marketing contact form is instead protected by an origin-locked
         // rate limit (throttle:6,1) and a honeypot field.
-        $middleware->validateCsrfTokens(except: ['contact']);
+        $middleware->validateCsrfTokens(except: [
+            'contact',
+            'api/v1/webhooks/*',
+            'api/webhooks/*',
+            'v1/webhooks/*',
+            'webhooks/*',
+        ]);
 
         $middleware->alias([
             'installed' => EnsureAppIsInstalled::class,
@@ -73,6 +83,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'maintenance_check' => CheckMaintenanceMode::class,
             'security_headers' => SecurityHeaders::class,
             'tenant_context' => ResolveTenantContext::class,
+            'tenant' => \App\Http\Middleware\AuthenticateTenantApi::class,
             'tenant.permission' => CheckTenantPermission::class,
             'tenant.api.permission' => CheckTenantApiUserPermission::class,
             'tenant.pos_mode' => EnsureTenantPosMode::class,

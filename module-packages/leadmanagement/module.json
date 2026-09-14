@@ -1,0 +1,63 @@
+{
+    "key": "leadmanagement",
+    "name": "Lead Management System",
+    "description": "Standalone CRM lead management vertical: lead pipeline, activity tracking, source attribution, and customer conversion.",
+    "version": "1.1.0",
+    "author": "ZoomNearby",
+    "icon": "leaderboard",
+    "layout_type": "standard_grid",
+    "inherits_ui": "universal_pos",
+    "min_system_version": "1.0.0",
+    "requires_license": true,
+    "features": {
+        "has_leads": true,
+        "has_activities": true,
+        "has_due_reminders": true,
+        "has_quotations_linking": true,
+        "has_invoices_linking": true,
+        "has_customer_autoprovision": true,
+        "cleanup": {
+            "permission_modules": ["leads", "leadmanagement"],
+            "config_key_prefixes": ["lead_mod."]
+        }
+    },
+    "navigation": [
+        {
+            "key": "lead_ops",
+            "title": "Lead Management",
+            "icon": "leaderboard",
+            "items": [
+                {
+                    "key": "lead_dashboard",
+                    "title": "Leads Dashboard",
+                    "icon": "dashboard",
+                    "target_endpoint": "/api/tenant/lead-module/views/dashboard"
+                },
+                {
+                    "key": "lead_create",
+                    "title": "Capture Lead",
+                    "icon": "person_add",
+                    "target_endpoint": "/api/tenant/lead-module/views/create-lead"
+                },
+                {
+                    "key": "lead_pipeline",
+                    "title": "Leads Pipeline",
+                    "icon": "view_kanban",
+                    "target_endpoint": "/api/tenant/lead-module/views/leads"
+                },
+                {
+                    "key": "lead_activities",
+                    "title": "Follow-ups & Activities",
+                    "icon": "event_note",
+                    "target_endpoint": "/api/tenant/lead-module/views/activities"
+                },
+                {
+                    "key": "lead_sources",
+                    "title": "Lead Sources",
+                    "icon": "source",
+                    "target_endpoint": "/api/tenant/lead-module/views/sources"
+                }
+            ]
+        }
+    ]
+}

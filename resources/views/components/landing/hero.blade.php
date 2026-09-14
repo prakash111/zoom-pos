@@ -30,13 +30,15 @@
         <div class="relative z-10 px-6 sm:px-10 lg:px-12 pt-6 sm:pt-8 pb-4 hidden md:flex items-center justify-between border-b border-slate-100/80 dark:border-slate-800/60">
             <!-- Brand Logo -->
             <a href="{{ url('/') }}" class="inline-flex items-center gap-2.5 group">
-                @if ($branding->logo_url)
-                    <img src="{{ $branding->logo_url }}" alt="{{ $branding->platform_name }}" class="h-8 w-auto object-contain" decoding="async" fetchpriority="high">
+                @php
+                    $heroLogo = \App\Models\DynamicSetting::get('platform_logo_url') ?: $branding->getLogoPublicUrl();
+                    $heroMonogram = mb_strtoupper(mb_substr(trim($branding->platform_name ?: 'S'), 0, 1)) ?: 'S';
+                @endphp
+                @if ($heroLogo)
+                    <img src="{{ $heroLogo }}" alt="{{ $branding->platform_name }}" class="h-8 w-auto object-contain" decoding="async" fetchpriority="high">
                 @else
-                    <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-lime to-emerald-400 p-1.5 flex items-center justify-center shadow-sm shadow-emerald-400/30 group-hover:scale-105 transition-transform">
-                        <svg class="w-5 h-5 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round">
-                            <path d="M7 17L17 7M11 17L17 11M7 13L13 7" />
-                        </svg>
+                    <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-lime to-emerald-400 p-1 flex items-center justify-center shadow-sm shadow-emerald-400/30 group-hover:scale-105 transition-transform text-slate-950 font-black text-sm uppercase">
+                        {{ $heroMonogram }}
                     </div>
                 @endif
                 <span class="text-lg font-black tracking-tight text-slate-900 dark:text-white">{{ $branding->platform_name }}</span>

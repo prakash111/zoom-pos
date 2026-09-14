@@ -104,6 +104,13 @@ class TenantProvisioningService
                 ],
             ]);
 
+            // 1.1 Immediate Full-Menu Activation & Feature Population for Store Type
+            try {
+                app(\App\Services\Navigation\MenuService::class)->populateDefaultNavigation($company, $posMode);
+            } catch (\Throwable $e) {
+                Log::warning("Failed to auto-populate default navigation for tenant [{$company->id}]: ".$e->getMessage());
+            }
+
             // 2. Create Default Payment Methods
             $defaults = [
                 ['name' => 'Cash', 'code' => 'cash', 'order_index' => 1],

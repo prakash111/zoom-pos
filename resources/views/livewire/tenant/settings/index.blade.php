@@ -1,7 +1,7 @@
 <div class="w-full space-y-6"
      x-data="{
          activeTab: @js($activeSection),
-         validTabs: ['overview', 'mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'navigation']
+         validTabs: ['overview', 'mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'integrations', 'navigation']
      }"
      x-init="
          if (window.location.hash && validTabs.includes(window.location.hash.substring(1))) {
@@ -42,6 +42,7 @@
                 'financial': '{{ __('Financial & Currency') }}',
                 'taxes': '{{ __('Taxes & Compliance') }}',
                 'api': '{{ __('API & Integrations') }}',
+                'integrations': '{{ __('API & Integrations') }}',
                 'navigation': '{{ __('Navigation Menu') }}'
             }[activeTab] || '{{ __('Settings') }}'"></span>
         </div>
@@ -116,12 +117,12 @@
         </a>
 
         <!-- Tab 6: API & Integrations -->
-        <a href="{{ route('tenant.settings.api') }}"
+        <a href="{{ route('tenant.settings.integrations') }}"
            wire:navigate
-           :aria-selected="activeTab === 'api' ? 'true' : 'false'"
-           :class="activeTab === 'api' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
-           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
-            <span class="text-sm">🔌</span>
+           :aria-selected="(activeTab === 'api' || activeTab === 'integrations') ? 'true' : 'false'"
+           :class="(activeTab === 'api' || activeTab === 'integrations') ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="tab-link snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer {{ request()->routeIs('tenant.settings.integrations*') ? 'active' : '' }}">
+            <i class="lucide-plug mr-1"><svg class="w-4 h-4 inline-block -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v6m0 0l3-3m-3 3L9 5m7 9h4a2 2 0 012 2v1a2 2 0 01-2 2h-4m-6 0H4a2 2 0 01-2-2v-1a2 2 0 012-2h4m2 4v4m0 0l3-3m-3 3l-3-3" /></svg></i>
             <span>{{ __('API & Integrations') }}</span>
         </a>
 
@@ -249,7 +250,7 @@
             </a>
 
             <!-- Card 6: API & Integrations -->
-            <a href="{{ route('tenant.settings.api') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <a href="{{ route('tenant.settings.integrations') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
                 <div class="space-y-3">
                     <div class="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center text-2xl font-bold">
                         🔌
@@ -697,10 +698,8 @@
                      x-data="{
                          instantLogoPreview: null,
                          instantFaviconPreview: null,
-                         instantDrawerCoverPreview: null,
                          logoError: '',
                          faviconError: '',
-                         drawerCoverError: '',
                          handleLogoChange(event) {
                              this.logoError = '';
                              const file = event.target.files[0];
@@ -735,27 +734,6 @@
                              }
                              const reader = new FileReader();
                              reader.onload = (e) => { this.instantFaviconPreview = e.target.result; };
-                             reader.readAsDataURL(file);
-                         },
-                         handleDrawerCoverChange(event) {
-                             this.drawerCoverError = '';
-                             const file = event.target.files[0];
-                             if (!file) return;
-                             const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-                             if (!allowed.includes(file.type)) {
-                                 this.drawerCoverError = '{{ __('Invalid file format: Please select a valid image file (.png, .jpg, .jpeg, .webp)') }}';
-                                 event.target.value = '';
-                                 this.instantDrawerCoverPreview = null;
-                                 return;
-                             }
-                             if (file.size > 4096 * 1024) {
-                                 this.drawerCoverError = '{{ __('File size exceeds 4MB limit. Please choose a smaller image.') }}';
-                                 event.target.value = '';
-                                 this.instantDrawerCoverPreview = null;
-                                 return;
-                             }
-                             const reader = new FileReader();
-                             reader.onload = (e) => { this.instantDrawerCoverPreview = e.target.result; };
                              reader.readAsDataURL(file);
                          }
                      }">
@@ -863,64 +841,6 @@
                                     <p class="text-[11px] text-red-500 font-bold" x-text="faviconError"></p>
                                 </template>
                                 @error('faviconFile') <span class="text-[10px] text-red-500 font-semibold block">{{ $message }}</span> @enderror
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Drawer Cover Image Upload -->
-                    <div class="space-y-3">
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                            {{ __('Drawer Cover Image') }}
-                        </label>
-                        <div class="flex items-start gap-4">
-                            <!-- Preview Box -->
-                            <div class="w-24 h-24 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-center overflow-hidden shrink-0 relative group">
-                                <template x-if="instantDrawerCoverPreview">
-                                    <img :src="instantDrawerCoverPreview" alt="{{ __('Preview') }}" class="w-full h-full object-cover">
-                                </template>
-                                <template x-if="!instantDrawerCoverPreview">
-                                    <div class="w-full h-full flex items-center justify-center">
-                                        @if ($drawerCoverFile && $this->drawerCoverPreviewUrl)
-                                            <img src="{{ $this->drawerCoverPreviewUrl }}" alt="{{ __('Preview') }}" class="w-full h-full object-cover">
-                                        @elseif ($company && $company->getDrawerCoverUrl())
-                                            <img src="{{ $company->getDrawerCoverUrl() }}" alt="{{ __('Drawer Cover') }}" class="w-full h-full object-cover">
-                                        @else
-                                            <div class="text-center p-2 text-slate-400">
-                                                <svg class="w-8 h-8 mx-auto stroke-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                                <span class="text-[9px] block mt-1 font-semibold">{{ __('No Cover') }}</span>
-                                            </div>
-                                        @endif
-                                    </div>
-                                </template>
-
-                                @if ($drawerCoverFile || $company->getDrawerCoverUrl())
-                                    <button type="button"
-                                            wire:click="removeDrawerCover"
-                                            x-on:click="instantDrawerCoverPreview = null"
-                                            wire:confirm="{{ __('Are you sure you want to remove the drawer cover image?') }}"
-                                            class="absolute inset-0 bg-red-950/70 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[10px] font-bold">
-                                        <svg class="w-4 h-4 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                        {{ __('Remove') }}
-                                    </button>
-                                @endif
-                            </div>
-
-                            <div class="flex-1 space-y-2">
-                                <label class="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 transition">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                                    <span>{{ __('Upload Cover Image') }}</span>
-                                    <input type="file" wire:model="drawerCoverFile" accept="image/png, image/jpeg, image/jpg, image/webp" x-on:change="handleDrawerCoverChange($event)" class="hidden">
-                                </label>
-                                <div wire:loading wire:target="drawerCoverFile" class="text-[11px] text-blue-600 font-semibold block">
-                                    {{ __('Uploading cover image...') }}
-                                </div>
-                                <p class="text-[10px] text-slate-400">
-                                    {{ __('PNG, JPG or WEBP up to 4MB. Shown as the background of the mobile app drawer header.') }}
-                                </p>
-                                <template x-if="drawerCoverError">
-                                    <p class="text-[11px] text-red-500 font-bold" x-text="drawerCoverError"></p>
-                                </template>
-                                @error('drawerCoverFile') <span class="text-[10px] text-red-500 font-semibold block">{{ $message }}</span> @enderror
                             </div>
                         </div>
                     </div>

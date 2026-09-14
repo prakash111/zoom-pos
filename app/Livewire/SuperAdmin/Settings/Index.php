@@ -16,12 +16,13 @@ use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 #[Layout('layouts.superadmin', ['title' => 'System & Platform Settings'])]
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, WithFileUploads;
 
     #[Url(as: 'tab')]
     public string $activeTab = 'general';
@@ -144,7 +145,17 @@ class Index extends Component
 
     public string $logoUrl = '';
 
+    public $logoImage = null;
+
     public string $faviconUrl = '';
+
+    public bool $showAuthBanner = false;
+
+    public string $authBannerImageUrl = '';
+
+    public $authBannerImage = null;
+
+    public bool $enableRegistrationDomainSetup = true;
 
     public string $primaryColor = '#4f46e5';
 
@@ -229,6 +240,12 @@ class Index extends Component
     /** @var array<int, array{q: string, a: string}> */
     public array $landingFaqs = [];
 
+    /** @var array<int, array{icon: string, title: string, body: string}> */
+    public array $landingFeatures = [];
+
+    /** @var array<int, array{quote: string, name: string, role: string}> */
+    public array $landingTestimonials = [];
+
     // --- TAB 4: CUSTOM PAGES (CMS) ---
     public string $pageSearch = '';
 
@@ -277,8 +294,11 @@ class Index extends Component
         // Load Platform Branding & SMTP
         $branding = PlatformBranding::current();
         $this->platformName = (string) ($branding->platform_name ?: 'Smart Inventory & Sales');
-        $this->logoUrl = (string) $branding->logo_url;
+        $this->logoUrl = (string) ($branding->logo_url ?: \App\Models\DynamicSetting::get('platform_logo_url', ''));
         $this->faviconUrl = (string) $branding->favicon_url;
+        $this->showAuthBanner = (bool) \App\Models\DynamicSetting::get('show_auth_banner', false);
+        $this->authBannerImageUrl = (string) \App\Models\DynamicSetting::get('auth_banner_image_url', '');
+        $this->enableRegistrationDomainSetup = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
         $this->primaryColor = $branding->primary_color ?? '#4f46e5';
         $this->superadminSidebarColor = $branding->superadmin_sidebar_color ?? '#4338ca';
         $this->landingPrimaryColor = $branding->landing_primary_color ?? '#10b981';
@@ -327,6 +347,24 @@ class Index extends Component
 
         $this->landingFaqs = collect($branding->landing_faqs ?? [])
             ->map(fn ($row) => ['q' => (string) ($row['q'] ?? ''), 'a' => (string) ($row['a'] ?? '')])
+            ->values()
+            ->all();
+
+        $this->landingFeatures = collect($branding->landing_features ?? [])
+            ->map(fn ($row) => [
+                'icon' => (string) ($row['icon'] ?? ''),
+                'title' => (string) ($row['title'] ?? ''),
+                'body' => (string) ($row['body'] ?? ''),
+            ])
+            ->values()
+            ->all();
+
+        $this->landingTestimonials = collect($branding->landing_testimonials ?? [])
+            ->map(fn ($row) => [
+                'quote' => (string) ($row['quote'] ?? ''),
+                'name' => (string) ($row['name'] ?? ''),
+                'role' => (string) ($row['role'] ?? ''),
+            ])
             ->values()
             ->all();
 
@@ -472,6 +510,65 @@ class Index extends Component
 
         $this->dispatch('notify', ['type' => 'success', 'message' => 'Global push notification settings saved.']);
         session()->flash('status', 'Global push notification settings saved.');
+    }
+
+    public function testPushNotifications(): void
+    {
+        $push = PushNotificationSetting::current();
+
+        if (! $push->enabled) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Push notifications are currently disabled. Enable them and save first.']);
+            return;
+        }
+
+        if (blank($push->fcm_service_account_json) && blank($push->fcm_server_key)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'No Firebase credentials configured. Add a service account JSON first.']);
+            return;
+        }
+
+        try {
+            $pushService = app(\App\Services\Push\FirebasePushService::class);
+            $ref = new \ReflectionClass($pushService);
+
+            if ($push->fcm_service_account_json && $push->fcm_project_id) {
+                $method = $ref->getMethod('accessToken');
+                $method->setAccessible(true);
+                $accessToken = $method->invoke($pushService, $push);
+
+                // Perform FCM v1 dry-run validation with Google
+                $response = \Illuminate\Support\Facades\Http::asJson()
+                    ->withToken($accessToken)
+                    ->timeout(15)
+                    ->post("https://fcm.googleapis.com/v1/projects/{$push->fcm_project_id}/messages:send", [
+                        'validate_only' => true,
+                        'message' => [
+                            'topic' => 'test-healthcheck',
+                            'data' => [
+                                'title' => 'Health Check',
+                                'body' => 'FCM v1 connection verified',
+                            ],
+                        ],
+                    ]);
+
+                if (! $response->successful()) {
+                    throw new \RuntimeException('Google FCM API error: ' . $response->body());
+                }
+
+                $activeDevices = \App\Models\PushDevice::withoutGlobalScope('company')
+                    ->whereNull('revoked_at')
+                    ->count();
+
+                $message = "Firebase Cloud Messaging v1 verified! Authenticated with project {$push->fcm_project_id}. ({$activeDevices} registered devices)";
+                $this->dispatch('notify', ['type' => 'success', 'message' => $message]);
+                session()->flash('status', $message);
+            } else {
+                $this->dispatch('notify', ['type' => 'info', 'message' => 'Legacy server key stored.']);
+            }
+        } catch (\Throwable $e) {
+            $errorMsg = 'Push notification test failed: ' . $e->getMessage();
+            $this->dispatch('notify', ['type' => 'error', 'message' => $errorMsg]);
+            session()->flash('error', $errorMsg);
+        }
     }
 
     public function setLandingTheme(string $themeKey): void
@@ -768,12 +865,28 @@ class Index extends Component
         $this->landingFaqs = array_values($this->landingFaqs);
     }
 
+    public function removeAuthBanner(): void
+    {
+        $this->authBannerImage = null;
+        $this->authBannerImageUrl = '';
+        \App\Models\DynamicSetting::put('auth_banner_image_url', '');
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => 'Auth banner image removed.',
+        ]);
+    }
+
     public function saveBranding(): void
     {
         $data = $this->validate([
             'platformName' => ['required', 'string', 'max:255'],
             'logoUrl' => ['nullable', 'string', 'max:500'],
+            'logoImage' => ['nullable', 'image', 'max:5120'],
             'faviconUrl' => ['nullable', 'string', 'max:500'],
+            'showAuthBanner' => ['boolean'],
+            'authBannerImageUrl' => ['nullable', 'string', 'max:500'],
+            'authBannerImage' => ['nullable', 'image', 'max:5120'],
+            'enableRegistrationDomainSetup' => ['boolean'],
             'primaryColor' => ['nullable', 'string', 'max:32'],
             'superadminSidebarColor' => ['nullable', 'string', 'max:32'],
             'landingPrimaryColor' => ['nullable', 'string', 'max:32'],
@@ -796,7 +909,38 @@ class Index extends Component
             'landingFaqs' => ['array', 'max:20'],
             'landingFaqs.*.q' => ['nullable', 'string', 'max:255'],
             'landingFaqs.*.a' => ['nullable', 'string', 'max:1000'],
+            'landingFeatures' => ['nullable', 'array'],
+            'landingFeatures.*.icon' => ['nullable', 'string', 'max:16'],
+            'landingFeatures.*.title' => ['nullable', 'string', 'max:120'],
+            'landingFeatures.*.body' => ['nullable', 'string', 'max:500'],
+            'landingTestimonials' => ['nullable', 'array'],
+            'landingTestimonials.*.quote' => ['nullable', 'string', 'max:500'],
+            'landingTestimonials.*.name' => ['nullable', 'string', 'max:120'],
+            'landingTestimonials.*.role' => ['nullable', 'string', 'max:160'],
         ]);
+
+        if ($this->logoImage) {
+            $logoPath = $this->logoImage->store('branding', 'public');
+            $data['logoUrl'] = \Illuminate\Support\Facades\Storage::disk('public')->url($logoPath);
+            $this->logoUrl = $data['logoUrl'];
+            $this->logoImage = null;
+        }
+
+        if ($this->authBannerImage) {
+            $bannerPath = $this->authBannerImage->store('branding', 'public');
+            $this->authBannerImageUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($bannerPath);
+            $this->authBannerImage = null;
+        }
+
+        \App\Models\DynamicSetting::put('show_auth_banner', $this->showAuthBanner);
+        \App\Models\DynamicSetting::put('auth_banner_image_url', $this->authBannerImageUrl);
+        \App\Models\DynamicSetting::put('enable_registration_domain_setup', $this->enableRegistrationDomainSetup);
+        if (! empty($data['logoUrl'])) {
+            \App\Models\DynamicSetting::put('platform_logo_url', $data['logoUrl']);
+        }
+        if (! empty($data['platformName'])) {
+            \App\Models\DynamicSetting::put('platform_brand_name', $data['platformName']);
+        }
 
         $sectionsConfig = [
             'hero' => $this->sectionHero,
@@ -828,6 +972,26 @@ class Index extends Component
             ->values()
             ->all();
 
+        $features = collect($this->landingFeatures)
+            ->map(fn ($row) => [
+                'icon' => trim((string) ($row['icon'] ?? '')),
+                'title' => trim((string) ($row['title'] ?? '')),
+                'body' => trim((string) ($row['body'] ?? '')),
+            ])
+            ->filter(fn ($row) => $row['title'] !== '' && $row['body'] !== '')
+            ->values()
+            ->all();
+
+        $testimonials = collect($this->landingTestimonials)
+            ->map(fn ($row) => [
+                'quote' => trim((string) ($row['quote'] ?? '')),
+                'name' => trim((string) ($row['name'] ?? '')),
+                'role' => trim((string) ($row['role'] ?? '')),
+            ])
+            ->filter(fn ($row) => $row['quote'] !== '' && $row['name'] !== '')
+            ->values()
+            ->all();
+
         PlatformBranding::current()->update([
             'platform_name' => $data['platformName'],
             'logo_url' => $data['logoUrl'] ?: null,
@@ -856,7 +1020,12 @@ class Index extends Component
             'landing_windows_enabled' => $this->landingWindowsEnabled,
             'landing_section_meta' => $sectionMeta ?: null,
             'landing_faqs' => $faqs ?: null,
+            'landing_features' => $features ?: null,
+            'landing_testimonials' => $testimonials ?: null,
         ]);
+
+        \Illuminate\Support\Facades\Cache::forget('public_settings');
+        \Illuminate\Support\Facades\Cache::forget('platform_branding_settings');
 
         AuditLog::record('branding.updated', null, auth('platform_web')->id());
 

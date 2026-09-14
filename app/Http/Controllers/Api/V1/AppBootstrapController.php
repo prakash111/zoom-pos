@@ -60,13 +60,22 @@ class AppBootstrapController extends Controller
         $menuStructure = TenantNavRegistry::getEffectiveNavForTenant($company);
 
         $translationVersion = $localization->translationVersion($locale, $company->id);
+        $effectiveTradeName = $company->getEffectiveTradeName();
+        $drawerHeader = $company->getDrawerHeaderPayload();
 
         return response()->json([
             'success' => true,
             'locale' => $locale,
+            'header' => $drawerHeader,
+            'drawer_header' => $drawerHeader,
             'tenant' => [
                 'id' => (string) $company->id,
-                'business_name' => $company->trade_name ?? $company->name,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $effectiveTradeName,
+                'trading_name' => $effectiveTradeName,
+                'display_name' => $company->display_name,
+                'store_name' => $company->display_name,
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
                 'currency_decimals' => (int) ($company->currency_decimals ?? 2),
@@ -79,6 +88,7 @@ class AppBootstrapController extends Controller
                 'is_seeding_complete' => (bool) $company->is_seeding_complete,
                 'navigation_labels' => $company->navigation_labels ?? new \stdClass,
                 'form_field_customizations' => $company->form_field_customizations ?? new \stdClass,
+                'drawer_header' => $drawerHeader,
             ],
             'navigation_labels' => $company->navigation_labels ?? new \stdClass,
             'form_field_customizations' => $company->form_field_customizations ?? new \stdClass,
@@ -102,12 +112,16 @@ class AppBootstrapController extends Controller
             'translations' => $localization->getMergedTranslations($locale, $company->id),
             'translations_version' => $translationVersion,
             'nav' => $company->normalizedNavConfig(),
-            'push' => PushNotificationSetting::current()->publicConfig(),
+            'push' => PushNotificationSetting::current()->publicConfig($company->id),
             'config' => [
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
-                'name' => $company->name,
-                'trade_name' => $company->trade_name ?? $company->name,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $effectiveTradeName,
+                'trading_name' => $effectiveTradeName,
+                'store_name' => $company->display_name,
+                'display_name' => $company->display_name,
                 'country' => $company->country ?? 'US',
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
@@ -121,6 +135,7 @@ class AppBootstrapController extends Controller
                 'logo_url' => $company->getLogoUrl(),
                 'favicon_url' => $company->getFaviconUrl(),
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
+                'drawer_header' => $drawerHeader,
             ],
             // Reserved for tenant-wide status/announcement banners.
             'messages' => [],

@@ -15,7 +15,7 @@
 
     {{-- 3. Interactive Operations Suite (POS, Stock, Dining KOT, Finance) --}}
     @if ($branding->isSectionEnabled('features'))
-        <x-landing.features />
+        <x-landing.features :branding="$branding" />
     @endif
 
     {{-- 4. Scale & Architecture Value Pillars --}}

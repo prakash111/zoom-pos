@@ -44,8 +44,43 @@ class PushNotificationSetting extends Model
     /**
      * Values which are safe and necessary for client-side Firebase setup.
      */
-    public function publicConfig(): array
+    public function publicConfig(?string $companyId = null): array
     {
+        $orderSound = $this->order_sound;
+        $orderChannelId = $this->order_channel_id;
+        $invoiceSound = $this->invoice_sound;
+        $invoiceChannelId = $this->invoice_channel_id;
+
+        if ($companyId) {
+            $configs = \App\Models\Configuration::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->whereIn('key', ['order_sound_preset', 'delayed_order_sound', 'tenant_audio_notifications'])
+                ->pluck('value', 'key')
+                ->all();
+
+            $delayed = $configs['delayed_order_sound'] ?? null;
+            if (! empty($configs['tenant_audio_notifications'])) {
+                $granular = json_decode($configs['tenant_audio_notifications'], true);
+                if (is_array($granular)) {
+                    if (! empty($granular['delayed_orders_alarm']['sound_preset'])) {
+                        $delayed = $granular['delayed_orders_alarm']['sound_preset'];
+                    }
+                    if (! empty($granular['new_online_order']['sound_preset'])) {
+                        $invoiceSound = $granular['new_online_order']['sound_preset'];
+                    }
+                }
+            }
+
+            if ($delayed) {
+                $orderSound = \App\Services\Push\FirebasePushService::mapToSystemSound($delayed);
+                $orderChannelId = $this->order_channel_id . '_' . $orderSound;
+            }
+            if ($invoiceSound) {
+                $invoiceSound = \App\Services\Push\FirebasePushService::mapToSystemSound($invoiceSound);
+                $invoiceChannelId = $this->invoice_channel_id . '_' . $invoiceSound;
+            }
+        }
+
         return [
             'enabled' => $this->enabled,
             'project_id' => $this->fcm_project_id,
@@ -53,14 +88,14 @@ class PushNotificationSetting extends Model
             'android_app_id' => $this->android_app_id,
             'messaging_sender_id' => $this->messaging_sender_id,
             'order_channel' => [
-                'id' => $this->order_channel_id,
+                'id' => $orderChannelId,
                 'name' => $this->order_channel_name,
-                'sound' => $this->order_sound,
+                'sound' => $orderSound,
             ],
             'invoice_channel' => [
-                'id' => $this->invoice_channel_id,
+                'id' => $invoiceChannelId,
                 'name' => $this->invoice_channel_name,
-                'sound' => $this->invoice_sound,
+                'sound' => $invoiceSound,
             ],
             'alarm_repeat_seconds' => $this->alarm_repeat_seconds,
         ];

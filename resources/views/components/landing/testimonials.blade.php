@@ -1,26 +1,16 @@
 @props(['branding'])
 
 @php
-    $testimonials = [
-        [
-            'quote' => __("We switched all our retail outlets and staff corporate registers over in one afternoon. Inventory clears immediately and end-of-day reconciliation takes seconds."),
-            'name' => 'Alexander Hayes',
-            'role' => __('Operations Director · Apex Retail Group'),
-            'avatar' => 'AH',
-        ],
-        [
-            'quote' => __("The offline checkout and instant stock sync saved us during a major fiber cut on a busy weekend. Not a single sale or customer was lost."),
-            'name' => 'Elena Rostova',
-            'role' => __('Founder & Owner · Metro Gourmet Markets'),
-            'avatar' => 'ER',
-        ],
-        [
-            'quote' => __("Having physical POS, inventory controls, and KOT kitchen displays in a single dashboard transformed our restaurant chain completely."),
-            'name' => 'Tariq Mansour',
-            'role' => __('Head of Operations · Urban Dine Hospitality'),
-            'avatar' => 'TM',
-        ],
-    ];
+    $branding = $branding ?? \App\Models\PlatformBranding::current();
+    $rawTestimonials = $branding ? $branding->landingTestimonials() : [];
+    $testimonials = array_map(function ($t) {
+        return [
+            'quote' => $t['quote'],
+            'name' => $t['name'],
+            'role' => $t['role'],
+            'avatar' => \App\Models\PlatformBranding::testimonialInitials($t['name']),
+        ];
+    }, $rawTestimonials);
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28">

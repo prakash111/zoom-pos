@@ -11,6 +11,7 @@ use App\Models\RepairTicket;
 use App\Models\Sale;
 use App\Models\SalonAppointment;
 use App\Models\User;
+use App\Services\Notifications\TenantNotificationDispatcherService;
 use App\Services\Pos\SduiPosAdapterInterface;
 use App\Services\TaxCalculationService;
 use Illuminate\Support\Facades\Schema;
@@ -901,10 +902,10 @@ class UniversalPosBuilder
             $lineComponents = [
                 SchemaResponse::row([
                     SchemaResponse::column([
-                        SchemaResponse::text((string) ($line['title'] ?? 'Item'), 'label_large', ['bold' => true]),
-                        SchemaResponse::text("{$qty} × {$currency}".number_format($price, 2), 'body_small', ['color' => '#64748b']),
+                        SchemaResponse::text((string) ($line['title'] ?? 'Item'), 'label_large', ['bold' => true, 'color' => '#F8FAFC']),
+                        SchemaResponse::text("{$qty} × {$currency}".number_format($price, 2), 'body_small', ['color' => '#94A3B8']),
                     ]),
-                    SchemaResponse::text($currency.number_format($lineTotal, 2), 'label_large', ['bold' => true]),
+                    SchemaResponse::text($currency.number_format($lineTotal, 2), 'label_large', ['bold' => true, 'color' => '#F8FAFC']),
                 ], ['main_axis_alignment' => 'space_between']),
             ];
 
@@ -929,8 +930,8 @@ class UniversalPosBuilder
             $summaryRows[] = SchemaResponse::container($lineComponents, [
                 'padding' => 10,
                 'margin' => ['bottom' => 8],
-                'color' => '#f8fafc',
-                'border_color' => '#e2e8f0',
+                'color' => '#1E293B',
+                'border_color' => '#334155',
                 'border_radius' => 10,
             ]);
         }
@@ -1009,6 +1010,9 @@ class UniversalPosBuilder
         $changeDue = max(0, round($selectedTendered - $grandTotal, 2));
 
         $sheetPath = request()->getPathInfo();
+        if (! str_starts_with($sheetPath, '/api/')) {
+            $sheetPath = '/api/tenant/pos/checkout-sheet';
+        }
         $sheetQuery = request()->query();
         $refreshSheet = static function (array $changes) use ($sheetPath, $sheetQuery): string {
             $query = array_merge($sheetQuery, $changes);
@@ -1056,18 +1060,67 @@ class UniversalPosBuilder
             SchemaResponse::card([
                 SchemaResponse::row([
                     SchemaResponse::row([
-                        SchemaResponse::text('Order Cart', 'title_large', ['bold' => true]),
+                        SchemaResponse::text('Order Cart', 'title_large', ['bold' => true, 'color' => '#F8FAFC']),
                         SchemaResponse::badge("{$itemCount} items", '#2563eb', 'subtle'),
                     ]),
                     SchemaResponse::badge('Clear Cart', '#ef4444', 'subtle'),
                 ], ['main_axis_alignment' => 'space_between']),
                 SchemaResponse::divider(),
                 ...$summaryRows,
-            ], ['border_radius' => 16, 'border_color' => '#e2e8f0']),
+            ], ['border_radius' => 16, 'color' => '#1E293B', 'border_color' => '#334155']),
         ];
 
         if (empty($summaryRows)) {
-            $components[] = SchemaResponse::text('Your cart is empty. Add items before checking out.', 'body_medium', ['color' => '#64748b']);
+            $components[] = SchemaResponse::text('Your cart is empty. Add items before checking out.', 'body_medium', ['color' => '#94A3B8']);
+        }
+
+        if ($module === 'restaurant' || $company->isRestaurantMode()) {
+            $defaultPrepMinutes = (int) request('prep_minutes', 15);
+            $defaultIntimation = (int) request('intimation_minutes', 5);
+
+            $presetMinutes = [5, 10, 15, 20, 30];
+            $chips = [];
+            foreach ($presetMinutes as $mins) {
+                $isSelected = ($defaultPrepMinutes === $mins);
+                $action = SchemaResponse::openRemoteSheetAction($refreshSheet([
+                    'prep_minutes' => $mins,
+                ]), 'Order Cart', ['refresh_in_place' => true]);
+
+                $chips[] = $isSelected
+                    ? SchemaResponse::buttonPrimary("{$mins}m", $action, null, [
+                        'type' => 'chip',
+                        'full_width' => false,
+                        'dense' => true,
+                        'border_radius' => 12,
+                        'background_color' => '#166534',
+                        'selected' => true,
+                    ])
+                    : SchemaResponse::buttonOutlined("{$mins}m", $action, null, [
+                        'type' => 'chip',
+                        'full_width' => false,
+                        'dense' => true,
+                        'border_radius' => 12,
+                        'color' => '#94A3B8',
+                        'selected' => false,
+                    ]);
+            }
+
+            $components[] = SchemaResponse::card([
+                SchemaResponse::row([
+                    SchemaResponse::icon('timer', ['color' => '#f59e0b', 'size' => 22]),
+                    SchemaResponse::column([
+                        SchemaResponse::text('Kitchen Prep Time & Alert', 'label_large', ['bold' => true, 'color' => '#F8FAFC']),
+                        SchemaResponse::text('Preset prep duration & alert lead time before target expiry', 'body_small', ['color' => '#94A3B8']),
+                    ]),
+                ], ['spacing' => 8]),
+                SchemaResponse::divider(),
+                SchemaResponse::text('Estimated Prep Time Presets:', 'body_small', ['color' => '#94A3B8']),
+                SchemaResponse::row($chips, ['scrollable' => true, 'spacing' => 8]),
+                SchemaResponse::row([
+                    SchemaResponse::textInput('prep_minutes', 'Prep Duration (mins)', (string) $defaultPrepMinutes, ['keyboard_type' => 'number']),
+                    SchemaResponse::textInput('intimation_minutes', 'Alert Lead Time (mins)', (string) $defaultIntimation, ['keyboard_type' => 'number']),
+                ], ['spacing' => 12]),
+            ], ['color' => '#1E293B', 'border_color' => '#334155', 'border_radius' => 16]);
         }
 
         // Action Pills row: Add Customer, Hold, Note, Discount, Split Payment, Amount Paid.
@@ -1157,20 +1210,20 @@ class UniversalPosBuilder
             ...($linkedCustomer ? [
                 SchemaResponse::container([
                     SchemaResponse::row([
-                        SchemaResponse::icon('person', ['color' => '#166534', 'size' => 22]),
+                        SchemaResponse::icon('person', ['color' => '#10b981', 'size' => 22]),
                         SchemaResponse::column([
-                            SchemaResponse::text($defaultCustomerName ?: $linkedCustomer->name, 'label_large', ['bold' => true]),
-                            SchemaResponse::text($linkedCustomer->phone ?: $selectedAppointment?->customer_phone ?: 'No phone supplied', 'body_small', ['color' => '#64748b']),
+                            SchemaResponse::text($defaultCustomerName ?: $linkedCustomer->name, 'label_large', ['bold' => true, 'color' => '#F8FAFC']),
+                            SchemaResponse::text($linkedCustomer->phone ?: $selectedAppointment?->customer_phone ?: 'No phone supplied', 'body_small', ['color' => '#94A3B8']),
                         ], ['expanded' => true]),
-                        SchemaResponse::badge('CRM LINKED', '#166534', 'subtle'),
+                        SchemaResponse::badge('CRM LINKED', '#10b981', 'subtle'),
                     ], ['spacing' => 8, 'cross_axis_alignment' => 'center']),
-                ], ['padding' => 10, 'margin' => ['top' => 8], 'color' => '#f0fdf4', 'border_color' => '#bbf7d0', 'border_radius' => 10]),
+                ], ['padding' => 10, 'margin' => ['top' => 8], 'color' => '#0F172A', 'border_color' => '#334155', 'border_radius' => 10]),
             ] : [
                 // Walk-ins retain the editable inline field; booked clients
                 // are shown above as their attached CRM record instead.
                 SchemaResponse::textInput('customer_name', $customerFieldLabel, $defaultCustomerName ?: 'Walk-in Customer'),
             ]),
-        ], ['border_radius' => 16]);
+        ], ['border_radius' => 16, 'color' => '#1E293B', 'border_color' => '#334155']);
 
         if ($ticketFieldLabel !== null && ! empty($repairTicketOptions)) {
             if ($previewIncludesTicket) {
@@ -1180,12 +1233,12 @@ class UniversalPosBuilder
                         SchemaResponse::row([
                             SchemaResponse::icon('handyman', ['color' => '#0284c7', 'size' => 20]),
                             SchemaResponse::column([
-                                SchemaResponse::text($firstTicket['label'], 'title_small', ['bold' => true]),
-                                SchemaResponse::text('Workbench Ticket Settlement', 'body_small', ['color' => '#64748b']),
+                                SchemaResponse::text($firstTicket['label'], 'title_small', ['bold' => true, 'color' => '#F8FAFC']),
+                                SchemaResponse::text('Workbench Ticket Settlement', 'body_small', ['color' => '#94A3B8']),
                             ]),
                             SchemaResponse::badge('LINKED', '#0284c7', 'subtle'),
                         ], ['main_axis_alignment' => 'space_between']),
-                    ], ['color' => '#f0f9ff', 'border_color' => '#bae6fd', 'padding' => 12, 'border_radius' => 12]);
+                    ], ['color' => '#1E293B', 'border_color' => '#334155', 'padding' => 12, 'border_radius' => 12]);
                 }
             } else {
                 $ticketOptions = array_merge(
@@ -1248,7 +1301,7 @@ class UniversalPosBuilder
         // place (refresh_in_place), so the cash card below appears/disappears
         // without the drawer dismissing or the workbench flashing behind it.
         $components[] = SchemaResponse::card([
-            SchemaResponse::text('Payment Method', 'label_large', ['bold' => true]),
+            SchemaResponse::text('Payment Method', 'label_large', ['bold' => true, 'color' => '#F8FAFC']),
             SchemaResponse::wrap(array_map(function (array $method) use ($selectedPaymentMethod, $refreshSheet) {
                 $action = SchemaResponse::openRemoteSheetAction($refreshSheet([
                     'selected_payment_method' => $method['value'],
@@ -1260,9 +1313,9 @@ class UniversalPosBuilder
 
                 return $isSelected
                     ? SchemaResponse::buttonPrimary($method['label'], $action, $method['icon'], ['full_width' => false, 'border_radius' => 20, 'background_color' => '#166534'])
-                    : SchemaResponse::buttonOutlined($method['label'], $action, $method['icon'], ['full_width' => false, 'border_radius' => 20]);
+                    : SchemaResponse::buttonOutlined($method['label'], $action, $method['icon'], ['full_width' => false, 'border_radius' => 20, 'color' => '#94A3B8']);
             }, $paymentMethods)),
-        ], ['border_radius' => 16]);
+        ], ['border_radius' => 16, 'color' => '#1E293B', 'border_color' => '#334155']);
 
         // Cash Tendered + CHANGE DUE TO CUSTOMER + Quick Cash (active when Cash
         // is selected). One self-contained widget: the input's onChanged and
@@ -1277,7 +1330,7 @@ class UniversalPosBuilder
                     $selectedTendered,
                     array_column($quickCash, 'amount'),
                 ),
-            ], ['border_radius' => 16, 'border_color' => '#bbf7d0']);
+            ], ['border_radius' => 16, 'color' => '#1E293B', 'border_color' => '#334155']);
         }
 
         // (Split Payment now lives in the "Split Payment" action-pill modal above.)
@@ -1285,31 +1338,62 @@ class UniversalPosBuilder
         // Settlement Footer
         $totalRows = [
             SchemaResponse::row([
-                SchemaResponse::text('Subtotal', 'body_medium', ['color' => '#475569']),
-                SchemaResponse::text($currency.number_format($billingSubtotal, 2), 'body_medium', ['bold' => true]),
+                SchemaResponse::text('Subtotal', 'body_medium', ['color' => '#94A3B8']),
+                SchemaResponse::text($currency.number_format($billingSubtotal, 2), 'body_medium', ['bold' => true, 'color' => '#F8FAFC']),
             ], ['main_axis_alignment' => 'space_between']),
             SchemaResponse::row([
-                SchemaResponse::text($company->tax_id_label ?: 'Tax', 'body_medium', ['color' => '#475569']),
-                SchemaResponse::text($currency.number_format($taxAmount, 2), 'body_medium', ['bold' => true]),
+                SchemaResponse::text($company->tax_id_label ?: 'Tax', 'body_medium', ['color' => '#94A3B8']),
+                SchemaResponse::text($currency.number_format($taxAmount, 2), 'body_medium', ['bold' => true, 'color' => '#F8FAFC']),
             ], ['main_axis_alignment' => 'space_between']),
         ];
         if ($advancePaid > 0) {
             $totalRows[] = SchemaResponse::row([
-                SchemaResponse::text($module === 'repair' ? 'Advance Deposit Paid' : 'Prepaid Deposit / Package Credit', 'body_medium', ['color' => '#15803d']),
-                SchemaResponse::text('-'.$currency.number_format($advancePaid, 2), 'body_medium', ['bold' => true, 'color' => '#15803d']),
+                SchemaResponse::text($module === 'repair' ? 'Advance Deposit Paid' : 'Prepaid Deposit / Package Credit', 'body_medium', ['color' => '#10b981']),
+                SchemaResponse::text('-'.$currency.number_format($advancePaid, 2), 'body_medium', ['bold' => true, 'color' => '#10b981']),
             ], ['main_axis_alignment' => 'space_between']);
         }
         $totalRows[] = SchemaResponse::divider();
         $totalRows[] = SchemaResponse::row([
-            SchemaResponse::text(in_array($module, ['repair', 'salon'], true) && $advancePaid > 0 ? 'Balance Due' : 'Grand Total', 'title_medium', ['bold' => true]),
-            SchemaResponse::text($currency.number_format($grandTotal, 2), 'title_large', ['bold' => true, 'color' => '#166534']),
+            SchemaResponse::text(in_array($module, ['repair', 'salon'], true) && $advancePaid > 0 ? 'Balance Due' : 'Grand Total', 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
+            SchemaResponse::text($currency.number_format($grandTotal, 2), 'title_large', ['bold' => true, 'color' => '#10b981']),
         ], ['main_axis_alignment' => 'space_between']);
         $components[] = SchemaResponse::container($totalRows, [
             'padding' => 14,
-            'color' => '#f8fafc',
-            'border_color' => '#cbd5e1',
+            'color' => '#1E293B',
+            'border_color' => '#334155',
             'border_radius' => 14,
         ]);
+
+        // Dynamic Channel Checkboxes: only show options if the tenant has configured them
+        $notificationComponents = [];
+        try {
+            $enabledChannels = app(TenantNotificationDispatcherService::class)->getEnabledChannels($company);
+            if (! empty($enabledChannels['whatsapp'])) {
+                $notificationComponents[] = SchemaResponse::checkbox('send_via_whatsapp', 'Send Receipt via WhatsApp', true);
+            }
+            if (! empty($enabledChannels['sms'])) {
+                $notificationComponents[] = SchemaResponse::checkbox('send_via_sms', 'Send Receipt via SMS', true);
+            }
+            if (! empty($enabledChannels['email'])) {
+                $notificationComponents[] = SchemaResponse::checkbox('send_via_email', 'Send Receipt via Email', false);
+            }
+            if (! empty($enabledChannels['custom_webhook'])) {
+                $notificationComponents[] = SchemaResponse::checkbox('send_via_webhook', 'Trigger Webhook Notification', true);
+            }
+        } catch (\Throwable) {
+            // gracefully skip if service unavailable
+        }
+
+        if (! empty($notificationComponents)) {
+            $components[] = SchemaResponse::card([
+                SchemaResponse::row([
+                    SchemaResponse::icon('notifications_active', ['color' => '#10b981', 'size' => 20]),
+                    SchemaResponse::text('Instant Receipt & Notification', 'label_large', ['bold' => true, 'color' => '#F8FAFC']),
+                ], ['spacing' => 8]),
+                SchemaResponse::divider(),
+                ...$notificationComponents,
+            ], ['color' => '#1E293B', 'border_color' => '#334155', 'border_radius' => 12]);
+        }
 
         $completeSaleLabel = 'Complete Sale · '.$currency.number_format($grandTotal, 2);
         $components[] = SchemaResponse::buttonPrimary($completeSaleLabel, SchemaResponse::formSubmitAction(

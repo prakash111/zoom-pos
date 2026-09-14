@@ -90,7 +90,8 @@ class TenantRegister extends Component
 
     public function updatedStoreName(string $value): void
     {
-        if (empty($this->slug) || Str::slug($this->slug) === Str::slug(substr($value, 0, -1))) {
+        $domainSetupEnabled = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
+        if ($domainSetupEnabled && (empty($this->slug) || Str::slug($this->slug) === Str::slug(substr($value, 0, -1)))) {
             $this->slug = Str::slug($value);
         }
     }
@@ -128,13 +129,34 @@ class TenantRegister extends Component
         $this->errorMessage = '';
         $this->otpStatusMessage = '';
 
-        if (empty($this->slug) && ! empty($this->storeName)) {
-            $this->slug = Str::slug($this->storeName);
-        }
+        $domainSetupEnabled = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
 
-        $cleanCustomDomain = ! empty($this->customDomain)
-            ? strtolower(trim(preg_replace('#^https?://#i', '', $this->customDomain)))
-            : null;
+        if (! $domainSetupEnabled) {
+            $baseSlug = Str::slug($this->storeName ?: 'store');
+            $candidate = $baseSlug.'-'.strtolower(Str::random(4));
+            while (Company::where('slug', $candidate)->exists() || in_array($candidate, Company::RESERVED_SLUGS, true)) {
+                $candidate = $baseSlug.'-'.strtolower(Str::random(6));
+            }
+            $this->slug = $candidate;
+            $this->customDomain = '';
+            $cleanCustomDomain = null;
+        } else {
+            if (empty($this->slug) && ! empty($this->storeName)) {
+                $baseSlug = Str::slug($this->storeName);
+                $candidate = $baseSlug.'-'.strtolower(Str::random(4));
+                if (! Company::where('slug', $baseSlug)->exists() && ! in_array($baseSlug, Company::RESERVED_SLUGS, true)) {
+                    $this->slug = $baseSlug;
+                } else {
+                    while (Company::where('slug', $candidate)->exists() || in_array($candidate, Company::RESERVED_SLUGS, true)) {
+                        $candidate = $baseSlug.'-'.strtolower(Str::random(6));
+                    }
+                    $this->slug = $candidate;
+                }
+            }
+            $cleanCustomDomain = ! empty($this->customDomain)
+                ? strtolower(trim(preg_replace('#^https?://#i', '', $this->customDomain)))
+                : null;
+        }
 
         $rules = [
             'storeName' => ['required', 'string', 'min:2', 'max:100'],

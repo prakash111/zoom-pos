@@ -138,7 +138,7 @@
                                     </a>
                                     <button type="button"
                                        x-data
-                                       x-on:click="$dispatch('open-print-preview', { url: @js(route('tenant.quotes.pdf', ['quote' => $quote, 'embed' => 1])), title: @js(__('Quotation Preview')) })"
+                                       x-on:click="$dispatch('open-sdui-sheet', { endpoint: @js(route('tenant.documents.preview-modal', ['type' => 'quotation', 'id' => $quote->id])) })"
                                        class="px-2 py-1 text-slate-400 hover:text-slate-600 transition font-bold text-xs"
                                        title="{{ __('Preview PDF') }}">
                                         {{ __("PDF") }}

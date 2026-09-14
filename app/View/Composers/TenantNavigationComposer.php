@@ -29,14 +29,19 @@ class TenantNavigationComposer
 
         $allows = fn (string $module, string $action = 'view'): bool => ! $user || $user->isPrivilegedRole() || $checker->allows($user, $module, $action);
 
-        // Primary non-retail business vertical this store operates in (from
-        // Company::licensedModuleKeys(), which normalises licensed_modules /
-        // pos_mode). Drives the additive "Pharmacy / Salon / Repair Operations"
-        // sidebar group; a plain retail or restaurant store has none.
+        // Compute vertical and operating mode flags based on company's licensed modules
         $verticalKeys = $user ? $company->licensedModuleKeys() : ['retail'];
         $activeVertical = collect($verticalKeys)
             ->first(fn ($k) => in_array($k, ['pharmacy', 'service_booking', 'repair_technician'], true))
             ?? ($verticalKeys[0] ?? 'retail');
+
+        $isRestaurantMode = $company->isRestaurantMode();
+        $hasRestaurant = $company->hasModule('restaurant');
+        $hasRetail = $company->hasModule('retail') || ! $isRestaurantMode;
+        $isPharmacy = $company->hasModule('pharmacy');
+        $isSalon = $company->hasModule('service_booking') || $company->hasModule('salon');
+        $isRepair = $company->hasModule('repair_technician') || $company->hasModule('repairtechnician');
+        $isLeadManagement = $company->hasModule('leadmanagement') || $company->hasModule('lead_management');
 
         $isQuotes = $this->request->routeIs('tenant.quotes.*') || $this->request->routeIs('tenant.quotations.*');
         $isSalesTargets = $this->request->routeIs('tenant.sales-targets.*');
@@ -56,15 +61,20 @@ class TenantNavigationComposer
             'tenantCompany' => $company,
             'themeClasses' => $themeClasses,
             'uiAccentColorHex' => $company->primary_color ?: ($themeClasses['hex'] ?? '#2563eb'),
-            'isRestaurant' => $user?->company?->isRestaurantMode() ?? false,
+            'isRestaurant' => $isRestaurantMode,
+            'isRestaurantMode' => $isRestaurantMode,
+            'hasRestaurant' => $hasRestaurant,
+            'hasRetail' => $hasRetail,
             'activeVertical' => $activeVertical,
-            'isPharmacy' => $activeVertical === 'pharmacy',
-            'isSalon' => $activeVertical === 'service_booking',
-            'isRepair' => $activeVertical === 'repair_technician',
-            'isVerticalStore' => in_array($activeVertical, ['pharmacy', 'service_booking', 'repair_technician'], true),
+            'isPharmacy' => $isPharmacy,
+            'isSalon' => $isSalon,
+            'isRepair' => $isRepair,
+            'isLeadManagement' => $isLeadManagement,
+            'isVerticalStore' => $isPharmacy || $isSalon || $isRepair || ($hasRestaurant && ! $isRestaurantMode),
             'isPosScreen' => $this->request->routeIs('tenant.sales.create') || $this->request->routeIs('tenant.restaurant.pos'),
 
             'canQuotes' => $allows('quotes'),
+            'canLeads' => $allows('leads'),
             'canSales' => $allows('sales'),
             'canConsignments' => $allows('consignments'),
             'canServiceOrders' => $allows('service_orders'),
@@ -85,6 +95,7 @@ class TenantNavigationComposer
 
             'isHome' => $this->request->routeIs('tenant.dashboard'),
             'isQuotes' => $isQuotes,
+            'isLeads' => $this->request->routeIs('tenant.leads.*'),
             'isConsignments' => $this->request->routeIs('tenant.consignments.*'),
             'isServiceOrders' => $this->request->routeIs('tenant.service-orders.*'),
             'isSalesTargets' => $isSalesTargets,

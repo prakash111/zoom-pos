@@ -576,7 +576,7 @@
                                 <tr>
                                     <td class="py-3 font-bold text-blue-600 dark:text-blue-400">
                                         <button type="button" x-data
-                                                x-on:click="$dispatch('open-print-preview', { url: @js(route('tenant.sales.pdf', ['sale' => $sale, 'embed' => 1])), title: @js(__('Invoice Preview')) })"
+                                                x-on:click="$dispatch('open-sdui-sheet', { endpoint: @js(route('tenant.documents.preview-modal', ['type' => 'invoice', 'id' => $sale->id])) })"
                                                 class="hover:underline">
                                             #{{ $sale->sale_number }}
                                         </button>

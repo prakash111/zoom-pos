@@ -60,7 +60,7 @@ return new class extends Migration
         if (! Schema::hasTable('reminders')) {
             Schema::create('reminders', function (Blueprint $table) {
                 $table->id();
-                $table->unsignedBigInteger('company_id')->index();
+                $table->string('company_id', 255)->index();
                 $table->unsignedBigInteger('customer_id')->nullable()->index();
                 $table->string('type', 50)->default('follow_up')->index();
                 $table->string('title', 255);

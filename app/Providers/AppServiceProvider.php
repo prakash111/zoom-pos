@@ -29,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        if (blank(config('app.key'))) {
+        if (Desktop::isRunning() && blank(config('app.key'))) {
             config(['app.key' => Desktop::resolveOrCreatePersistentAppKey()]);
         }
     }

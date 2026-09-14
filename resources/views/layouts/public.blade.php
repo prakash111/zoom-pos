@@ -65,14 +65,16 @@
         <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-[72px] flex items-center justify-between gap-3">
             <!-- Brand Logo -->
             <a href="{{ url('/') }}" class="inline-flex items-center gap-2.5 min-w-0 group">
-                @if ($publicBranding->logo_url)
-                    <img src="{{ $publicBranding->logo_url }}" alt="{{ $publicBranding->platform_name }}" class="h-8 w-auto object-contain" decoding="async" fetchpriority="high">
+                @php
+                    $pubLogo = \App\Models\DynamicSetting::get('platform_logo_url') ?: $publicBranding->getLogoPublicUrl();
+                    $pubMonogram = mb_strtoupper(mb_substr(trim($publicBranding->platform_name ?: 'S'), 0, 1)) ?: 'S';
+                @endphp
+                @if ($pubLogo)
+                    <img src="{{ $pubLogo }}" alt="{{ $publicBranding->platform_name }}" class="h-8 w-auto object-contain" decoding="async" fetchpriority="high">
                 @else
                     <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-lime via-emerald-400 to-teal-500 p-0.5 shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform flex items-center justify-center">
-                        <div class="w-full h-full bg-white dark:bg-slate-950 rounded-[10px] flex items-center justify-center text-brand-lime font-black text-lg">
-                            <svg class="w-5 h-5 text-brand-lime" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                                <path d="M7 17L17 7M11 17L17 11M7 13L13 7" />
-                            </svg>
+                        <div class="w-full h-full bg-white dark:bg-slate-950 rounded-[10px] flex items-center justify-center text-brand-lime font-black text-base uppercase">
+                            {{ $pubMonogram }}
                         </div>
                     </div>
                 @endif
@@ -281,14 +283,12 @@
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-8 lg:gap-12">
                 <div class="col-span-2 lg:col-span-1 pr-4">
                     <a href="{{ url('/') }}" class="inline-flex items-center gap-3">
-                        @if ($publicBranding->logo_url)
-                            <img src="{{ $publicBranding->logo_url }}" alt="{{ $publicBranding->platform_name }}" class="h-8 w-auto object-contain" loading="lazy" decoding="async">
+                        @if ($pubLogo)
+                            <img src="{{ $pubLogo }}" alt="{{ $publicBranding->platform_name }}" class="h-8 w-auto object-contain" loading="lazy" decoding="async">
                         @else
                             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-lime to-emerald-400 p-0.5 flex items-center justify-center">
-                                <div class="w-full h-full bg-white dark:bg-slate-950 rounded-[6px] flex items-center justify-center text-brand-lime font-black text-sm">
-                                    <svg class="w-4 h-4 text-brand-lime" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                                        <path d="M7 17L17 7M11 17L17 11M7 13L13 7" />
-                                    </svg>
+                                <div class="w-full h-full bg-white dark:bg-slate-950 rounded-[6px] flex items-center justify-center text-brand-lime font-black text-sm uppercase">
+                                    {{ $pubMonogram }}
                                 </div>
                             </div>
                         @endif

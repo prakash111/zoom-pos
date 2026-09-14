@@ -9,6 +9,9 @@ use App\Models\Company;
 use App\Models\Configuration;
 use App\Models\Customer;
 use App\Models\CustomNotificationChannel;
+use App\Models\DiningFloor;
+use App\Models\DiningTable;
+use App\Models\KitchenTicket;
 use App\Models\PaymentMethod;
 use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
@@ -21,6 +24,7 @@ use App\Models\SalonAppointment;
 use App\Models\SduiScreen;
 use App\Models\TaxRule;
 use App\Models\TenantApiKey;
+use App\Models\TenantNotificationGateway;
 use App\Models\TenantSession;
 use App\Models\User;
 use App\Services\Auth\PermissionChecker;
@@ -56,24 +60,76 @@ class SchemaResponse
         'file_picker',
         'line_item_tile', 'table_grid', 'step_counter', 'button_primary',
         'button_outlined', 'button_danger', 'fab', 'action_sheet_trigger', 'navigation_builder', 'tree_builder',
-        'wrap', 'cash_tendered_field', 'customer_selector',
+        'wrap', 'cash_tendered_field', 'customer_selector', 'chip',
+        'entity_record_card', 'pipeline_stage_tracker', 'progress_bar_stat', 'segmented_filter_chips', 'fab_action',
+        'segmented_tabs', 'document_preview_card', 'section_header', 'list_tile',
+        'notification_item', 'empty_state',
+        // Generic SDUI form component aliases
+        'select', 'input', 'number', 'switch', 'button', 'hidden',
     ];
 
     public const INPUT_TYPES = [
         'text_input', 'dropdown_select', 'creatable_select', 'search_bar', 'checkbox', 'toggle_switch',
         'date_time_picker', 'color_picker', 'file_upload', 'file_picker', 'step_counter',
         'cash_tendered_field', 'customer_selector',
+        // Generic SDUI input aliases
+        'select', 'input', 'number', 'switch', 'hidden',
     ];
 
     public const ACTION_COMPONENT_TYPES = [
-        'button_primary', 'button_outlined', 'button_danger', 'fab',
+        'button_primary', 'button_outlined', 'button_danger', 'fab', 'chip',
+        'button',
     ];
 
     public const ACTION_TYPES = [
-        'navigate', 'form_submit', 'api_post', 'open_modal', 'navigate_back', 'pop',
-        'add_to_cart', 'open_remote_sheet', 'open_url', 'show_post_sale_sheet',
+        'navigate', 'navigate_to', 'form_submit', 'submit_form', 'api_post', 'open_modal', 'navigate_back', 'pop',
+        'add_to_cart', 'open_remote_sheet', 'open_bottom_sheet', 'open_url', 'show_post_sale_sheet',
         'load_rx_to_pos', 'load_repair_to_pos', 'filter_view', 'show_ticket_share_sheet',
+        'trigger_print', 'reload_component', 'refresh_sheet', 'refresh_dashboard', 'thermal_print', 'system_share_file',
     ];
+
+    // =========================================================================
+    // Dynamic Theme Tokens & Mode Resolution
+    // =========================================================================
+
+    public static function isDarkMode(?\Illuminate\Http\Request $request = null): bool
+    {
+        $req = $request ?: request();
+        if ($req) {
+            $header = strtolower((string) ($req->header('X-App-Theme') ?: ($req->header('X-Theme') ?: '')));
+            if ($header === 'dark') return true;
+            if ($header === 'light') return false;
+
+            $param = strtolower((string) ($req->query('theme') ?: ($req->input('theme') ?: '')));
+            if ($param === 'dark') return true;
+            if ($param === 'light') return false;
+        }
+        return false;
+    }
+
+    public static function themeToken(string $token, ?\Illuminate\Http\Request $request = null): string
+    {
+        return match ($token) {
+            'canvas', 'theme.canvas', 'background', 'theme.background' => 'theme.background',
+            'surface', 'theme.surface', 'card_bg'                      => 'theme.surface',
+            'surfaceVariant', 'theme.surfaceVariant', 'note_bg'        => 'theme.surfaceVariant',
+            'divider', 'theme.divider', 'border', 'theme.border'       => 'theme.divider',
+            'textPrimary', 'theme.textPrimary', 'text_primary', 'onSurface', 'theme.onSurface' => 'theme.onSurface',
+            'textSecondary', 'theme.textSecondary', 'text_secondary'   => 'theme.textSecondary',
+            'accentText', 'theme.accentText', 'noteText', 'theme.noteText', 'note_text' => 'theme.accentText',
+            default => $token,
+        };
+    }
+
+    public static function themeColors(?\Illuminate\Http\Request $request = null): array
+    {
+        return [
+            'surface'    => 'theme.surface',
+            'background' => 'theme.background',
+            'on_surface' => 'theme.onSurface',
+            'divider'    => 'theme.divider',
+        ];
+    }
 
     // =========================================================================
     // Layout Primitives
@@ -81,17 +137,37 @@ class SchemaResponse
 
     public static function container(array $components, array $props = []): array
     {
+        if (isset($props['color']) && (str_starts_with((string) $props['color'], 'theme.') || in_array($props['color'], ['card_bg', 'note_bg', 'surface']))) {
+            unset($props['color']);
+        }
+        if (isset($props['border_color']) && (str_starts_with((string) $props['border_color'], 'theme.') || in_array($props['border_color'], ['border', 'divider']))) {
+            unset($props['border_color']);
+        }
         return array_merge([
             'type' => 'container',
             'components' => $components,
+            'children' => $components,
         ], $props);
     }
 
     public static function card(array $components, array $props = []): array
     {
+        if (isset($props['color']) && (str_starts_with((string) $props['color'], 'theme.') || in_array($props['color'], ['card_bg', 'note_bg', 'surface']))) {
+            unset($props['color']);
+        }
+        if (isset($props['border_color']) && (str_starts_with((string) $props['border_color'], 'theme.') || in_array($props['border_color'], ['border', 'divider']))) {
+            unset($props['border_color']);
+        }
+        if (isset($props['style']) && is_array($props['style'])) {
+            unset($props['style']['backgroundColor'], $props['style']['borderColor']);
+            if (empty($props['style'])) {
+                unset($props['style']);
+            }
+        }
         return array_merge([
             'type' => 'card',
             'components' => $components,
+            'children' => $components,
         ], $props);
     }
 
@@ -100,6 +176,7 @@ class SchemaResponse
         return array_merge([
             'type' => 'scroll_view',
             'components' => $components,
+            'children' => $components,
         ], $props);
     }
 
@@ -109,6 +186,7 @@ class SchemaResponse
             'type' => 'grid_view',
             'cross_axis_count' => $columns,
             'components' => $components,
+            'children' => $components,
         ], $props);
     }
 
@@ -118,6 +196,7 @@ class SchemaResponse
             'type' => 'accordion_group',
             'title' => $title,
             'components' => $components,
+            'children' => $components,
         ], $props);
     }
 
@@ -126,6 +205,7 @@ class SchemaResponse
         return array_merge([
             'type' => 'column',
             'components' => $components,
+            'children' => $components,
         ], $props);
     }
 
@@ -134,6 +214,7 @@ class SchemaResponse
         return array_merge([
             'type' => 'row',
             'components' => $components,
+            'children' => $components,
         ], $props);
     }
 
@@ -165,10 +246,32 @@ class SchemaResponse
 
     public static function text(?string $text, string $style = 'body_medium', array $props = []): array
     {
+        if (isset($props['color']) && (str_starts_with((string) $props['color'], 'theme.') || in_array($props['color'], ['text_primary', 'text_secondary', 'textPrimary', 'textSecondary', 'onSurface']))) {
+            unset($props['color']);
+        }
         return array_merge([
             'type' => 'text',
             'text' => (string) ($text ?? ''),
             'style' => $style,
+        ], $props);
+    }
+
+    public static function callout(string $text, string $variant = 'accent', array $props = []): array
+    {
+        return array_merge([
+            'type' => 'container',
+            'component_type' => 'callout',
+            'text' => $text,
+            'variant' => $variant,
+            'border_radius' => 6,
+            'padding' => [8, 12],
+            'margin' => [4, 0, 0, 0],
+            'components' => [
+                self::text($text, 'body_small', ['bold' => true, 'variant' => 'bodySmall']),
+            ],
+            'children' => [
+                self::text($text, 'body_small', ['bold' => true, 'variant' => 'bodySmall']),
+            ],
         ], $props);
     }
 
@@ -182,16 +285,22 @@ class SchemaResponse
 
     public static function badge(?string $label, ?string $color = '#10b981', string $style = 'subtle', array $props = []): array
     {
+        if ($color && str_starts_with($color, 'theme.')) {
+            $color = null;
+        }
         return array_merge([
             'type' => 'badge',
             'label' => (string) ($label ?? ''),
-            'color' => $color ?: '#10b981',
+            'text' => (string) ($label ?? ''),
             'badge_style' => $style,
-        ], $props);
+        ], $color ? ['color' => $color] : [], $props);
     }
 
     public static function icon(?string $icon, array $props = []): array
     {
+        if (isset($props['color']) && str_starts_with((string) $props['color'], 'theme.')) {
+            unset($props['color']);
+        }
         return array_merge([
             'type' => 'icon',
             'icon' => (string) ($icon ?? 'widgets') ?: 'widgets',
@@ -205,6 +314,17 @@ class SchemaResponse
         ], $props);
     }
 
+    public static function codeSnippet(string $code, ?string $description = null, array $props = []): array
+    {
+        $fieldId = 'endpoint_'.substr(md5($code), 0, 8);
+        return self::textInput($fieldId, $description ?: $code, $code, array_merge([
+            'read_only' => true,
+            'copyable' => true,
+            'copy_tooltip' => 'Copy to clipboard',
+            'copy_toast' => 'Copied to clipboard!',
+        ], $props));
+    }
+
     // =========================================================================
     // Form & Input Primitives
     // =========================================================================
@@ -216,6 +336,7 @@ class SchemaResponse
             'name' => $name,
             'label' => $label,
             'initial_value' => (string) ($initialValue ?? ''),
+            'value' => (string) ($initialValue ?? ''),
         ], $props);
     }
 
@@ -427,11 +548,32 @@ class SchemaResponse
     ): array {
         return array_merge([
             'type' => 'customer_selector',
+            'component_type' => 'customer_search_picker',
             'name' => $name,
             'label' => $label,
             'search_endpoint' => $searchEndpoint,
+            'endpoint' => $searchEndpoint,
+            'query_param' => 'q',
+            'min_chars' => 1,
             'fields' => $fields,
             'placeholder' => 'Search existing client by name, phone or email...',
+            'autofill_targets' => [
+                'customer_id'   => 'id',
+                'contact_name'  => 'name',
+                'client_name'   => 'name',
+                'phone_number'  => 'phone',
+                'email_address' => 'email',
+                'company_name'  => 'company_name',
+            ],
+            'style' => [
+                'dropdownBackgroundColor' => 'theme.surface',
+                'dropdown_surface'        => '#1E293B',
+                'popup_background'        => '#1E293B',
+                'dropdownItemHover'       => 'theme.surfaceVariant',
+                'borderColor'             => 'theme.divider',
+                'border_color'            => '#334155',
+                'backgroundColor'         => 'theme.surface',
+            ],
         ], $props);
     }
 
@@ -468,6 +610,52 @@ class SchemaResponse
             'initial_value' => $initialValue,
             'min' => $min,
             'max' => $max,
+        ], $props);
+    }
+
+    public static function entityRecordCard(array $config): array
+    {
+        return array_merge([
+            'type' => 'entity_record_card',
+        ], $config);
+    }
+
+    public static function pipelineStageTracker(array $stages, string|int $currentStage, array $props = []): array
+    {
+        return array_merge([
+            'type' => 'pipeline_stage_tracker',
+            'stages' => array_values($stages),
+            'current_stage' => $currentStage,
+        ], $props);
+    }
+
+    public static function progressBarStat(string $label, float|int $percentage, ?string $value = null, ?string $count = null, array $props = []): array
+    {
+        return array_merge([
+            'type' => 'progress_bar_stat',
+            'label' => $label,
+            'percentage' => $percentage,
+            'value' => $value,
+            'count' => $count,
+        ], $props);
+    }
+
+    public static function segmentedFilterChips(array $chips, ?string $selectedId = null, array $props = []): array
+    {
+        return array_merge([
+            'type' => 'segmented_filter_chips',
+            'chips' => array_values($chips),
+            'selected_id' => $selectedId,
+        ], $props);
+    }
+
+    public static function fabAction(string $icon, array $action, ?string $label = null, array $props = []): array
+    {
+        return array_merge([
+            'type' => 'fab_action',
+            'icon' => $icon,
+            'action' => $action,
+            'label' => $label,
         ], $props);
     }
 
@@ -536,6 +724,22 @@ class SchemaResponse
         ], $props);
     }
 
+    public static function chip(string $label, ?array $action = null, bool $selected = false, array $props = []): array
+    {
+        return array_merge([
+            'type' => 'chip',
+            'label' => $label,
+            'selected' => $selected,
+            'action' => $action,
+            'dense' => true,
+            'border_radius' => 12,
+            'selected_color' => '#166534',
+            'background_color' => $selected ? '#166534' : '#1E293B',
+            'text_color' => $selected ? '#ffffff' : '#F8FAFC',
+            'border_color' => $selected ? '#22c55e' : '#334155',
+        ], $props);
+    }
+
     /**
      * Payload for the native `show_post_sale_sheet` action — everything the
      * Flutter client needs to drive its own bottom sheet (Preview & Print,
@@ -592,7 +796,7 @@ class SchemaResponse
             'customer_name' => (string) ($sale->customer?->name ?? $sale->customer_name ?? ''),
             'customer_phone' => preg_replace('/[^0-9+]/', '', (string) ($sale->customer?->phone ?? $sale->customer_phone ?? '')),
             'customer_email' => (string) ($sale->customer?->email ?? ''),
-            'company_name' => (string) ($company?->trade_name ?: $company?->name ?: ''),
+            'company_name' => (string) ($company?->display_name ?: ''),
             'currency_symbol' => $currency,
             'total' => $total,
             'subtotal' => $subtotal,
@@ -910,6 +1114,17 @@ class SchemaResponse
         ];
     }
 
+    public static function sheet(string $title, array $components, string $layout = 'scroll_view', array $options = []): array
+    {
+        return array_merge([
+            'type' => 'sheet',
+            'schema_version' => self::SCHEMA_VERSION,
+            'title' => $title,
+            'layout' => $layout,
+            'components' => $components,
+        ], $options);
+    }
+
     /**
      * Multi-step form wizard. Each step is ['title' => ..., 'subtitle' => ...,
      * 'components' => [...]]. All steps share one form scope on the client, and
@@ -1039,7 +1254,7 @@ class SchemaResponse
             }
         }
 
-        return self::screen($company->trade_name ?: $company->name, [
+        return self::screen($company->display_name, [
             self::gridView($items, 2),
         ]);
     }
@@ -1116,7 +1331,7 @@ class SchemaResponse
                 self::text('Your public trading name, tax registration ID, and contact details.', 'body_small', ['color' => '#6b7280']),
                 self::divider(),
                 self::textInput('name', 'Business Name', $company->name, ['required' => true]),
-                self::textInput('trade_name', 'Trading Name (DBA)', $company->trade_name),
+                self::textInput('trade_name', 'Trading Name (DBA)', Company::isDemoPlaceholderName($company->trade_name) ? $company->name : $company->trade_name),
                 self::textInput('tax_id', 'Tax ID / GSTIN / VAT', $company->tax_id),
                 self::textInput('email', 'Store Email', $company->email, ['keyboard_type' => 'email']),
                 self::textInput('phone', 'Store Phone', $company->phone, ['keyboard_type' => 'phone']),
@@ -1353,19 +1568,315 @@ class SchemaResponse
 
     public static function restaurantTablesView(Company $company): array
     {
+        $floors = DiningFloor::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['tables' => function ($q) {
+                $q->withoutGlobalScope('company')->with('currentSale');
+            }])
+            ->orderBy('order_index')
+            ->get();
+
+        $currency = $company->currency_symbol ?: '$';
+        $statusColors = [
+            'available' => '#10b981',
+            'occupied' => '#f59e0b',
+            'reserved' => '#3b82f6',
+            'billed' => '#8b5cf6',
+        ];
+
+        $allTablesCount = 0;
+        $occupiedCount = 0;
+        $availableCount = 0;
+        $floorSections = [];
+
+        foreach ($floors as $floor) {
+            $tableCards = [];
+            foreach ($floor->tables as $table) {
+                $allTablesCount++;
+                $status = strtolower((string) ($table->status ?: 'available'));
+                if ($status === 'occupied') {
+                    $occupiedCount++;
+                } elseif ($status === 'available') {
+                    $availableCount++;
+                }
+
+                $badgeColor = $statusColors[$status] ?? '#64748b';
+                $currentSale = $table->currentSale;
+                $actionSheetUrl = "/api/tenant/tables/{$table->id}/actions-sheet";
+
+                $cardRows = [
+                    self::row([
+                        self::row([
+                            self::icon('table_restaurant', ['color' => $badgeColor, 'size' => 22]),
+                            self::column([
+                                self::text("{$table->table_number}", 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
+                                self::text("{$table->seating_capacity} Seats", 'body_small', ['color' => '#94A3B8']),
+                            ]),
+                        ], ['spacing' => 8]),
+                        self::row([
+                            self::badge(strtoupper($status), $badgeColor, 'solid'),
+                            // Explicit more_vert menu button opening action sheet (/tables/{id}/actions-sheet)
+                            self::buttonOutlined(
+                                '',
+                                self::openRemoteSheetAction($actionSheetUrl, "Table {$table->table_number} Actions"),
+                                'more_vert',
+                                ['dense' => true, 'full_width' => false, 'border_radius' => 20]
+                            ),
+                        ], ['spacing' => 4]),
+                    ], ['main_axis_alignment' => 'space_between', 'cross_axis_alignment' => 'center']),
+                ];
+
+                if ($currentSale && $status !== 'available') {
+                    $cardRows[] = self::divider();
+                    $cardRows[] = self::row([
+                        self::column([
+                            self::text($currentSale->sale_number, 'label_small', ['color' => '#94A3B8']),
+                            self::text("Guests: {$table->guest_count}", 'body_small', ['color' => '#94A3B8']),
+                        ]),
+                        self::text($currency.number_format((float) $currentSale->total, 2), 'title_medium', ['bold' => true, 'color' => '#10b981']),
+                    ], ['main_axis_alignment' => 'space_between']);
+                }
+
+                $tableCards[] = self::card($cardRows, [
+                    'color' => '#1E293B',
+                    'border_color' => $status === 'occupied' ? '#f59e0b' : '#334155',
+                    'border_radius' => 14,
+                    'padding' => 12,
+                ]);
+            }
+
+            $floorSections[] = self::card([
+                self::row([
+                    self::icon('apartment', ['color' => '#3b82f6', 'size' => 20]),
+                    self::text($floor->name, 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
+                    self::badge(count($tableCards).' Tables', '#3b82f6', 'subtle'),
+                ], ['spacing' => 8]),
+                self::divider(),
+                self::column(! empty($tableCards) ? $tableCards : [
+                    self::text('No tables placed on this floor yet.', 'body_medium', ['color' => '#94A3B8']),
+                ]),
+            ], ['color' => '#0F172A', 'border_color' => '#334155', 'border_radius' => 16]);
+        }
+
         return self::screen('Floor Plan & Tables', [
             self::card([
                 self::row([
-                    self::icon('table_restaurant', ['color' => '#4d7c0f', 'size' => 28]),
+                    self::icon('table_restaurant', ['color' => '#10b981', 'size' => 28]),
                     self::column([
-                        self::text('Floor Plan & Table Management', 'title_medium', ['bold' => true]),
-                        self::text('Live dining tables, occupancy status, and active order tickets.', 'body_small', ['color' => '#64748b']),
+                        self::text('Floor Plan & Table Management', 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
+                        self::text("{$allTablesCount} Tables Total · {$availableCount} Available · {$occupiedCount} Occupied", 'body_small', ['color' => '#94A3B8']),
                     ]),
-                ]),
-                self::divider(),
-                self::badge('Restaurant Operations Active', '#4d7c0f', 'subtle'),
-            ]),
+                ], ['spacing' => 10]),
+            ], ['color' => '#1E293B', 'border_color' => '#334155', 'border_radius' => 16]),
+            ...$floorSections,
         ]);
+    }
+
+    /**
+     * Bottom Action Sheet for a single dining table (/tables/{id}/actions-sheet).
+     */
+    public static function tableActionsSheet(DiningTable $table, Company $company): array
+    {
+        $table->loadMissing(['floor', 'currentSale']);
+        $status = strtolower((string) ($table->status ?: 'available'));
+        $statusColors = [
+            'available' => '#10b981',
+            'occupied' => '#f59e0b',
+            'reserved' => '#3b82f6',
+            'billed' => '#8b5cf6',
+        ];
+        $badgeColor = $statusColors[$status] ?? '#64748b';
+        $currency = $company->currency_symbol ?: '$';
+
+        $headerComponents = [
+            self::row([
+                self::icon('table_restaurant', ['color' => $badgeColor, 'size' => 28]),
+                self::column([
+                    self::text("Table {$table->table_number}", 'title_large', ['bold' => true, 'color' => '#F8FAFC']),
+                    self::text(($table->floor?->name ?: 'Dining Area')." · Capacity: {$table->seating_capacity} seats", 'body_small', ['color' => '#94A3B8']),
+                ]),
+                self::badge(strtoupper($status), $badgeColor, 'solid'),
+            ], ['main_axis_alignment' => 'space_between']),
+        ];
+
+        $currentSale = $table->currentSale;
+        if ($currentSale && $status !== 'available') {
+            $itemCount = is_array($currentSale->items) ? count($currentSale->items) : 0;
+            $headerComponents[] = self::divider();
+            $headerComponents[] = self::container([
+                self::row([
+                    self::column([
+                        self::text("Active Order: {$currentSale->sale_number}", 'label_large', ['bold' => true, 'color' => '#F8FAFC']),
+                        self::text("Guest Count: {$table->guest_count} · {$itemCount} items ordered", 'body_small', ['color' => '#94A3B8']),
+                    ]),
+                    self::text($currency.number_format((float) $currentSale->total, 2), 'title_large', ['bold' => true, 'color' => '#10b981']),
+                ], ['main_axis_alignment' => 'space_between']),
+            ], [
+                'color' => '#0F172A',
+                'border_color' => '#334155',
+                'padding' => 12,
+                'border_radius' => 12,
+            ]);
+        }
+
+        $actions = [];
+
+        // 1. Take Order / Open POS for this table
+        $actions[] = self::buttonPrimary(
+            $currentSale ? 'Add More Items / Order POS' : 'Take Order / Open POS',
+            self::openRemoteSheetAction("/api/tenant/pos/checkout-sheet?module=restaurant&table_id={$table->id}", "Table {$table->table_number} Cart"),
+            'add_shopping_cart',
+            ['background_color' => '#166534', 'border_radius' => 12]
+        );
+
+        // 2. Settle Bill (if occupied with sale)
+        if ($currentSale) {
+            $actions[] = self::buttonPrimary(
+                'Settle Bill & Free Table',
+                self::openRemoteSheetAction("/api/tenant/pos/checkout-sheet?module=restaurant&table_id={$table->id}&sale_id={$currentSale->id}", "Settle Table {$table->table_number}"),
+                'payments',
+                ['background_color' => '#0284c7', 'border_radius' => 12]
+            );
+        }
+
+        // 3. Quick Status Change Toggles
+        $statusOptions = [
+            ['label' => 'Mark Available', 'value' => 'available', 'icon' => 'check_circle', 'color' => '#10b981'],
+            ['label' => 'Mark Occupied', 'value' => 'occupied', 'icon' => 'people', 'color' => '#f59e0b'],
+            ['label' => 'Mark Reserved', 'value' => 'reserved', 'icon' => 'bookmark', 'color' => '#3b82f6'],
+            ['label' => 'Mark Billed', 'value' => 'billed', 'icon' => 'receipt', 'color' => '#8b5cf6'],
+        ];
+
+        $statusButtons = [];
+        foreach ($statusOptions as $opt) {
+            if ($opt['value'] === $status) {
+                continue;
+            }
+            $statusButtons[] = self::buttonOutlined(
+                $opt['label'],
+                self::apiPostAction("/api/tenant/restaurant/tables/{$table->id}/status", ['status' => $opt['value']], "Table {$table->table_number} marked as {$opt['value']}", reload: true),
+                $opt['icon'],
+                ['dense' => true, 'full_width' => false, 'border_radius' => 10]
+            );
+        }
+
+        $components = [
+            self::card($headerComponents, ['color' => '#1E293B', 'border_color' => '#334155', 'border_radius' => 16]),
+            self::card([
+                self::text('Table Operations', 'label_large', ['bold' => true, 'color' => '#F8FAFC']),
+                self::divider(),
+                ...$actions,
+                self::text('Quick Status Change', 'body_small', ['color' => '#94A3B8']),
+                self::wrap($statusButtons, ['spacing' => 8]),
+            ], ['color' => '#1E293B', 'border_color' => '#334155', 'border_radius' => 16]),
+            self::buttonOutlined('Close Sheet', self::popAction(), 'close', ['border_radius' => 12]),
+        ];
+
+        return self::sheet("Table {$table->table_number} Actions", $components);
+    }
+
+    /**
+     * Thermal Print text formatter for KOT tickets.
+     */
+    public static function formatKotThermalText(KitchenTicket $kot, Company $company): string
+    {
+        $storeName = strtoupper($company->display_name ?: 'RESTAURANT');
+        $kotNumber = $kot->kot_number;
+        $tableOrType = $kot->table_name ?: ucfirst(str_replace('_', ' ', $kot->service_type));
+        $server = $kot->server_name ?: 'Staff';
+        $time = ($kot->sent_to_kitchen_at ?: now())->format('d M Y, h:i A');
+        $prepMins = (int) ($kot->prep_minutes ?: 15);
+        $alertMins = (int) ($kot->intimation_minutes ?: 0);
+        $targetTime = $kot->target_completion_at ? $kot->target_completion_at->format('h:i A') : now()->addMinutes($prepMins)->format('h:i A');
+
+        $lines = [];
+        $lines[] = '========================================';
+        $lines[] = str_pad($storeName, 40, ' ', STR_PAD_BOTH);
+        $lines[] = str_pad('KITCHEN ORDER TICKET (KOT)', 40, ' ', STR_PAD_BOTH);
+        $lines[] = '========================================';
+        $lines[] = sprintf('KOT: %-15s Table: %s', $kotNumber, $tableOrType);
+        $lines[] = sprintf('Server: %-12s Time: %s', $server, $time);
+        $lines[] = '----------------------------------------';
+        $lines[] = sprintf('%-4s %-24s %s', 'QTY', 'ITEM', 'NOTES');
+        $lines[] = '----------------------------------------';
+
+        foreach ((array) ($kot->items ?? []) as $item) {
+            $qty = $item['quantity'] ?? 1;
+            $name = mb_substr((string) ($item['name'] ?? 'Item'), 0, 24);
+            $note = $item['note'] ?? ($item['variant'] ?? '');
+            $lines[] = sprintf('%-4s %-24s %s', $qty, $name, $note ? mb_substr($note, 0, 10) : '');
+            if (! empty($item['modifiers']) && is_array($item['modifiers'])) {
+                foreach ($item['modifiers'] as $mod) {
+                    $modName = is_array($mod) ? ($mod['name'] ?? '') : (string) $mod;
+                    if ($modName) {
+                        $lines[] = '  + '.mb_substr($modName, 0, 35);
+                    }
+                }
+            }
+        }
+
+        $lines[] = '----------------------------------------';
+        $lines[] = sprintf('Estimated Prep: %d mins (Target: %s)', $prepMins, $targetTime);
+        if ($alertMins > 0) {
+            $lines[] = sprintf('Kitchen Alert: %d mins before expiry', $alertMins);
+        }
+        $lines[] = '========================================';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * SDUI Modal Bottom Sheet containing thermal ticket preview and direct TRIGGER_PRINT action.
+     */
+    public static function kotPrintModalSheet(KitchenTicket $kot, Company $company, ?string $thermalText = null): array
+    {
+        $thermalText = $thermalText ?: self::formatKotThermalText($kot, $company);
+        $kotNumber = $kot->kot_number;
+        $tableOrType = $kot->table_name ?: ucfirst(str_replace('_', ' ', $kot->service_type));
+
+        $components = [
+            self::row([
+                self::icon('soup_kitchen', ['color' => '#10b981', 'size' => 24]),
+                self::column([
+                    self::text("KOT Dispatched: {$kotNumber}", 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
+                    self::text("Destination: {$tableOrType}", 'body_small', ['color' => '#94A3B8']),
+                ]),
+                self::badge('IN KITCHEN', '#10b981', 'solid'),
+            ], ['main_axis_alignment' => 'space_between']),
+            self::divider(),
+            self::container([
+                self::text($thermalText, 'body_small', [
+                    'font_family' => 'monospace',
+                    'color' => '#E2E8F0',
+                    'line_height' => 1.3,
+                ]),
+            ], [
+                'color' => '#0F172A',
+                'border_color' => '#334155',
+                'padding' => 12,
+                'border_radius' => 12,
+            ]),
+            self::divider(),
+            self::row([
+                self::buttonPrimary('Print Thermal Ticket', [
+                    'type' => 'TRIGGER_PRINT',
+                    'action' => 'TRIGGER_PRINT',
+                    'target' => 'thermal_printer',
+                    'kot_id' => (string) $kot->id,
+                    'kot_number' => $kotNumber,
+                    'raw_text' => $thermalText,
+                    'endpoint' => "/api/tenant/restaurant/kot/{$kot->id}/print",
+                ], 'print', [
+                    'background_color' => '#166534',
+                    'border_radius' => 12,
+                ]),
+            ]),
+            self::buttonOutlined('Dismiss / Back to POS', self::popAction(), 'check', [
+                'border_radius' => 12,
+            ]),
+        ];
+
+        return self::sheet("Kitchen Order Ticket · {$kotNumber}", $components);
     }
 
     public static function restaurantKdsView(Company $company): array
@@ -3699,7 +4210,7 @@ class SchemaResponse
                     ]),
                 ]),
                 self::divider(),
-                self::wrap([
+                self::wrap(array_filter([
                     self::buttonPrimary('Convert to Sale', self::apiPostAction(
                         "/api/tenant/quotations/{$q->id}/convert",
                         [],
@@ -3712,7 +4223,50 @@ class SchemaResponse
                         'Opening quotation PDF...',
                         reload: false
                     ), 'print'),
-                ]),
+                    self::buttonOutlined('Share Quote', self::openModalAction("Share Quotation #{$q->sale_number}", (function () use ($company, $q, $currency) {
+                        $enabled = [];
+                        try {
+                            $enabled = app(TenantNotificationDispatcherService::class)->getEnabledChannels($company);
+                        } catch (\Throwable) {}
+
+                        $channelCheckboxes = [];
+                        if (! empty($enabled['whatsapp'])) {
+                            $channelCheckboxes[] = self::checkbox('channels[]', 'Send via WhatsApp', true);
+                        }
+                        if (! empty($enabled['sms'])) {
+                            $channelCheckboxes[] = self::checkbox('channels[]', 'Send via SMS', true);
+                        }
+                        if (! empty($enabled['email'])) {
+                            $channelCheckboxes[] = self::checkbox('channels[]', 'Send via Email (PDF Attached)', true);
+                        }
+
+                        $modal = [
+                            self::text("Dispatch Quotation #{$q->sale_number}", 'title_medium', ['bold' => true]),
+                            self::text("Total Amount: {$currency}".number_format((float) $q->total, 2), 'body_small', ['color' => '#64748b']),
+                            self::divider(),
+                        ];
+
+                        if (! empty($channelCheckboxes)) {
+                            $modal[] = self::text('Active Delivery Channels', 'label_medium', ['bold' => true]);
+                            $modal = array_merge($modal, $channelCheckboxes);
+                            $modal[] = self::divider();
+                        }
+
+                        $modal[] = self::textInput('recipient_phone', 'Recipient Mobile Number', (string) ($q->customer?->phone ?? ''), ['placeholder' => 'e.g. 919876543210', 'keyboard_type' => 'phone']);
+                        $modal[] = self::textInput('recipient_email', 'Recipient Email Address', (string) ($q->customer?->email ?? ''), ['placeholder' => 'client@example.com', 'keyboard_type' => 'email']);
+                        $modal[] = self::buttonPrimary('Dispatch Quotation', self::formSubmitAction(
+                            '/api/v1/tenant/notifications/dispatch',
+                            'POST',
+                            'Quotation proposal dispatched across configured channels!',
+                            payload: [
+                                'document_type' => 'quotation',
+                                'document_id' => (string) $q->id,
+                            ]
+                        ), 'send');
+
+                        return $modal;
+                    })()), 'share'),
+                ])),
             ]);
         }
 
@@ -3809,33 +4363,83 @@ class SchemaResponse
                     ]),
                 ]),
                 self::divider(),
-                self::wrap([
-                    self::buttonPrimary('Record Payment', self::openModalAction("Record Payment - {$c->name}", [
-                        self::text("Customer Khata Settlement: {$c->name}", 'title_medium', ['bold' => true]),
-                        self::text("Current Due Balance: {$currency}".number_format($due, 2), 'body_medium', ['color' => $due > 0 ? '#ef4444' : '#10b981']),
-                        self::divider(),
-                        self::textInput('amount', 'Payment Amount', $due > 0 ? number_format($due, 2, '.', '') : '0.00'),
-                        self::dropdownSelect('payment_method', 'Payment Mode', [
-                            ['label' => 'Cash Payment', 'value' => 'cash'],
-                            ['label' => 'Debit / Credit Card', 'value' => 'card'],
-                            ['label' => 'UPI / QR Code', 'value' => 'upi'],
-                            ['label' => 'Bank Transfer', 'value' => 'bank_transfer'],
-                        ], 'cash'),
-                        self::textInput('notes', 'Payment Reference / Note', 'Customer Khata settlement'),
-                        self::buttonPrimary('Confirm Settlement', self::formSubmitAction(
-                            "/api/tenant/customers/{$c->id}/payment",
+                self::wrap((function () use ($c, $due, $currency, $company) {
+                    $btns = [
+                        self::buttonPrimary('Record Payment', self::openModalAction("Record Payment - {$c->name}", [
+                            self::text("Customer Khata Settlement: {$c->name}", 'title_medium', ['bold' => true]),
+                            self::text("Current Due Balance: {$currency}".number_format($due, 2), 'body_medium', ['color' => $due > 0 ? '#ef4444' : '#10b981']),
+                            self::divider(),
+                            self::textInput('amount', 'Payment Amount', $due > 0 ? number_format($due, 2, '.', '') : '0.00'),
+                            self::dropdownSelect('payment_method', 'Payment Mode', [
+                                ['label' => 'Cash Payment', 'value' => 'cash'],
+                                ['label' => 'Debit / Credit Card', 'value' => 'card'],
+                                ['label' => 'UPI / QR Code', 'value' => 'upi'],
+                                ['label' => 'Bank Transfer', 'value' => 'bank_transfer'],
+                            ], 'cash'),
+                            self::textInput('notes', 'Payment Reference / Note', 'Customer Khata settlement'),
+                            self::buttonPrimary('Confirm Settlement', self::formSubmitAction(
+                                "/api/tenant/customers/{$c->id}/payment",
+                                'POST',
+                                'Customer payment recorded successfully.',
+                                reload: true
+                            ), 'check'),
+                        ]), 'payment'),
+                        self::buttonOutlined('Ledger', self::openModalAction("Ledger History - {$c->name}", [
+                            self::text("Khata Statement: {$c->name}", 'title_medium', ['bold' => true]),
+                            self::text("Outstanding Balance: {$currency}".number_format($due, 2), 'body_small', ['color' => '#64748b']),
+                            self::divider(),
+                            self::text('View complete ledger transactions and audit logs in financial reports.', 'body_medium'),
+                        ]), 'menu_book'),
+                    ];
+
+                    if ($due > 0) {
+                        $enabled = [];
+                        try {
+                            $enabled = app(TenantNotificationDispatcherService::class)->getEnabledChannels($company);
+                        } catch (\Throwable) {}
+
+                        $remindChannels = [];
+                        if (! empty($enabled['whatsapp'])) {
+                            $remindChannels[] = self::checkbox('channels[]', 'Send via WhatsApp', true);
+                        }
+                        if (! empty($enabled['sms'])) {
+                            $remindChannels[] = self::checkbox('channels[]', 'Send via SMS', true);
+                        }
+                        if (! empty($enabled['email'])) {
+                            $remindChannels[] = self::checkbox('channels[]', 'Send via Email', true);
+                        }
+
+                        $remindModal = [
+                            self::text("Send Payment Due Reminder", 'title_medium', ['bold' => true]),
+                            self::text("Customer: {$c->name}", 'body_medium'),
+                            self::text("Outstanding Due: {$currency}".number_format($due, 2), 'body_large', ['bold' => true, 'color' => '#dc2626']),
+                            self::divider(),
+                        ];
+
+                        if (! empty($remindChannels)) {
+                            $remindModal[] = self::text('Active Delivery Channels', 'label_medium', ['bold' => true]);
+                            $remindModal = array_merge($remindModal, $remindChannels);
+                            $remindModal[] = self::divider();
+                        }
+
+                        $remindModal[] = self::textInput('recipient_phone', 'Customer Mobile Number', (string) ($c->phone ?? ''), ['placeholder' => 'e.g. 919876543210', 'keyboard_type' => 'phone']);
+                        $remindModal[] = self::textInput('recipient_email', 'Customer Email Address', (string) ($c->email ?? ''), ['placeholder' => 'client@example.com', 'keyboard_type' => 'email']);
+                        $remindModal[] = self::buttonPrimary('Send Due Reminder', self::formSubmitAction(
+                            '/api/v1/tenant/notifications/dispatch',
                             'POST',
-                            'Customer payment recorded successfully.',
-                            reload: true
-                        ), 'check'),
-                    ]), 'payment'),
-                    self::buttonOutlined('Ledger', self::openModalAction("Ledger History - {$c->name}", [
-                        self::text("Khata Statement: {$c->name}", 'title_medium', ['bold' => true]),
-                        self::text("Outstanding Balance: {$currency}".number_format($due, 2), 'body_small', ['color' => '#64748b']),
-                        self::divider(),
-                        self::text('View complete ledger transactions and audit logs in financial reports.', 'body_medium'),
-                    ]), 'menu_book'),
-                ]),
+                            'Due reminder dispatched successfully!',
+                            payload: [
+                                'document_type' => 'due_reminder',
+                                'customer_id' => (string) $c->id,
+                                'due_amount' => $due,
+                            ]
+                        ), 'notification_important');
+
+                        $btns[] = self::buttonOutlined('Due Reminder', self::openModalAction("Send Reminder - {$c->name}", $remindModal), 'notification_important');
+                    }
+
+                    return $btns;
+                })()),
             ]);
         }
 
@@ -3929,9 +4533,9 @@ class SchemaResponse
                 self::row([
                     self::icon('savings', ['color' => $isOpen ? '#10b981' : '#64748b', 'size' => 24]),
                     self::column([
-                        self::text("Shift #{$reg->id} • {$openerName}", 'title_medium', ['bold' => true]),
-                        self::text("Opened: {$openedText}", 'body_small', ['color' => '#64748b']),
-                        self::text("Closed: {$closedText}", 'body_small', ['color' => '#94a3b8']),
+                        self::text("Shift #{$reg->id} • {$openerName}", 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
+                        self::text("Opened: {$openedText}", 'body_small', ['color' => '#94A3B8']),
+                        self::text("Closed: {$closedText}", 'body_small', ['color' => '#94A3B8']),
                     ]),
                     self::column([
                         $regBadge,
@@ -3940,10 +4544,10 @@ class SchemaResponse
                 ]),
                 self::divider(),
                 self::row([
-                    self::text("Opening: {$currency}".number_format((float) $reg->opening_balance, 2), 'body_small'),
-                    self::text("Closing: {$currency}".number_format((float) ($reg->counted_closing_balance ?? $reg->expected_closing_balance ?? 0), 2), 'body_small', ['bold' => true]),
+                    self::text("Opening: {$currency}".number_format((float) $reg->opening_balance, 2), 'body_small', ['color' => '#94A3B8']),
+                    self::text("Closing: {$currency}".number_format((float) ($reg->counted_closing_balance ?? $reg->expected_closing_balance ?? 0), 2), 'body_small', ['bold' => true, 'color' => '#F8FAFC']),
                 ], ['main_axis_alignment' => 'space_between']),
-            ]);
+            ], ['color' => '#1E293B', 'border_color' => '#334155', 'border_radius' => 12]);
         }
 
         $activeSectionComponents = [];
@@ -3953,25 +4557,25 @@ class SchemaResponse
                     self::icon('point_of_sale', ['color' => '#10b981', 'size' => 28]),
                     self::column([
                         self::text('Register Shift Open', 'title_medium', ['bold' => true, 'color' => '#10b981']),
-                        self::text("Opened by {$activeRegister->opener?->name} at {$activeRegister->opened_at?->format('M d, Y · h:i A')}", 'body_small', ['color' => '#64748b']),
+                        self::text("Opened by {$activeRegister->opener?->name} at {$activeRegister->opened_at?->format('M d, Y · h:i A')}", 'body_small', ['color' => '#94A3B8']),
                     ]),
                     self::badge('ACTIVE', '#10b981', 'solid'),
                 ], ['main_axis_alignment' => 'space_between']),
                 self::divider(),
                 self::gridView([
                     self::card([
-                        self::text('Opening Cash Float', 'label_medium', ['color' => '#64748b']),
-                        self::text($currency.number_format((float) $activeRegister->opening_balance, 2), 'title_large', ['bold' => true, 'color' => '#0f766e']),
-                    ]),
+                        self::text('Opening Cash Float', 'label_medium', ['color' => '#94A3B8']),
+                        self::text($currency.number_format((float) $activeRegister->opening_balance, 2), 'title_large', ['bold' => true, 'color' => '#F8FAFC']),
+                    ], ['color' => '#1E293B', 'border_color' => '#334155', 'border_radius' => 12]),
                     self::card([
-                        self::text('Expected Drawer Cash', 'label_medium', ['color' => '#64748b']),
+                        self::text('Expected Drawer Cash', 'label_medium', ['color' => '#94A3B8']),
                         self::text($currency.number_format((float) $activeRegister->expected_closing_balance, 2), 'title_large', ['bold' => true, 'color' => '#10b981']),
-                    ]),
+                    ], ['color' => '#1E293B', 'border_color' => '#334155', 'border_radius' => 12]),
                 ], 2),
                 self::divider(),
                 self::wrap([
                     self::buttonPrimary('Cash In / Cash Out', self::openModalAction('Record Drawer Transaction', [
-                        self::text('Cash Drawer Deposit / Withdrawal', 'title_medium', ['bold' => true]),
+                        self::text('Cash Drawer Deposit / Withdrawal', 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
                         self::divider(),
                         self::dropdownSelect('type', 'Transaction Type', [
                             ['label' => 'Cash In (Deposit / Float Add)', 'value' => 'cash_in'],
@@ -3993,8 +4597,8 @@ class SchemaResponse
                         ), 'check'),
                     ]), 'payments'),
                     self::buttonOutlined('Close Register / End Shift', self::openModalAction('Close Cash Register Shift', [
-                        self::text('End Shift & Reconcile Cash Drawer', 'title_medium', ['bold' => true]),
-                        self::text("Expected Cash in Drawer: {$currency}".number_format((float) $activeRegister->expected_closing_balance, 2), 'body_medium', ['color' => '#0f766e']),
+                        self::text('End Shift & Reconcile Cash Drawer', 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
+                        self::text("Expected Cash in Drawer: {$currency}".number_format((float) $activeRegister->expected_closing_balance, 2), 'body_medium', ['color' => '#10b981']),
                         self::divider(),
                         self::textInput('counted_closing_balance', 'Physical Counted Cash in Drawer', number_format((float) $activeRegister->expected_closing_balance, 2, '.', '')),
                         self::textInput('notes', 'Shift Closing Remarks', 'Shift completed successfully.'),
@@ -4012,14 +4616,14 @@ class SchemaResponse
                 self::row([
                     self::icon('lock', ['color' => '#f59e0b', 'size' => 28]),
                     self::column([
-                        self::text('Cash Drawer is Closed', 'title_medium', ['bold' => true]),
-                        self::text('No active cashier shift is running on this terminal. Open the drawer to begin.', 'body_small', ['color' => '#64748b']),
+                        self::text('Cash Drawer is Closed', 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
+                        self::text('No active cashier shift is running on this terminal. Open the drawer to begin.', 'body_small', ['color' => '#94A3B8']),
                     ]),
                     self::badge('CLOSED', '#64748b', 'subtle'),
                 ], ['main_axis_alignment' => 'space_between']),
                 self::divider(),
                 self::buttonPrimary('Open Cash Register Shift', self::openModalAction('Start Cashier Shift', [
-                    self::text('Open Register & Declare Opening Float', 'title_medium', ['bold' => true]),
+                    self::text('Open Register & Declare Opening Float', 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
                     self::divider(),
                     self::textInput('opening_balance', 'Opening Cash Float', '0.00'),
                     self::textInput('opening_notes', 'Shift Notes (Optional)', 'Morning Shift'),
@@ -4034,14 +4638,14 @@ class SchemaResponse
         }
 
         return self::screen('Cash Register & Shifts', [
-            self::card($activeSectionComponents),
+            self::card($activeSectionComponents, ['color' => '#1E293B', 'border_color' => '#334155', 'border_radius' => 16]),
 
             self::card([
-                self::text('Shift & Register History', 'title_medium', ['bold' => true]),
+                self::text('Shift & Register History', 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
                 self::column(! empty($historyCards) ? $historyCards : [
-                    self::text('No past register shifts found.', 'body_medium', ['color' => '#64748b']),
+                    self::text('No past register shifts found.', 'body_medium', ['color' => '#94A3B8']),
                 ]),
-            ]),
+            ], ['color' => '#1E293B', 'border_color' => '#334155', 'border_radius' => 16]),
         ]);
     }
 
@@ -4696,6 +5300,20 @@ class SchemaResponse
                 ], 'left'),
                 self::text('Theme mode, page transition and menu placement are stored per device — the desktop / mobile app applies them the moment you change them.', 'body_small', ['color' => '#94a3b8']),
             ]),
+            self::card([
+                self::row([
+                    self::icon('notifications_active', ['color' => '#10B981', 'size' => 24]),
+                    self::column([
+                        self::text('Notifications & Audio Alerts', 'title_medium', ['bold' => true]),
+                        self::text('Custom sound alerts, recurring alarms, and vibration for delayed orders, online orders, invoices and stock alerts.', 'body_small', ['color' => '#94a3b8']),
+                    ], ['expanded' => true, 'spacing' => 2]),
+                ], ['spacing' => 10, 'cross_axis_alignment' => 'center']),
+                self::divider(),
+                self::buttonPrimary('Manage Sound & Alert Preferences', self::navigateAction(
+                    '/api/v1/tenant/settings/app-preferences/notifications',
+                    title: 'Notification Preferences'
+                ), 'volume_up'),
+            ]),
         ]);
     }
 
@@ -4964,35 +5582,580 @@ class SchemaResponse
         $platform = $configuration->get('webhook_platform', 'shopify');
         $outboundEvents = json_decode($configuration->get('outbound_events', '[]'), true) ?: [];
 
-        return self::screen('API & Integrations', [
+        return self::apiIntegrationsTabbedView($company);
+    }
+
+    /**
+     * Server-Driven UI Tabbed Layout for API & Integrations screen.
+     * Mirrors Store Profile tabbed architecture (WhatsApp, SMS, Custom SMTP, Custom Webhook, E-Commerce).
+     */
+    public static function apiIntegrationsTabbedView(Company $company): array
+    {
+        $tabParam = strtolower(trim((string) request('tab', '')));
+        $initialIndex = match ($tabParam) {
+            'sms', 'sms-gateways', 'sms_gateways' => 1,
+            'smtp', 'email', 'email_smtp', 'email-smtp', 'mail' => 2,
+            'webhook', 'webhooks', 'custom_webhook', 'custom-webhook' => 3,
+            'ai', 'ai_studio', 'ai-studio', 'ai_vision', 'ai-vision', 'vision' => 4,
+            'developer', 'developer_api', 'developer-api', 'api_keys', 'api-keys', 'ecommerce', 'rest', 'rest_api' => 5,
+            default => 0,
+        };
+
+        $tabItems = [
+            [
+                'id' => 'whatsapp',
+                'label' => 'WhatsApp Business',
+                'title' => 'WhatsApp Business',
+                'icon' => 'chat',
+                'endpoint' => '/api/v1/tenant/api-integrations/whatsapp',
+                'components' => self::apiWhatsAppTab($company),
+                'children' => self::apiWhatsAppTab($company),
+            ],
+            [
+                'id' => 'sms',
+                'label' => 'SMS Gateways',
+                'title' => 'SMS Gateways',
+                'icon' => 'sms',
+                'endpoint' => '/api/v1/tenant/api-integrations/sms',
+                'components' => self::apiSmsTab($company),
+                'children' => self::apiSmsTab($company),
+            ],
+            [
+                'id' => 'smtp',
+                'label' => 'Custom SMTP',
+                'title' => 'Custom SMTP',
+                'icon' => 'mail',
+                'endpoint' => '/api/v1/tenant/api-integrations/email',
+                'components' => self::apiSmtpTab($company),
+                'children' => self::apiSmtpTab($company),
+            ],
+            [
+                'id' => 'webhook',
+                'label' => 'Custom Webhook',
+                'title' => 'Custom Webhook',
+                'icon' => 'webhook',
+                'endpoint' => '/api/v1/tenant/api-integrations/custom_webhook',
+                'components' => self::apiWebhookTab($company),
+                'children' => self::apiWebhookTab($company),
+            ],
+            [
+                'id' => 'ai_studio',
+                'label' => 'AI Studio & Vision',
+                'title' => 'AI Studio & Vision',
+                'icon' => 'auto_awesome',
+                'endpoint' => '/api/v1/tenant/settings/ai-studio',
+                'components' => self::apiAiStudioTab($company),
+                'children' => self::apiAiStudioTab($company),
+            ],
+            [
+                'id' => 'developer_api',
+                'label' => 'Developer & REST API',
+                'title' => 'Developer & REST API',
+                'icon' => 'vpn_key',
+                'endpoint' => '/api/tenant/settings/api',
+                'components' => self::apiDeveloperTab($company),
+                'children' => self::apiDeveloperTab($company),
+            ],
+        ];
+
+        $tabViews = [
+            'whatsapp' => [
+                'type' => 'Form',
+                'endpoint' => '/api/v1/tenant/api-integrations/whatsapp',
+                'method' => 'POST',
+                'children' => $tabItems[0]['components'],
+                'components' => $tabItems[0]['components'],
+            ],
+            'sms' => [
+                'type' => 'Form',
+                'endpoint' => '/api/v1/tenant/api-integrations/sms',
+                'method' => 'POST',
+                'children' => $tabItems[1]['components'],
+                'components' => $tabItems[1]['components'],
+            ],
+            'smtp' => [
+                'type' => 'Form',
+                'endpoint' => '/api/v1/tenant/api-integrations/email',
+                'method' => 'POST',
+                'children' => $tabItems[2]['components'],
+                'components' => $tabItems[2]['components'],
+            ],
+            'webhook' => [
+                'type' => 'Form',
+                'endpoint' => '/api/v1/tenant/api-integrations/custom_webhook',
+                'method' => 'POST',
+                'children' => $tabItems[3]['components'],
+                'components' => $tabItems[3]['components'],
+            ],
+            'ai_studio' => [
+                'type' => 'Form',
+                'endpoint' => '/api/v1/tenant/settings/ai-studio',
+                'method' => 'POST',
+                'children' => $tabItems[4]['components'],
+                'components' => $tabItems[4]['components'],
+            ],
+            'developer_api' => [
+                'type' => 'Form',
+                'endpoint' => '/api/tenant/settings/api',
+                'method' => 'POST',
+                'children' => $tabItems[5]['components'],
+                'components' => $tabItems[5]['components'],
+            ],
+        ];
+
+        $tabsComponent = self::tabs($tabItems, ['initial_index' => $initialIndex, 'is_scrollable' => true]);
+
+        $screen = self::screen('API & Integrations', [
+            $tabsComponent,
+        ], 'tabs', ['key' => 'settings-api']);
+
+        $screen['screen'] = 'StoreSettingsScreen';
+        $screen['title'] = 'API & Integrations';
+        $screen['app_bar'] = [
+            'title' => 'API & Integrations',
+            'show_back_button' => true,
+            'actions' => [],
+        ];
+        $screen['layout'] = 'tabs';
+        $screen['is_scrollable'] = true;
+        $screen['initial_index'] = $initialIndex;
+        $screen['tabs'] = $tabItems;
+        $screen['tab_views'] = $tabViews;
+        $screen['components'] = [
+            $tabsComponent,
+        ];
+
+        return $screen;
+    }
+
+    /**
+     * Tab 1: WhatsApp Business (Meta Cloud API & Twilio WhatsApp).
+     */
+    private static function apiWhatsAppTab(Company $company): array
+    {
+        $gw = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('channel', TenantNotificationGateway::CHANNEL_WHATSAPP)
+            ->first();
+
+        $creds = (array) ($gw?->credentials ?? []);
+        if (empty($creds['phone_number_id'])) {
+            $creds['phone_number_id'] = Configuration::withoutGlobalScopes()->where('company_id', $company->id)->where('key', 'whatsapp_phone_number_id')->value('value') ?? '';
+        }
+        if (empty($creds['access_token'])) {
+            $creds['access_token'] = Configuration::withoutGlobalScopes()->where('company_id', $company->id)->where('key', 'whatsapp_access_token')->value('value') ?? '';
+        }
+        if (empty($creds['waba_id'])) {
+            $creds['waba_id'] = Configuration::withoutGlobalScopes()->where('company_id', $company->id)->where('key', 'whatsapp_business_account_id')->value('value') ?? '';
+        }
+
+        return [
             self::card([
-                self::text('Sanctum API Access', 'title_medium', ['bold' => true]),
-                self::text('Connect external ERPs, Shopify, WooCommerce, and mobile apps securely.', 'body_small', ['color' => '#6b7280']),
+                self::row([
+                    self::icon('chat', ['color' => '#16a34a', 'size' => 28]),
+                    self::column([
+                        self::text('WhatsApp Business Gateway', 'title_medium', ['bold' => true]),
+                        self::text('Send digital receipts, invoices, quotations, and due reminders directly via WhatsApp.', 'body_small', ['color' => '#94a3b8']),
+                    ]),
+                ], ['spacing' => 12]),
                 self::divider(),
-                self::text('Active Token Status: ENABLED', 'label_medium', ['bold' => true, 'color' => '#16a34a']),
+                self::toggleSwitch('whatsapp_is_enabled', 'Enable WhatsApp Notifications', (bool) ($gw?->is_enabled ?? false)),
+                self::dropdownSelect('whatsapp_provider', 'Active WhatsApp Provider', [
+                    ['label' => 'Meta WhatsApp Cloud API (Official)', 'value' => 'meta_cloud_api'],
+                    ['label' => 'Twilio WhatsApp API', 'value' => 'twilio'],
+                ], $gw?->provider ?? 'meta_cloud_api'),
             ]),
             self::card([
-                self::text('Integration Language & Localization', 'title_medium', ['bold' => true]),
-                self::text('Configure language defaults and multilingual serialization for external webhooks, SMS/WhatsApp receipts, and API payloads.', 'body_small', ['color' => '#6b7280']),
+                self::text('Meta WhatsApp Cloud API (Official)', 'title_medium', ['bold' => true]),
+                self::text('Official Meta Graph API integration with phone number ID and system user access token.', 'body_small', ['color' => '#94a3b8']),
                 self::divider(),
-                self::dropdownSelect('integration_default_locale', 'Default Communication Language', [
-                    ['label' => 'English (en)', 'value' => 'en'],
-                    ['label' => 'Hindi (hi)', 'value' => 'hi'],
-                    ['label' => 'Spanish (es)', 'value' => 'es'],
-                    ['label' => 'Arabic (ar)', 'value' => 'ar'],
-                    ['label' => 'French (fr)', 'value' => 'fr'],
-                    ['label' => 'German (de)', 'value' => 'de'],
-                    ['label' => 'Portuguese (pt)', 'value' => 'pt'],
-                    ['label' => 'Chinese (zh)', 'value' => 'zh'],
-                ], $configuration->get('integration_default_locale', 'en')),
-                self::toggleSwitch('integration_multilingual_payloads', 'Multi-Language Webhook Payloads', filter_var($configuration->get('integration_multilingual_payloads', false), FILTER_VALIDATE_BOOL)),
+                self::textInput('meta_phone_number_id', 'Phone Number ID', (string) ($creds['phone_number_id'] ?? ''), ['placeholder' => 'e.g. 104523456789012']),
+                self::textInput('meta_waba_id', 'WhatsApp Business Account ID (WABA ID)', (string) ($creds['waba_id'] ?? ''), ['placeholder' => 'e.g. 108765432109876']),
+                self::textInput('meta_access_token', 'Permanent System User Access Token', (string) ($creds['access_token'] ?? ''), ['placeholder' => 'EAAG...', 'is_password' => true]),
+                self::textInput('meta_template_namespace', 'Template Namespace / Name (Optional)', (string) ($creds['template_namespace'] ?? ''), ['placeholder' => 'e.g. store_receipt_v1']),
             ]),
             self::card([
-                self::text('E-Commerce Inbound Webhooks (Shopify / WooCommerce)', 'title_medium', ['bold' => true]),
-                self::text('Receive sales orders in real-time. Automatically decodes payloads, decrements inventory, creates kitchen tickets, and sends push alerts.', 'body_small', ['color' => '#6b7280']),
+                self::text('Twilio WhatsApp Alternative', 'title_medium', ['bold' => true]),
+                self::text('Deliver via Twilio Programmable Messaging WhatsApp sandbox or approved number.', 'body_small', ['color' => '#94a3b8']),
                 self::divider(),
-                self::textInput('inbound_webhook_url', 'Your Unique Webhook Endpoint URL', $inboundWebhookUrl, [
-                    'placeholder' => $inboundWebhookUrl,
+                self::textInput('twilio_account_sid', 'Twilio Account SID', (string) ($creds['account_sid'] ?? ''), ['placeholder' => 'AC...']),
+                self::textInput('twilio_auth_token', 'Twilio Auth Token', (string) ($creds['auth_token'] ?? ''), ['placeholder' => 'Auth Token', 'is_password' => true]),
+                self::textInput('twilio_from_number', 'Twilio WhatsApp Sender Number', (string) ($creds['from_number'] ?? ''), ['placeholder' => 'e.g. +14155238886']),
+            ]),
+            self::buttonPrimary('Save WhatsApp Credentials', self::formSubmitAction(
+                '/api/v1/tenant/api-integrations/whatsapp',
+                'POST',
+                'WhatsApp Business configuration saved successfully!'
+            ), 'save'),
+            self::card([
+                self::text('Test WhatsApp Connection', 'title_medium', ['bold' => true, 'color' => '#f8fafc']),
+                self::text('Send a live test verification ping to your mobile number.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::textInput('whatsapp_test_phone', 'Test Recipient Mobile Number', (string) ($company->phone ?? ''), ['placeholder' => 'e.g. 919876543210', 'keyboard_type' => 'phone']),
+                self::buttonOutlined('Send Test Message', self::formSubmitAction(
+                    '/api/v1/tenant/api-integrations/whatsapp/test',
+                    'POST',
+                    'Test WhatsApp message triggered!'
+                ), 'send', ['color' => '#10b981', 'border_color' => '#10b981']),
+            ], ['border_radius' => 16]),
+        ];
+    }
+
+    /**
+     * Tab 2: SMS Gateways (Twilio SMS, MSG91 India, Generic HTTP Gateway).
+     */
+    private static function apiSmsTab(Company $company): array
+    {
+        $gw = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('channel', TenantNotificationGateway::CHANNEL_SMS)
+            ->first();
+
+        $creds = (array) ($gw?->credentials ?? []);
+        $tenantSetting = function_exists('tenant_setting') ? tenant_setting($company->id, 'sms_gateway') : null;
+        if (is_string($tenantSetting)) {
+            $tenantSetting = json_decode($tenantSetting, true) ?: [];
+        }
+        if (is_array($tenantSetting)) {
+            if (empty($creds['url']) && ! empty($tenantSetting['gateway_url'])) {
+                $creds['url'] = $tenantSetting['gateway_url'];
+            }
+            if (empty($creds['method']) && ! empty($tenantSetting['method'])) {
+                $creds['method'] = $tenantSetting['method'];
+            }
+            if (empty($creds['api_key']) && ! empty($tenantSetting['api_token'])) {
+                $creds['api_key'] = $tenantSetting['api_token'];
+            }
+        }
+
+        if (empty($creds['url'])) {
+            $creds['url'] = 'https://sms.zoomnearby.com/api/v1/messages/send?phone={phone}&message={message}';
+        }
+        if (empty($creds['method'])) {
+            $creds['method'] = 'GET';
+        }
+        if (empty($creds['api_key'])) {
+            $creds['api_key'] = '4HIXpW0OPsnPpzzebeA5KI7rI4fnAi7utMu5jwYl8dada339';
+        }
+
+        $activeProvider = $gw?->provider ?? 'generic_http';
+        $isEnabled = (bool) ($gw?->is_enabled ?? true);
+        $testPhone = (string) ($company->phone ?: '+91 80 4111 8080');
+
+        return [
+            self::card([
+                self::row([
+                    self::icon('sms', ['color' => '#0284c7', 'size' => 28]),
+                    self::column([
+                        self::text('SMS Notification Gateways', 'title_medium', ['bold' => true]),
+                        self::text('Send transactional SMS for receipts, balance due reminders, and OTP alerts.', 'body_small', ['color' => '#94a3b8']),
+                    ]),
+                ], ['spacing' => 12]),
+                self::divider(),
+                self::toggleSwitch('sms_is_enabled', 'Enable SMS Notifications', $isEnabled),
+                self::dropdownSelect('sms_provider', 'Active SMS Provider', [
+                    ['label' => 'Twilio SMS Gateway', 'value' => 'twilio'],
+                    ['label' => 'MSG91 (India DLT Compliant)', 'value' => 'msg91'],
+                    ['label' => 'Generic HTTP REST SMS Gateway', 'value' => 'generic_http'],
+                ], $activeProvider),
+            ]),
+            self::card([
+                self::text('Twilio SMS Gateway', 'title_medium', ['bold' => true]),
+                self::text('Global SMS delivery via Twilio Programmable SMS.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::textInput('sms_twilio_sid', 'Twilio Account SID', (string) ($creds['account_sid'] ?? ''), ['placeholder' => 'AC...']),
+                self::textInput('sms_twilio_token', 'Twilio Auth Token', (string) ($creds['auth_token'] ?? ''), ['placeholder' => 'Auth Token', 'is_password' => true]),
+                self::textInput('sms_twilio_from', 'From Phone Number / Sender ID', (string) ($creds['from_number'] ?? ''), ['placeholder' => 'e.g. +12025550192']),
+            ]),
+            self::card([
+                self::text('MSG91 (India DLT Compliant)', 'title_medium', ['bold' => true]),
+                self::text('DLT compliant transactional SMS service for Indian telecom compliance.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::textInput('msg91_auth_key', 'MSG91 Auth Key', (string) ($creds['auth_key'] ?? ''), ['placeholder' => 'Auth Key', 'is_password' => true]),
+                self::textInput('msg91_sender_id', 'Approved 6-Character Sender ID', (string) ($creds['sender_id'] ?? ''), ['placeholder' => 'e.g. ZOOMNB']),
+                self::textInput('msg91_dlt_template_id', 'DLT Template / Flow ID', (string) ($creds['dlt_template_id'] ?? ''), ['placeholder' => 'e.g. 64b3...']),
+            ]),
+            self::card([
+                self::text('Generic HTTP SMS Gateway', 'title_medium', ['bold' => true]),
+                self::text('Integrate any REST SMS vendor using dynamic {phone} and {message} URL placeholders.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::textInput('generic_sms_url', 'Gateway Endpoint URL', (string) ($creds['url'] ?? ''), ['placeholder' => 'https://sms.zoomnearby.com/api/v1/messages/send?phone={phone}&message={message}']),
+                self::dropdownSelect('generic_sms_method', 'HTTP Method', [
+                    ['label' => 'POST', 'value' => 'POST'],
+                    ['label' => 'GET', 'value' => 'GET'],
+                ], $creds['method'] ?? 'GET'),
+                self::textInput('generic_sms_api_key', 'API Key / Bearer Token (Optional)', (string) ($creds['api_key'] ?? ''), ['is_password' => true]),
+            ]),
+            self::buttonPrimary('Save SMS Credentials', self::formSubmitAction(
+                '/api/v1/tenant/api-integrations/sms',
+                'POST',
+                'SMS gateway credentials saved successfully!'
+            ), 'save'),
+            self::card([
+                self::text('Test SMS Gateway', 'title_medium', ['bold' => true, 'color' => '#f8fafc']),
+                self::text('Dispatch a test SMS to confirm provider credentials and route deliverability.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::textInput('sms_test_phone', 'Test Recipient Mobile Number', $testPhone, ['placeholder' => '+91 80 4111 8080', 'keyboard_type' => 'phone']),
+                self::buttonOutlined('Send Test SMS', self::formSubmitAction(
+                    '/api/v1/tenant/api-integrations/sms/test',
+                    'POST',
+                    'Test SMS triggered!'
+                ), 'send', ['color' => '#10b981', 'border_color' => '#10b981']),
+            ], ['border_radius' => 16]),
+        ];
+    }
+
+    /**
+     * Tab 3: Custom SMTP Mailer.
+     */
+    private static function apiSmtpTab(Company $company): array
+    {
+        $gw = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('channel', TenantNotificationGateway::CHANNEL_EMAIL)
+            ->first();
+
+        $creds = (array) ($gw?->credentials ?? []);
+        if (empty($creds['host'])) {
+            $fallback = app(InvoiceDeliveryService::class)->getSmtpConfig($company);
+            $creds['host'] = $fallback['host'] ?? '';
+            $creds['port'] = $fallback['port'] ?? 587;
+            $creds['username'] = $fallback['username'] ?? '';
+            $creds['password'] = $fallback['password'] ?? '';
+            $creds['encryption'] = $fallback['encryption'] ?? 'tls';
+            $creds['from_address'] = $fallback['from_address'] ?? $company->email;
+            $creds['from_name'] = $fallback['from_name'] ?? $company->name;
+        }
+
+        return [
+            self::card([
+                self::row([
+                    self::icon('mail', ['color' => '#ea580c', 'size' => 28]),
+                    self::column([
+                        self::text('Custom SMTP Mail Server', 'title_medium', ['bold' => true]),
+                        self::text('Send branded PDF invoices, receipts, and quotations directly from your store email domain.', 'body_small', ['color' => '#94a3b8']),
+                    ]),
+                ], ['spacing' => 12]),
+                self::divider(),
+                self::toggleSwitch('smtp_is_enabled', 'Enable Custom SMTP Server', (bool) ($gw?->is_enabled ?? false)),
+                self::textInput('smtp_host', 'SMTP Host Server', (string) ($creds['host'] ?? ''), ['placeholder' => 'smtp.gmail.com or mail.yourstore.com']),
+                self::textInput('smtp_port', 'SMTP Port', (string) ($creds['port'] ?? 587), ['keyboard_type' => 'number', 'placeholder' => '587']),
+                self::dropdownSelect('smtp_encryption', 'Encryption Protocol', [
+                    ['label' => 'TLS (Port 587 - Recommended)', 'value' => 'tls'],
+                    ['label' => 'SSL (Port 465)', 'value' => 'ssl'],
+                    ['label' => 'None / Plain (Port 25)', 'value' => 'none'],
+                ], $creds['encryption'] ?? 'tls'),
+                self::textInput('smtp_username', 'SMTP Username / Login', (string) ($creds['username'] ?? ''), ['placeholder' => 'billing@yourstore.com']),
+                self::textInput('smtp_password', 'SMTP Password / App Password', (string) ($creds['password'] ?? ''), ['placeholder' => '••••••••••••', 'is_password' => true]),
+                self::textInput('smtp_from_address', 'From Email Address', (string) ($creds['from_address'] ?? $company->email), ['placeholder' => 'receipts@yourstore.com', 'keyboard_type' => 'email']),
+                self::textInput('smtp_from_name', 'From Display Name', (string) ($creds['from_name'] ?? $company->name), ['placeholder' => 'Store Name']),
+            ]),
+            self::buttonPrimary('Save SMTP Settings', self::formSubmitAction(
+                '/api/v1/tenant/api-integrations/email',
+                'POST',
+                'SMTP credentials saved successfully!'
+            ), 'save'),
+            self::card([
+                self::text('Test Mail Connection', 'title_medium', ['bold' => true, 'color' => '#f8fafc']),
+                self::text('Send a live verification email to check your server credentials.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::textInput('smtp_test_email', 'Test Recipient Email', (string) ($company->email ?? ''), ['placeholder' => 'you@example.com', 'keyboard_type' => 'email']),
+                self::buttonOutlined('Send Test Email', self::formSubmitAction(
+                    '/api/v1/tenant/api-integrations/email/test',
+                    'POST',
+                    'Test email dispatched!'
+                ), 'send', ['color' => '#10b981', 'border_color' => '#10b981']),
+            ], ['border_radius' => 16]),
+        ];
+    }
+
+    /**
+     * Tab 4: Custom Webhook Dispatcher.
+     */
+    private static function apiWebhookTab(Company $company): array
+    {
+        $gw = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('channel', TenantNotificationGateway::CHANNEL_WEBHOOK)
+            ->first();
+
+        $creds = (array) ($gw?->credentials ?? []);
+        $triggers = (array) ($creds['event_types'] ?? ['receipt_generated', 'invoice_created', 'quotation_sent', 'due_reminder']);
+
+        return [
+            self::card([
+                self::row([
+                    self::icon('webhook', ['color' => '#7c3aed', 'size' => 28]),
+                    self::column([
+                        self::text('Custom Webhook Dispatcher', 'title_medium', ['bold' => true]),
+                        self::text('Stream POS transactions and financial events to external endpoints in real-time.', 'body_small', ['color' => '#94a3b8']),
+                    ]),
+                ], ['spacing' => 12]),
+                self::divider(),
+                self::toggleSwitch('webhook_is_enabled', 'Enable Outbound Webhooks', (bool) ($gw?->is_enabled ?? false)),
+                self::textInput('webhook_url', 'Webhook Destination URL', (string) ($creds['url'] ?? ''), ['placeholder' => 'https://api.yourdomain.com/pos-events']),
+                self::dropdownSelect('webhook_method', 'HTTP Method', [
+                    ['label' => 'POST (JSON body)', 'value' => 'POST'],
+                    ['label' => 'PUT (JSON body)', 'value' => 'PUT'],
+                ], $creds['method'] ?? 'POST'),
+                self::textInput('webhook_secret', 'HMAC SHA-256 Secret Key', (string) ($creds['secret'] ?? ''), ['placeholder' => 'Shared secret key for signature verification', 'is_password' => true]),
+            ]),
+            self::card([
+                self::text('Subscribed Event Triggers', 'title_medium', ['bold' => true]),
+                self::text('Automatically dispatch signed payloads when these events occur in POS.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::checkbox('trigger_receipt_generated', 'receipt_generated (When POS sale is completed)', in_array('receipt_generated', $triggers, true)),
+                self::checkbox('trigger_invoice_created', 'invoice_created (When a tax invoice is created or updated)', in_array('invoice_created', $triggers, true)),
+                self::checkbox('trigger_quotation_sent', 'quotation_sent (When quotation estimate is shared)', in_array('quotation_sent', $triggers, true)),
+                self::checkbox('trigger_due_reminder', 'due_reminder (When customer due balance reminder is dispatched)', in_array('due_reminder', $triggers, true)),
+            ]),
+            self::buttonPrimary('Save Webhook Configuration', self::formSubmitAction(
+                '/api/v1/tenant/api-integrations/custom_webhook',
+                'POST',
+                'Webhook settings saved successfully!'
+            ), 'save'),
+            self::card([
+                self::text('Test Webhook Connection', 'title_medium', ['bold' => true, 'color' => '#f8fafc']),
+                self::text('Dispatch a signed test event to your webhook destination.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::buttonOutlined('Send Test Webhook Ping', self::formSubmitAction(
+                    '/api/v1/tenant/api-integrations/custom_webhook/test',
+                    'POST',
+                    'Test webhook ping dispatched!'
+                ), 'send', ['color' => '#10b981', 'border_color' => '#10b981']),
+            ], ['border_radius' => 16]),
+        ];
+    }
+
+    /**
+     * Tab 5: AI Studio & Vision (Exclusively for LLM & Image Generation models, presets, and API keys).
+     */
+    private static function apiAiStudioTab(Company $company): array
+    {
+        $configuration = Configuration::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->whereIn('key', [
+                'default_ai_provider', 'openai_model', 'gemini_model', 'claude_model',
+                'openai_api_key', 'gemini_api_key', 'claude_api_key',
+            ])
+            ->pluck('value', 'key');
+
+        $defaultAi = (string) $configuration->get('default_ai_provider', 'openai');
+        $openaiModel = (string) $configuration->get('openai_model', 'dall-e-3');
+        $geminiModel = (string) $configuration->get('gemini_model', 'imagen-3.0-generate-002');
+        $claudeModel = (string) $configuration->get('claude_model', 'claude-3-5-sonnet-20241022');
+
+        $hasOpenaiKey = ! empty($configuration->get('openai_api_key'));
+        $hasGeminiKey = ! empty($configuration->get('gemini_api_key'));
+        $hasClaudeKey = ! empty($configuration->get('claude_api_key'));
+
+        return [
+            self::card([
+                self::row([
+                    self::icon('auto_awesome', ['color' => '#9333ea', 'size' => 28]),
+                    self::column([
+                        self::text('Generative AI Studio & Vision Engine', 'title_medium', ['bold' => true]),
+                        self::text('Automate studio-grade commercial product imagery and descriptions from product titles and categories.', 'body_small', ['color' => '#94a3b8']),
+                    ]),
+                ], ['spacing' => 12]),
+                self::divider(),
+                self::dropdownSelect('default_ai_provider', 'Active Generative AI Provider', [
+                    ['label' => 'OpenAI (DALL-E 3 / GPT-4o Vision)', 'value' => 'openai'],
+                    ['label' => 'Google Gemini (1.5 Pro / Imagen 3)', 'value' => 'gemini'],
+                    ['label' => 'Anthropic Claude (3.5 Sonnet / Vision)', 'value' => 'claude'],
+                ], $defaultAi),
+            ], ['border_radius' => 16]),
+
+            self::card([
+                self::text('OpenAI Studio Settings', 'title_medium', ['bold' => true]),
+                self::text('High-definition neural generation via DALL-E 3 & GPT-4o Vision.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::dropdownSelect('openai_model', 'OpenAI Model Preset', [
+                    ['label' => 'DALL-E 3 (1024×1024) — High-Quality', 'value' => 'dall-e-3'],
+                    ['label' => 'DALL-E 2 (512×512) — Legacy Fast', 'value' => 'dall-e-2'],
+                    ['label' => 'GPT-4o Mini + DALL-E 3 — Fast Prompting', 'value' => 'gpt-4o-mini'],
+                    ['label' => 'GPT-4o Vision + DALL-E 3 — Multimodal', 'value' => 'gpt-4o'],
+                ], $openaiModel),
+                self::textInput('openai_api_key', 'OpenAI API Key', '', [
+                    'placeholder' => $hasOpenaiKey ? '•••••••••••• (Saved)' : 'sk-proj-...',
+                    'is_password' => true,
+                ]),
+            ], ['border_radius' => 16]),
+
+            self::card([
+                self::text('Google Gemini Studio Settings', 'title_medium', ['bold' => true]),
+                self::text('Google DeepMind multimodal generation with Imagen 3 & Gemini 1.5 Pro.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::dropdownSelect('gemini_model', 'Gemini Model Preset', [
+                    ['label' => 'Imagen 3 (Flagship Studio) — Latest', 'value' => 'imagen-3.0-generate-002'],
+                    ['label' => 'Gemini 1.5 Pro + Imagen 3 — Pro Multimodal', 'value' => 'gemini-1.5-pro'],
+                    ['label' => 'Gemini 1.5 Flash + Imagen 3 — Fast', 'value' => 'gemini-1.5-flash'],
+                    ['label' => 'Gemini 2.5 Flash + Imagen 3 — Hybrid', 'value' => 'gemini-2.5-flash'],
+                ], $geminiModel),
+                self::textInput('gemini_api_key', 'Google Gemini API Key', '', [
+                    'placeholder' => $hasGeminiKey ? '•••••••••••• (Saved)' : 'AIzaSy...',
+                    'is_password' => true,
+                ]),
+            ], ['border_radius' => 16]),
+
+            self::card([
+                self::text('Anthropic Claude Settings', 'title_medium', ['bold' => true]),
+                self::text('Claude reasoning engine for product cataloging and multimodal inspection.', 'body_small', ['color' => '#94a3b8']),
+                self::divider(),
+                self::dropdownSelect('claude_model', 'Claude Model Preset', [
+                    ['label' => 'Claude 3.5 Sonnet (Vision Specialist) — Stable', 'value' => 'claude-3-5-sonnet-20241022'],
+                    ['label' => 'Claude 3.7 Sonnet (Hybrid Reasoning) — Flagship', 'value' => 'claude-3-7-sonnet-latest'],
+                    ['label' => 'Claude 3 Haiku (Budget / High Speed) — Fast', 'value' => 'claude-3-haiku-20240307'],
+                ], $claudeModel),
+                self::textInput('claude_api_key', 'Anthropic Claude API Key', '', [
+                    'placeholder' => $hasClaudeKey ? '•••••••••••• (Saved)' : 'sk-ant-...',
+                    'is_password' => true,
+                ]),
+            ], ['border_radius' => 16]),
+
+            self::buttonPrimary('Save AI Studio Settings', self::formSubmitAction(
+                '/api/v1/tenant/settings/ai-studio',
+                'POST',
+                'AI Studio configuration saved successfully!'
+            ), 'save'),
+        ];
+    }
+
+    /**
+     * Tab 6: Developer & REST API (Bearer API Tokens, E-Commerce Platform Webhooks, cURL Quick Reference).
+     */
+    private static function apiDeveloperTab(Company $company): array
+    {
+        $configuration = Configuration::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->whereIn('key', [
+                'webhook_url', 'webhook_platform', 'webhook_hmac_secret',
+            ])
+            ->pluck('value', 'key');
+
+        $inboundWebhookUrl = url('/api/v1/integrations/webhooks/'.($company->unique_account_id ?: $company->id).'/orders');
+        $platform = (string) $configuration->get('webhook_platform', 'shopify');
+
+        $activeKey = TenantApiKey::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('active', true)
+            ->latest()
+            ->first();
+
+        $activeKeySnippet = $activeKey ? $activeKey->token : 'No active keys yet (click Regenerate Token)';
+
+        return [
+            // E-Commerce & External Platform Card
+            self::card([
+                self::row([
+                    self::icon('storefront', ['color' => '#2563eb', 'size' => 28]),
+                    self::column([
+                        self::text('E-Commerce & External Platform Integration', 'title_medium', ['bold' => true]),
+                        self::text('Receive inbound real-time order synchronizations from online storefronts.', 'body_small', ['color' => '#94a3b8']),
+                    ]),
+                ], ['spacing' => 12]),
+                self::divider(),
+                self::textInput('inbound_webhook_url', 'Your Inbound Webhook Endpoint URL', $inboundWebhookUrl, [
                     'read_only' => true,
                     'copyable' => true,
                     'copy_tooltip' => 'Copy webhook endpoint',
@@ -5000,41 +6163,81 @@ class SchemaResponse
                 ]),
                 self::dropdownSelect('webhook_platform', 'E-Commerce Platform', [
                     ['label' => 'Shopify (HMAC-SHA256)', 'value' => 'shopify'],
-                    ['label' => 'WooCommerce (HMAC-SHA256)', 'value' => 'woocommerce'],
-                    ['label' => 'Generic JSON / Custom Store', 'value' => 'generic'],
+                    ['label' => 'WooCommerce', 'value' => 'woocommerce'],
+                    ['label' => 'Custom Headless API', 'value' => 'generic'],
                 ], $platform),
-                self::textInput('webhook_hmac_secret', 'Webhook Secret / HMAC Key', $configuration->get('webhook_hmac_secret', ''), [
+                self::textInput('webhook_hmac_secret', 'Webhook Secret / HMAC Key', (string) $configuration->get('webhook_hmac_secret', ''), [
                     'placeholder' => 'Enter shared secret key for signature verification',
+                    'is_password' => true,
                 ]),
-            ]),
+                self::buttonPrimary('Save E-Commerce Settings', self::formSubmitAction(
+                    '/api/tenant/settings/api',
+                    'POST',
+                    'E-Commerce settings saved successfully!'
+                ), 'save'),
+            ], ['border_radius' => 16]),
+
+            // Active Bearer Token Card
             self::card([
-                self::text('Outbound Webhook Subscriptions', 'title_medium', ['bold' => true]),
-                self::text('Notify your external systems and third-party gateways when POS events take place.', 'body_small', ['color' => '#6b7280']),
+                self::row([
+                    self::icon('vpn_key', ['color' => '#10b981', 'size' => 28]),
+                    self::column([
+                        self::text('Active Bearer API Token', 'title_medium', ['bold' => true]),
+                        self::text('Authenticate REST calls with permanent scoped bearer tokens.', 'body_small', ['color' => '#94a3b8']),
+                    ]),
+                ], ['spacing' => 12]),
                 self::divider(),
-                self::textInput('outbound_webhook_url', 'Outbound Webhook URL', $configuration->get('outbound_webhook_url', $configuration->get('webhook_url', '')), [
-                    'placeholder' => 'https://example.com/webhooks/pos-events',
+                self::textInput('active_bearer_token', 'Active Bearer API Token', $activeKeySnippet, [
+                    'read_only' => true,
+                    'copyable' => (bool) $activeKey,
+                    'copy_tooltip' => 'Copy API Token',
+                    'copy_toast' => 'API Token copied to clipboard!',
                 ]),
-                self::textInput('outbound_webhook_secret', 'Outbound HMAC Secret', $configuration->get('outbound_webhook_secret', ''), [
-                    'placeholder' => 'Secret used to sign outbound X-Webhook-Signature headers',
+                self::buttonOutlined('Regenerate Token', self::formSubmitAction(
+                    '/api/v1/tenant/api-keys/regenerate',
+                    'POST',
+                    'API Bearer Token regenerated successfully!'
+                ), 'refresh', [
+                    'color' => '#f59e0b',
+                    'border_color' => '#f59e0b',
+                    'confirm_title' => 'Regenerate API Token?',
+                    'confirm_message' => 'Are you sure you want to revoke the existing token and generate a new one? External integrations using this key will stop working until updated.',
                 ]),
-                self::checkbox('event_order_created', 'order.created (When a new sale or order is registered)', in_array('order.created', $outboundEvents, true)),
-                self::checkbox('event_order_settled', 'order.settled (When payment is completed in full)', in_array('order.settled', $outboundEvents, true)),
-                self::checkbox('event_order_cancelled', 'order.cancelled (When a sale is voided or cancelled)', in_array('order.cancelled', $outboundEvents, true)),
-                self::checkbox('event_stock_low_alert', 'stock.low_alert (When an item reaches or drops below minimum stock)', in_array('stock.low_alert', $outboundEvents, true)),
-            ]),
+            ], ['border_radius' => 16]),
+
+            // Developer API Quick Reference Card
             self::card([
-                self::text('AI Assistant Studio Integration', 'title_medium', ['bold' => true]),
-                self::text('Empower point-of-sale catalog management with AI recommendations and OCR.', 'body_small', ['color' => '#6b7280']),
+                self::row([
+                    self::icon('api', ['color' => '#0284c7', 'size' => 28]),
+                    self::column([
+                        self::text('Developer API Quick Reference', 'title_medium', ['bold' => true, 'color' => '#f8fafc']),
+                        self::text('cURL and REST endpoints for external accounting and tax calculation.', 'body_small', ['color' => '#94a3b8']),
+                    ]),
+                ], ['spacing' => 12]),
                 self::divider(),
-                self::toggleSwitch('ai_catalog_enrichment', 'Enable AI Product Description & Categorization', filter_var($configuration->get('ai_catalog_enrichment', true), FILTER_VALIDATE_BOOL)),
-                self::toggleSwitch('ai_receipt_ocr', 'Enable Invoice & Bill OCR Scanner', filter_var($configuration->get('ai_receipt_ocr', true), FILTER_VALIDATE_BOOL)),
-            ]),
-            self::buttonPrimary('Save API Integrations', self::formSubmitAction(
-                '/api/tenant/settings/api',
-                'POST',
-                'API settings saved successfully'
-            ), 'save'),
-        ]);
+                self::text('Compute subtotals, customer exemptions, and itemized tax breakdowns.', 'body_small', ['color' => '#94a3b8']),
+                self::textInput('endpoint_tax_calc', 'POST /api/v1/tax/calculate', 'curl -X POST '.url('/api/v1/tax/calculate'), [
+                    'read_only' => true,
+                    'copyable' => true,
+                    'copy_tooltip' => 'Copy cURL command',
+                    'copy_toast' => 'Tax calculation endpoint copied to clipboard!',
+                ]),
+                self::text('Directly creates a cleared tax invoice record inside the tenant database.', 'body_small', ['color' => '#94a3b8']),
+                self::textInput('endpoint_tax_invoices', 'POST /api/v1/tax/invoices', 'curl -X POST '.url('/api/v1/tax/invoices'), [
+                    'read_only' => true,
+                    'copyable' => true,
+                    'copy_tooltip' => 'Copy cURL command',
+                    'copy_toast' => 'Tax invoice endpoint copied to clipboard!',
+                ]),
+                self::text('Omnichannel receipt & invoice dispatch (WhatsApp, SMS, Email).', 'body_small', ['color' => '#94a3b8']),
+                self::textInput('endpoint_notifications_dispatch', 'POST /api/v1/tenant/notifications/dispatch', 'curl -X POST '.url('/api/v1/tenant/notifications/dispatch'), [
+                    'read_only' => true,
+                    'copyable' => true,
+                    'copy_tooltip' => 'Copy cURL command',
+                    'copy_toast' => 'Notification dispatch endpoint copied to clipboard!',
+                ]),
+            ], ['border_radius' => 16]),
+        ];
     }
 
     public static function navigationView(Company $company): array
@@ -5676,6 +6879,7 @@ class SchemaResponse
             'payment-method-create', 'add-payment-method', 'new-payment-method' => self::paymentMethodCreateView($company),
             'settings-localization', 'localization' => self::localizationView($company),
             'settings-appearance', 'appearance', 'app-preferences', 'preferences' => self::appearanceView($company),
+            'settings-notification-sounds', 'notification-sounds', 'app-preferences-notifications', 'notifications-audio', 'settings-notifications-audio', 'settings-audio-notifications' => \App\Http\Controllers\Api\V1\TenantAppPreferencesController::buildSduiSchema($company, \App\Http\Controllers\Api\V1\TenantAppPreferencesController::getEffectivePreferences($company)),
             'settings-taxes', 'taxes' => self::taxesView($company),
             'tax-rule-create', 'add-tax-rule', 'new-tax-rule' => self::taxRuleCreateView($company),
             'settings-api', 'api', 'api-integrations' => self::apiView($company),
@@ -5716,6 +6920,7 @@ class SchemaResponse
             'sales', 'invoices', 'sales-invoices', 'pos-sales' => self::salesView($company),
             'quotations', 'quotes', 'estimates' => self::quotationsView($company),
             'customers', 'crm', 'clients' => self::customersView($company),
+            'leads', 'lead-management', 'leadmanagement', 'lead-module' => app(\Modules\leadmanagement\Services\LeadService::class)->getTabbedLeadManagementSchema($company, request()->user(), request('tab')),
             'cash-register', 'cash_register', 'register' => self::cashRegisterView($company),
             'devices', 'device-sessions', 'terminals' => self::devicesView($company),
             'categories', 'product-categories', 'inventory-categories' => self::categoriesView($company),
@@ -5724,6 +6929,26 @@ class SchemaResponse
             'register-store', 'register-tenant', 'tenant-register', 'auth-register', 'signup' => self::registerView($company),
             default => null,
         };
+
+        if ($schema === null && preg_match('#(?:^|/)quotations/(\d+)#', $normalized, $qm)) {
+            return app(\App\Http\Controllers\Api\QuotationController::class)->showSchema(request(), $qm[1]);
+        }
+
+        if ($schema === null && (str_contains($normalized, 'invoices/create') || str_contains($normalized, 'invoices-create'))) {
+            return app(\App\Http\Controllers\Api\InvoiceController::class)->createSchema(request());
+        }
+
+        if ($schema === null && preg_match('#(?:^|/)leads/([A-Za-z0-9\-_]+)#', $normalized, $lm)) {
+            return app(\App\Http\Controllers\Api\LeadController::class)->showSchema(request(), $lm[1]);
+        }
+
+        if ($schema === null && ($normalized === 'lead-detail' || str_ends_with($normalized, 'lead-detail'))) {
+            return app(\App\Http\Controllers\Api\LeadController::class)->leadDetail(request());
+        }
+
+        if ($schema === null && ($normalized === 'create-lead' || str_ends_with($normalized, 'create-lead') || str_contains($normalized, 'leads/create'))) {
+            return app(\App\Http\Controllers\Api\LeadController::class)->createSchema(request());
+        }
 
         if ($schema === null && str_ends_with($normalized, '-pos')) {
             $modKey = substr($normalized, 0, -4);

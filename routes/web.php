@@ -19,6 +19,15 @@ Route::middleware(EnsureAppIsInstalled::class)->get('/login', function () {
     return redirect()->route('tenant.login');
 })->name('login');
 
+Route::middleware(EnsureAppIsInstalled::class)->post('/logout', function () {
+    Auth::guard('web')->logout();
+
+    request()->session()->invalidate();
+    request()->session()->regenerateToken();
+
+    return redirect()->route('tenant.login');
+})->name('logout');
+
 Route::middleware(EnsureAppIsInstalled::class)->get('/register', function () {
     return redirect()->route('tenant.register');
 })->name('register');
@@ -49,6 +58,11 @@ Route::middleware(EnsureAppIsInstalled::class)->group(function () {
 Route::get('/subscription/payment/callback/{gateway}', [SubscriptionWebhookController::class, 'callback'])
     ->name('subscription.payment.callback');
 
+Route::post('/webhooks/{gateway}', [SubscriptionWebhookController::class, 'handle'])
+    ->name('webhooks.web.gateway');
+Route::post('/v1/webhooks/{gateway}', [SubscriptionWebhookController::class, 'handle'])
+    ->name('webhooks.web.v1.gateway');
+
 Route::get('/pos-standalone', function () {
     return view('pos-standalone');
 })->name('pos.standalone');
@@ -69,3 +83,50 @@ Route::get('/desktop/session/{token}', function (string $token) {
 
 Route::redirect('/admin/settings/general', '/superadmin/settings?tab=general');
 Route::redirect('/admin/settings/regional', '/superadmin/settings?tab=general');
+
+Route::get('/tenant/views/quotations/{id}', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->showSchema($request, $id);
+});
+Route::get('/tenant/quotations/{id}', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->showSchema($request, $id);
+});
+Route::get('/tenant/views/quotations/{id}/preview', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->previewView($request, $id);
+});
+Route::get('/tenant/quotations/{id}/preview', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->previewView($request, $id);
+});
+Route::get('/tenant/views/quotations/{id}/send', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->sendView($request, $id);
+});
+Route::get('/tenant/quotations/{id}/send', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->sendView($request, $id);
+});
+Route::get('/tenant/views/quotations/{id}/preview-sheet', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->previewSheet($request, $id);
+});
+Route::get('/tenant/quotations/{id}/preview-sheet', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->previewSheet($request, $id);
+});
+Route::get('/tenant/views/quotations/{id}/send-sheet', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->sendSheet($request, $id);
+});
+Route::get('/tenant/quotations/{id}/send-sheet', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->sendSheet($request, $id);
+});
+Route::get('/tenant/quotations/{id}/pdf', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\V1\QuotationApiController::class)->pdf($request, $id);
+});
+Route::get('/tenant/views/quotations/{id}/pdf', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\V1\QuotationApiController::class)->pdf($request, $id);
+});
+Route::post('/tenant/quotations/{id}/dispatch', function (\Illuminate\Http\Request $request, $id) {
+    return app(\App\Http\Controllers\Api\QuotationController::class)->dispatchQuotation($request, $id);
+});
+Route::get('/tenant/views/invoices/create', function (\Illuminate\Http\Request $request) {
+    return app(\App\Http\Controllers\Api\InvoiceController::class)->createSchema($request);
+});
+Route::get('/tenant/invoices/create', function (\Illuminate\Http\Request $request) {
+    return app(\App\Http\Controllers\Api\InvoiceController::class)->createSchema($request);
+});
+

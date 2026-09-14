@@ -28,15 +28,37 @@ class FinishStep extends Component
 
     public function finish(): void
     {
-        if (empty(config('app.key'))) {
-            try {
-                Artisan::call('key:generate', ['--force' => true]);
-            } catch (\Throwable $e) {
-                Log::warning('Installer key:generate failed: '.$e->getMessage());
-            }
+        try {
+            Artisan::call('key:generate', ['--force' => true]);
+        } catch (\Throwable $e) {
+            Log::warning('Installer key:generate failed: '.$e->getMessage());
         }
 
         try {
+            $publicStorage = public_path('storage');
+            $appPublic = storage_path('app/public');
+            if (! is_dir($appPublic)) {
+                mkdir($appPublic, 0755, true);
+            }
+            if (is_dir($publicStorage) && ! is_link($publicStorage)) {
+                $iterator = new \RecursiveIteratorIterator(
+                    new \RecursiveDirectoryIterator($publicStorage, \RecursiveDirectoryIterator::SKIP_DOTS),
+                    \RecursiveIteratorIterator::SELF_FIRST
+                );
+                foreach ($iterator as $item) {
+                    $target = $appPublic.DIRECTORY_SEPARATOR.$iterator->getSubPathname();
+                    if ($item->isDir()) {
+                        if (! is_dir($target)) {
+                            mkdir($target, 0755, true);
+                        }
+                    } else {
+                        if (! file_exists($target)) {
+                            copy($item->getRealPath(), $target);
+                        }
+                    }
+                }
+                \Illuminate\Support\Facades\File::deleteDirectory($publicStorage);
+            }
             Artisan::call('storage:link');
         } catch (\Throwable $e) {
             Log::info('Installer storage:link notice: '.$e->getMessage());

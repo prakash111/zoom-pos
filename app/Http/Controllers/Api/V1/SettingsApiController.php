@@ -13,6 +13,7 @@ use App\Models\PaymentMethod;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Localization\PlatformRegionalService;
 use App\Services\Navigation\MenuService;
+use App\Services\Navigation\TenantNavRegistry;
 use App\Services\Notifications\CustomChannelDispatcherService;
 use App\Services\Sdui\SchemaResponse;
 use Illuminate\Http\JsonResponse;
@@ -62,6 +63,14 @@ class SettingsApiController extends Controller
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
+        // Normalize aliases: business_name -> name, trading_name -> trade_name
+        if ($request->filled('business_name') && ! $request->filled('name')) {
+            $request->merge(['name' => $request->input('business_name')]);
+        }
+        if ($request->filled('trading_name') && ! $request->filled('trade_name')) {
+            $request->merge(['trade_name' => $request->input('trading_name')]);
+        }
+
         // An empty string means "clear the manual override, go back to the
         // country default" — not "invalid timezone".
         if ($request->input('timezone') === '') {
@@ -70,7 +79,9 @@ class SettingsApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => ['sometimes', 'required', 'string', 'max:150'],
+            'business_name' => ['nullable', 'string', 'max:150'],
             'trade_name' => ['nullable', 'string', 'max:150'],
+            'trading_name' => ['nullable', 'string', 'max:150'],
             'tax_id' => ['nullable', 'string', 'max:60'],
             'email' => ['nullable', 'email'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -103,6 +114,38 @@ class SettingsApiController extends Controller
         }
 
         $data = $validator->validated();
+
+        $businessName = trim((string) ($request->input('business_name') ?: $request->input('name') ?: ''));
+        if ($businessName !== '') {
+            $data['name'] = $businessName;
+        }
+
+        $incomingTrade = trim((string) ($request->input('trading_name') ?: $request->input('trade_name') ?: ''));
+        $existingTrade = trim((string) ($company->trade_name ?? ''));
+
+        // If user provided a trade_name that is a demo placeholder, or trade_name was blank,
+        // or existing trade_name is a demo placeholder while business_name is updated:
+        if (
+            $incomingTrade === '' ||
+            Company::isDemoPlaceholderName($incomingTrade) ||
+            Company::isDemoPlaceholderName($existingTrade)
+        ) {
+            if ($businessName !== '') {
+                $data['trade_name'] = $businessName;
+            }
+        } else {
+            $data['trade_name'] = $incomingTrade;
+        }
+
+        if (! empty($data['name'])) {
+            $legal = trim((string) ($company->legal_name ?? ''));
+            if ($legal === '' || Company::isDemoPlaceholderName(str_replace([' Pvt. Ltd.', ' Ltd.', ' Inc.'], '', $legal))) {
+                $data['legal_name'] = $data['name'].' Pvt. Ltd.';
+            }
+        }
+
+        unset($data['business_name'], $data['trading_name']);
+
         if (isset($data['country'])) {
             $data['country'] = strtoupper($data['country']);
         }
@@ -121,9 +164,66 @@ class SettingsApiController extends Controller
         }
 
         $company->update($data);
+        $freshCompany = $company->fresh();
+        $freshCompany->flushTenantCaches();
+
         AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'profile']);
 
-        return response()->json(['success' => true, 'message' => 'Profile saved.', 'profile' => $this->presentProfile($company->fresh())]);
+        $drawerHeader = $freshCompany->getDrawerHeaderPayload();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile saved.',
+            'profile' => $this->presentProfile($freshCompany),
+            'header' => $drawerHeader,
+            'drawer_header' => $drawerHeader,
+            'store_name' => $freshCompany->display_name,
+            'business_name' => $freshCompany->display_name,
+            'trading_name' => $freshCompany->display_name,
+            'trade_name' => $freshCompany->display_name,
+            'display_name' => $freshCompany->display_name,
+            'company' => [
+                'id' => $freshCompany->id,
+                'name' => $freshCompany->display_name,
+                'business_name' => $freshCompany->display_name,
+                'trade_name' => $freshCompany->display_name,
+                'trading_name' => $freshCompany->display_name,
+                'store_name' => $freshCompany->display_name,
+                'display_name' => $freshCompany->display_name,
+                'slug' => $freshCompany->slug,
+                'currency' => $freshCompany->currency ?? 'USD',
+                'currency_symbol' => $freshCompany->currency_symbol ?? '$',
+                'tax_number' => $freshCompany->document ?? $freshCompany->tax_id ?? '',
+                'tax_id' => $freshCompany->tax_id ?? $freshCompany->document ?? '',
+                'country' => $freshCompany->country ?? 'IN',
+                'timezone' => $freshCompany->resolveTimezone(),
+                'address' => $freshCompany->address ?? '',
+                'city' => $freshCompany->city ?? '',
+                'state' => $freshCompany->state ?? '',
+                'postal_code' => $freshCompany->postal_code ?? '',
+                'phone' => $freshCompany->phone ?? '',
+                'email' => $freshCompany->email ?? '',
+                'plan_name' => $freshCompany->plan_name ?? 'trial',
+                'pos_mode' => $freshCompany->isRestaurantMode() ? 'restaurant' : 'general',
+                'restaurant_mode_locked' => (bool) $freshCompany->restaurant_mode_locked,
+                'drawer_cover_url' => $freshCompany->getDrawerCoverUrl(),
+                'logo_url' => $freshCompany->getLogoUrl(),
+                'favicon_url' => $freshCompany->getFaviconUrl(),
+                'drawer_header' => $drawerHeader,
+                'header' => $drawerHeader,
+            ],
+            'tenant' => [
+                'id' => (string) $freshCompany->id,
+                'name' => $freshCompany->display_name,
+                'business_name' => $freshCompany->display_name,
+                'trade_name' => $freshCompany->display_name,
+                'trading_name' => $freshCompany->display_name,
+                'display_name' => $freshCompany->display_name,
+                'store_name' => $freshCompany->display_name,
+                'drawer_header' => $drawerHeader,
+                'header' => $drawerHeader,
+            ],
+        ]);
     }
 
     public function updateBranding(Request $request): JsonResponse
@@ -156,6 +256,29 @@ class SettingsApiController extends Controller
             'success' => true,
             'message' => 'Branding and colors updated successfully.',
             'theme' => $theme,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/tenant/theme or /api/tenant/theme
+     * Returns dynamic theme tokens with dark surface and zero-white-leak guarantees.
+     */
+    public function getTheme(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $tokens = $company->getThemeTokens();
+
+        return response()->json([
+            'success' => true,
+            'drawer_bg' => $tokens['drawer_bg'],
+            'drawer_background' => $tokens['drawer_background'],
+            'surface' => $tokens['surface'],
+            'background' => $tokens['background'],
+            'text_primary' => $tokens['text_primary'],
+            'text_secondary' => $tokens['text_secondary'],
+            'theme' => $tokens,
+            'branding' => $tokens,
+            'tokens' => $tokens,
         ]);
     }
 
@@ -750,9 +873,16 @@ class SettingsApiController extends Controller
 
     private function presentProfile(Company $company): array
     {
+        $effectiveTrade = $company->getEffectiveTradeName();
+        $drawerHeader = $company->getDrawerHeaderPayload();
+
         return [
-            'name' => $company->name,
-            'trade_name' => $company->trade_name ?? '',
+            'name' => $company->display_name,
+            'business_name' => $company->display_name,
+            'trade_name' => $effectiveTrade,
+            'trading_name' => $effectiveTrade,
+            'store_name' => $company->display_name,
+            'display_name' => $company->display_name,
             'tax_id' => $company->tax_id ?? '',
             'email' => $company->email ?? '',
             'phone' => $company->phone ?? '',
@@ -779,6 +909,8 @@ class SettingsApiController extends Controller
             'accent_color' => $company->getAccentColor(),
             'default_commission_rate' => (float) ($company->default_commission_rate ?? 0),
             'default_commission_type' => $company->default_commission_type ?: 'percentage',
+            'header' => $drawerHeader,
+            'drawer_header' => $drawerHeader,
         ];
     }
 
@@ -1175,10 +1307,13 @@ class SettingsApiController extends Controller
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
-        $sections = MenuService::getDrawerTree($company, $user);
+        $sections = TenantNavRegistry::getEffectiveNavForTenant($company);
+        $drawerHeader = $company->getDrawerHeaderPayload();
 
         return response()->json([
             'success' => true,
+            'header' => $drawerHeader,
+            'drawer_header' => $drawerHeader,
             'sections' => $sections,
             'navigation' => $sections,
         ]);

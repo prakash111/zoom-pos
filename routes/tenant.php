@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Sync\CatalogViewController;
+use App\Http\Controllers\Api\DispatchController as ApiDispatchController;
+use App\Http\Controllers\Api\DocumentPreviewController as ApiDocumentPreviewController;
+use App\Http\Controllers\Api\NotificationController as ApiNotificationController;
 use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Controllers\Tenant\BackupDownloadController;
 use App\Http\Controllers\Tenant\CashRegisterSlipController;
@@ -106,6 +109,7 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         Route::get('/settings/financial', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.financial');
         Route::get('/settings/taxes', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.taxes');
         Route::get('/settings/api', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.api');
+        Route::get('/settings/integrations', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.integrations');
         Route::get('/settings/navigation', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.navigation');
         Route::post('/settings/navigation-menu', [NavigationMenuController::class, 'store'])
             ->middleware('tenant.permission:settings,edit')
@@ -123,6 +127,22 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         // Core Dashboard & POS Operations (Protected by Subscription Status Middleware)
         Route::middleware('tenant.subscription')->group(function () {
             Route::get('/', Dashboard::class)->name('dashboard');
+
+            // Session-authenticated SDUI endpoints used by the web dashboard.
+            // They share the same controllers and schemas as the Sanctum API
+            // endpoints so browser and Flutter surfaces stay in sync.
+            Route::get('/notifications/feed', [ApiNotificationController::class, 'feed'])
+                ->name('notifications.feed');
+            Route::get('/documents/{type}/{id}/preview-modal', [ApiDocumentPreviewController::class, 'previewModal'])
+                ->name('documents.preview-modal');
+            Route::get('/documents/{type}/{id}/render-html', [ApiDocumentPreviewController::class, 'renderHtml'])
+                ->name('documents.render-html');
+            Route::post('/dispatch/sms', [ApiDispatchController::class, 'dispatchSms'])
+                ->name('dispatch.sms');
+            Route::post('/dispatch/email', [ApiDispatchController::class, 'dispatchEmail'])
+                ->name('dispatch.email');
+            Route::post('/dispatch/{type}/{id}', [ApiDispatchController::class, 'dispatchDocument'])
+                ->name('dispatch.document');
 
             Route::get('/products', Products\Index::class)->middleware('tenant.permission:products,view')->name('products.index');
             Route::get('/categories', Categories\Index::class)->middleware('tenant.permission:categories,view')->name('categories.index');
@@ -159,6 +179,16 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
             Route::get('/quotations/{quote}/edit', Quotes\Edit::class)->middleware(['tenant.permission:quotes,create', 'tenant.pos_mode:general'])->name('quotations.edit');
             Route::get('/quotations/{quote}/pdf', [QuotationController::class, 'pdf'])->middleware(['tenant.permission:quotes,view', 'tenant.pos_mode:general'])->name('quotations.pdf');
             Route::post('/quotations/{quote}/send', [QuotationController::class, 'send'])->middleware(['tenant.permission:quotes,export', 'tenant.pos_mode:general'])->name('quotations.send');
+
+            // Lead Management System
+            Route::get('/leads', [\App\Http\Controllers\Tenant\LeadWebController::class, 'index'])->middleware('tenant.permission:leads,view')->name('leads.index');
+            Route::get('/leads/create', [\App\Http\Controllers\Tenant\LeadWebController::class, 'create'])->middleware('tenant.permission:leads,create')->name('leads.create');
+            Route::get('/leads/{id}', [\App\Http\Controllers\Tenant\LeadWebController::class, 'show'])->middleware('tenant.permission:leads,view')->name('leads.show');
+            Route::post('/leads', [\App\Http\Controllers\Tenant\LeadWebController::class, 'store'])->middleware('tenant.permission:leads,create')->name('leads.store');
+            Route::match(['put', 'patch'], '/leads/{id}', [\App\Http\Controllers\Tenant\LeadWebController::class, 'update'])->middleware('tenant.permission:leads,edit')->name('leads.update');
+            Route::delete('/leads/{id}', [\App\Http\Controllers\Tenant\LeadWebController::class, 'destroy'])->middleware('tenant.permission:leads,edit')->name('leads.destroy');
+            Route::post('/leads/{id}/activities', [\App\Http\Controllers\Tenant\LeadWebController::class, 'storeActivity'])->middleware('tenant.permission:leads,edit')->name('leads.activities.store');
+            Route::post('/leads/activities/{id}/complete', [\App\Http\Controllers\Tenant\LeadWebController::class, 'completeActivity'])->middleware('tenant.permission:leads,edit')->name('leads.activities.complete');
 
             // Consignments
             Route::get('/consignments', Index::class)->middleware(['tenant.permission:consignments,view', 'tenant.pos_mode:general'])->name('consignments.index');

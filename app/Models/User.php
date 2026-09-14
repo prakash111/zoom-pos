@@ -81,6 +81,16 @@ class User extends Authenticatable implements AuthenticatableContract
         return $this->belongsTo(Company::class);
     }
 
+    public function tenant()
+    {
+        return $this->belongsTo(Company::class, 'company_id');
+    }
+
+    public function getTenantIdAttribute(): ?string
+    {
+        return (string) ($this->company_id ?? '');
+    }
+
     public function permissions()
     {
         return $this->hasMany(Permission::class);

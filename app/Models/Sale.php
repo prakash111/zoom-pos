@@ -12,7 +12,7 @@ class Sale extends Model
     use TracksSyncState;
 
     protected $fillable = [
-        'company_id', 'external_id', 'sale_number', 'customer_id', 'customer_name', 'user_id', 'cash_register_id',
+        'company_id', 'external_id', 'sale_number', 'customer_id', 'lead_id', 'customer_name', 'user_id', 'cash_register_id',
         'total', 'net_amount', 'discount', 'payment_method', 'agreed_payment_method', 'installments', 'status', 'is_demo', 'items', 'operation_type', 'gst_invoice',
         'service_type', 'dining_table_id', 'table_name', 'guest_count', 'pickup_time',
         'delivery_address', 'driver_name', 'driver_phone', 'dispatch_status', 'kot_status',
@@ -29,6 +29,7 @@ class Sale extends Model
     {
         return [
             'is_demo' => 'boolean',
+            'lead_id' => 'integer',
             'total' => 'decimal:2',
             'net_amount' => 'decimal:2',
             'discount' => 'decimal:2',
@@ -59,6 +60,11 @@ class Sale extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    public function lead()
+    {
+        return $this->belongsTo(Lead::class, 'lead_id');
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -84,9 +90,24 @@ class Sale extends Model
         return $this->hasMany(OrderPayment::class, 'sale_id')->orderByDesc('created_at');
     }
 
+    public function tenant()
+    {
+        return $this->belongsTo(Company::class, 'company_id');
+    }
+
     public function saleItems()
     {
-        return $this->hasMany(SaleItem::class);
+        return $this->hasMany(SaleItem::class, 'sale_id');
+    }
+
+    public function items()
+    {
+        return $this->hasMany(SaleItem::class, 'sale_id');
+    }
+
+    public function getTenantIdAttribute(): ?string
+    {
+        return (string) ($this->company_id ?? '');
     }
 
     public function cashRegister()
@@ -183,4 +204,25 @@ class Sale extends Model
 
         return $components;
     }
+
+    public function newEloquentBuilder($query): SaleBuilder
+    {
+        return new SaleBuilder($query);
+    }
+
+    public function getInvoiceNumberAttribute(): ?string
+    {
+        return $this->sale_number ?: (string) $this->id;
+    }
+
+    public function getBalanceDueAttribute(): float
+    {
+        return (float) ($this->due_amount ?? $this->total ?? 0);
+    }
+
+    public function getQuotationNumberAttribute(): ?string
+    {
+        return $this->sale_number ?: (string) $this->id;
+    }
 }
+

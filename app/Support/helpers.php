@@ -90,20 +90,88 @@ if (! function_exists('appearance_defaults')) {
 if (! function_exists('tenant_setting')) {
     /**
      * Get a tenant company setting value with fallback default.
+     * Supports both tenant_setting($key, $default) and tenant_setting($tenantId, $key, $default).
      */
-    function tenant_setting(string $key, mixed $default = null): mixed
+    function tenant_setting(mixed $arg1, mixed $arg2 = null, mixed $default = null): mixed
     {
-        $companyId = app()->bound('tenant.company_id')
-            ? app('tenant.company_id')
-            : (auth('web')->user()?->company_id ?? auth('tenant_api')->user()?->company_id);
+        if (func_num_args() === 1) {
+            $companyId = null;
+            $key = (string) $arg1;
+            $fallback = null;
+        } elseif (func_num_args() >= 3) {
+            $companyId = is_object($arg1) ? $arg1->id : $arg1;
+            $key = (string) $arg2;
+            $fallback = $default;
+        } else { // 2 arguments
+            if (is_numeric($arg1) || (is_string($arg1) && str_starts_with($arg1, 'emp_'))) {
+                $companyId = $arg1;
+                $key = (string) $arg2;
+                $fallback = null;
+            } else {
+                $companyId = null;
+                $key = (string) $arg1;
+                $fallback = $arg2;
+            }
+        }
 
         if (! $companyId) {
-            return $default;
+            $companyId = app()->bound('tenant.company_id')
+                ? app('tenant.company_id')
+                : (auth('web')->user()?->company_id ?? auth('tenant_api')->user()?->company_id ?? auth()->user()?->company_id);
+        }
+
+        if (! $companyId) {
+            $companyId = Company::first()?->id;
+        }
+
+        if ($key === 'sms_gateway') {
+            if (class_exists(Configuration::class) && $companyId) {
+                $configVal = Configuration::withoutGlobalScopes()
+                    ->where('company_id', $companyId)
+                    ->where('key', 'sms_gateway')
+                    ->value('value');
+                if ($configVal !== null && $configVal !== '') {
+                    $decoded = is_string($configVal) ? json_decode($configVal, true) : $configVal;
+                    if (is_array($decoded) && ! empty($decoded['gateway_url'])) {
+                        return $decoded;
+                    }
+                }
+            }
+
+            if (class_exists(\App\Models\TenantNotificationGateway::class) && $companyId) {
+                $gw = \App\Models\TenantNotificationGateway::withoutGlobalScope('company')
+                    ->where('company_id', $companyId)
+                    ->where('channel', \App\Models\TenantNotificationGateway::CHANNEL_SMS)
+                    ->first();
+                if ($gw && is_array($gw->credentials) && ! empty($gw->credentials['url'])) {
+                    return [
+                        'gateway_url' => $gw->credentials['url'],
+                        'method' => strtoupper($gw->credentials['method'] ?? 'GET'),
+                        'api_token' => $gw->credentials['api_key'] ?? ($gw->credentials['api_token'] ?? ''),
+                        'is_enabled' => (bool) $gw->is_enabled,
+                    ];
+                }
+            }
+
+            if ($fallback !== null) {
+                return $fallback;
+            }
+
+            return [
+                'gateway_url' => 'https://sms.zoomnearby.com/api/v1/messages/send?phone={phone}&message={message}',
+                'method' => 'GET',
+                'api_token' => '4HIXpW0OPsnPpzzebeA5KI7rI4fnAi7utMu5jwYl8dada339',
+                'is_enabled' => true,
+            ];
+        }
+
+        if (! $companyId) {
+            return $fallback;
         }
 
         $company = Company::find($companyId);
         if (! $company) {
-            return $default;
+            return $fallback;
         }
 
         $aliases = [
@@ -144,6 +212,62 @@ if (! function_exists('tenant_setting')) {
             }
         }
 
-        return $default;
+        return $fallback;
+    }
+}
+
+if (! function_exists('tenant_set_setting')) {
+    /**
+     * Set a tenant company setting value.
+     * Supports both tenant_set_setting($key, $value) and tenant_set_setting($tenantId, $key, $value).
+     */
+    function tenant_set_setting(mixed $arg1, mixed $arg2, mixed $arg3 = null): void
+    {
+        if (func_num_args() === 2) {
+            $companyId = app()->bound('tenant.company_id')
+                ? app('tenant.company_id')
+                : (auth('web')->user()?->company_id ?? auth('tenant_api')->user()?->company_id ?? auth()->user()?->company_id);
+            $key = (string) $arg1;
+            $value = $arg2;
+        } else {
+            $companyId = is_object($arg1) ? $arg1->id : $arg1;
+            $key = (string) $arg2;
+            $value = $arg3;
+        }
+
+        if (! $companyId) {
+            $companyId = Company::first()?->id ?? 1;
+        }
+
+        $storedVal = is_array($value) ? json_encode($value) : (string) $value;
+
+        if (class_exists(Configuration::class)) {
+            Configuration::withoutGlobalScopes()->updateOrCreate(
+                ['company_id' => $companyId, 'key' => $key],
+                ['value' => $storedVal]
+            );
+        }
+
+        if ($key === 'sms_gateway' && class_exists(\App\Models\TenantNotificationGateway::class)) {
+            $arr = is_array($value) ? $value : (json_decode((string) $value, true) ?: []);
+            $gwUrl = $arr['gateway_url'] ?? $arr['url'] ?? '';
+            $gwMethod = strtoupper($arr['method'] ?? 'GET');
+            $gwToken = $arr['api_token'] ?? $arr['api_key'] ?? '';
+
+            \App\Models\TenantNotificationGateway::withoutGlobalScope('company')->updateOrCreate(
+                ['company_id' => $companyId, 'channel' => \App\Models\TenantNotificationGateway::CHANNEL_SMS],
+                [
+                    'tenant_id' => $companyId,
+                    'provider' => \App\Models\TenantNotificationGateway::PROVIDER_GENERIC_HTTP,
+                    'is_enabled' => true,
+                    'credentials' => [
+                        'url' => $gwUrl,
+                        'method' => $gwMethod,
+                        'api_key' => $gwToken,
+                        'api_token' => $gwToken,
+                    ],
+                ]
+            );
+        }
     }
 }

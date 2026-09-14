@@ -700,4 +700,115 @@ class ModuleRegistry
             ],
         ];
     }
+
+    /**
+     * Get default modules for a given store operating mode / store type.
+     *
+     * @return list<array{key: string, group: string, label: string, icon: string, route: string}>
+     */
+    public static function getModulesForStoreType(string $storeType): array
+    {
+        $type = strtoupper(trim($storeType));
+        if (in_array($type, ['RESTAURANT', 'FOOD_RESTAURANT', 'CAFE', 'FOOD'], true)) {
+            return [
+                ['key' => 'point_of_sale', 'group' => 'cashier_sales', 'label' => 'Restaurant POS', 'icon' => 'restaurant', 'route' => 'tenant.restaurant.pos'],
+                ['key' => 'sales_invoices', 'group' => 'cashier_sales', 'label' => 'Sales & Invoices', 'icon' => 'receipt_long', 'route' => 'tenant.sales.index'],
+                ['key' => 'quotations', 'group' => 'cashier_sales', 'label' => 'Quotations & Party Orders', 'icon' => 'description', 'route' => 'tenant.quotes.index'],
+                ['key' => 'lead_management', 'group' => 'cashier_sales', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'route' => 'tenant.leads.index'],
+                ['key' => 'crm_customers', 'group' => 'cashier_sales', 'label' => 'Customers & CRM', 'icon' => 'people', 'route' => 'tenant.customers.index'],
+                ['key' => 'tables_floor_plan', 'group' => 'restaurant_operations', 'label' => 'Floor Plan & Tables', 'icon' => 'table_restaurant', 'route' => 'tenant.restaurant.tables'],
+                ['key' => 'kot_orders', 'group' => 'restaurant_operations', 'label' => 'KOT Orders & Live Queue', 'icon' => 'receipt', 'route' => 'tenant.sales.index'],
+                ['key' => 'kitchen_display_kds', 'group' => 'restaurant_operations', 'label' => 'Kitchen Display (KDS)', 'icon' => 'soup_kitchen', 'route' => 'tenant.restaurant.kds'],
+                ['key' => 'cash_register', 'group' => 'financial_management', 'label' => 'Cash Register', 'icon' => 'savings', 'route' => 'tenant.financials.cash_register'],
+                ['key' => 'accounts_receivable', 'group' => 'financial_management', 'label' => 'Accounts Receivable', 'icon' => 'notifications_active', 'route' => 'tenant.financials.receivables'],
+                ['key' => 'accounts_payable', 'group' => 'financial_management', 'label' => 'Accounts Payable', 'icon' => 'request_quote', 'route' => 'tenant.financials.payables'],
+                ['key' => 'reports', 'group' => 'financial_management', 'label' => 'Reports', 'icon' => 'insights', 'route' => 'tenant.reports.index'],
+                ['key' => 'analytics', 'group' => 'financial_management', 'label' => 'Analytics', 'icon' => 'bar_chart', 'route' => 'tenant.reports.index'],
+                ['key' => 'inventory_catalog', 'group' => 'kitchen_menu_catalog', 'label' => 'Menu Dishes & Stock', 'icon' => 'inventory_2', 'route' => 'tenant.products.index'],
+                ['key' => 'categories', 'group' => 'kitchen_menu_catalog', 'label' => 'Categories', 'icon' => 'sell', 'route' => 'tenant.categories.index'],
+                ['key' => 'brands', 'group' => 'kitchen_menu_catalog', 'label' => 'Brands & Modifiers', 'icon' => 'auto_awesome', 'route' => 'tenant.brands.index'],
+                ['key' => 'units', 'group' => 'kitchen_menu_catalog', 'label' => 'Units of Measure', 'icon' => 'straighten', 'route' => 'tenant.units.index'],
+                ['key' => 'suppliers', 'group' => 'kitchen_menu_catalog', 'label' => 'Food Suppliers', 'icon' => 'local_shipping', 'route' => 'tenant.suppliers.index'],
+                ['key' => 'store_settings', 'group' => 'administration', 'label' => 'Store Settings', 'icon' => 'settings', 'route' => 'tenant.settings.index'],
+            ];
+        }
+
+        if (in_array($type, ['PHARMACY'], true)) {
+            return [
+                ['key' => 'pharmacy_pos', 'group' => 'pharmacy_management', 'label' => 'Pharmacy POS & Checkout', 'icon' => 'point_of_sale', 'route' => 'pos'],
+                ['key' => 'new_prescription_intake', 'group' => 'pharmacy_management', 'label' => 'New Prescription Intake', 'icon' => 'note_add', 'route' => '/api/tenant/views/pharmacy-rx-create'],
+                ['key' => 'prescriptions_queue', 'group' => 'pharmacy_management', 'label' => 'Prescriptions & Patient Queue', 'icon' => 'medical_information', 'route' => 'tenant.pharmacy.prescriptions'],
+                ['key' => 'batch_inventory', 'group' => 'pharmacy_management', 'label' => 'Drug Batches & Expiry Tracker', 'icon' => 'inventory_2', 'route' => 'tenant.pharmacy.batches'],
+                ['key' => 'sales_invoices', 'group' => 'cashier_sales', 'label' => 'Sales & Invoices History', 'icon' => 'receipt_long', 'route' => 'tenant.sales.index'],
+                ['key' => 'quotations', 'group' => 'cashier_sales', 'label' => 'Quotations & Estimates', 'icon' => 'description', 'route' => 'tenant.quotes.index'],
+                ['key' => 'lead_management', 'group' => 'cashier_sales', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'route' => 'tenant.leads.index'],
+                ['key' => 'crm_customers', 'group' => 'cashier_sales', 'label' => 'Patients & Doctors', 'icon' => 'people', 'route' => 'tenant.customers.index'],
+                ['key' => 'cash_register', 'group' => 'financial_management', 'label' => 'Cash Register', 'icon' => 'savings', 'route' => 'tenant.financials.cash_register'],
+                ['key' => 'reports', 'group' => 'financial_management', 'label' => 'Reports', 'icon' => 'insights', 'route' => 'tenant.reports.index'],
+                ['key' => 'store_settings', 'group' => 'administration', 'label' => 'Store Settings', 'icon' => 'settings', 'route' => 'tenant.settings.index'],
+            ];
+        }
+
+        if (in_array($type, ['SERVICE_BOOKING', 'SALON'], true)) {
+            return [
+                ['key' => 'salon_pos', 'group' => 'salon_bookings', 'label' => 'Salon POS & Checkout', 'icon' => 'point_of_sale', 'route' => '/api/tenant/views/salon-pos'],
+                ['key' => 'book_appointment', 'group' => 'salon_bookings', 'label' => 'Book Service / Appointment', 'icon' => 'edit_calendar', 'route' => '/api/tenant/views/salon-booking-create'],
+                ['key' => 'booking_calendar', 'group' => 'salon_bookings', 'label' => 'Service Booking Calendar', 'icon' => 'calendar_month', 'route' => 'tenant.salon.calendar'],
+                ['key' => 'service_catalog', 'group' => 'salon_bookings', 'label' => 'Service Catalog & Rates', 'icon' => 'format_list_bulleted', 'route' => 'tenant.salon.services'],
+                ['key' => 'service_stylists', 'group' => 'salon_bookings', 'label' => 'Stylists & Staff Assignments', 'icon' => 'badge', 'route' => 'tenant.salon.stylists'],
+                ['key' => 'sales_invoices', 'group' => 'cashier_sales', 'label' => 'Sales & Invoices History', 'icon' => 'receipt_long', 'route' => 'tenant.sales.index'],
+                ['key' => 'lead_management', 'group' => 'cashier_sales', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'route' => 'tenant.leads.index'],
+                ['key' => 'crm_customers', 'group' => 'cashier_sales', 'label' => 'Clients & CRM', 'icon' => 'people', 'route' => 'tenant.customers.index'],
+                ['key' => 'cash_register', 'group' => 'financial_management', 'label' => 'Cash Register', 'icon' => 'savings', 'route' => 'tenant.financials.cash_register'],
+                ['key' => 'reports', 'group' => 'financial_management', 'label' => 'Reports', 'icon' => 'insights', 'route' => 'tenant.reports.index'],
+                ['key' => 'store_settings', 'group' => 'administration', 'label' => 'Store Settings', 'icon' => 'settings', 'route' => 'tenant.settings.index'],
+            ];
+        }
+
+        if (in_array($type, ['REPAIR_TECHNICIAN', 'REPAIRTECHNICIAN', 'REPAIR', 'TECHNICIAN'], true)) {
+            return [
+                ['key' => 'repair_dashboard', 'group' => 'repair_service', 'label' => 'Repair Workbench', 'icon' => 'handyman', 'route' => 'tenant.repair.dashboard'],
+                ['key' => 'repair_create_ticket', 'group' => 'repair_service', 'label' => 'New Intake Ticket', 'icon' => 'add_task', 'route' => '/api/tenant/views/repair-create-ticket'],
+                ['key' => 'repair_tickets', 'group' => 'repair_service', 'label' => 'Repair Ticket Register', 'icon' => 'receipt_long', 'route' => 'tenant.repair.tickets'],
+                ['key' => 'repair_categories', 'group' => 'repair_service', 'label' => 'Device Categories', 'icon' => 'devices', 'route' => 'tenant.repair.categories'],
+                ['key' => 'sales_invoices', 'group' => 'cashier_sales', 'label' => 'Sales & Invoices History', 'icon' => 'receipt_long', 'route' => 'tenant.sales.index'],
+                ['key' => 'lead_management', 'group' => 'cashier_sales', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'route' => 'tenant.leads.index'],
+                ['key' => 'crm_customers', 'group' => 'cashier_sales', 'label' => 'Customers & CRM', 'icon' => 'people', 'route' => 'tenant.customers.index'],
+                ['key' => 'cash_register', 'group' => 'financial_management', 'label' => 'Cash Register', 'icon' => 'savings', 'route' => 'tenant.financials.cash_register'],
+                ['key' => 'reports', 'group' => 'financial_management', 'label' => 'Reports', 'icon' => 'insights', 'route' => 'tenant.reports.index'],
+                ['key' => 'store_settings', 'group' => 'administration', 'label' => 'Store Settings', 'icon' => 'settings', 'route' => 'tenant.settings.index'],
+            ];
+        }
+
+        if (in_array($type, ['LEADMANAGEMENT', 'LEAD_MANAGEMENT', 'LEAD'], true)) {
+            return [
+                ['key' => 'lead_dashboard', 'group' => 'lead_ops', 'label' => 'Leads Dashboard', 'icon' => 'dashboard', 'route' => '/api/tenant/lead-module/views/dashboard'],
+                ['key' => 'lead_pipeline', 'group' => 'lead_ops', 'label' => 'Leads Pipeline', 'icon' => 'view_kanban', 'route' => '/api/tenant/lead-module/views/leads'],
+                ['key' => 'lead_activities', 'group' => 'lead_ops', 'label' => 'Follow-ups & Activities', 'icon' => 'event_note', 'route' => '/api/tenant/lead-module/views/activities'],
+                ['key' => 'lead_sources', 'group' => 'lead_ops', 'label' => 'Lead Sources', 'icon' => 'source', 'route' => '/api/tenant/lead-module/views/sources'],
+            ];
+        }
+
+        // RETAIL default
+        return [
+            ['key' => 'point_of_sale', 'group' => 'cashier_sales', 'label' => 'Point of Sale', 'icon' => 'point_of_sale', 'route' => 'tenant.sales.create'],
+            ['key' => 'barcode_printing', 'group' => 'cashier_sales', 'label' => 'Barcode & Label Printing', 'icon' => 'qr_code', 'route' => 'tenant.products.index'],
+            ['key' => 'batch_tracking', 'group' => 'cashier_sales', 'label' => 'Batch & Expiry Tracking', 'icon' => 'batch_prediction', 'route' => 'tenant.products.index'],
+            ['key' => 'sales_invoices', 'group' => 'cashier_sales', 'label' => 'Sales & Invoices', 'icon' => 'receipt_long', 'route' => 'tenant.sales.index'],
+            ['key' => 'quotations', 'group' => 'cashier_sales', 'label' => 'Quotations & Proposals', 'icon' => 'description', 'route' => 'tenant.quotes.index'],
+            ['key' => 'lead_management', 'group' => 'cashier_sales', 'label' => 'Lead Management', 'icon' => 'leaderboard', 'route' => 'tenant.leads.index'],
+            ['key' => 'crm_customers', 'group' => 'cashier_sales', 'label' => 'Customers & CRM', 'icon' => 'people', 'route' => 'tenant.customers.index'],
+            ['key' => 'cash_register', 'group' => 'financial_management', 'label' => 'Cash Register', 'icon' => 'savings', 'route' => 'tenant.financials.cash_register'],
+            ['key' => 'accounts_receivable', 'group' => 'financial_management', 'label' => 'Accounts Receivable', 'icon' => 'notifications_active', 'route' => 'tenant.financials.receivables'],
+            ['key' => 'accounts_payable', 'group' => 'financial_management', 'label' => 'Accounts Payable', 'icon' => 'request_quote', 'route' => 'tenant.financials.payables'],
+            ['key' => 'reports', 'group' => 'financial_management', 'label' => 'Reports', 'icon' => 'insights', 'route' => 'tenant.reports.index'],
+            ['key' => 'analytics', 'group' => 'financial_management', 'label' => 'Analytics', 'icon' => 'bar_chart', 'route' => 'tenant.reports.index'],
+            ['key' => 'inventory_catalog', 'group' => 'products_inventory', 'label' => 'All Products', 'icon' => 'inventory_2', 'route' => 'tenant.products.index'],
+            ['key' => 'categories', 'group' => 'products_inventory', 'label' => 'Categories', 'icon' => 'sell', 'route' => 'tenant.categories.index'],
+            ['key' => 'brands', 'group' => 'products_inventory', 'label' => 'Brands & Manufacturers', 'icon' => 'auto_awesome', 'route' => 'tenant.brands.index'],
+            ['key' => 'units', 'group' => 'products_inventory', 'label' => 'Units of Measure', 'icon' => 'straighten', 'route' => 'tenant.units.index'],
+            ['key' => 'suppliers', 'group' => 'products_inventory', 'label' => 'Suppliers & Vendors', 'icon' => 'local_shipping', 'route' => 'tenant.suppliers.index'],
+            ['key' => 'store_settings', 'group' => 'administration', 'label' => 'Store Settings', 'icon' => 'settings', 'route' => 'tenant.settings.index'],
+        ];
+    }
 }

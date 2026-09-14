@@ -13,11 +13,13 @@ class PushDeviceApiController extends Controller
 {
     use ResolvesTenantSyncContext;
 
-    public function config(): JsonResponse
+    public function config(Request $request): JsonResponse
     {
+        $company = rescue(fn () => $this->resolveCompany($request));
+
         return response()->json([
             'success' => true,
-            'push' => PushNotificationSetting::current()->publicConfig(),
+            'push' => PushNotificationSetting::current()->publicConfig($company?->id),
         ]);
     }
 

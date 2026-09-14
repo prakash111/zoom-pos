@@ -5,6 +5,17 @@
     standard retail nav still renders above this — a pharmacy still sells at the
     POS, keeps inventory, and has customers.
 --}}
+@if ($hasRestaurant && ! $isRestaurantMode)
+    <div data-section-key="restaurant_operations">
+        <div class="text-[10px] font-extrabold uppercase tracking-wider text-lime-600 dark:text-lime-400 mb-2 px-3">{{ __('Restaurant Operations') }}</div>
+        <div class="space-y-1">
+            <x-nav.drawer-item item-key="restaurant_pos" :route="route('tenant.restaurant.pos')" hover="lime" highlighted title="{{ __('Restaurant POS Terminal') }}" subtitle="{{ __('Dine-In, Takeaway & Delivery') }}">🍽️</x-nav.drawer-item>
+            <x-nav.drawer-item item-key="floor_plan" :route="route('tenant.restaurant.tables')" hover="lime" title="{{ __('Floor Plan & Tables') }}" subtitle="{{ __('Live Table Status & QR Menus') }}">🪑</x-nav.drawer-item>
+            <x-nav.drawer-item item-key="kitchen_display" :route="route('tenant.restaurant.kds')" hover="lime" title="{{ __('Kitchen Display (KDS)') }}" subtitle="{{ __('Live KOT preparation queue') }}">🍳</x-nav.drawer-item>
+        </div>
+    </div>
+@endif
+
 @if ($isPharmacy)
     <div data-section-key="pharmacy_management">
         <div class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 px-3">{{ __('Pharmacy Operations') }}</div>
@@ -18,7 +29,9 @@
             @endif
         </div>
     </div>
-@elseif ($isSalon)
+@endif
+
+@if ($isSalon)
     <div data-section-key="salon_bookings">
         <div class="text-[10px] font-extrabold uppercase tracking-wider text-violet-600 dark:text-violet-400 mb-2 px-3">{{ __('Salon & Bookings') }}</div>
         <div class="space-y-1">
@@ -27,7 +40,9 @@
             <x-nav.drawer-item item-key="salon_stylists" :route="route('tenant.salon.stylists')" title="{{ __('Stylists & Staff') }}" subtitle="{{ __('Who can be booked as a specialist') }}">🧑‍🎨</x-nav.drawer-item>
         </div>
     </div>
-@elseif ($isRepair)
+@endif
+
+@if ($isRepair)
     <div data-section-key="repair_service">
         <div class="text-[10px] font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400 mb-2 px-3">{{ __('Repair Operations') }}</div>
         <div class="space-y-1">

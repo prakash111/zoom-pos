@@ -15,8 +15,18 @@ class PlatformBranding extends Model
         // Any Superadmin save of the branding row invalidates a public-config
         // response cache so the pre-auth clients see the new colours on their
         // next fetch.
-        static::saved(fn () => Cache::forget('public_settings'));
-        static::deleted(fn () => Cache::forget('public_settings'));
+        $flush = function () {
+            Cache::forget('public_settings');
+            Cache::forget('platform_branding_settings');
+            if (Cache::has('landing_page_cache_version')) {
+                Cache::increment('landing_page_cache_version');
+            } else {
+                Cache::forever('landing_page_cache_version', 2);
+            }
+        };
+
+        static::saved($flush);
+        static::deleted($flush);
     }
 
     protected $fillable = [
@@ -68,11 +78,20 @@ class PlatformBranding extends Model
             return null;
         }
 
-        if (str_starts_with($this->logo_url, 'http://') || str_starts_with($this->logo_url, 'https://') || str_starts_with($this->logo_url, 'data:')) {
+        if (str_starts_with($this->logo_url, 'data:')) {
             return $this->logo_url;
         }
 
-        $cleanPath = preg_replace('#^/?storage/#', '', $this->logo_url);
+        if (preg_match('#(?:https?://[^/]+)?/?storage/(.+)#i', $this->logo_url, $matches)) {
+            $cleanPath = $matches[1];
+            return Storage::disk('public')->url($cleanPath);
+        }
+
+        if (str_starts_with($this->logo_url, 'http://') || str_starts_with($this->logo_url, 'https://')) {
+            return $this->logo_url;
+        }
+
+        $cleanPath = ltrim(preg_replace('#^/?storage/#', '', $this->logo_url), '/');
 
         if (Storage::disk('public')->exists($cleanPath)) {
             return Storage::disk('public')->url($cleanPath);
@@ -82,7 +101,7 @@ class PlatformBranding extends Model
             return asset(ltrim($this->logo_url, '/'));
         }
 
-        return asset('storage/'.ltrim($cleanPath, '/'));
+        return Storage::disk('public')->url($cleanPath);
     }
 
     /** Same resolution chain as [getLogoPublicUrl] for the favicon. */
@@ -92,11 +111,20 @@ class PlatformBranding extends Model
             return null;
         }
 
-        if (str_starts_with($this->favicon_url, 'http://') || str_starts_with($this->favicon_url, 'https://') || str_starts_with($this->favicon_url, 'data:')) {
+        if (str_starts_with($this->favicon_url, 'data:')) {
             return $this->favicon_url;
         }
 
-        $cleanPath = preg_replace('#^/?storage/#', '', $this->favicon_url);
+        if (preg_match('#(?:https?://[^/]+)?/?storage/(.+)#i', $this->favicon_url, $matches)) {
+            $cleanPath = $matches[1];
+            return Storage::disk('public')->url($cleanPath);
+        }
+
+        if (str_starts_with($this->favicon_url, 'http://') || str_starts_with($this->favicon_url, 'https://')) {
+            return $this->favicon_url;
+        }
+
+        $cleanPath = ltrim(preg_replace('#^/?storage/#', '', $this->favicon_url), '/');
 
         if (Storage::disk('public')->exists($cleanPath)) {
             return Storage::disk('public')->url($cleanPath);
@@ -106,7 +134,7 @@ class PlatformBranding extends Model
             return asset(ltrim($this->favicon_url, '/'));
         }
 
-        return asset('storage/'.ltrim($cleanPath, '/'));
+        return Storage::disk('public')->url($cleanPath);
     }
 
     /**

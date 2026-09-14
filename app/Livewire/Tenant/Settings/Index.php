@@ -8,9 +8,11 @@ use App\Models\Configuration;
 use App\Models\PaymentMethod;
 use App\Models\TaxRule;
 use App\Models\TenantApiKey;
+use App\Models\TenantNotificationGateway;
 use App\Services\Auth\PermissionChecker;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Navigation\TenantNavRegistry;
+use App\Services\Notifications\TenantNotificationDispatcherService;
 use App\Services\TaxCalculationService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -79,8 +81,6 @@ class Index extends Component
 
     public $faviconFile = null;
 
-    public $drawerCoverFile = null;
-
     public $newLogo;
 
     public $newFavicon;
@@ -88,8 +88,6 @@ class Index extends Component
     public string $logo = '';
 
     public string $favicon = '';
-
-    public string $drawerCover = '';
 
     public string $primaryColor = '#4F46E5';
 
@@ -180,6 +178,54 @@ class Index extends Component
     public array $channelEventTypes = [];
 
     public bool $channelIsActive = true;
+
+    // Multi-Channel Notification Gateways State (WhatsApp, SMS, SMTP, Webhooks)
+    public string $integrationsSubTab = 'whatsapp';
+
+    // 1. WhatsApp Business Gateway
+    public bool $whatsappEnabled = false;
+    public string $whatsappProvider = 'meta_cloud_api'; // meta_cloud_api, twilio
+    public string $metaPhoneNumberId = '';
+    public string $metaWabaId = '';
+    public string $metaAccessToken = '';
+    public string $metaTemplateNamespace = '';
+    public string $twilioWhatsappSid = '';
+    public string $twilioWhatsappToken = '';
+    public string $twilioWhatsappFrom = '';
+    public string $whatsappTestPhone = '';
+    public string $whatsappTestResult = '';
+    public string $whatsappTestStatus = '';
+
+    // 2. SMS Gateway
+    public bool $smsEnabled = false;
+    public string $smsProvider = 'twilio'; // twilio, msg91, generic_http
+    public string $smsTwilioSid = '';
+    public string $smsTwilioToken = '';
+    public string $smsTwilioFrom = '';
+    public string $msg91AuthKey = '';
+    public string $msg91SenderId = '';
+    public string $msg91DltTemplateId = '';
+    public string $genericSmsUrl = '';
+    public string $genericSmsMethod = 'POST';
+    public string $genericSmsApiKey = '';
+    public string $smsTestPhone = '';
+    public string $smsTestResult = '';
+    public string $smsTestStatus = '';
+
+    // 3. Custom SMTP Gateway
+    public bool $smtpEnabled = false;
+    public string $smtpTestEmail = '';
+    public string $smtpTestResult = '';
+    public string $smtpTestStatus = '';
+
+    // 4. Custom Webhook Gateway
+    public bool $webhookEnabled = false;
+    public string $webhookUrl = '';
+    public string $webhookMethod = 'POST';
+    public string $webhookSecret = '';
+    public array $webhookEvents = ['receipt_generated', 'invoice_created', 'quotation_sent', 'due_reminder'];
+    public string $webhookTestResult = '';
+    public string $webhookTestStatus = '';
 
     // Payment Methods Management Modal State
     public bool $showPaymentMethodModal = false;
@@ -297,22 +343,27 @@ class Index extends Component
             $this->activeSection = 'financial';
         } elseif (str_ends_with($routeName, '.taxes') || request()->query('section') === 'taxes') {
             $this->activeSection = 'taxes';
-        } elseif (str_ends_with($routeName, '.api') || request()->query('section') === 'api') {
-            $this->activeSection = 'api';
+        } elseif (str_ends_with($routeName, '.api') || str_ends_with($routeName, '.integrations') || in_array(request()->query('section'), ['api', 'integrations'])) {
+            $this->activeSection = 'integrations';
         } elseif (str_ends_with($routeName, '.navigation') || request()->query('section') === 'navigation') {
             $this->activeSection = 'navigation';
         } else {
             $this->activeSection = request()->query('section', 'overview');
-            if (! in_array($this->activeSection, ['overview', 'mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'navigation'])) {
+            if (! in_array($this->activeSection, ['overview', 'mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'integrations', 'navigation'])) {
                 $this->activeSection = 'overview';
             }
+        }
+
+        $tab = request()->query('tab');
+        if (in_array($tab, ['whatsapp', 'sms', 'smtp', 'webhook', 'api_keys'])) {
+            $this->integrationsSubTab = $tab;
         }
 
         $this->company = auth('web')->user()->company;
         $this->name = $this->company->name;
         $this->slug = (string) ($this->company->slug ?? '');
         $this->customDomain = (string) ($this->company->custom_domain ?? '');
-        $this->tradeName = (string) $this->company->trade_name;
+        $this->tradeName = \App\Models\Company::isDemoPlaceholderName($this->company->trade_name) ? (string) $this->company->name : (string) $this->company->trade_name;
         $this->taxId = (string) $this->company->tax_id;
         $this->email = (string) $this->company->email;
         $this->phone = (string) $this->company->phone;
@@ -326,17 +377,16 @@ class Index extends Component
         $this->currencySymbol = (string) ($this->company->currency_symbol ?: '$');
         $this->currencyDecimals = (int) ($this->company->currency_decimals ?? 2);
         $this->currencySymbolPosition = (string) ($this->company->currency_symbol_position ?: 'prefix');
-        $this->otherCurrencies = $this->company->other_currencies ?: [];
-        $this->invoicePrefix = (string) $this->company->invoice_prefix;
-        $this->quotationPrefix = (string) $this->company->quotation_prefix;
-        $this->invoiceTerms = (string) $this->company->invoice_terms;
-        $this->quoteTerms = (string) $this->company->quote_terms;
-        $this->bankDetails = (string) $this->company->bank_details;
+        $this->otherCurrencies = (array) ($this->company->other_currencies ?? []);
+        $this->invoicePrefix = (string) ($this->company->invoice_prefix ?: 'INV-');
+        $this->quotationPrefix = (string) ($this->company->quotation_prefix ?: 'QT-');
+        $this->invoiceTerms = (string) ($this->company->invoice_terms ?? '');
+        $this->quoteTerms = (string) ($this->company->quote_terms ?? '');
+        $this->bankDetails = (string) ($this->company->bank_details ?? '');
 
         // Branding
         $this->logo = (string) ($this->company->logo ?? '');
         $this->favicon = (string) ($this->company->favicon ?? '');
-        $this->drawerCover = (string) ($this->company->drawer_cover ?? '');
         $this->primaryColor = (string) ($this->company->primary_color ?: '#4F46E5');
         $this->accentColor = (string) ($this->company->accent_color ?: '#D97706');
         $this->drawerBg = (string) ($this->company->drawer_bg ?: '#FFF7ED');
@@ -399,6 +449,67 @@ class Index extends Component
 
         $this->testEmailTo = auth('web')->user()?->email ?? $this->email;
 
+        // Load multi-channel TenantNotificationGateway models
+        $gateways = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $this->company->id)
+            ->get()
+            ->keyBy('channel');
+
+        // WhatsApp Gateway
+        $waGw = $gateways->get(TenantNotificationGateway::CHANNEL_WHATSAPP);
+        $waCreds = (array) ($waGw?->credentials ?? []);
+        $this->whatsappEnabled = (bool) ($waGw?->is_enabled ?? false);
+        $this->whatsappProvider = (string) ($waGw?->provider ?: 'meta_cloud_api');
+        $this->metaPhoneNumberId = (string) ($waCreds['phone_number_id'] ?? ($configs['whatsapp_phone_number_id'] ?? ''));
+        $this->metaWabaId = (string) ($waCreds['waba_id'] ?? ($configs['whatsapp_business_account_id'] ?? ''));
+        $this->metaAccessToken = (string) ($waCreds['access_token'] ?? ($configs['whatsapp_access_token'] ?? ($configs['whatsapp_api_token'] ?? '')));
+        $this->metaTemplateNamespace = (string) ($waCreds['template_namespace'] ?? '');
+        $this->twilioWhatsappSid = (string) ($waCreds['account_sid'] ?? '');
+        $this->twilioWhatsappToken = (string) ($waCreds['auth_token'] ?? '');
+        $this->twilioWhatsappFrom = (string) ($waCreds['from_number'] ?? '');
+        $this->whatsappTestPhone = (string) ($this->company->phone ?? '');
+
+        // SMS Gateway
+        $smsGw = $gateways->get(TenantNotificationGateway::CHANNEL_SMS);
+        $smsCreds = (array) ($smsGw?->credentials ?? []);
+        $this->smsEnabled = (bool) ($smsGw?->is_enabled ?? false);
+        $this->smsProvider = (string) ($smsGw?->provider ?: 'twilio');
+        $this->smsTwilioSid = (string) ($smsCreds['account_sid'] ?? '');
+        $this->smsTwilioToken = (string) ($smsCreds['auth_token'] ?? '');
+        $this->smsTwilioFrom = (string) ($smsCreds['from_number'] ?? '');
+        $this->msg91AuthKey = (string) ($smsCreds['auth_key'] ?? '');
+        $this->msg91SenderId = (string) ($smsCreds['sender_id'] ?? '');
+        $this->msg91DltTemplateId = (string) ($smsCreds['dlt_template_id'] ?? '');
+        $this->genericSmsUrl = (string) ($smsCreds['url'] ?? '');
+        $this->genericSmsMethod = (string) ($smsCreds['method'] ?? 'POST');
+        $this->genericSmsApiKey = (string) ($smsCreds['api_key'] ?? '');
+        $this->smsTestPhone = (string) ($this->company->phone ?? '');
+
+        // Custom SMTP Gateway
+        $emailGw = $gateways->get(TenantNotificationGateway::CHANNEL_EMAIL);
+        $emailCreds = (array) ($emailGw?->credentials ?? []);
+        $this->smtpEnabled = (bool) ($emailGw?->is_enabled ?? false);
+        if (! empty($emailCreds['host'])) {
+            $this->smtpHost = (string) ($emailCreds['host'] ?? '');
+            $this->smtpPort = (int) ($emailCreds['port'] ?? 587);
+            $this->smtpEncryption = (string) ($emailCreds['encryption'] ?? 'tls');
+            $this->smtpUsername = (string) ($emailCreds['username'] ?? '');
+            $this->smtpPassword = (string) ($emailCreds['password'] ?? '');
+            $this->smtpFromAddress = (string) ($emailCreds['from_address'] ?? $this->email);
+            $this->smtpFromName = (string) ($emailCreds['from_name'] ?? $this->name);
+            $this->hasStoredSmtpPassword = filled($this->smtpPassword);
+        }
+        $this->smtpTestEmail = auth('web')->user()?->email ?: ($this->company->email ?: 'admin@example.com');
+
+        // Custom Webhook Gateway
+        $webhookGw = $gateways->get(TenantNotificationGateway::CHANNEL_WEBHOOK);
+        $webhookCreds = (array) ($webhookGw?->credentials ?? []);
+        $this->webhookEnabled = (bool) ($webhookGw?->is_enabled ?? false);
+        $this->webhookUrl = (string) ($webhookCreds['url'] ?? '');
+        $this->webhookMethod = (string) ($webhookCreds['method'] ?? 'POST');
+        $this->webhookSecret = (string) ($webhookCreds['secret'] ?? '');
+        $this->webhookEvents = (array) ($webhookCreds['event_types'] ?? ['receipt_generated', 'invoice_created', 'quotation_sent', 'due_reminder']);
+
         // Ensure default payment methods exist
         PaymentMethod::getForCompany($this->company->id);
     }
@@ -435,10 +546,8 @@ class Index extends Component
             'defaultCommissionType' => ['required', 'in:percentage,fixed,profit_percentage,profit'],
             'logo' => ['nullable', 'string', 'max:500'],
             'favicon' => ['nullable', 'string', 'max:500'],
-            'drawerCover' => ['nullable', 'string', 'max:500'],
             'logoFile' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp,svg', 'max:2048'],
             'faviconFile' => ['nullable', 'file', 'mimes:png,ico,svg,jpg,jpeg,webp', 'max:1024'],
-            'drawerCoverFile' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:4096'],
             'defaultAiProvider' => ['required', 'in:openai,gemini,claude'],
             'openaiModel' => ['required', Rule::in(array_column($this->modelPresets['openai'], 'id'))],
             'geminiModel' => ['required', Rule::in(array_column($this->modelPresets['gemini'], 'id'))],
@@ -498,18 +607,6 @@ class Index extends Component
         }
     }
 
-    public function getDrawerCoverPreviewUrlProperty(): ?string
-    {
-        if (! $this->drawerCoverFile) {
-            return null;
-        }
-        try {
-            return $this->drawerCoverFile->temporaryUrl();
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
     public function updatedLogoFile(): void
     {
         try {
@@ -544,23 +641,6 @@ class Index extends Component
         }
     }
 
-    public function updatedDrawerCoverFile(): void
-    {
-        try {
-            $this->validateOnly('drawerCoverFile', [
-                'drawerCoverFile' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:4096'],
-            ]);
-        } catch (ValidationException $e) {
-            $this->drawerCoverFile = null;
-            $msg = $e->validator->errors()->first('drawerCoverFile') ?: __('Invalid image format. Please upload a valid image file (.png, .jpg, .jpeg, .webp) under 4MB.');
-            $this->dispatch('notify', ['type' => 'error', 'message' => $msg]);
-            $this->addError('drawerCoverFile', $msg);
-        } catch (\Throwable $e) {
-            $this->drawerCoverFile = null;
-            $this->dispatch('notify', ['type' => 'error', 'message' => __('Invalid image format. Please upload a valid image file.')]);
-        }
-    }
-
     public function removeLogo(): void
     {
         if ($this->company->logo && ! filter_var($this->company->logo, FILTER_VALIDATE_URL)) {
@@ -586,19 +666,6 @@ class Index extends Component
         $this->favicon = '';
         $this->faviconFile = null;
         session()->flash('status', 'Favicon removed successfully.');
-    }
-
-    public function removeDrawerCover(): void
-    {
-        if ($this->company->drawer_cover && ! filter_var($this->company->drawer_cover, FILTER_VALIDATE_URL)) {
-            $cleanPath = preg_replace('#^/?storage/#', '', $this->company->drawer_cover);
-            Storage::disk('public')->delete($cleanPath);
-        }
-
-        $this->company->update(['drawer_cover' => null]);
-        $this->drawerCover = '';
-        $this->drawerCoverFile = null;
-        session()->flash('status', 'Drawer cover image removed successfully.');
     }
 
     public function addOtherCurrency(): void
@@ -635,18 +702,16 @@ class Index extends Component
             $this->faviconFile = null;
         }
 
-        // Handle Drawer Cover Upload
-        if ($this->drawerCoverFile) {
-            $path = $this->drawerCoverFile->store('tenant-drawer-covers', 'public');
-            $this->drawerCover = Storage::url($path);
-            $this->drawerCoverFile = null;
+        $effectiveTrade = trim((string) $this->tradeName);
+        if ($effectiveTrade === '' || \App\Models\Company::isDemoPlaceholderName($effectiveTrade) || \App\Models\Company::isDemoPlaceholderName($this->company->trade_name)) {
+            $effectiveTrade = $this->name;
         }
 
         $this->company->update([
             'name' => $this->name,
             'slug' => $this->slug ?: null,
             'custom_domain' => $this->customDomain ?: null,
-            'trade_name' => $this->tradeName ?: null,
+            'trade_name' => $effectiveTrade ?: null,
             'tax_id' => $this->taxId ?: null,
             'email' => $this->email ?: null,
             'phone' => $this->phone ?: null,
@@ -677,7 +742,6 @@ class Index extends Component
             'bank_details' => $this->bankDetails ?: null,
             'logo' => $this->logo ?: null,
             'favicon' => $this->favicon ?: null,
-            'drawer_cover' => $this->drawerCover ?: null,
             'primary_color' => $this->primaryColor ?: '#4F46E5',
             'accent_color' => $this->accentColor ?: '#D97706',
             'drawer_bg' => $this->drawerBg ?: '#FFF7ED',
@@ -797,6 +861,305 @@ class Index extends Component
         AuditLog::record('company.ai_settings_updated', $this->company->id, $user?->id);
         session()->flash('status', __('AI Vision & model configuration updated successfully.'));
         $this->dispatch('toast', ['type' => 'success', 'message' => __('AI Vision & model configuration updated successfully.')]);
+    }
+
+    public function saveWhatsAppGateway(): void
+    {
+        $credentials = [
+            'phone_number_id' => trim($this->metaPhoneNumberId),
+            'waba_id' => trim($this->metaWabaId),
+            'access_token' => trim($this->metaAccessToken),
+            'template_namespace' => trim($this->metaTemplateNamespace),
+            'account_sid' => trim($this->twilioWhatsappSid),
+            'auth_token' => trim($this->twilioWhatsappToken),
+            'from_number' => trim($this->twilioWhatsappFrom),
+        ];
+
+        TenantNotificationGateway::withoutGlobalScope('company')->updateOrCreate(
+            ['company_id' => $this->company->id, 'channel' => TenantNotificationGateway::CHANNEL_WHATSAPP],
+            [
+                'tenant_id' => $this->company->id,
+                'provider' => $this->whatsappProvider,
+                'is_enabled' => $this->whatsappEnabled,
+                'credentials' => $credentials,
+            ]
+        );
+
+        // Also sync to configurations table for backwards compatibility
+        if (filled($this->metaPhoneNumberId)) {
+            Configuration::setForCompany($this->company->id, 'whatsapp_phone_number_id', $this->metaPhoneNumberId);
+        }
+        if (filled($this->metaAccessToken)) {
+            Configuration::setForCompany($this->company->id, 'whatsapp_access_token', $this->metaAccessToken);
+        }
+        if (filled($this->metaWabaId)) {
+            Configuration::setForCompany($this->company->id, 'whatsapp_business_account_id', $this->metaWabaId);
+        }
+
+        AuditLog::record('gateway.configured', $this->company->id, auth('web')->id(), [
+            'channel' => 'whatsapp',
+            'enabled' => $this->whatsappEnabled,
+            'provider' => $this->whatsappProvider,
+        ]);
+
+        session()->flash('status', __('WhatsApp Business gateway configuration saved successfully.'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => __('WhatsApp Business gateway configuration saved.')]);
+    }
+
+    public function saveSmsGateway(): void
+    {
+        $credentials = [
+            'account_sid' => trim($this->smsTwilioSid),
+            'auth_token' => trim($this->smsTwilioToken),
+            'from_number' => trim($this->smsTwilioFrom),
+            'auth_key' => trim($this->msg91AuthKey),
+            'sender_id' => trim($this->msg91SenderId),
+            'dlt_template_id' => trim($this->msg91DltTemplateId),
+            'url' => trim($this->genericSmsUrl),
+            'method' => $this->genericSmsMethod,
+            'api_key' => trim($this->genericSmsApiKey),
+        ];
+
+        TenantNotificationGateway::withoutGlobalScope('company')->updateOrCreate(
+            ['company_id' => $this->company->id, 'channel' => TenantNotificationGateway::CHANNEL_SMS],
+            [
+                'tenant_id' => $this->company->id,
+                'provider' => $this->smsProvider,
+                'is_enabled' => $this->smsEnabled,
+                'credentials' => $credentials,
+            ]
+        );
+
+        AuditLog::record('gateway.configured', $this->company->id, auth('web')->id(), [
+            'channel' => 'sms',
+            'enabled' => $this->smsEnabled,
+            'provider' => $this->smsProvider,
+        ]);
+
+        session()->flash('status', __('SMS gateway configuration saved successfully.'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => __('SMS gateway configuration saved.')]);
+    }
+
+    public function saveSmtpGateway(): void
+    {
+        $credentials = [
+            'host' => trim($this->smtpHost),
+            'port' => (int) $this->smtpPort,
+            'encryption' => $this->smtpEncryption,
+            'username' => trim($this->smtpUsername),
+            'password' => $this->smtpPassword,
+            'from_address' => trim($this->smtpFromAddress ?: ($this->company->email ?? 'noreply@zoomnearby.com')),
+            'from_name' => trim($this->smtpFromName ?: ($this->company->name ?? 'POS Store')),
+        ];
+
+        TenantNotificationGateway::withoutGlobalScope('company')->updateOrCreate(
+            ['company_id' => $this->company->id, 'channel' => TenantNotificationGateway::CHANNEL_EMAIL],
+            [
+                'tenant_id' => $this->company->id,
+                'provider' => TenantNotificationGateway::PROVIDER_SMTP,
+                'is_enabled' => $this->smtpEnabled,
+                'credentials' => $credentials,
+            ]
+        );
+
+        // Also sync to configurations table for backwards compatibility
+        Configuration::setForCompany($this->company->id, 'smtp_host', $this->smtpHost);
+        Configuration::setForCompany($this->company->id, 'smtp_port', (string) $this->smtpPort);
+        Configuration::setForCompany($this->company->id, 'smtp_encryption', $this->smtpEncryption);
+        Configuration::setForCompany($this->company->id, 'smtp_username', $this->smtpUsername);
+        if (filled($this->smtpPassword)) {
+            Configuration::setForCompany($this->company->id, 'smtp_password', $this->smtpPassword);
+            $this->hasStoredSmtpPassword = true;
+        }
+        Configuration::setForCompany($this->company->id, 'smtp_from_address', $this->smtpFromAddress);
+        Configuration::setForCompany($this->company->id, 'smtp_from_name', $this->smtpFromName);
+
+        AuditLog::record('gateway.configured', $this->company->id, auth('web')->id(), [
+            'channel' => 'email',
+            'enabled' => $this->smtpEnabled,
+            'provider' => 'smtp',
+        ]);
+
+        session()->flash('status', __('Custom SMTP mail server configuration saved successfully.'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => __('Custom SMTP configuration saved.')]);
+    }
+
+    public function saveWebhookGateway(): void
+    {
+        $credentials = [
+            'url' => trim($this->webhookUrl),
+            'method' => $this->webhookMethod,
+            'secret' => trim($this->webhookSecret),
+            'event_types' => $this->webhookEvents,
+        ];
+
+        TenantNotificationGateway::withoutGlobalScope('company')->updateOrCreate(
+            ['company_id' => $this->company->id, 'channel' => TenantNotificationGateway::CHANNEL_WEBHOOK],
+            [
+                'tenant_id' => $this->company->id,
+                'provider' => TenantNotificationGateway::PROVIDER_WEBHOOK,
+                'is_enabled' => $this->webhookEnabled,
+                'credentials' => $credentials,
+            ]
+        );
+
+        AuditLog::record('gateway.configured', $this->company->id, auth('web')->id(), [
+            'channel' => 'custom_webhook',
+            'enabled' => $this->webhookEnabled,
+            'provider' => 'generic_webhook',
+        ]);
+
+        session()->flash('status', __('Custom webhook dispatcher configuration saved successfully.'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => __('Custom webhook dispatcher configuration saved.')]);
+    }
+
+    public function toggleGateway(string $channel): void
+    {
+        $channel = match ($channel) {
+            'email', 'smtp' => TenantNotificationGateway::CHANNEL_EMAIL,
+            'webhook', 'custom_webhook' => TenantNotificationGateway::CHANNEL_WEBHOOK,
+            'sms' => TenantNotificationGateway::CHANNEL_SMS,
+            'whatsapp' => TenantNotificationGateway::CHANNEL_WHATSAPP,
+            default => $channel,
+        };
+
+        $gw = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $this->company->id)
+            ->where('channel', $channel)
+            ->first();
+
+        if ($gw) {
+            $gw->update(['is_enabled' => ! $gw->is_enabled]);
+            if ($channel === TenantNotificationGateway::CHANNEL_WHATSAPP) {
+                $this->whatsappEnabled = $gw->is_enabled;
+            } elseif ($channel === TenantNotificationGateway::CHANNEL_SMS) {
+                $this->smsEnabled = $gw->is_enabled;
+            } elseif ($channel === TenantNotificationGateway::CHANNEL_EMAIL) {
+                $this->smtpEnabled = $gw->is_enabled;
+            } elseif ($channel === TenantNotificationGateway::CHANNEL_WEBHOOK) {
+                $this->webhookEnabled = $gw->is_enabled;
+            }
+            session()->flash('status', __(ucfirst(str_replace('_', ' ', $channel)).' channel status toggled.'));
+        }
+    }
+
+    public function testWhatsApp(TenantNotificationDispatcherService $dispatcher): void
+    {
+        $gw = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $this->company->id)
+            ->where('channel', TenantNotificationGateway::CHANNEL_WHATSAPP)
+            ->first();
+
+        if (! $gw) {
+            $this->whatsappTestStatus = 'error';
+            $this->whatsappTestResult = __('Please save WhatsApp credentials before testing.');
+
+            return;
+        }
+
+        try {
+            $recipient = filled($this->whatsappTestPhone) ? $this->whatsappTestPhone : ($this->company->phone ?: '1234567890');
+            $result = $dispatcher->testGateway($this->company, $gw, $recipient);
+            if (! empty($result['success'])) {
+                $this->whatsappTestStatus = 'success';
+                $this->whatsappTestResult = $result['message'] ?? __('Test WhatsApp message delivered successfully!');
+            } else {
+                $this->whatsappTestStatus = 'error';
+                $this->whatsappTestResult = $result['error'] ?? ($result['message'] ?? __('Failed to send test WhatsApp message.'));
+            }
+        } catch (\Throwable $e) {
+            $this->whatsappTestStatus = 'error';
+            $this->whatsappTestResult = $e->getMessage();
+        }
+    }
+
+    public function testSms(TenantNotificationDispatcherService $dispatcher): void
+    {
+        $gw = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $this->company->id)
+            ->where('channel', TenantNotificationGateway::CHANNEL_SMS)
+            ->first();
+
+        if (! $gw) {
+            $this->smsTestStatus = 'error';
+            $this->smsTestResult = __('Please save SMS gateway credentials before testing.');
+
+            return;
+        }
+
+        try {
+            $recipient = filled($this->smsTestPhone) ? $this->smsTestPhone : ($this->company->phone ?: '1234567890');
+            $result = $dispatcher->testGateway($this->company, $gw, $recipient);
+            if (! empty($result['success'])) {
+                $this->smsTestStatus = 'success';
+                $this->smsTestResult = $result['message'] ?? __('Test SMS delivered successfully!');
+            } else {
+                $this->smsTestStatus = 'error';
+                $this->smsTestResult = $result['error'] ?? ($result['message'] ?? __('Failed to dispatch test SMS.'));
+            }
+        } catch (\Throwable $e) {
+            $this->smsTestStatus = 'error';
+            $this->smsTestResult = $e->getMessage();
+        }
+    }
+
+    public function testSmtp(TenantNotificationDispatcherService $dispatcher): void
+    {
+        $gw = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $this->company->id)
+            ->where('channel', TenantNotificationGateway::CHANNEL_EMAIL)
+            ->first();
+
+        if (! $gw) {
+            $this->smtpTestStatus = 'error';
+            $this->smtpTestResult = __('Please save SMTP settings before testing.');
+
+            return;
+        }
+
+        try {
+            $recipient = filled($this->smtpTestEmail) ? $this->smtpTestEmail : ($this->company->email ?: 'admin@example.com');
+            $result = $dispatcher->testGateway($this->company, $gw, $recipient);
+            if (! empty($result['success'])) {
+                $this->smtpTestStatus = 'success';
+                $this->smtpTestResult = $result['message'] ?? __('Test email dispatched successfully!');
+            } else {
+                $this->smtpTestStatus = 'error';
+                $this->smtpTestResult = $result['error'] ?? ($result['message'] ?? __('Failed to send test email.'));
+            }
+        } catch (\Throwable $e) {
+            $this->smtpTestStatus = 'error';
+            $this->smtpTestResult = $e->getMessage();
+        }
+    }
+
+    public function testWebhook(TenantNotificationDispatcherService $dispatcher): void
+    {
+        $gw = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $this->company->id)
+            ->where('channel', TenantNotificationGateway::CHANNEL_WEBHOOK)
+            ->first();
+
+        if (! $gw) {
+            $this->webhookTestStatus = 'error';
+            $this->webhookTestResult = __('Please save Webhook settings before testing.');
+
+            return;
+        }
+
+        try {
+            $result = $dispatcher->testGateway($this->company, $gw);
+            if (! empty($result['success'])) {
+                $this->webhookTestStatus = 'success';
+                $this->webhookTestResult = $result['message'] ?? __('Test webhook ping delivered successfully!');
+            } else {
+                $this->webhookTestStatus = 'error';
+                $this->webhookTestResult = $result['error'] ?? ($result['message'] ?? __('Failed to dispatch test webhook ping.'));
+            }
+        } catch (\Throwable $e) {
+            $this->webhookTestStatus = 'error';
+            $this->webhookTestResult = $e->getMessage();
+        }
     }
 
     public function openAddChannelModal(): void

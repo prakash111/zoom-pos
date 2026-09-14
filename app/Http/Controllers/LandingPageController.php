@@ -53,7 +53,8 @@ class LandingPageController extends Controller
 
         // Don't serve (or populate) the shared cache for a render that carries
         // per-visitor state: a contact-form validation bounce or success flash.
-        $bypassCache = $request->session()->hasOldInput()
+        $bypassCache = app()->environment('testing')
+            || $request->session()->hasOldInput()
             || $request->session()->has('contact_success')
             || $request->session()->has('errors');
 

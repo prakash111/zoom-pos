@@ -39,4 +39,31 @@ class NavigationMenuController extends Controller
             'nav' => $navConfig,
         ]);
     }
+
+    /**
+     * Build and activate comprehensive default navigation for a store type.
+     */
+    public function populateDefaultNavigation(\App\Models\Company|\App\Models\Tenant $tenant, string $storeType): void
+    {
+        app(\App\Services\Navigation\MenuService::class)->populateDefaultNavigation($tenant, $storeType);
+    }
+
+    /**
+     * GET /tenant/navigation/header or drawer header info.
+     */
+    public function drawerHeader(Request $request): JsonResponse
+    {
+        $user = auth('web')->user() ?? auth('tenant_api')->user();
+        $tenant = $user?->tenant ?? $user?->company;
+        abort_unless($tenant, 404);
+
+        $drawerHeader = $tenant->getDrawerHeaderPayload();
+
+        return response()->json([
+            'success' => true,
+            'header' => $drawerHeader,
+            'drawer_header' => $drawerHeader,
+        ]);
+    }
 }
+

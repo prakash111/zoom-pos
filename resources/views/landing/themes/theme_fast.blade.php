@@ -13,14 +13,7 @@
     $ctaSecondaryUrl = $branding->getHeroCtaSecondaryUrl();
     $hasDownloads = $branding->hasAnyDownloadLink();
 
-    $features = [
-        ['icon' => '📦', 'title' => __('Smart Inventory & Stock'), 'body' => __('Real-time multi-warehouse stock, barcode & SKU labels, batch/expiry tracking and automatic low-stock re-order alerts.')],
-        ['icon' => '🛒', 'title' => __('Retail & Store POS'), 'body' => __('Sub-second barcode checkout, split cash/card tender, customer credit accounts, and full X/Z shift reports.')],
-        ['icon' => '🍽️', 'title' => __('Restaurant & Food POS'), 'body' => __('Live dining floor plans, Kitchen Order Tickets to KDS screens, QR table ordering, bill splitting and table merge.')],
-        ['icon' => '🧾', 'title' => __('Finance & Invoicing'), 'body' => __('Compliant tax invoices (VAT/GST), multi-currency pricing, thermal + A4 receipts, and built-in AP/AR ledgers.')],
-        ['icon' => '⚡', 'title' => __('Offline-First Sync'), 'body' => __('Keep ringing up sales when the internet drops. Transactions queue locally and sync automatically on reconnect.')],
-        ['icon' => '🏢', 'title' => __('Multi-Location Workspaces'), 'body' => __('Scale from one till to a nationwide franchise with isolated tenant data, custom domains and granular roles.')],
-    ];
+    $features = $branding->landingFeatures();
 
     $stats = [
         ['2,500,000+', __('Transactions Processed')],
@@ -233,17 +226,13 @@
             <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
                 <h2 class="text-center text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white mb-12">{{ __('Trusted by market leaders worldwide') }}</h2>
                 <div class="grid md:grid-cols-3 gap-6">
-                    @foreach ([
-                        [__('We switched all our retail outlets over in one afternoon. Inventory clears immediately and end-of-day reconciliation takes seconds.'), 'Alexander Hayes', __('Operations Director · Apex Retail Group')],
-                        [__('The offline checkout saved us during a major fiber cut on a busy weekend. Not a single sale or customer was lost.'), 'Elena Rostova', __('Founder · Metro Gourmet Markets')],
-                        [__('POS, inventory and KOT kitchen displays in a single dashboard transformed our restaurant chain.'), 'Tariq Mansour', __('Head of Operations · Urban Dine Hospitality')],
-                    ] as [$quote, $name, $role])
+                    @foreach ($branding->landingTestimonials() as $t)
                         <figure class="p-6 {{ $card }} flex flex-col">
                             <div class="text-amber-500 dark:text-brand-lime text-sm mb-3">★★★★★</div>
-                            <blockquote class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed flex-1">&ldquo;{{ $quote }}&rdquo;</blockquote>
+                            <blockquote class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed flex-1">&ldquo;{{ $t['quote'] }}&rdquo;</blockquote>
                             <figcaption class="mt-6 pt-4 border-t {{ $rule }}">
-                                <div class="text-sm font-black text-slate-900 dark:text-white">{{ $name }}</div>
-                                <div class="text-xs {{ $muted }}">{{ $role }}</div>
+                                <div class="text-sm font-black text-slate-900 dark:text-white">{{ $t['name'] }}</div>
+                                <div class="text-xs {{ $muted }}">{{ $t['role'] }}</div>
                             </figcaption>
                         </figure>
                     @endforeach

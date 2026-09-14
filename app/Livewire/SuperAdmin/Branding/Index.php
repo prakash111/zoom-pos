@@ -7,15 +7,28 @@ use App\Models\Page;
 use App\Models\PlatformBranding;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 #[Layout('layouts.superadmin', ['title' => 'Branding & Landing Page'])]
 class Index extends Component
 {
+    use WithFileUploads;
+
     public string $platformName = '';
 
     public string $logoUrl = '';
 
+    public $logoImage = null;
+
     public string $faviconUrl = '';
+
+    public bool $showAuthBanner = false;
+
+    public string $authBannerImageUrl = '';
+
+    public $authBannerImage = null;
+
+    public bool $enableRegistrationDomainSetup = true;
 
     public string $primaryColor = '#4f46e5';
 
@@ -73,8 +86,11 @@ class Index extends Component
     {
         $branding = PlatformBranding::current();
         $this->platformName = $branding->platform_name;
-        $this->logoUrl = (string) $branding->logo_url;
+        $this->logoUrl = (string) ($branding->logo_url ?: \App\Models\DynamicSetting::get('platform_logo_url', ''));
         $this->faviconUrl = (string) $branding->favicon_url;
+        $this->showAuthBanner = (bool) \App\Models\DynamicSetting::get('show_auth_banner', false);
+        $this->authBannerImageUrl = (string) \App\Models\DynamicSetting::get('auth_banner_image_url', '');
+        $this->enableRegistrationDomainSetup = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
         $this->primaryColor = $branding->primary_color ?? '#4f46e5';
         $this->superadminSidebarColor = $branding->superadmin_sidebar_color ?? '#4338ca';
         $this->landingPrimaryColor = $branding->landing_primary_color ?? '#10b981';
@@ -106,12 +122,25 @@ class Index extends Component
         $this->sectionCta = (bool) ($cfg['cta'] ?? true);
     }
 
+    public function removeAuthBanner(): void
+    {
+        $this->authBannerImage = null;
+        $this->authBannerImageUrl = '';
+        \App\Models\DynamicSetting::put('auth_banner_image_url', '');
+        session()->flash('status', 'Auth banner image removed.');
+    }
+
     protected function rules(): array
     {
         return [
             'platformName' => ['required', 'string', 'max:255'],
             'logoUrl' => ['nullable', 'string', 'max:500'],
+            'logoImage' => ['nullable', 'image', 'max:5120'],
             'faviconUrl' => ['nullable', 'string', 'max:500'],
+            'showAuthBanner' => ['boolean'],
+            'authBannerImageUrl' => ['nullable', 'string', 'max:500'],
+            'authBannerImage' => ['nullable', 'image', 'max:5120'],
+            'enableRegistrationDomainSetup' => ['boolean'],
             'primaryColor' => ['nullable', 'string', 'max:32'],
             'superadminSidebarColor' => ['nullable', 'string', 'max:32'],
             'landingPrimaryColor' => ['nullable', 'string', 'max:32'],
@@ -133,6 +162,29 @@ class Index extends Component
     public function save(): void
     {
         $data = $this->validate();
+
+        if ($this->logoImage) {
+            $logoPath = $this->logoImage->store('branding', 'public');
+            $data['logoUrl'] = \Illuminate\Support\Facades\Storage::disk('public')->url($logoPath);
+            $this->logoUrl = $data['logoUrl'];
+            $this->logoImage = null;
+        }
+
+        if ($this->authBannerImage) {
+            $bannerPath = $this->authBannerImage->store('branding', 'public');
+            $this->authBannerImageUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($bannerPath);
+            $this->authBannerImage = null;
+        }
+
+        \App\Models\DynamicSetting::put('show_auth_banner', $this->showAuthBanner);
+        \App\Models\DynamicSetting::put('auth_banner_image_url', $this->authBannerImageUrl);
+        \App\Models\DynamicSetting::put('enable_registration_domain_setup', $this->enableRegistrationDomainSetup);
+        if (! empty($data['logoUrl'])) {
+            \App\Models\DynamicSetting::put('platform_logo_url', $data['logoUrl']);
+        }
+        if (! empty($data['platformName'])) {
+            \App\Models\DynamicSetting::put('platform_brand_name', $data['platformName']);
+        }
 
         $sectionsConfig = [
             'trust_bar' => $this->sectionTrustBar,
@@ -169,6 +221,9 @@ class Index extends Component
             'landing_hero_banner_image_url' => $data['landingHeroBannerImageUrl'] ?: null,
             'landing_sections_config' => $sectionsConfig,
         ]);
+
+        \Illuminate\Support\Facades\Cache::forget('public_settings');
+        \Illuminate\Support\Facades\Cache::forget('platform_branding_settings');
 
         AuditLog::record('branding.updated', null, auth('platform_web')->id());
         session()->flash('status', 'Branding & Landing Page settings saved successfully.');

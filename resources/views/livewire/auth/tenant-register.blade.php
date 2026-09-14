@@ -1,7 +1,14 @@
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+@php
+    $showAuthBanner = (bool) \App\Models\DynamicSetting::get('show_auth_banner', false);
+    $authBannerUrl = \App\Models\DynamicSetting::get('auth_banner_image_url');
+    $hasBanner = $showAuthBanner && !empty($authBannerUrl);
+    $enableDomainSetup = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
+@endphp
+
+<div class="{{ $hasBanner ? 'grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start' : 'max-w-2xl mx-auto w-full' }}">
     
-    <!-- Left Column: Modern Registration Form Card -->
-    <div class="lg:col-span-7 w-full">
+    <!-- Left Column / Main Form Card -->
+    <div class="{{ $hasBanner ? 'lg:col-span-7' : '' }} w-full">
         <div class="rounded-3xl bg-slate-50 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-300 dark:border-white/15 p-6 sm:p-8 shadow-2xl space-y-5">
             
             @if ($step === 2)
@@ -258,60 +265,62 @@
                 </div>
                 @error('posMode') <p class="text-rose-400 text-[11px] mt-0.5">{{ $message }}</p> @enderror
 
-                <!-- Domain & Subdomain Setup (Optional Accordion) -->
-                @php
-                    $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?? 'yourdomain.com';
-                @endphp
-                <div class="pt-1 space-y-2">
-                    <button type="button"
-                            wire:click="toggleDomainSettings"
-                            class="w-full py-2.5 px-4 rounded-2xl bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 text-xs font-bold flex items-center justify-between transition cursor-pointer">
-                        <span class="flex items-center gap-2">
-                            <span>🌐</span>
-                            <span>{{ __('Subdomain & Custom Domain Setup') }}</span>
-                            <span class="text-[10px] text-slate-500 dark:text-slate-400 font-normal">({{ __('Optional') }})</span>
-                        </span>
-                        <span class="text-xs text-brand-lime font-mono">{{ $showDomainSettings ? __('▲ Hide') : __('▼ Configure') }}</span>
-                    </button>
+                @if ($enableDomainSetup)
+                    <!-- Domain & Subdomain Setup (Optional Accordion) -->
+                    @php
+                        $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?? 'yourdomain.com';
+                    @endphp
+                    <div class="pt-1 space-y-2">
+                        <button type="button"
+                                wire:click="toggleDomainSettings"
+                                class="w-full py-2.5 px-4 rounded-2xl bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 text-xs font-bold flex items-center justify-between transition cursor-pointer">
+                            <span class="flex items-center gap-2">
+                                <span>🌐</span>
+                                <span>{{ __('Subdomain & Custom Domain Setup') }}</span>
+                                <span class="text-[10px] text-slate-500 dark:text-slate-400 font-normal">({{ __('Optional') }})</span>
+                            </span>
+                            <span class="text-xs text-brand-lime font-mono">{{ $showDomainSettings ? __('▲ Hide') : __('▼ Configure') }}</span>
+                        </button>
 
-                    @if ($showDomainSettings)
-                        <div class="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-3">
-                            <!-- Subdomain / Slug Field -->
-                            <div class="space-y-1">
-                                <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                                    {{ __('Store Subdomain') }}
-                                </label>
-                                <div class="relative flex items-center rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-950 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition">
-                                    <div class="pl-3 pr-1 text-slate-500 dark:text-slate-400 text-xs font-bold">🔗</div>
-                                    <input type="text"
-                                           wire:model.live.debounce.300ms="slug"
-                                           placeholder="my-store"
-                                           class="w-full border-none bg-transparent text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-500 focus:ring-0 py-2 pr-1 font-mono">
-                                    <div class="pr-3 pl-1 text-[11px] font-mono text-slate-500 dark:text-slate-400 shrink-0">.{{ $appHost }}</div>
+                        @if ($showDomainSettings)
+                            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-3">
+                                <!-- Subdomain / Slug Field -->
+                                <div class="space-y-1">
+                                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                                        {{ __('Store Subdomain') }}
+                                    </label>
+                                    <div class="relative flex items-center rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-950 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition">
+                                        <div class="pl-3 pr-1 text-slate-500 dark:text-slate-400 text-xs font-bold">🔗</div>
+                                        <input type="text"
+                                               wire:model.live.debounce.300ms="slug"
+                                               placeholder="my-store"
+                                               class="w-full border-none bg-transparent text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-500 focus:ring-0 py-2 pr-1 font-mono">
+                                        <div class="pr-3 pl-1 text-[11px] font-mono text-slate-500 dark:text-slate-400 shrink-0">.{{ $appHost }}</div>
+                                    </div>
+                                    <p class="text-[10px] text-slate-500 dark:text-slate-400">
+                                        {{ __('Portal URL:') }} <span class="font-mono text-brand-lime">https://{{ $slug ?: 'your-store' }}.{{ $appHost }}</span>
+                                    </p>
+                                    @error('slug') <p class="text-rose-400 text-[11px] mt-0.5">{{ $message }}</p> @enderror
                                 </div>
-                                <p class="text-[10px] text-slate-500 dark:text-slate-400">
-                                    {{ __('Portal URL:') }} <span class="font-mono text-brand-lime">https://{{ $slug ?: 'your-store' }}.{{ $appHost }}</span>
-                                </p>
-                                @error('slug') <p class="text-rose-400 text-[11px] mt-0.5">{{ $message }}</p> @enderror
-                            </div>
 
-                            <!-- Custom Domain Field -->
-                            <div class="space-y-1">
-                                <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                                    {{ __('Custom Domain (e.g. pos.mystore.com)') }}
-                                </label>
-                                <div class="relative flex items-center rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-950 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition">
-                                    <div class="pl-3 pr-1 text-slate-500 dark:text-slate-400 text-xs font-bold">🌍</div>
-                                    <input type="text"
-                                           wire:model="customDomain"
-                                           placeholder="pos.yourcompany.com"
-                                           class="w-full border-none bg-transparent text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-500 focus:ring-0 py-2 pr-3 font-mono">
+                                <!-- Custom Domain Field -->
+                                <div class="space-y-1">
+                                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                                        {{ __('Custom Domain (e.g. pos.mystore.com)') }}
+                                    </label>
+                                    <div class="relative flex items-center rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-950 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition">
+                                        <div class="pl-3 pr-1 text-slate-500 dark:text-slate-400 text-xs font-bold">🌍</div>
+                                        <input type="text"
+                                               wire:model="customDomain"
+                                               placeholder="pos.yourcompany.com"
+                                               class="w-full border-none bg-transparent text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-500 focus:ring-0 py-2 pr-3 font-mono">
+                                    </div>
+                                    @error('customDomain') <p class="text-rose-400 text-[11px] mt-0.5">{{ $message }}</p> @enderror
                                 </div>
-                                @error('customDomain') <p class="text-rose-400 text-[11px] mt-0.5">{{ $message }}</p> @enderror
                             </div>
-                        </div>
-                    @endif
-                </div>
+                        @endif
+                    </div>
+                @endif
 
                 <!-- Activation License Code (Optional) -->
                 @if ($hasActivationCode)
@@ -383,59 +392,13 @@
         </div>
     </div>
 
-    <!-- Right Column: Instant Provisioning & Feature Highlights -->
-    <div class="lg:col-span-5 space-y-5">
-        
-        <!-- Guarantee Card -->
-        <div class="rounded-3xl bg-slate-50 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-6 sm:p-7 space-y-5 shadow-2xl">
-            <div class="flex items-center gap-3">
-                <span class="w-10 h-10 rounded-2xl bg-brand-lime/20 border border-brand-lime/30 flex items-center justify-center text-xl">
-                    🚀
-                </span>
-                <div>
-                    <h3 class="text-base font-black text-slate-900 dark:text-white">{{ __('Instant Cloud Provisioning') }}</h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Ready in <60s with full hardware support') }}</p>
-                </div>
-            </div>
-
-            <div class="space-y-3 text-xs">
-                <div class="flex items-start gap-2.5 text-slate-600 dark:text-slate-300">
-                    <span class="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">✓</span>
-                    <span><strong>{{ __('Multi-Warehouse & SKU Barcodes:') }}</strong> {{ __('Real-time inventory sync and low-stock alerts.') }}</span>
-                </div>
-
-                <div class="flex items-start gap-2.5 text-slate-600 dark:text-slate-300">
-                    <span class="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">✓</span>
-                    <span><strong>{{ __('High-Speed POS & Split Tenders:') }}</strong> {{ __('Cash, card, and digital payment registers.') }}</span>
-                </div>
-
-                <div class="flex items-start gap-2.5 text-slate-600 dark:text-slate-300">
-                    <span class="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">✓</span>
-                    <span><strong>{{ __('Restaurant Dining & KOT:') }}</strong> {{ __('Table layout management and kitchen screen tickets.') }}</span>
-                </div>
-
-                <div class="flex items-start gap-2.5 text-slate-600 dark:text-slate-300">
-                    <span class="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">✓</span>
-                    <span><strong>{{ __('Tax Invoices & WhatsApp PDF:') }}</strong> {{ __('80mm/58mm thermal printing and instant dispatch.') }}</span>
-                </div>
-            </div>
-
-            <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300">
-                <span>💳 {{ __('Credit Card Required') }}</span>
-                <span class="font-bold text-brand-lime">{{ __('None · 100% Free Trial') }}</span>
+    @if ($hasBanner)
+        <!-- Right Column: Dynamic Auth Graphic / Banner -->
+        <div class="lg:col-span-5 w-full flex items-center justify-center sticky top-8">
+            <div class="w-full overflow-hidden rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 p-2 sm:p-3">
+                <img src="{{ $authBannerUrl }}" alt="{{ __('Registration Banner') }}" class="w-full h-auto object-cover rounded-2xl shadow-inner">
             </div>
         </div>
-
-        <!-- Hardware Trust Badge Card -->
-        <div class="rounded-3xl bg-slate-50 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-5 space-y-2.5 text-xs">
-            <div class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🔌 {{ __('Plug & Play Hardware Integration') }}</span>
-            </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                {{ __('Compatible out-of-the-box with Epson/Star thermal receipt printers, Honeywell/Zebra barcode laser scanners, and USB/RJ11 cash drawers.') }}
-            </p>
-        </div>
-
-    </div>
+    @endif
 
 </div>

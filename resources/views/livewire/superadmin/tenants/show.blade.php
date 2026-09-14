@@ -124,7 +124,18 @@
             </div>
 
             <div class="pt-3">
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Tenant Licensed & Visible Modules") }}</label>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Tenant Licensed & Visible Modules") }}</label>
+                    <div class="flex items-center gap-2">
+                        <button type="button" wire:click="selectAllModules" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 cursor-pointer">
+                            {{ __("Select All") }}
+                        </button>
+                        <span class="text-slate-300 dark:text-slate-600">|</span>
+                        <button type="button" wire:click="deselectAllModules" class="text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 cursor-pointer">
+                            {{ __("Deselect All") }}
+                        </button>
+                    </div>
+                </div>
                 <p class="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
                     {{ __("Select which specific modules are licensed and visible in this tenant's workspace navigation.") }}
                 </p>
@@ -134,7 +145,7 @@
                         <label class="flex items-center justify-between p-3 rounded-xl border cursor-pointer {{ $isLic ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30' : 'border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-100' }}">
                             <div class="flex items-center gap-2">
                                 <span class="text-base">
-                                    @if ($mKey === 'restaurant') 🍽️ @elseif ($mKey === 'pharmacy') 💊 @elseif ($mKey === 'service_booking') ✂️ @else 🏪 @endif
+                                    @if ($mKey === 'restaurant') 🍽️ @elseif ($mKey === 'pharmacy') 💊 @elseif ($mKey === 'service_booking') ✂️ @elseif ($mKey === 'repair_technician') 🛠️ @elseif ($mKey === 'leadmanagement') 📊 @else 🏪 @endif
                                 </span>
                                 <div>
                                     <span class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ __($mVal['title']) }}</span>

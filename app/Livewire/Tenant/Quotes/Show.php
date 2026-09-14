@@ -152,6 +152,27 @@ class Show extends Component
         }
 
         $this->quote->update(['status' => $newStatus]);
+
+        if ($this->quote->lead_id && in_array($newStatus, ['accepted', 'won'])) {
+            $lead = \App\Models\Lead::find($this->quote->lead_id);
+            if ($lead) {
+                $lead->update([
+                    'stage' => 'won',
+                    'status' => 'won',
+                    'converted_at' => now(),
+                ]);
+                \Modules\leadmanagement\Models\LeadActivity::create([
+                    'company_id' => $this->quote->company_id,
+                    'lead_id' => $lead->id,
+                    'type' => 'note',
+                    'title' => 'Proposal Accepted',
+                    'description' => "Quotation #{$this->quote->sale_number} was accepted. Lead marked Won.",
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
+            }
+        }
+
         AuditLog::record('quotation.status_changed', $this->quote->company_id, auth('web')->id(), [
             'quote_id' => $this->quote->id,
             'new_status' => $newStatus,
@@ -224,6 +245,7 @@ class Show extends Component
                 'company_id' => $companyId,
                 'sale_number' => $saleNumber,
                 'customer_id' => $this->quote->customer_id,
+                'lead_id' => $this->quote->lead_id,
                 'customer_name' => $this->quote->customer_name,
                 'user_id' => auth('web')->id(),
                 'total' => $this->quote->total,
@@ -252,6 +274,26 @@ class Show extends Component
             ]);
 
             $this->quote->update(['status' => 'converted']);
+
+            if ($this->quote->lead_id) {
+                $lead = \App\Models\Lead::find($this->quote->lead_id);
+                if ($lead) {
+                    $lead->update([
+                        'stage' => 'won',
+                        'status' => 'won',
+                        'converted_at' => now(),
+                    ]);
+                    \Modules\leadmanagement\Models\LeadActivity::create([
+                        'company_id' => $companyId,
+                        'lead_id' => $lead->id,
+                        'type' => 'note',
+                        'title' => 'Sale Finalized',
+                        'description' => "Quotation #{$this->quote->sale_number} converted to Invoice #{$saleNumber}. Lead Won.",
+                        'status' => 'completed',
+                        'completed_at' => now(),
+                    ]);
+                }
+            }
 
             return $sale;
         });

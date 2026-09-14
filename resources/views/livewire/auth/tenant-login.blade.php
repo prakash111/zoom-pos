@@ -1,7 +1,13 @@
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+@php
+    $showAuthBanner = (bool) \App\Models\DynamicSetting::get('show_auth_banner', false);
+    $authBannerUrl = \App\Models\DynamicSetting::get('auth_banner_image_url');
+    $hasBanner = $showAuthBanner && !empty($authBannerUrl);
+@endphp
+
+<div class="{{ $hasBanner ? 'grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center' : 'max-w-xl mx-auto w-full' }}">
     
-    <!-- Left Column: Modern Login Card -->
-    <div class="lg:col-span-6 w-full">
+    <!-- Left Column / Modern Login Card -->
+    <div class="{{ $hasBanner ? 'lg:col-span-6' : '' }} w-full">
         <div class="rounded-3xl bg-white dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-white/15 p-6 sm:p-8 shadow-2xl space-y-6">
 
             <!-- Card Header: branding + Live POS (left), Register Store (top-right) -->
@@ -152,60 +158,13 @@
         </div>
     </div>
 
-    <!-- Right Column: Visual POS & Store Features Showcase -->
-    <div class="lg:col-span-6 space-y-6">
-        
-        <!-- Live Terminal Status Card -->
-        <div class="rounded-3xl bg-slate-50 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-6 sm:p-8 space-y-6 shadow-2xl">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-lime to-emerald-400 p-0.5 flex items-center justify-center">
-                        <div class="w-full h-full bg-white dark:bg-slate-950 rounded-[14px] flex items-center justify-center text-brand-lime font-black text-base">
-                            ⚡
-                        </div>
-                    </div>
-                    <div>
-                        <div class="text-sm font-black text-slate-900 dark:text-white">{{ __('Smart Inventory & POS Engine') }}</div>
-                        <div class="text-xs text-emerald-400 font-bold">● {{ __('High Availability Cloud Active') }}</div>
-                    </div>
-                </div>
-                <span class="px-3 py-1 rounded-full bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white text-[10px] font-mono font-bold">
-                    v2.5 Release
-                </span>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3.5">
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                    <div class="text-slate-500 dark:text-slate-400 text-xs font-medium">{{ __('Barcode Scanning') }}</div>
-                    <div class="text-sm font-black text-slate-900 dark:text-white mt-1">&lt;20ms {{ __('Latency') }}</div>
-                    <div class="text-[10px] text-emerald-400 font-bold mt-0.5">{{ __('Instant Add-to-Cart') }}</div>
-                </div>
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                    <div class="text-slate-500 dark:text-slate-400 text-xs font-medium">{{ __('Offline Checkout') }}</div>
-                    <div class="text-sm font-black text-slate-900 dark:text-white mt-1">{{ __('Zero Downtime') }}</div>
-                    <div class="text-[10px] text-brand-lime font-bold mt-0.5">{{ __('Local DB Cache & Sync') }}</div>
-                </div>
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                    <div class="text-slate-500 dark:text-slate-400 text-xs font-medium">{{ __('Floor & Table KOT') }}</div>
-                    <div class="text-sm font-black text-slate-900 dark:text-white mt-1">{{ __('Real-time KDS') }}</div>
-                    <div class="text-[10px] text-emerald-400 font-bold mt-0.5">{{ __('Kitchen Dispatch Ready') }}</div>
-                </div>
-                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                    <div class="text-slate-500 dark:text-slate-400 text-xs font-medium">{{ __('Tax & Split Tender') }}</div>
-                    <div class="text-sm font-black text-slate-900 dark:text-white mt-1">{{ __('Multi-Currency') }}</div>
-                    <div class="text-[10px] text-brand-lime font-bold mt-0.5">{{ __('Thermal & WhatsApp PDF') }}</div>
-                </div>
-            </div>
-
-            <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-lime-500/10 border border-emerald-500/20 flex items-center gap-3">
-                <span class="text-2xl">🔒</span>
-                <div>
-                    <div class="text-xs font-black text-slate-900 dark:text-white">{{ __('Encrypted Multi-Tenant Isolation') }}</div>
-                    <div class="text-[11px] text-slate-600 dark:text-slate-300">{{ __('Your store database and financial ledgers are securely partitioned with automated cloud snapshots.') }}</div>
-                </div>
+    @if ($hasBanner)
+        <!-- Right Column: Dynamic Auth Graphic / Banner -->
+        <div class="lg:col-span-6 w-full flex items-center justify-center">
+            <div class="w-full overflow-hidden rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 p-2 sm:p-3">
+                <img src="{{ $authBannerUrl }}" alt="{{ __('Store Sign In Banner') }}" class="w-full h-auto object-cover rounded-2xl shadow-inner">
             </div>
         </div>
-
-    </div>
+    @endif
 
 </div>

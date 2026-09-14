@@ -90,9 +90,26 @@ class QuotationApiController extends Controller
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
+        // Auto-synthesize items from reference_title / estimated_amount if items array is omitted (e.g. from SDUI form)
+        if (! $request->has('items') || ! is_array($request->input('items')) || empty($request->input('items'))) {
+            $title = (string) ($request->input('reference_title') ?: $request->input('title') ?: 'Quotation Requirement / Scope');
+            $amount = (float) ($request->input('estimated_amount') ?: $request->input('total') ?: $request->input('amount') ?: 0);
+            $request->merge([
+                'items' => [
+                    [
+                        'name' => $title,
+                        'price' => $amount,
+                        'quantity' => 1,
+                        'tax_rate' => 0,
+                    ],
+                ],
+            ]);
+        }
+
         $validator = Validator::make($request->all(), [
             'customer_id' => ['nullable', 'string'],
             'customer_name' => ['nullable', 'string', 'max:150'],
+            'lead_id' => ['nullable', 'integer'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['nullable'],
             'items.*.product_id' => ['nullable'],
@@ -131,6 +148,7 @@ class QuotationApiController extends Controller
             'sale_number' => $this->nextQuoteNumber($company),
             'user_id' => $user?->id,
             'customer_id' => $customerId,
+            'lead_id' => $data['lead_id'] ?? null,
             'customer_name' => $customerName,
             'total' => $total,
             'net_amount' => max(0, $total - $discount),
@@ -148,6 +166,22 @@ class QuotationApiController extends Controller
             'due_date' => $data['valid_until'] ?? null,
             'items' => $items,
         ]);
+
+        if (! empty($data['lead_id'])) {
+            $lead = \App\Models\Lead::find($data['lead_id']);
+            if ($lead) {
+                $lead->update(['stage' => 'proposal_sent']);
+                \Modules\leadmanagement\Models\LeadActivity::create([
+                    'company_id' => $company->id,
+                    'lead_id' => $lead->id,
+                    'type' => 'note',
+                    'title' => 'Quotation Created',
+                    'description' => "Quotation #{$quote->sale_number} generated from lead.",
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
+            }
+        }
 
         AuditLog::record('quotation.created', $company->id, $user?->id, ['quote_id' => $quote->id]);
 
@@ -220,6 +254,26 @@ class QuotationApiController extends Controller
             'items' => $items,
         ]);
 
+        if ($quote->lead_id && isset($data['status']) && in_array($data['status'], ['accepted', 'won'], true)) {
+            $lead = \App\Models\Lead::find($quote->lead_id);
+            if ($lead) {
+                $lead->update([
+                    'stage' => 'won',
+                    'status' => 'won',
+                    'converted_at' => now(),
+                ]);
+                \Modules\leadmanagement\Models\LeadActivity::create([
+                    'company_id' => $company->id,
+                    'lead_id' => $lead->id,
+                    'type' => 'note',
+                    'title' => 'Proposal Accepted',
+                    'description' => "Quotation #{$quote->sale_number} marked accepted. Lead Won.",
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
+            }
+        }
+
         AuditLog::record('quotation.updated', $company->id, $user?->id, ['quote_id' => $quote->id]);
 
         return response()->json([
@@ -287,6 +341,7 @@ class QuotationApiController extends Controller
                 'sale_number' => 'INV-'.strtoupper(Str::random(8)),
                 'user_id' => $user?->id,
                 'customer_id' => $quote->customer_id,
+                'lead_id' => $quote->lead_id,
                 'customer_name' => $quote->customer_name,
                 'total' => $quote->total,
                 'net_amount' => $quote->net_amount,
@@ -305,6 +360,26 @@ class QuotationApiController extends Controller
             ]);
 
             $quote->update(['status' => 'converted']);
+
+            if ($quote->lead_id) {
+                $lead = \App\Models\Lead::find($quote->lead_id);
+                if ($lead) {
+                    $lead->update([
+                        'stage' => 'won',
+                        'status' => 'won',
+                        'converted_at' => now(),
+                    ]);
+                    \Modules\leadmanagement\Models\LeadActivity::create([
+                        'company_id' => $company->id,
+                        'lead_id' => $lead->id,
+                        'type' => 'note',
+                        'title' => 'Sale Finalized',
+                        'description' => "Quotation #{$quote->sale_number} converted to Sale. Lead Won.",
+                        'status' => 'completed',
+                        'completed_at' => now(),
+                    ]);
+                }
+            }
 
             return $sale;
         });
@@ -378,6 +453,27 @@ class QuotationApiController extends Controller
             if ($customer) {
                 $customerId = $customer->id;
                 $customerName = $customer->name;
+            }
+        }
+
+        if (! $customerId && ! empty($data['lead_id'])) {
+            $lead = \App\Models\Lead::query()
+                ->where('company_id', $company->id)
+                ->find($data['lead_id']);
+            if ($lead) {
+                if ($lead->customer_id) {
+                    $customer = Customer::query()
+                        ->withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->find($lead->customer_id);
+                    if ($customer) {
+                        $customerId = $customer->id;
+                        $customerName = $customer->name;
+                    }
+                }
+                if (! $customerName) {
+                    $customerName = $lead->name;
+                }
             }
         }
 

@@ -151,6 +151,48 @@ class TabbedSettingsAndAppearanceTest extends TestCase
         $this->assertTrue($branding->otp_registration_enabled);
     }
 
+    public function test_branding_tab_saves_custom_features_and_testimonials(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        Livewire::test(SettingsIndex::class)
+            ->set('activeTab', 'branding')
+            ->set('platformName', 'ZoomNearby Cloud POS')
+            ->set('landingFeatures', [
+                ['icon' => '🚀', 'title' => 'Blazing Checkout', 'body' => "Sub-second scans.\nOffline queue."],
+                ['icon' => '', 'title' => '', 'body' => ''], // blank row is dropped
+            ])
+            ->set('landingTestimonials', [
+                ['quote' => 'Cut our closing time in half.', 'name' => 'Dana Lee', 'role' => 'COO · Northwind Retail'],
+            ])
+            ->call('saveBranding')
+            ->assertHasNoErrors()
+            ->assertDispatched('notify');
+
+        $branding = PlatformBranding::current();
+
+        $this->assertCount(1, $branding->landing_features);
+        $this->assertSame('Blazing Checkout', $branding->landing_features[0]['title']);
+        $this->assertSame('🚀', $branding->landing_features[0]['icon']);
+
+        $this->assertCount(1, $branding->landing_testimonials);
+        $this->assertSame('Dana Lee', $branding->landing_testimonials[0]['name']);
+
+        // The accessors now return the authored lists.
+        $this->assertSame('Blazing Checkout', $branding->landingFeatures()[0]['title']);
+        $this->assertSame('Dana Lee', $branding->landingTestimonials()[0]['name']);
+        $this->assertSame('DL', PlatformBranding::testimonialInitials('Dana Lee'));
+    }
+
+    public function test_feature_and_testimonial_lists_fall_back_to_defaults_when_empty(): void
+    {
+        $branding = PlatformBranding::current();
+        $branding->update(['landing_features' => null, 'landing_testimonials' => null]);
+
+        $this->assertNotEmpty($branding->fresh()->landingFeatures());
+        $this->assertNotEmpty($branding->fresh()->landingTestimonials());
+    }
+
     public function test_pages_cms_tab_allows_searching_and_deleting_pages(): void
     {
         $this->actingAsSuperAdmin();
