@@ -69,6 +69,12 @@ class DynamicSchemaParser {
       case 'code_snippet':
       case 'code_block':
         return _buildCodeSnippet(context, schema);
+      case 'section_header':
+        return _buildSectionHeader(context, schema);
+      case 'empty_state':
+        return _buildEmptyState(context, schema);
+      case 'document_preview_card':
+        return _buildDocumentPreviewCard(context, schema);
 
       // Forms & Inputs
       case 'text_input':
@@ -99,6 +105,10 @@ class DynamicSchemaParser {
       // Lists & Tables
       case 'line_item_tile':
         return _buildLineItemTile(context, schema);
+      case 'list_tile':
+        return _buildListTile(context, schema);
+      case 'notification_item':
+        return _buildNotificationItem(context, schema);
       case 'table_grid':
         return _buildTableGrid(context, schema);
       case 'step_counter':
@@ -111,6 +121,8 @@ class DynamicSchemaParser {
         return _buildProgressBarStat(context, schema);
       case 'segmented_filter_chips':
         return _buildSegmentedFilterChips(context, schema);
+      case 'segmented_tabs':
+        return _buildSegmentedTabs(context, schema);
 
       // Actions
       case 'button_primary':
@@ -193,10 +205,11 @@ class DynamicSchemaParser {
     Color? color;
     final rawColor = schema['color']?.toString().trim();
     if (rawColor != null && rawColor.isNotEmpty) {
-      if (rawColor == 'surface' || rawColor == 'card' || rawColor == 'theme.surface') {
-        color = theme.colorScheme.surface;
-      } else {
-        final parsed = SduiIconRegistry.parseColor(rawColor);
+      final parsed = _semanticColor(context, rawColor,
+          fallback: theme.colorScheme.surface);
+      if (!rawColor.startsWith('theme.') &&
+          rawColor != 'surface' &&
+          rawColor != 'card') {
         if (isDark &&
             schema['force_light'] != true &&
             ThemeData.estimateBrightnessForColor(parsed) == Brightness.light) {
@@ -204,6 +217,8 @@ class DynamicSchemaParser {
         } else {
           color = parsed;
         }
+      } else {
+        color = parsed;
       }
     }
 
@@ -212,21 +227,21 @@ class DynamicSchemaParser {
     Color? borderColor;
     final rawBorderColor = schema['border_color']?.toString().trim();
     if (rawBorderColor != null && rawBorderColor.isNotEmpty) {
-      if (rawBorderColor == 'outline' ||
-          rawBorderColor == 'border' ||
-          rawBorderColor == 'theme.outlineVariant') {
-        borderColor = isDark
-            ? const Color(0xFF334155)
-            : theme.colorScheme.outlineVariant;
-      } else {
-        final parsedBorder = SduiIconRegistry.parseColor(rawBorderColor);
+      final parsedBorder =
+          _semanticColor(context, rawBorderColor, fallback: theme.dividerColor);
+      if (!rawBorderColor.startsWith('theme.') &&
+          rawBorderColor != 'outline' &&
+          rawBorderColor != 'border') {
         if (isDark &&
             schema['force_light'] != true &&
-            ThemeData.estimateBrightnessForColor(parsedBorder) == Brightness.light) {
+            ThemeData.estimateBrightnessForColor(parsedBorder) ==
+                Brightness.light) {
           borderColor = const Color(0xFF334155);
         } else {
           borderColor = parsedBorder;
         }
+      } else {
+        borderColor = parsedBorder;
       }
     }
     final borderWidth = _parseDouble(schema['border_width']) ?? 1.0;
@@ -277,7 +292,8 @@ class DynamicSchemaParser {
         rawColor == 'theme.surface') {
       color = theme.colorScheme.surface;
     } else {
-      final parsed = SduiIconRegistry.parseColor(rawColor);
+      final parsed = _semanticColor(context, rawColor,
+          fallback: theme.colorScheme.surface);
       if (isDark &&
           schema['force_light'] != true &&
           ThemeData.estimateBrightnessForColor(parsed) == Brightness.light) {
@@ -294,14 +310,14 @@ class DynamicSchemaParser {
         rawBorderColor == 'outline' ||
         rawBorderColor == 'border' ||
         rawBorderColor == 'theme.outlineVariant') {
-      borderColor = isDark
-          ? const Color(0xFF334155)
-          : theme.colorScheme.outlineVariant.withValues(alpha: 0.5);
+      borderColor = theme.dividerColor;
     } else {
-      final parsedBorder = SduiIconRegistry.parseColor(rawBorderColor);
+      final parsedBorder =
+          _semanticColor(context, rawBorderColor, fallback: theme.dividerColor);
       if (isDark &&
           schema['force_light'] != true &&
-          ThemeData.estimateBrightnessForColor(parsedBorder) == Brightness.light) {
+          ThemeData.estimateBrightnessForColor(parsedBorder) ==
+              Brightness.light) {
         borderColor = const Color(0xFF334155);
       } else {
         borderColor = parsedBorder;
@@ -559,7 +575,8 @@ class DynamicSchemaParser {
     final isBold = schema['bold'] == true;
     final isItalic = schema['italic'] == true;
     Color? color = schema['color'] != null
-        ? SduiIconRegistry.parseColor(schema['color'].toString())
+        ? _semanticColor(context, schema['color'],
+            fallback: theme.colorScheme.onSurface)
         : null;
 
     // In dark mode, ensure low-contrast muted grays are boosted to slate-400 (#94a3b8)
@@ -680,7 +697,8 @@ class DynamicSchemaParser {
     final label = context
         .tr(schema['label']?.toString() ?? schema['text']?.toString() ?? '');
     final color = schema['color'] != null
-        ? SduiIconRegistry.parseColor(schema['color'].toString())
+        ? _semanticColor(context, schema['color'],
+            fallback: Theme.of(context).colorScheme.onSurface)
         : Colors.blue;
     final isSolid = schema['badge_style'] == 'solid';
 
@@ -708,7 +726,8 @@ class DynamicSchemaParser {
     final iconName = schema['icon']?.toString() ?? 'widgets';
     final size = _parseDouble(schema['size']) ?? 24.0;
     final color = schema['color'] != null
-        ? SduiIconRegistry.parseColor(schema['color'].toString())
+        ? _semanticColor(context, schema['color'],
+            fallback: Theme.of(context).dividerColor)
         : null;
 
     return Icon(
@@ -723,22 +742,326 @@ class DynamicSchemaParser {
     final height = _parseDouble(schema['height']) ?? 16.0;
     final thickness = _parseDouble(schema['thickness']) ?? 1.0;
     final color = schema['color'] != null
-        ? SduiIconRegistry.parseColor(schema['color'].toString())
+        ? _semanticColor(context, schema['color'],
+            fallback: Theme.of(context).dividerColor)
         : null;
 
     return Divider(height: height, thickness: thickness, color: color);
+  }
+
+  static Widget _buildSectionHeader(
+      BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final title = context.tr(schema['title']?.toString() ?? '');
+    final subtitle = schema['subtitle'] == null
+        ? null
+        : context.tr(schema['subtitle'].toString());
+    final textColor = _semanticColor(
+      context,
+      schema['text_color'],
+      fallback: theme.colorScheme.onSurface,
+    );
+    final dividerColor = _semanticColor(
+      context,
+      schema['divider_color'],
+      fallback: theme.dividerColor,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: textColor,
+                fontWeight: FontWeight.w700,
+              )),
+          if (subtitle != null && subtitle.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                )),
+          ],
+          const SizedBox(height: 8),
+          Divider(height: 1, color: dividerColor),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildEmptyState(
+      BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final background = _semanticColor(
+      context,
+      schema['background_color'],
+      fallback: theme.colorScheme.surface,
+    );
+    final textColor = _semanticColor(
+      context,
+      schema['text_color'],
+      fallback: theme.colorScheme.onSurface,
+    );
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            SduiIconRegistry.resolve(
+                schema['icon']?.toString() ?? 'notifications_none'),
+            size: 34,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            context.tr(schema['message']?.toString() ?? ''),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildDocumentPreviewCard(
+      BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final rawDocument = schema['document'];
+    final document = rawDocument is Map
+        ? Map<String, dynamic>.from(rawDocument)
+        : <String, dynamic>{};
+    final rawSummary = schema['summary'];
+    final summary = rawSummary is Map
+        ? Map<String, dynamic>.from(rawSummary)
+        : <String, dynamic>{};
+    final lines = (document['lines'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((line) => Map<String, dynamic>.from(line))
+        .toList();
+    final format = schema['format']?.toString() ?? 'a4';
+    final currency = document['currency_symbol']?.toString() ?? '';
+
+    double number(dynamic value) {
+      if (value is num) return value.toDouble();
+      return double.tryParse('${value ?? ''}') ?? 0;
+    }
+
+    String money(dynamic value) =>
+        '$currency${number(value).toStringAsFixed(2)}';
+
+    final logicalWidth = switch (format) {
+      'thermal_58mm' => 260.0,
+      'thermal_80mm' => 340.0,
+      'slip' => 360.0,
+      _ => 620.0,
+    };
+    final logicalHeight = switch (format) {
+      'thermal_58mm' => 430.0 + lines.length.clamp(0, 8).toDouble() * 34,
+      'thermal_80mm' => 450.0 + lines.length.clamp(0, 8).toDouble() * 38,
+      'slip' => 640.0,
+      _ => 877.0,
+    };
+    final viewportHeight = format == 'a4' ? 430.0 : 390.0;
+    final compact = format.startsWith('thermal_');
+    final paperPadding = compact ? 18.0 : 28.0;
+    final accent = theme.colorScheme.primary;
+    final outerSurface = _semanticColor(
+      context,
+      schema['background_color'],
+      fallback: theme.colorScheme.surface,
+    );
+    final border = _semanticColor(
+      context,
+      schema['border_color'],
+      fallback: theme.dividerColor,
+    );
+
+    Widget amountRow(String label, dynamic amount,
+        {bool strong = false, bool negative = false}) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: compact ? 11 : 13,
+                    fontWeight: strong ? FontWeight.w800 : FontWeight.w500)),
+            Text('${negative ? '-' : ''}${money(amount)}',
+                style: TextStyle(
+                    fontSize:
+                        strong ? (compact ? 15 : 18) : (compact ? 11 : 13),
+                    fontWeight: strong ? FontWeight.w800 : FontWeight.w600)),
+          ],
+        ),
+      );
+    }
+
+    final paper = Container(
+      width: logicalWidth,
+      height: logicalHeight,
+      padding: EdgeInsets.all(paperPadding),
+      color: Colors.white,
+      child: DefaultTextStyle(
+        style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13),
+        child: Column(
+          crossAxisAlignment:
+              compact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+          children: [
+            Text(
+              document['company_name']?.toString() ?? 'Store',
+              textAlign: compact ? TextAlign.center : TextAlign.left,
+              style: TextStyle(
+                color: accent,
+                fontSize: compact ? 18 : 24,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${document['tax_label'] ?? 'GSTIN'}: ${document['tax_id'] ?? 'Unregistered'}',
+              style: const TextStyle(color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(document['document_label']?.toString() ?? 'DOCUMENT',
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
+                Text('#${document['reference'] ?? ''}',
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
+              ],
+            ),
+            const Divider(height: 24, color: Color(0xFFCBD5E1)),
+            Text(
+              'Customer: ${document['customer_name'] ?? summary['client_name'] ?? 'Walk-in Client'}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+              color: accent,
+              child: const Row(
+                children: [
+                  Expanded(
+                      child: Text('ITEM',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800))),
+                  SizedBox(
+                      width: 42,
+                      child: Text('QTY',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800))),
+                  SizedBox(
+                      width: 82,
+                      child: Text('AMOUNT',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800))),
+                ],
+              ),
+            ),
+            for (final line in lines.take(8))
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                        child: Text(line['name']?.toString() ?? 'Item',
+                            maxLines: 2, overflow: TextOverflow.ellipsis)),
+                    SizedBox(
+                        width: 42,
+                        child: Text('${number(line['quantity'])}',
+                            textAlign: TextAlign.right)),
+                    SizedBox(
+                        width: 82,
+                        child: Text(money(line['line_total']),
+                            textAlign: TextAlign.right,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600))),
+                  ],
+                ),
+              ),
+            if (lines.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text('No line items',
+                    style: TextStyle(color: Color(0xFF64748B))),
+              ),
+            const Divider(color: Color(0xFFCBD5E1)),
+            amountRow('Subtotal', document['subtotal']),
+            if (number(document['discount']) > 0)
+              amountRow('Discount', document['discount'], negative: true),
+            amountRow('Tax', document['tax_amount']),
+            amountRow('TOTAL', document['total_amount'], strong: true),
+            if (!compact) ...[
+              const Spacer(),
+              Text(
+                document['notes']?.toString() ?? '',
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: outerSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      child: SizedBox(
+        height: viewportHeight,
+        width: double.infinity,
+        child: FittedBox(
+          fit: BoxFit.contain,
+          alignment: Alignment.topCenter,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: paper,
+          ),
+        ),
+      ),
+    );
   }
 
   static Widget _buildCodeSnippet(
       BuildContext context, Map<String, dynamic> schema) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final code =
-        schema['code']?.toString() ?? schema['text']?.toString() ?? '';
+    final code = schema['code']?.toString() ?? schema['text']?.toString() ?? '';
     final description =
         schema['description']?.toString() ?? schema['subtitle']?.toString();
-    final copyToast = context
-        .tr(schema['copy_toast']?.toString() ?? 'Endpoint copied to clipboard!');
+    final copyToast = context.tr(
+        schema['copy_toast']?.toString() ?? 'Endpoint copied to clipboard!');
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -849,9 +1172,8 @@ class DynamicSchemaParser {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final readOnlyFill = isDark
-        ? const Color(0xFF1E293B)
-        : const Color(0xFFF1F5F9);
+    final readOnlyFill =
+        isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
     final defaultInputBorderColor =
         isDark ? const Color(0xFF334155) : scheme.outlineVariant;
     final inputFill = isDark
@@ -1304,6 +1626,183 @@ class DynamicSchemaParser {
     );
   }
 
+  static Widget _buildListTile(
+      BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final sduiContext = DynamicSchemaContext.of(context);
+    final leadingSchema = schema['leading'] is Map
+        ? Map<String, dynamic>.from(schema['leading'] as Map)
+        : <String, dynamic>{};
+    final trailingSchema = schema['trailing'] is Map
+        ? Map<String, dynamic>.from(schema['trailing'] as Map)
+        : <String, dynamic>{};
+    final action = _componentAction(schema);
+    final iconName = leadingSchema['icon']?.toString() ??
+        schema['leading_icon']?.toString() ??
+        schema['icon']?.toString();
+    final iconColor = _semanticColor(
+      context,
+      leadingSchema['color'] ?? schema['color'],
+      fallback: theme.colorScheme.primary,
+    );
+    final background = _semanticColor(
+      context,
+      schema['background_color'],
+      fallback: theme.colorScheme.surface,
+    );
+    final divider = _semanticColor(
+      context,
+      schema['divider_color'] ?? schema['border_color'],
+      fallback: theme.dividerColor,
+    );
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: background,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: divider),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          leading: iconName == null
+              ? null
+              : Icon(SduiIconRegistry.resolve(iconName), color: iconColor),
+          title: Text(
+            context.tr(schema['title']?.toString() ?? ''),
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: schema['subtitle'] == null
+              ? null
+              : Text(
+                  context.tr(schema['subtitle'].toString()),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+          trailing: trailingSchema.isNotEmpty
+              ? Icon(
+                  SduiIconRegistry.resolve(
+                      trailingSchema['icon']?.toString() ?? 'chevron_right'),
+                  size: (trailingSchema['size'] as num?)?.toDouble() ?? 18,
+                  color: _semanticColor(
+                    context,
+                    trailingSchema['color'],
+                    fallback: theme.colorScheme.onSurfaceVariant,
+                  ),
+                )
+              : (action == null
+                  ? null
+                  : Icon(Icons.chevron_right,
+                      color: theme.colorScheme.onSurfaceVariant)),
+          onTap:
+              action == null ? null : () => sduiContext?.dispatchAction(action),
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildNotificationItem(
+      BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final sduiContext = DynamicSchemaContext.of(context);
+    final action = _componentAction(schema);
+    final iconColor = _semanticColor(
+      context,
+      schema['icon_color'],
+      fallback: theme.colorScheme.primary,
+    );
+    final timestamp = schema['timestamp']?.toString();
+    final category = schema['category']?.toString();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      child: Material(
+        color: _semanticColor(context, schema['background_color'],
+            fallback: theme.colorScheme.surface),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: _semanticColor(context, schema['divider_color'],
+                fallback: theme.dividerColor),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap:
+              action == null ? null : () => sduiContext?.dispatchAction(action),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.13),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    SduiIconRegistry.resolve(
+                        schema['icon']?.toString() ?? 'notifications_active'),
+                    color: iconColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.tr(schema['title']?.toString() ?? ''),
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        context.tr(schema['subtitle']?.toString() ?? ''),
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                      if ((timestamp != null && timestamp.isNotEmpty) ||
+                          (category != null && category.isNotEmpty)) ...[
+                        const SizedBox(height: 7),
+                        Text(
+                          [
+                            if (category != null && category.isNotEmpty)
+                              category.toUpperCase(),
+                            if (timestamp != null && timestamp.isNotEmpty)
+                              timestamp.replaceFirst('T', ' ').split('.').first,
+                          ].join('  •  '),
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (action != null)
+                  Icon(Icons.chevron_right,
+                      size: 18, color: theme.colorScheme.onSurfaceVariant),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   static Widget _buildTableGrid(
       BuildContext context, Map<String, dynamic> schema) {
     final headers = (schema['headers'] as List<dynamic>? ?? const [])
@@ -1387,14 +1886,15 @@ class DynamicSchemaParser {
         schema['company_name']?.toString();
 
     // Derive avatar monogram initials if not directly supplied
-    var avatarText = schema['avatar_text']?.toString() ??
-        schema['initials']?.toString();
+    var avatarText =
+        schema['avatar_text']?.toString() ?? schema['initials']?.toString();
     if ((avatarText == null || avatarText.isEmpty) && title.isNotEmpty) {
       final words = title.trim().split(RegExp(r'\s+'));
       if (words.length >= 2) {
         avatarText = '${words[0][0]}${words[1][0]}'.toUpperCase();
       } else if (words.isNotEmpty && words[0].isNotEmpty) {
-        avatarText = words[0].substring(0, words[0].length >= 2 ? 2 : 1).toUpperCase();
+        avatarText =
+            words[0].substring(0, words[0].length >= 2 ? 2 : 1).toUpperCase();
       }
     }
     avatarText ??= 'L';
@@ -1445,7 +1945,8 @@ class DynamicSchemaParser {
         schema['tags'] as List<dynamic>? ??
         const [];
 
-    final note = schema['note']?.toString() ?? schema['description']?.toString();
+    final note =
+        schema['note']?.toString() ?? schema['description']?.toString();
 
     final rawActions = schema['actions'] as List<dynamic>? ??
         schema['buttons'] as List<dynamic>? ??
@@ -1463,7 +1964,8 @@ class DynamicSchemaParser {
         ? SduiIconRegistry.parseColor(schema['border_color'].toString())
         : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0));
 
-    final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final mutedColor =
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Container(
       margin: _parseEdgeInsets(schema['margin'],
@@ -1530,7 +2032,8 @@ class DynamicSchemaParser {
                                           : const Color(0xFF0F172A),
                                     ),
                                   ),
-                                  if (subtitle != null && subtitle.isNotEmpty) ...[
+                                  if (subtitle != null &&
+                                      subtitle.isNotEmpty) ...[
                                     const SizedBox(height: 2),
                                     Text(
                                       context.tr(subtitle),
@@ -1555,7 +2058,8 @@ class DynamicSchemaParser {
                                     color: badgeColor,
                                     isSolid: schema['badge_style'] == 'solid',
                                   ),
-                                if (amountText != null && amountText.isNotEmpty) ...[
+                                if (amountText != null &&
+                                    amountText.isNotEmpty) ...[
                                   const SizedBox(height: 4),
                                   Text(
                                     amountText,
@@ -1623,9 +2127,9 @@ class DynamicSchemaParser {
                                       ],
                                       Text(
                                         context.tr((m['text'] ??
-                                                m['label'] ??
-                                                m['value'])
-                                            ?.toString() ??
+                                                    m['label'] ??
+                                                    m['value'])
+                                                ?.toString() ??
                                             ''),
                                         style: TextStyle(
                                             fontSize: 12, color: mutedColor),
@@ -1735,12 +2239,10 @@ class DynamicSchemaParser {
         actMap['style'] == 'outlined';
 
     if (isOutlined) {
-      final borderColor = isDark
-          ? const Color(0xFF334155)
-          : const Color(0xFFCBD5E1);
-      final textColor = isDark
-          ? const Color(0xFFF8FAFC)
-          : const Color(0xFF0F172A);
+      final borderColor =
+          isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+      final textColor =
+          isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
 
       return OutlinedButton(
         style: OutlinedButton.styleFrom(
@@ -1758,7 +2260,8 @@ class DynamicSchemaParser {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (iconName != null) ...[
-              Icon(SduiIconRegistry.resolve(iconName), size: 14, color: textColor),
+              Icon(SduiIconRegistry.resolve(iconName),
+                  size: 14, color: textColor),
               const SizedBox(width: 4),
             ],
             Text(
@@ -1819,9 +2322,8 @@ class DynamicSchemaParser {
     final isDark = theme.brightness == Brightness.dark;
     final sduiContext = DynamicSchemaContext.of(context);
 
-    final rawStages = schema['stages'] as List<dynamic>? ?? const [
-      'New', 'Contacted', 'Qualified', 'Proposal', 'Won'
-    ];
+    final rawStages = schema['stages'] as List<dynamic>? ??
+        const ['New', 'Contacted', 'Qualified', 'Proposal', 'Won'];
     if (rawStages.isEmpty) return const SizedBox.shrink();
 
     final stageItems = <Map<String, dynamic>>[];
@@ -1831,7 +2333,8 @@ class DynamicSchemaParser {
       } else if (s is Map) {
         stageItems.add(Map<String, dynamic>.from(s));
       } else {
-        stageItems.add({'label': s.toString(), 'key': s.toString().toLowerCase()});
+        stageItems
+            .add({'label': s.toString(), 'key': s.toString().toLowerCase()});
       }
     }
 
@@ -1890,10 +2393,12 @@ class DynamicSchemaParser {
                 borderRadius: BorderRadius.circular(8),
                 onTap: stageItems[i]['action'] != null
                     ? () => sduiContext?.dispatchAction(
-                        Map<String, dynamic>.from(stageItems[i]['action'] as Map))
+                        Map<String, dynamic>.from(
+                            stageItems[i]['action'] as Map))
                     : null,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1906,7 +2411,8 @@ class DynamicSchemaParser {
                             color: completedColor,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.check, size: 12, color: Colors.white),
+                          child: const Icon(Icons.check,
+                              size: 12, color: Colors.white),
                         )
                       else if (i == currentIndex)
                         Container(
@@ -1935,7 +2441,8 @@ class DynamicSchemaParser {
                           decoration: BoxDecoration(
                             color: Colors.transparent,
                             shape: BoxShape.circle,
-                            border: Border.all(color: inactiveColor, width: 1.5),
+                            border:
+                                Border.all(color: inactiveColor, width: 1.5),
                           ),
                         ),
                       const SizedBox(height: 6),
@@ -1946,12 +2453,18 @@ class DynamicSchemaParser {
                           fontSize: 11,
                           fontWeight: i == currentIndex
                               ? FontWeight.w700
-                              : (i < currentIndex ? FontWeight.w600 : FontWeight.normal),
+                              : (i < currentIndex
+                                  ? FontWeight.w600
+                                  : FontWeight.normal),
                           color: i == currentIndex
                               ? activeColor
                               : (i < currentIndex
-                                  ? (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A))
-                                  : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8))),
+                                  ? (isDark
+                                      ? const Color(0xFFF8FAFC)
+                                      : const Color(0xFF0F172A))
+                                  : (isDark
+                                      ? const Color(0xFF64748B)
+                                      : const Color(0xFF94A3B8))),
                         ),
                       ),
                     ],
@@ -1971,7 +2484,8 @@ class DynamicSchemaParser {
     final isDark = theme.brightness == Brightness.dark;
 
     final label = context.tr(schema['label']?.toString() ?? '');
-    final count = schema['count']?.toString() ?? schema['count_text']?.toString();
+    final count =
+        schema['count']?.toString() ?? schema['count_text']?.toString();
     final value = schema['value']?.toString() ??
         schema['value_text']?.toString() ??
         schema['amount']?.toString();
@@ -2016,15 +2530,20 @@ class DynamicSchemaParser {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                  color: isDark
+                      ? const Color(0xFFF8FAFC)
+                      : const Color(0xFF0F172A),
                 ),
               ),
               if (count != null && count.isNotEmpty) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                    color: isDark
+                        ? const Color(0xFF1E293B)
+                        : const Color(0xFFE2E8F0),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -2032,7 +2551,9 @@ class DynamicSchemaParser {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
                     ),
                   ),
                 ),
@@ -2044,7 +2565,9 @@ class DynamicSchemaParser {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                    color: isDark
+                        ? const Color(0xFFF8FAFC)
+                        : const Color(0xFF0F172A),
                   ),
                 ),
             ],
@@ -2065,7 +2588,8 @@ class DynamicSchemaParser {
               context.tr(subtitle),
               style: TextStyle(
                 fontSize: 11,
-                color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                color:
+                    isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
               ),
             ),
           ],
@@ -2135,9 +2659,8 @@ class DynamicSchemaParser {
 
     final rawLabel = context.tr(chip['label']?.toString() ?? '');
     final count = chip['count']?.toString();
-    final text = (count != null && count.isNotEmpty)
-        ? '$rawLabel · $count'
-        : rawLabel;
+    final text =
+        (count != null && count.isNotEmpty) ? '$rawLabel · $count' : rawLabel;
 
     final action = chip['action'] as Map<String, dynamic>?;
 
@@ -2173,6 +2696,72 @@ class DynamicSchemaParser {
             color: textColor,
           ),
         ),
+      ),
+    );
+  }
+
+  static Widget _buildSegmentedTabs(
+      BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final sduiContext = DynamicSchemaContext.of(context);
+    final options = (schema['options'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((option) => Map<String, dynamic>.from(option))
+        .toList();
+    final active = schema['active_value']?.toString();
+    final paramName = schema['param_name']?.toString() ?? 'value';
+    final baseAction = schema['action'] is Map
+        ? Map<String, dynamic>.from(schema['action'] as Map)
+        : <String, dynamic>{};
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          for (var index = 0; index < options.length; index++) ...[
+            if (index > 0) const SizedBox(width: 8),
+            Builder(builder: (context) {
+              final option = options[index];
+              final value = option['value']?.toString() ?? '';
+              final selected = value == active;
+
+              return ChoiceChip(
+                selected: selected,
+                showCheckmark: selected,
+                label: Text(context.tr(option['label']?.toString() ?? value)),
+                selectedColor: theme.colorScheme.primaryContainer,
+                backgroundColor: theme.colorScheme.surface,
+                side: BorderSide(
+                  color:
+                      selected ? theme.colorScheme.primary : theme.dividerColor,
+                ),
+                labelStyle: TextStyle(
+                  color: selected
+                      ? theme.colorScheme.onPrimaryContainer
+                      : theme.colorScheme.onSurfaceVariant,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+                onSelected: selected || baseAction.isEmpty
+                    ? null
+                    : (_) {
+                        final action = Map<String, dynamic>.from(baseAction);
+                        final endpoint = action['endpoint']?.toString() ?? '';
+                        if (endpoint.isNotEmpty) {
+                          final uri = Uri.parse(endpoint);
+                          action['endpoint'] = uri.replace(queryParameters: {
+                            ...uri.queryParameters,
+                            paramName: value,
+                          }).toString();
+                        }
+                        action['type'] = 'refresh_sheet';
+                        action['refresh_in_place'] = true;
+                        sduiContext?.dispatchAction(action);
+                      },
+              );
+            }),
+          ],
+        ],
       ),
     );
   }
@@ -2280,7 +2869,8 @@ class DynamicSchemaParser {
     final enabled = schema['enabled'] != false;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final defaultGreen = isDark ? const Color(0xFF10B981) : _outlinedButtonGreen;
+    final defaultGreen =
+        isDark ? const Color(0xFF10B981) : _outlinedButtonGreen;
     final accent = schema['color'] != null
         ? SduiIconRegistry.parseColor(schema['color'].toString(),
             fallback: defaultGreen)
@@ -2562,6 +3152,59 @@ class DynamicSchemaParser {
   // Helpers
   // ===========================================================================
 
+  static Map<String, dynamic>? _componentAction(Map<String, dynamic> schema) {
+    final raw = schema['action'] ?? schema['on_tap'] ?? schema['on_click'];
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+
+    final type = schema['action_type']?.toString();
+    if (type == null || type.isEmpty) return null;
+
+    return <String, dynamic>{
+      'type': type,
+      if (schema['endpoint'] != null) 'endpoint': schema['endpoint'],
+      if (schema['route'] != null) 'route': schema['route'],
+      if (schema['url'] != null) 'url': schema['url'],
+      if (schema['method'] != null) 'method': schema['method'],
+      if (schema['data'] != null) 'data': schema['data'],
+      if (schema['payload'] != null) 'payload': schema['payload'],
+    };
+  }
+
+  static Color _semanticColor(
+    BuildContext context,
+    dynamic value, {
+    required Color fallback,
+  }) {
+    final theme = Theme.of(context);
+    final token = value?.toString().trim().toLowerCase();
+
+    return switch (token) {
+      'theme.surface' || 'surface' || 'card' => theme.colorScheme.surface,
+      'theme.canvas' ||
+      'theme.background' ||
+      'canvas' ||
+      'background' =>
+        theme.scaffoldBackgroundColor,
+      'theme.divider' ||
+      'theme.border' ||
+      'theme.outlinevariant' ||
+      'divider' ||
+      'border' ||
+      'outline' =>
+        theme.dividerColor,
+      'theme.textprimary' ||
+      'theme.onsurface' ||
+      'textprimary' =>
+        theme.colorScheme.onSurface,
+      'theme.textsecondary' ||
+      'theme.onsurfacevariant' ||
+      'textsecondary' =>
+        theme.colorScheme.onSurfaceVariant,
+      null || '' => fallback,
+      _ => SduiIconRegistry.parseColor(value.toString(), fallback: fallback),
+    };
+  }
+
   static List<Map<String, dynamic>> _extractChildren(
       Map<String, dynamic> schema) {
     final raw = schema['components'] ?? schema['children'] ?? schema['child'];
@@ -2755,12 +3398,11 @@ class _SchemaTabsViewState extends State<_SchemaTabsView>
         .toList();
 
     final maxIndex = _tabItems.isEmpty ? 0 : _tabItems.length - 1;
-    final initialIndex =
-        ((widget.schema['initial_index'] ?? widget.schema['active_index'])
-                    as num?)
-                ?.toInt()
-                .clamp(0, maxIndex) ??
-            0;
+    final initialIndex = ((widget.schema['initial_index'] ??
+                widget.schema['active_index']) as num?)
+            ?.toInt()
+            .clamp(0, maxIndex) ??
+        0;
 
     _controller = TabController(
       length: _tabItems.length,
@@ -4581,8 +5223,8 @@ class _CashTenderedFieldState extends State<_CashTenderedField> {
             style: TextStyle(color: isDark ? const Color(0xFFF8FAFC) : null),
             decoration: InputDecoration(
               labelText: label,
-              labelStyle: TextStyle(
-                  color: isDark ? const Color(0xFF94A3B8) : null),
+              labelStyle:
+                  TextStyle(color: isDark ? const Color(0xFF94A3B8) : null),
               prefixIcon: Icon(Icons.payments_outlined,
                   color: isDark ? const Color(0xFF94A3B8) : null),
               border: OutlineInputBorder(

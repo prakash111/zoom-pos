@@ -8,8 +8,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_client.dart';
-import '../../../core/api/api_exception.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/sdui/sdui_icon_registry.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/widgets/adaptive_sheet.dart';
 import '../../settings/screens/printer_selection_dialog.dart';
@@ -96,8 +96,238 @@ Future<void> showInvoiceActionsSheet(
 
   return showAdaptiveSheet(
     context,
-    builder: (sheetContext) {
-      return SafeArea(
+    builder: (sheetContext) => _InvoiceActionsSheetContent(
+      parentContext: context,
+      apiClient: apiClient,
+      data: data,
+    ),
+  );
+}
+
+class _InvoiceActionsSheetContent extends StatefulWidget {
+  const _InvoiceActionsSheetContent({
+    required this.parentContext,
+    required this.apiClient,
+    required this.data,
+  });
+
+  final BuildContext parentContext;
+  final ApiClient apiClient;
+  final InvoiceActionsData data;
+
+  @override
+  State<_InvoiceActionsSheetContent> createState() =>
+      _InvoiceActionsSheetContentState();
+}
+
+class _InvoiceActionsSheetContentState
+    extends State<_InvoiceActionsSheetContent> {
+  List<Map<String, dynamic>> _channels = const [];
+  bool _channelsLoading = true;
+  String? _channelsError;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchChannels();
+  }
+
+  Future<void> _fetchChannels() async {
+    if (mounted) {
+      setState(() {
+        _channelsLoading = true;
+        _channelsError = null;
+      });
+    }
+
+    try {
+      final normalizedType = widget.data.documentType == 'quotation'
+          ? 'quotation'
+          : widget.data.documentType == 'sale'
+              ? 'sale'
+              : 'invoice';
+      final documentId = Uri.encodeComponent(widget.data.documentId);
+      final endpoint =
+          '/api/v1/tenant/documents/$normalizedType/$documentId/preview-modal';
+      final response = await widget.apiClient.requestAbsolute(
+        endpoint,
+        method: 'GET',
+      );
+      final rawSchema = response['schema'] is Map
+          ? Map<String, dynamic>.from(response['schema'] as Map)
+          : response;
+      final rawComponents = rawSchema['components'];
+      final channels = <Map<String, dynamic>>[];
+
+      if (rawComponents is List) {
+        for (final raw in rawComponents) {
+          if (raw is! Map) continue;
+          final component = Map<String, dynamic>.from(raw);
+          if (component['type']?.toString() != 'list_tile') continue;
+
+          final action = component['action'];
+          final actionMap =
+              action is Map ? Map<String, dynamic>.from(action) : const {};
+          final channel = component['channel']?.toString().trim() ?? '';
+          final endpoint = actionMap['endpoint']?.toString() ?? '';
+          final actionType = (actionMap['type'] ?? component['action_type'])
+              ?.toString()
+              .toUpperCase();
+
+          if (channel.isNotEmpty ||
+              endpoint.contains('/dispatch/') ||
+              actionType == 'OPEN_URL') {
+            channels.add(component);
+          }
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _channels = channels;
+        _channelsLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _channels = const [];
+        _channelsLoading = false;
+        _channelsError = 'Could not load configured channels. Tap to retry.';
+      });
+    }
+  }
+
+  Map<String, dynamic> _map(dynamic value) =>
+      value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+
+  Widget _buildChannelTile(
+    BuildContext context,
+    Map<String, dynamic> channel,
+  ) {
+    final leading = _map(channel['leading']);
+    final icon = SduiIconRegistry.resolve(
+      leading['icon']?.toString() ?? channel['icon']?.toString(),
+      fallback: Icons.send_outlined,
+    );
+    final color = SduiIconRegistry.parseColor(
+      leading['color']?.toString() ?? channel['color']?.toString(),
+      fallback: Theme.of(context).colorScheme.primary,
+    );
+
+    return ListTile(
+      key: ValueKey(channel['id'] ?? channel['channel'] ?? channel['title']),
+      leading: Icon(icon, color: color, size: 22),
+      title: Text(
+        channel['title']?.toString() ?? 'Send document',
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+      ),
+      subtitle: channel['subtitle'] == null
+          ? null
+          : Text(
+              channel['subtitle'].toString(),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).textTheme.bodySmall?.color,
+              ),
+            ),
+      trailing: const Icon(Icons.send_outlined, size: 18),
+      onTap: () => _executeChannel(context, channel),
+    );
+  }
+
+  Future<void> _executeChannel(
+    BuildContext sheetContext,
+    Map<String, dynamic> channel,
+  ) async {
+    final action = _map(channel['action'] ?? channel['on_tap']);
+    final actionType =
+        (action['type'] ?? channel['action_type'])?.toString().toUpperCase() ??
+            '';
+
+    if (actionType == 'OPEN_URL') {
+      final uri = Uri.tryParse(
+          action['url']?.toString() ?? channel['url']?.toString() ?? '');
+      if (uri == null) return;
+      Navigator.of(sheetContext).pop();
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+
+    final endpoint =
+        action['endpoint']?.toString() ?? channel['endpoint']?.toString() ?? '';
+    if (!endpoint.startsWith('/api/') && !endpoint.startsWith('http')) {
+      ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+        const SnackBar(content: Text('This dispatch action is unavailable.')),
+      );
+      return;
+    }
+
+    final payload =
+        _map(action['data'] ?? action['payload'] ?? channel['data']);
+    final channelName =
+        (payload['channel'] ?? channel['channel'] ?? channel['id'] ?? '')
+            .toString()
+            .toLowerCase();
+    if (channelName == 'sms' ||
+        channelName == 'whatsapp' ||
+        channelName == 'email') {
+      var recipient = payload['recipient']?.toString().trim() ?? '';
+      if (recipient.isEmpty) {
+        recipient = (channelName == 'email'
+                    ? widget.data.customerEmail
+                    : widget.data.customerPhone)
+                ?.trim() ??
+            '';
+      }
+      if (recipient.isEmpty) {
+        final prompted = await showDialog<String>(
+          context: widget.parentContext,
+          builder: (_) => _RecipientDialog(
+            type: channelName,
+            initialValue: channelName == 'email'
+                ? widget.data.customerEmail
+                : widget.data.customerPhone,
+          ),
+        );
+        recipient = prompted?.trim() ?? '';
+      }
+      if (recipient.isEmpty) return;
+      payload['recipient'] = recipient;
+    }
+
+    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+    final messenger = ScaffoldMessenger.of(widget.parentContext);
+    try {
+      final response = await widget.apiClient.requestAbsolute(
+        endpoint,
+        method: action['method']?.toString() ?? 'POST',
+        data: payload,
+      );
+      final message = response['message']?.toString() ??
+          action['feedback']?.toString() ??
+          'Document dispatched.';
+      messenger.showSnackBar(SnackBar(content: Text(message)));
+
+      final returnedUrl =
+          response['whatsapp_url']?.toString() ?? response['url']?.toString();
+      final uri = Uri.tryParse(returnedUrl ?? '');
+      if (uri != null) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Dispatch failed: $error')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.data;
+    final apiClient = widget.apiClient;
+
+    return SafeArea(
+      child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -108,7 +338,7 @@ Future<void> showInvoiceActionsSheet(
                 children: [
                   Text(
                     data.documentNumber,
-                    style: Theme.of(sheetContext)
+                    style: Theme.of(context)
                         .textTheme
                         .titleMedium
                         ?.copyWith(fontWeight: FontWeight.bold),
@@ -128,8 +358,8 @@ Future<void> showInvoiceActionsSheet(
               title: const Text('Preview & Print'),
               subtitle: const Text('View the PDF, print, or share the file'),
               onTap: () {
-                Navigator.of(sheetContext).pop();
-                Navigator.of(context).push(
+                Navigator.of(context).pop();
+                Navigator.of(widget.parentContext).push(
                   MaterialPageRoute(
                       builder: (_) => _InvoicePreviewScreen(
                           apiClient: apiClient, data: data)),
@@ -142,60 +372,38 @@ Future<void> showInvoiceActionsSheet(
                 title: const Text('Print on receipt printer'),
                 subtitle: const Text('Bluetooth thermal printer'),
                 onTap: () async {
-                  Navigator.of(sheetContext).pop();
-                  await _printThermal(context, data);
+                  Navigator.of(context).pop();
+                  await _printThermal(widget.parentContext, data);
                 },
               ),
-            ListTile(
-              leading: const Icon(Icons.chat_outlined),
-              title: const Text('Share via WhatsApp'),
-              subtitle: (data.customerPhone ?? '').isNotEmpty
-                  ? Text('to ${data.customerPhone}')
-                  : null,
-              trailing: (data.customerPhone ?? '').isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      tooltip: 'Change recipient',
-                      onPressed: () async {
-                        Navigator.of(sheetContext).pop();
-                        await _sendDelivery(context, apiClient, data,
-                            type: 'whatsapp', forcePrompt: true);
-                      },
-                    )
-                  : null,
-              onTap: () async {
-                Navigator.of(sheetContext).pop();
-                await _sendDelivery(context, apiClient, data, type: 'whatsapp');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.email_outlined),
-              title: const Text('Send via Email'),
-              subtitle: (data.customerEmail ?? '').isNotEmpty
-                  ? Text('to ${data.customerEmail}')
-                  : null,
-              trailing: (data.customerEmail ?? '').isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      tooltip: 'Change recipient',
-                      onPressed: () async {
-                        Navigator.of(sheetContext).pop();
-                        await _sendDelivery(context, apiClient, data,
-                            type: 'email', forcePrompt: true);
-                      },
-                    )
-                  : null,
-              onTap: () async {
-                Navigator.of(sheetContext).pop();
-                await _sendDelivery(context, apiClient, data, type: 'email');
-              },
-            ),
+            if (_channelsLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: CircularProgressIndicator.adaptive(),
+              )
+            else if (_channelsError != null)
+              ListTile(
+                leading: const Icon(Icons.sync_problem_outlined),
+                title: Text(_channelsError!),
+                trailing: const Icon(Icons.refresh),
+                onTap: _fetchChannels,
+              )
+            else if (_channels.isEmpty)
+              const ListTile(
+                leading: Icon(Icons.info_outline),
+                title: Text('No delivery channels are configured'),
+                subtitle: Text(
+                    'Enable SMS, WhatsApp, SMTP, or a custom channel in Settings.'),
+              )
+            else
+              for (final channel in _channels)
+                _buildChannelTile(context, channel),
             const SizedBox(height: 8),
           ],
         ),
-      );
-    },
-  );
+      ),
+    );
+  }
 }
 
 Future<void> _printThermal(
@@ -230,53 +438,6 @@ Future<void> _printThermal(
       content: Text(ok ? 'Sent to printer.' : 'Could not reach the printer.')));
 }
 
-Future<void> _sendDelivery(
-  BuildContext context,
-  ApiClient apiClient,
-  InvoiceActionsData data, {
-  required String type,
-  bool forcePrompt = false,
-}) async {
-  final knownRecipient =
-      type == 'email' ? data.customerEmail : data.customerPhone;
-  String? recipient = (!forcePrompt && (knownRecipient ?? '').isNotEmpty)
-      ? knownRecipient
-      : null;
-
-  if (recipient == null) {
-    recipient = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) =>
-          _RecipientDialog(type: type, initialValue: knownRecipient),
-    );
-  }
-  if (recipient == null || recipient.trim().isEmpty) return;
-  if (!context.mounted) return;
-
-  final messenger = ScaffoldMessenger.of(context);
-  try {
-    final response = await apiClient.post(ApiEndpoints.sendDelivery, data: {
-      'type': type,
-      'document_type': data.documentType,
-      'recipient': recipient.trim(),
-      'document_id': data.documentId,
-    });
-
-    final message = response['message']?.toString() ?? 'Sent.';
-    messenger.showSnackBar(SnackBar(content: Text(message)));
-
-    final whatsappUrl = response['whatsapp_url']?.toString();
-    if (type == 'whatsapp' && whatsappUrl != null && whatsappUrl.isNotEmpty) {
-      final uri = Uri.tryParse(whatsappUrl);
-      if (uri != null) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    }
-  } on ApiException catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text(e.message)));
-  }
-}
-
 class _RecipientDialog extends StatefulWidget {
   const _RecipientDialog({required this.type, this.initialValue});
 
@@ -300,8 +461,17 @@ class _RecipientDialogState extends State<_RecipientDialog> {
   @override
   Widget build(BuildContext context) {
     final isEmail = widget.type == 'email';
+    final isSms = widget.type == 'sms';
+    final String titleText;
+    if (isEmail) {
+      titleText = 'Send via Email';
+    } else if (isSms) {
+      titleText = 'Send via SMS';
+    } else {
+      titleText = 'Share via WhatsApp';
+    }
     return AlertDialog(
-      title: Text(isEmail ? 'Send via Email' : 'Share via WhatsApp'),
+      title: Text(titleText),
       content: TextField(
         controller: _controller,
         autofocus: true,

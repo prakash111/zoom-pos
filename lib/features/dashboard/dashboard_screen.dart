@@ -15,6 +15,7 @@ import '../../core/models/analytics_model.dart';
 import '../../core/models/company_model.dart';
 import '../../core/models/user_model.dart';
 import '../../core/sdui/models/sdui_models.dart';
+import '../../core/sdui/sdui_action_dispatcher.dart';
 import '../../core/sdui/sdui_component_registry.dart';
 import '../../core/sdui/sdui_icon_registry.dart';
 import '../../core/services/sync/sync_status_badge.dart';
@@ -384,8 +385,16 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  final _dashboardActionFormKey = GlobalKey<FormState>();
+  final Map<String, dynamic> _dashboardActionValues = {};
   late final AnalyticsRepository _analyticsRepository;
   late Future<AnalyticsModel> _analyticsFuture;
+  int _notificationBadgeCount = 0;
+  Map<String, dynamic> _notificationAction = const {
+    'type': 'OPEN_BOTTOM_SHEET',
+    'title': 'System Alerts & Reminders',
+    'endpoint': '/api/v1/tenant/notifications/feed',
+  };
 
   /// The dashboard "Filter" date range — drives every metric card, the
   /// balance sparkline and the statistics deltas.
@@ -402,6 +411,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
         from: _customRange?.start,
         to: _customRange?.end,
       );
+
+  Future<void> _loadDashboardChrome() async {
+    try {
+      final apiClient = context.read<ApiClient>();
+      try {
+        final unreadRes = await apiClient.requestAbsolute(
+          '/api/v1/tenant/notifications/unread-count',
+          method: 'GET',
+        );
+        if (unreadRes['unread_count'] != null) {
+          if (mounted) {
+            setState(() {
+              _notificationBadgeCount =
+                  (unreadRes['unread_count'] as num).toInt();
+            });
+          }
+        }
+      } catch (_) {}
+
+      final response = await apiClient.requestAbsolute(
+        '/api/tenant/views/dashboard',
+        method: 'GET',
+      );
+      final rawSchema = response['schema'];
+      if (rawSchema is! Map) return;
+      final appBar = rawSchema['app_bar'];
+      if (appBar is! Map || appBar['actions'] is! List) return;
+
+      for (final rawAction in appBar['actions'] as List) {
+        if (rawAction is! Map ||
+            rawAction['type']?.toString() != 'notification_bell') {
+          continue;
+        }
+        final action = rawAction['action'];
+        if (!mounted) return;
+        setState(() {
+          if (rawAction['badge_count'] != null) {
+            _notificationBadgeCount =
+                (rawAction['badge_count'] as num?)?.toInt() ??
+                    _notificationBadgeCount;
+          }
+          if (action is Map) {
+            _notificationAction = Map<String, dynamic>.from(action);
+          }
+        });
+        return;
+      }
+    } catch (_) {
+      // Dashboard content remains usable offline; the bell simply keeps the
+      // last server-provided count until the next refresh succeeds.
+    }
+  }
+
+  Future<void> _openNotificationFeed() async {
+    final dispatcher = SduiActionDispatcher(
+      resolveApiClient: () => context.read<ApiClient>(),
+      formKey: _dashboardActionFormKey,
+      formValues: _dashboardActionValues,
+      setFormValue: (key, value) => _dashboardActionValues[key] = value,
+      onReload: () {
+        if (!mounted) return;
+        setState(() => _analyticsFuture = _loadAnalytics());
+        _loadDashboardChrome();
+      },
+      showToast: (message, {isError = false}) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(message),
+          backgroundColor:
+              isError ? Colors.red.shade700 : Colors.green.shade700,
+        ));
+      },
+    );
+    await dispatcher.dispatch(context, _notificationAction);
+  }
 
   Future<void> _pickDateRange() async {
     final selected = await showMenu<AnalyticsRange>(
@@ -455,6 +539,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _analyticsRepository = AnalyticsRepository(context.read<ApiClient>());
     _analyticsFuture = _loadAnalytics();
+    _loadDashboardChrome();
     context
         .read<ThemeProvider>()
         .refreshFromServer(SettingsRepository(context.read<ApiClient>()));
@@ -468,19 +553,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.signOutConfirmTitle),
-        content: Text(l10n.signOutConfirmBody),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log Out'),
+        content: const Text('Are you sure you want to exit your session?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(l10n.cancel)),
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(l10n.signOut)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log Out'),
+          ),
         ],
       ),
     );
@@ -913,11 +1002,103 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: SafeArea(
                 top: false,
                 bottom: true,
-                child: ListView(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).padding.bottom + 16,
-                  ),
-                  children: children,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        padding: EdgeInsets.zero,
+                        children: children,
+                      ),
+                    ),
+                    SafeArea(
+                      top: false,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: BorderSide(
+                              color: onDrawer.withValues(alpha: 0.18),
+                            ),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (user != null) ...[
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor:
+                                        onDrawer.withValues(alpha: 0.12),
+                                    child: Text(
+                                      (user.name)
+                                          .trim()
+                                          .split(RegExp(r'\s+'))
+                                          .where((part) => part.isNotEmpty)
+                                          .take(2)
+                                          .map((part) => part[0])
+                                          .join()
+                                          .toUpperCase(),
+                                      style: TextStyle(
+                                        color: onDrawer,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          user.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700),
+                                        ),
+                                        Text(
+                                          user.email,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: unselectedIconColor,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                            ],
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.logout,
+                                  color: Color(0xFFEF4444)),
+                              title: const Text(
+                                'Log Out',
+                                style: TextStyle(
+                                  color: Color(0xFFEF4444),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              onTap: () => _confirmLogout(context),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1213,37 +1394,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if ((company?.logoUrl ?? BootstrapCache.instance.logoUrl) != null &&
-                (company?.logoUrl ?? BootstrapCache.instance.logoUrl)!.isNotEmpty) ...[
-              Container(
-                width: 32,
-                height: 32,
-                margin: const EdgeInsets.only(right: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                padding: const EdgeInsets.all(2),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: CachedNetworkImage(
-                    imageUrl: (company?.logoUrl ?? BootstrapCache.instance.logoUrl)!,
-                    fit: BoxFit.contain,
-                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-            ],
-            Flexible(
-              child: Text(
-                company?.tradeName ?? company?.name ?? 'Sales & Inventory',
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
+        title: Text(
+          company?.tradeName ?? company?.name ?? 'Sales & Inventory',
+          overflow: TextOverflow.ellipsis,
         ),
         elevation: 0,
         bottom: appBarBottom,
@@ -1264,6 +1417,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               setState(() {
                 _analyticsFuture = _loadAnalytics();
               });
+              _loadDashboardChrome();
               context.read<AuthProvider>().reloadSession();
               context.read<LocaleProvider>().refreshFromServer();
             },
@@ -1278,11 +1432,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ),
-          IconButton(
-            tooltip: l10n.signOut,
-            icon: const Icon(Icons.logout),
-            onPressed: () => _confirmLogout(context),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined, size: 24),
+                tooltip: 'Alerts & Reminders',
+                onPressed: _openNotificationFeed,
+              ),
+              if (_notificationBadgeCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints:
+                        const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      _notificationBadgeCount > 99
+                          ? '99+'
+                          : '$_notificationBadgeCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
+          const SizedBox(width: 4),
           // endDrawer has no automatic AppBar affordance the way `drawer`
           // does, so add one explicitly when the dock is docked right.
           if (endDrawer != null)
@@ -1314,6 +1499,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 setState(() {
                   _analyticsFuture = _loadAnalytics();
                 });
+                await _loadDashboardChrome();
               },
               child: AnimatedPadding(
                 duration: const Duration(milliseconds: 250),
@@ -1386,6 +1572,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           setState(() {
                                             _analyticsFuture = _loadAnalytics();
                                           });
+                                          _loadDashboardChrome();
                                         },
                                       ),
                                     ],

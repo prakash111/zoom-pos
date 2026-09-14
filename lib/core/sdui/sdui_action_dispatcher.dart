@@ -109,7 +109,7 @@ class SduiActionDispatcher {
       return;
     }
 
-    final type = action['type']?.toString().toLowerCase().trim();
+    final type = _canonicalActionType(action['type']);
     final client = resolveApiClient();
 
     switch (type) {
@@ -172,7 +172,7 @@ class SduiActionDispatcher {
 
         final submitData = <String, dynamic>{};
         try {
-          final rawPayload = action['payload'];
+          final rawPayload = action['payload'] ?? action['data'];
           if (rawPayload is Map) {
             submitData.addAll(Map<String, dynamic>.from(rawPayload));
           }
@@ -242,8 +242,7 @@ class SduiActionDispatcher {
           // ask the client to move to the next tab, or — on the final tab —
           // finish onboarding and drop back to the dashboard.
           final advanceTab = _advanceTabDirective(res, action);
-          if (advanceTab != null &&
-              _handleAdvanceTab(context, advanceTab)) {
+          if (advanceTab != null && _handleAdvanceTab(context, advanceTab)) {
             return;
           }
 
@@ -375,6 +374,11 @@ class SduiActionDispatcher {
         await _openRemoteSheet(context, action, client);
         break;
 
+      case 'refresh_sheet':
+      case 'refresh_dashboard':
+        onReload();
+        break;
+
       case 'pop':
       case 'navigate_back':
         Navigator.of(context).pop();
@@ -395,6 +399,17 @@ class SduiActionDispatcher {
       default:
         break;
     }
+  }
+
+  static String? _canonicalActionType(dynamic rawType) {
+    final type = rawType?.toString().toLowerCase().trim();
+    return switch (type) {
+      'navigate_to' => 'navigate',
+      'submit_form' => 'form_submit',
+      'open_bottom_sheet' => 'open_remote_sheet',
+      'reload_component' => 'refresh_sheet',
+      _ => type,
+    };
   }
 
   /// Handles an SDUI write (`form_submit` / `api_post`) that threw while
@@ -617,7 +632,9 @@ class SduiActionDispatcher {
     Map<String, dynamic> action,
     ApiClient? client,
   ) async {
-    final sheetEndpoint = action['sheet_endpoint']?.toString() ?? '';
+    final sheetEndpoint = action['sheet_endpoint']?.toString() ??
+        action['endpoint']?.toString() ??
+        '';
     if (sheetEndpoint.isEmpty) {
       showToast('This action is missing a sheet endpoint.', isError: true);
       return;
@@ -728,7 +745,7 @@ class SduiActionDispatcher {
             formValues: formValues,
             setFormValue: setFormValue,
             dispatchAction: (modalAction) async {
-              final t = modalAction['type']?.toString().toLowerCase().trim();
+              final t = _canonicalActionType(modalAction['type']);
 
               // A pop/back inside a sheet closes THAT sheet only — it must
               // never bubble to the page underneath.

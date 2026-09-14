@@ -17,6 +17,7 @@ class SduiIconRegistry {
     'person': Icons.person_outline,
     'person_add': Icons.person_add_outlined,
     'person_add_outlined': Icons.person_add_outlined,
+    'person_pin': Icons.person_pin_outlined,
     'qr_code_scanner': Icons.qr_code_scanner,
     'phone': Icons.phone_outlined,
     'phone_outlined': Icons.phone_outlined,
@@ -64,6 +65,8 @@ class SduiIconRegistry {
     // Financial
     'savings': Icons.savings_outlined,
     'notifications_active': Icons.notifications_active_outlined,
+    'notifications_none': Icons.notifications_none_outlined,
+    'sync': Icons.sync,
     'request_quote': Icons.request_quote_outlined,
     'flag': Icons.flag_outlined,
     'insights': Icons.insights_outlined,
@@ -98,8 +101,16 @@ class SduiIconRegistry {
     'key': Icons.key_outlined,
     'chat': Icons.chat_outlined,
     'sms': Icons.sms_outlined,
+    'textsms': Icons.textsms_outlined,
     'mail': Icons.mail_outlined,
     'webhook': Icons.webhook_outlined,
+    'hub': Icons.hub_outlined,
+    'slack': Icons.forum_outlined,
+    'telegram': Icons.send_outlined,
+    'discord': Icons.forum_outlined,
+    'bell': Icons.notifications_none_outlined,
+    'megaphone': Icons.campaign_outlined,
+    'arrow_forward_ios': Icons.arrow_forward_ios,
     'menu_open': Icons.menu_open_outlined,
     'lock': Icons.lock_outline,
     'lock_reset': Icons.lock_reset_outlined,
@@ -139,6 +150,8 @@ class SduiIconRegistry {
     'circle': Icons.circle_outlined,
     'store': Icons.storefront_outlined,
     'mark_email_read': Icons.mark_email_read_outlined,
+    'picture_as_pdf': Icons.picture_as_pdf_outlined,
+    'print': Icons.print_outlined,
     'mail_lock': Icons.mail_lock_outlined,
     'facebook': Icons.facebook,
     'google': Icons.g_mobiledata,
@@ -155,18 +168,21 @@ class SduiIconRegistry {
   };
 
   /// Direct icon lookup alias matching `SduiIconRegistry.get(...)`.
-  static IconData get(String? iconName, {IconData fallback = Icons.widgets_outlined}) =>
+  static IconData get(String? iconName,
+          {IconData fallback = Icons.widgets_outlined}) =>
       resolve(iconName, fallback: fallback);
 
   /// Resolves an icon name from server payload to an [IconData].
-  static IconData resolve(String? iconName, {IconData fallback = Icons.widgets_outlined}) {
+  static IconData resolve(String? iconName,
+      {IconData fallback = Icons.widgets_outlined}) {
     if (iconName == null || iconName.isEmpty) return fallback;
     final normalized = iconName.toLowerCase().trim().replaceAll('-', '_');
     return _icons[normalized] ?? fallback;
   }
 
   /// Parses a hex color string (e.g. '#15803d', '15803d') into a Flutter [Color].
-  static Color parseColor(String? hexString, {Color fallback = const Color(0xFF2563EB)}) {
+  static Color parseColor(String? hexString,
+      {Color fallback = const Color(0xFF2563EB)}) {
     if (hexString == null || hexString.isEmpty) return fallback;
     try {
       final buffer = StringBuffer();

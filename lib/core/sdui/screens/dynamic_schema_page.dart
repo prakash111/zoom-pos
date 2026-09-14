@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../api/api_client.dart';
 import '../../api/api_exception.dart';
+import '../../config/theme_provider.dart';
 import '../../services/dynamic_string_service.dart';
 import '../dynamic_schema_context.dart';
 import '../dynamic_schema_parser.dart';
@@ -258,6 +259,49 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
     );
   }
 
+  Widget _buildAppBarAction(Map<String, dynamic> config) {
+    final type = config['type']?.toString().toLowerCase().trim();
+
+    if (type == 'theme_selector_dropdown') {
+      final current = context.watch<ThemeProvider>().themeMode;
+      return PopupMenuButton<ThemeMode>(
+        tooltip: 'Theme',
+        initialValue: current,
+        icon: Icon(current == ThemeMode.dark
+            ? Icons.dark_mode_outlined
+            : current == ThemeMode.light
+                ? Icons.light_mode_outlined
+                : Icons.brightness_auto_outlined),
+        onSelected: (mode) => context.read<ThemeProvider>().setThemeMode(mode),
+        itemBuilder: (_) => const [
+          PopupMenuItem(value: ThemeMode.system, child: Text('Match device')),
+          PopupMenuItem(value: ThemeMode.light, child: Text('Light')),
+          PopupMenuItem(value: ThemeMode.dark, child: Text('Dark')),
+        ],
+      );
+    }
+
+    final rawAction = config['action'];
+    final action = rawAction is Map
+        ? Map<String, dynamic>.from(rawAction)
+        : <String, dynamic>{
+            if (config['action_type'] != null) 'type': config['action_type'],
+          };
+    final icon = Icon(SduiIconRegistry.resolve(config['icon']?.toString()));
+    final badgeCount = (config['badge_count'] as num?)?.toInt() ?? 0;
+    final iconWidget = type == 'notification_bell' && badgeCount > 0
+        ? Badge.count(count: badgeCount, child: icon)
+        : icon;
+
+    return IconButton(
+      icon: iconWidget,
+      tooltip: config['label'] == null
+          ? (type == 'notification_bell' ? 'Notifications' : null)
+          : context.tr(config['label'].toString()),
+      onPressed: action.isEmpty ? null : () => _dispatchAction(action),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final client = _resolveApiClient();
@@ -272,15 +316,15 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
     }
 
     final appBarConfig = _schema?['app_bar'] as Map<String, dynamic>?;
-    final rawTitle =
-        _schema?['title']?.toString() ??
+    final rawTitle = _schema?['title']?.toString() ??
         appBarConfig?['title']?.toString() ??
         widget.initialTitle;
 
     String displayTitle = 'Screen';
     if (rawTitle != null && rawTitle.trim().isNotEmpty) {
       final trimmed = rawTitle.trim();
-      if (trimmed.contains('_') || (trimmed.contains('-') && !trimmed.contains(' '))) {
+      if (trimmed.contains('_') ||
+          (trimmed.contains('-') && !trimmed.contains(' '))) {
         displayTitle = trimmed
             .replaceAll('-', ' ')
             .replaceAll('_', ' ')
@@ -312,17 +356,7 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
             if (appBarConfig?['actions'] is List)
               for (final act in appBarConfig!['actions'])
                 if (act is Map)
-                  IconButton(
-                    icon:
-                        Icon(SduiIconRegistry.resolve(act['icon']?.toString())),
-                    tooltip: act['label'] == null
-                        ? null
-                        : context.tr(act['label'].toString()),
-                    onPressed: () {
-                      final a = act['action'] as Map<String, dynamic>?;
-                      if (a != null) _dispatchAction(a);
-                    },
-                  ),
+                  _buildAppBarAction(Map<String, dynamic>.from(act)),
           ],
         ),
         body: Builder(
