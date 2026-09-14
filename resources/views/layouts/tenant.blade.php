@@ -781,10 +781,6 @@
                                 @endif
 
 
-                                @if ($canLeads)
-                                    <x-nav.drawer-item item-key="lead_management" :route="route('tenant.leads.index')" title="{{ __('Lead Management') }}" subtitle="{{ __('Pipeline, follow-ups & auto-sync CRM') }}">🎯</x-nav.drawer-item>
-                                @endif
-
                                 @if ($canFinance)
                                     <x-nav.drawer-item item-key="cash_register" :route="route('tenant.financials.cash_register')" hover="lime" title="{{ __('Cash Register') }}" subtitle="{{ __('Opening, closing, cash withdrawals') }}">🗄️</x-nav.drawer-item>
                                 @endif
@@ -862,15 +858,20 @@
                                     <x-nav.drawer-item item-key="quotations" :route="route('tenant.quotes.index')" title="{{ __('Quotations & Proposals') }}" subtitle="{{ __('Quotes, estimates & 1-click sales conversion') }}">📑</x-nav.drawer-item>
                                 @endif
 
-                                @if ($canLeads)
-                                    <x-nav.drawer-item item-key="lead_management" :route="route('tenant.leads.index')" title="{{ __('Lead Management') }}" subtitle="{{ __('Pipeline, follow-ups & auto-sync CRM') }}">🎯</x-nav.drawer-item>
-                                @endif
-
                                 @if ($canCustomers)
                                     <x-nav.drawer-item item-key="customers" :route="route('tenant.customers.index')" title="{{ __('Customers & CRM') }}" subtitle="{{ __('Customer directory & loyalty points') }}">👥</x-nav.drawer-item>
                                 @endif
                             </div>
                         </div>
+
+                        @if ($canLeads)
+                            <div data-section-key="lead_ops">
+                                <div class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 px-3">{{ __('Lead Operations') }}</div>
+                                <div class="space-y-1">
+                                    <x-nav.drawer-item item-key="lead_management" :route="route('tenant.leads.index')" title="{{ __('Lead Management') }}" subtitle="{{ __('Pipeline, follow-ups & auto-sync CRM') }}">🎯</x-nav.drawer-item>
+                                </div>
+                            </div>
+                        @endif
 
                         @if ($canFinance)
                             <div data-section-key="financial_management">

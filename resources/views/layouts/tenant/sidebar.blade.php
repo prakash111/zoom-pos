@@ -1,5 +1,5 @@
 {{-- Tenant Cashier & Sales Drawer Item Partial for Lead Management --}}
-@if ($canLeads ?? true)
+@if ($canLeads ?? false)
     <x-nav.drawer-item 
         item-key="lead_management" 
         :route="route('tenant.leads.index')" 
