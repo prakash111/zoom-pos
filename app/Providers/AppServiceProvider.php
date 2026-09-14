@@ -39,6 +39,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (! $this->app->runningUnitTests()) {
+            \App\Support\Installation::isInstalled();
+        }
+
         Sale::observe(SaleObserver::class);
         Event::listen(TenantRegistered::class, TenantRegisteredListener::class);
 

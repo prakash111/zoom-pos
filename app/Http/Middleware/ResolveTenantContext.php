@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Company;
+use App\Support\Installation;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -31,13 +32,7 @@ class ResolveTenantContext
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $installedFile = storage_path('installed');
-        $legacyInstalledFile = storage_path('--installed');
-        if (! file_exists($installedFile) && file_exists($legacyInstalledFile)) {
-            @copy($legacyInstalledFile, $installedFile);
-        }
-
-        if (! file_exists($installedFile) || $request->is('install*')) {
+        if (! Installation::isInstalled() || $request->is('install*')) {
             return $next($request);
         }
 

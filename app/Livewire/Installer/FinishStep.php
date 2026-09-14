@@ -3,6 +3,7 @@
 namespace App\Livewire\Installer;
 
 use App\Models\PlatformSystem;
+use App\Support\Installation;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
@@ -17,7 +18,7 @@ class FinishStep extends Component
 
     public function mount(): void
     {
-        $this->done = file_exists(storage_path('installed'));
+        $this->done = Installation::isInstalled();
         $this->licenseData = session('installer_license_data', [
             'license_type' => 'Standard Commercial License',
             'purchase_code' => 'STANDARD-CODECANYON-LICENSE',
@@ -73,12 +74,7 @@ class FinishStep extends Component
             'verified_at' => now()->toIso8601String(),
         ]);
 
-        file_put_contents(storage_path('installed'), json_encode([
-            'installed_at' => now()->toIso8601String(),
-            'installer_version' => '2.0',
-            'app_version' => config('app.version', '1.0.0'),
-            'license' => $license,
-        ], JSON_PRETTY_PRINT));
+        Installation::markAsInstalled($license);
 
         try {
             PlatformSystem::set('core_license_status', 'ok');

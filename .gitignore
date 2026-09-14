@@ -16,6 +16,7 @@ docker-compose.override.yml
 /.zed
 /database/database.sqlite
 /storage/installed
+/storage/--installed
 /laravel.zip
 /lara.zip
 *.zip
