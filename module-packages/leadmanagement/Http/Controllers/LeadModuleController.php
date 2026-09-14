@@ -4,6 +4,7 @@ namespace Modules\leadmanagement\Http\Controllers;
 
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
+use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Sale;
 use App\Models\User;
@@ -176,7 +177,11 @@ class LeadModuleController extends Controller
 
         $existingLead = null;
         if ($id = $request->query('id')) {
-            $existingLead = Lead::where('company_id', $company->id)->find($id);
+            try {
+                $existingLead = $this->resolveLead($id, $company);
+            } catch (\Throwable $e) {
+                $existingLead = null;
+            }
         }
 
         $schema = $this->leadService->getCreateLeadSchema($company, $existingLead);
@@ -265,29 +270,160 @@ class LeadModuleController extends Controller
     }
 
     /**
+     * Safely resolve a Lead by numeric primary key OR string code (e.g., LD-TMFIAY4U / TMFIAY4U),
+     * supporting withTrashed(), company scope fallback, and auto-aligning company_id.
+     */
+    public function resolveLead($id, ?Company $company = null): Lead
+    {
+        $tenantId = $company?->id ?? auth()->user()?->tenant_id ?? auth()->user()?->company_id;
+        $idStr = trim((string) $id);
+        $cleanId = preg_replace('/^LD[-_]?/i', '', $idStr);
+
+        // 1. Resolve lead by numeric primary key OR string code with company constraint & withTrashed
+        $lead = Lead::withTrashed()
+            ->where(function ($query) use ($idStr, $cleanId) {
+                if (is_numeric($idStr)) {
+                    $query->where('id', (int) $idStr)->orWhere('lead_code', $idStr);
+                } else {
+                    $query->where('lead_code', $idStr)
+                          ->orWhere('lead_code', 'LD-' . $idStr)
+                          ->orWhere('lead_code', 'LD-' . $cleanId);
+                    if (! empty($cleanId) && is_numeric($cleanId)) {
+                        $query->orWhere('id', (int) $cleanId);
+                    }
+                }
+            })
+            ->where(function ($query) use ($tenantId) {
+                if ($tenantId) {
+                    $query->where('company_id', $tenantId)
+                          ->orWhereNull('company_id');
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                        $query->orWhere('tenant_id', $tenantId);
+                    }
+                }
+            })
+            ->first();
+
+        // 2. Fallback search without tenant constraint if scope differed during migrations
+        if (! $lead) {
+            $lead = Lead::withTrashed()
+                ->where(function ($query) use ($idStr, $cleanId) {
+                    if (is_numeric($idStr)) {
+                        $query->where('id', (int) $idStr)->orWhere('lead_code', $idStr);
+                    } else {
+                        $query->where('lead_code', $idStr)
+                              ->orWhere('lead_code', 'LD-' . $idStr)
+                              ->orWhere('lead_code', 'LD-' . $cleanId);
+                        if (! empty($cleanId) && is_numeric($cleanId)) {
+                            $query->orWhere('id', (int) $cleanId);
+                        }
+                    }
+                })
+                ->first();
+        }
+
+        // 3. Fallback LIKE search on lead_code
+        if (! $lead && ! empty($cleanId)) {
+            $lead = Lead::withTrashed()
+                ->where('lead_code', 'LIKE', "%{$cleanId}%")
+                ->first();
+        }
+
+        // 4. Fallback search via reminder table if lead was referenced in a reminder
+        if (! $lead) {
+            $reminder = \App\Models\Reminder::withoutGlobalScope('company')
+                ->where(function ($q) use ($idStr, $cleanId) {
+                    $q->where('notes', 'LIKE', "%{$idStr}%")
+                      ->orWhere('notes', 'LIKE', "%{$cleanId}%")
+                      ->orWhere('remindable_id', $idStr);
+                })
+                ->first();
+            if ($reminder && $reminder->remindable_id) {
+                $lead = Lead::withTrashed()->find($reminder->remindable_id);
+            }
+        }
+
+        if (! $lead) {
+            throw (new \Illuminate\Database\Eloquent\ModelNotFoundException)->setModel(Lead::class, [$id]);
+        }
+
+        // 5. Un-delete any mistakenly soft-deleted lead
+        if (method_exists($lead, 'trashed') && $lead->trashed()) {
+            $lead->restore();
+        }
+
+        // 6. Ensure company_id aligns with current session so it doesn't vanish
+        if ($tenantId && $lead->company_id !== $tenantId) {
+            $lead->company_id = $tenantId;
+            $lead->saveQuietly();
+        }
+
+        return $lead;
+    }
+
+    /**
+     * Resolve lead by numeric primary key OR string code (e.g. LD-TMFIAY4U) and return SDUI schema.
+     */
+    public function show($id = null): JsonResponse
+    {
+        $tenantId = auth()->user()?->tenant_id ?? auth()->user()?->company_id;
+        $company = null;
+        try {
+            $company = $this->resolveCompany(request());
+        } catch (\Throwable $e) {
+            if ($tenantId) {
+                $company = Company::find($tenantId);
+            }
+        }
+
+        $lookupId = $id;
+        if ($lookupId instanceof Request) {
+            $request = $lookupId;
+            $lookupId = $request->query('id') ?: ($request->route('id') ?: ($request->input('id') ?: ($request->query('lead_code') ?: $request->input('lead_code'))));
+        } elseif (! $lookupId) {
+            $lookupId = request()->query('id') ?: (request()->route('id') ?: (request()->input('id') ?: (request()->query('lead_code') ?: request()->input('lead_code'))));
+        }
+
+        $lead = $this->resolveLead($lookupId, $company);
+        $lead->load(['source', 'customer', 'assignedUser', 'activities' => fn ($q) => $q->orderByDesc('created_at')]);
+
+        return $this->buildLeadSchemaResponse($lead, $company);
+    }
+
+    /**
      * Lead Detailed SDUI Screen.
      */
     public function leadDetail(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
-        $currency = $company->currency_symbol ?: ($company->currency ?: '$');
 
-        $leadId = $request->query('id') ?: ($request->route('id') ?: $request->input('id'));
-        $lead = Lead::with(['source', 'customer', 'assignedUser', 'activities' => fn ($q) => $q->orderByDesc('created_at')])
-            ->where('company_id', $company->id)
-            ->where(function ($q) use ($leadId) {
-                if (is_numeric($leadId)) {
-                    $q->where('id', $leadId)->orWhere('lead_code', $leadId);
-                } else {
-                    $q->where('lead_code', $leadId);
-                }
-            })
-            ->firstOrFail();
+        $leadId = $request->query('id') ?: ($request->route('id') ?: ($request->input('id') ?: ($request->query('lead_code') ?: $request->input('lead_code'))));
+        if (! $leadId) {
+            return response()->json(['success' => false, 'error' => 'Lead ID or lead code is required.'], 400);
+        }
+
+        $lead = $this->resolveLead($leadId, $company);
+        $lead->load(['source', 'customer', 'assignedUser', 'activities' => fn ($q) => $q->orderByDesc('created_at')]);
 
         if ($user && ! PermissionChecker::can($user, 'leads', 'view_any') && $lead->assigned_to !== $user->id) {
             abort(403, 'Unauthorized: you can only view leads assigned to you.');
         }
+
+        return $this->buildLeadSchemaResponse($lead, $company, $user);
+    }
+
+    /**
+     * Build the Lead Detail SDUI Schema Response.
+     */
+    public function buildLeadSchemaResponse(Lead $lead, ?Company $company = null, ?User $user = null): JsonResponse
+    {
+        $company = $company ?? ($lead->company ?? Company::find($lead->company_id));
+        if (! $company) {
+            $company = $this->resolveCompany(request());
+        }
+        $user = $user ?? $this->resolveUser(request(), $company);
+        $currency = $company ? ($company->currency_symbol ?: ($company->currency ?: '$')) : '₹';
 
         $stage = $lead->stage ?: $lead->status ?: 'new';
         $stageLabels = [
@@ -472,56 +608,46 @@ class LeadModuleController extends Controller
                     ];
                 }
 
-                $postSaleData = [
-                    'sale_id'         => (string) $q->id,
-                    'invoice_number'  => (string) $q->sale_number,
-                    'company_name'    => (string) ($company?->trade_name ?: ($company?->name ?: 'Zoom CRM')),
-                    'customer_name'   => (string) ($lead->contact_name ?: ($lead->name ?: 'Customer')),
-                    'customer_phone'  => (string) ($lead->phone ?: ''),
-                    'customer_email'  => (string) ($lead->email ?: ''),
-                    'currency_symbol' => (string) $currency,
-                    'subtotal'        => (float) ($q->subtotal ?? $q->total),
-                    'discount'        => (float) ($q->discount_amount ?? 0),
-                    'tax'             => (float) ($q->tax_amount ?? 0),
-                    'total'           => (float) $q->total,
-                    'tax_id'          => (string) ($company?->tax_id ?: ($company?->tax_number ?: '')),
-                    'tax_label'       => 'GSTIN',
-                    'is_india'        => true,
-                    'tax_rate'        => 0,
-                    'paid_amount'     => null,
-                    'due_amount'      => (float) $q->total,
-                    'lines'           => $lines,
-                    'pdf_endpoint'    => "/api/tenant/quotations/{$q->id}/pdf",
-                ];
-
-                $navEndpoint = '/api/tenant/views/quotations/' . $q->id;
-                $navAction = [
-                    'type'            => 'navigate',
-                    'action_type'     => 'navigate',
-                    'route'           => $navEndpoint,
-                    'endpoint'        => $navEndpoint,
-                    'target_endpoint' => $navEndpoint,
-                    'url'             => $navEndpoint,
-                    'target'          => 'dynamic_page',
-                    'title'           => "Quotation #{$q->sale_number}",
-                ];
-
                 $sheetAction = [
                     'type'        => 'show_post_sale_sheet',
                     'action_type' => 'show_post_sale_sheet',
-                    'data'        => $postSaleData,
+                    'data'        => [
+                        'sale_id'            => $q->id,
+                        'sale_number'        => $q->sale_number,
+                        'invoice_number'     => $q->sale_number,
+                        'operation_type'     => 'quotation',
+                        'customer_name'      => $q->customer?->name ?? 'Walk-in Customer',
+                        'customer_phone'     => $q->customer?->phone ?? '',
+                        'customer_email'     => $q->customer?->email ?? '',
+                        'total'              => (float) $q->total,
+                        'subtotal'           => (float) ($q->subtotal ?? $q->total),
+                        'tax'                => (float) ($q->tax_amount ?? 0),
+                        'discount'           => (float) ($q->discount_amount ?? 0),
+                        'formatted_total'    => $currency.number_format((float) $q->total, 2),
+                        'formatted_subtotal' => $currency.number_format((float) ($q->subtotal ?? $q->total), 2),
+                        'date'               => $q->created_at?->toIso8601String() ?? now()->toIso8601String(),
+                        'created_at'         => $q->created_at?->format('d M Y, h:i A') ?? now()->format('d M Y, h:i A'),
+                        'pdf_url'            => url("/tenant/quotations/{$q->id}/print"),
+                        'print_url'          => url("/tenant/quotations/{$q->id}/print"),
+                        'view_url'           => url("/tenant/quotations/{$q->id}"),
+                        'share_url'          => url("/tenant/quotations/{$q->id}/print"),
+                        'share_text'         => "Quotation #{$q->sale_number} from {$company->name}: {$currency}".number_format((float) $q->total, 2),
+                        'whatsapp_text'      => "Hello, here is your quotation #{$q->sale_number} for {$currency}".number_format((float) $q->total, 2).': '.url("/tenant/quotations/{$q->id}/print"),
+                        'items'              => $lines,
+                    ],
                 ];
 
                 $docTiles[] = S::lineItemTile(
                     "Quotation #{$q->sale_number}",
                     'Total: '.$currency.number_format((float) $q->total, 2).'  ·  Status: '.ucfirst($q->status),
                     'request_quote',
-                    $navAction,
                     [
-                        'endpoint'        => $navEndpoint,
-                        'route'           => $navEndpoint,
-                        'target_endpoint' => $navEndpoint,
-                        'url'             => $navEndpoint,
+                        'type'            => 'navigate',
+                        'target'          => 'dynamic_page',
+                        'endpoint'        => "/api/tenant/views/quotations/{$q->id}",
+                        'route'           => "/api/tenant/views/quotations/{$q->id}",
+                        'target_endpoint' => "/api/tenant/views/quotations/{$q->id}",
+                        'title'           => "Quote #{$q->sale_number}",
                         'action_type'     => 'navigate',
                     ]
                 );
@@ -596,19 +722,35 @@ class LeadModuleController extends Controller
     /**
      * RESTful Lead Listing (`GET /api/v1/tenant/leads`).
      */
+    /**
+     * RESTful Lead Listing (`GET /api/v1/tenant/leads`).
+     */
     public function leadsIndex(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
+        $tenantId = $company->id ?? auth()->user()?->tenant_id ?? auth()->user()?->company_id;
 
         if ($user && ! PermissionChecker::can($user, 'leads', 'view') && ! PermissionChecker::can($user, 'leads', 'view_any')) {
             return response()->json(['success' => false, 'error' => 'Unauthorized: leads.view permission required.'], 403);
         }
 
         $query = Lead::withoutGlobalScope('company')
-            ->where('company_id', $company->id)
+            ->where(function ($q) use ($tenantId) {
+                if ($tenantId) {
+                    $q->where('company_id', $tenantId)
+                      ->orWhereNull('company_id');
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                        $q->orWhere('tenant_id', $tenantId);
+                    }
+                }
+            })
             ->with(['source', 'customer', 'assignedUser', 'reminders', 'quotations', 'invoices'])
             ->latest('created_at');
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
 
         if ($user && ! PermissionChecker::can($user, 'leads', 'view_any')) {
             $query->where('assigned_to', $user->id);
@@ -641,10 +783,25 @@ class LeadModuleController extends Controller
 
         $leads = $query->paginate(20);
 
+        $pipelineValue = (float) (Lead::withoutGlobalScope('company')
+            ->where(function ($q) use ($tenantId) {
+                if ($tenantId) {
+                    $q->where('company_id', $tenantId)->orWhereNull('company_id');
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                        $q->orWhere('tenant_id', $tenantId);
+                    }
+                }
+            })
+            ->when(\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'))
+            ->whereNotIn('stage', ['lost'])
+            ->sum('expected_value') ?: 0);
+
         return response()->json([
             'success' => true,
             'data' => $leads->items(),
             'leads' => $leads->items(),
+            'pipeline_count' => $leads->total(),
+            'pipeline_value' => $pipelineValue,
             'meta' => [
                 'total' => $leads->total(),
                 'current_page' => $leads->currentPage(),
@@ -667,9 +824,8 @@ class LeadModuleController extends Controller
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
-        $lead = Lead::where('company_id', $company->id)
-            ->with(['source', 'customer', 'assignedUser', 'activities', 'reminders', 'quotations', 'invoices'])
-            ->findOrFail($id);
+        $lead = $this->resolveLead($id, $company);
+        $lead->load(['source', 'customer', 'assignedUser', 'activities', 'reminders', 'quotations', 'invoices']);
 
         if ($user && ! PermissionChecker::can($user, 'leads', 'view_any') && $lead->assigned_to !== $user->id) {
             return response()->json(['success' => false, 'error' => 'Unauthorized: you can only view leads assigned to you.'], 403);
@@ -693,7 +849,7 @@ class LeadModuleController extends Controller
             return response()->json(['success' => false, 'error' => 'Unauthorized: leads.edit permission required.'], 403);
         }
 
-        $lead = Lead::where('company_id', $company->id)->findOrFail($id);
+        $lead = $this->resolveLead($id, $company);
 
         if ($user && ! PermissionChecker::can($user, 'leads', 'view_any') && $lead->assigned_to !== $user->id) {
             return response()->json(['success' => false, 'error' => 'Unauthorized: you can only edit leads assigned to you.'], 403);
@@ -753,7 +909,7 @@ class LeadModuleController extends Controller
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
-        $lead = Lead::where('company_id', $company->id)->findOrFail($id);
+        $lead = $this->resolveLead($id, $company);
 
         $data = $request->validate([
             'stage' => ['sometimes', 'string', 'in:new,contacted,qualified,proposal_sent,won,lost'],
@@ -783,7 +939,7 @@ class LeadModuleController extends Controller
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
-        $lead = Lead::where('company_id', $company->id)->findOrFail($id);
+        $lead = $this->resolveLead($id, $company);
 
         $customer = $this->leadService->convertToCustomer($lead, $company, $user);
 
@@ -802,7 +958,7 @@ class LeadModuleController extends Controller
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
-        $lead = Lead::where('company_id', $company->id)->findOrFail($id);
+        $lead = $this->resolveLead($id, $company);
 
         if ($user && ! PermissionChecker::can($user, 'leads', 'convert')) {
             return response()->json(['success' => false, 'error' => 'Unauthorized: leads.convert permission required.'], 403);
@@ -826,15 +982,7 @@ class LeadModuleController extends Controller
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
-        $lead = Lead::where('company_id', $company->id)
-            ->where(function ($q) use ($id) {
-                if (is_numeric($id)) {
-                    $q->where('id', $id)->orWhere('lead_code', $id);
-                } else {
-                    $q->where('lead_code', $id);
-                }
-            })
-            ->firstOrFail();
+        $lead = $this->resolveLead($id, $company);
 
         $notes = $request->input('notes')
               ?? $request->input('reminder_notes')
@@ -1027,18 +1175,18 @@ class LeadModuleController extends Controller
         $company = $this->resolveCompany($request);
 
         $data = $request->validate([
-            'lead_id' => ['required', 'integer'],
+            'lead_id' => ['required'],
             'type' => ['required', 'string', 'in:call,meeting,email,note,task'],
             'title' => ['required', 'string', 'max:200'],
             'due_date' => ['nullable', 'date'],
             'description' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        Lead::where('company_id', $company->id)->findOrFail($data['lead_id']);
+        $lead = $this->resolveLead($data['lead_id'], $company);
 
         $activity = LeadActivity::create([
             'company_id' => $company->id,
-            'lead_id' => (int) $data['lead_id'],
+            'lead_id' => (int) $lead->id,
             'type' => $data['type'],
             'title' => $data['title'],
             'due_date' => $data['due_date'] ?? null,

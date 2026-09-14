@@ -16,11 +16,49 @@ use Modules\leadmanagement\Http\Controllers\LeadModuleController;
 class LeadController extends LeadModuleController
 {
     /**
-     * SDUI Tabbed Lead Management View (`GET /api/v1/tenant/leads`, `/api/tenant/views/leads`).
+     * SDUI Tabbed Lead Management View or JSON listing (`GET /api/v1/tenant/leads`, `/api/tenant/views/leads`).
      */
     public function index(Request $request): JsonResponse
     {
-        return $this->dashboard($request);
+        if ($request->routeIs('*views*') || $request->has('tab') || ! $request->wantsJson()) {
+            return $this->dashboard($request);
+        }
+
+        $tenantId = auth()->user()?->tenant_id ?? auth()->user()?->company_id;
+        try {
+            $company = $this->resolveCompany($request);
+            $tenantId = $company->id;
+        } catch (\Throwable $e) {
+        }
+
+        $query = Lead::query();
+
+        // Match either company_id or tenant_id
+        if ($tenantId) {
+            $query->where(function ($q) use ($tenantId) {
+                $q->where('company_id', $tenantId)
+                  ->orWhereNull('company_id');
+                if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                    $q->orWhere('tenant_id', $tenantId);
+                }
+            });
+        }
+
+        // Filter out deleted if column exists
+        if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        $leads = $query->latest()->get();
+
+        return response()->json([
+            'success'        => true,
+            'data'           => $leads,
+            'leads'          => $leads,
+            'pipeline_count' => $leads->count(),
+            'pipeline_value' => (float) ($leads->sum('opportunity_value') ?: ($leads->sum('expected_value') ?: ($leads->sum('estimated_value') ?: 0))),
+            'components'     => $this->buildLeadListComponents($leads),
+        ]);
     }
 
     /**
@@ -29,20 +67,46 @@ class LeadController extends LeadModuleController
      * GET /api/tenant/views/leads/{id}
      * GET /api/v1/tenant/leads/{id}
      */
-    public function showSchema(Request $request, $id = null): JsonResponse
+    public function showSchema($request = null, $id = null): JsonResponse
     {
-        if ($id && ! $request->has('id')) {
-            $request->merge(['id' => $id]);
+        if ($request instanceof Request) {
+            $req = $request;
+            $leadId = $id ?: ($req->query('id') ?: ($req->route('id') ?: ($req->input('id') ?: ($req->query('lead_code') ?: $req->input('lead_code')))));
+        } else {
+            $leadId = $request ?: $id;
+            $req = request();
         }
-        return $this->leadDetail($request);
+
+        if ($leadId && ! $req->has('id')) {
+            $req->merge(['id' => $leadId]);
+        }
+
+        return $this->leadDetail($req);
     }
 
     /**
-     * Alias for showSchema.
+     * Resolve lead by numeric primary key OR string code (e.g., LD-TMFIAY4U)
      */
-    public function show(Request $request, $id = null): JsonResponse
+    public function show($id = null): JsonResponse
     {
-        return $this->showSchema($request, $id);
+        if ($id instanceof Request) {
+            return $this->showSchema($id);
+        }
+
+        $tenantId = auth()->user()?->tenant_id ?? auth()->user()?->company_id;
+        $company = null;
+        try {
+            $company = $this->resolveCompany(request());
+        } catch (\Throwable $e) {
+            if ($tenantId) {
+                $company = Company::find($tenantId);
+            }
+        }
+
+        $lead = $this->resolveLead($id ?: request()->input('id'), $company);
+        $lead->load(['source', 'customer', 'assignedUser', 'activities' => fn ($q) => $q->orderByDesc('created_at')]);
+
+        return $this->buildLeadSchemaResponse($lead, $company);
     }
 
     /**
@@ -91,11 +155,15 @@ class LeadController extends LeadModuleController
         $leadsQuery = Lead::with(['customer', 'source', 'assignedUser'])
             ->where(function ($q) use ($tenantId) {
                 if ($tenantId) {
-                    $q->where('company_id', $tenantId);
+                    $q->where('company_id', $tenantId)
+                      ->orWhereNull('company_id');
                     if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
                         $q->orWhere('tenant_id', $tenantId);
                     }
                 }
+            })
+            ->when(\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'deleted_at'), function ($q) {
+                $q->whereNull('deleted_at');
             })
             ->when($stage !== 'all', function ($q) use ($stage) {
                 $q->where(function ($sq) use ($stage) {
@@ -229,5 +297,46 @@ class LeadController extends LeadModuleController
     public function followups(Request $request): JsonResponse
     {
         return app(LeadReminderController::class)->index($request);
+    }
+
+    /**
+     * Build SDUI components for leads list.
+     */
+    public function buildLeadListComponents($leads): array
+    {
+        $components = [];
+        foreach ($leads as $lead) {
+            $stage = $lead->stage ?: ($lead->status ?: 'new');
+            $stageColor = match ($stage) {
+                'won' => '#10B981',
+                'lost' => '#EF4444',
+                'proposal_sent' => '#F59E0B',
+                'qualified' => '#0284C7',
+                'contacted' => '#8B5CF6',
+                default => '#06B6D4',
+            };
+            $val = '₹' . number_format((float) ($lead->expected_value ?: ($lead->estimated_value ?: 0)), 2);
+            $leadTitle = $lead->customer?->name ?? ($lead->name ?: ($lead->title ?? 'Unnamed Lead'));
+            $companyName = $lead->customer?->company_name ?? ($lead->company_name ?: '');
+            $contactInfo = trim(($lead->phone ?: '') . ($lead->email ? "  ·  {$lead->email}" : ''));
+
+            $components[] = [
+                'type' => 'card',
+                'components' => [
+                    S::row([
+                        S::badge($lead->lead_code, '#0284C7'),
+                        S::badge(ucfirst(str_replace('_', ' ', $stage)), $stageColor),
+                        S::text($val, 'body_medium', ['bold' => true]),
+                    ]),
+                    S::text($leadTitle . ($companyName ? "  ·  {$companyName}" : ''), 'title_medium', ['bold' => true]),
+                    $contactInfo ? S::text($contactInfo, 'body_small') : S::text('No phone/email provided', 'body_small'),
+                    S::row([
+                        S::buttonOutlined('View Details',
+                            S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $lead->id, 'dynamic_page', $lead->lead_code)),
+                    ]),
+                ],
+            ];
+        }
+        return $components;
     }
 }

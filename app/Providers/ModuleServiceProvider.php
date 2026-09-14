@@ -43,8 +43,25 @@ class ModuleServiceProvider extends ServiceProvider
 
             if (is_file($path)) {
                 require $path;
-            } elseif (is_file(base_path('module-packages/'.$relative))) {
+                return;
+            }
+            if (is_file(base_path('module-packages/'.$relative))) {
                 require base_path('module-packages/'.$relative);
+                return;
+            }
+
+            // Fallback for case differences in module directory (e.g. LeadManagement vs leadmanagement)
+            $parts = explode('/', $relative, 2);
+            if (count($parts) === 2) {
+                $lowerRelative = strtolower($parts[0]).'/'.$parts[1];
+                if (is_file(base_path('modules/'.$lowerRelative))) {
+                    require base_path('modules/'.$lowerRelative);
+                    return;
+                }
+                if (is_file(base_path('module-packages/'.$lowerRelative))) {
+                    require base_path('module-packages/'.$lowerRelative);
+                    return;
+                }
             }
         });
     }

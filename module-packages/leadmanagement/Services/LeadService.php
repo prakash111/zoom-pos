@@ -723,8 +723,23 @@ class LeadService
     {
         $currency = $company->currency_symbol ?: ($company->currency ?: '₹');
 
-        // Base query with RBAC
-        $query = Lead::withoutGlobalScope('company')->where('company_id', $company->id);
+        // Base query with tenant fallback, deleted_at check, and RBAC
+        $tenantId = $company->id ?? auth()->user()?->tenant_id ?? auth()->user()?->company_id;
+        $query = Lead::withoutGlobalScope('company')
+            ->where(function ($q) use ($tenantId) {
+                if ($tenantId) {
+                    $q->where('company_id', $tenantId)
+                      ->orWhereNull('company_id');
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'tenant_id')) {
+                        $q->orWhere('tenant_id', $tenantId);
+                    }
+                }
+            });
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('lead_mod_leads', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
         if ($user && ! PermissionChecker::can($user, 'leads', 'view_any')) {
             $query->where('assigned_to', $user->id);
         }
@@ -733,7 +748,7 @@ class LeadService
         $totalLeads = (clone $query)->count();
         $activePipeline = (clone $query)->whereNotIn('stage', ['won', 'lost'])->count();
         $wonDeals = (clone $query)->where('stage', 'won')->count();
-        $pipelineValue = (float) (clone $query)->whereNotIn('stage', ['lost'])->sum('expected_value');
+        $pipelineValue = (float) ((clone $query)->whereNotIn('stage', ['lost'])->sum('expected_value') ?: (clone $query)->whereNotIn('stage', ['lost'])->sum('estimated_value') ?: 0);
 
         $pendingReminders = Reminder::withoutGlobalScope('company')
             ->where('company_id', $company->id)
@@ -923,7 +938,7 @@ class LeadService
 
         $leadRows = $leadsListQuery->orderByDesc('created_at')->limit(50)->get();
         $totalInView = $leadRows->count();
-        $sumInView = (float) $leadRows->sum('expected_value');
+        $sumInView = (float) ($leadRows->sum('expected_value') ?: ($leadRows->sum('estimated_value') ?: 0));
         $summaryText = "{$totalInView} leads in view  ·  {$currency}" . number_format($sumInView, 0) . " pipeline value";
 
         $leadItems = [];
@@ -1219,9 +1234,13 @@ class LeadService
                 $components[] = S::callout('📝 ' . $act->description, 'accent');
             }
 
-            if ($act->lead_id) {
+            $targetLeadId = $act->lead_id ?: ($act->lead?->lead_code ?: null);
+            if (! $targetLeadId && preg_match('/LD-([A-Za-z0-9]+)/i', (string) $act->description, $matches)) {
+                $targetLeadId = $matches[0];
+            }
+            if ($targetLeadId) {
                 $components[] = S::buttonOutlined('View Lead',
-                    S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $act->lead_id, 'dynamic_page', 'Lead'));
+                    S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $targetLeadId, 'dynamic_page', 'Lead'));
             }
 
             $followupCards[] = [
@@ -1248,9 +1267,13 @@ class LeadService
                 $remChildren[] = S::callout('📝 ' . $noteText, 'accent');
             }
 
-            if ($rem->remindable_id) {
+            $targetLeadId = $rem->remindable_id;
+            if (! $targetLeadId && preg_match('/LD-([A-Za-z0-9]+)/i', $noteText, $matches)) {
+                $targetLeadId = $matches[0];
+            }
+            if ($targetLeadId) {
                 $remChildren[] = S::buttonOutlined('View Lead',
-                    S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $rem->remindable_id, 'dynamic_page', 'Lead'));
+                    S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $targetLeadId, 'dynamic_page', 'Lead'));
             }
 
             $followupCards[] = [

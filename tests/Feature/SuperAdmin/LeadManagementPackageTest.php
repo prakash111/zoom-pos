@@ -346,4 +346,99 @@ class LeadManagementPackageTest extends TestCase
         $customCashierItems = collect($customSections->get('cashier_sales')['items'] ?? [])->pluck('key')->all();
         $this->assertNotContains('lead_management', $customCashierItems, 'Saved lead_management in cashier_sales must be purged');
     }
+
+    public function test_lead_lookup_by_lead_code_and_id_and_prefix_variations(): void
+    {
+        $this->artisan('migrate', ['--path' => 'module-packages/leadmanagement/Database/Migrations', '--realpath' => false]);
+
+        $company = Company::create([
+            'id' => 'cmp_test_lookup_' . uniqid(),
+            'name' => 'Lookup Test Corp',
+            'slug' => 'lookup-test-' . uniqid(),
+            'status' => 'active',
+            'pos_mode' => 'retail',
+            'currency' => 'USD',
+            'currency_symbol' => '$',
+            'licensed_modules' => ['retail', 'leadmanagement'],
+        ]);
+
+        $admin = User::create([
+            'company_id' => $company->id,
+            'name' => 'Lead Admin',
+            'email' => 'lookup_admin_' . uniqid() . '@example.test',
+            'password' => bcrypt('secret123'),
+            'role' => 'administrator',
+        ]);
+
+        $lead = Lead::create([
+            'company_id' => $company->id,
+            'lead_code' => 'LD-TEST999',
+            'name' => 'Test Lead Buyer',
+            'email' => 'buyer@test.org',
+            'phone' => '1234567890',
+            'status' => 'active',
+            'stage' => 'qualified',
+            'priority' => 'high',
+            'expected_value' => 15000.00,
+            'estimated_value' => 15000.00,
+            'assigned_to' => $admin->id,
+        ]);
+
+        $this->actingAs($admin);
+        $controller = app(\App\Http\Controllers\Api\LeadController::class);
+
+        // 1. Lookup by numeric ID
+        $reqId = $this->tenantRequest($company, '/', 'GET', ['id' => (string) $lead->id]);
+        $resId = $controller->leadDetail($reqId);
+        $this->assertSame(200, $resId->getStatusCode());
+        $this->assertStringContainsString('LD-TEST999', json_encode($resId->getData(true)));
+
+        // 2. Lookup by full lead_code with LD- prefix
+        $reqCode = $this->tenantRequest($company, '/', 'GET', ['id' => 'LD-TEST999']);
+        $resCode = $controller->leadDetail($reqCode);
+        $this->assertSame(200, $resCode->getStatusCode());
+
+        // 3. Lookup by code without LD- prefix
+        $reqNoPrefix = $this->tenantRequest($company, '/', 'GET', ['id' => 'TEST999']);
+        $resNoPrefix = $controller->leadDetail($reqNoPrefix);
+        $this->assertSame(200, $resNoPrefix->getStatusCode());
+
+        // 4. RESTful leadsShow with code
+        $reqShow = $this->tenantRequest($company, '/', 'GET');
+        $resShow = $controller->leadsShow($reqShow, 'LD-TEST999');
+        $this->assertSame(200, $resShow->getStatusCode());
+        $this->assertSame('LD-TEST999', $resShow->getData(true)['lead']['lead_code']);
+
+        // 5. RESTful leadsShow with no-prefix code
+        $resShowNoPrefix = $controller->leadsShow($reqShow, 'TEST999');
+        $this->assertSame(200, $resShowNoPrefix->getStatusCode());
+        $this->assertSame('LD-TEST999', $resShowNoPrefix->getData(true)['lead']['lead_code']);
+
+        // 6. Direct show method
+        $resDirect = $controller->show('LD-TEST999');
+        $this->assertSame(200, $resDirect->getStatusCode());
+
+        // 7. Soft-deleted lead auto-restores and resolves
+        $lead->delete();
+        $this->assertSoftDeleted('lead_mod_leads', ['id' => $lead->id]);
+        $resRestored = $controller->show('LD-TEST999');
+        $this->assertSame(200, $resRestored->getStatusCode());
+        $this->assertNotSoftDeleted('lead_mod_leads', ['id' => $lead->id]);
+
+        // 8. All Leads tab and pipeline calculation
+        $reqAllLeads = $this->tenantRequest($company, '/', 'GET', ['tab' => 'all_leads']);
+        $resAllLeads = $controller->dashboard($reqAllLeads);
+        $allLeadsJson = json_encode($resAllLeads->getData(true));
+        $this->assertStringContainsString('1 leads in view', $allLeadsJson);
+        $this->assertStringContainsString('15,000 pipeline value', $allLeadsJson);
+
+        // 9. API index JSON response
+        $reqIndex = $this->tenantRequest($company, '/api/v1/tenant/leads', 'GET');
+        $reqIndex->headers->set('Accept', 'application/json');
+        $resIndex = $controller->index($reqIndex);
+        $this->assertSame(200, $resIndex->getStatusCode());
+        $indexData = $resIndex->getData(true);
+        $this->assertSame(1, $indexData['pipeline_count']);
+        $this->assertEquals(15000.0, (float) $indexData['pipeline_value']);
+    }
 }
