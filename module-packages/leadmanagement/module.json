@@ -29,7 +29,7 @@
             "items": [
                 {
                     "key": "lead_dashboard",
-                    "title": "Leads Dashboard",
+                    "title": "Lead Dashboard",
                     "icon": "dashboard",
                     "target_endpoint": "/api/tenant/lead-module/views/dashboard"
                 },

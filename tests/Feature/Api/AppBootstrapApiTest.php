@@ -224,6 +224,14 @@ class AppBootstrapApiTest extends TestCase
             ->assertJsonMissingPath('modules.pharmacy')
             ->assertJsonPath('menu_structure.0.key', 'cashier_sales')
             ->assertJsonPath('menu_structure.0.items.0.key', 'pos')
+            ->assertJsonPath('menu_structure.0.first_item.key', 'pos')
+            ->assertJsonPath('menu_structure.0.first_item.title', 'Point of Sale')
+            ->assertJsonPath('menu_structure.0.first_item.action_type', 'NAVIGATE_TO')
+            ->assertJsonPath('menu_structure.0.first_item.action.type', 'NAVIGATE_TO')
+            ->assertJsonPath('menu_structure.0.first_item.route', '/api/tenant/views/pos')
+            ->assertJsonPath('menu_structure.0.sub_items.0.key', 'sales')
+            ->assertJsonPath('menu_structure.0.show_top_divider', true)
+            ->assertJsonPath('menu_structure.0.divider_style.color', 'theme.divider')
             ->assertJsonStructure([
                 'tenant' => ['id', 'business_name', 'active_mode', 'available_modes'],
                 'modules' => [
@@ -327,6 +335,15 @@ class AppBootstrapApiTest extends TestCase
                 $this->assertArrayHasKey('title', $section);
                 $this->assertEquals($section['label'], $section['title']);
                 $this->assertNotEmpty($section['items']);
+                $this->assertSame($section['items'][0]['key'], $section['first_item']['key']);
+                $this->assertSame(
+                    array_column(array_slice($section['items'], 1), 'key'),
+                    array_column($section['sub_items'], 'key')
+                );
+                $this->assertTrue($section['show_top_divider']);
+                $this->assertSame('theme.divider', $section['divider_style']['color']);
+                $this->assertSame('NAVIGATE_TO', $section['first_item']['action_type']);
+                $this->assertSame($section['first_item']['route'], $section['first_item']['action']['route']);
 
                 foreach ($section['items'] as $item) {
                     $this->assertArrayHasKey('key', $item);

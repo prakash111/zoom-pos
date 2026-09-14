@@ -1309,14 +1309,23 @@ class SettingsApiController extends Controller
         $user = $this->resolveUser($request, $company);
         $sections = TenantNavRegistry::getEffectiveNavForTenant($company);
         $drawerHeader = $company->getDrawerHeaderPayload();
+        $menuComponents = app(\App\Http\Controllers\Api\NavigationController::class)->getDrawerMenuComponents($request);
 
         return response()->json([
-            'success' => true,
-            'header' => $drawerHeader,
-            'drawer_header' => $drawerHeader,
-            'sections' => $sections,
-            'navigation' => $sections,
+            'success'         => true,
+            'header'          => $drawerHeader,
+            'drawer_header'   => $drawerHeader,
+            'sections'        => $sections,
+            'navigation'      => $sections,
+            'components'      => $menuComponents,
+            'menu'            => $menuComponents,
+            'menu_components' => $menuComponents,
         ]);
+    }
+
+    public function getDrawerMenu(Request $request): JsonResponse
+    {
+        return app(\App\Http\Controllers\Api\NavigationController::class)->getDrawerMenu($request);
     }
 
     public function getFormLabels(Request $request): JsonResponse

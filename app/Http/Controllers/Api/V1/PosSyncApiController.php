@@ -17,6 +17,7 @@ use App\Models\Plan;
 use App\Models\PlatformBranding;
 use App\Models\PlatformSystem;
 use App\Models\Product;
+use App\Models\PushDevice;
 use App\Models\Sale;
 use App\Models\Subscription;
 use App\Models\Supplier;
@@ -113,6 +114,10 @@ class PosSyncApiController extends Controller
             'email' => ['required', 'string'],
             'password' => ['required', 'string'],
             'account_id' => ['nullable', 'string'],
+            'fcm_token' => ['nullable', 'string', 'max:512'],
+            'push_token' => ['nullable', 'string', 'max:512'],
+            'platform' => ['nullable', 'string', 'in:android,ios,web'],
+            'device_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         if ($validator->fails()) {
@@ -242,6 +247,30 @@ class PosSyncApiController extends Controller
                 'active' => true,
                 'last_used_at' => now(),
             ]);
+        }
+
+        // Associate or reactivate push notification device token if provided
+        $pushToken = $request->input('fcm_token')
+            ?? $request->input('push_token')
+            ?? null;
+
+        if ($pushToken && is_string($pushToken) && trim($pushToken) !== '') {
+            $pushToken = trim($pushToken);
+            $devicePlatform = strtolower((string) ($request->input('platform') ?? 'android'));
+            if (! in_array($devicePlatform, ['android', 'ios', 'web'], true)) {
+                $devicePlatform = 'android';
+            }
+            PushDevice::withoutGlobalScope('company')->updateOrCreate(
+                ['token' => $pushToken],
+                [
+                    'company_id' => $company->id,
+                    'user_id' => $user->id,
+                    'platform' => $devicePlatform,
+                    'device_name' => $deviceName,
+                    'last_seen_at' => now(),
+                    'revoked_at' => null,
+                ]
+            );
         }
 
         $subscription = Subscription::query()

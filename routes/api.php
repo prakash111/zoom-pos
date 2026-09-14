@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\InvoiceController as ApiInvoiceController;
 use App\Http\Controllers\Api\InvoicePreviewController;
 use App\Http\Controllers\Api\LeadController;
 use App\Http\Controllers\Api\LicenseActivationController;
+use App\Http\Controllers\Api\NavigationController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\QuotationController;
 use App\Http\Controllers\Api\ReceivablesController;
@@ -621,6 +622,16 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::get('/tenant/ui/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
     Route::get('/v1/tenant/ui/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
     Route::get('/v1/tenant/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+    Route::get('/navigation/menu', [NavigationController::class, 'getDrawerMenu']);
+    Route::get('/drawer/menu', [NavigationController::class, 'getDrawerMenu']);
+    Route::get('/drawer-menu', [NavigationController::class, 'getDrawerMenu']);
+    Route::get('/menu', [NavigationController::class, 'getDrawerMenu']);
+    Route::get('/tenant/navigation/menu', [NavigationController::class, 'getDrawerMenu']);
+    Route::get('/app/navigation/menu', [NavigationController::class, 'getDrawerMenu']);
+    Route::get('/v1/tenant/navigation/menu', [NavigationController::class, 'getDrawerMenu']);
+    Route::get('/v1/navigation/menu', [NavigationController::class, 'getDrawerMenu']);
+    Route::get('/tenant/drawer/menu', [NavigationController::class, 'getDrawerMenu']);
+    Route::get('/app/drawer/menu', [NavigationController::class, 'getDrawerMenu']);
 
     // Dynamic Theme Tokens & Zero-White-Leak Surface
     Route::get('/tenant/theme', [SettingsApiController::class, 'getTheme']);
@@ -795,6 +806,7 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/status', [PosSyncApiController::class, 'status']);
         Route::post('/push-devices', [PushDeviceApiController::class, 'store']);
         Route::delete('/push-devices', [PushDeviceApiController::class, 'destroy']);
+        Route::post('/push-devices/test', [PushDeviceApiController::class, 'test']);
         Route::get('/sync-catalog', [PosSyncApiController::class, 'syncPull'])->middleware('tenant.api.permission:products,view');
         Route::get('/sync-pull', [PosSyncApiController::class, 'syncPull'])->middleware('tenant.api.permission:products,view');
         Route::post('/sync-sales', [PosSyncApiController::class, 'syncPush'])->middleware('tenant.api.permission:pos,create');
@@ -865,6 +877,10 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/navigation/drawer', [SettingsApiController::class, 'getDrawerNavigation']);
         Route::get('/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
         Route::get('/ui/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+        Route::get('/navigation/menu', [NavigationController::class, 'getDrawerMenu']);
+        Route::get('/drawer/menu', [NavigationController::class, 'getDrawerMenu']);
+        Route::get('/drawer-menu', [NavigationController::class, 'getDrawerMenu']);
+        Route::get('/menu', [NavigationController::class, 'getDrawerMenu']);
         Route::get('/settings/form-labels', [SettingsApiController::class, 'getFormLabels'])->middleware('tenant.api.permission:settings,view');
         Route::post('/settings/form-labels', [SettingsApiController::class, 'updateFormLabels'])->middleware('tenant.api.permission:settings,edit');
 

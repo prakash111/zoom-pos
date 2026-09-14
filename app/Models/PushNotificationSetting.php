@@ -88,6 +88,20 @@ class PushNotificationSetting extends Model
             \Illuminate\Support\Facades\Log::warning("Failed to decrypt android_api_key in PushNotificationSetting: {$e->getMessage()}");
         }
 
+        // Auto-heal: If android_api_key is missing but service account is configured, discover from Google Firebase API
+        if (empty($androidApiKey) && ! empty($this->fcm_service_account_json)) {
+            $discovered = static::discoverFirebaseConfig();
+            if ($discovered && ! empty($discovered['android_api_key'])) {
+                $androidApiKey = $discovered['android_api_key'];
+                $this->update([
+                    'android_api_key'     => $discovered['android_api_key'],
+                    'android_app_id'      => $this->android_app_id ?: $discovered['android_app_id'],
+                    'messaging_sender_id' => $this->messaging_sender_id ?: $discovered['messaging_sender_id'],
+                    'fcm_project_id'      => $this->fcm_project_id ?: $discovered['project_id'],
+                ]);
+            }
+        }
+
         return [
             'enabled' => (bool) $this->enabled,
             'project_id' => $this->fcm_project_id,
@@ -106,5 +120,127 @@ class PushNotificationSetting extends Model
             ],
             'alarm_repeat_seconds' => $this->alarm_repeat_seconds,
         ];
+    }
+
+    /**
+     * Automatically discover Android client configuration from Google Firebase Management API
+     * using the service account credentials.
+     *
+     * @param  array<string, mixed>|string|null  $serviceAccount
+     * @return array{project_id: string, messaging_sender_id: string, android_app_id: string, android_api_key: string}|null
+     */
+    public static function discoverFirebaseConfig(array|string|null $serviceAccount = null, ?string $targetPackage = 'com.zoomnearby.zoompos'): ?array
+    {
+        try {
+            $credentials = is_string($serviceAccount)
+                ? json_decode($serviceAccount, true)
+                : ($serviceAccount ?: json_decode((string) static::current()->fcm_service_account_json, true));
+
+            if (! is_array($credentials) || empty($credentials['client_email']) || empty($credentials['private_key'])) {
+                return null;
+            }
+
+            $now = time();
+            $header = rtrim(strtr(base64_encode(json_encode(['alg' => 'RS256', 'typ' => 'JWT'], JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+            $claims = rtrim(strtr(base64_encode(json_encode([
+                'iss' => $credentials['client_email'],
+                'scope' => 'https://www.googleapis.com/auth/cloud-platform',
+                'aud' => 'https://oauth2.googleapis.com/token',
+                'iat' => $now,
+                'exp' => $now + 3600,
+            ], JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+
+            $signature = '';
+            if (! openssl_sign("{$header}.{$claims}", $signature, $credentials['private_key'], OPENSSL_ALGO_SHA256)) {
+                return null;
+            }
+
+            $assertion = "{$header}.{$claims}." . rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
+            $res = \Illuminate\Support\Facades\Http::asForm()->timeout(15)->post('https://oauth2.googleapis.com/token', [
+                'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                'assertion' => $assertion,
+            ]);
+
+            $accessToken = $res->json('access_token');
+            if (! $accessToken) {
+                return null;
+            }
+
+            $projectId = $credentials['project_id'] ?? null;
+            if (! $projectId) {
+                return null;
+            }
+
+            $appsRes = \Illuminate\Support\Facades\Http::withToken($accessToken)
+                ->timeout(15)
+                ->get("https://firebase.googleapis.com/v1beta1/projects/{$projectId}/androidApps");
+
+            if (! $appsRes->successful()) {
+                return null;
+            }
+
+            $apps = $appsRes->json('apps', []);
+            if (empty($apps)) {
+                return null;
+            }
+
+            $selectedApp = null;
+            foreach ($apps as $app) {
+                if (($app['packageName'] ?? '') === $targetPackage) {
+                    $selectedApp = $app;
+                    break;
+                }
+            }
+            if (! $selectedApp) {
+                $selectedApp = $apps[0];
+            }
+
+            $appId = $selectedApp['appId'];
+            $cfgRes = \Illuminate\Support\Facades\Http::withToken($accessToken)
+                ->timeout(15)
+                ->get("https://firebase.googleapis.com/v1beta1/projects/{$projectId}/androidApps/{$appId}/config");
+
+            if (! $cfgRes->successful()) {
+                return null;
+            }
+
+            $encoded = $cfgRes->json('configFileContents');
+            if (! $encoded) {
+                return null;
+            }
+
+            $json = json_decode(base64_decode($encoded), true);
+            if (! is_array($json)) {
+                return null;
+            }
+
+            $clients = $json['client'] ?? [];
+            $matchingClient = null;
+            foreach ($clients as $client) {
+                if (($client['client_info']['android_client_info']['package_name'] ?? '') === $targetPackage) {
+                    $matchingClient = $client;
+                    break;
+                }
+            }
+            if (! $matchingClient && ! empty($clients)) {
+                $matchingClient = $clients[0];
+            }
+
+            $apiKey = $matchingClient['api_key'][0]['current_key'] ?? '';
+            $appId = $matchingClient['client_info']['mobilesdk_app_id'] ?? $appId;
+            $senderId = (string) ($json['project_info']['project_number'] ?? '');
+            $resolvedProjectId = $json['project_info']['project_id'] ?? $projectId;
+
+            return [
+                'project_id'          => $resolvedProjectId,
+                'messaging_sender_id' => $senderId,
+                'android_app_id'      => $appId,
+                'android_api_key'     => $apiKey,
+            ];
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to auto-discover Firebase Android config: {$e->getMessage()}");
+
+            return null;
+        }
     }
 }

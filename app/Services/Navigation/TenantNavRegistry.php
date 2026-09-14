@@ -237,19 +237,25 @@ class TenantNavRegistry
                 $sections = array_values(array_map([self::class, 'normalizeSection'], $custom));
                 $sections = self::filterDomainMismatches($sections, $tenant);
 
-                return self::applyNavigationLabels($sections, $labels);
+                return self::withActionableSectionParents(
+                    self::applyNavigationLabels($sections, $labels)
+                );
             }
         } elseif (is_object($tenant) && ! empty($tenant->navigation_menu_customization)) {
             $sections = array_values(array_map([self::class, 'normalizeSection'], (array) $tenant->navigation_menu_customization));
             $sections = self::filterDomainMismatches($sections, $tenant);
 
-            return self::applyNavigationLabels($sections, $labels);
+            return self::withActionableSectionParents(
+                self::applyNavigationLabels($sections, $labels)
+            );
         }
 
         $sections = self::getBaseNavSectionsForTenant($tenant);
         $sections = self::filterDomainMismatches($sections, $tenant);
 
-        return self::applyNavigationLabels($sections, $labels);
+        return self::withActionableSectionParents(
+            self::applyNavigationLabels($sections, $labels)
+        );
     }
 
     /**
@@ -1347,7 +1353,9 @@ class TenantNavRegistry
         if (is_bool($isRestaurantOrMode)) {
             $raw = $isRestaurantOrMode ? self::restaurantSections() : self::retailSections();
 
-            return array_values(array_map([self::class, 'normalizeSection'], $raw));
+            return self::withActionableSectionParents(
+                array_values(array_map([self::class, 'normalizeSection'], $raw))
+            );
         }
 
         $mode = strtolower(trim((string) $isRestaurantOrMode));
@@ -1389,7 +1397,9 @@ class TenantNavRegistry
 
         $normalized = array_values(array_map([self::class, 'normalizeSection'], $sections));
 
-        return self::filterDomainMismatches($normalized, $isRestaurantOrMode);
+        return self::withActionableSectionParents(
+            self::filterDomainMismatches($normalized, $isRestaurantOrMode)
+        );
     }
 
     /**
@@ -1400,6 +1410,87 @@ class TenantNavRegistry
     public static function menuStructureForMode(string $mode): array
     {
         return self::getEffectiveNavForTenant($mode);
+    }
+
+    /**
+     * Add the cross-client section-parent contract after permissions, tenant
+     * ordering, domain filtering, and custom labels have all been resolved.
+     * The legacy `items` list remains intact for older clients.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @return list<array<string, mixed>>
+     */
+    public static function withActionableSectionParents(array $sections): array
+    {
+        return array_values(array_map(function (array $section): array {
+            $items = array_values(array_filter(
+                $section['items'] ?? [],
+                static fn ($item): bool => is_array($item)
+            ));
+
+            $asActionableItem = static function (array $item): array {
+                $route = trim((string) ($item['route'] ?? $item['target_endpoint'] ?? $item['endpoint'] ?? ''));
+                if ($route === '') {
+                    return $item;
+                }
+
+                return array_merge($item, [
+                    'type' => 'list_tile',
+                    'route' => $route,
+                    'target_endpoint' => $route,
+                    'action_type' => 'NAVIGATE_TO',
+                    'action' => [
+                        'type' => 'NAVIGATE_TO',
+                        'action_type' => 'NAVIGATE_TO',
+                        'route' => $route,
+                        'endpoint' => $route,
+                    ],
+                ]);
+            };
+
+            $firstItem = isset($items[0]) ? $asActionableItem($items[0]) : null;
+            if ($firstItem !== null) {
+                $firstItem['type'] = 'list_tile';
+                $firstItem['style'] = array_merge([
+                    'fontWeight' => 'bold',
+                    'textColor' => '#F97316',
+                ], (array) ($firstItem['style'] ?? []));
+            }
+
+            $subItems = array_map($asActionableItem, array_slice($items, 1));
+            $firstRoute = $firstItem ? ($firstItem['route'] ?? $firstItem['target_endpoint'] ?? '') : '';
+            $firstIcon = $firstItem['icon'] ?? ($section['icon'] ?? 'folder');
+
+            return array_merge($section, [
+                'type' => 'list_tile',
+                'action_type' => 'NAVIGATE_TO',
+                'route' => $firstRoute,
+                'target_endpoint' => $firstRoute,
+                'icon' => $firstIcon,
+                'style' => [
+                    'fontWeight' => 'bold',
+                    'textColor' => '#F97316',
+                ],
+                'action' => [
+                    'type' => 'NAVIGATE_TO',
+                    'action_type' => 'NAVIGATE_TO',
+                    'route' => $firstRoute,
+                    'endpoint' => $firstRoute,
+                ],
+                'divider' => ['type' => 'divider'],
+                'top_divider' => ['type' => 'divider'],
+                'first_item' => $firstItem,
+                'sub_items' => array_values($subItems),
+                'show_top_divider' => true,
+                'divider_style' => [
+                    'color' => 'theme.divider',
+                    'alpha' => 0.12,
+                    'thickness' => 1,
+                    'horizontal_padding' => 16,
+                    'vertical_padding' => 8,
+                ],
+            ]);
+        }, $sections));
     }
 
     /**

@@ -6323,6 +6323,13 @@ class SchemaResponse
         ]);
     }
 
+    public static function drawerMenuView(Company $company): array
+    {
+        $components = app(\App\Http\Controllers\Api\NavigationController::class)->getDrawerMenuComponents();
+
+        return self::screen('Navigation Drawer', $components, 'scroll_view');
+    }
+
     /**
      * Build the complete editable navigation hierarchy for the active store.
      *
@@ -6947,6 +6954,7 @@ class SchemaResponse
             'tax-rule-create', 'add-tax-rule', 'new-tax-rule' => self::taxRuleCreateView($company),
             'settings-api', 'api', 'api-integrations' => self::apiView($company),
             'settings-navigation', 'navigation', 'navigation-menu' => self::navigationView($company),
+            'drawer-menu', 'drawer', 'navigation-drawer' => self::drawerMenuView($company),
             'settings-form-labels', 'form-labels', 'custom-form-fields' => self::formLabelsView($company),
             'settings-notifications', 'notifications', 'custom-notifications' => self::notificationsView($company),
             'settings-advanced', 'advanced', 'danger-zone' => self::advancedView($company),

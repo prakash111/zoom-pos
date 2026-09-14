@@ -64,6 +64,9 @@ class SchemaValidator
         }
 
         $type = strtolower(trim((string) ($component['type'] ?? '')));
+        if ($type === '' && isset($component['title']) && (isset($component['route']) || isset($component['endpoint']))) {
+            $type = 'list_tile';
+        }
         if (! in_array($type, SchemaResponse::COMPONENT_TYPES, true)) {
             $errors[] = "{$path}.type: unsupported component [{$type}]";
 

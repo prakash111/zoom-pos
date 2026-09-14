@@ -7,6 +7,7 @@ use App\Models\PushDevice;
 use App\Models\PushNotificationSetting;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -194,13 +195,20 @@ class FirebasePushService
 
             if ($response->successful()) {
                 $delivered++;
+                $device->update(['last_seen_at' => now()]);
 
                 continue;
             }
 
             $body = $response->body();
             if ($response->status() === 404 || Str::contains($body, ['UNREGISTERED', 'registration-token-not-registered'])) {
+                Log::info("FCM device token revoked [id: {$device->id}, device: {$device->device_name}] due to UNREGISTERED response.");
                 $device->update(['revoked_at' => now()]);
+            } else {
+                Log::warning("FCM v1 message send failed [status: {$response->status()}]: {$body}", [
+                    'device_id'  => $device->id,
+                    'company_id' => $device->company_id,
+                ]);
             }
         }
 
@@ -220,6 +228,8 @@ class FirebasePushService
             ]);
 
         if (! $response->successful()) {
+            Log::warning("FCM legacy send failed [status: {$response->status()}]: {$response->body()}");
+
             return 0;
         }
 

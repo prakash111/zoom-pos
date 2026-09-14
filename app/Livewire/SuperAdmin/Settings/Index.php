@@ -494,11 +494,36 @@ class Index extends Component
             $update['android_api_key'] = trim($this->androidApiKey);
         }
 
+        // Auto-discover Android app credentials from Google if missing
+        if (filled($this->fcmServiceAccountJson) || filled($push->fcm_service_account_json)) {
+            $saJson = filled($this->fcmServiceAccountJson) ? $this->fcmServiceAccountJson : $push->fcm_service_account_json;
+            if (blank($this->androidApiKey) && blank($push->android_api_key) || blank($update['android_app_id']) || blank($update['messaging_sender_id'])) {
+                $discovered = PushNotificationSetting::discoverFirebaseConfig($saJson);
+                if ($discovered) {
+                    if ((blank($this->androidApiKey) && blank($push->android_api_key)) && ! empty($discovered['android_api_key'])) {
+                        $update['android_api_key'] = $discovered['android_api_key'];
+                    }
+                    if (blank($update['android_app_id']) && ! empty($discovered['android_app_id'])) {
+                        $update['android_app_id'] = $discovered['android_app_id'];
+                    }
+                    if (blank($update['messaging_sender_id']) && ! empty($discovered['messaging_sender_id'])) {
+                        $update['messaging_sender_id'] = $discovered['messaging_sender_id'];
+                    }
+                    if (empty($update['fcm_project_id']) && ! empty($discovered['project_id'])) {
+                        $update['fcm_project_id'] = $discovered['project_id'];
+                    }
+                }
+            }
+        }
+
         $push->update($update);
-        $this->fcmProjectId = (string) $push->fresh()->fcm_project_id;
-        $this->hasFcmServiceAccount = filled($push->fcm_service_account_json);
-        $this->hasFcmServerKey = filled($push->fcm_server_key);
-        $this->hasAndroidApiKey = filled($push->android_api_key);
+        $fresh = $push->fresh();
+        $this->fcmProjectId = (string) $fresh->fcm_project_id;
+        $this->androidAppId = (string) $fresh->android_app_id;
+        $this->messagingSenderId = (string) $fresh->messaging_sender_id;
+        $this->hasFcmServiceAccount = filled($fresh->fcm_service_account_json);
+        $this->hasFcmServerKey = filled($fresh->fcm_server_key);
+        $this->hasAndroidApiKey = filled($fresh->android_api_key);
         $this->reset('fcmServiceAccountJson', 'fcmServerKey', 'androidApiKey');
 
         AuditLog::record('push.settings_updated', null, auth('platform_web')->id(), [
@@ -558,7 +583,9 @@ class Index extends Component
                     ->whereNull('revoked_at')
                     ->count();
 
-                $message = "Firebase Cloud Messaging v1 verified! Authenticated with project {$push->fcm_project_id}. ({$activeDevices} registered devices)";
+                $androidReady = filled($push->android_api_key) && filled($push->android_app_id);
+                $androidStatus = $androidReady ? "Android client bootstrap configured." : "Warning: Android API Key is empty.";
+                $message = "Firebase Cloud Messaging v1 verified! Authenticated with project {$push->fcm_project_id}. {$androidStatus} ({$activeDevices} active devices)";
                 $this->dispatch('notify', ['type' => 'success', 'message' => $message]);
                 session()->flash('status', $message);
             } else {
