@@ -51,6 +51,28 @@ class UserModel {
   }
 
   bool can(String permission) {
+    if (permissions[permission] == false) return false;
+
+    final dotIndex = permission.indexOf('.');
+    if (dotIndex != -1) {
+      final module = permission.substring(0, dotIndex);
+      if (permissions[module] == false) return false;
+    } else {
+      if (permissions['$permission.view'] == false) return false;
+    }
+
+    if (permission == 'leads' ||
+        permission == 'leads.view' ||
+        permission == 'lead_management' ||
+        permission == 'lead_management.view') {
+      if (permissions['leads'] == false ||
+          permissions['leads.view'] == false ||
+          permissions['lead_management'] == false ||
+          permissions['lead_management.view'] == false) {
+        return false;
+      }
+    }
+
     final lowerRole = role.toLowerCase().trim();
     if (lowerRole == 'owner' ||
         lowerRole == 'admin' ||
@@ -61,7 +83,6 @@ class UserModel {
     if (permissions['*'] == true) return true;
     if (permissions[permission] == true) return true;
 
-    final dotIndex = permission.indexOf('.');
     if (dotIndex != -1) {
       final module = permission.substring(0, dotIndex);
       if (permissions[module] == true) return true;

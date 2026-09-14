@@ -294,6 +294,24 @@ void main() {
       expect(cashierUser.can('lead_management.view'), isTrue);
       expect(cashierUser.can('quotes.view'), isTrue);
       expect(cashierUser.can('leads.view'), isTrue);
+
+      final disabledLeadAdmin = UserModel(
+        id: 'u3',
+        companyId: 'c1',
+        name: 'prakash',
+        email: 'prakashks.bbm@gmail.com',
+        role: 'administrator',
+        permissions: const {
+          '*': true,
+          'leads': false,
+          'leads.view': false,
+          'lead_management': false,
+          'lead_management.view': false,
+        },
+      );
+      expect(disabledLeadAdmin.can('leads.view'), isFalse);
+      expect(disabledLeadAdmin.can('lead_management.view'), isFalse);
+      expect(disabledLeadAdmin.can('pos.view'), isTrue);
     });
 
     test('BootstrapCache defaults activeMode and activeModule gracefully', () async {
