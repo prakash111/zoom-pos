@@ -138,8 +138,21 @@ class BootstrapCache extends ChangeNotifier {
 
   String? get navigationError => _navigationError;
 
-  String get activeMode =>
-      tenant?.activeMode ?? config['pos_mode']?.toString() ?? '';
+  String get activeMode {
+    final tMode = tenant?.activeMode.trim();
+    if (tMode != null && tMode.isNotEmpty && tMode.toLowerCase() != 'general') {
+      return tMode;
+    }
+    final cMode = config['pos_mode']?.toString().trim();
+    if (cMode != null && cMode.isNotEmpty && cMode.toLowerCase() != 'general') {
+      return cMode;
+    }
+    final bType = tenant?.businessType?.trim();
+    if (bType != null && bType.isNotEmpty && bType.toLowerCase() != 'general') {
+      return bType.toLowerCase();
+    }
+    return 'retail';
+  }
 
   List<String> get availableModes => tenant?.availableModes.isNotEmpty == true
       ? tenant!.availableModes
@@ -154,7 +167,7 @@ class BootstrapCache extends ChangeNotifier {
     return modules[mode] ??
         ModuleSchema(
           id: mode,
-          title: mode,
+          title: mode == 'retail' ? 'Retail' : (mode.isEmpty ? 'Retail' : mode),
           layoutType: 'standard_grid',
         );
   }
@@ -651,6 +664,7 @@ class BootstrapCache extends ChangeNotifier {
               icon: 'point_of_sale',
               component: 'pos',
               permission: 'pos',
+              targetEndpoint: '/tenant/views/pos',
             ),
             SduiNavItemSchema(
               key: 'sales',
@@ -658,6 +672,39 @@ class BootstrapCache extends ChangeNotifier {
               icon: 'receipt_long',
               component: 'sales',
               permission: 'sales',
+              targetEndpoint: '/tenant/views/sales',
+            ),
+            SduiNavItemSchema(
+              key: 'quotations',
+              title: 'Quotations & Proposals',
+              icon: 'description',
+              component: 'quotations',
+              permission: 'quotes',
+              targetEndpoint: '/tenant/views/quotations',
+            ),
+            SduiNavItemSchema(
+              key: 'lead_management',
+              title: 'Lead Management',
+              icon: 'leaderboard',
+              component: 'lead_management',
+              permission: 'leads',
+              targetEndpoint: '/tenant/views/leads',
+            ),
+            SduiNavItemSchema(
+              key: 'consignments',
+              title: 'Consignments',
+              icon: 'local_shipping',
+              component: 'consignments',
+              permission: 'consignments',
+              targetEndpoint: '/consignments',
+            ),
+            SduiNavItemSchema(
+              key: 'customers',
+              title: 'Customers & CRM',
+              icon: 'people',
+              component: 'customers',
+              permission: 'customers',
+              targetEndpoint: '/customers',
             ),
           ],
         ),

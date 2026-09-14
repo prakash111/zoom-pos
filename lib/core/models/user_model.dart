@@ -50,5 +50,58 @@ class UserModel {
     return const {};
   }
 
-  bool can(String permission) => permissions['*'] == true || permissions[permission] == true;
+  bool can(String permission) {
+    final lowerRole = role.toLowerCase().trim();
+    if (lowerRole == 'owner' ||
+        lowerRole == 'admin' ||
+        lowerRole == 'administrator' ||
+        lowerRole == 'superadmin') {
+      return true;
+    }
+    if (permissions['*'] == true) return true;
+    if (permissions[permission] == true) return true;
+
+    final dotIndex = permission.indexOf('.');
+    if (dotIndex != -1) {
+      final module = permission.substring(0, dotIndex);
+      if (permissions[module] == true) return true;
+    } else {
+      if (permissions['$permission.view'] == true) return true;
+    }
+
+    if (permission == 'quotes' ||
+        permission == 'quotes.view' ||
+        permission == 'quotations' ||
+        permission == 'quotations.view') {
+      return permissions['quotes'] == true ||
+          permissions['quotes.view'] == true ||
+          permissions['quotations'] == true ||
+          permissions['quotations.view'] == true;
+    }
+    if (permission == 'leads' ||
+        permission == 'leads.view' ||
+        permission == 'lead_management' ||
+        permission == 'lead_management.view') {
+      return permissions['leads'] == true ||
+          permissions['leads.view'] == true ||
+          permissions['lead_management'] == true ||
+          permissions['lead_management.view'] == true;
+    }
+    if (permission == 'consignments' || permission == 'consignments.view') {
+      return permissions['consignments'] == true ||
+          permissions['consignments.view'] == true;
+    }
+    if (permission == 'customers' || permission == 'customers.view') {
+      return permissions['customers'] == true ||
+          permissions['customers.view'] == true;
+    }
+    if (permission == 'pos' || permission == 'pos.view') {
+      return permissions['pos'] == true || permissions['pos.view'] == true;
+    }
+    if (permission == 'sales' || permission == 'sales.view') {
+      return permissions['sales'] == true || permissions['sales.view'] == true;
+    }
+
+    return false;
+  }
 }

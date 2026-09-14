@@ -85,7 +85,29 @@ class SduiComponentRegistry {
     'dining_history': (_) => const SalesScreen(),
     'cash_register': (_) => const CashRegisterScreen(),
     'quotations': (_) => const QuotationsScreen(),
+    'quotes': (_) => const QuotationsScreen(),
+    '/tenant/views/quotations': (_) => const QuotationsScreen(),
+    '/api/tenant/views/quotations': (_) => const QuotationsScreen(),
     'consignments': (_) => const ConsignmentsScreen(),
+    '/consignments': (_) => const ConsignmentsScreen(),
+    '/tenant/views/consignments': (_) => const ConsignmentsScreen(),
+    '/api/tenant/views/consignments': (_) => const ConsignmentsScreen(),
+    'lead_management': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/leads',
+          initialTitle: 'Lead Management',
+        ),
+    'leads': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/leads',
+          initialTitle: 'Lead Management',
+        ),
+    '/tenant/views/leads': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/leads',
+          initialTitle: 'Lead Management',
+        ),
+    '/api/tenant/views/leads': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/views/leads',
+          initialTitle: 'Lead Management',
+        ),
     'service_orders': (_) => _resolveServiceOrdersScreen(),
     'service-orders': (_) => _resolveServiceOrdersScreen(),
     'new_prescription_intake': (_) => const DynamicSchemaPage(
@@ -124,8 +146,10 @@ class SduiComponentRegistry {
     'verify-otp': (_) => const VerifyOtpScreen(email: ''),
     'verify_email': (_) => const VerifyOtpScreen(email: ''),
     'change_password': (_) => const ChangePasswordScreen(),
-    'change-password': (_) => const ChangePasswordScreen(),
     'customers': (_) => const CustomersScreen(),
+    '/customers': (_) => const CustomersScreen(),
+    '/tenant/views/customers': (_) => const CustomersScreen(),
+    '/api/tenant/views/customers': (_) => const CustomersScreen(),
 
     // Financial
     'due_receivables': (_) => const DueReceivablesScreen(),
@@ -201,8 +225,8 @@ class SduiComponentRegistry {
         return const GlobalPrinterSetupScreen();
     }
 
-    // Pre-registered native screens when invoked by route key (not an explicit API endpoint)
-    if (!clean.startsWith('/api/') && instance.has(key)) {
+    // Pre-registered native screens when invoked by route key or endpoint
+    if (instance.has(key)) {
       final builder = instance._registry[key];
       if (builder != null) {
         return Builder(builder: builder);

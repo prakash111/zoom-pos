@@ -15,6 +15,8 @@ class CompanyModel {
     this.phone = '',
     this.email = '',
     this.posMode = 'general',
+    this.businessType,
+    this.planFeatures = const [],
     this.restaurantModeLocked = false,
     this.drawerCoverUrl,
     this.logoUrl,
@@ -23,6 +25,25 @@ class CompanyModel {
   });
 
   factory CompanyModel.fromJson(Map<String, dynamic> json) {
+    final rawPosMode = json['pos_mode']?.toString() ?? 'general';
+    final resolvedBusinessType = (json['business_type'] ??
+            json['active_mode'] ??
+            (rawPosMode.toLowerCase() == 'restaurant' ? 'RESTAURANT' : 'RETAIL'))
+        ?.toString();
+
+    final rawFeatures = json['plan_features'] ?? json['features'];
+    final List<String> resolvedFeatures;
+    if (rawFeatures is List) {
+      resolvedFeatures = rawFeatures.map((e) => e.toString()).toList();
+    } else if (rawFeatures is Map) {
+      resolvedFeatures = rawFeatures.entries
+          .where((e) => e.value == true)
+          .map((e) => e.key.toString())
+          .toList();
+    } else {
+      resolvedFeatures = const [];
+    }
+
     return CompanyModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
@@ -38,14 +59,13 @@ class CompanyModel {
       postalCode: json['postal_code']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
-      posMode: json['pos_mode']?.toString() ?? 'general',
+      posMode: rawPosMode,
+      businessType: resolvedBusinessType,
+      planFeatures: resolvedFeatures,
       restaurantModeLocked: json['restaurant_mode_locked'] as bool? ?? false,
       drawerCoverUrl: json['drawer_cover_url']?.toString(),
       logoUrl: (json['logo_url'] ?? json['logo'])?.toString(),
       faviconUrl: (json['favicon_url'] ?? json['favicon'])?.toString(),
-      // Always the *resolved* zone (Company::resolveTimezone() server-side)
-      // — a manual override if the store set one, else a default derived
-      // from `country`. Never empty.
       timezone: json['timezone']?.toString().isNotEmpty == true ? json['timezone'].toString() : 'UTC',
     );
   }
@@ -65,6 +85,8 @@ class CompanyModel {
   final String phone;
   final String email;
   final String posMode;
+  final String? businessType;
+  final List<String> planFeatures;
   final bool restaurantModeLocked;
   final String? drawerCoverUrl;
   final String? logoUrl;
@@ -87,6 +109,8 @@ class CompanyModel {
     String? phone,
     String? email,
     String? posMode,
+    String? businessType,
+    List<String>? planFeatures,
     bool? restaurantModeLocked,
     String? drawerCoverUrl,
     bool clearDrawerCoverUrl = false,
@@ -112,6 +136,8 @@ class CompanyModel {
       phone: phone ?? this.phone,
       email: email ?? this.email,
       posMode: posMode ?? this.posMode,
+      businessType: businessType ?? this.businessType,
+      planFeatures: planFeatures ?? this.planFeatures,
       restaurantModeLocked: restaurantModeLocked ?? this.restaurantModeLocked,
       drawerCoverUrl: clearDrawerCoverUrl ? null : (drawerCoverUrl ?? this.drawerCoverUrl),
       logoUrl: clearLogoUrl ? null : (logoUrl ?? this.logoUrl),
@@ -138,6 +164,8 @@ class CompanyModel {
         'phone': phone,
         'email': email,
         'pos_mode': posMode,
+        if (businessType != null) 'business_type': businessType,
+        'plan_features': planFeatures,
         'restaurant_mode_locked': restaurantModeLocked,
         'drawer_cover_url': drawerCoverUrl,
         'logo_url': logoUrl,

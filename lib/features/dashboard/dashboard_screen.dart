@@ -227,6 +227,106 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
     }
   }
 
+  if (!sectionMetaByKey.containsKey('cashier_sales')) {
+    sectionMetaByKey['cashier_sales'] = _NavSection(
+      'cashier_sales',
+      (l10n) => BootstrapCache.instance.resolveNavigationLabel(
+        'cashier_sales',
+        l10n.text('Cashier & Sales', fallback: 'Cashier & Sales'),
+      ),
+      const [],
+      headerColor: const Color(0xFF1D4ED8),
+    );
+  }
+
+  final cashierRows = tilesBySection['cashier_sales'] ??= [];
+  final existingCashierKeys = {for (final r in cashierRows) r.tile.key};
+
+  final coreCashierItems = <({
+    String key,
+    String title,
+    String icon,
+    String component,
+    String permission,
+    String endpoint
+  })>[
+    (
+      key: 'pos',
+      title: 'Point of Sale',
+      icon: 'point_of_sale',
+      component: 'pos',
+      permission: 'pos',
+      endpoint: '/tenant/views/pos'
+    ),
+    (
+      key: 'sales',
+      title: 'Sales & Invoices',
+      icon: 'receipt_long',
+      component: 'sales',
+      permission: 'sales',
+      endpoint: '/tenant/views/sales'
+    ),
+    (
+      key: 'quotations',
+      title: 'Quotations & Proposals',
+      icon: 'description',
+      component: 'quotations',
+      permission: 'quotes',
+      endpoint: '/tenant/views/quotations'
+    ),
+    (
+      key: 'lead_management',
+      title: 'Lead Management',
+      icon: 'leaderboard',
+      component: 'lead_management',
+      permission: 'leads',
+      endpoint: '/tenant/views/leads'
+    ),
+    (
+      key: 'consignments',
+      title: 'Consignments',
+      icon: 'local_shipping',
+      component: 'consignments',
+      permission: 'consignments',
+      endpoint: '/consignments'
+    ),
+    (
+      key: 'customers',
+      title: 'Customers & CRM',
+      icon: 'people',
+      component: 'customers',
+      permission: 'customers',
+      endpoint: '/customers'
+    ),
+  ];
+
+  for (var i = 0; i < coreCashierItems.length; i++) {
+    final core = coreCashierItems[i];
+    if (!existingCashierKeys.contains(core.key)) {
+      final tile = _FeatureTile(
+        core.key,
+        (l10n) => BootstrapCache.instance.resolveNavigationLabel(
+          core.key,
+          l10n.text(core.title, fallback: core.title),
+        ),
+        SduiIconRegistry.resolve(core.icon),
+        SduiComponentRegistry.instance.resolve(
+          core.component,
+          targetEndpoint: core.endpoint,
+          title: core.title,
+        ),
+        core.permission,
+      );
+      if (tile.visibleTo(user)) {
+        cashierRows.add((
+          order: i,
+          fallback: fallback++,
+          tile: tile,
+        ));
+      }
+    }
+  }
+
   final result = <_NavSection>[];
   for (final entry in tilesBySection.entries) {
     final rows = entry.value;
@@ -240,6 +340,16 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
           sectionMetaByKey[entry.key]?.parentByKey[row.tile.key];
       final candidate =
           rawParent == null || rawParent.isEmpty ? null : rawParent;
+
+      // POS is an executable primary transaction screen and must never have children.
+      // Furthermore, cashier_sales items must always be top-level root items.
+      if (candidate == 'pos' ||
+          row.tile.key == 'pos' ||
+          entry.key == 'cashier_sales') {
+        safeParent[row.tile.key] = null;
+        continue;
+      }
+
       var cursor = candidate;
       var valid = true;
       var depth = 0;
@@ -614,6 +724,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           (feature.icon, feature.titleOf(l10n)),
       ];
 
+  String _resolveTenantBadge(CompanyModel? company, BootstrapCache bootstrap) {
+    final candidates = [
+      company?.businessType,
+      bootstrap.tenant?.businessType,
+      bootstrap.activeModule.title,
+      bootstrap.activeMode,
+      company?.posMode,
+    ];
+    for (final raw in candidates) {
+      final val = raw?.trim();
+      if (val != null && val.isNotEmpty && val.toLowerCase() != 'general') {
+        return val.toUpperCase();
+      }
+    }
+    return 'RETAIL';
+  }
+
   /// Structured, mode-isolated drawer: a Home tile followed by every
   /// [_NavSection] with its own header — the mobile equivalent of the web
   /// tenant sidebar's slide-out drawer (see layouts/tenant.blade.php).
@@ -754,8 +881,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        BootstrapCache.instance.activeModule.title
-                            .toUpperCase(),
+                        _resolveTenantBadge(company, bootstrap),
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.95),
                           fontSize: 11,

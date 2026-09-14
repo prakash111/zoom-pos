@@ -150,8 +150,11 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       compiled = const [
         NavSectionDescriptor('cashier_sales', 'Cashier & Sales', [
           NavTileDescriptor('pos', 'Point of Sale'),
-          NavTileDescriptor('sales', 'Sales History'),
-          NavTileDescriptor('quotations', 'Quotations'),
+          NavTileDescriptor('sales', 'Sales & Invoices'),
+          NavTileDescriptor('quotations', 'Quotations & Proposals'),
+          NavTileDescriptor('lead_management', 'Lead Management'),
+          NavTileDescriptor('consignments', 'Consignments'),
+          NavTileDescriptor('customers', 'Customers & CRM'),
         ]),
         NavSectionDescriptor('financial_mgmt', 'Financial Management', [
           NavTileDescriptor('cash_register', 'Cash Register'),

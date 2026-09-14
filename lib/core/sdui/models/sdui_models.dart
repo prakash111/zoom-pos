@@ -7,22 +7,48 @@ class TenantSchema {
     required this.businessName,
     required this.activeMode,
     this.availableModes = const [],
+    this.businessType,
+    this.planFeatures = const [],
   });
 
   final String id;
   final String businessName;
   final String activeMode;
   final List<String> availableModes;
+  final String? businessType;
+  final List<String> planFeatures;
 
   factory TenantSchema.fromJson(Map<String, dynamic> json) {
+    final rawFeatures = json['plan_features'] ?? json['features'];
+    final List<String> resolvedFeatures;
+    if (rawFeatures is List) {
+      resolvedFeatures = rawFeatures.map((e) => e.toString()).toList();
+    } else if (rawFeatures is Map) {
+      resolvedFeatures = rawFeatures.entries
+          .where((e) => e.value == true)
+          .map((e) => e.key.toString())
+          .toList();
+    } else {
+      resolvedFeatures = const [];
+    }
+
+    final rawMode = json['active_mode']?.toString() ?? json['pos_mode']?.toString() ?? '';
+    final resolvedType = (json['business_type'] ??
+            (rawMode.isNotEmpty && rawMode.toLowerCase() != 'general'
+                ? rawMode
+                : 'RETAIL'))
+        .toString();
+
     return TenantSchema(
       id: json['id']?.toString() ?? '',
-      businessName: json['business_name']?.toString() ?? '',
-      activeMode: json['active_mode']?.toString() ?? '',
+      businessName: (json['business_name'] ?? json['store_name'] ?? json['name'])?.toString() ?? '',
+      activeMode: rawMode,
       availableModes: (json['available_modes'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
+      businessType: resolvedType,
+      planFeatures: resolvedFeatures,
     );
   }
 
@@ -31,6 +57,8 @@ class TenantSchema {
         'business_name': businessName,
         'active_mode': activeMode,
         'available_modes': availableModes,
+        if (businessType != null) 'business_type': businessType,
+        'plan_features': planFeatures,
       };
 }
 
