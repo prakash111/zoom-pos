@@ -494,27 +494,38 @@ class LeadModuleController extends Controller
             'subject'     => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
             'notes'       => $lead->notes ?? '',
         ]);
-        $actionButtons[] = [
-            'type'        => 'button',
-            'label'       => 'Create Quotation',
-            'icon'        => 'description',
-            'variant'     => 'outline_primary',
-            'action_type' => 'OPEN_BOTTOM_SHEET',
-            'action'      => [
-                'type'           => 'OPEN_BOTTOM_SHEET',
-                'title'          => 'New quotation',
-                'endpoint'       => $quotationModalEndpoint,
-                'sheet_endpoint' => $quotationModalEndpoint,
-                'lead_id'        => $lead->id,
-                'lead_code'      => $lead->lead_code ?? "LD-{$lead->id}",
-                'customer_id'    => $lead->customer_id,
+        $quotationAction = S::openBottomSheetAction($quotationModalEndpoint, 'New quotation', [
+            'lead_id'     => $lead->id,
+            'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+            'customer_id' => $lead->customer_id,
+        ]);
+        $actionButtons[] = S::buttonPrimary('Create Quotation', $quotationAction, 'description', [
+            'variant'          => 'primary',
+            'action_type'      => 'OPEN_BOTTOM_SHEET',
+            'background_color' => '#166534',
+            'foreground_color' => '#FFFFFF',
+            'border_radius'    => 10,
+            'style'            => [
+                'backgroundColor' => '#166534',
+                'textColor'       => '#FFFFFF',
+                'borderRadius'    => 10,
+                'marginVertical'  => 6,
             ],
-        ];
+        ]);
 
         // 2. 1-Tap Convert to Invoice
-        $actionButtons[] = S::buttonPrimary('Convert to Tax Invoice',
+        $actionButtons[] = S::buttonOutlined('Convert to Tax Invoice',
             S::apiPostAction(self::BASE.'/leads/'.$lead->id.'/convert-to-invoice', [], 'Lead converted to draft invoice.', reload: true),
-            'receipt_long');
+            'receipt_long', [
+                'variant'       => 'outline',
+                'border_radius' => 10,
+                'style'         => [
+                    'textColor'      => '#15803D',
+                    'borderColor'    => '#15803D',
+                    'borderRadius'   => 10,
+                    'marginVertical' => 6,
+                ],
+            ]);
 
         // 3. Convert to Customer
         if (! $lead->customer_id) {

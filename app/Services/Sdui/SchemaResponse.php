@@ -991,6 +991,25 @@ class SchemaResponse
         ], $props);
     }
 
+    /**
+     * Cross-client action contract for a server-provided modal bottom sheet.
+     *
+     * Older native clients dispatch the upper-case action aliases while the
+     * current SDUI engine canonicalizes them to `open_remote_sheet`.  Emitting
+     * both endpoint keys also keeps list cards, regular buttons, and app-bar
+     * actions on the same backend-driven contract.
+     */
+    public static function openBottomSheetAction(string $endpoint, string $title = '', array $props = []): array
+    {
+        return array_merge([
+            'type' => 'OPEN_BOTTOM_SHEET',
+            'action_type' => 'OPEN_BOTTOM_SHEET',
+            'title' => $title,
+            'endpoint' => $endpoint,
+            'sheet_endpoint' => $endpoint,
+        ], $props);
+    }
+
     public static function popAction(): array
     {
         return [

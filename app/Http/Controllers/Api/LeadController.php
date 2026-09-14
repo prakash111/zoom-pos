@@ -241,34 +241,7 @@ class LeadController extends LeadModuleController
                     S::row([
                         S::buttonOutlined('View Details',
                             S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $lead->id, 'dynamic_page', $lead->lead_code)),
-                        [
-                            'type'        => 'button',
-                            'label'       => 'Create Quote',
-                            'icon'        => 'request_quote',
-                            'variant'     => 'primary',
-                            'action_type' => 'OPEN_BOTTOM_SHEET',
-                            'action'      => [
-                                'type'           => 'OPEN_BOTTOM_SHEET',
-                                'title'          => 'New quotation',
-                                'endpoint'       => '/api/v1/tenant/quotations/create-modal?' . http_build_query([
-                                    'lead_id'     => $lead->id,
-                                    'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
-                                    'customer_id' => $lead->customer_id ?? '',
-                                    'subject'     => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
-                                    'notes'       => $lead->notes ?? '',
-                                ]),
-                                'sheet_endpoint' => '/api/v1/tenant/quotations/create-modal?' . http_build_query([
-                                    'lead_id'     => $lead->id,
-                                    'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
-                                    'customer_id' => $lead->customer_id ?? '',
-                                    'subject'     => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
-                                    'notes'       => $lead->notes ?? '',
-                                ]),
-                                'lead_id'        => $lead->id,
-                                'lead_code'      => $lead->lead_code ?? "LD-{$lead->id}",
-                                'customer_id'    => $lead->customer_id,
-                            ],
-                        ],
+                        $this->quotationButton($lead, 'Create quote'),
                     ]),
                 ],
             ]);
@@ -359,10 +332,46 @@ class LeadController extends LeadModuleController
                     S::row([
                         S::buttonOutlined('View Details',
                             S::navigateAction('/api/tenant/lead-module/views/lead-detail?id=' . $lead->id, 'dynamic_page', $lead->lead_code)),
+                        $this->quotationButton($lead, 'Create quote'),
                     ]),
                 ],
             ];
         }
         return $components;
+    }
+
+    /**
+     * Standard lead-to-quotation SDUI action used by every REST lead list.
+     */
+    private function quotationButton(Lead $lead, string $label): array
+    {
+        $endpoint = '/api/v1/tenant/quotations/create-modal?' . http_build_query([
+            'lead_id'     => $lead->id,
+            'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+            'customer_id' => $lead->customer_id ?? '',
+            'subject'     => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
+            'notes'       => $lead->notes ?? '',
+        ]);
+
+        $action = S::openBottomSheetAction($endpoint, 'New quotation', [
+            'lead_id'     => $lead->id,
+            'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+            'customer_id' => $lead->customer_id,
+        ]);
+
+        return S::buttonPrimary($label, $action, 'add_circle_outline', [
+            'variant'          => 'primary',
+            'action_type'      => 'OPEN_BOTTOM_SHEET',
+            'background_color' => '#166534',
+            'foreground_color' => '#FFFFFF',
+            'border_radius'    => 10,
+            'expanded'         => true,
+            'style'            => [
+                'backgroundColor' => '#166534',
+                'textColor'       => '#FFFFFF',
+                'borderRadius'    => 10,
+                'flex'            => 1,
+            ],
+        ]);
     }
 }

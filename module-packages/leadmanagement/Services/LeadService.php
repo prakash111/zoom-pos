@@ -630,6 +630,7 @@ class LeadService
                 'search_endpoint' => '/api/tenant/customers/search',
                 'endpoint' => '/api/v1/tenant/customers/search',
                 'query_param' => 'q',
+                'currency_symbol' => $company->currency_symbol ?: ($company->currency ?: '₹'),
                 'border_color' => '#06B6D4',
                 'min_chars' => 1,
                 'fields' => [
@@ -656,6 +657,15 @@ class LeadService
                     'email_address' => 'email',
                     'email'         => 'email',
                     'company_name'  => 'company_name',
+                ],
+                'style' => [
+                    'dropdownBackgroundColor' => 'theme.surface',
+                    'dropdownItemHover'       => 'theme.surfaceVariant',
+                    'borderColor'             => 'theme.divider',
+                    'backgroundColor'         => 'theme.surface',
+                    'titleColor'              => 'theme.textPrimary',
+                    'subtitleColor'           => 'theme.textSecondary',
+                    'dueColor'                => '#EF4444',
                 ],
             ],
 
@@ -973,6 +983,18 @@ class LeadService
             };
 
             $noteSnippet = $lead->requirement_summary ? Str::limit($lead->requirement_summary, 80) : ($lead->notes ? Str::limit($lead->notes, 80) : null);
+            $quotationModalEndpoint = '/api/v1/tenant/quotations/create-modal?' . http_build_query([
+                'lead_id'     => $lead->id,
+                'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+                'customer_id' => $lead->customer_id ?? '',
+                'subject'     => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
+                'notes'       => $lead->notes ?? '',
+            ]);
+            $quotationAction = S::openBottomSheetAction($quotationModalEndpoint, 'New quotation', [
+                'lead_id'     => $lead->id,
+                'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
+                'customer_id' => $lead->customer_id,
+            ]);
 
             $leadItems[] = S::entityRecordCard([
                 'title' => $leadTitle,
@@ -1003,29 +1025,15 @@ class LeadService
                     [
                         'label'       => 'Create quote',
                         'variant'     => 'primary',
-                        'color'       => '#2DD4BF',
-                        'icon'        => 'request_quote',
+                        'color'       => '#166534',
+                        'icon'        => 'add_circle_outline',
                         'action_type' => 'OPEN_BOTTOM_SHEET',
-                        'action'      => [
-                            'type'           => 'OPEN_BOTTOM_SHEET',
-                            'title'          => 'New quotation',
-                            'endpoint'       => '/api/v1/tenant/quotations/create-modal?' . http_build_query([
-                                'lead_id'     => $lead->id,
-                                'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
-                                'customer_id' => $lead->customer_id ?? '',
-                                'subject'     => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
-                                'notes'       => $lead->notes ?? '',
-                            ]),
-                            'sheet_endpoint' => '/api/v1/tenant/quotations/create-modal?' . http_build_query([
-                                'lead_id'     => $lead->id,
-                                'lead_code'   => $lead->lead_code ?? "LD-{$lead->id}",
-                                'customer_id' => $lead->customer_id ?? '',
-                                'subject'     => $lead->requirement_scope ?? $lead->subject ?? $lead->requirement_summary ?? '',
-                                'notes'       => $lead->notes ?? '',
-                            ]),
-                            'lead_id'        => $lead->id,
-                            'lead_code'      => $lead->lead_code ?? "LD-{$lead->id}",
-                            'customer_id'    => $lead->customer_id,
+                        'action'      => $quotationAction,
+                        'style'       => [
+                            'backgroundColor' => '#166534',
+                            'textColor'       => '#FFFFFF',
+                            'borderRadius'    => 10,
+                            'flex'            => 1,
                         ],
                     ],
                 ],
@@ -1090,6 +1098,7 @@ class LeadService
                     'search_endpoint' => '/api/tenant/customers/search',
                     'endpoint' => '/api/v1/tenant/customers/search',
                     'query_param' => 'q',
+                    'currency_symbol' => $currency,
                     'border_color' => '#06B6D4',
                     'min_chars' => 1,
                     'fields' => [
@@ -1108,6 +1117,15 @@ class LeadService
                         'phone_number'  => 'phone',
                         'email_address' => 'email',
                         'company_name'  => 'company_name',
+                    ],
+                    'style' => [
+                        'dropdownBackgroundColor' => 'theme.surface',
+                        'dropdownItemHover'       => 'theme.surfaceVariant',
+                        'borderColor'             => 'theme.divider',
+                        'backgroundColor'         => 'theme.surface',
+                        'titleColor'              => 'theme.textPrimary',
+                        'subtitleColor'           => 'theme.textSecondary',
+                        'dueColor'                => '#EF4444',
                     ],
                 ],
                 S::textInput('company_name', 'Company / Organization Name', '', [
