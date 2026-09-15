@@ -40,6 +40,8 @@
             </a>
         </div>
 
+        <x-landing.download-buttons :branding="$branding" class="mt-6 justify-center" />
+
         <!-- Studio Interactive Terminal Showcase -->
         <div class="mt-16 max-w-5xl mx-auto rounded-3xl bg-[#0f111e] border border-purple-500/20 shadow-2xl p-4 sm:p-6 backdrop-blur-2xl text-left relative overflow-hidden">
             <!-- Studio Tab Switcher -->

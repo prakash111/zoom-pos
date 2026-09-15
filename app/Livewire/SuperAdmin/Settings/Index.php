@@ -7,23 +7,27 @@ use App\Models\Page;
 use App\Models\PlatformBranding;
 use App\Models\PlatformSystem;
 use App\Models\PushNotificationSetting;
+use App\Models\SduiModule;
 use App\Services\Localization\PlatformRegionalService;
+use App\Services\Modular\ModuleCatalog;
+use App\Services\Modular\ModuleRegistry;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 #[Layout('layouts.superadmin', ['title' => 'System & Platform Settings'])]
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, WithFileUploads;
 
     #[Url(as: 'tab')]
     public string $activeTab = 'general';
 
-    public string $landingTheme = 'theme_modern';
+    public string $landingTheme = 'theme_fast';
 
     public array $social = [
         'google' => ['enabled' => false, 'client_id' => '', 'client_secret' => ''],
@@ -57,6 +61,13 @@ class Index extends Component
 
     /** @var array<int, string> */
     public array $enabledRegistrationModules = [];
+
+    // When on (the existing default), a new tenant signup is auto-seeded
+    // with sample products/categories/tables/transactions unless the
+    // caller explicitly opts out per-request (seed_demo_data: false). When
+    // off, TenantProvisioningService::registerTenant() skips seeding
+    // regardless of what the caller sent, so every new tenant starts clean.
+    public bool $autoSeedDemoDataOnRegistration = true;
 
     // Platform-wide AI Product Image Generation
     public bool $aiImageEnabled = false;
@@ -134,7 +145,17 @@ class Index extends Component
 
     public string $logoUrl = '';
 
+    public $logoImage = null;
+
     public string $faviconUrl = '';
+
+    public bool $showAuthBanner = false;
+
+    public string $authBannerImageUrl = '';
+
+    public $authBannerImage = null;
+
+    public bool $enableRegistrationDomainSetup = true;
 
     public string $primaryColor = '#4f46e5';
 
@@ -188,6 +209,57 @@ class Index extends Component
 
     public bool $sectionCta = true;
 
+    public bool $sectionHero = true;
+
+    public bool $sectionDownloads = true;
+
+    public bool $sectionFaq = true;
+
+    // App download links
+    public string $landingPlaystoreUrl = '';
+
+    public bool $landingPlaystoreEnabled = false;
+
+    public string $landingWindowsUrl = '';
+
+    public bool $landingWindowsEnabled = false;
+
+    /**
+     * Per-section title / subtitle overrides, keyed by section slug.
+     *
+     * @var array<string, array{title: string, subtitle: string}>
+     */
+    public array $sectionMeta = [
+        'hero' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'trust_bar' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'features' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#ffffff', 'accent' => '#10b981'],
+        'solutions' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'downloads' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'stats' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'about' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#10b981'],
+        'testimonials' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'pricing' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'faq' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'contact' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#ffffff', 'accent' => '#10b981'],
+        'cta' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+    ];
+
+    /** Comma-separated section slugs; saved order is used by compatible themes. */
+    public string $landingSectionOrder = 'hero,trust_bar,features,solutions,downloads,stats,about,testimonials,pricing,faq,contact,cta';
+
+    /** @var array<int, array{q: string, a: string}> */
+    public array $landingFaqs = [];
+
+    /** @var array<int, array{icon: string, title: string, body: string}> */
+    public array $landingFeatures = [];
+
+    /** @var array<int, array{quote: string, name: string, role: string}> */
+    public array $landingTestimonials = [];
+
+    public string $landingFeaturesJson = '';
+
+    public string $landingTestimonialsJson = '';
+
     // --- TAB 4: CUSTOM PAGES (CMS) ---
     public string $pageSearch = '';
 
@@ -220,7 +292,12 @@ class Index extends Component
         $this->minClientBuildVersion = (string) PlatformSystem::get('min_client_build_version', '0');
         $this->appVersion = (string) PlatformSystem::get('app_version', '1.0.0');
         $this->showPoweredBy = filter_var(PlatformSystem::get('show_powered_by', true), FILTER_VALIDATE_BOOLEAN);
-        $this->enabledRegistrationModules = \App\Services\Modular\ModuleRegistry::enabledRegistrationModes();
+        $this->autoSeedDemoDataOnRegistration = filter_var(PlatformSystem::get('auto_seed_demo_data_on_registration', true), FILTER_VALIDATE_BOOLEAN);
+        $guard = $this->moduleGovernance();
+        $this->enabledRegistrationModules = array_values(array_filter(
+            ModuleRegistry::enabledRegistrationModes(),
+            fn ($key) => empty($guard[$key]['premium']) || ! empty($guard[$key]['licensed']),
+        ));
         $this->allowedRegistrationModes = in_array('restaurant', $this->enabledRegistrationModules, true) && in_array('retail', $this->enabledRegistrationModules, true) ? 'both' : (in_array('restaurant', $this->enabledRegistrationModules, true) ? 'restaurant_only' : 'retail_only');
         $this->aiImageEnabled = filter_var(PlatformSystem::get('ai_image_enabled', false), FILTER_VALIDATE_BOOLEAN);
         $this->aiImageProvider = (string) PlatformSystem::get('ai_image_provider', 'openai');
@@ -231,8 +308,11 @@ class Index extends Component
         // Load Platform Branding & SMTP
         $branding = PlatformBranding::current();
         $this->platformName = (string) ($branding->platform_name ?: 'Smart Inventory & Sales');
-        $this->logoUrl = (string) $branding->logo_url;
+        $this->logoUrl = (string) ($branding->logo_url ?: \App\Models\DynamicSetting::get('platform_logo_url', ''));
         $this->faviconUrl = (string) $branding->favicon_url;
+        $this->showAuthBanner = (bool) \App\Models\DynamicSetting::get('show_auth_banner', false);
+        $this->authBannerImageUrl = (string) \App\Models\DynamicSetting::get('auth_banner_image_url', '');
+        $this->enableRegistrationDomainSetup = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
         $this->primaryColor = $branding->primary_color ?? '#4f46e5';
         $this->superadminSidebarColor = $branding->superadmin_sidebar_color ?? '#4338ca';
         $this->landingPrimaryColor = $branding->landing_primary_color ?? '#10b981';
@@ -253,6 +333,7 @@ class Index extends Component
         $this->landingHeroBannerImageUrl = (string) ($branding->landing_hero_banner_image_url ?? '');
 
         $cfg = $branding->landing_sections_config ?? [];
+        $this->landingSectionOrder = implode(',', $branding->landingSectionOrder());
         $this->sectionTrustBar = (bool) ($cfg['trust_bar'] ?? true);
         $this->sectionFeatures = (bool) ($cfg['features'] ?? true);
         $this->sectionSolutions = (bool) ($cfg['solutions'] ?? true);
@@ -262,8 +343,52 @@ class Index extends Component
         $this->sectionPricing = (bool) ($cfg['pricing'] ?? true);
         $this->sectionContact = (bool) ($cfg['contact'] ?? true);
         $this->sectionCta = (bool) ($cfg['cta'] ?? true);
+        $this->sectionHero = (bool) ($cfg['hero'] ?? true);
+        $this->sectionFaq = (bool) ($cfg['faq'] ?? true);
+        $this->sectionDownloads = (bool) ($cfg['downloads'] ?? $branding->hasAnyDownloadLink());
 
-        $this->landingTheme = (string) setting('landing_page_theme', 'theme_modern');
+        $this->landingPlaystoreUrl = (string) ($branding->landing_playstore_url ?? '');
+        $this->landingPlaystoreEnabled = (bool) $branding->landing_playstore_enabled;
+        $this->landingWindowsUrl = (string) ($branding->landing_windows_url ?? '');
+        $this->landingWindowsEnabled = (bool) $branding->landing_windows_enabled;
+
+        $meta = $branding->landing_section_meta ?? [];
+        foreach (array_keys($this->sectionMeta) as $key) {
+            $this->sectionMeta[$key] = [
+                'title' => (string) ($meta[$key]['title'] ?? ''),
+                'subtitle' => (string) ($meta[$key]['subtitle'] ?? ''),
+                'body' => (string) ($meta[$key]['body'] ?? ''),
+                'background' => (string) ($meta[$key]['background'] ?? ($this->sectionMeta[$key]['background'] ?? '#ffffff')),
+                'accent' => (string) ($meta[$key]['accent'] ?? ($this->sectionMeta[$key]['accent'] ?? '#10b981')),
+            ];
+        }
+
+        $this->landingFaqs = collect($branding->landing_faqs ?? [])
+            ->map(fn ($row) => ['q' => (string) ($row['q'] ?? ''), 'a' => (string) ($row['a'] ?? '')])
+            ->values()
+            ->all();
+
+        $this->landingFeatures = collect($branding->landing_features ?? [])
+            ->map(fn ($row) => [
+                'icon' => (string) ($row['icon'] ?? ''),
+                'title' => (string) ($row['title'] ?? ''),
+                'body' => (string) ($row['body'] ?? ''),
+            ])
+            ->values()
+            ->all();
+
+        $this->landingTestimonials = collect($branding->landing_testimonials ?? [])
+            ->map(fn ($row) => [
+                'quote' => (string) ($row['quote'] ?? ''),
+                'name' => (string) ($row['name'] ?? ''),
+                'role' => (string) ($row['role'] ?? ''),
+            ])
+            ->values()
+            ->all();
+        $this->landingFeaturesJson = json_encode($this->landingFeatures, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
+        $this->landingTestimonialsJson = json_encode($this->landingTestimonials, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
+
+        $this->landingTheme = (string) setting('landing_page_theme', 'theme_fast');
 
         foreach (array_keys($this->social) as $provider) {
             $this->social[$provider] = [
@@ -389,11 +514,36 @@ class Index extends Component
             $update['android_api_key'] = trim($this->androidApiKey);
         }
 
+        // Auto-discover Android app credentials from Google if missing
+        if (filled($this->fcmServiceAccountJson) || filled($push->fcm_service_account_json)) {
+            $saJson = filled($this->fcmServiceAccountJson) ? $this->fcmServiceAccountJson : $push->fcm_service_account_json;
+            if (blank($this->androidApiKey) && blank($push->android_api_key) || blank($update['android_app_id']) || blank($update['messaging_sender_id'])) {
+                $discovered = PushNotificationSetting::discoverFirebaseConfig($saJson);
+                if ($discovered) {
+                    if ((blank($this->androidApiKey) && blank($push->android_api_key)) && ! empty($discovered['android_api_key'])) {
+                        $update['android_api_key'] = $discovered['android_api_key'];
+                    }
+                    if (blank($update['android_app_id']) && ! empty($discovered['android_app_id'])) {
+                        $update['android_app_id'] = $discovered['android_app_id'];
+                    }
+                    if (blank($update['messaging_sender_id']) && ! empty($discovered['messaging_sender_id'])) {
+                        $update['messaging_sender_id'] = $discovered['messaging_sender_id'];
+                    }
+                    if (empty($update['fcm_project_id']) && ! empty($discovered['project_id'])) {
+                        $update['fcm_project_id'] = $discovered['project_id'];
+                    }
+                }
+            }
+        }
+
         $push->update($update);
-        $this->fcmProjectId = (string) $push->fresh()->fcm_project_id;
-        $this->hasFcmServiceAccount = filled($push->fcm_service_account_json);
-        $this->hasFcmServerKey = filled($push->fcm_server_key);
-        $this->hasAndroidApiKey = filled($push->android_api_key);
+        $fresh = $push->fresh();
+        $this->fcmProjectId = (string) $fresh->fcm_project_id;
+        $this->androidAppId = (string) $fresh->android_app_id;
+        $this->messagingSenderId = (string) $fresh->messaging_sender_id;
+        $this->hasFcmServiceAccount = filled($fresh->fcm_service_account_json);
+        $this->hasFcmServerKey = filled($fresh->fcm_server_key);
+        $this->hasAndroidApiKey = filled($fresh->android_api_key);
         $this->reset('fcmServiceAccountJson', 'fcmServerKey', 'androidApiKey');
 
         AuditLog::record('push.settings_updated', null, auth('platform_web')->id(), [
@@ -407,13 +557,75 @@ class Index extends Component
         session()->flash('status', 'Global push notification settings saved.');
     }
 
+    public function testPushNotifications(): void
+    {
+        $push = PushNotificationSetting::current();
+
+        if (! $push->enabled) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Push notifications are currently disabled. Enable them and save first.']);
+            return;
+        }
+
+        if (blank($push->fcm_service_account_json) && blank($push->fcm_server_key)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'No Firebase credentials configured. Add a service account JSON first.']);
+            return;
+        }
+
+        try {
+            $pushService = app(\App\Services\Push\FirebasePushService::class);
+            $ref = new \ReflectionClass($pushService);
+
+            if ($push->fcm_service_account_json && $push->fcm_project_id) {
+                $method = $ref->getMethod('accessToken');
+                $method->setAccessible(true);
+                $accessToken = $method->invoke($pushService, $push);
+
+                // Perform FCM v1 dry-run validation with Google
+                $response = \Illuminate\Support\Facades\Http::asJson()
+                    ->withToken($accessToken)
+                    ->timeout(15)
+                    ->post("https://fcm.googleapis.com/v1/projects/{$push->fcm_project_id}/messages:send", [
+                        'validate_only' => true,
+                        'message' => [
+                            'topic' => 'test-healthcheck',
+                            'data' => [
+                                'title' => 'Health Check',
+                                'body' => 'FCM v1 connection verified',
+                            ],
+                        ],
+                    ]);
+
+                if (! $response->successful()) {
+                    throw new \RuntimeException('Google FCM API error: ' . $response->body());
+                }
+
+                $activeDevices = \App\Models\PushDevice::withoutGlobalScope('company')
+                    ->whereNull('revoked_at')
+                    ->count();
+
+                $androidReady = filled($push->android_api_key) && filled($push->android_app_id);
+                $androidStatus = $androidReady ? "Android client bootstrap configured." : "Warning: Android API Key is empty.";
+                $message = "Firebase Cloud Messaging v1 verified! Authenticated with project {$push->fcm_project_id}. {$androidStatus} ({$activeDevices} active devices)";
+                $this->dispatch('notify', ['type' => 'success', 'message' => $message]);
+                session()->flash('status', $message);
+            } else {
+                $this->dispatch('notify', ['type' => 'info', 'message' => 'Legacy server key stored.']);
+            }
+        } catch (\Throwable $e) {
+            $errorMsg = 'Push notification test failed: ' . $e->getMessage();
+            $this->dispatch('notify', ['type' => 'error', 'message' => $errorMsg]);
+            session()->flash('error', $errorMsg);
+        }
+    }
+
     public function setLandingTheme(string $themeKey): void
     {
-        $allowedThemes = ['theme_modern', 'theme_enterprise', 'theme_minimal', 'theme_dark_studio'];
+        $allowedThemes = ['theme_fast', 'theme_modern', 'theme_enterprise', 'theme_minimal', 'theme_dark_studio'];
         if (in_array($themeKey, $allowedThemes, true)) {
             $this->landingTheme = $themeKey;
             set_setting('landing_page_theme', $themeKey);
             cache()->forget('app_landing_page_theme');
+            cache()->increment('landing_page_cache_version') ?: cache()->forever('landing_page_cache_version', 2);
             $this->dispatch('toast', ['message' => 'Landing page layout updated successfully!', 'type' => 'success']);
             $this->dispatch('notify', ['type' => 'success', 'message' => 'Landing page layout updated successfully!']);
         }
@@ -502,11 +714,13 @@ class Index extends Component
             'aiImageOpenaiApiKey' => ['nullable', 'string', 'max:500'],
             'aiImageGeminiApiKey' => ['nullable', 'string', 'max:500'],
             'aiImageClaudeApiKey' => ['nullable', 'string', 'max:500'],
+            'autoSeedDemoDataOnRegistration' => ['boolean'],
         ]);
 
         $before = [
             'maintenance_mode' => PlatformSystem::get('maintenance_mode', '0'),
             'min_client_build_version' => PlatformSystem::get('min_client_build_version', '0'),
+            'auto_seed_demo_data_on_registration' => PlatformSystem::get('auto_seed_demo_data_on_registration', '1'),
         ];
 
         $this->allowedRegistrationModes = in_array('restaurant', $this->enabledRegistrationModules, true) && in_array('retail', $this->enabledRegistrationModules, true) ? 'both' : (in_array('restaurant', $this->enabledRegistrationModules, true) ? 'restaurant_only' : 'retail_only');
@@ -538,13 +752,16 @@ class Index extends Component
         PlatformSystem::set('min_client_build_version', $this->minClientBuildVersion);
         PlatformSystem::set('app_version', $this->appVersion);
         PlatformSystem::set('show_powered_by', $this->showPoweredBy ? '1' : '0');
+        PlatformSystem::set('auto_seed_demo_data_on_registration', $this->autoSeedDemoDataOnRegistration ? '1' : '0');
         // Never persist a key that is no longer a real store type — an
         // uninstalled / deactivated package module must not linger in this
         // list even if it was somehow still in the posted payload.
-        $validModeKeys = array_keys(\App\Services\Modular\ModuleRegistry::allModules());
-        $this->enabledRegistrationModules = array_values(array_intersect(
-            array_values($this->enabledRegistrationModules),
-            $validModeKeys,
+        $validModeKeys = array_keys(ModuleRegistry::allModules());
+        $guard = $this->moduleGovernance();
+        $this->enabledRegistrationModules = array_values(array_filter(
+            array_intersect(array_values($this->enabledRegistrationModules), $validModeKeys),
+            // A premium vertical can only be enabled once its module is licensed.
+            fn ($key) => empty($guard[$key]['premium']) || ! empty($guard[$key]['licensed']),
         ));
         PlatformSystem::set('allowed_registration_modes', json_encode($this->enabledRegistrationModules));
         PlatformSystem::set('ai_image_enabled', $this->aiImageEnabled ? '1' : '0');
@@ -567,6 +784,7 @@ class Index extends Component
             'after' => [
                 'maintenance_mode' => $this->maintenanceMode ? '1' : '0',
                 'min_client_build_version' => $this->minClientBuildVersion,
+                'auto_seed_demo_data_on_registration' => $this->autoSeedDemoDataOnRegistration ? '1' : '0',
             ],
         ]);
 
@@ -681,12 +899,41 @@ class Index extends Component
     }
 
     // --- BRANDING TAB SAVE ---
+    public function addFaq(): void
+    {
+        if (count($this->landingFaqs) < 20) {
+            $this->landingFaqs[] = ['q' => '', 'a' => ''];
+        }
+    }
+
+    public function removeFaq(int $index): void
+    {
+        unset($this->landingFaqs[$index]);
+        $this->landingFaqs = array_values($this->landingFaqs);
+    }
+
+    public function removeAuthBanner(): void
+    {
+        $this->authBannerImage = null;
+        $this->authBannerImageUrl = '';
+        \App\Models\DynamicSetting::put('auth_banner_image_url', '');
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => 'Auth banner image removed.',
+        ]);
+    }
+
     public function saveBranding(): void
     {
         $data = $this->validate([
             'platformName' => ['required', 'string', 'max:255'],
             'logoUrl' => ['nullable', 'string', 'max:500'],
+            'logoImage' => ['nullable', 'image', 'max:5120'],
             'faviconUrl' => ['nullable', 'string', 'max:500'],
+            'showAuthBanner' => ['boolean'],
+            'authBannerImageUrl' => ['nullable', 'string', 'max:500'],
+            'authBannerImage' => ['nullable', 'image', 'max:5120'],
+            'enableRegistrationDomainSetup' => ['boolean'],
             'primaryColor' => ['nullable', 'string', 'max:32'],
             'superadminSidebarColor' => ['nullable', 'string', 'max:32'],
             'landingPrimaryColor' => ['nullable', 'string', 'max:32'],
@@ -702,19 +949,119 @@ class Index extends Component
             'landingHeroCtaSecondaryText' => ['nullable', 'string', 'max:100'],
             'landingHeroCtaSecondaryUrl' => ['nullable', 'string', 'max:500'],
             'landingHeroBannerImageUrl' => ['nullable', 'string', 'max:500'],
+            'landingSectionOrder' => ['nullable', 'string', 'max:500'],
+            'landingPlaystoreUrl' => ['nullable', 'url', 'max:500'],
+            'landingWindowsUrl' => ['nullable', 'url', 'max:500'],
+            'sectionMeta.*.title' => ['nullable', 'string', 'max:255'],
+            'sectionMeta.*.subtitle' => ['nullable', 'string', 'max:500'],
+            'sectionMeta.*.body' => ['nullable', 'string', 'max:2000'],
+            'sectionMeta.*.background' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'sectionMeta.*.accent' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'landingFaqs' => ['array', 'max:20'],
+            'landingFaqs.*.q' => ['nullable', 'string', 'max:255'],
+            'landingFaqs.*.a' => ['nullable', 'string', 'max:1000'],
+            'landingFeatures' => ['nullable', 'array'],
+            'landingFeatures.*.icon' => ['nullable', 'string', 'max:16'],
+            'landingFeatures.*.title' => ['nullable', 'string', 'max:120'],
+            'landingFeatures.*.body' => ['nullable', 'string', 'max:500'],
+            'landingTestimonials' => ['nullable', 'array'],
+            'landingTestimonials.*.quote' => ['nullable', 'string', 'max:500'],
+            'landingTestimonials.*.name' => ['nullable', 'string', 'max:120'],
+            'landingTestimonials.*.role' => ['nullable', 'string', 'max:160'],
+            'landingFeaturesJson' => ['nullable', 'string', 'max:50000'],
+            'landingTestimonialsJson' => ['nullable', 'string', 'max:50000'],
         ]);
 
+        foreach (['landingFeaturesJson' => 'landingFeatures', 'landingTestimonialsJson' => 'landingTestimonials'] as $jsonKey => $arrayKey) {
+            if (filled($this->{$jsonKey})) {
+                $decoded = json_decode($this->{$jsonKey}, true);
+                if (! is_array($decoded)) {
+                    $this->addError($jsonKey, 'Enter valid JSON array data.');
+                    return;
+                }
+                $this->{$arrayKey} = $decoded;
+            }
+        }
+
+        if ($this->logoImage) {
+            $logoPath = $this->logoImage->store('branding', 'public');
+            $data['logoUrl'] = \Illuminate\Support\Facades\Storage::disk('public')->url($logoPath);
+            $this->logoUrl = $data['logoUrl'];
+            $this->logoImage = null;
+        }
+
+        if ($this->authBannerImage) {
+            $bannerPath = $this->authBannerImage->store('branding', 'public');
+            $this->authBannerImageUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($bannerPath);
+            $this->authBannerImage = null;
+        }
+
+        \App\Models\DynamicSetting::put('show_auth_banner', $this->showAuthBanner);
+        \App\Models\DynamicSetting::put('auth_banner_image_url', $this->authBannerImageUrl);
+        \App\Models\DynamicSetting::put('enable_registration_domain_setup', $this->enableRegistrationDomainSetup);
+        if (! empty($data['logoUrl'])) {
+            \App\Models\DynamicSetting::put('platform_logo_url', $data['logoUrl']);
+        }
+        if (! empty($data['platformName'])) {
+            \App\Models\DynamicSetting::put('platform_brand_name', $data['platformName']);
+        }
+
         $sectionsConfig = [
+            'hero' => $this->sectionHero,
             'trust_bar' => $this->sectionTrustBar,
             'features' => $this->sectionFeatures,
             'solutions' => $this->sectionSolutions,
+            'downloads' => $this->sectionDownloads,
             'stats' => $this->sectionStats,
             'about' => $this->sectionAbout,
             'testimonials' => $this->sectionTestimonials,
             'pricing' => $this->sectionPricing,
+            'faq' => $this->sectionFaq,
             'contact' => $this->sectionContact,
             'cta' => $this->sectionCta,
         ];
+
+        $sectionMeta = [];
+        foreach ($this->sectionMeta as $key => $meta) {
+            $title = trim((string) ($meta['title'] ?? ''));
+            $subtitle = trim((string) ($meta['subtitle'] ?? ''));
+            $body = trim((string) ($meta['body'] ?? ''));
+            $background = preg_match('/^#[0-9A-Fa-f]{6}$/', (string) ($meta['background'] ?? '')) ? strtoupper($meta['background']) : null;
+            $accent = preg_match('/^#[0-9A-Fa-f]{6}$/', (string) ($meta['accent'] ?? '')) ? strtoupper($meta['accent']) : null;
+            if ($title !== '' || $subtitle !== '' || $body !== '' || $background || $accent) {
+                $sectionMeta[$key] = compact('title', 'subtitle', 'body', 'background', 'accent');
+            }
+        }
+
+        $allowedOrder = ['hero', 'trust_bar', 'features', 'solutions', 'downloads', 'stats', 'about', 'testimonials', 'pricing', 'faq', 'contact', 'cta'];
+        $order = array_values(array_unique(array_filter(array_map('trim', explode(',', $this->landingSectionOrder)), fn ($key) => in_array($key, $allowedOrder, true))));
+        $sectionsConfig['order'] = array_values(array_unique(array_merge($order, array_diff($allowedOrder, $order))));
+
+        $faqs = collect($this->landingFaqs)
+            ->map(fn ($row) => ['q' => trim((string) ($row['q'] ?? '')), 'a' => trim((string) ($row['a'] ?? ''))])
+            ->filter(fn ($row) => $row['q'] !== '' && $row['a'] !== '')
+            ->values()
+            ->all();
+
+        $features = collect($this->landingFeatures)
+            ->map(fn ($row) => [
+                'icon' => trim((string) ($row['icon'] ?? '')),
+                'title' => trim((string) ($row['title'] ?? '')),
+                'body' => trim((string) ($row['body'] ?? '')),
+            ])
+            ->filter(fn ($row) => $row['title'] !== '' && $row['body'] !== '')
+            ->values()
+            ->all();
+
+        $testimonials = collect($this->landingTestimonials)
+            ->map(fn ($row) => [
+                'quote' => trim((string) ($row['quote'] ?? '')),
+                'name' => trim((string) ($row['name'] ?? '')),
+                'role' => trim((string) ($row['role'] ?? '')),
+            ])
+            ->filter(fn ($row) => $row['quote'] !== '' && $row['name'] !== '')
+            ->values()
+            ->all();
 
         PlatformBranding::current()->update([
             'platform_name' => $data['platformName'],
@@ -738,7 +1085,18 @@ class Index extends Component
             'landing_hero_cta_secondary_url' => $data['landingHeroCtaSecondaryUrl'] ?: null,
             'landing_hero_banner_image_url' => $data['landingHeroBannerImageUrl'] ?: null,
             'landing_sections_config' => $sectionsConfig,
+            'landing_playstore_url' => $data['landingPlaystoreUrl'] ?: null,
+            'landing_playstore_enabled' => $this->landingPlaystoreEnabled,
+            'landing_windows_url' => $data['landingWindowsUrl'] ?: null,
+            'landing_windows_enabled' => $this->landingWindowsEnabled,
+            'landing_section_meta' => $sectionMeta ?: null,
+            'landing_faqs' => $faqs ?: null,
+            'landing_features' => $features ?: null,
+            'landing_testimonials' => $testimonials ?: null,
         ]);
+
+        \Illuminate\Support\Facades\Cache::forget('public_settings');
+        \Illuminate\Support\Facades\Cache::forget('platform_branding_settings');
 
         AuditLog::record('branding.updated', null, auth('platform_web')->id());
 
@@ -793,6 +1151,40 @@ class Index extends Component
             'currencyOptions' => PlatformRegionalService::currencyOptions(),
             'languageOptions' => PlatformRegionalService::languageOptions(),
             'timezoneOptions' => PlatformRegionalService::timezoneOptions(),
+            'moduleGuard' => $this->moduleGovernance(),
         ]);
+    }
+
+    /**
+     * Per registration-mode gating for the Module Governance card.
+     *
+     * @return array<string, array{premium: bool, licensed: bool, catalog_slug: string, store_link: ?string}>
+     */
+    public function moduleGovernance(): array
+    {
+        $free = (array) config('modules.registration.free', ['retail', 'restaurant']);
+        $premium = (array) config('modules.registration.premium', []);
+
+        $licensedSlugs = SduiModule::query()
+            ->where('license_status', 'active')
+            ->pluck('slug')
+            ->all();
+
+        $guard = [];
+        foreach (array_keys(ModuleRegistry::allModules()) as $key) {
+            $isPremium = array_key_exists($key, $premium);
+            $catalogSlug = $isPremium ? (string) $premium[$key] : $key;
+
+            $guard[$key] = [
+                'premium' => $isPremium,
+                'licensed' => ! $isPremium
+                    || in_array($key, $free, true)
+                    || in_array($catalogSlug, $licensedSlugs, true),
+                'catalog_slug' => $catalogSlug,
+                'store_link' => $isPremium ? ModuleCatalog::storeLink($catalogSlug) : null,
+            ];
+        }
+
+        return $guard;
     }
 }

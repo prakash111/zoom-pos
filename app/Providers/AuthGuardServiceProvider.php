@@ -57,6 +57,60 @@ class AuthGuardServiceProvider extends ServiceProvider
 
             return $session?->admin;
         });
+
+        Auth::viaRequest('sanctum', function (Request $request) {
+            $token = $request->bearerToken()
+                ?? $request->header('X-API-Key')
+                ?? $request->header('X-Auth-Token')
+                ?? $request->input('api_key')
+                ?? $request->input('token');
+
+            if (! $token) {
+                return null;
+            }
+
+            $apiKey = \App\Models\TenantApiKey::withoutGlobalScope('company')->where('token', $token)->where('active', true)->first();
+            if ($apiKey) {
+                $apiKey->update(['last_used_at' => now()]);
+                app()->instance('tenant.company_id', $apiKey->company_id);
+                app()->instance('tenant.api_key', $apiKey);
+                $request->attributes->set('company_id', $apiKey->company_id);
+                $request->attributes->set('api_key', $apiKey);
+
+                if ($apiKey->user_id) {
+                    $user = User::query()->withoutGlobalScope('company')->find($apiKey->user_id);
+                    if ($user && $user->company_id === $apiKey->company_id && $user->status !== 'inactive') {
+                        return $user;
+                    }
+                }
+
+                return User::query()->withoutGlobalScope('company')->where('company_id', $apiKey->company_id)->first();
+            }
+
+            if (str_contains($token, '.')) {
+                $session = TenantSession::query()->active()->find($token);
+                if ($session) {
+                    $user = User::query()->withoutGlobalScope('company')->find($session->user_id);
+                    if ($user && $user->company_id === $session->company_id) {
+                        app()->instance('tenant.company_id', $session->company_id);
+                        app()->instance('tenant.session', $session);
+                        $request->attributes->set('company_id', $session->company_id);
+
+                        return $user;
+                    }
+                }
+            }
+
+            $company = \App\Models\Company::where('tax_api_key', $token)->orWhere('activation_key', $token)->first();
+            if ($company) {
+                app()->instance('tenant.company_id', $company->id);
+                $request->attributes->set('company_id', $company->id);
+
+                return User::query()->withoutGlobalScope('company')->where('company_id', $company->id)->first();
+            }
+
+            return null;
+        });
     }
 
     protected function bearerToken(Request $request): ?string

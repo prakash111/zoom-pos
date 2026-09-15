@@ -11,7 +11,7 @@
         $amountSize = $is58mm ? '14px' : '17px';
         $qrDimension = $is58mm ? '65px' : '80px';
         $platformName = $branding?->platform_name ?? config('app.name');
-        $platformUrl = config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'saas.zoomnearby.com';
+        $platformUrl = config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'yourdomain.com';
     @endphp
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }

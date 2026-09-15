@@ -14,12 +14,14 @@ use App\Models\Sale;
 use App\Services\Delivery\MessageQueueService;
 use App\Services\Delivery\WebhookDispatchService;
 use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\Notifications\TenantNotificationDispatcherService;
 use App\Services\Sdui\PosScreenBuilder;
 use App\Services\Sdui\SchemaValidator;
 use App\Services\TaxCalculationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class SaleApiController extends Controller
@@ -74,6 +76,8 @@ class SaleApiController extends Controller
         $messageQueue = app(MessageQueueService::class);
         $deliveryService = app(InvoiceDeliveryService::class);
 
+        $dispatcher = app(TenantNotificationDispatcherService::class);
+
         if ($channel === 'email') {
             $email = $recipient ?: ($sale->customer?->email ?? '');
             if (empty($email)) {
@@ -84,22 +88,32 @@ class SaleApiController extends Controller
             }
 
             try {
-                $result = $messageQueue->sendOrQueueEmail($sale, $email, $customMessage, true);
+                $dispatchResult = $dispatcher->dispatchReceipt($company, $sale, ['email'], null, $email);
+                $emailResult = $dispatchResult['email'] ?? ['success' => false, 'status' => 'failed', 'message' => 'Email delivery failed'];
+
+                if (! ($emailResult['success'] ?? false)) {
+                    $result = $messageQueue->sendOrQueueEmail($sale, $email, $customMessage, true);
+                    $emailResult = [
+                        'status' => $result['status'],
+                        'message' => $result['status'] === 'sent'
+                            ? "Invoice #{$sale->sale_number} sent to {$email}."
+                            : "Invoice #{$sale->sale_number} queued for delivery to {$email}.",
+                    ];
+                }
+
                 AuditLog::record('invoice.dispatched', $company->id, $user?->id, [
                     'sale_id' => $sale->id,
                     'sale_number' => $sale->sale_number,
                     'channel' => 'email',
                     'recipient' => $email,
-                    'status' => $result['status'],
+                    'status' => $emailResult['status'] ?? 'sent',
                 ]);
 
                 return response()->json([
                     'success' => true,
                     'channel' => 'email',
-                    'status' => $result['status'],
-                    'message' => $result['status'] === 'sent'
-                        ? "Invoice #{$sale->sale_number} sent to {$email}."
-                        : "Invoice #{$sale->sale_number} queued for delivery to {$email}.",
+                    'status' => $emailResult['status'] ?? 'sent',
+                    'message' => $emailResult['message'] ?? "Invoice #{$sale->sale_number} sent to {$email}.",
                 ]);
             } catch (\Throwable $e) {
                 return response()->json([
@@ -117,6 +131,8 @@ class SaleApiController extends Controller
                     'error' => 'Customer has no phone number configured. Please provide a phone recipient.',
                 ], 422);
             }
+
+            $smsResult = $dispatcher->dispatchReceipt($company, $sale, ['sms'], $phone);
 
             $smsChannel = CustomNotificationChannel::withoutGlobalScope('company')
                 ->where('company_id', $company->id)
@@ -144,44 +160,35 @@ class SaleApiController extends Controller
             return response()->json([
                 'success' => true,
                 'channel' => 'sms',
-                'message' => "SMS receipt notification dispatched to {$phone}.",
+                'message' => $smsResult['sms']['message'] ?? "SMS receipt notification dispatched to {$phone}.",
             ]);
         }
 
         // WhatsApp (default)
         $phone = $recipient ?: ($sale->customer?->phone ?? '');
-        $whatsappUrl = $deliveryService->generateInvoiceWhatsAppUrl($sale, $phone ?: null, $customMessage);
+        $whatsappResult = $dispatcher->dispatchReceipt($company, $sale, ['whatsapp'], $phone);
+        $wa = $whatsappResult['whatsapp'] ?? [];
+        $status = $wa['status'] ?? 'manual_link';
+        $url = $wa['url'] ?? $wa['whatsapp_url'] ?? $deliveryService->generateInvoiceWhatsAppUrl($sale, $phone ?: null, $customMessage);
 
-        try {
-            $result = $messageQueue->sendOrQueueWhatsApp($sale, $phone ?: '0000000000', $customMessage);
-            AuditLog::record('invoice.dispatched', $company->id, $user?->id, [
-                'sale_id' => $sale->id,
-                'sale_number' => $sale->sale_number,
-                'channel' => 'whatsapp',
-                'recipient' => $phone,
-                'status' => $result['status'] ?? 'manual_link',
-            ]);
+        AuditLog::record('invoice.dispatched', $company->id, $user?->id, [
+            'sale_id' => $sale->id,
+            'sale_number' => $sale->sale_number,
+            'channel' => 'whatsapp',
+            'recipient' => $phone,
+            'status' => $status,
+        ]);
 
-            return response()->json([
-                'success' => true,
-                'channel' => 'whatsapp',
-                'status' => $result['status'] ?? 'manual_link',
-                'url' => $result['url'] ?? $whatsappUrl,
-                'whatsapp_url' => $result['url'] ?? $whatsappUrl,
-                'message' => ($result['status'] ?? '') === 'sent'
-                    ? "Invoice #{$sale->sale_number} delivered via WhatsApp."
-                    : "Opening WhatsApp with receipt for #{$sale->sale_number}.",
-            ]);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'success' => true,
-                'channel' => 'whatsapp',
-                'status' => 'manual_link',
-                'url' => $whatsappUrl,
-                'whatsapp_url' => $whatsappUrl,
-                'message' => "Invoice #{$sale->sale_number} ready to share via WhatsApp.",
-            ]);
-        }
+        return response()->json([
+            'success' => true,
+            'channel' => 'whatsapp',
+            'status' => $status,
+            'url' => $url,
+            'whatsapp_url' => $url,
+            'message' => $status === 'sent'
+                ? "Invoice #{$sale->sale_number} delivered via WhatsApp."
+                : ($wa['message'] ?? "Opening WhatsApp with receipt for #{$sale->sale_number}."),
+        ]);
     }
 
     /**
@@ -483,6 +490,29 @@ class SaleApiController extends Controller
 
                 return $sale;
             });
+
+            // Dispatch receipt across tenant-enabled channels selected by cashier
+            $selectedChannels = [];
+            if ($request->boolean('send_via_whatsapp')) {
+                $selectedChannels[] = 'whatsapp';
+            }
+            if ($request->boolean('send_via_sms')) {
+                $selectedChannels[] = 'sms';
+            }
+            if ($request->boolean('send_via_email')) {
+                $selectedChannels[] = 'email';
+            }
+            if ($request->boolean('send_via_webhook')) {
+                $selectedChannels[] = 'custom_webhook';
+            }
+
+            if (! empty($selectedChannels)) {
+                try {
+                    app(TenantNotificationDispatcherService::class)->dispatchReceipt($company, $sale, $selectedChannels);
+                } catch (\Throwable $dispatchEx) {
+                    Log::warning("POS sale notification dispatch error: ".$dispatchEx->getMessage());
+                }
+            }
 
             AuditLog::record('pos.sale_completed', $company->id, $user?->id, [
                 'sale_id' => $sale->id,

@@ -112,12 +112,13 @@
                 <span>🔐</span> {{ __('Social Login') }}
             </button>
 
-            <button type="button" 
+            <button type="button"
                     @click="switchTab('appearance')"
                     :class="activeTab === 'appearance' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
                     class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
                 <span>🎨</span> {{ __('Navigation & Appearance') }}
             </button>
+
         </div>
 
         <!-- Tab Panes -->

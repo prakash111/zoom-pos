@@ -29,6 +29,20 @@ class TenantNavigationComposer
 
         $allows = fn (string $module, string $action = 'view'): bool => ! $user || $user->isPrivilegedRole() || $checker->allows($user, $module, $action);
 
+        // Compute vertical and operating mode flags based on company's licensed modules
+        $verticalKeys = $user ? $company->licensedModuleKeys() : ['retail'];
+        $activeVertical = collect($verticalKeys)
+            ->first(fn ($k) => in_array($k, ['pharmacy', 'service_booking', 'repair_technician'], true))
+            ?? ($verticalKeys[0] ?? 'retail');
+
+        $isRestaurantMode = $company->isRestaurantMode();
+        $hasRestaurant = $company->hasModule('restaurant');
+        $hasRetail = $company->hasModule('retail') || ! $isRestaurantMode;
+        $isPharmacy = $company->hasModule('pharmacy');
+        $isSalon = $company->hasModule('service_booking') || $company->hasModule('salon');
+        $isRepair = $company->hasModule('repair_technician') || $company->hasModule('repairtechnician');
+        $isLeadManagement = $company->hasModule('leadmanagement') || $company->hasModule('lead_management');
+
         $isQuotes = $this->request->routeIs('tenant.quotes.*') || $this->request->routeIs('tenant.quotations.*');
         $isSalesTargets = $this->request->routeIs('tenant.sales-targets.*');
         $isCashRegister = $this->request->routeIs('tenant.financials.cash_register');
@@ -47,13 +61,24 @@ class TenantNavigationComposer
             'tenantCompany' => $company,
             'themeClasses' => $themeClasses,
             'uiAccentColorHex' => $company->primary_color ?: ($themeClasses['hex'] ?? '#2563eb'),
-            'isRestaurant' => $user?->company?->isRestaurantMode() ?? false,
+            'isRestaurant' => $isRestaurantMode,
+            'isRestaurantMode' => $isRestaurantMode,
+            'hasRestaurant' => $hasRestaurant,
+            'hasRetail' => $hasRetail,
+            'activeVertical' => $activeVertical,
+            'isPharmacy' => $isPharmacy,
+            'isSalon' => $isSalon,
+            'isRepair' => $isRepair,
+            'isLeadManagement' => $isLeadManagement,
+            'isVerticalStore' => $isPharmacy || $isSalon || $isRepair || ($hasRestaurant && ! $isRestaurantMode),
             'isPosScreen' => $this->request->routeIs('tenant.sales.create') || $this->request->routeIs('tenant.restaurant.pos'),
 
             'canQuotes' => $allows('quotes'),
+            'canLeads' => $isLeadManagement && $allows('leads'),
             'canSales' => $allows('sales'),
             'canConsignments' => $allows('consignments'),
             'canServiceOrders' => $allows('service_orders'),
+            'canRepair' => $allows('repair'),
             'canPos' => $allows('pos', 'create'),
             'canProducts' => $allows('products'),
             'canCategories' => $allows('categories'),
@@ -70,6 +95,7 @@ class TenantNavigationComposer
 
             'isHome' => $this->request->routeIs('tenant.dashboard'),
             'isQuotes' => $isQuotes,
+            'isLeads' => $this->request->routeIs('tenant.leads.*'),
             'isConsignments' => $this->request->routeIs('tenant.consignments.*'),
             'isServiceOrders' => $this->request->routeIs('tenant.service-orders.*'),
             'isSalesTargets' => $isSalesTargets,

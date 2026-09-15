@@ -184,4 +184,103 @@ class SystemPushNotificationArchitectureTest extends TestCase
 
         $this->artisan('notifications:dispatch-scheduled')->assertSuccessful();
     }
+
+    public function test_pos_push_config_endpoint_returns_complete_bootstrap_options(): void
+    {
+        PushNotificationSetting::current()->update([
+            'enabled' => true,
+            'fcm_project_id' => 'zender-app-1a24e',
+            'android_api_key' => 'AIzaSyAT9dCfXlrjo2_FmVjCe2xpeVndcFyAJuw',
+            'android_app_id' => '1:101039922760:android:a2e17af47b397589a1c27d',
+            'messaging_sender_id' => '101039922760',
+        ]);
+
+        $res = $this->getJson('/api/v1/pos/auth/push-config');
+        $res->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('push.enabled', true)
+            ->assertJsonPath('push.project_id', 'zender-app-1a24e')
+            ->assertJsonPath('push.android_api_key', 'AIzaSyAT9dCfXlrjo2_FmVjCe2xpeVndcFyAJuw')
+            ->assertJsonPath('push.android_app_id', '1:101039922760:android:a2e17af47b397589a1c27d')
+            ->assertJsonPath('push.messaging_sender_id', '101039922760');
+    }
+
+    public function test_tenant_can_trigger_test_push_to_active_devices(): void
+    {
+        [$company, $user] = $this->actingAsTenantAdmin();
+        $apiKey = TenantApiKey::create([
+            'company_id' => $company->id,
+            'user_id' => $user->id,
+            'name' => 'Tablet POS',
+            'token' => 'zk_live_test_push_device_test_endpoint',
+            'permissions' => ['*'],
+            'active' => true,
+        ]);
+
+        // When no devices registered -> returns 404
+        $this->withToken($apiKey->token)->postJson('/api/v1/pos/push-devices/test')
+            ->assertNotFound()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('active_devices_count', 0);
+
+        // Register a device
+        $this->withToken($apiKey->token)->postJson('/api/v1/pos/push-devices', [
+            'token' => 'fcm-device-token-12345',
+            'platform' => 'android',
+            'device_name' => 'Kitchen Tablet',
+        ])->assertOk();
+
+        $push = $this->mock(FirebasePushService::class);
+        $push->shouldReceive('sendToCompany')
+            ->once()
+            ->with($company->id, \Mockery::on(fn ($data) => ($data['type'] ?? '') === 'test_push'))
+            ->andReturn(1);
+
+        $res = $this->withToken($apiKey->token)->postJson('/api/v1/pos/push-devices/test');
+        $res->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('active_devices_count', 1)
+            ->assertJsonPath('delivered_count', 1);
+    }
+
+    public function test_login_associates_and_unrevokes_push_device_token(): void
+    {
+        [$company, $user] = $this->actingAsTenantAdmin();
+
+        // 1. Login with fcm_token associates device and creates active PushDevice
+        $response = $this->postJson('/api/v1/pos/auth/login', [
+            'email' => $user->email,
+            'password' => 'secret1234',
+            'fcm_token' => 'fcm-persistent-token-xyz',
+            'platform' => 'android',
+            'device_name' => 'Cashier Tablet',
+        ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+
+        $device = PushDevice::withoutGlobalScope('company')
+            ->where('token', 'fcm-persistent-token-xyz')
+            ->first();
+
+        $this->assertNotNull($device);
+        $this->assertSame($company->id, $device->company_id);
+        $this->assertSame($user->id, $device->user_id);
+        $this->assertSame('android', $device->platform);
+        $this->assertNull($device->revoked_at);
+
+        // 2. Simulate revocation (e.g., previous logout or FCM unregister)
+        $device->update(['revoked_at' => now()->subDay()]);
+        $this->assertNotNull($device->fresh()->revoked_at);
+
+        // 3. Re-login after reinstall with the same cached token restores device without losing it
+        $relogin = $this->postJson('/api/v1/pos/auth/login', [
+            'email' => $user->email,
+            'password' => 'secret1234',
+            'fcm_token' => 'fcm-persistent-token-xyz',
+        ]);
+
+        $relogin->assertOk()->assertJsonPath('success', true);
+        $this->assertNull($device->fresh()->revoked_at);
+        $this->assertSame($company->id, $device->fresh()->company_id);
+    }
 }

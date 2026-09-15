@@ -1,13 +1,15 @@
 <?php
 
 use App\Http\Middleware\CheckMaintenanceMode;
-use App\Http\Middleware\CheckTenantPermission;
 use App\Http\Middleware\CheckTenantApiUserPermission;
+use App\Http\Middleware\CheckTenantPermission;
 use App\Http\Middleware\EnsureAppIsInstalled;
 use App\Http\Middleware\EnsureNotInstalled;
 use App\Http\Middleware\EnsureTenantEmailIsVerified;
 use App\Http\Middleware\EnsureTenantPosMode;
 use App\Http\Middleware\EnsureTenantSubscriptionActive;
+use App\Http\Middleware\EnsureTenantVertical;
+use App\Http\Middleware\PreventDemoModifications;
 use App\Http\Middleware\ResolveTenantContext;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
@@ -16,6 +18,10 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+if (! file_exists(dirname(__DIR__).'/.env') && file_exists(dirname(__DIR__).'/.env.example')) {
+    @copy(dirname(__DIR__).'/.env.example', dirname(__DIR__).'/.env');
+}
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -59,17 +65,32 @@ return Application::configure(basePath: dirname(__DIR__))
             SecurityHeaders::class,
         ]);
 
+        // The public landing page is served from a whole-response cache shared
+        // across visitors, so its embedded CSRF token is not per-session. The
+        // marketing contact form is instead protected by an origin-locked
+        // rate limit (throttle:6,1) and a honeypot field.
+        $middleware->validateCsrfTokens(except: [
+            'contact',
+            'api/v1/webhooks/*',
+            'api/webhooks/*',
+            'v1/webhooks/*',
+            'webhooks/*',
+        ]);
+
         $middleware->alias([
             'installed' => EnsureAppIsInstalled::class,
             'not_installed' => EnsureNotInstalled::class,
             'maintenance_check' => CheckMaintenanceMode::class,
             'security_headers' => SecurityHeaders::class,
             'tenant_context' => ResolveTenantContext::class,
+            'tenant' => \App\Http\Middleware\AuthenticateTenantApi::class,
             'tenant.permission' => CheckTenantPermission::class,
             'tenant.api.permission' => CheckTenantApiUserPermission::class,
             'tenant.pos_mode' => EnsureTenantPosMode::class,
+            'tenant.vertical' => EnsureTenantVertical::class,
             'tenant.subscription' => EnsureTenantSubscriptionActive::class,
             'tenant.verified' => EnsureTenantEmailIsVerified::class,
+            'demo.guard' => PreventDemoModifications::class,
         ]);
 
         // There is no single named "login" route — two separate guards each

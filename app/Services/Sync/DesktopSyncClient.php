@@ -93,9 +93,7 @@ class DesktopSyncClient
         'quotations' => ['tax' => 'tax_amount', 'quote_number' => 'sale_number', 'valid_until' => 'due_date'],
     ];
 
-    public function __construct(protected Company $company, protected DesktopSyncEngine $engine)
-    {
-    }
+    public function __construct(protected Company $company, protected DesktopSyncEngine $engine) {}
 
     public function isConfigured(): bool
     {
@@ -371,7 +369,7 @@ class DesktopSyncClient
 
     protected function http()
     {
-        return Http::baseUrl($this->getConfig('remote_base_url', config('nativephp.website', 'https://saas.zoomnearby.com')))
+        return Http::baseUrl($this->getConfig('remote_base_url', config('nativephp.website', 'https://yourdomain.com')))
             ->withToken($this->deviceToken())
             ->acceptJson()
             // Without a bound timeout, a slow/unresponsive server would hang

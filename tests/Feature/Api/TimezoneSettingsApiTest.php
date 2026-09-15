@@ -85,6 +85,36 @@ class TimezoneSettingsApiTest extends TestCase
             ->assertJsonPath('profile.resolved_timezone', 'Asia/Kolkata');
     }
 
+    public function test_profile_update_persists_the_brand_colour_and_surfaces_it_in_bootstrap(): void
+    {
+        $token = $this->token();
+
+        $this->withToken($token)->putJson('/api/v1/pos/settings/profile', [
+            'name' => $this->company->name,
+            'primary_color' => '#7C3AED',
+            'accent_color' => '#F59E0B',
+        ])->assertOk()
+            ->assertJsonPath('profile.primary_color', '#7C3AED')
+            ->assertJsonPath('profile.accent_color', '#F59E0B');
+
+        $this->assertSame('#7C3AED', $this->company->fresh()->primary_color);
+        $this->assertSame('#F59E0B', $this->company->fresh()->accent_color);
+
+        // The next bootstrap the app pulls must echo the new colour, so a
+        // background theme sync keeps (not reverts) the user's choice.
+        $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap?locale=en')
+            ->assertOk()
+            ->assertJsonPath('theme.primary_color', '#7C3AED');
+    }
+
+    public function test_profile_update_rejects_a_malformed_brand_colour(): void
+    {
+        $this->withToken($this->token())->putJson('/api/v1/pos/settings/profile', [
+            'name' => $this->company->name,
+            'primary_color' => 'purple',
+        ])->assertStatus(422);
+    }
+
     public function test_rejects_an_invalid_timezone_identifier(): void
     {
         $this->withToken($this->token())->putJson('/api/v1/pos/settings/profile', [

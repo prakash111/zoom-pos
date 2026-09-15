@@ -34,7 +34,7 @@ class DesktopAuthBootstrapService
 
     public function attemptOnlineBootstrap(string $identifier, string $password): ?User
     {
-        $baseUrl = rtrim(config('nativephp.website') ?: 'https://saas.zoomnearby.com', '/');
+        $baseUrl = rtrim(config('nativephp.website') ?: 'https://yourdomain.com', '/');
 
         try {
             $response = Http::baseUrl($baseUrl)
@@ -122,7 +122,7 @@ class DesktopAuthBootstrapService
      */
     public function registerOnline(array $payload): User
     {
-        $baseUrl = rtrim(config('nativephp.website') ?: 'https://saas.zoomnearby.com', '/');
+        $baseUrl = rtrim(config('nativephp.website') ?: 'https://yourdomain.com', '/');
 
         try {
             $response = Http::baseUrl($baseUrl)

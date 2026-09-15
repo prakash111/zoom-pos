@@ -76,10 +76,15 @@
                     const key = String(section?.key || '').trim();
                     if (!key) return [];
 
+                    const items = normalizeNodes(section.items, 0);
+                    const customTitle = String(section?.custom_title || '').trim()
+                        || String(items[0]?.label || key).trim();
+
                     return [{
                         key,
                         label: section.label || key,
-                        items: normalizeNodes(section.items, 0),
+                        custom_title: customTitle,
+                        items,
                     }];
                 });
             },
@@ -419,6 +424,8 @@
                     nextSections.push({
                         key: existingSection.key,
                         label: existingSection.label,
+                        custom_title: String(existingSection.custom_title || '').trim()
+                            || String(roots[0]?.label || existingSection.label || existingSection.key).trim(),
                         items: roots,
                     });
                 });
@@ -454,15 +461,24 @@
                         return node;
                     });
 
+                    const customTitle = String(section.custom_title || '').trim()
+                        || String(section.items?.[0]?.label || section.label || section.key).trim();
+                    section.custom_title = customTitle;
+
                     return {
                         key: section.key,
                         order: sectionOrder,
+                        custom_title: customTitle,
                         items: serializeNodes(section.items || [], null, 0),
                     };
                 });
 
                 return {
-                    sections: tree.map((section) => ({ key: section.key, order: section.order })),
+                    sections: tree.map((section) => ({
+                        key: section.key,
+                        order: section.order,
+                        custom_title: section.custom_title,
+                    })),
                     items,
                     tree,
                 };

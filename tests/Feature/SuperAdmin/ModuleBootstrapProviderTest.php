@@ -38,6 +38,7 @@ class ModuleBootstrapProviderTest extends TestCase
             'key' => 'bootmod',
             'name' => 'Boot Module',
             'version' => '1.0.0',
+            'requires_license' => false,
             'navigation' => [[
                 'key' => 'bootmod_section',
                 'title' => 'Boot Module',

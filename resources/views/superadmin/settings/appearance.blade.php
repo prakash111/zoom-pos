@@ -201,9 +201,27 @@
         </div>
 
         <!-- Theme Grid Selector Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1">
-            
-            <!-- Theme 1: Modern SaaS / Cloud POS (Default) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 pt-1">
+
+            <!-- Theme 0: Fast / Lightweight (Default) -->
+            <div wire:click="setLandingTheme('theme_fast')"
+                 class="cursor-pointer relative p-3.5 rounded-2xl border-2 transition-all duration-150 flex flex-col justify-between
+                 {{ $landingTheme === 'theme_fast'
+                     ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm ring-2 ring-blue-500/20'
+                     : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700' }}">
+                <div class="flex items-start justify-between">
+                    <div class="p-2 rounded-xl bg-lime-100/60 dark:bg-lime-900/40 text-lime-600 text-lg">⚡</div>
+                    @if($landingTheme === 'theme_fast')
+                        <span class="text-blue-600 dark:text-blue-400 font-bold text-sm">✓</span>
+                    @endif
+                </div>
+                <div class="mt-3">
+                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Fast &amp; Lightweight</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">Flat design, ~30&nbsp;KB CSS, no framework JS — best load speed</div>
+                </div>
+            </div>
+
+            <!-- Theme 1: Modern SaaS / Cloud POS -->
             <div wire:click="setLandingTheme('theme_modern')"
                  class="cursor-pointer relative p-3.5 rounded-2xl border-2 transition-all duration-150 flex flex-col justify-between
                  {{ $landingTheme === 'theme_modern' 

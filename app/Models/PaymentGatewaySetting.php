@@ -12,8 +12,8 @@ class PaymentGatewaySetting extends Model
     {
         return [
             'enabled' => 'boolean',
-            'secret_key' => 'encrypted',
-            'webhook_secret' => 'encrypted',
+            'secret_key' => \App\Casts\SafeEncryptedString::class,
+            'webhook_secret' => \App\Casts\SafeEncryptedString::class,
             'extra' => 'array',
         ];
     }

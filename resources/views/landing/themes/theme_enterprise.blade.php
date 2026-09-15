@@ -56,6 +56,8 @@
                     </button>
                 </div>
 
+                <x-landing.download-buttons :branding="$branding" class="mt-6 justify-center" />
+
                 <!-- Live Metrics Bar -->
                 <div class="mt-12 pt-8 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-4 text-left">
                     <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">

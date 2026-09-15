@@ -107,7 +107,7 @@ class InvoiceDeliveryService
             'username' => $username,
             'password' => $password,
             'encryption' => $encryption,
-            'from_address' => $fromAddress ?: 'no-reply@saas.zoomnearby.com',
+            'from_address' => $fromAddress ?: 'no-reply@example.com',
             'from_name' => $fromName ?: 'Store',
         ];
     }
@@ -195,11 +195,11 @@ class InvoiceDeliveryService
                 'company' => $company,
                 'logoBase64' => $logoBase64,
             ])->setPaper('a4', 'portrait')
-              ->setOptions([
-                  'isHtml5ParserEnabled' => true,
-                  'isRemoteEnabled' => true,
-                  'defaultFont' => 'sans-serif',
-              ]);
+                ->setOptions([
+                    'isHtml5ParserEnabled' => true,
+                    'isRemoteEnabled' => true,
+                    'defaultFont' => 'sans-serif',
+                ]);
 
             return $pdf->output();
         } finally {
@@ -241,11 +241,11 @@ class InvoiceDeliveryService
                     'logoBase64' => $logoBase64,
                     ...$this->devanagariFontData(),
                 ])->setPaper('a4', 'portrait')
-                  ->setOptions([
-                      'isHtml5ParserEnabled' => true,
-                      'isRemoteEnabled' => true,
-                      'defaultFont' => 'sans-serif',
-                  ]);
+                    ->setOptions([
+                        'isHtml5ParserEnabled' => true,
+                        'isRemoteEnabled' => true,
+                        'defaultFont' => 'sans-serif',
+                    ]);
 
                 return $pdf->output();
             }
@@ -682,7 +682,7 @@ class InvoiceDeliveryService
         $customerName = $sale->customer_name ?: 'Valued Customer';
         $currency = $company?->currency ?? 'USD';
         $sym = $company?->currency_symbol ?: ($currency === 'INR' ? '₹' : '$');
-        $isIndia = in_array(strtoupper(trim((string)($company?->country ?? ''))), ['IN', 'IND', 'INDIA'], true) || $currency === 'INR' || $sym === '₹';
+        $isIndia = in_array(strtoupper(trim((string) ($company?->country ?? ''))), ['IN', 'IND', 'INDIA'], true) || $currency === 'INR' || $sym === '₹';
         $taxLabel = $isIndia ? 'GSTIN' : 'Tax ID';
 
         $itemsText = '';
@@ -695,15 +695,15 @@ class InvoiceDeliveryService
 
         $subtotal = number_format((float) ($sale->total - ($sale->tax_amount ?? 0) + $sale->discount), 2);
         $discountText = $sale->discount > 0 ? "\n*Discount:* -{$sym}".number_format((float) $sale->discount, 2) : '';
-        $taxText = (float)($sale->tax_amount ?? 0) > 0 ? "\n*".($isIndia ? 'GST' : 'Tax').":* +{$sym}".number_format((float) $sale->tax_amount, 2) : '';
+        $taxText = (float) ($sale->tax_amount ?? 0) > 0 ? "\n*".($isIndia ? 'GST' : 'Tax').":* +{$sym}".number_format((float) $sale->tax_amount, 2) : '';
         $total = number_format((float) $sale->total, 2);
         $date = $sale->created_at ? $sale->created_at->format('d M Y, h:i A') : now()->format('d M Y, h:i A');
         $publicLink = route('sales.public', $sale->sale_number);
-        $taxIdLine = !empty($company?->tax_id) ? "*{$taxLabel}:* {$company->tax_id}\n" : '';
+        $taxIdLine = ! empty($company?->tax_id) ? "*{$taxLabel}:* {$company->tax_id}\n" : '';
 
-        return "🧾 *" . ($isIndia ? 'TAX INVOICE / GST RECEIPT' : 'TAX INVOICE RECEIPT') . "*\n"
+        return '🧾 *'.($isIndia ? 'TAX INVOICE / GST RECEIPT' : 'TAX INVOICE RECEIPT')."*\n"
             ."*Store:* {$companyName}\n"
-            . $taxIdLine
+            .$taxIdLine
             ."*Invoice:* #{$sale->sale_number}\n"
             ."*Date:* {$date}\n"
             ."*Customer:* {$customerName}\n\n"

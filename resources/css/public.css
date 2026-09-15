@@ -1,0 +1,156 @@
+/* ==========================================================================
+   Public marketing site stylesheet.
+
+   Scoped Tailwind build for the landing themes, CMS pages and the shared
+   public layout ONLY. The authenticated app ships the full `app.css`
+   (~277 KB); a visitor on `/` should never pay for the POS / dashboard
+   utilities they will never see. Keeping the @source globs tight here is
+   what makes this bundle small (~30 KB) — do not widen them to `views/**`.
+   ========================================================================== */
+
+/* `source(none)` disables Tailwind v4's automatic whole-project content
+   detection — without it this bundle scans every Blade file in the app and
+   ends up the same size as app.css. Only the files listed below are scanned:
+   the fast theme + the shared public chrome. The four legacy themes
+   (theme_modern / _enterprise / _minimal / _dark_studio) keep using the full
+   app.css — layouts/public.blade.php picks the bundle per active theme. */
+@import 'tailwindcss' source(none);
+@plugin '@tailwindcss/forms';
+
+@source '../views/layouts/public.blade.php';
+@source '../views/landing/themes/theme_fast.blade.php';
+@source '../views/components/landing/contact-form.blade.php';
+@source '../views/components/landing/download-buttons.blade.php';
+@source '../views/public/**/*.blade.php';
+
+/* Class-based dark mode (toggled via localStorage + <html class="dark">). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+    /* Marketing brand palette — bold ink + lime accent, pastel icon tints.
+       Mirrors the marketing tokens in resources/css/app.css. */
+    --color-brand-ink: #14161f;
+    --color-brand-lime: #d7f24e;
+    --color-brand-lime-dark: #bfda36;
+    --color-brand-emerald: #10b981;
+    --color-brand-teal: #14b8a6;
+    --color-brand-lavender: #e2dcfb;
+    --color-brand-lavender-ink: #6d5bd0;
+    --color-brand-butter: #fdf0c4;
+    --color-brand-butter-ink: #b6890a;
+    --color-brand-mint: #d9f2e6;
+    --color-brand-mint-ink: #10916b;
+}
+
+/* This site must render correctly with no network beyond the page itself —
+   no Google Fonts, no icon CDN. Use the OS-native font stack: zero bytes
+   shipped, zero round trips, instant first paint. */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        ui-sans-serif, system-ui, Helvetica, Arial, sans-serif;
+}
+
+html {
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    overflow-x: clip;
+}
+
+img, svg, video, canvas {
+    max-width: 100%;
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+:where(button, a, input, select, textarea, [role='button']):focus-visible {
+    outline: 2px solid color-mix(in srgb, #2563eb 82%, white);
+    outline-offset: 2px;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* CMS page body (TinyMCE-authored content injected via {!! clean_html() !!}). */
+.page-content :where(h1, h2, h3, h4) { font-weight: 800; letter-spacing: -0.02em; margin: 1.5em 0 0.5em; }
+.page-content h1 { font-size: 2rem; }
+.page-content h2 { font-size: 1.625rem; }
+.page-content h3 { font-size: 1.25rem; }
+.page-content p { margin: 1em 0; line-height: 1.75; }
+.page-content ul, .page-content ol { margin: 1em 0; padding-inline-start: 1.5em; }
+.page-content li { margin: 0.35em 0; }
+.page-content a { color: var(--color-brand-emerald); text-decoration: underline; }
+.page-content img { border-radius: 1rem; max-width: 100%; height: auto; }
+.page-content table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+.page-content td, .page-content th { border: 1px solid rgb(226 232 240); padding: 0.5em 0.75em; }
+html.dark .page-content td, html.dark .page-content th { border-color: rgb(51 65 85); }
+
+/* Paint & scroll performance: sections past the first viewport are not
+   rendered until the user scrolls near them, with reserved height so the
+   scrollbar doesn't jump. */
+.public-site main > :nth-child(n + 3) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 720px;
+}
+
+@keyframes float-slow {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+}
+.animate-float-slow {
+    animation: float-slow 6s ease-in-out infinite;
+}
+
+/* SPA navigation progress bar (NProgress, driven by public-navigation.js). */
+#nprogress { pointer-events: none; }
+#nprogress .bar {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 3px;
+    z-index: 100000;
+    background: linear-gradient(90deg, #10b981, #d7f24e);
+}
+#nprogress .peg {
+    display: block;
+    position: absolute;
+    right: 0;
+    width: 100px;
+    height: 100%;
+    box-shadow: 0 0 10px #10b981, 0 0 5px #d7f24e;
+    opacity: 1;
+    transform: rotate(3deg) translate(0, -4px);
+}
+
+/* Low-power / reduced-motion / small screens: drop the expensive full-screen
+   backdrop blurs and ambient orbs, and neutralise animation. */
+@media (max-width: 767px), (prefers-reduced-motion: reduce) {
+    .public-site *,
+    .public-site *::before,
+    .public-site *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    .public-site .landing-ambient {
+        display: none;
+    }
+    .public-site [class*='backdrop-blur'] {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html:focus-within { scroll-behavior: auto !important; }
+}

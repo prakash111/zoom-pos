@@ -24,7 +24,7 @@ class EnsureTenantPosMode
             return $next($request);
         }
 
-        if ($expectedMode === 'restaurant' && $company->isGeneralMode()) {
+        if ($expectedMode === 'restaurant' && ! $company->hasModule('restaurant') && $company->isGeneralMode()) {
             if ($request->wantsJson()) {
                 return response()->json([
                     'error' => 'Restaurant mode is currently disabled for your store.',
@@ -35,7 +35,7 @@ class EnsureTenantPosMode
                 ->with('error', '🍽️ Restaurant Mode is currently disabled. You can switch your Operating Mode to "Food & Restaurant" in Store Settings.');
         }
 
-        if ($expectedMode === 'general' && $company->isRestaurantMode()) {
+        if ($expectedMode === 'general' && ! $company->hasModule('retail') && $company->isRestaurantMode()) {
             if ($request->wantsJson()) {
                 return response()->json([
                     'error' => 'General retail POS is disabled while Food & Restaurant mode is active.',

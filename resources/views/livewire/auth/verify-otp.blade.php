@@ -1,14 +1,14 @@
-<div class="max-w-xl mx-auto rounded-3xl bg-slate-900/90 backdrop-blur-xl border border-white/15 p-7 sm:p-9 shadow-2xl space-y-6">
+<div class="max-w-xl mx-auto rounded-3xl bg-slate-50 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-300 dark:border-white/15 p-7 sm:p-9 shadow-2xl space-y-6">
     
     <!-- Card Header with Lock & Shield Badge -->
-    <div class="border-b border-white/10 pb-4">
+    <div class="border-b border-slate-200 dark:border-white/10 pb-4">
         <div class="flex items-center gap-2">
-            <h1 class="text-2xl sm:text-3xl font-black text-white tracking-tight">{{ __('Verify Your Account') }}</h1>
+            <h1 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">{{ __('Verify Your Account') }}</h1>
             <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-brand-lime/10 text-brand-lime text-[10px] font-bold border border-brand-lime/20">
                 🔒 {{ __('Email OTP') }}
             </span>
         </div>
-        <p class="text-xs text-slate-400 mt-1">
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {{ __('Please enter the 6-digit verification code sent to') }} <span class="font-bold text-brand-lime">{{ $userEmail }}</span> {{ __('to access your dashboard.') }}
         </p>
     </div>
@@ -36,8 +36,8 @@
     <!-- OTP Input Form -->
     <div class="space-y-4">
         <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-300 mb-1 text-center">{{ __('Enter 6-Digit Code *') }}</label>
-            <div class="relative flex items-center rounded-2xl border border-white/10 bg-white/5 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition max-w-xs mx-auto">
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1 text-center">{{ __('Enter 6-Digit Code *') }}</label>
+            <div class="relative flex items-center rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 overflow-hidden focus-within:ring-2 focus-within:ring-brand-lime transition max-w-xs mx-auto">
                 <input type="text"
                        wire:model="otp"
                        wire:keydown.enter="verify"
@@ -53,7 +53,7 @@
             <button type="button"
                     wire:click="resend"
                     wire:loading.attr="disabled"
-                    class="text-xs font-bold text-slate-400 hover:text-brand-lime transition inline-flex items-center gap-1 cursor-pointer">
+                    class="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-brand-lime transition inline-flex items-center gap-1 cursor-pointer">
                 <span>🔄 {{ __('Didn\'t receive code? Resend Code') }}</span>
             </button>
         </div>
@@ -77,8 +77,8 @@
     </div>
 
     <!-- Log Out link -->
-    <div class="pt-4 border-t border-white/10 text-center">
-        <button type="button" wire:click="logout" class="text-xs font-bold text-slate-400 hover:text-rose-400 transition inline-flex items-center gap-1 cursor-pointer">
+    <div class="pt-4 border-t border-slate-200 dark:border-white/10 text-center">
+        <button type="button" wire:click="logout" class="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-rose-400 transition inline-flex items-center gap-1 cursor-pointer">
             <span>← {{ __('Log Out & Sign in with different account') }}</span>
         </button>
     </div>

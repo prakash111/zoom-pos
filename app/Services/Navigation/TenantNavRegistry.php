@@ -3,8 +3,12 @@
 namespace App\Services\Navigation;
 
 use App\Models\Company;
+use App\Models\SduiModule;
 use App\Services\Modular\ModuleRegistry;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * The nav tree for the tenant sidebar/drawer and mobile client,
@@ -13,6 +17,14 @@ use Illuminate\Support\Facades\Log;
  */
 class TenantNavRegistry
 {
+    /**
+     * The primary, mutually-exclusive business verticals. A store selects one
+     * of these at registration; a tenant with an explicit licensed_modules
+     * whitelist is never shown the nav for a primary vertical it did not pick.
+     * Keyed by canonical mode id (see ModuleRegistry::canonicalKey()).
+     */
+    private const PRIMARY_VERTICALS = ['retail', 'restaurant', 'pharmacy', 'service_booking', 'repair_technician'];
+
     /**
      * Resolve all normalized active and licensed modes for a tenant.
      *
@@ -46,10 +58,13 @@ class TenantNavRegistry
         foreach ($modes as $item) {
             if (is_string($item)) {
                 $norm = strtolower(trim($item));
+                $norm = ModuleRegistry::canonicalKey($norm);
                 $norm = match ($norm) {
                     'general', 'general_retail' => 'retail',
                     'food_restaurant' => 'restaurant',
-                    'repair', 'repairs', 'technician', 'repair_technician' => 'repair_technician',
+                    'repair', 'repairs', 'technician', 'repair_technician', 'repairtechnician' => 'repair_technician',
+                    'salon', 'service_booking' => 'service_booking',
+                    'lead', 'leads', 'lead_management' => 'leadmanagement',
                     default => $norm,
                 };
                 if ($norm !== '') {
@@ -88,7 +103,22 @@ class TenantNavRegistry
             }
         }
 
-        $filterItems = function (array $items) use (&$filterItems, $isRepair, $isSalon): array {
+        $hasModuleWhitelist = $tenant instanceof Company && ! empty($tenant->licensed_modules);
+        $isLeadManagement = false;
+        foreach ($modes as $m) {
+            if (in_array($m, ['leadmanagement', 'lead_management', 'leads'], true)) {
+                $isLeadManagement = true;
+                break;
+            }
+        }
+        if (! $isLeadManagement && $tenant instanceof Company) {
+            $isLeadManagement = $tenant->hasModule('leadmanagement') || $tenant->hasModule('lead_management') || $tenant->hasModule('leads');
+        }
+        if (! $isLeadManagement && ! $hasModuleWhitelist) {
+            $isLeadManagement = ModuleRegistry::isActive('leadmanagement');
+        }
+
+        $filterItems = function (array $items, string $currentSecKey = '') use (&$filterItems, $isRepair, $isSalon, $isLeadManagement): array {
             $filtered = [];
             foreach ($items as $item) {
                 if (! is_array($item)) {
@@ -98,6 +128,36 @@ class TenantNavRegistry
                 $component = strtolower(trim((string) ($item['component'] ?? '')));
                 $target = strtolower(trim((string) ($item['target_endpoint'] ?? '')));
                 $title = strtolower(trim((string) ($item['title'] ?? $item['label'] ?? '')));
+
+                // Lead Management is a separate vertical module (lead_ops) and must NEVER be mixed inside core cashier/sales or other sections
+                if ($currentSecKey !== 'lead_ops' && (
+                    $key === 'lead_management'
+                    || $key === 'leads'
+                    || str_starts_with($key, 'lead_')
+                    || $component === 'lead_management'
+                    || $component === 'leads'
+                    || str_starts_with($component, 'lead_')
+                    || $target === '/api/tenant/views/leads'
+                    || $target === '/tenant/views/leads'
+                    || str_starts_with($target, '/api/tenant/lead-module')
+                    || str_contains($key, 'lead')
+                    || str_contains($title, 'lead')
+                )) {
+                    continue;
+                }
+
+                // If tenant does not license Lead Management, strip any lead items anywhere
+                if (! $isLeadManagement) {
+                    if ($key === 'lead_management'
+                        || str_starts_with($key, 'lead_')
+                        || $component === 'lead_management'
+                        || str_starts_with($component, 'lead_')
+                        || str_starts_with($target, '/api/tenant/lead-module')
+                        || $target === '/api/tenant/views/leads'
+                    ) {
+                        continue;
+                    }
+                }
 
                 // Service orders (equipment/warranty repair tickets) are strictly gated to repair workbenches
                 if (! $isRepair) {
@@ -110,8 +170,8 @@ class TenantNavRegistry
                     }
                 }
 
-                // In salon/spa modes, strip any repair tickets or equipment intake
-                if ($isSalon) {
+                // In salon/spa modes, strip any repair tickets or equipment intake only if tenant does not license repair
+                if ($isSalon && ! $isRepair) {
                     if (in_array($key, ['service_orders', 'repair_tickets', 'repair_create_ticket', 'repair_dashboard', 'repair_my_jobs', 'repair_detail'], true)
                         || in_array($component, ['service_orders', 'repair_tickets', 'repair_create_ticket', 'repair_dashboard'], true)
                         || in_array($title, ['service orders', 'repair ticket register', 'new intake ticket', 'repair workbench'], true)) {
@@ -120,7 +180,7 @@ class TenantNavRegistry
                 }
 
                 if (! empty($item['children']) && is_array($item['children'])) {
-                    $item['children'] = $filterItems($item['children']);
+                    $item['children'] = $filterItems($item['children'], $currentSecKey);
                 }
 
                 $filtered[] = $item;
@@ -135,11 +195,14 @@ class TenantNavRegistry
                 continue;
             }
             $secKey = strtolower(trim((string) ($section['key'] ?? $section['id'] ?? '')));
-            if ($isSalon && in_array($secKey, ['repair_operations', 'repair_service', 'spare_parts_inventory'], true)) {
+            if ($isSalon && ! $isRepair && in_array($secKey, ['repair_operations', 'repair_service', 'spare_parts_inventory'], true)) {
+                continue;
+            }
+            if (! $isLeadManagement && ($secKey === 'lead_ops' || str_starts_with($secKey, 'lead_'))) {
                 continue;
             }
             if (isset($section['items']) && is_array($section['items'])) {
-                $section['items'] = $filterItems($section['items']);
+                $section['items'] = $filterItems($section['items'], $secKey);
             }
             if (empty($section['items']) && ! in_array($secKey, ['administration', 'settings'], true)) {
                 continue;
@@ -173,17 +236,26 @@ class TenantNavRegistry
             if (! empty($custom)) {
                 $sections = array_values(array_map([self::class, 'normalizeSection'], $custom));
                 $sections = self::filterDomainMismatches($sections, $tenant);
-                return self::applyNavigationLabels($sections, $labels);
+
+                return self::withActionableSectionParents(
+                    self::applyNavigationLabels($sections, $labels)
+                );
             }
         } elseif (is_object($tenant) && ! empty($tenant->navigation_menu_customization)) {
             $sections = array_values(array_map([self::class, 'normalizeSection'], (array) $tenant->navigation_menu_customization));
             $sections = self::filterDomainMismatches($sections, $tenant);
-            return self::applyNavigationLabels($sections, $labels);
+
+            return self::withActionableSectionParents(
+                self::applyNavigationLabels($sections, $labels)
+            );
         }
 
         $sections = self::getBaseNavSectionsForTenant($tenant);
         $sections = self::filterDomainMismatches($sections, $tenant);
-        return self::applyNavigationLabels($sections, $labels);
+
+        return self::withActionableSectionParents(
+            self::applyNavigationLabels($sections, $labels)
+        );
     }
 
     /**
@@ -199,6 +271,15 @@ class TenantNavRegistry
         $sections = [];
 
         // Determine licensed modules
+        //
+        // $hasModuleWhitelist marks a tenant that carries an *explicit*
+        // licensed_modules list (self-registration stores exactly the vertical
+        // picked at signup, e.g. ['pharmacy']). Such a tenant must not be
+        // shown the nav for another primary vertical it never chose. Tenants
+        // without a whitelist keep the legacy "active package is visible to
+        // everyone" behaviour.
+        $hasModuleWhitelist = $tenant instanceof Company && ! empty($tenant->licensed_modules);
+
         if ($tenant instanceof Company) {
             $licensedRaw = $tenant->licensed_modules;
             if (empty($licensedRaw)) {
@@ -214,10 +295,13 @@ class TenantNavRegistry
         foreach ((array) $licensedRaw as $item) {
             if (is_string($item)) {
                 $norm = strtolower(trim($item));
+                $norm = ModuleRegistry::canonicalKey($norm);
                 $norm = match ($norm) {
                     'general', 'general_retail' => 'retail',
                     'food_restaurant' => 'restaurant',
-                    'repair', 'repairs', 'technician', 'repair_technician' => 'repair_technician',
+                    'repair', 'repairs', 'technician', 'repair_technician', 'repairtechnician' => 'repair_technician',
+                    'salon', 'service_booking' => 'service_booking',
+                    'lead', 'leads', 'lead_management' => 'leadmanagement',
                     default => $norm,
                 };
                 if ($norm !== '') {
@@ -299,9 +383,9 @@ class TenantNavRegistry
         }
 
         // 7. Active Package Modules (Perfex CRM pattern)
-        if (\Illuminate\Support\Facades\Schema::hasTable('sdui_modules')) {
+        if (Schema::hasTable('sdui_modules')) {
             try {
-                $activePackageModules = \App\Models\SduiModule::query()
+                $activePackageModules = SduiModule::query()
                     ->where('is_active', true)
                     ->where('source_type', 'package')
                     ->orderBy('sort_order')
@@ -309,10 +393,61 @@ class TenantNavRegistry
 
                 foreach ($activePackageModules as $pkgModule) {
                     $pkgSlug = $pkgModule->slug;
+
+                    // A package row can be flagged active in the DB while its
+                    // files never landed under modules/<key>/ (fresh deploy,
+                    // half-finished install, seeded row). Its routes are then
+                    // NOT registered by ModuleServiceProvider, so injecting its
+                    // navigation only produces "route ... could not be found"
+                    // 404s (e.g. /api/tenant/repair-module/views/tickets). Skip
+                    // it — the built-in vertical section already covers the
+                    // licensed mode with working /api/tenant/views/* endpoints.
+                    if (! self::packageIsInstalledOnDisk($pkgModule)) {
+                        Log::warning('TenantNavRegistry: skipping nav for active package module without on-disk routes.', [
+                            'slug' => $pkgSlug,
+                            'package_path' => $pkgModule->package_path,
+                        ]);
+
+                        continue;
+                    }
+
+                    // The primary business verticals are mutually exclusive — a
+                    // store picks one at registration and licensed_modules
+                    // records it. An active vertical package must NOT be
+                    // injected into a whitelisted tenant that chose a different
+                    // one (a pharmacy store must not get salon/repair menus).
+                    // Additive third-party add-ons (not a known vertical) still
+                    // auto-hydrate for everyone, as do tenants with no explicit
+                    // whitelist. Slugs may be pre-alias ("salon",
+                    // "repairtechnician"), so match the canonical mode id too.
+                    $pkgMode = ModuleRegistry::canonicalKey($pkgSlug);
+                    if ($hasModuleWhitelist
+                        && ! in_array($pkgMode, $licensed, true)
+                        && ! in_array(strtolower(trim((string) $pkgSlug)), $licensed, true)) {
+                        continue;
+                    }
+
+                    $pkgNavKeys = [];
+                    if (is_array($pkgModule->navigation)) {
+                        foreach ($pkgModule->navigation as $pnSec) {
+                            if (! empty($pnSec['key'])) {
+                                $pkgNavKeys[] = $pnSec['key'];
+                            }
+                        }
+                    }
+
                     $alreadyAdded = false;
                     foreach ($sections as $sec) {
                         $secKey = $sec['key'] ?? $sec['id'] ?? '';
-                        if (str_starts_with($secKey, $pkgSlug) || $secKey === $pkgSlug) {
+                        if (
+                            str_starts_with($secKey, $pkgSlug)
+                            || str_starts_with($secKey, $pkgMode)
+                            || $secKey === $pkgSlug
+                            || $secKey === $pkgMode
+                            || in_array($secKey, $pkgNavKeys, true)
+                            || ($pkgMode === 'repair_technician' && str_starts_with($secKey, 'repair_'))
+                            || ($pkgMode === 'service_booking' && str_starts_with($secKey, 'salon_'))
+                        ) {
                             $alreadyAdded = true;
                             break;
                         }
@@ -329,6 +464,7 @@ class TenantNavRegistry
                                         $sections[] = self::normalizeSection($sec);
                                     }
                                 }
+
                                 continue;
                             }
                         }
@@ -368,7 +504,22 @@ class TenantNavRegistry
      */
     public static function buildCustomNavTree(Company $company): ?array
     {
-        $raw = $company->nav_config ?? $company->navigation_menu_customization;
+        $raw = null;
+        if (\Illuminate\Support\Facades\Schema::hasTable('tenant_settings')) {
+            $customSetting = \Illuminate\Support\Facades\DB::table('tenant_settings')
+                ->where('tenant_id', $company->id)
+                ->where('key', 'navigation_menu_custom')
+                ->value('value');
+            if (! empty($customSetting)) {
+                $decoded = json_decode($customSetting, true);
+                if (is_array($decoded) && ! empty($decoded)) {
+                    $raw = $decoded;
+                }
+            }
+        }
+        if (empty($raw)) {
+            $raw = $company->nav_config ?? $company->navigation_menu_customization;
+        }
         if (! is_array($raw) || empty($raw)) {
             return null;
         }
@@ -381,6 +532,11 @@ class TenantNavRegistry
         } elseif (! empty($raw['items']) && is_array($raw['items'])) {
             $normalized = app(TenantNavigationConfigService::class)->normalize($raw);
             $tree = $normalized['tree'] ?? null;
+        } elseif (isset($raw[0]['key']) && isset($raw[0]['items'])) {
+            $tree = $raw;
+        } elseif (! empty($raw['sections']) && is_array($raw['sections'])) {
+            $normalized = app(TenantNavigationConfigService::class)->normalize($raw);
+            $tree = $normalized['tree'] ?? $raw['sections'];
         }
 
         if (empty($tree)) {
@@ -447,15 +603,27 @@ class TenantNavRegistry
             $decorated['target_endpoint'] = $meta['target_endpoint'] ?? ('/api/tenant/views/'.str_replace('_', '-', $k));
             $decorated['permission'] = $meta['permission'] ?? null;
 
-            if ($parentId !== null) {
+            // Store Settings must always be an independent root item (never nested under subscription)
+            if ($k === 'settings') {
+                $parentId = null;
+            }
+
+            if ($parentId !== null && $k !== 'settings') {
                 $decorated['parent'] = $parentId;
                 $decorated['parent_id'] = $parentId;
                 $decorated['type'] = 'link';
+            } else {
+                $decorated['parent'] = null;
+                $decorated['parent_id'] = null;
             }
 
             $children = [];
             foreach ($node['children'] ?? [] as $child) {
                 if (is_array($child)) {
+                    $childKey = trim((string) ($child['key'] ?? $child['id'] ?? ''));
+                    if ($childKey === 'settings') {
+                        continue;
+                    }
                     $decChild = $decorateNode($child, $k);
                     if ($decChild !== null) {
                         $children[] = $decChild;
@@ -492,21 +660,109 @@ class TenantNavRegistry
             ];
 
             $decoratedItems = [];
+            $extractedRoots = [];
+
             foreach ($treeSection['items'] ?? [] as $itemNode) {
                 if (is_array($itemNode)) {
-                    $dec = $decorateNode($itemNode, null);
+                    $extractSettings = function (array &$node) use (&$extractSettings, &$extractedRoots): void {
+                        if (! empty($node['children']) && is_array($node['children'])) {
+                            $cleanChildren = [];
+                            foreach ($node['children'] as $child) {
+                                if (is_array($child)) {
+                                    $ck = trim((string) ($child['key'] ?? $child['id'] ?? ''));
+                                    if ($ck === 'settings') {
+                                        $extractedRoots[] = $child;
+                                    } else {
+                                        $cleanChildren[] = $child;
+                                        $extractSettings($child);
+                                    }
+                                }
+                            }
+                            $node['children'] = $cleanChildren;
+                        }
+                    };
+                    $copyNode = $itemNode;
+                    $extractSettings($copyNode);
+                    $dec = $decorateNode($copyNode, null);
                     if ($dec !== null) {
                         $decoratedItems[] = $dec;
                     }
                 }
             }
 
+            foreach ($extractedRoots as $ext) {
+                $decExt = $decorateNode($ext, null);
+                if ($decExt !== null) {
+                    $decoratedItems[] = $decExt;
+                }
+            }
+
+            if ($secKey === 'cashier_sales') {
+                $decoratedItems = array_values(array_filter($decoratedItems, static function (array $item): bool {
+                    $itemKey = strtolower((string) ($item['key'] ?? ''));
+
+                    return $itemKey !== 'lead_management'
+                        && $itemKey !== 'leads'
+                        && ! str_starts_with($itemKey, 'lead_')
+                        && ! str_contains($itemKey, 'lead');
+                }));
+
+                $existingKeys = [];
+                $collectKeys = function (array $items) use (&$collectKeys, &$existingKeys): void {
+                    foreach ($items as $item) {
+                        if (! is_array($item)) {
+                            continue;
+                        }
+                        $existingKeys[] = $item['key'] ?? null;
+                        $collectKeys(is_array($item['children'] ?? null) ? $item['children'] : []);
+                    }
+                };
+                $collectKeys($decoratedItems);
+                foreach (['pos', 'sales', 'quotations', 'consignments', 'customers'] as $coreKey) {
+                    if (! in_array($coreKey, $existingKeys, true) && isset($catalogItems[$coreKey])) {
+                        $decoratedItems[] = $catalogItems[$coreKey];
+                    }
+                }
+            }
+
             if (! empty($decoratedItems)) {
+                $customTitle = trim((string) ($treeSection['custom_title'] ?? ''));
+                if ($customTitle === '') {
+                    $customTitle = trim((string) ($decoratedItems[0]['title'] ?? $decoratedItems[0]['label'] ?? ''));
+                }
                 $customSections[] = array_merge($meta, [
                     'id' => $secKey,
                     'key' => $secKey,
+                    'custom_title' => $customTitle,
                     'items' => $decoratedItems,
                 ]);
+            }
+        }
+
+        // Reconcile missing licensed sections: if any section from getBaseNavSectionsForTenant
+        // is missing from customSections (e.g. newly enabled/licensed modules), inject them before administration.
+        $existingKeys = array_column($customSections, 'key');
+        $missingSections = [];
+        foreach ($baseSections as $bSec) {
+            $bKey = trim((string) ($bSec['key'] ?? $bSec['id'] ?? ''));
+            if ($bKey !== '' && $bKey !== 'administration' && ! in_array($bKey, $existingKeys, true)) {
+                $missingSections[] = $bSec;
+                $existingKeys[] = $bKey;
+            }
+        }
+
+        if (! empty($missingSections)) {
+            $adminIndex = null;
+            foreach ($customSections as $idx => $cs) {
+                if (($cs['key'] ?? $cs['id'] ?? '') === 'administration') {
+                    $adminIndex = $idx;
+                    break;
+                }
+            }
+            if ($adminIndex !== null) {
+                array_splice($customSections, $adminIndex, 0, $missingSections);
+            } else {
+                $customSections = array_merge($customSections, $missingSections);
             }
         }
 
@@ -1154,7 +1410,9 @@ class TenantNavRegistry
         if (is_bool($isRestaurantOrMode)) {
             $raw = $isRestaurantOrMode ? self::restaurantSections() : self::retailSections();
 
-            return array_values(array_map([self::class, 'normalizeSection'], $raw));
+            return self::withActionableSectionParents(
+                array_values(array_map([self::class, 'normalizeSection'], $raw))
+            );
         }
 
         $mode = strtolower(trim((string) $isRestaurantOrMode));
@@ -1196,7 +1454,9 @@ class TenantNavRegistry
 
         $normalized = array_values(array_map([self::class, 'normalizeSection'], $sections));
 
-        return self::filterDomainMismatches($normalized, $isRestaurantOrMode);
+        return self::withActionableSectionParents(
+            self::filterDomainMismatches($normalized, $isRestaurantOrMode)
+        );
     }
 
     /**
@@ -1207,6 +1467,87 @@ class TenantNavRegistry
     public static function menuStructureForMode(string $mode): array
     {
         return self::getEffectiveNavForTenant($mode);
+    }
+
+    /**
+     * Add the cross-client section-parent contract after permissions, tenant
+     * ordering, domain filtering, and custom labels have all been resolved.
+     * The legacy `items` list remains intact for older clients.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @return list<array<string, mixed>>
+     */
+    public static function withActionableSectionParents(array $sections): array
+    {
+        return array_values(array_map(function (array $section): array {
+            $items = array_values(array_filter(
+                $section['items'] ?? [],
+                static fn ($item): bool => is_array($item)
+            ));
+
+            $asActionableItem = static function (array $item): array {
+                $route = trim((string) ($item['route'] ?? $item['target_endpoint'] ?? $item['endpoint'] ?? ''));
+                if ($route === '') {
+                    return $item;
+                }
+
+                return array_merge($item, [
+                    'type' => 'list_tile',
+                    'route' => $route,
+                    'target_endpoint' => $route,
+                    'action_type' => 'NAVIGATE_TO',
+                    'action' => [
+                        'type' => 'NAVIGATE_TO',
+                        'action_type' => 'NAVIGATE_TO',
+                        'route' => $route,
+                        'endpoint' => $route,
+                    ],
+                ]);
+            };
+
+            $firstItem = isset($items[0]) ? $asActionableItem($items[0]) : null;
+            if ($firstItem !== null) {
+                $firstItem['type'] = 'list_tile';
+                $firstItem['style'] = array_merge([
+                    'fontWeight' => 'bold',
+                    'textColor' => '#F97316',
+                ], (array) ($firstItem['style'] ?? []));
+            }
+
+            $subItems = array_map($asActionableItem, array_slice($items, 1));
+            $firstRoute = $firstItem ? ($firstItem['route'] ?? $firstItem['target_endpoint'] ?? '') : '';
+            $firstIcon = $firstItem['icon'] ?? ($section['icon'] ?? 'folder');
+
+            return array_merge($section, [
+                'type' => 'list_tile',
+                'action_type' => 'NAVIGATE_TO',
+                'route' => $firstRoute,
+                'target_endpoint' => $firstRoute,
+                'icon' => $firstIcon,
+                'style' => [
+                    'fontWeight' => 'bold',
+                    'textColor' => '#F97316',
+                ],
+                'action' => [
+                    'type' => 'NAVIGATE_TO',
+                    'action_type' => 'NAVIGATE_TO',
+                    'route' => $firstRoute,
+                    'endpoint' => $firstRoute,
+                ],
+                'divider' => ['type' => 'divider'],
+                'top_divider' => ['type' => 'divider'],
+                'first_item' => $firstItem,
+                'sub_items' => array_values($subItems),
+                'show_top_divider' => true,
+                'divider_style' => [
+                    'color' => 'theme.divider',
+                    'alpha' => 0.12,
+                    'thickness' => 1,
+                    'horizontal_padding' => 16,
+                    'vertical_padding' => 8,
+                ],
+            ]);
+        }, $sections));
     }
 
     /**
@@ -1246,7 +1587,7 @@ class TenantNavRegistry
             $key = (string) ($item['key'] ?? $item['id'] ?? '');
             $id = (string) ($item['id'] ?? '');
             $component = (string) ($item['component'] ?? '');
-            $labelSlug = \Illuminate\Support\Str::snake(strtolower($item['label'] ?? ''));
+            $labelSlug = Str::snake(strtolower($item['label'] ?? ''));
             $candidates = array_unique(array_filter([$key, $id, $component, $labelSlug]));
             if ($key === 'repair_dashboard' || $key === 'repair_workbench') {
                 $candidates[] = 'repair_workbench';
@@ -1317,11 +1658,20 @@ class TenantNavRegistry
             }
         }
 
+        // The section heading is independent from its first actionable menu
+        // item. New tenants start with that first parent's name and can then
+        // rename only the heading without changing the parent's route label.
+        $customTitle = trim((string) ($section['custom_title'] ?? ''));
+        if ($customTitle === '' && isset($items[0])) {
+            $customTitle = trim((string) ($items[0]['title'] ?? $items[0]['label'] ?? ''));
+        }
+
         return array_merge($section, [
             'id' => $key,
             'key' => $key,
             'title' => $title,
             'label' => $title,
+            'custom_title' => $customTitle !== '' ? $customTitle : $title,
             'color' => $color,
             'items' => $items,
         ], self::collapsedFlags());
@@ -1415,6 +1765,36 @@ class TenantNavRegistry
      * @param  list<mixed>  $navigation
      * @return list<array<string, mixed>>|null
      */
+    /**
+     * True when a package module's files are physically present where
+     * {@see \App\Providers\ModuleServiceProvider::bootModule()} loads routes
+     * from — i.e. its endpoints will actually resolve. A DB row alone is not
+     * enough.
+     */
+    private static function packageIsInstalledOnDisk(SduiModule $module): bool
+    {
+        $path = trim((string) ($module->package_path ?: $module->slug));
+        if ($path === '') {
+            return false;
+        }
+
+        $base = base_path('modules/'.$path);
+        if (! File::isDirectory($base)) {
+            $base = base_path('module-packages/'.$path);
+            if (! File::isDirectory($base)) {
+                return false;
+            }
+        }
+
+        foreach (['routes.php', 'routes/api.php', 'routes/web.php', 'module.json'] as $marker) {
+            if (File::exists($base.'/'.$marker)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static function validatedCustomNavigation(array $navigation): ?array
     {
         $sections = [];
@@ -1469,11 +1849,11 @@ class TenantNavRegistry
             $key = trim((string) ($item['key'] ?? $item['id'] ?? ''));
             if ($key === '') {
                 if (! empty($item['title'])) {
-                    $key = \Illuminate\Support\Str::slug($item['title'], '_');
+                    $key = Str::slug($item['title'], '_');
                 } elseif (! empty($item['label'])) {
-                    $key = \Illuminate\Support\Str::slug($item['label'], '_');
+                    $key = Str::slug($item['label'], '_');
                 } elseif (! empty($item['route'])) {
-                    $key = \Illuminate\Support\Str::slug(basename($item['route']), '_');
+                    $key = Str::slug(basename($item['route']), '_');
                 }
             }
             if ($key === '' || isset($seen[$key])) {
@@ -1520,6 +1900,8 @@ class TenantNavRegistry
                 'color' => '#1d4ed8',
                 'items' => [
                     ['key' => 'pos', 'label' => 'Point of Sale', 'icon' => 'point_of_sale', 'component' => 'pos', 'permission' => 'pos'],
+                    ['key' => 'barcode_printing', 'label' => 'Barcode & Label Printing', 'icon' => 'qr_code', 'component' => 'inventory', 'permission' => 'products'],
+                    ['key' => 'batch_tracking', 'label' => 'Batch & Expiry Tracking', 'icon' => 'batch_prediction', 'component' => 'inventory', 'permission' => 'products'],
                     ['key' => 'sales', 'label' => 'Sales & Invoices', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales'],
                     ['key' => 'quotations', 'label' => 'Quotations & Proposals', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes'],
                     ['key' => 'consignments', 'label' => 'Consignments', 'icon' => 'local_shipping', 'component' => 'consignments', 'permission' => 'consignments'],
@@ -1576,6 +1958,9 @@ class TenantNavRegistry
                 'color' => '#0284c7',
                 'items' => [
                     ['key' => 'dining_history', 'label' => 'Dining & Sales History', 'icon' => 'receipt_long', 'component' => 'sales', 'permission' => 'sales'],
+                    ['key' => 'sales', 'label' => 'Sales & Invoices History', 'icon' => 'receipt', 'component' => 'sales', 'permission' => 'sales'],
+                    ['key' => 'quotations', 'label' => 'Quotations & Party Orders', 'icon' => 'description', 'component' => 'quotations', 'permission' => 'quotes'],
+                    ['key' => 'customers', 'label' => 'Customers & CRM', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers'],
                     ['key' => 'cash_register', 'label' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register'],
                 ],
             ],
@@ -1587,6 +1972,7 @@ class TenantNavRegistry
                     ['key' => 'due_receivables', 'label' => 'Accounts Receivable', 'icon' => 'notifications_active', 'component' => 'due_receivables', 'permission' => 'finance'],
                     ['key' => 'payables', 'label' => 'Accounts Payable', 'icon' => 'request_quote', 'component' => 'payables', 'permission' => 'finance'],
                     ['key' => 'reports', 'label' => 'Reports & Analytics', 'icon' => 'insights', 'component' => 'reports', 'permission' => 'reports'],
+                    ['key' => 'analytics', 'label' => 'Analytics', 'icon' => 'bar_chart', 'component' => 'analytics', 'permission' => 'reports'],
                 ],
             ],
             [
@@ -1876,6 +2262,35 @@ class TenantNavRegistry
                 'parent' => 'settings',
                 'parent_id' => 'settings',
                 'permission' => 'settings',
+            ],
+            [
+                // Per-device: light/dark theme, page-move animation, nav-dock
+                // placement. `component` resolves to the native
+                // AppPreferencesScreen on the desktop/mobile app; the
+                // target_endpoint is the graceful web fallback.
+                'key' => 'app_preferences',
+                'label' => 'App Preferences',
+                'title' => 'App Preferences',
+                'icon' => 'tune',
+                'component' => 'app_preferences',
+                'type' => 'link',
+                'target_endpoint' => '/api/tenant/views/settings-appearance',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => null,
+            ],
+            [
+                'key' => 'settings_audio_notifications',
+                'label' => 'Notifications & Audio Alerts',
+                'title' => 'Notifications & Audio Alerts',
+                'icon' => 'notifications_active',
+                'component' => 'notifications_audio',
+                'type' => 'link',
+                'route' => '/api/v1/tenant/settings/notifications-audio',
+                'target_endpoint' => '/api/v1/tenant/settings/notifications-audio',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => null,
             ],
         ];
     }

@@ -43,17 +43,42 @@ class ModuleServiceProvider extends ServiceProvider
 
             if (is_file($path)) {
                 require $path;
+                return;
+            }
+            if (is_file(base_path('module-packages/'.$relative))) {
+                require base_path('module-packages/'.$relative);
+                return;
+            }
+
+            // Fallback for case differences in module directory (e.g. LeadManagement vs leadmanagement)
+            $parts = explode('/', $relative, 2);
+            if (count($parts) === 2) {
+                $lowerRelative = strtolower($parts[0]).'/'.$parts[1];
+                if (is_file(base_path('modules/'.$lowerRelative))) {
+                    require base_path('modules/'.$lowerRelative);
+                    return;
+                }
+                if (is_file(base_path('module-packages/'.$lowerRelative))) {
+                    require base_path('module-packages/'.$lowerRelative);
+                    return;
+                }
             }
         });
     }
 
     public function boot(): void
     {
-        if (! Schema::hasTable('sdui_modules')) {
-            return;
-        }
-
         try {
+            // Schema::hasTable() itself opens a DB connection — on a fresh
+            // install (no database configured/migrated yet, e.g. before the
+            // /install wizard has run, or the DB is briefly unreachable) this
+            // throws rather than returning false, which would otherwise crash
+            // every single request app-wide (including /install itself) since
+            // this provider boots on every bootstrap, HTTP or console.
+            if (! Schema::hasTable('sdui_modules')) {
+                return;
+            }
+
             $activeModules = SduiModule::query()
                 ->where('source_type', 'package')
                 ->where('is_active', true)
@@ -84,7 +109,10 @@ class ModuleServiceProvider extends ServiceProvider
     {
         $base = base_path('modules/'.$packagePath);
         if ($packagePath === '' || ! is_dir($base)) {
-            return;
+            $base = base_path('module-packages/'.$packagePath);
+            if ($packagePath === '' || ! is_dir($base)) {
+                return;
+            }
         }
 
         $key = basename($packagePath);

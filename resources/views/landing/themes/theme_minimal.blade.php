@@ -46,6 +46,8 @@
             </a>
         </div>
 
+        <x-landing.download-buttons :branding="$branding" class="justify-center" />
+
         <div class="flex items-center justify-center gap-6 text-xs text-slate-500 font-medium">
             <span class="flex items-center gap-1.5"><strong class="text-slate-300">✓</strong> {{ __('Instant Access') }}</span>
             <span class="flex items-center gap-1.5"><strong class="text-slate-300">✓</strong> {{ __('Zero Setup Fees') }}</span>

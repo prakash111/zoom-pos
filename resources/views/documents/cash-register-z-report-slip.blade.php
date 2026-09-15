@@ -15,7 +15,7 @@
         $fontSize = $is58mm ? '11px' : '12.5px';
         $subSize = $is58mm ? '10px' : '11px';
         $platformName = $branding?->platform_name ?? config('app.name');
-        $platformUrl = config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'saas.zoomnearby.com';
+        $platformUrl = config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'yourdomain.com';
     @endphp
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }

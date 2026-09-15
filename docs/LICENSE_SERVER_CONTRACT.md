@@ -1,0 +1,251 @@
+# Custom License Server contract
+
+The `custom` license driver talks to a self-hosted license server — e.g.
+`https://license.zoomnearby.com`. That server is a separate application; this
+document is the contract the platform's client
+(`App\Services\License\CustomLicenseServerClient`) expects it to honour.
+
+The URL (`https://license.zoomnearby.com`) and `custom` driver are **hardcoded**
+in the SaaS `config/services.php`. Only `LICENSE_SERVER_SECRET` is set in `.env`
+(it must equal the server's `SERVER_SECRET`). There is no in-app screen for any
+of it. Verification is strict — an unreachable server or a non-2xx response is a
+failure, never a silent pass. (In tests the URL is blanked, and the client then
+only format-checks keys.)
+
+### Endpoint paths
+
+The SaaS client calls the PHP files **directly** so nothing needs URL rewriting:
+
+| Contract name (below) | Actual URL the SaaS calls |
+|---|---|
+| `POST /api/v1/license/verify` | `POST /api/verify.php` |
+| `POST /api/v1/license/issue` | `POST /api/issue.php` |
+| `POST /api/v1/module/download` | `POST /api/download.php` |
+| `GET /api/v1/catalog` | `GET /api/catalog.php` |
+
+The `/api/v1/...` forms are Apache-only aliases (`.htaccess`); a reference
+implementation only needs the `.php` files to answer.
+
+All requests send:
+
+```
+Content-Type: application/json
+Accept: application/json
+X-Server-Secret: <LICENSE_SERVER_SECRET>
+```
+
+Timeout: `LICENSE_SERVER_TIMEOUT` seconds (default 10).
+
+---
+
+## POST `/api/v1/license/verify`
+
+Called on module activation, on the SuperAdmin "Re-check license" button, and by
+the daily `license:check-status` job for every licensed module + the core
+product (`product_slug = "core"`).
+
+**Request body**
+
+```json
+{ "license_key": "…", "product_slug": "pharmacy", "domain": "acme.example.com" }
+```
+
+**200 response**
+
+```json
+{
+  "status": true,
+  "expires_at": "2027-01-01T00:00:00Z",   // ISO-8601, or null for a perpetual license
+  "message": "License valid for acme.example.com.",
+  "plan": "extended"                        // optional, free-form
+}
+```
+
+- `status: false` — key unknown, revoked, expired, or **domain-locked to a
+  different host**. Include a human `message`; the client shows it and, from the
+  daily job, deactivates the module immediately.
+- `401` — bad / missing `X-Server-Secret`.
+- `422` — malformed request.
+- Any non-200 or a transport error → the client treats it as
+  `status: false, message: "License server unreachable: …"`. The daily job
+  tolerates this for **3 consecutive days** (`license_module_<slug>_fail_streak`
+  in `platform_system`) before deactivating the module; a definitive
+  `status: false` deactivates on the first run.
+
+---
+
+## POST `/api/v1/license/issue`
+
+Called once, from the SuperAdmin "Buy Module" checkout, **after** the payment
+has been verified with the gateway.
+
+**Request body**
+
+```json
+{
+  "payment": {
+    "gateway": "razorpay",
+    "reference": "pay_XXXXXXXXXXXX",
+    "amount": 49.0,
+    "currency": "USD",
+    "payer_email": "owner@acme.example.com"
+  },
+  "product_slug": "pharmacy",
+  "domain": "acme.example.com",
+  "item_id": "codecanyon-or-internal-product-id"   // optional (module.json "buy_item_id")
+}
+```
+
+**200 response**
+
+```json
+{
+  "status": true,
+  "license_key": "PH-XXXX-XXXX-XXXX",
+  "expires_at": "2027-01-01T00:00:00Z",   // or null
+  "message": "License issued.",
+  "plan": "regular"
+}
+```
+
+- **Must be idempotent on `payment.reference`** — the platform may retry. A
+  repeat call for a reference that already issued returns the same
+  `license_key`.
+- `status: false` (or a missing `license_key`) → the platform keeps the payment
+  record under `platform_system` key `module_purchase_pending_<slug>` and shows
+  the SuperAdmin the payment reference to quote to support. The payment is never
+  dropped.
+- The platform immediately calls `/api/v1/license/verify` with the returned key;
+  it must pass for the domain in the request.
+
+---
+
+## POST `/api/v1/module/download`
+
+The module source files live **only** on the license server. The SaaS calls
+this to fetch a module's package after (or as part of) licensing it.
+
+**Request body** — same as `verify`: `{license_key, product_slug, domain}`.
+
+- License verifies → **`200` with the raw ZIP bytes**
+  (`Content-Type: application/zip`, `Content-Disposition: attachment`,
+  optional `X-License-Expires-At` header). The SaaS extracts it into
+  `modules/<slug>/` and installs.
+- License invalid / revoked / wrong domain → **`403`** JSON
+  `{status:false, message}`.
+- No package uploaded for that product yet → **`404`** JSON.
+- `401` bad secret, `422` bad body.
+
+The vendor uploads each product's ZIP on the License Manager admin →
+**Products** → *Module package (.zip)*; it is stored web-inaccessible under
+`storage/packages/<slug>.zip`.
+
+---
+
+## GET `/api/v1/catalog`
+
+Called by the SaaS Modules screen to list what the vendor sells.
+
+**200 response**
+
+```json
+{
+  "status": true,
+  "products": [
+    { "slug": "core", "name": "Main SaaS Script", "description": "…", "price": 199.0, "currency": "USD" },
+    { "slug": "pharmacy", "name": "Pharmacy POS Module", "description": "…", "price": 49.0, "currency": "USD" }
+  ]
+}
+```
+
+Only active products. `slug` must match the SaaS module key (`pharmacy`,
+`salon`, `repairtechnician`, …); `core` is the platform itself and is filtered
+out of the "Buy module" list. The client caches this for ~30 min.
+
+---
+
+## Hosted checkout → POST `https://<domain>/api/license/activate` (server → SaaS)
+
+The vendor hosts the checkout (`/buy.php` in the reference build). After the
+operator pays, the license server issues a key bound to `<domain>` and **pushes
+it to that install** so the module (or core) self-activates:
+
+```
+X-License-Signature: <hex hmac-sha256(raw_body, LICENSE_SERVER_SECRET)>
+```
+
+```json
+{
+  "product_slug": "pharmacy",
+  "license_key": "PH-XXXX-XXXX-XXXX",
+  "domain": "acme.example.com",
+  "expires_at": "2027-01-01T00:00:00Z",   // or null
+  "plan": null
+}
+```
+
+The SaaS (`LicenseActivationController`) verifies the HMAC and the domain, then:
+- `product_slug = "core"` → records the key in `storage/installed`, sets
+  `core_license_status = ok`.
+- an installed module → verifies + records the key and activates it if the
+  files are present.
+- a module whose ZIP is not uploaded yet → stashes the key
+  (`platform_system.license_pending_<slug>`); `ModulePackageService::install()`
+  applies it when the ZIP arrives.
+
+The receipt page also shows the key so the operator can paste it manually if the
+push failed.
+
+---
+
+## Optional: POST `<app>/api/v1/license/webhook` (server → platform)
+
+Not required — the daily poll already keeps state correct — but supported for
+faster propagation. If implemented, the license server calls the platform with:
+
+```
+X-License-Signature: <hex hmac-sha256(raw_body, LICENSE_SERVER_SECRET)>
+```
+
+```json
+{
+  "event": "revoked",                       // revoked | renewed | expired
+  "product_slug": "pharmacy",
+  "domain": "acme.example.com",
+  "license_key_prefix": "PH-XXXX-XX",       // first 10 chars, matches sdui_modules.license_key_prefix
+  "expires_at": "2028-01-01T00:00:00Z"      // for "renewed"
+}
+```
+
+The platform verifies the HMAC, finds the `sdui_modules` row by
+`license_key_prefix` + `product_slug`, and applies the same
+`clearLicense` / `deactivate` / re-activate logic as `license:check-status`.
+
+---
+
+## Reference implementation
+
+A ready-to-deploy implementation of this contract is generated by:
+
+```bash
+php scripts/build_license_server.php
+# -> storage/app/license-dist/license-manager-standalone.zip   (git-ignored)
+```
+
+The ZIP is a dependency-free PHP 8+ micro-app (`api/verify.php`, `api/issue.php`,
+a password-protected admin panel, `database/schema.sql`) meant to run on its own
+subdomain. Deploy it, import the schema, set `SERVER_SECRET` in
+`config/config.php`, and put that same value in the SaaS's `LICENSE_SERVER_SECRET`
+(the URL is already hardcoded). See the ZIP's `README.md` for the full runbook.
+
+## Semantics
+
+- **Domain lock.** A key is bound to one `domain`. `verify` for any other host
+  returns `status: false`. `domain` is the host of the platform's `APP_URL`.
+- **Perpetual vs subscription.** `expires_at: null` = perpetual (CodeCanyon
+  regular/extended style). A date = subscription; the platform enforces a
+  configurable grace window (`license:check-status --grace-days`, default 3)
+  before deactivating.
+- **Core product.** `product_slug = "core"` verification is informational only —
+  a failure raises a SuperAdmin banner (`core_license_status = warn`) and never
+  disables the platform.

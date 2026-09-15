@@ -31,6 +31,7 @@ class PermissionChecker
         'targets' => 'Sales Targets & Goals',
         'settings' => 'Store Settings & SMTP',
         'users' => 'Users & Permissions',
+        'leads' => 'Lead Management System',
     ];
 
     public const ACTIONS = [
@@ -180,6 +181,16 @@ class PermissionChecker
             'delete' => 'Deactivate / remove users',
             'export' => 'Export user list',
         ],
+        'leads' => [
+            'view' => 'View assigned leads',
+            'view_any' => 'View all organization leads',
+            'create' => 'Capture new leads',
+            'edit' => 'Update lead details & stage',
+            'delete' => 'Delete leads',
+            'assign' => 'Assign leads to sales representatives',
+            'convert' => 'Convert leads to customers & invoices',
+            'export' => 'Export leads data',
+        ],
     ];
 
     public static function getActionsForModule(string $module): array
@@ -304,6 +315,7 @@ class PermissionChecker
                     'targets' => ['view', 'create', 'edit', 'delete', 'export'],
                     'settings' => ['view', 'edit'],
                     'users' => ['view'],
+                    'leads' => ['view', 'view_any', 'create', 'edit', 'delete', 'assign', 'convert', 'export'],
                 ];
 
             case User::ROLE_SALESPERSON:
@@ -320,6 +332,7 @@ class PermissionChecker
                     'catalog' => ['view', 'create'],
                     'cash_register' => ['view'],
                     'targets' => ['view'],
+                    'leads' => ['view', 'create', 'edit', 'convert'],
                 ];
 
             case User::ROLE_CASHIER:

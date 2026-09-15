@@ -3,7 +3,7 @@
 namespace Tests\Feature\SuperAdmin;
 
 use App\Livewire\Tenant\Sales\Create as SalesCreate;
-use App\Models\GlobalSetting;
+use App\Models\PlatformBranding;
 use App\Models\Product;
 use App\Services\Navigation\NavigationAppearanceCustomizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -70,8 +70,8 @@ class ScannerLayoutAuthNavigationAndAdminDockTest extends TestCase
 
     public function test_back_to_home_button_is_conditionally_hidden_on_tenant_auth_views(): void
     {
-        // 1. When landing page is enabled (default)
-        GlobalSetting::set('landing_page_enabled', true);
+        // 1. When landing page is enabled
+        PlatformBranding::current()->update(['landing_page_enabled' => true]);
 
         $response = $this->get(route('tenant.login'));
         $response->assertStatus(200);
@@ -82,7 +82,7 @@ class ScannerLayoutAuthNavigationAndAdminDockTest extends TestCase
         $registerResponse->assertSee(__('Back to Home'));
 
         // 2. When landing page is disabled
-        GlobalSetting::set('landing_page_enabled', false);
+        PlatformBranding::current()->update(['landing_page_enabled' => false]);
 
         $responseDisabled = $this->get(route('tenant.login'));
         $responseDisabled->assertStatus(200);

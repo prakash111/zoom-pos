@@ -16,6 +16,12 @@
     <meta name="theme-color" content="{{ $uiAccentColorHex ?? '#2563eb' }}">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    @php
+        // Per-user dock position, server-persisted, seeds first paint before
+        // localStorage (anti-flicker) and Alpine take over.
+        $dockPosition = auth()->user()?->dock_position ?: 'left';
+    @endphp
     <title>{{ $title ?? 'POS & Store Manager' }} — {{ auth()->user()?->company?->name ?? config('app.name') }}</title>
     @if (auth()->user()?->company?->favicon)
         <link rel="icon" href="{{ auth()->user()->company->favicon }}">
@@ -53,7 +59,9 @@
             try {
                 var raw = localStorage.getItem('tenant_dock_nav_state');
                 var saved = raw ? JSON.parse(raw) : null;
-                var pos = (saved && saved.position) ? saved.position : 'left';
+                // Fall back to the server-persisted position (per user, survives a
+                // cleared localStorage / a fresh device) instead of a hardcoded default.
+                var pos = (saved && saved.position) ? saved.position : @json($dockPosition);
                 var mode = (saved && saved.mode) ? saved.mode : 'docked';
                 var layout = (saved && saved.layout) ? saved.layout : 'slim';
                 var theme = (saved && saved.theme) ? saved.theme : 'violet';
@@ -108,7 +116,7 @@
          TenantNavigationComposer now, computed once per request. --}}
 
     <!-- Main Outer Container with Draggable & Dockable Layout Binding -->
-    <div x-data="dockableNav('tenant_dock_nav_state', 'left', '{{ $isRestaurant ? 'restaurant' : 'general' }}')"
+    <div x-data="dockableNav('tenant_dock_nav_state', @js($dockPosition), '{{ $isRestaurant ? 'restaurant' : 'general' }}', '{{ route('tenant.preferences.dock-position') }}')"
          :class="{
              'flex-row': position === 'left' && layout !== 'macos-dock' && layout !== 'speed-dial',
              'flex-row-reverse': position === 'right' && layout !== 'macos-dock' && layout !== 'speed-dial',
@@ -325,6 +333,12 @@
                         </x-nav.rail-item>
                     @endif
 
+                    @if ($canLeads)
+                        <x-nav.rail-item :route="route('tenant.leads.index')" :active="$isLeads" item-key="lead_management" title="{{ __('Lead Management') }}" label="{{ __('Leads') }}">
+                            <span class="text-xl group-hover:scale-110 transition-transform shrink-0">🎯</span>
+                        </x-nav.rail-item>
+                    @endif
+
                     @if ($canConsignments)
                         <x-nav.rail-item :route="route('tenant.consignments.index')" :active="$isConsignments" title="{{ __('Consignments') }}" label="{{ __('Consign') }}">
                             <x-ui.icon name="box" class="w-5 h-5 group-hover:scale-110 transition-transform" />
@@ -442,6 +456,11 @@
                                 <span class="text-base shrink-0">📑</span>
                             </x-nav.expanded-item>
                         @endif
+                        @if ($canLeads)
+                            <x-nav.expanded-item :route="route('tenant.leads.index')" :active="$isLeads" item-key="lead_management" title="{{ __('Lead Management') }}" subtitle="{{ __('Pipeline, follow-ups & auto-sync CRM') }}">
+                                <span class="text-base shrink-0">🎯</span>
+                            </x-nav.expanded-item>
+                        @endif
                         @if ($canCustomers)
                             <x-nav.expanded-item :route="route('tenant.customers.index')" :active="$isCustomers" item-key="customers" title="{{ __('Customers & CRM') }}" subtitle="{{ __('Profiles, history & loyalty') }}">
                                 <span class="text-base shrink-0">👥</span>
@@ -495,6 +514,8 @@
                         </x-nav.expanded-item>
                     @endif
                 </div>
+
+                @include('layouts.partials.vertical-nav-expanded')
 
                 <!-- Category 5: Administration & Settings -->
                 <div :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
@@ -587,6 +608,10 @@
                 <x-nav.pill-item :route="route('tenant.quotes.index')" :active="$isQuotes" item-key="quotes" title="{{ __('Quotations & Proposals') }}">📑</x-nav.pill-item>
             @endif
 
+            @if ($canLeads)
+                <x-nav.pill-item :route="route('tenant.leads.index')" :active="$isLeads" item-key="lead_management" title="{{ __('Lead Management') }}">🎯</x-nav.pill-item>
+            @endif
+
             <!-- 5. Products -->
             @if ($canProducts)
                 <x-nav.pill-item :route="route('tenant.products.index')" :active="$isProducts" item-key="products" title="{{ __('Products & Catalog') }}">📦</x-nav.pill-item>
@@ -666,6 +691,10 @@
 
                 @if (!$isRestaurant && $canQuotes)
                     <x-nav.speed-dial-item :route="route('tenant.quotes.index')" item-key="quotes" label="{{ __('Quotations') }}">📑</x-nav.speed-dial-item>
+                @endif
+
+                @if ($canLeads)
+                    <x-nav.speed-dial-item :route="route('tenant.leads.index')" item-key="lead_management" label="{{ __('Lead Management') }}">🎯</x-nav.speed-dial-item>
                 @endif
 
                 @if ($canFinance)
@@ -751,6 +780,7 @@
                                     </x-nav.drawer-item>
                                 @endif
 
+
                                 @if ($canFinance)
                                     <x-nav.drawer-item item-key="cash_register" :route="route('tenant.financials.cash_register')" hover="lime" title="{{ __('Cash Register') }}" subtitle="{{ __('Opening, closing, cash withdrawals') }}">🗄️</x-nav.drawer-item>
                                 @endif
@@ -761,10 +791,14 @@
                             <div data-section-key="financial_management">
                                 <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Financial Management') }}</div>
                                 <div class="space-y-1">
+                                    <x-nav.drawer-item item-key="due_receivables" :route="route('tenant.financials.receivables')" title="{{ __('Accounts Receivable') }}" subtitle="{{ __('Customer credit & unpaid bills') }}">📈</x-nav.drawer-item>
                                     <x-nav.drawer-item item-key="accounts_receivable" :route="route('tenant.financials.receivables')" title="{{ __('Accounts Receivable') }}" subtitle="{{ __('Customer credit & unpaid bills') }}">📈</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="payables" :route="route('tenant.financials.payables')" title="{{ __('Accounts Payable') }}" subtitle="{{ __('Supplier bills & food purchases') }}">📉</x-nav.drawer-item>
                                     <x-nav.drawer-item item-key="accounts_payable" :route="route('tenant.financials.payables')" title="{{ __('Accounts Payable') }}" subtitle="{{ __('Supplier bills & food purchases') }}">📉</x-nav.drawer-item>
 
                                     @if ($canReports)
+                                        <x-nav.drawer-item item-key="reports" :route="route('tenant.reports.index')" title="{{ __('Reports') }}" subtitle="{{ __('Sales, commissions & aging') }}">📊</x-nav.drawer-item>
+                                        <x-nav.drawer-item item-key="analytics" :route="route('tenant.reports.index')" title="{{ __('Analytics') }}" subtitle="{{ __('Sales trends & performance charts') }}">📈</x-nav.drawer-item>
                                         <x-nav.drawer-item item-key="reports_analytics" :route="route('tenant.reports.index')" title="{{ __('Reports & Analytics') }}" subtitle="{{ __('Sales, commissions & aging') }}">📊</x-nav.drawer-item>
                                     @endif
                                 </div>
@@ -811,6 +845,11 @@
                                     <x-nav.drawer-item item-key="pos" :route="route('tenant.sales.create')" highlighted title="{{ __('Cashier POS Terminal') }}" subtitle="{{ __('Fast barcode scan & cash checkout') }}">🛒</x-nav.drawer-item>
                                 @endif
 
+                                @if ($canProducts)
+                                    <x-nav.drawer-item item-key="barcode_printing" :route="route('tenant.products.index')" title="{{ __('Barcode & Label Printing') }}" subtitle="{{ __('Print product labels & barcodes') }}">🏷️</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="batch_tracking" :route="route('tenant.products.index')" title="{{ __('Batch & Expiry Tracking') }}" subtitle="{{ __('Track lots, batches & expirations') }}">📦</x-nav.drawer-item>
+                                @endif
+
                                 @if ($canSales)
                                     <x-nav.drawer-item item-key="sales" :route="route('tenant.sales.index')" title="{{ __('Sales & Invoices') }}" subtitle="{{ __('History, print receipts & refunds') }}">🧾</x-nav.drawer-item>
                                 @endif
@@ -825,6 +864,15 @@
                             </div>
                         </div>
 
+                        @if ($canLeads)
+                            <div data-section-key="lead_ops">
+                                <div class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 px-3">{{ __('Lead Operations') }}</div>
+                                <div class="space-y-1">
+                                    <x-nav.drawer-item item-key="lead_management" :route="route('tenant.leads.index')" title="{{ __('Lead Management') }}" subtitle="{{ __('Pipeline, follow-ups & auto-sync CRM') }}">🎯</x-nav.drawer-item>
+                                </div>
+                            </div>
+                        @endif
+
                         @if ($canFinance)
                             <div data-section-key="financial_management">
                                 <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Financial Management') }}</div>
@@ -834,7 +882,8 @@
                                     <x-nav.drawer-item item-key="payables" :route="route('tenant.financials.payables')" title="{{ __('Accounts Payable') }}" subtitle="{{ __('Supplier bills & purchase dues') }}">📉</x-nav.drawer-item>
 
                                     @if ($canReports)
-                                        <x-nav.drawer-item item-key="reports" :route="route('tenant.reports.index')" title="{{ __('Reports & Analytics') }}" subtitle="{{ __('Sales, commissions & aging') }}">📊</x-nav.drawer-item>
+                                        <x-nav.drawer-item item-key="reports" :route="route('tenant.reports.index')" title="{{ __('Reports') }}" subtitle="{{ __('Sales, commissions & aging') }}">📊</x-nav.drawer-item>
+                                        <x-nav.drawer-item item-key="analytics" :route="route('tenant.reports.index')" title="{{ __('Analytics') }}" subtitle="{{ __('Sales trends & performance charts') }}">📈</x-nav.drawer-item>
                                     @endif
                                 </div>
                             </div>
@@ -868,6 +917,8 @@
                         </div>
                     @endif
 
+                    @include('layouts.partials.vertical-nav-drawer')
+
                     <!-- Administration & Settings -->
                     <div data-section-key="administration">
                         <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Administration & Settings') }}</div>
@@ -882,7 +933,7 @@
                                     <x-nav.drawer-link item-key="settings_receipts" :route="route('tenant.settings.receipts')" :title="__('Receipt Prefixes & Bank Terms')" />
                                     <x-nav.drawer-link item-key="settings_financial" :route="route('tenant.settings.financial')" :title="__('Financial & Currency')" />
                                     <x-nav.drawer-link item-key="settings_taxes" :route="route('tenant.settings.taxes')" :title="__('Taxes & Compliance')" />
-                                    <x-nav.drawer-link item-key="settings_api" :route="route('tenant.settings.api')" :title="__('API & Integrations')" />
+                                    <x-nav.drawer-link item-key="settings_api" :route="route('tenant.settings.integrations')" :title="__('API & Integrations')" />
                                     <x-nav.drawer-link item-key="settings_navigation" :route="route('tenant.settings.navigation')" :title="__('Navigation Menu')" />
                                 </div>
                             @endif
@@ -1029,8 +1080,12 @@
                             removeAccordionControls(navEl);
 
                             const sectionOrder = {};
+                            const sectionTitles = {};
                             (navConfig.sections || []).forEach((section) => {
                                 sectionOrder[section.key] = section.order;
+                                if (String(section.custom_title || '').trim()) {
+                                    sectionTitles[section.key] = String(section.custom_title).trim();
+                                }
                             });
                             const itemMeta = {};
                             (navConfig.items || []).forEach((item) => {
@@ -1039,7 +1094,12 @@
 
                             const sectionsByKey = {};
                             navEl.querySelectorAll(':scope > [data-section-key]').forEach((section) => {
-                                sectionsByKey[section.getAttribute('data-section-key')] = section;
+                                const sectionKey = section.getAttribute('data-section-key');
+                                sectionsByKey[sectionKey] = section;
+                                const heading = section.querySelector(':scope > div:first-child');
+                                if (heading && sectionTitles[sectionKey]) {
+                                    heading.textContent = sectionTitles[sectionKey];
+                                }
                             });
 
                             // Apply parent placement before sorting. A missing
@@ -1128,17 +1188,33 @@
                 </script>
             </div>
 
-            <!-- Drawer Bottom Bar -->
-            <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                <button type="button" x-on:click="dark = !dark" class="text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center gap-1.5 font-bold transition">
+            <!-- Sticky account footer: sign-out lives in the drawer, not the app bar. -->
+            <div class="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <button type="button" x-on:click="dark = !dark" class="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center gap-1.5 font-bold transition">
                     <span x-show="!dark">🌙 Dark Mode</span>
                     <span x-show="dark">☀️ Light Mode</span>
                 </button>
 
-                <form method="POST" action="{{ route('tenant.logout') }}">
-                    @csrf
-                    <button type="submit" class="text-rose-600 hover:underline font-extrabold">{{ __('Sign Out') }}</button>
-                </form>
+                <div class="mt-auto border-t border-slate-200 dark:border-slate-800 p-3 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-xs">
+                            {{ strtoupper(substr(auth()->user()?->name ?? 'U', 0, 2)) }}
+                        </div>
+                        <div class="text-xs">
+                            <p class="font-medium text-slate-800 dark:text-slate-200">{{ auth()->user()?->name }}</p>
+                            <p class="text-slate-400 truncate max-w-[120px]">{{ auth()->user()?->email }}</p>
+                        </div>
+                    </div>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="p-2 text-rose-500 hover:bg-rose-500/10 rounded-lg text-xs font-semibold flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                            </svg>
+                            {{ __('Sign Out') }}
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -1195,6 +1271,34 @@
                     @endif
 
                     <livewire:tenant.desktop-sync-status />
+
+                    <!-- Server-driven notification bell; opens the SDUI alerts feed. -->
+                    @php
+                        $notificationUnreadCount = app(\App\Services\NotificationAlertService::class)
+                            ->unreadCount($tenantCompany?->id ?? auth('web')->user()?->company_id);
+                    @endphp
+                    <div
+                        x-data="{ count: @js($notificationUnreadCount) }"
+                        x-on:sdui-unread-count.window="count = Number($event.detail?.count || 0)"
+                        class="relative"
+                    >
+                        <button
+                            type="button"
+                            x-on:click="$dispatch('open-sdui-sheet', { endpoint: @js(route('tenant.notifications.feed')) })"
+                            class="relative flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-blue-50 hover:text-blue-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-blue-950/60 dark:hover:text-blue-300"
+                            title="{{ __('System Alerts & Reminders') }}"
+                            aria-label="{{ __('Open notifications') }}"
+                        >
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            <span
+                                x-show="count > 0"
+                                x-text="count > 99 ? '99+' : count"
+                                class="absolute -right-1.5 -top-1.5 min-w-5 rounded-full border-2 border-white bg-rose-500 px-1 py-0.5 text-center text-[9px] font-black leading-none text-white dark:border-slate-900"
+                            ></span>
+                        </button>
+                    </div>
 
                     <!-- Multi-Language Switcher Dropdown -->
                     @php
@@ -1275,7 +1379,7 @@
                         </span>
                     </button>
 
-                    <!-- User Pill & Sign out -->
+                    <!-- User identity; sign-out is intentionally in the drawer footer. -->
                     <div class="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
                         <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-black text-xs flex items-center justify-center shadow-sm">
                             {{ substr(auth()->user()?->name ?? 'U', 0, 1) }}
@@ -1285,12 +1389,6 @@
                             <div class="text-[10px] text-slate-400 capitalize mt-0.5">{{ auth()->user()?->role }}</div>
                         </div>
 
-                        <form method="POST" action="{{ route('tenant.logout') }}" class="ml-2">
-                            @csrf
-                            <button type="submit" class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition" title="Sign out">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                            </button>
-                        </form>
                     </div>
                 </div>
             </header>
@@ -1314,6 +1412,9 @@
 
     <!-- Shared invoice and quotation preview modal -->
     @include('layouts.partials.document-print-preview-modal')
+
+    <!-- Shared Server-Driven UI renderer for notifications and document dispatch. -->
+    @include('layouts.partials.sdui-bottom-sheet')
 
     <!-- Resume Fullscreen Nudge -->
     <div x-data

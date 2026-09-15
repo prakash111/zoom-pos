@@ -2,19 +2,19 @@
 
 namespace App\Services\Tenancy;
 
+use App\Events\TenantRegistered;
 use App\Models\ActivationCode;
 use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\PaymentMethod;
 use App\Models\Plan;
 use App\Models\PlatformBranding;
+use App\Models\PlatformSystem;
 use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
 use App\Models\User;
 use App\Services\Localization\PlatformRegionalService;
 use Carbon\Carbon;
-use Database\Seeders\RestaurantDemoSeeder;
-use Database\Seeders\TenantDemoSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -104,6 +104,13 @@ class TenantProvisioningService
                 ],
             ]);
 
+            // 1.1 Immediate Full-Menu Activation & Feature Population for Store Type
+            try {
+                app(\App\Services\Navigation\MenuService::class)->populateDefaultNavigation($company, $posMode);
+            } catch (\Throwable $e) {
+                Log::warning("Failed to auto-populate default navigation for tenant [{$company->id}]: ".$e->getMessage());
+            }
+
             // 2. Create Default Payment Methods
             $defaults = [
                 ['name' => 'Cash', 'code' => 'cash', 'order_index' => 1],
@@ -166,14 +173,28 @@ class TenantProvisioningService
                 'activation_code' => $activationCode,
             ]);
 
-            // 6. Automatically Import Default Demo Data tailored to the operating mode
-            $shouldSeed = ! array_key_exists('seed_demo_data', $data) || ! empty($data['seed_demo_data']);
+            // 6. Automatically Import Default Demo Data tailored to the operating
+            // mode — gated by the SuperAdmin-wide "Auto-Seed Demo Data on Signup"
+            // toggle (Platform Settings ▸ General). When that platform toggle is
+            // off, no new tenant is ever seeded, regardless of what the request
+            // itself asked for; when it's on (the default), the existing
+            // per-request opt-out still applies.
+            $platformAllowsSeeding = filter_var(PlatformSystem::get('auto_seed_demo_data_on_registration', true), FILTER_VALIDATE_BOOLEAN);
+            $requestWantsSeeding = ! array_key_exists('seed_demo_data', $data) || ! empty($data['seed_demo_data']);
+            $shouldSeed = $platformAllowsSeeding && $requestWantsSeeding;
             if ($shouldSeed) {
                 if (app()->environment('testing') || ! empty($data['sync_seed'])) {
                     $this->seedTenantDemoData($company, $posMode, $admin);
                 } else {
-                    event(new \App\Events\TenantRegistered($company, $admin, $posMode));
+                    event(new TenantRegistered($company, $admin, $posMode));
                 }
+            } elseif (! $platformAllowsSeeding) {
+                // The platform-wide toggle is off — leave this tenant clean
+                // *permanently*, not merely deferred: mark seeding "handled"
+                // now so a later bootstrap call never lazily seeds it either
+                // (a per-request opt-out with the platform toggle still on
+                // is left as-is — that pre-existing behavior is unchanged).
+                $company->update(['is_seeding_complete' => true]);
             }
 
             AuditLog::record('tenant.self_registered', $company->id, $admin->id, [
@@ -326,7 +347,7 @@ class TenantProvisioningService
             'company_name' => $branding?->platform_name ?? 'Smart Inventory & POS SaaS',
             'legal_name' => $branding?->platform_name ?? 'Smart Inventory Platform Inc.',
             'tax_id' => 'GSTIN-PLATFORM-2026-991A',
-            'support_email' => $branding?->support_email ?? 'support@saas.zoomnearby.com',
+            'support_email' => $branding?->support_email ?? 'support@example.com',
             'support_phone' => $branding?->support_phone ?? '+1 (800) 555-0199',
             'address' => '100 Innovation Blvd, Suite 400',
             'city' => 'San Francisco',

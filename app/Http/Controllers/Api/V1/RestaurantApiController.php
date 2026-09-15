@@ -15,6 +15,7 @@ use App\Models\OrderPayment;
 use App\Models\PushNotificationSetting;
 use App\Models\Sale;
 use App\Services\Push\FirebasePushService;
+use App\Services\Sdui\SchemaResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +42,7 @@ class RestaurantApiController extends Controller
 
     private function ensureRestaurantMode(Company $company): ?JsonResponse
     {
-        if (! $company->isRestaurantMode()) {
+        if (! $company->isRestaurantMode() && ! $company->hasModule('restaurant')) {
             return response()->json([
                 'success' => false,
                 'error' => 'Restaurant Mode is not enabled for this store.',
@@ -267,6 +268,23 @@ class RestaurantApiController extends Controller
         ]);
     }
 
+    public function tableActionsSheet(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        if ($blocked = $this->ensureRestaurantMode($company)) {
+            return $blocked;
+        }
+
+        $table = $this->findTable($company, $id);
+        if (! $table) {
+            return response()->json(['success' => false, 'error' => 'Table not found.'], 404);
+        }
+
+        $sheet = SchemaResponse::tableActionsSheet($table, $company);
+
+        return response()->json($sheet);
+    }
+
     // ---------------------------------------------------------------
     // Orders: send to kitchen, settle bill
     // ---------------------------------------------------------------
@@ -293,7 +311,10 @@ class RestaurantApiController extends Controller
             'discount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'prep_minutes' => ['nullable', 'integer', 'min:1', 'max:240'],
-            'intimation_minutes' => ['nullable', 'integer', 'in:0,2,5'],
+            // Any custom alert lead time is accepted (was previously capped to
+            // the 0/2/5 quick-chip presets); it's clamped to <= prep_minutes
+            // below so an alert can never fire before the order was sent.
+            'intimation_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable'],
             'items.*.name' => ['required', 'string', 'max:255'],
@@ -357,7 +378,7 @@ class RestaurantApiController extends Controller
             $existingSale = $table->currentSale;
         }
 
-        [$sale, $kot] = DB::transaction(function () use ($company, $user, $existingSale, $items, $subtotal, $discount, $total, $serviceType, $table, $tableName, $data) {
+        [$sale, $kot] = DB::transaction(function () use ($company, $user, $existingSale, $items, $discount, $total, $serviceType, $table, $tableName, $data) {
             if ($existingSale) {
                 $mergedItems = array_merge($existingSale->items ?? [], $items);
                 $mergedSubtotal = array_sum(array_map(fn ($i) => (float) $i['price'] * (float) $i['quantity'], $mergedItems));
@@ -433,11 +454,31 @@ class RestaurantApiController extends Controller
             'service_type' => $serviceType,
         ]);
 
+        $freshKot = $kot->fresh('table');
+        $thermalText = SchemaResponse::formatKotThermalText($freshKot, $company);
+        $printModalSheet = SchemaResponse::kotPrintModalSheet($freshKot, $company, $thermalText);
+
         return response()->json([
             'success' => true,
             'message' => "{$kot->kot_number} dispatched to kitchen for {$tableName}.",
+            'action' => 'OPEN_MODAL_BOTTOM_SHEET',
+            'type' => 'OPEN_MODAL_BOTTOM_SHEET',
+            'sheet' => $printModalSheet,
+            'modal' => $printModalSheet,
+            'thermal_preview' => $thermalText,
+            'thermal_text' => $thermalText,
+            'print_action' => [
+                'type' => 'TRIGGER_PRINT',
+                'action' => 'TRIGGER_PRINT',
+                'target' => 'thermal_printer',
+                'endpoint' => "/api/tenant/restaurant/kot/{$kot->id}/print",
+                'payload' => [
+                    'kot_id' => (string) $kot->id,
+                    'thermal_text' => $thermalText,
+                ],
+            ],
             'sale' => $this->presentSale($sale->fresh()),
-            'kot' => $this->presentKot($kot->fresh('table')),
+            'kot' => $this->presentKot($freshKot),
         ], 201);
     }
 
@@ -514,7 +555,7 @@ class RestaurantApiController extends Controller
 
         $saleNumber = 'INV-'.sprintf('%04d', Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count() + 1);
 
-        $sale = DB::transaction(function () use ($sale, $saleNumber, $total, $discount, $isSplit, $paidAmount, $dueAmount, $paymentStatus, $data, $splitPayments, $company, $user, $customer, $cashRegisterId) {
+        $sale = DB::transaction(function () use ($sale, $saleNumber, $total, $discount, $isSplit, $paidAmount, $dueAmount, $paymentStatus, $data, $splitPayments, $company, $customer, $cashRegisterId) {
             $sale->update([
                 'sale_number' => $saleNumber,
                 'total' => $total,
@@ -621,7 +662,7 @@ class RestaurantApiController extends Controller
                 'preparing' => KitchenTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', KitchenTicket::STATUS_PREPARING)->count(),
                 'ready' => KitchenTicket::withoutGlobalScope('company')->where('company_id', $company->id)->where('status', KitchenTicket::STATUS_READY)->count(),
             ],
-            'alert_settings' => PushNotificationSetting::current()->publicConfig(),
+            'alert_settings' => PushNotificationSetting::current()->publicConfig($company->id),
         ]);
     }
 
@@ -700,6 +741,45 @@ class RestaurantApiController extends Controller
         ]), report: true);
 
         return response()->json(['success' => true, 'message' => 'Order alarm dismissed.']);
+    }
+
+    public function kotPrint(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        if ($blocked = $this->ensureRestaurantMode($company)) {
+            return $blocked;
+        }
+
+        $kot = KitchenTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with('table')
+            ->find($id);
+
+        if (! $kot) {
+            return response()->json(['success' => false, 'error' => 'Kitchen ticket not found.'], 404);
+        }
+
+        $thermalText = $request->input('thermal_text') ?: SchemaResponse::formatKotThermalText($kot, $company);
+
+        AuditLog::record('restaurant.kot_printed', $company->id, $this->resolveUser($request, $company)?->id, [
+            'kot_number' => $kot->kot_number,
+            'kot_id' => $kot->id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "KOT {$kot->kot_number} print payload generated.",
+            'kot_id' => (string) $kot->id,
+            'kot_number' => $kot->kot_number,
+            'raw_text' => $thermalText,
+            'thermal_text' => $thermalText,
+            'print_action' => [
+                'type' => 'TRIGGER_PRINT',
+                'action' => 'TRIGGER_PRINT',
+                'target' => 'thermal_printer',
+                'raw_text' => $thermalText,
+            ],
+        ]);
     }
 
     // ---------------------------------------------------------------

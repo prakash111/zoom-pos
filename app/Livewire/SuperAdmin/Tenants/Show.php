@@ -47,7 +47,19 @@ class Show extends Component
         $this->maxUsers = $company->max_users;
         $this->maxDevices = $company->max_devices;
         $this->posMode = \App\Services\Modular\ModuleRegistry::resolveActiveMode($company);
-        $this->licensedModules = ! empty($company->licensed_modules) ? $company->licensed_modules : [$this->posMode];
+
+        $rawModules = ! empty($company->licensed_modules) ? (array) $company->licensed_modules : [$this->posMode];
+        $this->licensedModules = array_values(array_unique(array_map([\App\Services\Modular\ModuleRegistry::class, 'canonicalKey'], $rawModules)));
+    }
+
+    public function selectAllModules(): void
+    {
+        $this->licensedModules = array_keys(\App\Services\Modular\ModuleRegistry::allModules());
+    }
+
+    public function deselectAllModules(): void
+    {
+        $this->licensedModules = [\App\Services\Modular\ModuleRegistry::canonicalKey($this->posMode)];
     }
 
     protected function rules(): array
@@ -71,6 +83,9 @@ class Show extends Component
 
     public function save(): void
     {
+        $this->posMode = \App\Services\Modular\ModuleRegistry::canonicalKey($this->posMode);
+        $this->licensedModules = array_values(array_unique(array_map([\App\Services\Modular\ModuleRegistry::class, 'canonicalKey'], (array) $this->licensedModules)));
+
         $data = $this->validate();
         $before = $this->company->only(['name', 'email', 'phone', 'plan_name', 'status', 'max_users', 'max_devices', 'pos_mode', 'licensed_modules']);
 
@@ -90,6 +105,14 @@ class Show extends Component
             'pos_mode' => $this->posMode,
             'licensed_modules' => array_values($this->licensedModules),
         ]);
+
+        $this->company->refresh();
+
+        try {
+            app(\App\Services\Navigation\MenuService::class)->populateDefaultNavigation($this->company, $this->posMode);
+        } catch (\Throwable) {
+            // graceful fallback
+        }
 
         AuditLog::record('tenant.updated', $this->company->id, auth('platform_web')->id(), [
             'before' => $before,

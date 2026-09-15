@@ -12,7 +12,10 @@ use App\Models\OrderPayment;
 use App\Models\PaymentMethod;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Localization\PlatformRegionalService;
+use App\Services\Navigation\MenuService;
+use App\Services\Navigation\TenantNavRegistry;
 use App\Services\Notifications\CustomChannelDispatcherService;
+use App\Services\Sdui\SchemaResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -60,6 +63,14 @@ class SettingsApiController extends Controller
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
+        // Normalize aliases: business_name -> name, trading_name -> trade_name
+        if ($request->filled('business_name') && ! $request->filled('name')) {
+            $request->merge(['name' => $request->input('business_name')]);
+        }
+        if ($request->filled('trading_name') && ! $request->filled('trade_name')) {
+            $request->merge(['trade_name' => $request->input('trading_name')]);
+        }
+
         // An empty string means "clear the manual override, go back to the
         // country default" — not "invalid timezone".
         if ($request->input('timezone') === '') {
@@ -68,7 +79,9 @@ class SettingsApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => ['sometimes', 'required', 'string', 'max:150'],
+            'business_name' => ['nullable', 'string', 'max:150'],
             'trade_name' => ['nullable', 'string', 'max:150'],
+            'trading_name' => ['nullable', 'string', 'max:150'],
             'tax_id' => ['nullable', 'string', 'max:60'],
             'email' => ['nullable', 'email'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -83,6 +96,13 @@ class SettingsApiController extends Controller
             'default_locale' => ['nullable', 'string', 'max:10'],
             'default_commission_rate' => ['nullable', 'numeric', 'min:0'],
             'default_commission_type' => ['nullable', 'string', 'in:percentage,fixed'],
+            // The mobile Profile tab sends the brand colour alongside the rest
+            // of the profile; without these it was silently dropped by
+            // `validated()` and the picked colour reverted on the next
+            // bootstrap sync. Full drawer/gradient branding still goes through
+            // `updateBranding()`.
+            'primary_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'accent_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
         if ($validator->fails()) {
@@ -94,6 +114,38 @@ class SettingsApiController extends Controller
         }
 
         $data = $validator->validated();
+
+        $businessName = trim((string) ($request->input('business_name') ?: $request->input('name') ?: ''));
+        if ($businessName !== '') {
+            $data['name'] = $businessName;
+        }
+
+        $incomingTrade = trim((string) ($request->input('trading_name') ?: $request->input('trade_name') ?: ''));
+        $existingTrade = trim((string) ($company->trade_name ?? ''));
+
+        // If user provided a trade_name that is a demo placeholder, or trade_name was blank,
+        // or existing trade_name is a demo placeholder while business_name is updated:
+        if (
+            $incomingTrade === '' ||
+            Company::isDemoPlaceholderName($incomingTrade) ||
+            Company::isDemoPlaceholderName($existingTrade)
+        ) {
+            if ($businessName !== '') {
+                $data['trade_name'] = $businessName;
+            }
+        } else {
+            $data['trade_name'] = $incomingTrade;
+        }
+
+        if (! empty($data['name'])) {
+            $legal = trim((string) ($company->legal_name ?? ''));
+            if ($legal === '' || Company::isDemoPlaceholderName(str_replace([' Pvt. Ltd.', ' Ltd.', ' Inc.'], '', $legal))) {
+                $data['legal_name'] = $data['name'].' Pvt. Ltd.';
+            }
+        }
+
+        unset($data['business_name'], $data['trading_name']);
+
         if (isset($data['country'])) {
             $data['country'] = strtoupper($data['country']);
         }
@@ -112,9 +164,66 @@ class SettingsApiController extends Controller
         }
 
         $company->update($data);
+        $freshCompany = $company->fresh();
+        $freshCompany->flushTenantCaches();
+
         AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'profile']);
 
-        return response()->json(['success' => true, 'message' => 'Profile saved.', 'profile' => $this->presentProfile($company->fresh())]);
+        $drawerHeader = $freshCompany->getDrawerHeaderPayload();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile saved.',
+            'profile' => $this->presentProfile($freshCompany),
+            'header' => $drawerHeader,
+            'drawer_header' => $drawerHeader,
+            'store_name' => $freshCompany->display_name,
+            'business_name' => $freshCompany->display_name,
+            'trading_name' => $freshCompany->display_name,
+            'trade_name' => $freshCompany->display_name,
+            'display_name' => $freshCompany->display_name,
+            'company' => [
+                'id' => $freshCompany->id,
+                'name' => $freshCompany->display_name,
+                'business_name' => $freshCompany->display_name,
+                'trade_name' => $freshCompany->display_name,
+                'trading_name' => $freshCompany->display_name,
+                'store_name' => $freshCompany->display_name,
+                'display_name' => $freshCompany->display_name,
+                'slug' => $freshCompany->slug,
+                'currency' => $freshCompany->currency ?? 'USD',
+                'currency_symbol' => $freshCompany->currency_symbol ?? '$',
+                'tax_number' => $freshCompany->document ?? $freshCompany->tax_id ?? '',
+                'tax_id' => $freshCompany->tax_id ?? $freshCompany->document ?? '',
+                'country' => $freshCompany->country ?? 'IN',
+                'timezone' => $freshCompany->resolveTimezone(),
+                'address' => $freshCompany->address ?? '',
+                'city' => $freshCompany->city ?? '',
+                'state' => $freshCompany->state ?? '',
+                'postal_code' => $freshCompany->postal_code ?? '',
+                'phone' => $freshCompany->phone ?? '',
+                'email' => $freshCompany->email ?? '',
+                'plan_name' => $freshCompany->plan_name ?? 'trial',
+                'pos_mode' => $freshCompany->isRestaurantMode() ? 'restaurant' : 'general',
+                'restaurant_mode_locked' => (bool) $freshCompany->restaurant_mode_locked,
+                'drawer_cover_url' => $freshCompany->getDrawerCoverUrl(),
+                'logo_url' => $freshCompany->getLogoUrl(),
+                'favicon_url' => $freshCompany->getFaviconUrl(),
+                'drawer_header' => $drawerHeader,
+                'header' => $drawerHeader,
+            ],
+            'tenant' => [
+                'id' => (string) $freshCompany->id,
+                'name' => $freshCompany->display_name,
+                'business_name' => $freshCompany->display_name,
+                'trade_name' => $freshCompany->display_name,
+                'trading_name' => $freshCompany->display_name,
+                'display_name' => $freshCompany->display_name,
+                'store_name' => $freshCompany->display_name,
+                'drawer_header' => $drawerHeader,
+                'header' => $drawerHeader,
+            ],
+        ]);
     }
 
     public function updateBranding(Request $request): JsonResponse
@@ -147,6 +256,29 @@ class SettingsApiController extends Controller
             'success' => true,
             'message' => 'Branding and colors updated successfully.',
             'theme' => $theme,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/tenant/theme or /api/tenant/theme
+     * Returns dynamic theme tokens with dark surface and zero-white-leak guarantees.
+     */
+    public function getTheme(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $tokens = $company->getThemeTokens();
+
+        return response()->json([
+            'success' => true,
+            'drawer_bg' => $tokens['drawer_bg'],
+            'drawer_background' => $tokens['drawer_background'],
+            'surface' => $tokens['surface'],
+            'background' => $tokens['background'],
+            'text_primary' => $tokens['text_primary'],
+            'text_secondary' => $tokens['text_secondary'],
+            'theme' => $tokens,
+            'branding' => $tokens,
+            'tokens' => $tokens,
         ]);
     }
 
@@ -493,6 +625,60 @@ class SettingsApiController extends Controller
         ]);
     }
 
+    /**
+     * Store Profile ▸ "Notifications & Sounds" tab. Per-tenant push-alert
+     * sound preferences — which preset (or custom audio URL) plays for a new
+     * order vs. a delayed order, and whether the alert also vibrates.
+     * Consumed by FirebasePushService::sendToCompany()/sendToUser(), which
+     * merge these into every data-only FCM payload alongside the platform's
+     * global high-importance channel settings.
+     */
+    public function updateNotificationSounds(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'order_sound_preset' => ['required', 'string', 'in:ringtone,chime,alarm,bell,custom'],
+            'order_sound_custom_url' => ['required_if:order_sound_preset,custom', 'nullable', 'string', 'max:500', 'url'],
+            'delayed_order_sound' => ['required', 'string', 'in:alarm,siren,beep,default'],
+            'sound_vibration_enabled' => ['nullable', 'boolean'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+
+        $this->putConfig($company, 'order_sound_preset', (string) $data['order_sound_preset']);
+        // Custom URL only makes sense (and is only validated) alongside the
+        // "custom" preset — clear it whenever another preset is chosen so a
+        // stale URL can never linger and get picked up if the tenant later
+        // switches back to "custom" without re-entering it.
+        $this->putConfig(
+            $company,
+            'order_sound_custom_url',
+            $data['order_sound_preset'] === 'custom' ? (string) ($data['order_sound_custom_url'] ?? '') : ''
+        );
+        $this->putConfig($company, 'delayed_order_sound', (string) $data['delayed_order_sound']);
+        $this->putConfig($company, 'sound_vibration_enabled', $request->boolean('sound_vibration_enabled') ? '1' : '0');
+
+        AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'notification_sounds']);
+
+        $configs = Configuration::withoutGlobalScopes()->where('company_id', $company->id)->pluck('value', 'key')->all();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notification and sound alert preferences saved successfully.',
+            'notification_sounds' => $this->presentNotificationSounds($configs),
+        ]);
+    }
+
     public function testEmail(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
@@ -569,6 +755,51 @@ class SettingsApiController extends Controller
         return response()->json(['success' => true, 'message' => 'Deleted.']);
     }
 
+    /**
+     * SDUI bottom-sheet schema for editing one payment method, opened by the
+     * "Edit" button on SchemaResponse::paymentMethodsView. Submits back to the
+     * same savePaymentMethod() path as create.
+     */
+    public function paymentMethodsEditSheet(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $pm = PaymentMethod::where('company_id', $company->id)->find($id);
+
+        if (! $pm) {
+            return response()->json(['success' => false, 'error' => 'Payment method not found.'], 404);
+        }
+
+        $meta = $pm->metadata ?? [];
+
+        $sheet = SchemaResponse::screen("Edit {$pm->name}", [
+            SchemaResponse::card([
+                SchemaResponse::text('Edit Payment Method', 'title_medium', ['bold' => true]),
+                SchemaResponse::text('Changes apply immediately at every module checkout.', 'body_small', ['color' => '#64748b']),
+                SchemaResponse::divider(),
+                SchemaResponse::textInput('name', 'Display Name', $pm->name),
+                SchemaResponse::textInput('code', 'Short Code', (string) ($pm->code ?? '')),
+                SchemaResponse::textInput('description', 'Description', (string) ($pm->description ?? ''), ['max_lines' => 2]),
+                SchemaResponse::textInput('order_index', 'Display Order', (string) $pm->order_index, ['keyboard_type' => 'number']),
+                SchemaResponse::toggleSwitch('is_active', 'Active (show at checkout)', (bool) $pm->is_active),
+                SchemaResponse::divider(),
+                SchemaResponse::textInput('metadata[bank_name]', 'Bank Name', (string) ($meta['bank_name'] ?? '')),
+                SchemaResponse::textInput('metadata[account_no]', 'Account Number', (string) ($meta['account_no'] ?? '')),
+                SchemaResponse::textInput('metadata[ifsc_code]', 'IFSC / SWIFT Code', (string) ($meta['ifsc_code'] ?? '')),
+                SchemaResponse::textInput('metadata[upi_id]', 'UPI ID / VPA', (string) ($meta['upi_id'] ?? '')),
+                SchemaResponse::textInput('metadata[holder_name]', 'Account Holder Name', (string) ($meta['holder_name'] ?? '')),
+                SchemaResponse::buttonPrimary('Save Changes', SchemaResponse::formSubmitAction(
+                    "/api/tenant/settings/payment-methods/{$pm->id}",
+                    'POST',
+                    'Payment method updated.',
+                    navigateBack: true,
+                    reload: true
+                ), 'save'),
+            ]),
+        ]);
+
+        return response()->json($sheet);
+    }
+
     private function savePaymentMethod(Request $request, ?string $id = null): JsonResponse
     {
         $company = $this->resolveCompany($request);
@@ -598,6 +829,16 @@ class SettingsApiController extends Controller
 
         $data = $validator->validated();
         $data['code'] = ($data['code'] ?? null) ?: Str::slug($data['name'], '_');
+
+        // The SDUI form always submits every metadata[...] field, so drop the
+        // blank ones instead of persisting a bag of empty strings. An entirely
+        // empty bag becomes null.
+        if (array_key_exists('metadata', $data)) {
+            $data['metadata'] = array_filter(
+                (array) $data['metadata'],
+                static fn ($v) => $v !== null && $v !== ''
+            ) ?: null;
+        }
 
         if ($id !== null) {
             $pm = PaymentMethod::where('company_id', $company->id)->find($id);
@@ -632,9 +873,16 @@ class SettingsApiController extends Controller
 
     private function presentProfile(Company $company): array
     {
+        $effectiveTrade = $company->getEffectiveTradeName();
+        $drawerHeader = $company->getDrawerHeaderPayload();
+
         return [
-            'name' => $company->name,
-            'trade_name' => $company->trade_name ?? '',
+            'name' => $company->display_name,
+            'business_name' => $company->display_name,
+            'trade_name' => $effectiveTrade,
+            'trading_name' => $effectiveTrade,
+            'store_name' => $company->display_name,
+            'display_name' => $company->display_name,
             'tax_id' => $company->tax_id ?? '',
             'email' => $company->email ?? '',
             'phone' => $company->phone ?? '',
@@ -657,8 +905,12 @@ class SettingsApiController extends Controller
             'logo_url' => $company->getLogoUrl(),
             'favicon_url' => $company->getFaviconUrl(),
             'drawer_cover_url' => $company->getDrawerCoverUrl(),
+            'primary_color' => $company->getPrimaryColor(),
+            'accent_color' => $company->getAccentColor(),
             'default_commission_rate' => (float) ($company->default_commission_rate ?? 0),
             'default_commission_type' => $company->default_commission_type ?: 'percentage',
+            'header' => $drawerHeader,
+            'drawer_header' => $drawerHeader,
         ];
     }
 
@@ -713,6 +965,20 @@ class SettingsApiController extends Controller
                 'sound_preset' => $configs['restaurant_alert_sound_preset'] ?? 'chime',
                 'sound_url' => $configs['restaurant_alert_sound_url'] ?? '',
             ],
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $configs
+     * @return array<string, mixed>
+     */
+    public static function presentNotificationSounds(array $configs): array
+    {
+        return [
+            'order_sound_preset' => $configs['order_sound_preset'] ?? 'chime',
+            'order_sound_custom_url' => $configs['order_sound_custom_url'] ?? '',
+            'delayed_order_sound' => $configs['delayed_order_sound'] ?? 'alarm',
+            'sound_vibration_enabled' => ($configs['sound_vibration_enabled'] ?? '1') === '1',
         ];
     }
 
@@ -1041,13 +1307,25 @@ class SettingsApiController extends Controller
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
-        $sections = \App\Services\Navigation\MenuService::getDrawerTree($company, $user);
+        $sections = TenantNavRegistry::getEffectiveNavForTenant($company);
+        $drawerHeader = $company->getDrawerHeaderPayload();
+        $menuComponents = app(\App\Http\Controllers\Api\NavigationController::class)->getDrawerMenuComponents($request);
 
         return response()->json([
-            'success' => true,
-            'sections' => $sections,
-            'navigation' => $sections,
+            'success'         => true,
+            'header'          => $drawerHeader,
+            'drawer_header'   => $drawerHeader,
+            'sections'        => $sections,
+            'navigation'      => $sections,
+            'components'      => $menuComponents,
+            'menu'            => $menuComponents,
+            'menu_components' => $menuComponents,
         ]);
+    }
+
+    public function getDrawerMenu(Request $request): JsonResponse
+    {
+        return app(\App\Http\Controllers\Api\NavigationController::class)->getDrawerMenu($request);
     }
 
     public function getFormLabels(Request $request): JsonResponse

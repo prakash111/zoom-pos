@@ -1,0 +1,81 @@
+/* ==========================================================================
+   Authentication / guest stylesheet.
+
+   Scoped Tailwind build for the sign-in, register, OTP and invite screens
+   (layouts/guest.blade.php + livewire/auth/*). The authenticated app ships
+   the full app.css (~277 KB) and app.js (~365 KB); a visitor on the login
+   page should pay for neither. Keep the @source list tight — `source(none)`
+   disables Tailwind v4's automatic whole-project scan.
+   ========================================================================== */
+
+@import 'tailwindcss' source(none);
+@plugin '@tailwindcss/forms';
+
+@source '../views/layouts/guest.blade.php';
+@source '../views/layouts/partials/preloader.blade.php';
+@source '../views/livewire/auth/**/*.blade.php';
+@source '../views/components/auth-pos-illustration.blade.php';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+    --color-brand-ink: #14161f;
+    --color-brand-lime: #d7f24e;
+    --color-brand-lime-dark: #bfda36;
+    --color-brand-emerald: #10b981;
+    --color-brand-teal: #14b8a6;
+}
+
+/* No webfonts: the OS-native stack, matching the marketing site. Zero bytes
+   shipped, no render-blocking font request, instant first paint. */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        ui-sans-serif, system-ui, Helvetica, Arial, sans-serif;
+}
+
+html {
+    -webkit-tap-highlight-color: transparent;
+}
+
+img, svg, video, canvas {
+    max-width: 100%;
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+:where(button, a, input, select, textarea, [role='button']):focus-visible {
+    outline: 2px solid color-mix(in srgb, #2563eb 82%, white);
+    outline-offset: 2px;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* The ambient blur orbs are decorative. On phones, low-power GPUs and for
+   users who ask for less motion, drop the expensive 120px+ blur passes and
+   the backdrop-filters rather than jank the sign-in paint. */
+@media (max-width: 640px), (prefers-reduced-motion: reduce) {
+    .auth-ambient {
+        display: none !important;
+    }
+    [class*='backdrop-blur'] {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+    }
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}

@@ -7,6 +7,7 @@ use App\Livewire\SuperAdmin\Branding\Index as BrandingIndex;
 use App\Livewire\SuperAdmin\Pages\Create as PagesCreate;
 use App\Livewire\SuperAdmin\Pages\Edit as PagesEdit;
 use App\Livewire\SuperAdmin\Pages\Index as PagesIndex;
+use App\Livewire\SuperAdmin\Settings\Index as SettingsIndex;
 use App\Mail\ContactInquiryMailable;
 use App\Models\ContactInquiry;
 use App\Models\Page;
@@ -111,6 +112,43 @@ class PagesAndLandingPageTest extends TestCase
             ->assertSee('public-navigation', false);
     }
 
+    public function test_landing_page_renders_superadmin_authored_features_and_testimonials(): void
+    {
+        $branding = PlatformBranding::current();
+        $branding->update([
+            'landing_page_enabled' => true,
+            'landing_features' => [
+                ['icon' => '🚀', 'title' => 'Warp Speed Checkout', 'body' => 'Scan and go in under a second.'],
+            ],
+            'landing_testimonials' => [
+                ['quote' => 'Halved our end-of-day close.', 'name' => 'Priya Nair', 'role' => 'Owner · Nair Provisions'],
+            ],
+        ]);
+
+        $res = $this->get('/');
+        if (! str_contains($res->getContent(), 'Warp Speed Checkout')) {
+            $hasFeaturesSection = str_contains($res->getContent(), 'id="features"');
+            $branding = PlatformBranding::current();
+            throw new \Exception("DBG: hasFeatures={$hasFeaturesSection}, theme=" . setting('landing_page_theme', 'none') . ", brandingFeatures=" . json_encode($branding->landingFeatures()) . ", isSectionEnabled=" . json_encode($branding->isSectionEnabled('features')));
+        }
+        $res->assertOk()
+            ->assertSee('Halved our end-of-day close.')
+            ->assertSee('Priya Nair')
+            // built-in defaults no longer present once overridden
+            ->assertDontSee('Multi-Location Workspaces')
+            ->assertDontSee('Alexander Hayes');
+
+        // The modern theme renders the same lists through its blade components.
+        set_setting('landing_page_theme', 'theme_modern');
+        cache()->forget('app_landing_page_theme');
+        cache()->increment('landing_page_cache_version') ?: cache()->forever('landing_page_cache_version', 2);
+
+        $this->get('/')->assertOk()
+            ->assertSee('Warp Speed Checkout')
+            ->assertSee('Halved our end-of-day close.')
+            ->assertSee('Priya Nair');
+    }
+
     public function test_contact_form_stores_inquiry_and_sends_notification_email(): void
     {
         Mail::fake();
@@ -145,5 +183,99 @@ class PagesAndLandingPageTest extends TestCase
             ->assertHasErrors(['name', 'email', 'message']);
 
         $this->assertSame(0, ContactInquiry::count());
+    }
+
+    public function test_public_contact_endpoint_stores_inquiry_and_notifies(): void
+    {
+        Mail::fake();
+        PlatformBranding::current()->update(['support_email' => 'owner@example.com']);
+
+        $this->post('/contact', [
+            'name' => 'Sam Lead',
+            'email' => 'sam@lead.test',
+            'store_type' => 'Retail Store',
+            'message' => 'Do you support weighing scales at the counter?',
+        ])->assertRedirect();
+
+        $inquiry = ContactInquiry::where('email', 'sam@lead.test')->firstOrFail();
+        $this->assertSame('Retail Store', $inquiry->store_type);
+        Mail::assertQueued(ContactInquiryMailable::class);
+    }
+
+    public function test_public_contact_endpoint_validates_and_honours_the_honeypot(): void
+    {
+        $this->post('/contact', ['email' => 'nope'])
+            ->assertSessionHasErrors(['name', 'email', 'message']);
+
+        // Honeypot filled → silently accepted, nothing stored.
+        $this->post('/contact', [
+            'name' => 'Bot',
+            'email' => 'bot@spam.test',
+            'message' => 'buy cheap things now',
+            'company_website' => 'http://spam.example',
+        ])->assertRedirect();
+
+        $this->assertSame(0, ContactInquiry::count());
+    }
+
+    public function test_superadmin_saves_download_links_and_section_meta(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        Livewire::test(SettingsIndex::class)
+            ->set('platformName', 'Zoom POS')
+            ->set('landingPlaystoreEnabled', true)
+            ->set('landingPlaystoreUrl', 'https://play.google.com/store/apps/details?id=com.zoom.pos')
+            ->set('landingWindowsEnabled', true)
+            ->set('landingWindowsUrl', 'https://cdn.example.com/ZoomPOS-Setup.exe')
+            ->set('sectionMeta.features.title', 'What you get')
+            ->set('sectionMeta.downloads.subtitle', 'Grab the native app')
+            ->set('sectionFaq', false)
+            ->set('landingFaqs', [['q' => 'Is it fast?', 'a' => 'Yes, sub-second checkout.']])
+            ->call('saveBranding')
+            ->assertHasNoErrors();
+
+        $b = PlatformBranding::current()->fresh();
+        $this->assertSame('https://play.google.com/store/apps/details?id=com.zoom.pos', $b->playStoreLink());
+        $this->assertSame('https://cdn.example.com/ZoomPOS-Setup.exe', $b->windowsAppLink());
+        $this->assertTrue($b->hasAnyDownloadLink());
+        $this->assertSame('What you get', $b->getSectionTitle('features', 'default'));
+        $this->assertSame('Grab the native app', $b->getSectionSubtitle('downloads', 'default'));
+        $this->assertFalse($b->isSectionEnabled('faq'));
+        $this->assertSame([['q' => 'Is it fast?', 'a' => 'Yes, sub-second checkout.']], $b->landingFaqs());
+    }
+
+    public function test_download_link_is_hidden_when_disabled_or_blank(): void
+    {
+        $b = PlatformBranding::current();
+
+        $b->update(['landing_playstore_url' => 'https://play.google.com/x', 'landing_playstore_enabled' => false]);
+        $this->assertNull($b->fresh()->playStoreLink());
+
+        $b->update(['landing_playstore_enabled' => true, 'landing_playstore_url' => null]);
+        $this->assertNull($b->fresh()->playStoreLink());
+
+        $b->update(['landing_playstore_url' => 'https://play.google.com/x', 'landing_playstore_enabled' => true]);
+        $this->assertNotNull($b->fresh()->playStoreLink());
+    }
+
+    public function test_landing_page_renders_download_buttons_when_enabled(): void
+    {
+        $page = Page::create(['title' => 'Home', 'slug' => 'home', 'content' => 'Welcome to our platform', 'is_active' => true]);
+        PlatformBranding::current()->update([
+            'landing_page_enabled' => true,
+            'landing_page_id' => $page->id,
+            'landing_playstore_url' => 'https://play.google.com/store/apps/details?id=com.zoom.pos',
+            'landing_playstore_enabled' => true,
+        ]);
+
+        $response = $this->get('/');
+        $response->assertOk()
+            ->assertSee('https://play.google.com/store/apps/details?id=com.zoom.pos', false)
+            ->assertSee('Google Play')
+            ->assertSee('id="download"', false);
+
+        // Windows link stays hidden while disabled.
+        $response->assertDontSee('DOWNLOAD FOR');
     }
 }

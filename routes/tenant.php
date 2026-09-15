@@ -1,6 +1,10 @@
 <?php
 
 use App\Http\Controllers\Sync\CatalogViewController;
+use App\Http\Controllers\Api\DispatchController as ApiDispatchController;
+use App\Http\Controllers\Api\DocumentPreviewController as ApiDocumentPreviewController;
+use App\Http\Controllers\Api\NotificationController as ApiNotificationController;
+use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Controllers\Tenant\BackupDownloadController;
 use App\Http\Controllers\Tenant\CashRegisterSlipController;
 use App\Http\Controllers\Tenant\ImpersonationController;
@@ -12,6 +16,7 @@ use App\Http\Controllers\Tenant\RepairPortalController;
 use App\Http\Controllers\Tenant\Restaurant\KotController;
 use App\Http\Controllers\Tenant\Restaurant\TableOrderController;
 use App\Http\Controllers\Tenant\SubscriptionInvoiceController;
+use App\Http\Controllers\Tenant\UserPreferenceController;
 use App\Http\Middleware\CheckMaintenanceMode;
 use App\Http\Middleware\ResolveTenantContext;
 use App\Livewire\Auth\AcceptInvite;
@@ -30,11 +35,18 @@ use App\Livewire\Tenant\Dashboard;
 use App\Livewire\Tenant\Devices;
 use App\Livewire\Tenant\Financials;
 use App\Livewire\Tenant\Languages;
+use App\Livewire\Tenant\Pharmacy\Batches;
+use App\Livewire\Tenant\Pharmacy\Prescriptions;
 use App\Livewire\Tenant\Products;
 use App\Livewire\Tenant\Quotes;
+use App\Livewire\Tenant\Repair\TicketDetail;
+use App\Livewire\Tenant\Repair\Tickets;
 use App\Livewire\Tenant\Reports;
 use App\Livewire\Tenant\Restaurant;
 use App\Livewire\Tenant\Sales;
+use App\Livewire\Tenant\Salon\Calendar;
+use App\Livewire\Tenant\Salon\ServiceCatalog;
+use App\Livewire\Tenant\Salon\Stylists;
 use App\Livewire\Tenant\Settings;
 use App\Livewire\Tenant\Suppliers;
 use App\Livewire\Tenant\Units;
@@ -65,10 +77,10 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         ->name('register');
 
     Route::middleware('guest:web')->group(function () {
-        Route::get('/forgot-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'showForgotForm'])->name('password.request');
-        Route::post('/forgot-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'sendResetLink'])->name('password.email');
-        Route::get('/reset-password/{token}', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'showResetForm'])->name('password.reset.form');
-        Route::post('/reset-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'reset'])->name('password.reset');
+        Route::get('/forgot-password', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
+        Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])->name('password.email');
+        Route::get('/reset-password/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset.form');
+        Route::post('/reset-password', [PasswordResetController::class, 'reset'])->name('password.reset');
     });
 
     Route::get('/verify-otp', VerifyOtp::class)
@@ -97,11 +109,17 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         Route::get('/settings/financial', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.financial');
         Route::get('/settings/taxes', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.taxes');
         Route::get('/settings/api', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.api');
+        Route::get('/settings/integrations', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.integrations');
         Route::get('/settings/navigation', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.navigation');
         Route::post('/settings/navigation-menu', [NavigationMenuController::class, 'store'])
             ->middleware('tenant.permission:settings,edit')
             ->name('settings.navigation-menu.store');
-        Route::post('/settings/change-password', [\App\Http\Controllers\Tenant\Auth\PasswordResetController::class, 'changePassword'])->name('settings.change-password');
+        Route::post('/settings/change-password', [PasswordResetController::class, 'changePassword'])->name('settings.change-password');
+
+        // Per-user workspace preference — the dockable nav position. Any
+        // signed-in user may move their own dock; no settings permission.
+        Route::post('/preferences/dock-position', [UserPreferenceController::class, 'updateDockPosition'])
+            ->name('preferences.dock-position');
         Route::redirect('/settings-redirect', '/tenant/settings')->name('settings');
         Route::get('/settings/backup/download', [BackupDownloadController::class, 'download'])->middleware('tenant.permission:settings,view')->name('settings.backup.download');
         Route::get('/languages', Languages\Index::class)->middleware('tenant.permission:settings,view')->name('languages.index');
@@ -109,6 +127,22 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         // Core Dashboard & POS Operations (Protected by Subscription Status Middleware)
         Route::middleware('tenant.subscription')->group(function () {
             Route::get('/', Dashboard::class)->name('dashboard');
+
+            // Session-authenticated SDUI endpoints used by the web dashboard.
+            // They share the same controllers and schemas as the Sanctum API
+            // endpoints so browser and Flutter surfaces stay in sync.
+            Route::get('/notifications/feed', [ApiNotificationController::class, 'feed'])
+                ->name('notifications.feed');
+            Route::get('/documents/{type}/{id}/preview-modal', [ApiDocumentPreviewController::class, 'previewModal'])
+                ->name('documents.preview-modal');
+            Route::get('/documents/{type}/{id}/render-html', [ApiDocumentPreviewController::class, 'renderHtml'])
+                ->name('documents.render-html');
+            Route::post('/dispatch/sms', [ApiDispatchController::class, 'dispatchSms'])
+                ->name('dispatch.sms');
+            Route::post('/dispatch/email', [ApiDispatchController::class, 'dispatchEmail'])
+                ->name('dispatch.email');
+            Route::post('/dispatch/{type}/{id}', [ApiDispatchController::class, 'dispatchDocument'])
+                ->name('dispatch.document');
 
             Route::get('/products', Products\Index::class)->middleware('tenant.permission:products,view')->name('products.index');
             Route::get('/categories', Categories\Index::class)->middleware('tenant.permission:categories,view')->name('categories.index');
@@ -146,6 +180,16 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
             Route::get('/quotations/{quote}/pdf', [QuotationController::class, 'pdf'])->middleware(['tenant.permission:quotes,view', 'tenant.pos_mode:general'])->name('quotations.pdf');
             Route::post('/quotations/{quote}/send', [QuotationController::class, 'send'])->middleware(['tenant.permission:quotes,export', 'tenant.pos_mode:general'])->name('quotations.send');
 
+            // Lead Management System
+            Route::get('/leads', [\App\Http\Controllers\Tenant\LeadWebController::class, 'index'])->middleware('tenant.permission:leads,view')->name('leads.index');
+            Route::get('/leads/create', [\App\Http\Controllers\Tenant\LeadWebController::class, 'create'])->middleware('tenant.permission:leads,create')->name('leads.create');
+            Route::get('/leads/{id}', [\App\Http\Controllers\Tenant\LeadWebController::class, 'show'])->middleware('tenant.permission:leads,view')->name('leads.show');
+            Route::post('/leads', [\App\Http\Controllers\Tenant\LeadWebController::class, 'store'])->middleware('tenant.permission:leads,create')->name('leads.store');
+            Route::match(['put', 'patch'], '/leads/{id}', [\App\Http\Controllers\Tenant\LeadWebController::class, 'update'])->middleware('tenant.permission:leads,edit')->name('leads.update');
+            Route::delete('/leads/{id}', [\App\Http\Controllers\Tenant\LeadWebController::class, 'destroy'])->middleware('tenant.permission:leads,edit')->name('leads.destroy');
+            Route::post('/leads/{id}/activities', [\App\Http\Controllers\Tenant\LeadWebController::class, 'storeActivity'])->middleware('tenant.permission:leads,edit')->name('leads.activities.store');
+            Route::post('/leads/activities/{id}/complete', [\App\Http\Controllers\Tenant\LeadWebController::class, 'completeActivity'])->middleware('tenant.permission:leads,edit')->name('leads.activities.complete');
+
             // Consignments
             Route::get('/consignments', Index::class)->middleware(['tenant.permission:consignments,view', 'tenant.pos_mode:general'])->name('consignments.index');
             Route::get('/consignments/create', Create::class)->middleware(['tenant.permission:consignments,create', 'tenant.pos_mode:general'])->name('consignments.create');
@@ -179,6 +223,28 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
             Route::get('/restaurant/kds', Restaurant\Kds::class)->middleware(['tenant.permission:pos,view', 'tenant.pos_mode:restaurant'])->name('restaurant.kds');
             Route::get('/restaurant/kot/{kot}/print', [KotController::class, 'print'])->middleware(['tenant.permission:pos,view', 'tenant.pos_mode:restaurant'])->name('restaurant.kot.print');
             Route::get('/restaurant/tables/{table}/qr', [TableOrderController::class, 'qrCard'])->middleware(['tenant.permission:pos,view', 'tenant.pos_mode:restaurant'])->name('restaurant.table.qr');
+
+            // Pharmacy vertical — gated to stores licensed for the pharmacy module.
+            Route::middleware('tenant.vertical:pharmacy')->prefix('pharmacy')->name('pharmacy.')->group(function () {
+                Route::get('/', App\Livewire\Tenant\Pharmacy\Dashboard::class)->middleware('tenant.permission:products,view')->name('dashboard');
+                Route::get('/batches', Batches::class)->middleware('tenant.permission:products,view')->name('batches');
+                Route::get('/prescriptions', Prescriptions::class)->middleware('tenant.permission:sales,view')->name('prescriptions');
+            });
+
+            // Salon & Service Booking vertical.
+            Route::middleware('tenant.vertical:service_booking')->prefix('salon')->name('salon.')->group(function () {
+                Route::get('/', Calendar::class)->middleware('tenant.permission:service_orders,view')->name('calendar');
+                Route::get('/stylists', Stylists::class)->middleware('tenant.permission:service_orders,view')->name('stylists');
+                Route::get('/services', ServiceCatalog::class)->middleware('tenant.permission:products,view')->name('services');
+            });
+
+            // Repair & Technician workbench vertical.
+            Route::middleware('tenant.vertical:repair_technician')->prefix('repair')->name('repair.')->group(function () {
+                Route::get('/', App\Livewire\Tenant\Repair\Dashboard::class)->middleware('tenant.permission:repair,view')->name('dashboard');
+                Route::get('/tickets', Tickets::class)->middleware('tenant.permission:repair,view')->name('tickets');
+                Route::get('/tickets/{ticket}', TicketDetail::class)->middleware('tenant.permission:repair,view')->name('ticket');
+                Route::get('/categories', App\Livewire\Tenant\Repair\Categories::class)->middleware('tenant.permission:repair,diagnose')->name('categories');
+            });
 
             Route::get('/catalog', Catalog\Index::class)->middleware('tenant.permission:catalog,view')->name('catalog.index');
 

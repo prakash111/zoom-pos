@@ -10,6 +10,6 @@
             <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-white">{{ __('Questions before you sign up?') }}</h2>
             <p class="mt-2 text-sm text-slate-400">{{ __("Send our enterprise POS & inventory solutions team a note and we'll reply within 24 hours.") }}</p>
         </div>
-        <livewire:public.contact-form />
+        <x-landing.contact-form />
     </div>
 </div>

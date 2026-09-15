@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Services\Navigation\TenantNavRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -116,6 +117,75 @@ class AppBootstrapApiTest extends TestCase
             ->assertJsonPath('nav.items', $expectedItems);
     }
 
+    public function test_nav_save_persists_cross_section_settings_tree_and_invalidates_drawer_cache(): void
+    {
+        $token = $this->token();
+        Cache::put("tenant_{$this->company->id}_drawer_menu", ['stale'], 600);
+
+        $payload = [
+            'sections' => [
+                ['key' => 'billing', 'order' => 0, 'custom_title' => 'Subscription & Billing'],
+                ['key' => 'administration', 'order' => 1, 'custom_title' => 'Administration & Settings'],
+            ],
+            'items' => [
+                ['key' => 'subscription', 'section' => 'billing', 'parent' => null, 'level' => 0, 'order' => 0, 'visible' => true],
+                ['key' => 'settings', 'section' => 'administration', 'parent' => null, 'level' => 0, 'order' => 0, 'visible' => true],
+                ['key' => 'settings_profile', 'section' => 'administration', 'parent' => 'settings', 'level' => 1, 'order' => 0, 'visible' => true],
+            ],
+        ];
+
+        $this->withToken($token)->postJson('/api/v1/pos/settings/nav-config', $payload)
+            ->assertOk()
+            ->assertJsonPath('nav.sections.1.custom_title', 'Administration & Settings')
+            ->assertJsonPath('nav.tree.1.items.0.key', 'settings')
+            ->assertJsonPath('nav.tree.1.items.0.parent_id', null)
+            ->assertJsonPath('nav.tree.1.items.0.children.0.key', 'settings_profile');
+
+        $this->assertFalse(Cache::has("tenant_{$this->company->id}_drawer_menu"));
+        $stored = $this->company->fresh()->nav_config;
+        $this->assertSame('settings', $stored['tree'][1]['items'][0]['key']);
+        $this->assertNull($stored['tree'][1]['items'][0]['parent_id']);
+
+        // A separate bootstrap request reads the database copy, not the
+        // controller's in-memory response payload.
+        $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap?locale=en')
+            ->assertOk()
+            ->assertJsonPath('nav.tree.1.items.0.key', 'settings')
+            ->assertJsonPath('nav.tree.1.items.0.children.0.parent_id', 'settings');
+    }
+
+    public function test_empty_nav_save_is_rejected_without_erasing_existing_customization(): void
+    {
+        $existing = [
+            'sections' => [['key' => 'cashier_sales', 'order' => 0]],
+            'items' => [['key' => 'pos', 'section' => 'cashier_sales', 'parent' => null, 'parent_id' => null, 'level' => 0, 'order' => 0, 'visible' => true]],
+            'tree' => [[
+                'key' => 'cashier_sales',
+                'order' => 0,
+                'items' => [[
+                    'key' => 'pos',
+                    'section' => 'cashier_sales',
+                    'parent' => null,
+                    'parent_id' => null,
+                    'level' => 0,
+                    'order' => 0,
+                    'visible' => true,
+                    'children' => [],
+                ]],
+            ]],
+        ];
+        $this->company->update(['nav_config' => $existing]);
+
+        $this->withToken($this->token())->postJson('/api/v1/pos/settings/nav-config', [
+            'sections' => [],
+            'items' => [],
+        ])->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('error', 'Invalid menu configuration.');
+
+        $this->assertSame($existing, $this->company->fresh()->nav_config);
+    }
+
     public function test_nested_item_parent_round_trips_through_update_and_bootstrap(): void
     {
         $token = $this->token();
@@ -126,22 +196,24 @@ class AppBootstrapApiTest extends TestCase
             ],
             'items' => [
                 ['key' => 'settings', 'section' => 'administration', 'parent' => null, 'order' => 0, 'visible' => true],
-                // Un-nested from "settings" back to the section root.
+                // A drag tried to pull "settings_navigation" out to the section
+                // root — but every Store Settings tab is registry-pinned under
+                // the "settings" accordion, so normalize() snaps it back.
                 ['key' => 'settings_navigation', 'section' => 'administration', 'parent' => null, 'order' => 1, 'visible' => true],
-                // Nested under "settings" (only one of the eight tabs kept).
                 ['key' => 'settings_profile', 'section' => 'administration', 'parent' => 'settings', 'order' => 0, 'visible' => true],
             ],
         ];
         $expectedItems = [
             ['key' => 'settings', 'section' => 'administration', 'parent' => null, 'parent_id' => null, 'level' => 0, 'order' => 0, 'visible' => true],
             ['key' => 'settings_profile', 'section' => 'administration', 'parent' => 'settings', 'parent_id' => 'settings', 'level' => 1, 'order' => 0, 'visible' => true],
-            ['key' => 'settings_navigation', 'section' => 'administration', 'parent' => null, 'parent_id' => null, 'level' => 0, 'order' => 1, 'visible' => true],
+            ['key' => 'settings_navigation', 'section' => 'administration', 'parent' => 'settings', 'parent_id' => 'settings', 'level' => 1, 'order' => 1, 'visible' => true],
         ];
 
         $this->withToken($token)->postJson('/api/v1/pos/settings/nav-config', $payload)
             ->assertOk()
             ->assertJsonPath('nav.items', $expectedItems)
-            ->assertJsonPath('nav.tree.0.items.0.children.0.key', 'settings_profile');
+            ->assertJsonPath('nav.tree.0.items.0.children.0.key', 'settings_profile')
+            ->assertJsonPath('nav.tree.0.items.0.children.1.key', 'settings_navigation');
 
         $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap?locale=en')
             ->assertOk()
@@ -217,10 +289,19 @@ class AppBootstrapApiTest extends TestCase
             ->assertJsonPath('modules.restaurant.layout_type', 'table_floor_plan')
             ->assertJsonPath('modules.restaurant.features.has_tables', true)
             ->assertJsonPath('modules.restaurant.features.has_kot', true)
-            ->assertJsonPath('modules.pharmacy.id', 'pharmacy')
-            ->assertJsonPath('modules.service_booking.id', 'service_booking')
+            // retail + restaurant are the only native verticals; others arrive
+            // as installed packages (see PackagedVerticalModulesTest).
+            ->assertJsonMissingPath('modules.pharmacy')
             ->assertJsonPath('menu_structure.0.key', 'cashier_sales')
             ->assertJsonPath('menu_structure.0.items.0.key', 'pos')
+            ->assertJsonPath('menu_structure.0.first_item.key', 'pos')
+            ->assertJsonPath('menu_structure.0.first_item.title', 'Point of Sale')
+            ->assertJsonPath('menu_structure.0.first_item.action_type', 'NAVIGATE_TO')
+            ->assertJsonPath('menu_structure.0.first_item.action.type', 'NAVIGATE_TO')
+            ->assertJsonPath('menu_structure.0.first_item.route', '/api/tenant/views/pos')
+            ->assertJsonPath('menu_structure.0.sub_items.0.key', 'sales')
+            ->assertJsonPath('menu_structure.0.show_top_divider', true)
+            ->assertJsonPath('menu_structure.0.divider_style.color', 'theme.divider')
             ->assertJsonStructure([
                 'tenant' => ['id', 'business_name', 'active_mode', 'available_modes'],
                 'modules' => [
@@ -230,6 +311,20 @@ class AppBootstrapApiTest extends TestCase
                 'menu_structure',
                 'ui_schema' => ['payment_methods', 'status_labels', 'tax_configuration', 'action_pills'],
             ]);
+    }
+
+    public function test_bootstrap_exposes_active_features_and_store_types_for_zero_touch_clients(): void
+    {
+        $response = $this->withToken($this->token())->getJson('/api/v1/pos/app/bootstrap?locale=en');
+
+        $response->assertOk()
+            ->assertJsonPath('store_types', ['retail'])
+            ->assertJsonStructure(['active_features', 'store_types']);
+
+        $features = $response->json('active_features');
+        $this->assertIsArray($features);
+        $this->assertArrayHasKey('has_barcode_scanner', $features);
+        $this->assertTrue($features['has_barcode_scanner']);
     }
 
     public function test_empty_or_corrupted_database_navigation_falls_back_to_core_sections(): void
@@ -310,6 +405,15 @@ class AppBootstrapApiTest extends TestCase
                 $this->assertArrayHasKey('title', $section);
                 $this->assertEquals($section['label'], $section['title']);
                 $this->assertNotEmpty($section['items']);
+                $this->assertSame($section['items'][0]['key'], $section['first_item']['key']);
+                $this->assertSame(
+                    array_column(array_slice($section['items'], 1), 'key'),
+                    array_column($section['sub_items'], 'key')
+                );
+                $this->assertTrue($section['show_top_divider']);
+                $this->assertSame('theme.divider', $section['divider_style']['color']);
+                $this->assertSame('NAVIGATE_TO', $section['first_item']['action_type']);
+                $this->assertSame($section['first_item']['route'], $section['first_item']['action']['route']);
 
                 foreach ($section['items'] as $item) {
                     $this->assertArrayHasKey('key', $item);
@@ -325,17 +429,17 @@ class AppBootstrapApiTest extends TestCase
 
     public function test_bootstrap_seeds_sample_data_on_first_launch_without_error(): void
     {
-        $unseededCompany = \App\Models\Company::create([
-            'id' => 'test_unseeded_' . uniqid(),
+        $unseededCompany = Company::create([
+            'id' => 'test_unseeded_'.uniqid(),
             'name' => 'Unseeded Test Store',
             'pos_mode' => 'retail',
             'is_seeding_complete' => false,
             'status' => 'active',
         ]);
 
-        $user = \App\Models\User::factory()->create([
+        $user = User::factory()->create([
             'company_id' => $unseededCompany->id,
-            'email' => 'unseeded_' . uniqid() . '@example.com',
+            'email' => 'unseeded_'.uniqid().'@example.com',
             'password' => Hash::make('secret123'),
             'role' => 'admin',
         ]);
@@ -425,4 +529,3 @@ class AppBootstrapApiTest extends TestCase
         $this->assertNotContains('service_orders', $serviceItems);
     }
 }
-

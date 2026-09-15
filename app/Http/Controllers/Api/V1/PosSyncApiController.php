@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\ReceivablesController;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
@@ -15,7 +16,9 @@ use App\Models\OrderPayment;
 use App\Models\PaymentMethod;
 use App\Models\Plan;
 use App\Models\PlatformBranding;
+use App\Models\PlatformSystem;
 use App\Models\Product;
+use App\Models\PushDevice;
 use App\Models\Sale;
 use App\Models\Subscription;
 use App\Models\Supplier;
@@ -29,10 +32,16 @@ use App\Services\Delivery\WebhookDispatchService;
 use App\Services\Financial\CustomerLedgerService;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Modular\ModuleRegistry;
+use App\Services\Notifications\TenantNotificationDispatcherService;
 use App\Services\Payment\SubscriptionPaymentGatewayService;
+use App\Services\Sdui\SchemaResponse;
+use App\Services\SmsGatewayService;
+use App\Services\TaxCalculationService;
 use App\Services\TaxEngineService;
 use App\Services\Tenancy\TenantProvisioningService;
 use Carbon\Carbon;
+use Database\Seeders\DemoAccountsSeeder;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,12 +59,30 @@ class PosSyncApiController extends Controller
 
     protected function desktopPermissions(User $user): array
     {
+        $company = $user->company;
+        $hasLeadMod = (bool) ($company && ($company->hasModule('leadmanagement') || $company->hasModule('lead_management') || $company->hasModule('leads')));
+
         $permissions = [
+            'pos' => true,
+            'pos.view' => true,
             'pos.create' => $user->hasPermission('pos', 'create'),
             'pos.edit' => $user->hasPermission('pos', 'edit'),
+            'sales' => true,
+            'sales.view' => $user->hasPermission('sales', 'view'),
+            'quotes' => $user->hasPermission('quotes', 'view'),
+            'quotes.view' => $user->hasPermission('quotes', 'view'),
+            'quotations' => $user->hasPermission('quotes', 'view'),
+            'quotations.view' => $user->hasPermission('quotes', 'view'),
+            'leads' => $hasLeadMod && $user->hasPermission('leads', 'view'),
+            'leads.view' => $hasLeadMod && $user->hasPermission('leads', 'view'),
+            'lead_management' => $hasLeadMod && $user->hasPermission('leads', 'view'),
+            'lead_management.view' => $hasLeadMod && $user->hasPermission('leads', 'view'),
+            'consignments' => $user->hasPermission('consignments', 'view'),
+            'consignments.view' => $user->hasPermission('consignments', 'view'),
             'products.view' => $user->hasPermission('products', 'view'),
             'products.create' => $user->hasPermission('products', 'create'),
             'products.edit' => $user->hasPermission('products', 'edit'),
+            'customers' => $user->hasPermission('customers', 'view'),
             'customers.view' => $user->hasPermission('customers', 'view'),
             'customers.create' => $user->hasPermission('customers', 'create'),
             'customers.edit' => $user->hasPermission('customers', 'edit'),
@@ -63,12 +90,17 @@ class PosSyncApiController extends Controller
             'settings.view' => $user->hasPermission('settings', 'view'),
         ];
 
+        if ($user->isPrivilegedRole()) {
+            $permissions['*'] = true;
+        }
+
         // A `.view` flag for every remaining module (mirrors
         // PermissionChecker::MODULES exactly) so the mobile drawer/menu can
         // gate each feature tile by the user's own authorized modules
         // instead of showing every module to every role.
         foreach (array_keys(PermissionChecker::MODULES) as $module) {
             $permissions["{$module}.view"] ??= $user->hasPermission($module, 'view');
+            $permissions[$module] ??= $permissions["{$module}.view"];
         }
 
         return $permissions;
@@ -84,6 +116,10 @@ class PosSyncApiController extends Controller
             'email' => ['required', 'string'],
             'password' => ['required', 'string'],
             'account_id' => ['nullable', 'string'],
+            'fcm_token' => ['nullable', 'string', 'max:512'],
+            'push_token' => ['nullable', 'string', 'max:512'],
+            'platform' => ['nullable', 'string', 'in:android,ios,web'],
+            'device_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         if ($validator->fails()) {
@@ -215,6 +251,30 @@ class PosSyncApiController extends Controller
             ]);
         }
 
+        // Associate or reactivate push notification device token if provided
+        $pushToken = $request->input('fcm_token')
+            ?? $request->input('push_token')
+            ?? null;
+
+        if ($pushToken && is_string($pushToken) && trim($pushToken) !== '') {
+            $pushToken = trim($pushToken);
+            $devicePlatform = strtolower((string) ($request->input('platform') ?? 'android'));
+            if (! in_array($devicePlatform, ['android', 'ios', 'web'], true)) {
+                $devicePlatform = 'android';
+            }
+            PushDevice::withoutGlobalScope('company')->updateOrCreate(
+                ['token' => $pushToken],
+                [
+                    'company_id' => $company->id,
+                    'user_id' => $user->id,
+                    'platform' => $devicePlatform,
+                    'device_name' => $deviceName,
+                    'last_seen_at' => now(),
+                    'revoked_at' => null,
+                ]
+            );
+        }
+
         $subscription = Subscription::query()
             ->withoutGlobalScope('company')
             ->where('company_id', $company->id)
@@ -222,9 +282,15 @@ class PosSyncApiController extends Controller
             ->latest('started_at')
             ->first();
 
+        $businessType = strtoupper($company->pos_mode ?: 'RETAIL');
+        $activeFeatures = ModuleRegistry::activeFeaturesFor($company);
+
         return response()->json([
             'success' => true,
             'token' => $apiKey->token,
+            'business_type' => $businessType,
+            'plan_features' => $activeFeatures,
+            'features' => $activeFeatures,
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -234,10 +300,28 @@ class PosSyncApiController extends Controller
                 'company_id' => $user->company_id,
                 'permissions' => $this->desktopPermissions($user),
             ],
+            'drawer_header' => $company->getDrawerHeaderPayload(),
+            'header' => $company->getDrawerHeaderPayload(),
+            'tenant' => [
+                'id' => (string) $company->id,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $company->getEffectiveTradeName(),
+                'trading_name' => $company->getEffectiveTradeName(),
+                'business_type' => $businessType,
+                'plan_features' => $activeFeatures,
+                'features' => $activeFeatures,
+                'active_mode' => strtolower(trim(ModuleRegistry::resolveActiveMode($company))),
+                'available_modes' => ModuleRegistry::availableModes($company),
+            ],
             'company' => [
                 'id' => $company->id,
-                'name' => $company->name,
-                'trade_name' => $company->trade_name ?? $company->name,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $company->getEffectiveTradeName(),
+                'trading_name' => $company->getEffectiveTradeName(),
+                'store_name' => $company->display_name,
+                'display_name' => $company->display_name,
                 'slug' => $company->slug,
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
@@ -254,8 +338,15 @@ class PosSyncApiController extends Controller
                 'plan_name' => $company->plan_name ?? 'trial',
                 'expires_at' => $company->expires_at?->toIso8601String(),
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
+                'business_type' => $businessType,
+                'plan_features' => $activeFeatures,
+                'features' => $activeFeatures,
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
+                'logo_url' => $company->getLogoUrl(),
+                'favicon_url' => $company->getFaviconUrl(),
+                'drawer_header' => $company->getDrawerHeaderPayload(),
+                'header' => $company->getDrawerHeaderPayload(),
             ],
             // Only present when the tenant is actually on a plan — lets a fresh
             // desktop device provision a local mirror of both rows (companies.plan_name
@@ -337,19 +428,42 @@ class PosSyncApiController extends Controller
     }
 
     /**
-     * Platform-wide (not tenant-scoped) branding for pre-auth screens —
-     * currently just the Sign In screen's logo, set by the Superadmin in
-     * Branding settings. GET /api/v1/pos/auth/branding
+     * Platform-wide (not tenant-scoped) branding + theme for the pre-auth
+     * screens (Splash / Login / Register / Forgot Password), set by the
+     * Superadmin in Branding settings. Tenants override this after sign-in.
+     *
+     * GET /api/v1/pos/auth/branding
+     * GET /api/v1/pos/auth/public-settings   (same payload, canonical name)
      */
     public function branding(): JsonResponse
     {
         $branding = PlatformBranding::current();
+        $settings = $branding->publicSettings();
 
         return response()->json([
             'success' => true,
-            'platform_name' => $branding->platform_name ?: config('app.name', 'Smart Inventory & Sales'),
-            'brand_logo_url' => $branding->getLogoPublicUrl(),
+            // Superadmin global defaults — the canonical nested contract.
+            'platform' => $settings['platform'],
+            'theme' => $settings['theme'],
+            // Flat aliases kept for older clients — the Superadmin "Platform
+            // Title / App Name" under every name the pre-auth screens read.
+            'platform_name' => $settings['platform']['name'],
+            'platform_title' => $settings['platform']['name'],
+            'app_name' => $settings['platform']['name'],
+            'brand_logo_url' => $settings['platform']['logo_url'],
+            // Primary colour under every name a client might parse.
+            'primary_color' => $settings['theme']['primary_color'],
+            'brand_color' => $settings['theme']['primary_color'],
+            'platform_tagline' => null,
+            'header_inline' => true,
+            'show_tagline' => false,
         ]);
+    }
+
+    /** Alias of [branding] under a clearer name. GET .../auth/public-settings */
+    public function publicSettings(): JsonResponse
+    {
+        return $this->branding();
     }
 
     /**
@@ -359,13 +473,26 @@ class PosSyncApiController extends Controller
      */
     public function authConfig(): JsonResponse
     {
-        $googleEnabled = filter_var(\App\Models\PlatformSystem::get('social_google_enabled', false), FILTER_VALIDATE_BOOLEAN)
+        $googleEnabled = filter_var(PlatformSystem::get('social_google_enabled', false), FILTER_VALIDATE_BOOLEAN)
             || (bool) config('services.google.enabled', true);
-        $googleClientId = (string) (\App\Models\PlatformSystem::get('social_google_client_id') ?: config('services.google.client_id', ''));
+        $googleClientId = (string) (PlatformSystem::get('social_google_client_id') ?: config('services.google.client_id', ''));
 
-        $facebookEnabled = filter_var(\App\Models\PlatformSystem::get('social_facebook_enabled', false), FILTER_VALIDATE_BOOLEAN)
+        $facebookEnabled = filter_var(PlatformSystem::get('social_facebook_enabled', false), FILTER_VALIDATE_BOOLEAN)
             || (bool) config('services.facebook.enabled', true);
-        $facebookClientId = (string) (\App\Models\PlatformSystem::get('social_facebook_client_id') ?: config('services.facebook.client_id', ''));
+        $facebookClientId = (string) (PlatformSystem::get('social_facebook_client_id') ?: config('services.facebook.client_id', ''));
+
+        $demoMode = (bool) config('app.demo_mode');
+        $demoAccounts = [];
+        if ($demoMode) {
+            foreach (DemoAccountsSeeder::ACCOUNTS as $storeType => $meta) {
+                $demoAccounts[] = [
+                    'label' => $meta['label'],
+                    'store_type' => $storeType,
+                    'email' => $meta['email'],
+                    'password' => DemoAccountsSeeder::PASSWORD,
+                ];
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -375,6 +502,10 @@ class PosSyncApiController extends Controller
                 'google_client_id' => $googleClientId ?: null,
                 'facebook_client_id' => $facebookClientId ?: null,
             ],
+            // Zero-Flutter-touch 1-click demo login: the client renders a
+            // quick-fill chip bar from this list and auto-submits on tap.
+            'demo_mode' => $demoMode,
+            'demo_accounts' => $demoAccounts,
         ]);
     }
 
@@ -466,7 +597,7 @@ class PosSyncApiController extends Controller
                 try {
                     app(AuthApiController::class)->sendOtpEmail($user->email, $otp, $branding);
                 } catch (\Throwable $e) {
-                    Log::warning("Failed to send OTP verification email to {$user->email}: " . $e->getMessage());
+                    Log::warning("Failed to send OTP verification email to {$user->email}: ".$e->getMessage());
                 }
 
                 return response()->json([
@@ -521,6 +652,8 @@ class PosSyncApiController extends Controller
                     'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                     'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                     'drawer_cover_url' => $company->getDrawerCoverUrl(),
+                    'logo_url' => $company->getLogoUrl(),
+                    'favicon_url' => $company->getFaviconUrl(),
                 ],
                 'plan' => $company->plan ? $company->plan->only([
                     'name', 'display_name', 'billing_cycle', 'duration_days', 'price', 'currency', 'features', 'limits', 'active',
@@ -550,8 +683,14 @@ class PosSyncApiController extends Controller
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
+        $businessType = strtoupper($company->pos_mode ?: 'RETAIL');
+        $activeFeatures = ModuleRegistry::activeFeaturesFor($company);
+
         return response()->json([
             'success' => true,
+            'business_type' => $businessType,
+            'plan_features' => $activeFeatures,
+            'features' => $activeFeatures,
             'user' => $user ? [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -560,10 +699,28 @@ class PosSyncApiController extends Controller
                 'company_id' => $user->company_id,
                 'permissions' => $this->desktopPermissions($user),
             ] : null,
+            'drawer_header' => $company->getDrawerHeaderPayload(),
+            'header' => $company->getDrawerHeaderPayload(),
+            'tenant' => [
+                'id' => (string) $company->id,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $company->getEffectiveTradeName(),
+                'trading_name' => $company->getEffectiveTradeName(),
+                'business_type' => $businessType,
+                'plan_features' => $activeFeatures,
+                'features' => $activeFeatures,
+                'active_mode' => strtolower(trim(ModuleRegistry::resolveActiveMode($company))),
+                'available_modes' => ModuleRegistry::availableModes($company),
+            ],
             'company' => [
                 'id' => $company->id,
-                'name' => $company->name,
-                'trade_name' => $company->trade_name ?? $company->name,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $company->getEffectiveTradeName(),
+                'trading_name' => $company->getEffectiveTradeName(),
+                'store_name' => $company->display_name,
+                'display_name' => $company->display_name,
                 'slug' => $company->slug,
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
@@ -580,10 +737,17 @@ class PosSyncApiController extends Controller
                 'plan_name' => $company->plan_name ?? 'trial',
                 'expires_at' => $company->expires_at?->toIso8601String(),
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
+                'business_type' => $businessType,
+                'plan_features' => $activeFeatures,
+                'features' => $activeFeatures,
                 'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
-                'navigation_labels' => $company->navigation_labels ?? new \stdClass(),
-                'form_field_customizations' => $company->form_field_customizations ?? new \stdClass(),
+                'logo_url' => $company->getLogoUrl(),
+                'favicon_url' => $company->getFaviconUrl(),
+                'navigation_labels' => $company->navigation_labels ?? new \stdClass,
+                'form_field_customizations' => $company->form_field_customizations ?? new \stdClass,
+                'drawer_header' => $company->getDrawerHeaderPayload(),
+                'header' => $company->getDrawerHeaderPayload(),
             ],
         ]);
     }
@@ -631,10 +795,16 @@ class PosSyncApiController extends Controller
             'success' => true,
             'status' => 'online',
             'server_time' => now()->toIso8601String(),
+            'header' => $company->getDrawerHeaderPayload(),
+            'drawer_header' => $company->getDrawerHeaderPayload(),
             'company' => [
                 'id' => $company->id,
-                'name' => $company->name,
-                'trade_name' => $company->trade_name ?? $company->name,
+                'name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'trade_name' => $company->getEffectiveTradeName(),
+                'trading_name' => $company->getEffectiveTradeName(),
+                'store_name' => $company->display_name,
+                'display_name' => $company->display_name,
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
                 'tax_number' => $company->document ?? $company->tax_id ?? '',
@@ -644,6 +814,11 @@ class PosSyncApiController extends Controller
                 'state' => $company->state ?? '',
                 'phone' => $company->phone ?? '',
                 'receipt_footer_note' => $company->receipt_footer_note ?? 'Thank you for your business!',
+                'logo_url' => $company->getLogoUrl(),
+                'favicon_url' => $company->getFaviconUrl(),
+                'drawer_cover_url' => $company->getDrawerCoverUrl(),
+                'drawer_header' => $company->getDrawerHeaderPayload(),
+                'header' => $company->getDrawerHeaderPayload(),
             ],
             'features' => [
                 'offline_sync' => true,
@@ -931,9 +1106,34 @@ class PosSyncApiController extends Controller
             'invoice_terms' => $company->invoice_terms,
             'quote_terms' => $company->quote_terms,
             'bank_details' => $company->bank_details,
+            'logo_url' => $company->getLogoUrl(),
+            'favicon_url' => $company->getFaviconUrl(),
+            'drawer_cover_url' => $company->getDrawerCoverUrl(),
         ];
 
-        return response()->json([
+        // Tombstones: rows deleted (by a delta-only client's queued offline
+        // delete, replayed through syncBatch) since `since`. Keyed by the
+        // plural entity name, matching the data arrays. Additive — a client
+        // that predates this key simply never prunes, which is the previous
+        // behaviour. With no `since` every tombstone is returned so a fresh
+        // client starts already converged.
+        $tombstoneQuery = DB::table('sync_tombstones')->where('company_id', $company->id);
+        if ($sinceCarbon) {
+            $tombstoneQuery->where('deleted_at', '>=', $sinceCarbon);
+        }
+        $entityPlural = [];
+        foreach (self::syncEntityConfig() as $entity => $cfg) {
+            $entityPlural[$entity] = $cfg['plural'];
+        }
+        $deletedIds = array_fill_keys(array_values($entityPlural), []);
+        foreach ($tombstoneQuery->get(['entity', 'external_id']) as $tomb) {
+            $bucket = $entityPlural[$tomb->entity] ?? null;
+            if ($bucket !== null) {
+                $deletedIds[$bucket][] = $tomb->external_id;
+            }
+        }
+
+        $payload = [
             'success' => true,
             'server_time' => now()->toIso8601String(),
             'counts' => [
@@ -957,7 +1157,38 @@ class PosSyncApiController extends Controller
             'units' => $units,
             'taxes' => $taxes,
             'company' => $companySettings,
-        ]);
+            'deleted_ids' => $deletedIds,
+        ];
+
+        // Optional `?entities=products,customers` — let a client pull one
+        // entity at a time (progress UI, retry a single failed table) without
+        // downloading the whole delta each cycle. Always keeps `success`,
+        // `server_time`, `company`, and the matching `deleted_ids` subset.
+        $wanted = array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) $request->query('entities', '')),
+        )));
+        if ($wanted !== []) {
+            $keep = [
+                'success' => true,
+                'server_time' => $payload['server_time'],
+                'company' => $companySettings,
+                'counts' => [],
+                'deleted_ids' => [],
+            ];
+            foreach ($wanted as $w) {
+                if (array_key_exists($w, $payload) && ! in_array($w, ['success', 'server_time', 'company', 'counts', 'deleted_ids'], true)) {
+                    $keep[$w] = $payload[$w];
+                    $keep['counts'][$w] = $payload['counts'][$w] ?? 0;
+                }
+                if (array_key_exists($w, $deletedIds)) {
+                    $keep['deleted_ids'][$w] = $deletedIds[$w];
+                }
+            }
+            $payload = $keep;
+        }
+
+        return response()->json($payload);
     }
 
     /**
@@ -999,6 +1230,29 @@ class PosSyncApiController extends Controller
     }
 
     /**
+     * The eight entity kinds the offline desktop client can push
+     * creates / edits / deletes for: the Eloquent model, the plural key used
+     * in request/response arrays (`deleted_<plural>`, `deleted_ids.<plural>`),
+     * and whether the table carries a client `external_id`. Quotations are
+     * Sale rows with operation_type = 'quotation'.
+     *
+     * @return array<string, array{model: class-string<Model>, plural: string, external_id: bool}>
+     */
+    protected static function syncEntityConfig(): array
+    {
+        return [
+            'product' => ['model' => Product::class, 'plural' => 'products', 'external_id' => true],
+            'customer' => ['model' => Customer::class, 'plural' => 'customers', 'external_id' => true],
+            'quotation' => ['model' => Sale::class, 'plural' => 'quotations', 'external_id' => true],
+            'category' => ['model' => Category::class, 'plural' => 'categories', 'external_id' => true],
+            'brand' => ['model' => Brand::class, 'plural' => 'brands', 'external_id' => true],
+            'supplier' => ['model' => Supplier::class, 'plural' => 'suppliers', 'external_id' => true],
+            'unit' => ['model' => Unit::class, 'plural' => 'units', 'external_id' => true],
+            'tax_rule' => ['model' => TaxRule::class, 'plural' => 'tax_rules', 'external_id' => false],
+        ];
+    }
+
+    /**
      * Last-write-wins guard for a pushed field edit: apply it unless the
      * payload carries an updated_at that is not newer than the server row's
      * — a client with no updated_at (or one already applied) always applies,
@@ -1015,6 +1269,27 @@ class PosSyncApiController extends Controller
         } catch (\Throwable) {
             return true;
         }
+    }
+
+    /**
+     * One row for the sync-batch `conflicts` array: an offline edit/delete the
+     * server dropped because its own copy of the row was already newer. The
+     * desktop Sync panel lists these so the change isn't lost silently; the
+     * client also re-pulls the row so its local copy converges on the server's.
+     */
+    protected function conflictEntry(string $entity, string $externalId, Model $serverRow, string $reason = 'server_newer'): array
+    {
+        return [
+            'entity' => $entity,
+            'id' => $externalId,
+            'server_id' => (string) $serverRow->getKey(),
+            'reason' => $reason,
+            'server_updated_at' => optional($serverRow->updated_at)->toIso8601String(),
+            'label' => $serverRow->name
+                ?? $serverRow->tax_name
+                ?? $serverRow->sale_number
+                ?? null,
+        ];
     }
 
     /**
@@ -1270,6 +1545,14 @@ class PosSyncApiController extends Controller
         $syncedBrands = [];
         $syncedSuppliers = [];
         $syncedUnits = [];
+        // entity => list of external_ids the client asked us to delete and we
+        // either deleted or already had gone. Server-newer rows are skipped
+        // (not listed) so the client re-pulls them on the next delta.
+        $deleted = [];
+        // Offline edits/deletes that lost the last-write-wins race: the server
+        // row was already newer, so the client's change was dropped. Surfaced
+        // to the desktop's Sync panel so the change isn't silently lost.
+        $conflicts = [];
 
         DB::beginTransaction();
         try {
@@ -1279,7 +1562,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($prodData['id'] ?? Str::uuid()->toString());
                     $p = Product::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $p && ! empty($prodData['barcode'])) {
                         $p = Product::withoutGlobalScope('company')
@@ -1315,6 +1604,8 @@ class PosSyncApiController extends Controller
                         // A field edit made offline (e.g. name/price change) — apply it
                         // unless the server has a strictly newer edit for the same row.
                         $p->update($attrs);
+                    } elseif (! empty($prodData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('product', $extId, $p);
                     }
                     $syncedProducts[] = $extId;
                 }
@@ -1326,7 +1617,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($custData['id'] ?? Str::uuid()->toString());
                     $c = Customer::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $c && ! empty($custData['phone'])) {
                         $c = Customer::withoutGlobalScope('company')
@@ -1353,6 +1650,8 @@ class PosSyncApiController extends Controller
                         ]);
                     } elseif ($this->clientRowIsNewer($c, $custData)) {
                         $c->update($attrs);
+                    } elseif (! empty($custData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('customer', $extId, $c);
                     }
                     $syncedCustomers[] = $extId;
                 }
@@ -1371,7 +1670,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($catData['id'] ?? Str::uuid()->toString());
                     $cat = Category::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $cat && ! empty($catData['name'])) {
                         $cat = Category::withoutGlobalScope('company')
@@ -1391,6 +1696,8 @@ class PosSyncApiController extends Controller
                         $cat = Category::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
                     } elseif ($this->clientRowIsNewer($cat, $catData)) {
                         $cat->update($attrs);
+                    } elseif (! empty($catData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('category', $extId, $cat);
                     }
                     $syncedCategories[] = $extId;
                 }
@@ -1401,7 +1708,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($brandData['id'] ?? Str::uuid()->toString());
                     $brand = Brand::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $brand && ! empty($brandData['name'])) {
                         $brand = Brand::withoutGlobalScope('company')
@@ -1419,6 +1732,8 @@ class PosSyncApiController extends Controller
                         $brand = Brand::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
                     } elseif ($this->clientRowIsNewer($brand, $brandData)) {
                         $brand->update($attrs);
+                    } elseif (! empty($brandData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('brand', $extId, $brand);
                     }
                     $syncedBrands[] = $extId;
                 }
@@ -1429,7 +1744,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($supData['id'] ?? Str::uuid()->toString());
                     $sup = Supplier::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $sup && ! empty($supData['name'])) {
                         $sup = Supplier::withoutGlobalScope('company')
@@ -1454,6 +1775,8 @@ class PosSyncApiController extends Controller
                         $sup = Supplier::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
                     } elseif ($this->clientRowIsNewer($sup, $supData)) {
                         $sup->update($attrs);
+                    } elseif (! empty($supData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('supplier', $extId, $sup);
                     }
                     $syncedSuppliers[] = $extId;
                 }
@@ -1464,7 +1787,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($unitData['id'] ?? Str::uuid()->toString());
                     $unit = Unit::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
                     if (! $unit && ! empty($unitData['name'])) {
                         $unit = Unit::withoutGlobalScope('company')
@@ -1482,6 +1811,8 @@ class PosSyncApiController extends Controller
                         $unit = Unit::create($attrs + ['company_id' => $company->id, 'external_id' => $extId]);
                     } elseif ($this->clientRowIsNewer($unit, $unitData)) {
                         $unit->update($attrs);
+                    } elseif (! empty($unitData['updated_at'])) {
+                        $conflicts[] = $this->conflictEntry('unit', $extId, $unit);
                     }
                     $syncedUnits[] = $extId;
                 }
@@ -1606,7 +1937,13 @@ class PosSyncApiController extends Controller
                     $extId = (string) ($quoteData['id'] ?? Str::uuid()->toString());
                     $quote = Sale::withoutGlobalScope('company')
                         ->where('company_id', $company->id)
-                        ->where('external_id', $extId)
+                        // Match the client id against external_id first; fall
+                        // back to the numeric primary key so an offline *edit*
+                        // of a row that was created on the web (no external_id)
+                        // still lands on the right record instead of inserting
+                        // a duplicate. A UUID compared to a bigint column just
+                        // never matches, so this is safe for offline creates.
+                        ->where(fn ($q) => $q->where('external_id', $extId)->orWhere('id', $extId))
                         ->first();
 
                     $items = (array) ($quoteData['items'] ?? []);
@@ -1671,6 +2008,117 @@ class PosSyncApiController extends Controller
                 }
             }
 
+            // 7. Process Offline Deletes (create/edit already handled above).
+            //
+            // The desktop client can delete a record while disconnected; it
+            // queues the delete and replays it here in `deleted_<entity>`
+            // arrays of `{id, deleted_at, updated_at?}`. Rules:
+            //   - idempotent: a `desktop_sync_receipts` row (`delete_<entity>`)
+            //     guards against re-processing the same queued delete;
+            //   - last-write-wins: if the server row was edited *after* the
+            //     offline delete (clientRowIsNewer === false) the delete is
+            //     skipped and the row survives — the client re-pulls it next
+            //     delta and converges to the server;
+            //   - otherwise the row is removed and a `sync_tombstones` row is
+            //     written so every other delta-only client learns it is gone
+            //     (`deleted_ids` in sync-pull).
+            foreach (self::syncEntityConfig() as $entity => $cfg) {
+                $modelClass = $cfg['model'];
+                $plural = $cfg['plural'];
+                $hasExternalId = $cfg['external_id'];
+                $key = 'deleted_'.$plural;
+                if (! $request->has($key) || ! is_array($request->input($key))) {
+                    continue;
+                }
+                $rows = [];
+                foreach ($request->input($key) as $delData) {
+                    if (is_string($delData)) {
+                        $delData = ['id' => $delData];
+                    }
+                    if (! is_array($delData)) {
+                        continue;
+                    }
+                    $extId = (string) ($delData['id'] ?? $delData['external_id'] ?? '');
+                    if ($extId === '') {
+                        continue;
+                    }
+
+                    $isNewOperation = DB::table('desktop_sync_receipts')->insertOrIgnore([
+                        'company_id' => $company->id,
+                        'operation_type' => 'delete_'.$entity,
+                        'external_id' => $extId,
+                        'created_at' => now(),
+                    ]) === 1;
+
+                    $row = $modelClass::withoutGlobalScope('company')
+                        ->where('company_id', $company->id)
+                        ->where(function ($q) use ($extId, $hasExternalId) {
+                            $q->where('id', $extId);
+                            if ($hasExternalId) {
+                                $q->orWhere('external_id', $extId);
+                            }
+                        })
+                        ->first();
+
+                    // Quotations live in the sales table — only ever delete the
+                    // quotation, never a completed sale.
+                    if ($entity === 'quotation' && $row && $row->operation_type !== 'quotation') {
+                        $row = null;
+                    }
+
+                    if ($row === null) {
+                        // Already gone (or never reached us) — still a success
+                        // for the client, and still worth a tombstone for peers.
+                        $rows[] = $extId;
+                        DB::table('sync_tombstones')->updateOrInsert(
+                            ['company_id' => $company->id, 'entity' => $entity, 'external_id' => $extId],
+                            ['deleted_at' => $delData['deleted_at'] ?? now(), 'created_at' => now()],
+                        );
+
+                        continue;
+                    }
+
+                    if (! $isNewOperation) {
+                        $rows[] = $extId;
+
+                        continue;
+                    }
+
+                    // Server edited the row after the offline delete → keep it,
+                    // and tell the client its delete was overridden.
+                    if (! $this->clientRowIsNewer($row, $delData + ['updated_at' => $delData['updated_at'] ?? $delData['deleted_at'] ?? null])) {
+                        $conflicts[] = $this->conflictEntry($entity, $extId, $row, 'deleted_offline_kept_on_server');
+
+                        continue;
+                    }
+
+                    $serverId = (string) $row->getKey();
+                    // A queued offline delete is an explicit removal and we
+                    // hold a tombstone — hard-delete so a later re-create with
+                    // the same external_id doesn't collide with a hidden
+                    // soft-deleted row (only Product has SoftDeletes today).
+                    method_exists($row, 'forceDelete') ? $row->forceDelete() : $row->delete();
+                    DB::table('sync_tombstones')->updateOrInsert(
+                        ['company_id' => $company->id, 'entity' => $entity, 'external_id' => $extId],
+                        [
+                            'server_id' => $serverId,
+                            'deleted_at' => $delData['deleted_at'] ?? now(),
+                            'created_at' => now(),
+                        ],
+                    );
+                    $rows[] = $extId;
+
+                    AuditLog::record('desktop_sync.deleted', $company->id, $user?->id, [
+                        'entity' => $entity,
+                        'external_id' => $extId,
+                        'server_id' => $serverId,
+                    ]);
+                }
+                if ($rows !== []) {
+                    $deleted[$plural] = array_values(array_unique($rows));
+                }
+            }
+
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -1681,6 +2129,48 @@ class PosSyncApiController extends Controller
                 'error' => 'Batch sync failed: '.$e->getMessage(),
             ], 500);
         }
+
+        // Generic queued mutations: offline SDUI `form_submit` / `api_post`
+        // actions the typed arrays above don't model. Replayed AFTER the
+        // transaction has committed — each one is an independent internal
+        // request against its own real route (so its own validation, auth and
+        // permission middleware run exactly as for a live call), and a single
+        // bad mutation is recorded as failed instead of poisoning the batch.
+        // Idempotent via `desktop_sync_receipts` keyed by the client's
+        // `idempotency_key`.
+        [$mutationsApplied, $mutationsFailed] = $this->replayQueuedMutations($request, $company);
+
+        // Resolve every external_id we just created/updated to its server
+        // primary key so the client can backfill `server_id` on its local
+        // rows and stop re-sending them. Additive: older clients ignore it.
+        $idMap = [];
+        $mapFor = function (string $modelClass, array $externalIds, bool $hasExternalId = true) use (&$idMap, $company) {
+            $externalIds = array_values(array_filter(array_unique($externalIds)));
+            if ($externalIds === []) {
+                return;
+            }
+            $columns = $hasExternalId ? ['id', 'external_id'] : ['id'];
+            $rows = $modelClass::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where(function ($q) use ($externalIds, $hasExternalId) {
+                    $q->whereIn('id', $externalIds);
+                    if ($hasExternalId) {
+                        $q->orWhereIn('external_id', $externalIds);
+                    }
+                })
+                ->get($columns);
+            foreach ($rows as $row) {
+                $ext = ($hasExternalId && ! empty($row->external_id)) ? (string) $row->external_id : (string) $row->id;
+                $idMap[$ext] = (string) $row->id;
+            }
+        };
+        $mapFor(Product::class, $syncedProducts);
+        $mapFor(Customer::class, $syncedCustomers);
+        $mapFor(Category::class, $syncedCategories);
+        $mapFor(Brand::class, $syncedBrands);
+        $mapFor(Supplier::class, $syncedSuppliers);
+        $mapFor(Unit::class, $syncedUnits);
+        $mapFor(Sale::class, $syncedQuotations);
 
         return response()->json([
             'success' => true,
@@ -1698,7 +2188,179 @@ class PosSyncApiController extends Controller
                 'suppliers' => $syncedSuppliers,
                 'units' => $syncedUnits,
             ],
+            // entity(plural) => [external_id, ...] the client can drop locally.
+            'deleted' => $deleted,
+            // Offline edits/deletes the server dropped because its row was
+            // already newer — [{entity, id, server_id, reason, label,
+            // server_updated_at}]. The client logs these + re-pulls the rows.
+            'conflicts' => $conflicts,
+            // external_id => server primary key, for every row touched above.
+            'id_map' => $idMap,
+            // idempotency_key => outcome, for the generic offline mutation
+            // queue (SDUI form_submit / api_post). Additive: clients that
+            // never queue generic mutations get empty arrays.
+            'mutations_applied' => $mutationsApplied,
+            'mutations_failed' => $mutationsFailed,
         ]);
+    }
+
+    /**
+     * Replay the optional `mutations: []` array on a sync-batch request.
+     *
+     * Each entry is `{idempotency_key|id, endpoint, method, payload}` — a
+     * verbatim record of an SDUI `form_submit` / `api_post` the client could
+     * not send while offline. We dispatch it as a fresh internal HTTP request
+     * against the app's own router, carrying the caller's bearer token so the
+     * target route's auth + `tenant.api.permission` middleware authorise it
+     * identically to a live call. Runs outside the batch transaction; one
+     * failure never rolls back the rest.
+     *
+     * @return array{0: list<string>, 1: list<array<string,string>>} [applied keys, failures]
+     */
+    protected function replayQueuedMutations(Request $request, Company $company): array
+    {
+        $raw = $request->input('mutations');
+        if (! is_array($raw) || $raw === []) {
+            return [[], []];
+        }
+
+        $applied = [];
+        $failed = [];
+        // Bound the work per batch — a client with a huge backlog still makes
+        // progress across several sync cycles rather than timing out here.
+        $raw = array_slice($raw, 0, 100);
+
+        $outerRequest = app()->bound('request') ? app('request') : null;
+
+        foreach ($raw as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $key = (string) ($entry['idempotency_key'] ?? $entry['id'] ?? '');
+            $endpoint = trim((string) ($entry['endpoint'] ?? ''));
+            $method = strtoupper((string) ($entry['method'] ?? 'POST'));
+            $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+
+            if ($key === '' || $endpoint === '') {
+                $failed[] = ['idempotency_key' => $key, 'reason' => 'Missing endpoint or idempotency_key.'];
+
+                continue;
+            }
+
+            // Never let a queued item re-enter the sync pipeline itself.
+            if (preg_match('#sync-(batch|pull|push|catalog|sales)#', $endpoint)) {
+                $failed[] = ['idempotency_key' => $key, 'reason' => 'Endpoint is not replayable.', 'endpoint' => $endpoint];
+
+                continue;
+            }
+
+            // Idempotency ledger: insertOrIgnore returns 1 only the first time
+            // we see this key for this company.
+            $isNew = DB::table('desktop_sync_receipts')->insertOrIgnore([
+                'company_id' => $company->id,
+                'operation_type' => 'mutation',
+                'external_id' => $key,
+                'created_at' => now(),
+            ]) === 1;
+
+            if (! $isNew) {
+                // Already handled on an earlier attempt — report success so the
+                // client drops it from the queue.
+                $applied[] = $key;
+
+                continue;
+            }
+
+            try {
+                [$status, $body] = $this->dispatchInternalRequest($request, $endpoint, $method, $payload);
+
+                if ($status >= 200 && $status < 300) {
+                    $applied[] = $key;
+                } else {
+                    // Let a future retry (or a fixed client) try again.
+                    $this->forgetMutationReceipt($company->id, $key);
+                    $failed[] = [
+                        'idempotency_key' => $key,
+                        'reason' => 'Replay returned HTTP '.$status.'.',
+                        'endpoint' => $endpoint,
+                        'response' => mb_substr($body, 0, 500),
+                    ];
+                }
+            } catch (\Throwable $e) {
+                $this->forgetMutationReceipt($company->id, $key);
+                $failed[] = ['idempotency_key' => $key, 'reason' => $e->getMessage(), 'endpoint' => $endpoint];
+                Log::warning('POS sync: queued mutation replay failed', [
+                    'endpoint' => $endpoint,
+                    'method' => $method,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Router dispatch rebinds the container's `request`; restore ours so
+        // anything downstream in this action still sees the real one.
+        if ($outerRequest !== null) {
+            app()->instance('request', $outerRequest);
+        }
+
+        return [$applied, $failed];
+    }
+
+    private function forgetMutationReceipt(int|string $companyId, string $key): void
+    {
+        DB::table('desktop_sync_receipts')
+            ->where('company_id', $companyId)
+            ->where('operation_type', 'mutation')
+            ->where('external_id', $key)
+            ->delete();
+    }
+
+    /**
+     * Build a fresh internal request for [$endpoint] (an absolute URL or a
+     * bare path), copy the caller's credential headers onto it, and run it
+     * through the HTTP kernel.
+     *
+     * @return array{0: int, 1: string} [status code, response body]
+     */
+    private function dispatchInternalRequest(Request $original, string $endpoint, string $method, array $payload): array
+    {
+        $path = $endpoint;
+        if (preg_match('#^https?://#i', $endpoint)) {
+            $parts = parse_url($endpoint);
+            $path = ($parts['path'] ?? '/').(isset($parts['query']) ? '?'.$parts['query'] : '');
+        }
+        if (! str_starts_with($path, '/')) {
+            $path = '/'.$path;
+        }
+
+        $isRead = in_array($method, ['GET', 'HEAD'], true);
+        $sub = Request::create(
+            $path,
+            $method,
+            $isRead ? [] : $payload,
+            [],
+            [],
+            [],
+            $isRead ? null : json_encode($payload)
+        );
+
+        // Carry only the headers the tenant guard / permission middleware read.
+        foreach (['Authorization', 'X-API-Key', 'X-Auth-Token', 'X-Tenant', 'X-Company-Id'] as $header) {
+            if ($original->headers->has($header)) {
+                $sub->headers->set($header, $original->headers->get($header));
+            }
+        }
+        $sub->headers->set('Accept', 'application/json');
+        if (! $isRead) {
+            $sub->headers->set('Content-Type', 'application/json');
+        }
+
+        /** @var Kernel $kernel */
+        $kernel = app(Kernel::class);
+        $response = $kernel->handle($sub);
+
+        return [$response->getStatusCode(), (string) $response->getContent()];
     }
 
     /**
@@ -2225,31 +2887,66 @@ class PosSyncApiController extends Controller
                         ->orWhere('email', 'like', "%{$query}%")
                         ->orWhere('document', 'like', "%{$query}%")
                         ->orWhere('tax_id', 'like', "%{$query}%")
-                        ->orWhere('gstin', 'like', "%{$query}%");
+                        ->orWhere('gstin', 'like', "%{$query}%")
+                        ->orWhere('custom_fields->company_name', 'like', "%{$query}%");
                 });
             })
             ->orderBy('name')
             ->limit(50)
             ->get()
-            ->map(fn (Customer $c) => [
-                'id' => (string) ($c->external_id ?: $c->id),
-                'server_id' => $c->id,
-                'name' => $c->name,
-                'phone' => $c->phone ?? '',
-                'email' => $c->email ?? '',
-                'document' => $c->document ?? $c->tax_id ?? '',
-                'balance_due' => (float) ($c->due_balance ?? 0),
-                'age' => $c->age,
-                'gender' => $c->gender,
-                'allergies' => $c->allergies,
-                'prescribing_doctor' => $c->prescribing_doctor,
-                'doctor_registration_no' => $c->doctor_registration_no,
-                'custom_fields' => $c->custom_fields ?? (object) [],
-            ]);
+            ->map(function (Customer $c) {
+                $companyName = $c->company_name ?? ($c->custom_fields['company_name'] ?? '');
+                $label = $c->name;
+                if ($c->phone) {
+                    $label .= " ({$c->phone})";
+                }
+                if ($companyName && $companyName !== $c->name) {
+                    $label .= " - {$companyName}";
+                }
+
+                return [
+                    'id' => (string) ($c->external_id ?: $c->id),
+                    'server_id' => $c->id,
+                    'value' => $c->id,
+                    'label' => $label,
+                    'name' => $c->name,
+                    'title' => $c->name,
+                    'subtitle' => $c->phone ?: ($c->email ?: ''),
+                    'phone' => $c->phone ?? '',
+                    'email' => $c->email ?? '',
+                    'company_name' => $companyName,
+                    'due_amount' => $c->due_balance > 0 ? 'Due: '.number_format((float) $c->due_balance, 2) : null,
+                    'avatar_icon' => 'person',
+                    'badge_due_bg' => 'rgba(239, 68, 68, 0.15)',
+                    'badge_due_tx' => '#F87171',
+                    'document' => $c->document ?? $c->tax_id ?? '',
+                    'balance_due' => (float) ($c->due_balance ?? 0),
+                    'age' => $c->age,
+                    'gender' => $c->gender,
+                    'allergies' => $c->allergies,
+                    'prescribing_doctor' => $c->prescribing_doctor,
+                    'doctor_registration_no' => $c->doctor_registration_no,
+                    'custom_fields' => $c->custom_fields ?? (object) [],
+                ];
+            });
 
         return response()->json([
             'success' => true,
             'count' => $customers->count(),
+            'theme' => [
+                'container_bg' => '#1E293B',    // High-contrast slate surface
+                'dropdown_surface' => '#1E293B',
+                'popup_background' => '#1E293B',
+                'surface' => '#1E293B',
+                'card' => '#1E293B',
+                'border_color' => '#334155',    // Slate divider
+                'title_color' => '#F8FAFC',    // High-contrast white
+                'sub_color' => '#94A3B8',    // Slate-400
+                'text_color' => '#F8FAFC',
+                'badge_due_bg' => 'rgba(239, 68, 68, 0.15)',
+                'badge_due_tx' => '#F87171',
+            ],
+            'data' => $customers,
             'customers' => $customers,
         ]);
     }
@@ -2392,6 +3089,16 @@ class PosSyncApiController extends Controller
                 'payment_method' => $sale->payment_method,
                 'status' => $sale->payment_status,
                 'items_count' => count((array) ($sale->items ?: [])),
+                'background_color' => '#182230',
+                'border_color' => '#334155',
+                'text_color' => '#F8FAFC',
+                'secondary_text_color' => '#CBD5E1',
+                'style' => [
+                    'backgroundColor' => '#182230',
+                    'borderColor' => '#334155',
+                    'borderWidth' => 1,
+                    'borderRadius' => 10,
+                ],
             ];
 
             foreach ($sale->payments as $pay) {
@@ -2404,6 +3111,19 @@ class PosSyncApiController extends Controller
                     'payment_method' => $pay->payment_method,
                     'reference' => $pay->reference_number,
                     'notes' => $pay->notes,
+                    'background_color' => '#132A24',
+                    'border_color' => '#10B981',
+                    'border_opacity' => 0.3,
+                    'text_color' => '#F8FAFC',
+                    'secondary_text_color' => '#CBD5E1',
+                    'amount_text_color' => '#6EE7B7',
+                    'style' => [
+                        'backgroundColor' => '#132A24',
+                        'borderColor' => '#10B981',
+                        'borderOpacity' => 0.3,
+                        'borderWidth' => 1,
+                        'borderRadius' => 10,
+                    ],
                 ];
             }
         }
@@ -2545,6 +3265,22 @@ class PosSyncApiController extends Controller
             ->where('company_id', $company->id)
             ->where('status', '!=', 'cancelled');
 
+        // Interactive dashboard date-range filter (the "Filter" control). The
+        // range scopes the headline metric cards + the revenue trend; the
+        // rolling monthly activity / top products stay whole-history for
+        // context.
+        [$rangeStart, $rangeEnd, $rangeKey, $rangeLabel] = $this->resolveAnalyticsRange($request);
+        $rangeSpanDays = max(1, $rangeStart->diffInDays($rangeEnd) + 1);
+        $prevRangeStart = (clone $rangeStart)->subDays($rangeSpanDays);
+        $prevRangeEnd = (clone $rangeStart)->subSecond();
+
+        $rangeSales = (clone $salesBase)->whereBetween('created_at', [$rangeStart, $rangeEnd]);
+        $rangeRevenue = (float) (clone $rangeSales)->sum('total');
+        $rangeOrders = (clone $rangeSales)->count();
+        $prevRangeSales = (clone $salesBase)->whereBetween('created_at', [$prevRangeStart, $prevRangeEnd]);
+        $prevRangeRevenue = (float) (clone $prevRangeSales)->sum('total');
+        $prevRangeOrders = (clone $prevRangeSales)->count();
+
         $todaySales = (clone $salesBase)->whereDate('created_at', now()->toDateString());
         $todayRevenue = (float) (clone $todaySales)->sum('total');
         $todayOrders = (clone $todaySales)->count();
@@ -2568,21 +3304,71 @@ class PosSyncApiController extends Controller
                 'total' => (float) $row->total,
             ]);
 
-        // 7-day revenue trend
-        $sevenDaysTrend = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $d = now()->subDays($i)->format('Y-m-d');
-            $dayRev = (float) Sale::withoutGlobalScope('company')
-                ->where('company_id', $company->id)
-                ->where('status', '!=', 'cancelled')
-                ->whereDate('created_at', $d)
-                ->sum('total');
+        // Revenue trend across the selected range. A single-day view ("Today" /
+        // "Yesterday" / a one-day custom range) grouped by DATE() collapses to
+        // one point, which fl_chart treats as empty ("No revenue yet") — so a
+        // single day is bucketed into 24 zero-filled hourly intervals in the
+        // tenant's timezone instead. Multi-day ranges keep daily buckets
+        // (capped at 31 points; longer ranges roll up to weekly), with every
+        // calendar day in between zero-filled so the line never breaks.
+        if ($rangeStart->isSameDay($rangeEnd)) {
+            $tz = $company->resolveTimezone();
+            $localDay = ($rangeKey === 'yesterday')
+                ? Carbon::now($tz)->subDay()->startOfDay()
+                : (($rangeKey === 'today')
+                    ? Carbon::now($tz)->startOfDay()
+                    : Carbon::parse($rangeStart)->setTimezone($tz)->startOfDay());
 
-            $sevenDaysTrend[] = [
-                'date' => $d,
-                'day' => now()->subDays($i)->format('D'),
-                'revenue' => $dayRev,
-            ];
+            $hourTotals = array_fill(0, 24, 0.0);
+            (clone $rangeSales)
+                ->select('created_at', 'total')
+                ->get()
+                ->each(function ($row) use (&$hourTotals, $tz) {
+                    $hour = (int) Carbon::parse($row->created_at)->setTimezone($tz)->format('G');
+                    $hourTotals[$hour] += (float) $row->total;
+                });
+
+            $sevenDaysTrend = [];
+            for ($h = 0; $h < 24; $h++) {
+                $label = sprintf('%02d:00', $h);
+                $amount = round($hourTotals[$h], 2);
+                $slot = $localDay->copy()->addHours($h);
+                $sevenDaysTrend[] = [
+                    'date' => $slot->toDateString(),
+                    'day' => $label,
+                    'label' => $label,
+                    'revenue' => $amount,
+                    'amount' => $amount,
+                    'timestamp' => $slot->timestamp,
+                ];
+            }
+        } else {
+            $trendBucketDays = $rangeSpanDays > 31 ? (int) ceil($rangeSpanDays / 31) : 1;
+            $trendRows = (clone $rangeSales)
+                ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'))
+                ->groupBy('d')
+                ->pluck('t', 'd');
+            $sevenDaysTrend = [];
+            $cursor = (clone $rangeStart);
+            while ($cursor->lte($rangeEnd)) {
+                $bucketEnd = (clone $cursor)->addDays($trendBucketDays - 1);
+                $sum = 0.0;
+                $probe = (clone $cursor);
+                while ($probe->lte($bucketEnd) && $probe->lte($rangeEnd)) {
+                    $sum += (float) ($trendRows[$probe->format('Y-m-d')] ?? 0);
+                    $probe->addDay();
+                }
+                $label = $cursor->format($trendBucketDays > 1 ? 'M d' : 'D');
+                $sum = round($sum, 2);
+                $sevenDaysTrend[] = [
+                    'date' => $cursor->format('Y-m-d'),
+                    'day' => $label,
+                    'label' => $label,
+                    'revenue' => $sum,
+                    'amount' => $sum,
+                ];
+                $cursor->addDays($trendBucketDays);
+            }
         }
 
         // Top 5 Products by Sales
@@ -2613,24 +3399,198 @@ class PosSyncApiController extends Controller
 
         $totalReceivables = (float) (clone $salesBase)->sum('due_amount');
 
+        // Previous calendar month — drives the ▲/▼ deltas on the redesigned
+        // "Statistics" card.
+        $prevMonthSales = (clone $salesBase)->whereBetween('created_at', [
+            now()->subMonthNoOverflow()->startOfMonth(),
+            now()->subMonthNoOverflow()->endOfMonth(),
+        ]);
+        $prevMonthRevenue = (float) (clone $prevMonthSales)->sum('total');
+        $prevMonthOrders = (clone $prevMonthSales)->count();
+
+        $productCount = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)->count();
+        $customerCount = Customer::withoutGlobalScope('company')
+            ->where('company_id', $company->id)->count();
+
+        // Monthly purchase activity for the last 9 months: a "completed" sale
+        // is fully paid, a "pending" one still carries a balance.
+        $monthlyActivity = [];
+        for ($i = 8; $i >= 0; $i--) {
+            $start = now()->subMonthsNoOverflow($i)->startOfMonth();
+            $end = (clone $start)->endOfMonth();
+            $rows = (clone $salesBase)->whereBetween('created_at', [$start, $end]);
+            $completed = (clone $rows)->where('due_amount', '<=', 0.01)->count();
+            $pending = (clone $rows)->where('due_amount', '>', 0.01)->count();
+            $monthlyActivity[] = [
+                'month' => $start->format('M'),
+                'year' => (int) $start->format('Y'),
+                'completed' => $completed,
+                'pending' => $pending,
+            ];
+        }
+
+        // "Popular tags" — the catalogue's most-used category names.
+        $popularTags = Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->whereNotNull('category_name')
+            ->where('category_name', '!=', '')
+            ->select('category_name', DB::raw('COUNT(*) as c'))
+            ->groupBy('category_name')
+            ->orderByDesc('c')
+            ->limit(14)
+            ->pluck('category_name')
+            ->values();
+
+        // Latest transactions table. The status chip is a fixed-width column
+        // on the mobile dashboard, so the label must stay short: "Completed"
+        // (9 chars) wrapped onto two lines, "Paid" does not. Date is the
+        // compact "10 Sep" form for the same reason.
+        //
+        // Machine key vs display label are kept separate:
+        //  - `status`        — the short display text the current client renders
+        //  - `status_key`    — stable machine key ('completed' | 'pending')
+        //  - `status_label`  — explicit display label
+        //  - `status_color`  — semantic token ('success' | 'warning')
+        //  - `badge`         — a fully resolved chip spec (text + hex colors)
+        // so a paid row can be styled green ('success') even though its label
+        // is no longer the literal string "completed".
+        $recentTransactions = (clone $salesBase)
+            ->latest('created_at')
+            ->limit(8)
+            ->get(['id', 'sale_number', 'customer_name', 'total', 'due_amount', 'status', 'created_at'])
+            ->map(function ($s) {
+                $isPaid = ((float) $s->due_amount) <= 0.01;
+                $label = $isPaid ? 'Paid' : 'Pending';
+
+                return [
+                    'id' => (string) $s->id,
+                    'reference' => $s->sale_number ?: ('TR-'.str_pad((string) $s->id, 6, '0', STR_PAD_LEFT)),
+                    'customer' => $s->customer_name ?: 'Walk-in',
+                    'date' => optional($s->created_at)->format('j M'),
+                    'status' => $label,
+                    'status_key' => $isPaid ? 'completed' : 'pending',
+                    'status_label' => $label,
+                    'status_color' => $isPaid ? 'success' : 'warning',
+                    'badge' => [
+                        'text' => $label,
+                        'variant' => $isPaid ? 'success' : 'warning',
+                        'color' => $isPaid ? '#10B981' : '#F59E0B',
+                        'background_color' => $isPaid ? '#132A24' : '#2A1E17',
+                        'border_color' => $isPaid ? '#10B981' : '#D97706',
+                        'border_opacity' => $isPaid ? 0.3 : 1,
+                        'text_color' => $isPaid ? '#D1FAE5' : '#FCD34D',
+                        'white_space' => 'nowrap',
+                    ],
+                    'amount' => (float) $s->total,
+                ];
+            })
+            ->values();
+
+        // Recent customers — stands in for the design's "Recent Messages".
+        $recentCustomers = Customer::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->latest('created_at')
+            ->limit(6)
+            ->get(['id', 'name', 'phone', 'email', 'created_at'])
+            ->map(fn ($c) => [
+                'id' => (string) $c->id,
+                'name' => $c->name ?: 'Customer',
+                'detail' => $c->phone ?: ($c->email ?: 'No contact on file'),
+                'time' => optional($c->created_at)->format('d M, h:i A'),
+            ])
+            ->values();
+
         return response()->json([
             'success' => true,
             'currency_symbol' => $company->currency_symbol ?? '$',
+            'server_time' => now()->toIso8601String(),
+            'range' => [
+                'key' => $rangeKey,
+                'label' => $rangeLabel,
+                'from' => $rangeStart->toIso8601String(),
+                'to' => $rangeEnd->toIso8601String(),
+            ],
             'kpis' => [
                 'today_revenue' => $todayRevenue,
                 'today_orders' => $todayOrders,
+                'range_revenue' => $rangeRevenue,
+                'range_orders' => $rangeOrders,
+                'prev_range_revenue' => $prevRangeRevenue,
+                'prev_range_orders' => $prevRangeOrders,
                 'month_revenue' => $monthRevenue,
                 'month_orders' => $monthOrders,
+                'prev_month_revenue' => $prevMonthRevenue,
+                'prev_month_orders' => $prevMonthOrders,
                 'all_time_revenue' => $allTimeRevenue,
                 'all_time_orders' => $allTimeOrders,
                 'average_order_value' => $avgTicket,
                 'total_receivables' => $totalReceivables,
                 'low_stock_count' => $lowStockCount,
+                'product_count' => $productCount,
+                'customer_count' => $customerCount,
             ],
             'payment_breakdown' => $paymentMethods,
             'revenue_trend' => $sevenDaysTrend,
+            // Alias of revenue_trend under the schema key some clients expect;
+            // each point carries both {revenue} and {amount}, {day} and {label}.
+            'chart_data' => $sevenDaysTrend,
+            'monthly_activity' => $monthlyActivity,
+            'popular_tags' => $popularTags,
+            'recent_transactions' => $recentTransactions,
+            'recent_customers' => $recentCustomers,
             'top_products' => $topProducts,
         ]);
+    }
+
+    /**
+     * Resolve the dashboard "Filter" date range from the request.
+     * Accepts ?range=today|yesterday|last7|last30|month|last_month|year|custom
+     * (+ ?from=Y-m-d&to=Y-m-d for custom). Defaults to the current month.
+     *
+     * @return array{0: \Illuminate\Support\Carbon, 1: \Illuminate\Support\Carbon, 2: string, 3: string}
+     */
+    private function resolveAnalyticsRange(Request $request): array
+    {
+        $key = strtolower(trim((string) $request->query('range', 'month')));
+
+        return match ($key) {
+            'today' => [now()->startOfDay(), now()->endOfDay(), 'today', 'Today'],
+            'yesterday' => [
+                now()->subDay()->startOfDay(),
+                now()->subDay()->endOfDay(),
+                'yesterday',
+                'Yesterday',
+            ],
+            'last7', 'last_7_days', '7d' => [
+                now()->subDays(6)->startOfDay(), now()->endOfDay(), 'last7', 'Last 7 Days',
+            ],
+            'last30', 'last_30_days', '30d' => [
+                now()->subDays(29)->startOfDay(), now()->endOfDay(), 'last30', 'Last 30 Days',
+            ],
+            'last_month', 'prev_month' => [
+                now()->subMonthNoOverflow()->startOfMonth(),
+                now()->subMonthNoOverflow()->endOfMonth(),
+                'last_month',
+                'Last Month',
+            ],
+            'year', 'this_year' => [
+                now()->startOfYear(), now()->endOfYear(), 'year', 'This Year',
+            ],
+            'all', 'all_time' => [
+                now()->subYears(5)->startOfDay(), now()->endOfDay(), 'all', 'All Time',
+            ],
+            'custom' => (function () use ($request) {
+                $from = rescue(fn () => \Illuminate\Support\Carbon::parse((string) $request->query('from'))->startOfDay(), null);
+                $to = rescue(fn () => \Illuminate\Support\Carbon::parse((string) $request->query('to'))->endOfDay(), null);
+                if (! $from || ! $to || $from->gt($to)) {
+                    return [now()->startOfMonth(), now()->endOfMonth(), 'month', 'This Month'];
+                }
+
+                return [$from, $to, 'custom', $from->format('d M').' – '.$to->format('d M')];
+            })(),
+            default => [now()->startOfMonth(), now()->endOfMonth(), 'month', 'This Month'],
+        };
     }
 
     /**
@@ -2942,7 +3902,7 @@ class PosSyncApiController extends Controller
         $user = $this->resolveUser($request, $company);
 
         $validator = Validator::make($request->all(), [
-            'type' => ['required', 'string', 'in:email,whatsapp,custom'],
+            'type' => ['required', 'string', 'in:email,whatsapp,sms,custom'],
             'document_type' => ['required', 'string', 'in:invoice,quotation'],
             'recipient' => ['required_unless:type,custom', 'nullable', 'string'],
             'channel_id' => ['required_if:type,custom', 'nullable', 'integer'],
@@ -3047,7 +4007,53 @@ class PosSyncApiController extends Controller
                 ]);
             }
 
+            $dispatcher = app(TenantNotificationDispatcherService::class);
+
+            if ($type === 'sms') {
+                $smsResult = $docType === 'quotation'
+                    ? $dispatcher->dispatchQuotation($company, $sale, ['sms'], $recipient)
+                    : $dispatcher->dispatchReceipt($company, $sale, ['sms'], $recipient);
+
+                AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
+                    'type' => 'sms',
+                    'document_type' => $docType,
+                    'recipient' => $recipient,
+                    'document_number' => $sale->sale_number,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'status' => 'sent',
+                    'message' => $smsResult['sms']['message'] ?? "SMS sent successfully to {$recipient}.",
+                    'document_number' => $sale->sale_number,
+                    'sent_at' => now()->toIso8601String(),
+                ]);
+            }
+
             if ($type === 'email') {
+                $dispatchResult = $docType === 'quotation'
+                    ? $dispatcher->dispatchQuotation($company, $sale, ['email'], null, $recipient)
+                    : $dispatcher->dispatchReceipt($company, $sale, ['email'], null, $recipient);
+
+                $emailRes = $dispatchResult['email'] ?? [];
+                if (! empty($emailRes['success'])) {
+                    AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
+                        'type' => 'email',
+                        'document_type' => $docType,
+                        'recipient' => $recipient,
+                        'document_number' => $sale->sale_number,
+                        'status' => 'sent',
+                    ]);
+
+                    return response()->json([
+                        'success' => true,
+                        'status' => 'sent',
+                        'message' => $emailRes['message'] ?? "Email sent successfully to {$recipient}.",
+                        'document_number' => $sale->sale_number,
+                        'sent_at' => now()->toIso8601String(),
+                    ]);
+                }
+
                 $result = $messageQueue->sendOrQueueEmail($sale, $recipient, $customMessage, true);
 
                 AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
@@ -3068,6 +4074,33 @@ class PosSyncApiController extends Controller
                     'sent_at' => $result['status'] === 'sent' ? now()->toIso8601String() : null,
                 ]);
             } else {
+                $dispatchResult = $docType === 'quotation'
+                    ? $dispatcher->dispatchQuotation($company, $sale, ['whatsapp'], $recipient)
+                    : $dispatcher->dispatchReceipt($company, $sale, ['whatsapp'], $recipient);
+
+                $wa = $dispatchResult['whatsapp'] ?? [];
+                $status = $wa['status'] ?? null;
+                $url = $wa['url'] ?? $wa['whatsapp_url'] ?? null;
+
+                if ($status === 'sent') {
+                    AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
+                        'type' => 'whatsapp',
+                        'document_type' => $docType,
+                        'recipient' => $recipient,
+                        'document_number' => $sale->sale_number,
+                        'status' => 'sent',
+                    ]);
+
+                    return response()->json([
+                        'success' => true,
+                        'status' => 'sent',
+                        'message' => $wa['message'] ?? "WhatsApp message sent successfully to {$recipient}.",
+                        'whatsapp_url' => $url,
+                        'document_number' => $sale->sale_number,
+                        'sent_at' => now()->toIso8601String(),
+                    ]);
+                }
+
                 $result = $messageQueue->sendOrQueueWhatsApp($sale, $recipient, $customMessage);
 
                 AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
@@ -3086,7 +4119,7 @@ class PosSyncApiController extends Controller
                         'queued' => "No connection right now — queued and will send to {$recipient} automatically once back online.",
                         default => "WhatsApp message prepared for {$recipient}.",
                     },
-                    'whatsapp_url' => $result['url'] ?? null,
+                    'whatsapp_url' => $url ?? $result['url'] ?? null,
                     'document_number' => $sale->sale_number,
                     'sent_at' => $result['status'] === 'sent' ? now()->toIso8601String() : null,
                 ]);
@@ -3314,6 +4347,101 @@ class PosSyncApiController extends Controller
     }
 
     /**
+     * Auto-add the standard fiscal tax rules for a country (SDUI "Add New Tax
+     * Rule" tab -> "Auto-add for <Country>"). Same presets the web Settings >
+     * Taxes tab pre-seeds — see TaxCalculationService::seedTenantDefaultTaxRules().
+     * POST /api/tenant/settings/tax-rules/seed-country
+     */
+    public function taxRulesSeedCountry(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $country = strtoupper(trim((string) ($request->input('country') ?: $company->country ?: 'US')));
+
+        $service = app(TaxCalculationService::class);
+        $service->seedTenantDefaultTaxRules($company, $country);
+
+        $presets = $service->getJurisdictionPresets($country);
+        $countryName = $presets['country'] ?? $country;
+        $count = TaxRule::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('country', $country)
+            ->count();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Standard tax rules for {$countryName} added.",
+            'country' => $country,
+            'count' => $count,
+        ]);
+    }
+
+    /**
+     * Flip a tax rule's active flag (SDUI "Enable / Disable" button on the
+     * Taxes & Compliance screen). Update needs name + rate; this does not.
+     * POST /api/tenant/settings/tax-rules/{id}/toggle
+     */
+    public function taxRulesToggle(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $taxRule = TaxRule::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $taxRule) {
+            return response()->json(['success' => false, 'error' => 'Tax rule not found.'], 404);
+        }
+
+        $taxRule->update(['active' => ! $taxRule->active]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $taxRule->tax_name.' is now '.($taxRule->active ? 'active' : 'disabled').'.',
+        ]);
+    }
+
+    /**
+     * SDUI bottom-sheet schema for editing one tax rule, opened by the "Edit"
+     * button on SchemaResponse::taxesView. Submits to taxRulesUpdate().
+     * GET /api/tenant/settings/tax-rules/{id}/edit-sheet
+     */
+    public function taxRulesEditSheet(Request $request, string $id): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+
+        $taxRule = TaxRule::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $taxRule) {
+            return response()->json(['success' => false, 'error' => 'Tax rule not found.'], 404);
+        }
+
+        $sheet = SchemaResponse::screen("Edit {$taxRule->tax_name}", [
+            SchemaResponse::card([
+                SchemaResponse::text('Edit Tax Rule', 'title_medium', ['bold' => true]),
+                SchemaResponse::text('Changes apply immediately at checkout.', 'body_small', ['color' => '#64748b']),
+                SchemaResponse::divider(),
+                SchemaResponse::textInput('name', 'Name', $taxRule->tax_name),
+                SchemaResponse::textInput('rate', 'Rate (%)', number_format((float) $taxRule->rate, 3, '.', ''), ['keyboard_type' => 'decimal']),
+                SchemaResponse::toggleSwitch('is_default', 'Set as default', (bool) $taxRule->is_default),
+                SchemaResponse::toggleSwitch('active', 'Active', (bool) $taxRule->active),
+                SchemaResponse::buttonPrimary('Save Changes', SchemaResponse::formSubmitAction(
+                    "/api/tenant/settings/tax-rules/{$taxRule->id}",
+                    'POST',
+                    'Tax rule updated.',
+                    navigateBack: true,
+                    reload: true
+                ), 'save'),
+            ]),
+        ]);
+
+        return response()->json($sheet);
+    }
+
+    /**
      * 22. Taxes Management: Set Default Tax Rule
      * POST /api/v1/pos/taxes/{id}/set-default
      */
@@ -3371,6 +4499,7 @@ class PosSyncApiController extends Controller
 
         $sales = Sale::withoutGlobalScope('company')
             ->where('company_id', $company->id)
+            ->where(fn ($operation) => $operation->whereNull('operation_type')->orWhere('operation_type', 'sale'))
             ->where('status', '!=', 'cancelled')
             ->where('due_amount', '>', 0)
             ->with('customer')
@@ -3380,21 +4509,60 @@ class PosSyncApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'receivables' => collect($sales->items())->map(fn (Sale $sale) => [
-                'sale_id' => (string) ($sale->external_id ?: $sale->id),
-                'sale_number' => $sale->sale_number,
-                'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? 'Walk-in',
-                'phone' => $sale->customer?->phone,
-                'email' => $sale->customer?->email,
-                'date' => $sale->created_at?->toIso8601String(),
-                'due_date' => $sale->due_date?->toIso8601String(),
-                'due_reminder_at' => $sale->due_reminder_at?->toIso8601String(),
-                'due_reminder_sent_at' => $sale->due_reminder_sent_at?->toIso8601String(),
-                'total' => (float) $sale->total,
-                'paid_amount' => (float) $sale->paid_amount,
-                'due_amount' => (float) $sale->due_amount,
-                'status' => $sale->payment_status,
-            ])->values(),
+            'receivables' => collect($sales->items())->map(function (Sale $sale) {
+                $postSaleData = SchemaResponse::postSaleActionData($sale);
+                $documentType = str_starts_with(strtoupper((string) $sale->sale_number), 'POS-') ? 'sale' : 'invoice';
+                $postSaleData['actions_endpoint'] = "/api/v1/tenant/documents/{$documentType}/{$sale->id}/actions-sheet";
+                $nativeSheetAction = [
+                    'type' => 'show_post_sale_sheet',
+                    'action_type' => 'show_post_sale_sheet',
+                    'data' => $postSaleData,
+                ];
+
+                return [
+                    'sale_id' => (string) ($sale->external_id ?: $sale->id),
+                    'document_id' => (string) $sale->id,
+                    'document_type' => $documentType,
+                    'sale_number' => $sale->sale_number,
+                    'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? 'Walk-in',
+                    'phone' => $sale->customer?->phone,
+                    'email' => $sale->customer?->email,
+                    'date' => $sale->created_at?->toIso8601String(),
+                    'due_date' => $sale->due_date?->toIso8601String(),
+                    'due_reminder_at' => $sale->due_reminder_at?->toIso8601String(),
+                    'due_reminder_sent_at' => $sale->due_reminder_sent_at?->toIso8601String(),
+                    'total' => (float) $sale->total,
+                    'paid_amount' => (float) $sale->paid_amount,
+                    'due_amount' => (float) $sale->due_amount,
+                    'status' => $sale->payment_status,
+                    // Card taps and the visible reminder affordance both use
+                    // the exact native POS post-sale bottom-sheet contract.
+                    'action' => $nativeSheetAction,
+                    'on_tap' => $nativeSheetAction,
+                    'modal_endpoint' => "/api/v1/tenant/documents/{$documentType}/{$sale->id}/actions-sheet",
+                    'post_sale_sheet' => [
+                        'action' => 'show_post_sale_sheet',
+                        'data' => $postSaleData,
+                    ],
+                    'actions' => [
+                        [
+                            'label' => 'Schedule push reminder',
+                            'icon' => 'schedule',
+                            'action' => [
+                                'type' => 'OPEN_DIALOG',
+                                'action_type' => 'OPEN_DIALOG',
+                                'title' => 'Schedule push reminder',
+                                'endpoint' => "/api/v1/pos/receivables/{$sale->id}/reminder",
+                            ],
+                        ],
+                        [
+                            'label' => 'Send Reminder',
+                            'icon' => 'send',
+                            'action' => $nativeSheetAction,
+                        ],
+                    ],
+                ];
+            })->values(),
             'total' => $sales->total(),
             'current_page' => $sales->currentPage(),
             'last_page' => $sales->lastPage(),
@@ -3409,8 +4577,12 @@ class PosSyncApiController extends Controller
     {
         $company = $this->resolveCompany($request);
 
+        if ($request->isMethod('get')) {
+            return app(ReceivablesController::class)->reminderSheet($request, $sale);
+        }
+
         $validator = Validator::make($request->all(), [
-            'channel' => ['required', 'string', 'in:whatsapp,email,custom'],
+            'channel' => ['required', 'string', 'in:whatsapp,email,sms,custom'],
         ]);
 
         if ($validator->fails()) {
@@ -3429,6 +4601,39 @@ class PosSyncApiController extends Controller
 
         $delivery = app(InvoiceDeliveryService::class);
         $channel = $request->input('channel');
+
+        if ($channel === 'sms') {
+            $phone = preg_replace('/[^0-9+]/', '', (string) ($saleModel->customer?->phone ?? $saleModel->customer_phone ?? ''));
+            if (empty($phone)) {
+                return response()->json(['success' => false, 'error' => 'This customer has no phone number on file.'], 422);
+            }
+
+            $smsBody = $delivery->buildDueReminderMessage($saleModel);
+            $res = SmsGatewayService::send($phone, $smsBody, $company->id);
+
+            AuditLog::record('pos.delivery_dispatched', $company->id, $this->resolveUser($request, $company)?->id, [
+                'type' => 'sms',
+                'document_type' => 'receivable_reminder',
+                'recipient' => $phone,
+                'document_number' => $saleModel->sale_number,
+                'status' => ($res['success'] ?? false) ? 'sent' : 'failed',
+            ]);
+
+            if (! ($res['success'] ?? false)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $res['error'] ?? 'Failed to send SMS reminder.',
+                    'details' => $res['body'] ?? null,
+                ], 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'status' => 'sent',
+                'message' => 'Payment reminder sent via SMS (Text Message).',
+                'document_number' => $saleModel->sale_number,
+            ]);
+        }
 
         if ($channel === 'whatsapp') {
             $phone = $saleModel->customer?->phone;

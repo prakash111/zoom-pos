@@ -42,10 +42,13 @@ export const ADMIN_DOCK_ITEMS = [
     { key: 'smtp', label: 'SMTP & Mail Config', icon: '✉️', route: 'superadmin.smtp.index' }
 ];
 
-export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 'left', operatingMode = 'general') {
+export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 'left', operatingMode = 'general', persistUrl = '') {
     return {
         storageKey: storageKey,
         operatingMode: operatingMode, // 'general' | 'restaurant' | 'food_restaurant' | 'admin'
+        persistUrl: persistUrl,       // Laravel endpoint that stores the dock position per user (tenant only)
+        _lastPersistedPosition: null,
+        _persistTimer: null,
         position: defaultPosition, // 'left' | 'right' | 'top' | 'bottom' | 'floating'
         mode: 'docked',            // 'docked' | 'floating'
         layout: 'slim',            // 'slim' | 'expanded' | 'macos-dock' | 'speed-dial'
@@ -423,6 +426,43 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
                     y: this.y
                 }
             }));
+
+            this.persistServerPosition();
+        },
+
+        /**
+         * Asynchronously store the dock position on the server (per-user) so a
+         * page reload on any device restores the exact position. Debounced,
+         * de-duped, and a no-op when no endpoint was wired (e.g. the superadmin
+         * panel, which is localStorage-only). Never blocks or throws.
+         */
+        persistServerPosition() {
+            if (!this.persistUrl) return;
+
+            const pos = this.position;
+            if (['left', 'right', 'top', 'bottom', 'floating'].indexOf(pos) === -1) return;
+            if (pos === this._lastPersistedPosition) return;
+
+            clearTimeout(this._persistTimer);
+            this._persistTimer = setTimeout(() => {
+                const tokenEl = document.querySelector('meta[name="csrf-token"]');
+                const token = tokenEl ? tokenEl.getAttribute('content') : '';
+
+                fetch(this.persistUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({ dock_position: pos }),
+                    credentials: 'same-origin',
+                    keepalive: true,
+                }).then((res) => {
+                    if (res && res.ok) this._lastPersistedPosition = pos;
+                }).catch(() => { /* offline / transient — localStorage still holds it */ });
+            }, 400);
         },
 
         setPosition(newPos) {

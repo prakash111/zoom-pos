@@ -67,7 +67,12 @@
         </div>
     </section>
 
-    <div class="flex justify-end">
+    <div class="flex items-center justify-between">
+        <button type="button" wire:click="testPushNotifications" wire:loading.attr="disabled" class="rounded-2xl border border-slate-300 bg-white px-6 py-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+            <span wire:loading.remove wire:target="testPushNotifications">{{ __('Test Push Gateway') }}</span>
+            <span wire:loading wire:target="testPushNotifications">{{ __('Testing connection…') }}</span>
+        </button>
+
         <button type="submit" wire:loading.attr="disabled" class="rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-lg hover:bg-indigo-700 disabled:opacity-60">
             <span wire:loading.remove wire:target="savePushNotifications">{{ __('Save push settings') }}</span>
             <span wire:loading wire:target="savePushNotifications">{{ __('Saving…') }}</span>

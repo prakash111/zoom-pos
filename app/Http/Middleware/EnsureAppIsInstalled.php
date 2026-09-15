@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Support\Desktop;
+use App\Support\Installation;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,7 +16,7 @@ class EnsureAppIsInstalled
             return $next($request);
         }
 
-        if (! file_exists(storage_path('installed')) && ! $request->is('install*')) {
+        if (! Installation::isInstalled() && ! $request->is('install*')) {
             return redirect('/install');
         }
 

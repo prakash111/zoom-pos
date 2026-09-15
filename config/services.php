@@ -47,4 +47,27 @@ return [
         'api_key' => env('ANTHROPIC_API_KEY'),
     ],
 
+    'envato' => [
+        'api_token' => env('ENVATO_API_TOKEN'),
+        'item_id' => env('ENVATO_ITEM_ID'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | License Server
+    |--------------------------------------------------------------------------
+    |
+    | The license server location is fixed for this product — it is NOT taken
+    | from the environment. Only the shared secret (which must stay private) and
+    | the request timeout are configurable via .env.
+    |
+    */
+    'license_server' => [
+        'driver' => 'custom',
+        'url' => 'https://license.zoomnearby.com',
+        'store_url' => 'https://license.zoomnearby.com/buy.php',
+        'secret' => env('LICENSE_SERVER_SECRET'),
+        'timeout' => (int) env('LICENSE_SERVER_TIMEOUT', 10),
+    ],
+
 ];

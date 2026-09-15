@@ -17,6 +17,8 @@ class Create extends Component
 {
     public ?int $customerId = null;
 
+    public ?int $leadId = null;
+
     public ?string $userId = null;
 
     public string $discountType = 'fixed'; // fixed | percent
@@ -122,7 +124,36 @@ class Create extends Component
         $this->agreedPaymentMethod = $this->availablePaymentMethods->first()?->code ?? 'cash';
         $this->paymentMethod = $this->agreedPaymentMethod;
 
-        $this->addItem();
+        if ($leadIdQuery = request()->query('lead_id')) {
+            $lead = \App\Models\Lead::find($leadIdQuery);
+            if ($lead) {
+                $this->leadId = $lead->id;
+                if ($lead->customer_id) {
+                    $this->customerId = $lead->customer_id;
+                }
+                if ($lead->assigned_to) {
+                    $this->userId = (string) $lead->assigned_to;
+                }
+                if ($lead->requirement_summary || $lead->notes) {
+                    $this->notes = $lead->notes ?: $lead->requirement_summary;
+                    $this->quoteNotes = $this->notes;
+                }
+                $amount = (float) ($lead->expected_value ?: $lead->estimated_value ?: 0);
+                $this->items = [
+                    [
+                        'product_id' => null,
+                        'name' => $lead->title ?: ($lead->name.' - Scope of Work'),
+                        'description' => $lead->requirement_summary ?: ($lead->notes ?: ''),
+                        'quantity' => 1,
+                        'price' => $amount,
+                    ],
+                ];
+            } else {
+                $this->addItem();
+            }
+        } else {
+            $this->addItem();
+        }
     }
 
     public function addItem(): void
@@ -321,6 +352,7 @@ class Create extends Component
             'company_id' => $companyId,
             'sale_number' => $this->quoteNumber,
             'customer_id' => $customer?->id,
+            'lead_id' => $this->leadId,
             'customer_name' => $customer?->name ?? 'Client Proposal',
             'user_id' => $this->userId ?: auth('web')->id(),
             'total' => $this->total,
@@ -339,7 +371,23 @@ class Create extends Component
             'items' => $this->items,
         ]);
 
-        AuditLog::record('quotation.created', $quote->company_id, auth('web')->id(), ['quote_id' => $quote->id, 'quote_number' => $quote->sale_number]);
+        if ($this->leadId) {
+            $lead = \App\Models\Lead::find($this->leadId);
+            if ($lead) {
+                $lead->update(['stage' => 'proposal_sent']);
+                \Modules\leadmanagement\Models\LeadActivity::create([
+                    'company_id' => $companyId,
+                    'lead_id' => $lead->id,
+                    'type' => 'note',
+                    'title' => 'Quotation Created',
+                    'description' => "Quotation #{$quote->sale_number} sent to prospect.",
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
+            }
+        }
+
+        AuditLog::record('quotation.created', $quote->company_id, auth('web')->id(), ['quote_id' => $quote->id, 'quote_number' => $quote->sale_number, 'lead_id' => $this->leadId]);
 
         session()->flash('status', "Quotation {$quote->sale_number} created successfully.");
 

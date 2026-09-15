@@ -1,7 +1,7 @@
 <div>
     <div class="mb-5">
-        <h2 class="text-xl font-black text-slate-900 dark:text-white tracking-tight">{{ __("Step 4 — Administrator Account & License Registration") }}</h2>
-        <p class="text-xs text-slate-500 mt-1">{{ __("Create the primary Super Admin owner and enter your Envato / CodeCanyon purchase code.") }}</p>
+        <h2 class="text-xl font-black text-slate-900 dark:text-white tracking-tight">{{ __("Step 4 — Administrator Account & License Activation") }}</h2>
+        <p class="text-xs text-slate-500 mt-1">{{ __("Create the primary Super Admin owner and activate your license key for this domain.") }}</p>
     </div>
 
     @if ($alreadyBootstrapped)
@@ -15,34 +15,36 @@
         </div>
     @else
         <div class="space-y-4">
-            <!-- Envato Purchase Code Registration Box -->
+            <!-- License Key Activation Box -->
             <div class="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 space-y-3">
                 <div class="flex items-center justify-between">
                     <span class="text-xs font-extrabold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-                        <span>🛡️</span> {{ __("Envato / CodeCanyon License Verification") }}
+                        <span>🛡️</span> {{ __("License Activation") }}
                     </span>
-                    <span class="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/60 px-2 py-0.5 rounded-full">{{ __("Commercial License") }}</span>
+                    @if ($this->storeLink)
+                        <a href="{{ $this->storeLink }}" target="_blank" rel="noopener noreferrer" class="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded-full">{{ __("Buy a license") }} ↗</a>
+                    @endif
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Purchase Code") }}</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("License Key") }} <span class="text-rose-500">*</span></label>
                         <input type="text"
-                               wire:model="purchaseCode"
-                               placeholder="e.g. 12345678-abcd-1234-abcd-1234567890ab"
+                               wire:model="licenseKey"
+                               placeholder="e.g. ABCDE-FGHIJ-KLMNO-PQRST"
                                class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-mono font-medium focus:ring-2 focus:ring-blue-500 py-2 px-3">
-                        @error('purchaseCode') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
+                        @error('licenseKey') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Envato Buyer / Organization") }}</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Buyer / Organization (optional)") }}</label>
                         <input type="text"
                                wire:model="buyerUsername"
                                placeholder="e.g. your_company_name"
                                class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-medium focus:ring-2 focus:ring-blue-500 py-2 px-3">
                     </div>
                 </div>
-                <p class="text-[11px] text-slate-400 leading-normal">{{ __("Enter your Item Purchase Code from your CodeCanyon license certificate to activate lifetime updates and product support.") }}</p>
+                <p class="text-[11px] text-slate-400 leading-normal">{{ __("Enter the license key you received from the vendor. It is validated for this domain and unlocks updates and support.") }}</p>
             </div>
 
             <!-- Super Admin Account Details -->

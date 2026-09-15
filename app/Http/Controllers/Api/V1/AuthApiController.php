@@ -37,6 +37,8 @@ class AuthApiController extends Controller
             'password' => ['required', 'string', 'min:6'],
             'phone' => ['nullable', 'string', 'max:50'],
             'currency' => ['nullable', 'string', 'max:10'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'timezone' => ['nullable', 'string', 'max:64'],
             'pos_mode' => ['nullable', 'string'],
             'plan_name' => ['nullable', 'string', 'in:trial,starter,professional'],
             'activation_code' => ['nullable', 'string'],
@@ -76,6 +78,7 @@ class AuthApiController extends Controller
                 'admin_password' => $request->input('password'),
                 'phone' => $request->input('phone'),
                 'currency' => $request->filled('currency') ? $request->input('currency') : null,
+                'country' => $request->filled('country') ? $request->input('country') : null,
                 'language' => $request->filled('language') ? $request->input('language') : ($request->filled('locale') ? $request->input('locale') : null),
                 'default_locale' => $request->filled('default_locale') ? $request->input('default_locale') : null,
                 'timezone' => $request->filled('timezone') ? $request->input('timezone') : null,
@@ -118,7 +121,7 @@ class AuthApiController extends Controller
                 try {
                     $this->sendOtpEmail($user->email, $otp, $branding);
                 } catch (\Throwable $e) {
-                    Log::warning("Failed to send OTP verification email to {$user->email}: " . $e->getMessage());
+                    Log::warning("Failed to send OTP verification email to {$user->email}: ".$e->getMessage());
                 }
 
                 return response()->json([
@@ -263,8 +266,8 @@ class AuthApiController extends Controller
         $company = Company::find($user->company_id);
         if (! $company) {
             $company = Company::create([
-                'name' => ($user->name ?: 'Store') . "'s POS",
-                'slug' => Str::slug($user->name . '-' . Str::random(5)),
+                'name' => ($user->name ?: 'Store')."'s POS",
+                'slug' => Str::slug($user->name.'-'.Str::random(5)),
                 'status' => 'active',
                 'currency' => 'USD',
                 'currency_symbol' => '$',
@@ -356,7 +359,7 @@ class AuthApiController extends Controller
         try {
             $this->sendOtpEmail($user->email, $otp, $branding);
         } catch (\Throwable $e) {
-            Log::warning("Failed to resend OTP to {$user->email}: " . $e->getMessage());
+            Log::warning("Failed to resend OTP to {$user->email}: ".$e->getMessage());
         }
 
         return response()->json([
@@ -372,7 +375,7 @@ class AuthApiController extends Controller
         $username = $branding?->smtp_username;
         $password = $branding?->smtp_password;
         $encryption = $branding?->smtp_encryption ?? 'tls';
-        $fromAddress = $branding?->smtp_from_address ?: config('mail.from.address', 'noreply@zoomnearby.com');
+        $fromAddress = $branding?->smtp_from_address ?: config('mail.from.address', 'noreply@example.com');
         $fromName = $branding?->smtp_from_name ?: ($branding?->platform_name ?: config('mail.from.name', 'ZoomNearby'));
 
         if (! empty($host)) {

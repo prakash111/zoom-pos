@@ -1,60 +1,86 @@
-@props([])
+@props(['branding' => null])
 
 @php
-    $showcaseFeatures = [
-        'inventory' => [
-            'icon' => '📦',
-            'label' => __('Smart Inventory & Stock'),
-            'title' => __('Real-time stock tracking, multi-warehouse sync & restock alerts'),
-            'points' => [
-                __('Instant barcode & SKU generator with one-click label printing'),
-                __('Multi-warehouse & branch transfers with receiving audit trails'),
-                __('Automated low-stock threshold triggers & re-order notifications'),
-                __('Batch & lot tracking with expiry dates, weight & unit conversions'),
-                __('Real-time valuation, cost-averaging & margin analytics per category'),
+    $branding = $branding ?? \App\Models\PlatformBranding::current();
+    $rawFeatures = $branding ? $branding->landingFeatures() : [];
+    $mockupKeys = ['inventory', 'pos', 'restaurant', 'finance'];
+
+    $showcaseFeatures = [];
+    foreach ($rawFeatures as $i => $item) {
+        $key = 'feat_' . $i;
+        $mockup = $item['mockup'] ?? $mockupKeys[$i % count($mockupKeys)];
+        $body = $item['body'] ?? '';
+        $points = array_filter(array_map('trim', explode("\n", $body)));
+        if (empty($points)) {
+            $points = [$body];
+        }
+        $showcaseFeatures[$key] = [
+            'icon' => $item['icon'] ?: '✨',
+            'label' => $item['title'],
+            'title' => $item['title'],
+            'points' => $points,
+            'mockup' => $mockup,
+        ];
+    }
+
+    if (empty($showcaseFeatures)) {
+        $showcaseFeatures = [
+            'inventory' => [
+                'icon' => '📦',
+                'label' => __('Smart Inventory & Stock'),
+                'title' => __('Real-time stock tracking, multi-warehouse sync & restock alerts'),
+                'points' => [
+                    __('Instant barcode & SKU generator with one-click label printing'),
+                    __('Multi-warehouse & branch transfers with receiving audit trails'),
+                    __('Automated low-stock threshold triggers & re-order notifications'),
+                    __('Batch & lot tracking with expiry dates, weight & unit conversions'),
+                    __('Real-time valuation, cost-averaging & margin analytics per category'),
+                ],
+                'mockup' => 'inventory',
             ],
-            'mockup' => 'inventory',
-        ],
-        'retail' => [
-            'icon' => '🛒',
-            'label' => __('Retail & Store POS'),
-            'title' => __('A fast, flexible checkout built for peak rush hours'),
-            'points' => [
-                __('Barcode scanning with sub-second add-to-cart feedback'),
-                __('Multi-payment tender split — cash, card, and digital transfers'),
-                __('Seamless customer accounts with credit limits & payment histories'),
-                __('Full cash register management with opening/closing shift balances & X/Z reports'),
-                __('Zero-latency offline mode — ring up sales during network outages without interruption'),
+            'retail' => [
+                'icon' => '🛒',
+                'label' => __('Retail & Store POS'),
+                'title' => __('A fast, flexible checkout built for peak rush hours'),
+                'points' => [
+                    __('Barcode scanning with sub-second add-to-cart feedback'),
+                    __('Multi-payment tender split — cash, card, and digital transfers'),
+                    __('Seamless customer accounts with credit limits & payment histories'),
+                    __('Full cash register management with opening/closing shift balances & X/Z reports'),
+                    __('Zero-latency offline mode — ring up sales during network outages without interruption'),
+                ],
+                'mockup' => 'pos',
             ],
-            'mockup' => 'pos',
-        ],
-        'restaurant' => [
-            'icon' => '🍽️',
-            'label' => __('Restaurant & Food POS'),
-            'title' => __('Dine-in floor, takeaway, and the kitchen — perfectly synchronized'),
-            'points' => [
-                __('Interactive dining floor plans with live occupied & billing status'),
-                __('Kitchen Order Tickets (KOT) dispatched to live Kitchen Display Screens (KDS)'),
-                __('Contactless Table QR menu ordering — guests scan, browse, and order from phones'),
-                __('Per-seat item tracking, custom food modifiers, and course pacing'),
-                __('Instant table merge, bill splitting, and takeaway queue management'),
+            'restaurant' => [
+                'icon' => '🍽️',
+                'label' => __('Restaurant & Food POS'),
+                'title' => __('Dine-in floor, takeaway, and the kitchen — perfectly synchronized'),
+                'points' => [
+                    __('Interactive dining floor plans with live occupied & billing status'),
+                    __('Kitchen Order Tickets (KOT) dispatched to live Kitchen Display Screens (KDS)'),
+                    __('Contactless Table QR menu ordering — guests scan, browse, and order from phones'),
+                    __('Per-seat item tracking, custom food modifiers, and course pacing'),
+                    __('Instant table merge, bill splitting, and takeaway queue management'),
+                ],
+                'mockup' => 'restaurant',
             ],
-            'mockup' => 'restaurant',
-        ],
-        'finance' => [
-            'icon' => '🧾',
-            'label' => __('Finance & Invoicing'),
-            'title' => __('Automated tax invoicing and real-time ledger accounting'),
-            'points' => [
-                __('Multi-currency pricing with configurable precision & exchange rates'),
-                __('Compliant automated tax invoices (VAT/GST/HSN) generated instantly'),
-                __('One-click instant dispatch to customers via WhatsApp or Email'),
-                __('Thermal receipt printing (80mm / 58mm) alongside full A4 PDF invoices'),
-                __('Accounts Payable (AP) and Accounts Receivable (AR) ledgers built-in'),
+            'finance' => [
+                'icon' => '🧾',
+                'label' => __('Finance & Invoicing'),
+                'title' => __('Automated tax invoicing and real-time ledger accounting'),
+                'points' => [
+                    __('Multi-currency pricing with configurable precision & exchange rates'),
+                    __('Compliant automated tax invoices (VAT/GST/HSN) generated instantly'),
+                    __('One-click instant dispatch to customers via WhatsApp or Email'),
+                    __('Thermal receipt printing (80mm / 58mm) alongside full A4 PDF invoices'),
+                    __('Accounts Payable (AP) and Accounts Receivable (AR) ledgers built-in'),
+                ],
+                'mockup' => 'finance',
             ],
-            'mockup' => 'finance',
-        ],
-    ];
+        ];
+    }
+
+    $firstTab = array_key_first($showcaseFeatures) ?: 'feat_0';
 @endphp
 
 <div id="features" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 scroll-mt-20">
@@ -63,11 +89,11 @@
             <span class="w-1.5 h-1.5 rounded-full bg-brand-lime"></span>
             {{ __('Unified Operations Suite') }}
         </span>
-        <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white">{{ __('Everything your business needs, in one unified engine') }}</h2>
-        <p class="mt-3 text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">{{ __("From real-time warehouse stock tracking to front-counter barcode POS and back-of-house kitchen display, it's all synchronized.") }}</p>
+        <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white">{{ $branding->getSectionTitle('features', __('Everything your business needs, in one unified engine')) }}</h2>
+        <p class="mt-3 text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">{{ $branding->getSectionSubtitle('features', __("From real-time warehouse stock tracking to front-counter barcode POS and back-of-house kitchen display, it's all synchronized.")) }}</p>
     </div>
 
-    <div x-data="{ tab: 'inventory' }" class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 lg:gap-8 items-start">
+    <div x-data="{ tab: '{{ $firstTab }}' }" class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 lg:gap-8 items-start">
         <!-- Tab List -->
         <div class="flex lg:flex-col gap-2 overflow-x-auto no-scrollbar pb-2 lg:pb-0">
             @foreach ($showcaseFeatures as $key => $f)

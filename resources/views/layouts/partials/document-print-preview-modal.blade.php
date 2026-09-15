@@ -1,6 +1,7 @@
 <div x-data="{
         open: false,
         url: '',
+        loading: true,
         title: @js(__('Document Preview')),
         openPreview(detail) {
             const source = typeof detail === 'string' ? detail : detail?.url;
@@ -10,12 +11,14 @@
             previewUrl.searchParams.set('embed', '1');
             this.url = previewUrl.toString();
             this.title = detail?.title || @js(__('Document Preview'));
+            this.loading = true;
             this.open = true;
             document.documentElement.classList.add('overflow-hidden');
         },
         closePreview() {
             this.open = false;
             this.url = '';
+            this.loading = true;
             document.documentElement.classList.remove('overflow-hidden');
         },
         printPreview() {
@@ -26,7 +29,7 @@
      x-on:keydown.escape.window="if (open) closePreview()">
     <div x-show="open" x-cloak class="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-6">
         <div class="absolute inset-0 bg-slate-950/75 backdrop-blur-sm" x-on:click="closePreview()"></div>
-        <section class="relative flex h-[96dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:h-[92dvh] sm:rounded-3xl"
+        <section class="relative flex h-[96dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-[#0F172A] sm:h-[92dvh] sm:rounded-3xl"
                  role="dialog" aria-modal="true" aria-labelledby="document-preview-title">
             <header class="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-slate-200 px-4 dark:border-slate-700 sm:h-16 sm:px-6">
                 <div class="min-w-0">
@@ -35,8 +38,14 @@
                 </div>
                 <button type="button" x-on:click="closePreview()" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg text-slate-500 hover:text-slate-900 dark:bg-slate-800 dark:hover:text-white" aria-label="{{ __('Close preview') }}">&times;</button>
             </header>
-            <div class="min-h-0 flex-1 bg-slate-100 p-1.5 dark:bg-slate-950 sm:p-4">
-                <iframe x-ref="documentPreviewFrame" :src="url" class="h-full w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700" title="{{ __('Document preview') }}"></iframe>
+            <div class="relative min-h-0 flex-1 bg-[#0B1120] p-1.5 sm:p-4">
+                <div x-show="loading" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[#0B1120] text-sm font-bold text-slate-300">
+                    <span class="h-9 w-9 animate-spin rounded-full border-4 border-slate-700 border-t-emerald-500"></span>
+                    <span>{{ __('Loading document…') }}</span>
+                </div>
+                <iframe x-ref="documentPreviewFrame" :src="url" x-on:load="loading = false"
+                        class="h-full w-full rounded-xl border border-slate-700 bg-[#0B1120] transition-opacity duration-150"
+                        :class="loading ? 'opacity-0' : 'opacity-100'" title="{{ __('Document preview') }}"></iframe>
             </div>
             <footer class="flex shrink-0 justify-end border-t border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-6 sm:py-4">
                 <button type="button" x-on:click="printPreview()" class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006aff] px-7 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-500/25 transition hover:bg-[#0055d6] active:scale-[0.98] sm:w-auto sm:min-w-52 sm:text-base">
