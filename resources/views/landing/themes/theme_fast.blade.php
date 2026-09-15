@@ -89,10 +89,12 @@
                         </div>
                         <div class="mt-4 space-y-2">
                             @foreach ($heroProducts as $product)
-                                @php($name = $product[0] ?? ($product['name'] ?? ''))
-                                @php($price = $product[1] ?? ($product['price'] ?? ''))
-                                @php($tag = $product[2] ?? ($product['status'] ?? ''))
-                                @php($c = $product[3] ?? 'emerald')
+                                @php
+                                    $name = $product[0] ?? ($product['name'] ?? '');
+                                    $price = $product[1] ?? ($product['price'] ?? '');
+                                    $tag = $product[2] ?? ($product['status'] ?? '');
+                                    $c = $product[3] ?? 'emerald';
+                                @endphp
                                 <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 text-xs">
                                     <span class="font-medium text-slate-700 dark:text-slate-200">{{ $name }}</span>
                                     <span class="flex items-center gap-2">
@@ -121,8 +123,10 @@
                 </p>
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-center">
                     @foreach ($hardware as $item)
-                        @php($label = $item[0] ?? ($item['label'] ?? ''))
-                        @php($tag = $item[1] ?? ($item['tag'] ?? ''))
+                        @php
+                            $label = $item[0] ?? ($item['label'] ?? '');
+                            $tag = $item[1] ?? ($item['tag'] ?? '');
+                        @endphp
                         <div class="p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
                             <div class="text-xs font-black text-slate-900 dark:text-white leading-tight">{{ __($label) }}</div>
                             <div class="text-[10px] {{ $muted }} mt-1">{{ __($tag) }}</div>
@@ -185,9 +189,11 @@
                 </div>
                 <div class="mt-10 grid sm:grid-cols-2 gap-6">
                     @foreach ($solutions as $item)
-                        @php($icon = $item[0] ?? ($item['icon'] ?? '✨'))
-                        @php($title = $item[1] ?? ($item['title'] ?? ''))
-                        @php($body = $item[2] ?? ($item['body'] ?? ''))
+                        @php
+                            $icon = $item[0] ?? ($item['icon'] ?? '✨');
+                            $title = $item[1] ?? ($item['title'] ?? '');
+                            $body = $item[2] ?? ($item['body'] ?? '');
+                        @endphp
                         <div class="p-6 {{ $card }}">
                             <div class="text-xl mb-3">{{ $icon }}</div>
                             <h3 class="text-base font-black text-slate-900 dark:text-white">{{ $title }}</h3>

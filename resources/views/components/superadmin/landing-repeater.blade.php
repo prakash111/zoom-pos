@@ -1,5 +1,7 @@
 @props(['title', 'type', 'items' => [], 'fields' => []])
-@php($property = ['highlight'=>'landingHeroHighlights','product'=>'landingHeroProducts','hardware'=>'landingHardwareItems','stat'=>'landingStats','solution'=>'landingSolutions'][$type] ?? null)
+@php
+    $property = ['highlight'=>'landingHeroHighlights','product'=>'landingHeroProducts','hardware'=>'landingHardwareItems','stat'=>'landingStats','solution'=>'landingSolutions'][$type] ?? null;
+@endphp
 @if ($property)
 <div class="space-y-2">
     <div class="flex items-center justify-between">
