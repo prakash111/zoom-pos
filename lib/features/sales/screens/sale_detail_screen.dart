@@ -13,7 +13,8 @@ final _dateFormat = DateFormat('MMM d, y · h:mm a');
 
 /// Read-only breakdown of one sale's line items and totals.
 class SaleDetailScreen extends StatelessWidget {
-  const SaleDetailScreen({super.key, required this.sale, required this.formatter});
+  const SaleDetailScreen(
+      {super.key, required this.sale, required this.formatter});
 
   final SaleModel sale;
   final CurrencyFormatter formatter;
@@ -24,6 +25,7 @@ class SaleDetailScreen extends StatelessWidget {
       documentType: 'invoice',
       documentId: sale.id,
       documentNumber: sale.saleNumber,
+      batchDispatchEndpoint: '/api/v1/tenant/dispatch/batch-send',
       companyName: company?.tradeName ?? company?.name ?? '',
       customerName: sale.customerName,
       currencySymbol: company?.currencySymbol ?? '\$',
@@ -34,20 +36,21 @@ class SaleDetailScreen extends StatelessWidget {
       taxId: company?.taxId,
       taxLabel: company?.taxLabel ?? 'Tax',
       isIndia: company?.isIndia ?? false,
-      taxRate: (sale.total - sale.tax) > 0 ? sale.tax / (sale.total - sale.tax) * 100 : 0,
-      lines: sale.items
-          .map((item) {
-            final qty = ((item['quantity'] as num?) ?? (item['qty'] as num?) ?? 1).toDouble();
-            final price = ((item['price'] as num?) ?? 0).toDouble();
-            final total = ((item['total'] as num?) ?? (qty * price)).toDouble();
-            return ReceiptLine(
-              name: item['name']?.toString() ?? 'Item',
-              quantity: qty,
-              unitPrice: price,
-              lineTotal: total,
-            );
-          })
-          .toList(),
+      taxRate: (sale.total - sale.tax) > 0
+          ? sale.tax / (sale.total - sale.tax) * 100
+          : 0,
+      lines: sale.items.map((item) {
+        final qty = ((item['quantity'] as num?) ?? (item['qty'] as num?) ?? 1)
+            .toDouble();
+        final price = ((item['price'] as num?) ?? 0).toDouble();
+        final total = ((item['total'] as num?) ?? (qty * price)).toDouble();
+        return ReceiptLine(
+          name: item['name']?.toString() ?? 'Item',
+          quantity: qty,
+          unitPrice: price,
+          lineTotal: total,
+        );
+      }).toList(),
     );
   }
 
@@ -63,7 +66,8 @@ class SaleDetailScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.ios_share_outlined),
             tooltip: 'Preview, print, or share',
-            onPressed: () => showInvoiceActionsSheet(context, _actionsData(context)),
+            onPressed: () =>
+                showInvoiceActionsSheet(context, _actionsData(context)),
           ),
         ],
       ),
@@ -77,7 +81,8 @@ class SaleDetailScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (sale.createdAt != null)
-                    Text(_dateFormat.format(TenantTimeService.instance.toTenantTime(sale.createdAt!))),
+                    Text(_dateFormat.format(TenantTimeService.instance
+                        .toTenantTime(sale.createdAt!))),
                   if ((sale.customerName ?? '').isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text('Customer: ${sale.customerName}'),
@@ -86,7 +91,10 @@ class SaleDetailScreen extends StatelessWidget {
                   Text('Payment: ${_titleCase(sale.paymentMethod)}'),
                   if (sale.isCancelled) ...[
                     const SizedBox(height: 8),
-                    Text('Cancelled', style: TextStyle(color: Colors.red.shade400, fontWeight: FontWeight.w600)),
+                    Text('Cancelled',
+                        style: TextStyle(
+                            color: Colors.red.shade400,
+                            fontWeight: FontWeight.w600)),
                   ],
                 ],
               ),
@@ -98,13 +106,15 @@ class SaleDetailScreen extends StatelessWidget {
           if (sale.items.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text('No item details available.', style: TextStyle(color: Colors.grey.shade600)),
+              child: Text('No item details available.',
+                  style: TextStyle(color: Colors.grey.shade600)),
             )
           else
             Card(
               child: Column(
                 children: [
-                  for (final item in sale.items) _ItemRow(item: item, formatter: formatter),
+                  for (final item in sale.items)
+                    _ItemRow(item: item, formatter: formatter),
                 ],
               ),
             ),
@@ -120,12 +130,14 @@ class SaleDetailScreen extends StatelessWidget {
                       _TotalRow('CGST', formatter.format(sale.tax / 2)),
                       _TotalRow('SGST', formatter.format(sale.tax / 2)),
                     ] else
-                      _TotalRow(company?.taxLabel ?? 'Tax', formatter.format(sale.tax)),
+                      _TotalRow(company?.taxLabel ?? 'Tax',
+                          formatter.format(sale.tax)),
                   const Divider(),
                   _TotalRow('Total', formatter.format(sale.total), bold: true),
                   _TotalRow('Paid', formatter.format(sale.paidAmount)),
                   if (sale.dueAmount > 0)
-                    _TotalRow('Due', formatter.format(sale.dueAmount), color: Colors.red.shade400),
+                    _TotalRow('Due', formatter.format(sale.dueAmount),
+                        color: Colors.red.shade400),
                 ],
               ),
             ),
@@ -135,7 +147,8 @@ class SaleDetailScreen extends StatelessWidget {
     );
   }
 
-  String _titleCase(String value) => value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
+  String _titleCase(String value) =>
+      value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
 }
 
 class _ItemRow extends StatelessWidget {
@@ -149,12 +162,14 @@ class _ItemRow extends StatelessWidget {
     final name = item['name']?.toString() ?? 'Item';
     final qty = (item['quantity'] as num?) ?? (item['qty'] as num?) ?? 1;
     final price = (item['price'] as num?) ?? 0;
-    final total = (item['total'] as num?) ?? (qty.toDouble() * price.toDouble());
+    final total =
+        (item['total'] as num?) ?? (qty.toDouble() * price.toDouble());
 
     return ListTile(
       title: Text(name),
       subtitle: Text('${qty.toString()} × ${formatter.format(price)}'),
-      trailing: Text(formatter.format(total), style: const TextStyle(fontWeight: FontWeight.w600)),
+      trailing: Text(formatter.format(total),
+          style: const TextStyle(fontWeight: FontWeight.w600)),
     );
   }
 }
@@ -169,7 +184,8 @@ class _TotalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal, color: color);
+    final style = TextStyle(
+        fontWeight: bold ? FontWeight.bold : FontWeight.normal, color: color);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(

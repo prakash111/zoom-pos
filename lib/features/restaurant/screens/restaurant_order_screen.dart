@@ -345,6 +345,7 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
           documentType: 'invoice',
           documentId: sale.id,
           documentNumber: sale.saleNumber,
+          batchDispatchEndpoint: '/api/v1/tenant/dispatch/batch-send',
           companyName: company?.tradeName ?? company?.name ?? '',
           customerName: sale.customerName,
           customerPhone: sale.customerPhone,
@@ -1198,7 +1199,8 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                       controller: _tenderedController,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                      style: TextStyle(color: isDark ? const Color(0xFFF8FAFC) : null),
+                      style: TextStyle(
+                          color: isDark ? const Color(0xFFF8FAFC) : null),
                       decoration: InputDecoration(
                         labelText: 'Cash Tendered by Customer',
                         labelStyle: TextStyle(
@@ -1219,8 +1221,8 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide:
-                              const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF10B981), width: 1.5),
                         ),
                         filled: isDark,
                         fillColor: isDark ? const Color(0xFF0F172A) : null,
@@ -1233,8 +1235,10 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                       decoration: BoxDecoration(
                         color: isDark
                             ? (_tenderedAmount >= widget.total
-                                ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                                : const Color(0xFFF59E0B).withValues(alpha: 0.12))
+                                ? const Color(0xFF10B981)
+                                    .withValues(alpha: 0.12)
+                                : const Color(0xFFF59E0B)
+                                    .withValues(alpha: 0.12))
                             : (_tenderedAmount >= widget.total
                                 ? const Color(0xFFECFDF5)
                                 : const Color(0xFFFFFBEB)),
@@ -1242,8 +1246,10 @@ class _SettleBillSheetState extends State<_SettleBillSheet> {
                         border: Border.all(
                             color: isDark
                                 ? (_tenderedAmount >= widget.total
-                                    ? const Color(0xFF10B981).withValues(alpha: 0.3)
-                                    : const Color(0xFFF59E0B).withValues(alpha: 0.3))
+                                    ? const Color(0xFF10B981)
+                                        .withValues(alpha: 0.3)
+                                    : const Color(0xFFF59E0B)
+                                        .withValues(alpha: 0.3))
                                 : (_tenderedAmount >= widget.total
                                     ? const Color(0xFFA7F3D0)
                                     : const Color(0xFFFDE68A))),

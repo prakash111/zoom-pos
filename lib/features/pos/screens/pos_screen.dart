@@ -167,6 +167,7 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
             : 0,
         paidAmount: result.paidAmount,
         dueAmount: result.dueAmount,
+        batchDispatchEndpoint: '/api/v1/tenant/dispatch/batch-send',
         lines: result.items
             .map((item) => ReceiptLine(
                   name: item.product.name,

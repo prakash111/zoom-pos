@@ -29,7 +29,8 @@ class ServiceOrderDetailsScreen extends StatefulWidget {
   final ServiceOrderModel order;
 
   @override
-  State<ServiceOrderDetailsScreen> createState() => _ServiceOrderDetailsScreenState();
+  State<ServiceOrderDetailsScreen> createState() =>
+      _ServiceOrderDetailsScreenState();
 }
 
 class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
@@ -62,8 +63,12 @@ class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => ServiceOrderFormSheet(repository: widget.repository, formatter: widget.formatter, order: _order),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => ServiceOrderFormSheet(
+          repository: widget.repository,
+          formatter: widget.formatter,
+          order: _order),
     );
     if (saved == true) {
       await _refresh();
@@ -92,17 +97,30 @@ class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
 
       data = InvoiceActionsData(
         documentType: 'invoice',
-        documentId: (postData['sale_id'] ?? _order.saleId ?? _order.id).toString(),
-        documentNumber: (postData['invoice_number'] ?? _order.invoiceNumber ?? 'SO-${_order.orderNumber}').toString(),
+        documentId:
+            (postData['sale_id'] ?? _order.saleId ?? _order.id).toString(),
+        documentNumber: (postData['invoice_number'] ??
+                _order.invoiceNumber ??
+                'SO-${_order.orderNumber}')
+            .toString(),
+        batchDispatchEndpoint:
+            postData['batch_dispatch_endpoint']?.toString() ??
+                '/api/v1/tenant/dispatch/batch-send',
         companyName: (postData['company_name'] ?? 'Service Center').toString(),
         lines: lines,
-        subtotal: ((postData['subtotal'] as num?) ?? (_order.partsTotal + _order.laborCost)).toDouble(),
-        discount: ((postData['discount'] as num?) ?? _order.discount).toDouble(),
+        subtotal: ((postData['subtotal'] as num?) ??
+                (_order.partsTotal + _order.laborCost))
+            .toDouble(),
+        discount:
+            ((postData['discount'] as num?) ?? _order.discount).toDouble(),
         tax: ((postData['tax'] as num?) ?? _order.taxAmount).toDouble(),
         total: ((postData['total'] as num?) ?? _order.totalAmount).toDouble(),
-        customerName: postData['customer_name']?.toString() ?? _order.customerName,
-        customerPhone: postData['customer_phone']?.toString() ?? _order.customerPhone,
-        customerEmail: postData['customer_email']?.toString() ?? _order.customerEmail,
+        customerName:
+            postData['customer_name']?.toString() ?? _order.customerName,
+        customerPhone:
+            postData['customer_phone']?.toString() ?? _order.customerPhone,
+        customerEmail:
+            postData['customer_email']?.toString() ?? _order.customerEmail,
         currencySymbol: postData['currency_symbol']?.toString() ?? '\$',
         taxRate: ((postData['tax_rate'] as num?) ?? _order.taxRate).toDouble(),
       );
@@ -131,6 +149,7 @@ class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
         documentType: 'invoice',
         documentId: _order.saleId ?? _order.id,
         documentNumber: _order.invoiceNumber ?? 'SO-${_order.orderNumber}',
+        batchDispatchEndpoint: '/api/v1/tenant/dispatch/batch-send',
         companyName: 'Service Center',
         lines: lines,
         subtotal: _order.partsTotal + _order.laborCost,
@@ -158,7 +177,9 @@ class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
         }
       }
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -169,8 +190,12 @@ class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
         title: Text('Delete order #${_order.orderNumber}?'),
         content: const Text('This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -180,209 +205,257 @@ class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
       await widget.repository.deleteOrder(_order.id);
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-          title: Text('#${_order.orderNumber}'),
-          actions: [
-            IconButton(icon: const Icon(Icons.edit_outlined), tooltip: 'Edit', onPressed: _edit),
-            PopupMenuButton<String>(
-              onSelected: (value) => value == 'delete' ? _delete() : _changeStatus(value),
-              itemBuilder: (context) => [
-                for (final s in kServiceOrderStatuses)
-                  if (s != _order.status)
-                    PopupMenuItem(value: s, child: Text('Mark ${kServiceOrderStatusLabels[s]}')),
-                const PopupMenuDivider(),
-                const PopupMenuItem(value: 'delete', child: Text('Delete')),
-              ],
-            ),
-          ],
-        ),
-        body: _isLoading
-            ? const LoadingIndicator()
-            : _error != null
-                ? ErrorView(message: _error!, onRetry: _refresh)
-                : RefreshIndicator(
-                    onRefresh: _refresh,
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        _StatusTimeline(status: _order.status),
-                        if (_order.status == 'delivered_settled') ...[
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.green.shade200),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.check_circle, color: Colors.green.shade700, size: 28),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Delivered & Settled',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.green.shade900,
-                                        ),
-                                      ),
-                                      Text(
-                                        _order.invoiceNumber != null
-                                            ? 'Linked to Invoice #${_order.invoiceNumber}'
-                                            : 'Payment settled and invoice generated',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.green.shade800,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                ElevatedButton.icon(
-                                  onPressed: () => _openInvoiceActions(),
-                                  icon: const Icon(Icons.share, size: 16),
-                                  label: const Text('Invoice'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green.shade700,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  ),
-                                ),
-                              ],
-                            ),
+      appBar: AppBar(
+        title: Text('#${_order.orderNumber}'),
+        actions: [
+          IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit',
+              onPressed: _edit),
+          PopupMenuButton<String>(
+            onSelected: (value) =>
+                value == 'delete' ? _delete() : _changeStatus(value),
+            itemBuilder: (context) => [
+              for (final s in kServiceOrderStatuses)
+                if (s != _order.status)
+                  PopupMenuItem(
+                      value: s,
+                      child: Text('Mark ${kServiceOrderStatusLabels[s]}')),
+              const PopupMenuDivider(),
+              const PopupMenuItem(value: 'delete', child: Text('Delete')),
+            ],
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const LoadingIndicator()
+          : _error != null
+              ? ErrorView(message: _error!, onRetry: _refresh)
+              : RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      _StatusTimeline(status: _order.status),
+                      if (_order.status == 'delivered_settled') ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.green.shade200),
                           ),
-                        ],
-                        const SizedBox(height: 20),
-                        _SectionCard(
-                          title: 'Customer',
-                          icon: Icons.person_outline,
-                          children: [
-                            _InfoRow('Name', _order.customerName.isEmpty ? '—' : _order.customerName),
-                            if (_order.customerPhone.isNotEmpty) _InfoRow('Phone', _order.customerPhone),
-                            if (_order.customerEmail.isNotEmpty) _InfoRow('Email', _order.customerEmail),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _SectionCard(
-                          title: 'Device / Item',
-                          icon: Icons.devices_other_outlined,
-                          children: [
-                            _InfoRow('Equipment', _order.equipmentName.isEmpty ? '—' : _order.equipmentName),
-                            if (_order.brandModel.isNotEmpty) _InfoRow('Brand / Model', _order.brandModel),
-                            if (_order.serialNumber.isNotEmpty) _InfoRow('Serial Number', _order.serialNumber),
-                          ],
-                        ),
-                        if (_order.extraAttributes.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          _SectionCard(
-                            title: 'Specifications',
-                            icon: Icons.tune_outlined,
+                          child: Row(
                             children: [
-                              for (final entry in _order.extraAttributes.entries)
-                                _InfoRow(entry.key, entry.value?.toString() ?? '—', emphasize: true),
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-                        _SectionCard(
-                          title: 'Diagnosis',
-                          icon: Icons.medical_information_outlined,
-                          children: [
-                            _InfoRow('Status', _order.statusLabel.isEmpty ? kServiceOrderStatusLabels[_order.status] ?? _order.status : _order.statusLabel),
-                            _InfoRow('Priority', _order.priority),
-                            const SizedBox(height: 8),
-                            const Text('Reported Issue', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
-                            const SizedBox(height: 2),
-                            Text(_order.reportedDefect.isEmpty ? 'No issue description provided.' : _order.reportedDefect),
-                            if (_order.technicalDiagnosis.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              const Text('Technical Diagnosis', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
-                              const SizedBox(height: 2),
-                              Text(_order.technicalDiagnosis),
-                            ],
-                            if ((_order.notes ?? '').isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              const Text('Notes', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
-                              const SizedBox(height: 2),
-                              Text(_order.notes!),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _SectionCard(
-                          title: 'Charges',
-                          icon: Icons.receipt_long_outlined,
-                          children: [
-                            for (final part in _order.partsUsed)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 2),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              Icon(Icons.check_circle,
+                                  color: Colors.green.shade700, size: 28),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: Text(
-                                        '${part['name'] ?? 'Part'} × ${part['quantity'] ?? 1}',
-                                        overflow: TextOverflow.ellipsis,
+                                    Text(
+                                      'Delivered & Settled',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green.shade900,
                                       ),
                                     ),
-                                    Text(widget.formatter.format(
-                                      ((part['quantity'] as num?) ?? 1) * ((part['unit_price'] as num?) ?? 0),
-                                    )),
+                                    Text(
+                                      _order.invoiceNumber != null
+                                          ? 'Linked to Invoice #${_order.invoiceNumber}'
+                                          : 'Payment settled and invoice generated',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.green.shade800,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
-                            if (_order.partsUsed.isNotEmpty) const Divider(height: 16),
-                            _InfoRow('Parts Total', widget.formatter.format(_order.partsTotal)),
-                            _InfoRow('Labor Cost', widget.formatter.format(_order.laborCost)),
-                            if (_order.discount > 0) _InfoRow('Discount', '-${widget.formatter.format(_order.discount)}'),
-                            if (_order.taxAmount > 0 || _order.taxRate > 0)
-                              _InfoRow(
-                                _order.isTaxInclusive
-                                    ? 'Tax (${_order.taxRate.toStringAsFixed(0)}% incl.)'
-                                    : 'Tax (${_order.taxRate.toStringAsFixed(0)}%)',
-                                _order.isTaxInclusive
-                                    ? widget.formatter.format(_order.taxAmount)
-                                    : '+${widget.formatter.format(_order.taxAmount)}',
+                              ElevatedButton.icon(
+                                onPressed: () => _openInvoiceActions(),
+                                icon: const Icon(Icons.share, size: 16),
+                                label: const Text('Invoice'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green.shade700,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                ),
                               ),
-                            const Divider(height: 16),
-                            _InfoRow(
-                              'Total Amount',
-                              widget.formatter.format(_order.totalAmount),
-                              emphasize: true,
-                            ),
-                          ],
-                        ),
-                        if (_order.warrantyPeriod.isNotEmpty || _order.warrantyTerms.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          _SectionCard(
-                            title: 'Warranty',
-                            icon: Icons.verified_user_outlined,
-                            children: [
-                              if (_order.warrantyPeriod.isNotEmpty) _InfoRow('Period', _order.warrantyPeriod),
-                              if (_order.warrantyTerms.isNotEmpty) _InfoRow('Terms', _order.warrantyTerms),
                             ],
                           ),
-                        ],
+                        ),
                       ],
-                    ),
+                      const SizedBox(height: 20),
+                      _SectionCard(
+                        title: 'Customer',
+                        icon: Icons.person_outline,
+                        children: [
+                          _InfoRow(
+                              'Name',
+                              _order.customerName.isEmpty
+                                  ? '—'
+                                  : _order.customerName),
+                          if (_order.customerPhone.isNotEmpty)
+                            _InfoRow('Phone', _order.customerPhone),
+                          if (_order.customerEmail.isNotEmpty)
+                            _InfoRow('Email', _order.customerEmail),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _SectionCard(
+                        title: 'Device / Item',
+                        icon: Icons.devices_other_outlined,
+                        children: [
+                          _InfoRow(
+                              'Equipment',
+                              _order.equipmentName.isEmpty
+                                  ? '—'
+                                  : _order.equipmentName),
+                          if (_order.brandModel.isNotEmpty)
+                            _InfoRow('Brand / Model', _order.brandModel),
+                          if (_order.serialNumber.isNotEmpty)
+                            _InfoRow('Serial Number', _order.serialNumber),
+                        ],
+                      ),
+                      if (_order.extraAttributes.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _SectionCard(
+                          title: 'Specifications',
+                          icon: Icons.tune_outlined,
+                          children: [
+                            for (final entry in _order.extraAttributes.entries)
+                              _InfoRow(
+                                  entry.key, entry.value?.toString() ?? '—',
+                                  emphasize: true),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      _SectionCard(
+                        title: 'Diagnosis',
+                        icon: Icons.medical_information_outlined,
+                        children: [
+                          _InfoRow(
+                              'Status',
+                              _order.statusLabel.isEmpty
+                                  ? kServiceOrderStatusLabels[_order.status] ??
+                                      _order.status
+                                  : _order.statusLabel),
+                          _InfoRow('Priority', _order.priority),
+                          const SizedBox(height: 8),
+                          const Text('Reported Issue',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 12)),
+                          const SizedBox(height: 2),
+                          Text(_order.reportedDefect.isEmpty
+                              ? 'No issue description provided.'
+                              : _order.reportedDefect),
+                          if (_order.technicalDiagnosis.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            const Text('Technical Diagnosis',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 12)),
+                            const SizedBox(height: 2),
+                            Text(_order.technicalDiagnosis),
+                          ],
+                          if ((_order.notes ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            const Text('Notes',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 12)),
+                            const SizedBox(height: 2),
+                            Text(_order.notes!),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _SectionCard(
+                        title: 'Charges',
+                        icon: Icons.receipt_long_outlined,
+                        children: [
+                          for (final part in _order.partsUsed)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${part['name'] ?? 'Part'} × ${part['quantity'] ?? 1}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(widget.formatter.format(
+                                    ((part['quantity'] as num?) ?? 1) *
+                                        ((part['unit_price'] as num?) ?? 0),
+                                  )),
+                                ],
+                              ),
+                            ),
+                          if (_order.partsUsed.isNotEmpty)
+                            const Divider(height: 16),
+                          _InfoRow('Parts Total',
+                              widget.formatter.format(_order.partsTotal)),
+                          _InfoRow('Labor Cost',
+                              widget.formatter.format(_order.laborCost)),
+                          if (_order.discount > 0)
+                            _InfoRow('Discount',
+                                '-${widget.formatter.format(_order.discount)}'),
+                          if (_order.taxAmount > 0 || _order.taxRate > 0)
+                            _InfoRow(
+                              _order.isTaxInclusive
+                                  ? 'Tax (${_order.taxRate.toStringAsFixed(0)}% incl.)'
+                                  : 'Tax (${_order.taxRate.toStringAsFixed(0)}%)',
+                              _order.isTaxInclusive
+                                  ? widget.formatter.format(_order.taxAmount)
+                                  : '+${widget.formatter.format(_order.taxAmount)}',
+                            ),
+                          const Divider(height: 16),
+                          _InfoRow(
+                            'Total Amount',
+                            widget.formatter.format(_order.totalAmount),
+                            emphasize: true,
+                          ),
+                        ],
+                      ),
+                      if (_order.warrantyPeriod.isNotEmpty ||
+                          _order.warrantyTerms.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _SectionCard(
+                          title: 'Warranty',
+                          icon: Icons.verified_user_outlined,
+                          children: [
+                            if (_order.warrantyPeriod.isNotEmpty)
+                              _InfoRow('Period', _order.warrantyPeriod),
+                            if (_order.warrantyTerms.isNotEmpty)
+                              _InfoRow('Terms', _order.warrantyTerms),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
+                ),
     );
   }
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.icon, required this.children});
+  const _SectionCard(
+      {required this.title, required this.icon, required this.children});
 
   final String title;
   final IconData icon;
@@ -398,9 +471,12 @@ class _SectionCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+                Icon(icon,
+                    size: 18, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15)),
               ],
             ),
             const SizedBox(height: 12),
@@ -426,12 +502,16 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: emphasize ? 14 : 13)),
+          Text(label,
+              style: TextStyle(
+                  color: Colors.grey.shade600, fontSize: emphasize ? 14 : 13)),
           Flexible(
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: TextStyle(fontWeight: emphasize ? FontWeight.bold : FontWeight.w500, fontSize: emphasize ? 16 : 13),
+              style: TextStyle(
+                  fontWeight: emphasize ? FontWeight.bold : FontWeight.w500,
+                  fontSize: emphasize ? 16 : 13),
             ),
           ),
         ],
@@ -463,12 +543,15 @@ class _StatusTimeline extends StatelessWidget {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10)),
+        decoration: BoxDecoration(
+            color: Colors.red.shade50, borderRadius: BorderRadius.circular(10)),
         child: Row(
           children: [
             Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 18),
             const SizedBox(width: 8),
-            Text('Cancelled', style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w600)),
+            Text('Cancelled',
+                style: TextStyle(
+                    color: Colors.red.shade700, fontWeight: FontWeight.w600)),
           ],
         ),
       );
@@ -500,8 +583,11 @@ class _StatusTimeline extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight: i == currentIndex ? FontWeight.bold : FontWeight.normal,
-                    color: i <= currentIndex ? Colors.black87 : Colors.grey.shade500,
+                    fontWeight:
+                        i == currentIndex ? FontWeight.bold : FontWeight.normal,
+                    color: i <= currentIndex
+                        ? Colors.black87
+                        : Colors.grey.shade500,
                   ),
                 ),
               ],
