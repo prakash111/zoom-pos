@@ -51,6 +51,7 @@ class TenantNavigationConfigService
             'sections' => ['nullable', 'array'],
             'sections.*.key' => ['required', 'string', 'max:60'],
             'sections.*.order' => ['nullable', 'integer', 'min:0'],
+            'sections.*.custom_title' => ['nullable', 'string', 'max:120'],
             'items' => ['nullable', 'array'],
             'items.*.key' => ['required', 'string', 'max:60'],
             'items.*.section' => ['nullable', 'string', 'max:60'],
@@ -62,11 +63,14 @@ class TenantNavigationConfigService
             'tree' => ['nullable', 'array'],
             'tree.*.key' => ['required', 'string', 'max:60'],
             'tree.*.order' => ['nullable', 'integer', 'min:0'],
+            'tree.*.custom_title' => ['nullable', 'string', 'max:120'],
             'tree.*.items' => ['required', 'array'],
         ];
 
         foreach (['tree.*.items.*', 'tree.*.items.*.children.*', 'tree.*.items.*.children.*.children.*'] as $path) {
             $rules[$path.'.key'] = ['required', 'string', 'max:60'];
+            $rules[$path.'.title'] = ['nullable', 'string', 'max:120'];
+            $rules[$path.'.label'] = ['nullable', 'string', 'max:120'];
             $rules[$path.'.parent_id'] = ['nullable', 'string', 'max:60'];
             $rules[$path.'.level'] = ['nullable', 'integer', 'between:0,2'];
             $rules[$path.'.order'] = ['nullable', 'integer', 'min:0'];
@@ -132,13 +136,24 @@ class TenantNavigationConfigService
     /**
      * @param  array<string, mixed>  $payload
      * @param  list<array<string, mixed>>  $tree
-     * @return list<array{key: string, order: int}>
+     * @return list<array{key: string, order: int, custom_title?: string}>
      */
     private function normalizeSections(array $payload, array $tree): array
     {
         $source = is_array($payload['sections'] ?? null) ? $payload['sections'] : [];
         if ($source === [] && $tree !== []) {
             $source = $tree;
+        }
+
+        $treeByKey = [];
+        foreach ($tree as $treeSection) {
+            if (! is_array($treeSection)) {
+                continue;
+            }
+            $treeKey = trim((string) ($treeSection['key'] ?? ''));
+            if ($treeKey !== '') {
+                $treeByKey[$treeKey] = $treeSection;
+            }
         }
 
         $sections = [];
@@ -150,7 +165,29 @@ class TenantNavigationConfigService
             if ($key === '' || isset($sections[$key])) {
                 continue;
             }
+
+            $treeSection = $treeByKey[$key] ?? null;
+            $customTitle = trim((string) ($row['custom_title'] ?? ''));
+            if ($customTitle === '') {
+                $customTitle = trim((string) ($treeSection['custom_title'] ?? ''));
+            }
+            if ($customTitle === '') {
+                $items = is_array($row['items'] ?? null)
+                    ? $row['items']
+                    : (is_array($treeSection['items'] ?? null) ? $treeSection['items'] : []);
+                foreach ($items as $item) {
+                    if (! is_array($item) || ! empty($item['parent_id'] ?? $item['parent'] ?? null)) {
+                        continue;
+                    }
+                    $customTitle = trim((string) ($item['title'] ?? $item['label'] ?? ''));
+                    break;
+                }
+            }
+
             $sections[$key] = ['key' => $key, 'order' => max(0, (int) ($row['order'] ?? $index))];
+            if ($customTitle !== '') {
+                $sections[$key]['custom_title'] = $customTitle;
+            }
         }
 
         uasort($sections, fn ($a, $b) => $a['order'] <=> $b['order']);
@@ -331,7 +368,7 @@ class TenantNavigationConfigService
     }
 
     /**
-     * @param  list<array{key: string, order: int}>  $sections
+     * @param  list<array{key: string, order: int, custom_title?: string}>  $sections
      * @param  array<string, array{section: ?string}>  $items
      * @return list<array{key: string, order: int}>
      */
@@ -351,9 +388,9 @@ class TenantNavigationConfigService
     }
 
     /**
-     * @param  list<array{key: string, order: int}>  $sections
+     * @param  list<array{key: string, order: int, custom_title?: string}>  $sections
      * @param  array<string, array{key: string, section: ?string, parent: ?string, parent_id: ?string, level: int, order: ?int, visible: bool}>  $items
-     * @return list<array{key: string, order: int, items: list<array<string, mixed>>}>
+     * @return list<array{key: string, order: int, custom_title?: string, items: list<array<string, mixed>>}>
      */
     private function buildTree(array $sections, array $items): array
     {
@@ -384,13 +421,17 @@ class TenantNavigationConfigService
             }, $rows));
         };
 
-        return array_values(array_map(
-            fn ($section) => [
+        return array_values(array_map(function ($section) use ($buildNodes): array {
+            $treeSection = [
                 'key' => $section['key'],
                 'order' => $section['order'],
                 'items' => $buildNodes($section['key'], null),
-            ],
-            $sections
-        ));
+            ];
+            if (! empty($section['custom_title'])) {
+                $treeSection['custom_title'] = $section['custom_title'];
+            }
+
+            return $treeSection;
+        }, $sections));
     }
 }

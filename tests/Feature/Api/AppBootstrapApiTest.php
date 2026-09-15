@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Services\Navigation\TenantNavRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -114,6 +115,75 @@ class AppBootstrapApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('nav.sections', $payload['sections'])
             ->assertJsonPath('nav.items', $expectedItems);
+    }
+
+    public function test_nav_save_persists_cross_section_settings_tree_and_invalidates_drawer_cache(): void
+    {
+        $token = $this->token();
+        Cache::put("tenant_{$this->company->id}_drawer_menu", ['stale'], 600);
+
+        $payload = [
+            'sections' => [
+                ['key' => 'billing', 'order' => 0, 'custom_title' => 'Subscription & Billing'],
+                ['key' => 'administration', 'order' => 1, 'custom_title' => 'Administration & Settings'],
+            ],
+            'items' => [
+                ['key' => 'subscription', 'section' => 'billing', 'parent' => null, 'level' => 0, 'order' => 0, 'visible' => true],
+                ['key' => 'settings', 'section' => 'administration', 'parent' => null, 'level' => 0, 'order' => 0, 'visible' => true],
+                ['key' => 'settings_profile', 'section' => 'administration', 'parent' => 'settings', 'level' => 1, 'order' => 0, 'visible' => true],
+            ],
+        ];
+
+        $this->withToken($token)->postJson('/api/v1/pos/settings/nav-config', $payload)
+            ->assertOk()
+            ->assertJsonPath('nav.sections.1.custom_title', 'Administration & Settings')
+            ->assertJsonPath('nav.tree.1.items.0.key', 'settings')
+            ->assertJsonPath('nav.tree.1.items.0.parent_id', null)
+            ->assertJsonPath('nav.tree.1.items.0.children.0.key', 'settings_profile');
+
+        $this->assertFalse(Cache::has("tenant_{$this->company->id}_drawer_menu"));
+        $stored = $this->company->fresh()->nav_config;
+        $this->assertSame('settings', $stored['tree'][1]['items'][0]['key']);
+        $this->assertNull($stored['tree'][1]['items'][0]['parent_id']);
+
+        // A separate bootstrap request reads the database copy, not the
+        // controller's in-memory response payload.
+        $this->withToken($token)->getJson('/api/v1/pos/app/bootstrap?locale=en')
+            ->assertOk()
+            ->assertJsonPath('nav.tree.1.items.0.key', 'settings')
+            ->assertJsonPath('nav.tree.1.items.0.children.0.parent_id', 'settings');
+    }
+
+    public function test_empty_nav_save_is_rejected_without_erasing_existing_customization(): void
+    {
+        $existing = [
+            'sections' => [['key' => 'cashier_sales', 'order' => 0]],
+            'items' => [['key' => 'pos', 'section' => 'cashier_sales', 'parent' => null, 'parent_id' => null, 'level' => 0, 'order' => 0, 'visible' => true]],
+            'tree' => [[
+                'key' => 'cashier_sales',
+                'order' => 0,
+                'items' => [[
+                    'key' => 'pos',
+                    'section' => 'cashier_sales',
+                    'parent' => null,
+                    'parent_id' => null,
+                    'level' => 0,
+                    'order' => 0,
+                    'visible' => true,
+                    'children' => [],
+                ]],
+            ]],
+        ];
+        $this->company->update(['nav_config' => $existing]);
+
+        $this->withToken($this->token())->postJson('/api/v1/pos/settings/nav-config', [
+            'sections' => [],
+            'items' => [],
+        ])->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('error', 'Invalid menu configuration.');
+
+        $this->assertSame($existing, $this->company->fresh()->nav_config);
     }
 
     public function test_nested_item_parent_round_trips_through_update_and_bootstrap(): void

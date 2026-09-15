@@ -1080,8 +1080,12 @@
                             removeAccordionControls(navEl);
 
                             const sectionOrder = {};
+                            const sectionTitles = {};
                             (navConfig.sections || []).forEach((section) => {
                                 sectionOrder[section.key] = section.order;
+                                if (String(section.custom_title || '').trim()) {
+                                    sectionTitles[section.key] = String(section.custom_title).trim();
+                                }
                             });
                             const itemMeta = {};
                             (navConfig.items || []).forEach((item) => {
@@ -1090,7 +1094,12 @@
 
                             const sectionsByKey = {};
                             navEl.querySelectorAll(':scope > [data-section-key]').forEach((section) => {
-                                sectionsByKey[section.getAttribute('data-section-key')] = section;
+                                const sectionKey = section.getAttribute('data-section-key');
+                                sectionsByKey[sectionKey] = section;
+                                const heading = section.querySelector(':scope > div:first-child');
+                                if (heading && sectionTitles[sectionKey]) {
+                                    heading.textContent = sectionTitles[sectionKey];
+                                }
                             });
 
                             // Apply parent placement before sorting. A missing

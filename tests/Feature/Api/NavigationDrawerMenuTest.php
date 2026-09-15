@@ -6,8 +6,9 @@ use App\Http\Controllers\Api\NavigationController;
 use App\Models\Company;
 use App\Models\Plan;
 use App\Models\User;
-use App\Services\Navigation\TenantNavRegistry;
+use App\Services\Navigation\TenantNavigationConfigService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -67,7 +68,7 @@ class NavigationDrawerMenuTest extends TestCase
     public function test_get_drawer_menu_controller_returns_correct_sdui_schema(): void
     {
         $controller = new NavigationController;
-        $response = $controller->getDrawerMenu();
+        $response = $controller->getDrawerMenu(Request::create('/api/navigation/menu'));
 
         $this->assertSame(200, $response->getStatusCode());
         $data = $response->getData(true);
@@ -183,17 +184,11 @@ class NavigationDrawerMenuTest extends TestCase
                 ->assertJsonPath('components.0.type', 'list_tile')
                 ->assertJsonPath('components.0.title', 'Home')
                 ->assertJsonPath('components.1.type', 'divider')
-                ->assertJsonPath('components.2.type', 'list_tile')
-                ->assertJsonPath('components.2.title', 'Point of Sale')
-                ->assertJsonPath('components.2.route', '/pos')
-                ->assertJsonPath('components.2.style.textColor', '#F97316')
-                ->assertJsonPath('components.8.type', 'list_tile')
-                ->assertJsonPath('components.8.title', 'Lead Dashboard')
-                ->assertJsonPath('components.8.route', '/tenant/views/leads')
-                ->assertJsonPath('components.10.title', 'Product Catalog')
-                ->assertJsonPath('components.10.route', '/products')
-                ->assertJsonPath('components.12.title', 'Cash Register')
-                ->assertJsonPath('components.12.route', '/register');
+                ->assertJsonPath('components.2.type', 'section_header')
+                ->assertJsonPath('components.2.title', 'Point of Sale');
+
+            $components = collect($response->json('components'));
+            $this->assertSame('/api/tenant/views/pos', $components->firstWhere('key', 'pos')['route']);
         }
     }
 
@@ -213,8 +208,11 @@ class NavigationDrawerMenuTest extends TestCase
             ])
             ->assertJsonPath('components.0.title', 'Home')
             ->assertJsonPath('components.1.type', 'divider')
-            ->assertJsonPath('components.2.title', 'Point of Sale')
-            ->assertJsonPath('components.8.title', 'Lead Dashboard');
+            ->assertJsonPath('components.2.type', 'section_header')
+            ->assertJsonPath('components.2.title', 'Point of Sale');
+
+        $components = collect($response->json('components'));
+        $this->assertSame('/api/tenant/views/pos', $components->firstWhere('key', 'pos')['route']);
 
         // Check that sections have clickable list_tile parent metadata
         $sections = $response->json('sections');
@@ -235,12 +233,88 @@ class NavigationDrawerMenuTest extends TestCase
             ->assertJsonPath('schema.type', 'screen')
             ->assertJsonPath('schema.components.0.title', 'Home')
             ->assertJsonPath('schema.components.1.type', 'divider')
+            ->assertJsonPath('schema.components.2.type', 'section_header')
             ->assertJsonPath('schema.components.2.title', 'Point of Sale');
 
         $menuResponse = $this->withToken($this->token)->getJson('/api/tenant/views/drawer-menu');
         $menuResponse->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('schema.type', 'screen')
-            ->assertJsonPath('schema.components.8.title', 'Lead Dashboard');
+            ->assertJsonPath('schema.type', 'screen');
+        $this->assertSame('/api/tenant/views/pos', collect($menuResponse->json('schema.components'))->firstWhere('key', 'pos')['route']);
+    }
+
+    public function test_drawer_navigation_keeps_parent_route_children_and_custom_section_title_separate(): void
+    {
+        $nav = app(TenantNavigationConfigService::class)->normalize([
+            'sections' => [[
+                'key' => 'cashier_sales',
+                'order' => 0,
+                'custom_title' => 'Cashier & Sales',
+            ]],
+            'tree' => [[
+                'key' => 'cashier_sales',
+                'order' => 0,
+                'custom_title' => 'Cashier & Sales',
+                'items' => [[
+                    'key' => 'pos',
+                    'visible' => true,
+                    'children' => [[
+                        'key' => 'sales',
+                        'visible' => true,
+                        'children' => [],
+                    ]],
+                ]],
+            ]],
+        ]);
+        $this->company->update(['nav_config' => $nav]);
+
+        $response = $this->withToken($this->token)
+            ->getJson('/api/tenant/navigation/drawer')
+            ->assertOk();
+
+        $cashier = collect($response->json('sections'))->firstWhere('key', 'cashier_sales');
+        $this->assertSame('Cashier & Sales', $cashier['custom_title']);
+        $this->assertSame('Point of Sale', $cashier['first_item']['title']);
+        $this->assertSame('/api/tenant/views/pos', $cashier['first_item']['route']);
+        $this->assertSame('NAVIGATE_TO', $cashier['first_item']['action_type']);
+        $this->assertSame('sales', $cashier['items'][0]['children'][0]['key']);
+    }
+
+    public function test_saved_store_settings_root_and_custom_section_are_used_by_drawer_components(): void
+    {
+        $nav = app(TenantNavigationConfigService::class)->normalize([
+            'sections' => [[
+                'key' => 'administration',
+                'order' => 0,
+                'custom_title' => 'Administration & Settings',
+            ]],
+            'items' => [
+                ['key' => 'subscription', 'section' => 'administration', 'parent' => null, 'order' => 0, 'visible' => true],
+                // Simulate the bad saved offset. The canonical normalizer must
+                // promote Store Settings before it reaches any drawer reader.
+                ['key' => 'settings', 'section' => 'administration', 'parent' => 'subscription', 'order' => 1, 'visible' => true],
+                ['key' => 'settings_profile', 'section' => 'administration', 'parent' => 'settings', 'order' => 0, 'visible' => true],
+            ],
+        ]);
+        $this->company->update(['nav_config' => $nav]);
+
+        $response = $this->withToken($this->token)
+            ->getJson('/api/tenant/navigation/menu')
+            ->assertOk();
+
+        $components = collect($response->json('components'));
+        $administrationHeader = $components->first(
+            fn (array $component) => ($component['type'] ?? null) === 'section_header'
+                && ($component['section_key'] ?? null) === 'administration'
+        );
+        $settings = $components->firstWhere('key', 'settings');
+        $subscription = $components->firstWhere('key', 'subscription');
+
+        $this->assertSame('Administration & Settings', $administrationHeader['title']);
+        $this->assertNull($settings['parent_id']);
+        $this->assertSame(0, $settings['level']);
+        $this->assertSame('settings_profile', $settings['children'][0]['key']);
+        $this->assertSame('settings', $settings['children'][0]['parent_id']);
+        $this->assertSame([], $subscription['children']);
     }
 }

@@ -1479,7 +1479,18 @@
             <template x-for="section in sections" :key="section.key">
                 <div :data-section-key="section.key" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="section.label"></span>
+                        <div class="flex-1 min-w-0 pr-3">
+                            <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                                {{ __('Custom section title') }}
+                            </label>
+                            <div class="text-[10px] text-slate-400 dark:text-slate-500 mb-1" x-text="section.label"></div>
+                            <input type="text"
+                                   maxlength="120"
+                                   x-model="section.custom_title"
+                                   :placeholder="section.items?.[0]?.label || section.label"
+                                   class="w-full rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                                   aria-label="{{ __('Custom section title') }}">
+                        </div>
                         <button type="button"
                                 class="nav-section-drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1"
                                 title="{{ __('Drag to reorder this section') }}"

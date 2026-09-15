@@ -6325,7 +6325,8 @@ class SchemaResponse
 
     public static function drawerMenuView(Company $company): array
     {
-        $components = app(\App\Http\Controllers\Api\NavigationController::class)->getDrawerMenuComponents();
+        $components = app(\App\Http\Controllers\Api\NavigationController::class)
+            ->getDrawerMenuComponents(company: $company);
 
         return self::screen('Navigation Drawer', $components, 'scroll_view');
     }
@@ -6413,7 +6414,7 @@ class SchemaResponse
         $sectionOverrides = [];
         foreach ($storedConfig['sections'] ?? [] as $section) {
             if (is_array($section) && ! empty($section['key'])) {
-                $sectionOverrides[(string) $section['key']] = max(0, (int) ($section['order'] ?? 0));
+                $sectionOverrides[(string) $section['key']] = $section;
             }
         }
 
@@ -6445,10 +6446,15 @@ class SchemaResponse
         }
 
         $sections = [];
-        foreach ($sectionMeta as $key => $_section) {
+        foreach ($sectionMeta as $key => $sectionMetaRow) {
+            $override = $sectionOverrides[$key] ?? [];
+            $customTitle = trim((string) ($override['custom_title'] ?? $sectionMetaRow['custom_title'] ?? ''));
             $sections[] = [
                 'key' => $key,
-                'order' => $sectionOverrides[$key] ?? $sectionIndexes[$key],
+                'order' => isset($override['order'])
+                    ? max(0, (int) $override['order'])
+                    : $sectionIndexes[$key],
+                'custom_title' => $customTitle,
             ];
         }
 

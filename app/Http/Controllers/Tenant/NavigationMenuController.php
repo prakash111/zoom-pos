@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Services\Navigation\TenantNavigationConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
 class NavigationMenuController extends Controller
@@ -29,14 +30,24 @@ class NavigationMenuController extends Controller
         $company = $user?->company;
         abort_unless($user && $company, 403);
 
-        $navConfig = $navigation->normalize($validator->validated());
-        $company->update(['nav_config' => $navConfig]);
+        $validated = $validator->validated();
+        if (empty($validated['sections']) || (empty($validated['items']) && empty($validated['tree']))) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Invalid menu configuration.'),
+            ], 422);
+        }
+
+        $navConfig = $navigation->normalize($validated);
+        $company->forceFill(['nav_config' => $navConfig])->saveOrFail();
+        Cache::forget("tenant_{$company->id}_drawer_menu");
+        $persistedNav = $company->fresh()->normalizedNavConfig();
         AuditLog::record('company.settings_updated', $company->id, $user->id, ['section' => 'nav_config']);
 
         return response()->json([
             'success' => true,
             'message' => __('Navigation menu updated.'),
-            'nav' => $navConfig,
+            'nav' => $persistedNav,
         ]);
     }
 
@@ -66,4 +77,3 @@ class NavigationMenuController extends Controller
         ]);
     }
 }
-

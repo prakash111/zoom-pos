@@ -36,6 +36,7 @@ class NavigationMenuBuilderTest extends TestCase
 
                 return $cashierSales
                     && $cashierSales['label'] === 'Cashier & Sales'
+                    && $cashierSales['custom_title'] === 'Point of Sale'
                     && collect($cashierSales['items'])->pluck('key')->all() === ['pos', 'barcode_printing', 'batch_tracking', 'sales', 'quotations', 'consignments', 'customers']
                     && collect($cashierSales['items'])->every(fn ($i) => $i['visible'] === true);
             });
@@ -252,7 +253,10 @@ class NavigationMenuBuilderTest extends TestCase
         $nav = $company->fresh()->normalizedNavConfig();
 
         $this->assertSame(
-            [['key' => 'financial_management', 'order' => 0], ['key' => 'cashier_sales', 'order' => 1]],
+            [
+                ['key' => 'financial_management', 'order' => 0, 'custom_title' => 'Cash Register'],
+                ['key' => 'cashier_sales', 'order' => 1, 'custom_title' => 'Sales & Invoices'],
+            ],
             $nav['sections']
         );
 
@@ -314,6 +318,45 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertSame('quotations', $saved['tree'][0]['items'][0]['children'][0]['children'][0]['key']);
     }
 
+    public function test_navigation_menu_endpoint_persists_custom_section_title_and_repairs_a_cleared_title(): void
+    {
+        [$company] = $this->actingAsTenantAdmin();
+
+        $payload = [
+            'sections' => [[
+                'key' => 'cashier_sales',
+                'order' => 0,
+                'custom_title' => '',
+            ]],
+            'tree' => [[
+                'key' => 'cashier_sales',
+                'order' => 0,
+                'custom_title' => '',
+                'items' => [[
+                    'key' => 'pos',
+                    'title' => 'Point of Sale',
+                    'visible' => true,
+                    'children' => [],
+                ]],
+            ]],
+        ];
+
+        $this->postJson(route('tenant.settings.navigation-menu.store'), $payload)
+            ->assertOk()
+            ->assertJsonPath('nav.sections.0.custom_title', 'Point of Sale')
+            ->assertJsonPath('nav.tree.0.custom_title', 'Point of Sale');
+
+        $saved = $company->fresh()->normalizedNavConfig();
+        $this->assertSame('Point of Sale', $saved['sections'][0]['custom_title']);
+
+        $payload['sections'][0]['custom_title'] = 'Cashier & Sales';
+        $payload['tree'][0]['custom_title'] = 'Cashier & Sales';
+
+        $this->postJson(route('tenant.settings.navigation-menu.store'), $payload)
+            ->assertOk()
+            ->assertJsonPath('nav.sections.0.custom_title', 'Cashier & Sales');
+    }
+
     /**
      * The tree builder is an external Alpine component. Its serialized
      * payload is passed with @js() so the attribute remains valid HTML even
@@ -335,6 +378,7 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertStringContainsString('id="nav-sections-container"', $html);
         $this->assertStringContainsString('x-for="section in sections"', $html);
         $this->assertStringContainsString('x-for="item in flattenedItems(section)"', $html);
+        $this->assertStringContainsString('x-model="section.custom_title"', $html);
         $this->assertStringContainsString('x-model="item.visible"', $html);
         $this->assertStringContainsString('class="nav-section-drag-handle', $html);
         $this->assertStringContainsString('class="nav-item-drag-handle', $html);

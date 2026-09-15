@@ -638,45 +638,42 @@ class TenantNavRegistry
             }
 
             if ($secKey === 'cashier_sales') {
-                $flattened = [];
-                foreach ($decoratedItems as $it) {
-                    $itKey = strtolower((string) ($it['key'] ?? ''));
-                    if ($itKey === 'lead_management' || $itKey === 'leads' || str_starts_with($itKey, 'lead_') || str_contains($itKey, 'lead')) {
-                        continue;
-                    }
-                    if (($it['key'] ?? '') === 'pos' && ! empty($it['children'])) {
-                        $children = $it['children'];
-                        $it['children'] = [];
-                        $it['type'] = 'link';
-                        $flattened[] = $it;
-                        foreach ($children as $ch) {
-                            $chKey = strtolower((string) ($ch['key'] ?? ''));
-                            if ($chKey === 'lead_management' || $chKey === 'leads' || str_starts_with($chKey, 'lead_') || str_contains($chKey, 'lead')) {
-                                continue;
-                            }
-                            $ch['parent'] = null;
-                            $ch['parent_id'] = null;
-                            $ch['level'] = 0;
-                            $ch['type'] = 'link';
-                            $flattened[] = $ch;
+                $decoratedItems = array_values(array_filter($decoratedItems, static function (array $item): bool {
+                    $itemKey = strtolower((string) ($item['key'] ?? ''));
+
+                    return $itemKey !== 'lead_management'
+                        && $itemKey !== 'leads'
+                        && ! str_starts_with($itemKey, 'lead_')
+                        && ! str_contains($itemKey, 'lead');
+                }));
+
+                $existingKeys = [];
+                $collectKeys = function (array $items) use (&$collectKeys, &$existingKeys): void {
+                    foreach ($items as $item) {
+                        if (! is_array($item)) {
+                            continue;
                         }
-                    } else {
-                        $flattened[] = $it;
+                        $existingKeys[] = $item['key'] ?? null;
+                        $collectKeys(is_array($item['children'] ?? null) ? $item['children'] : []);
                     }
-                }
-                $existingKeys = array_column($flattened, 'key');
+                };
+                $collectKeys($decoratedItems);
                 foreach (['pos', 'sales', 'quotations', 'consignments', 'customers'] as $coreKey) {
                     if (! in_array($coreKey, $existingKeys, true) && isset($catalogItems[$coreKey])) {
-                        $flattened[] = $catalogItems[$coreKey];
+                        $decoratedItems[] = $catalogItems[$coreKey];
                     }
                 }
-                $decoratedItems = $flattened;
             }
 
             if (! empty($decoratedItems)) {
+                $customTitle = trim((string) ($treeSection['custom_title'] ?? ''));
+                if ($customTitle === '') {
+                    $customTitle = trim((string) ($decoratedItems[0]['title'] ?? $decoratedItems[0]['label'] ?? ''));
+                }
                 $customSections[] = array_merge($meta, [
                     'id' => $secKey,
                     'key' => $secKey,
+                    'custom_title' => $customTitle,
                     'items' => $decoratedItems,
                 ]);
             }
@@ -1601,11 +1598,20 @@ class TenantNavRegistry
             }
         }
 
+        // The section heading is independent from its first actionable menu
+        // item. New tenants start with that first parent's name and can then
+        // rename only the heading without changing the parent's route label.
+        $customTitle = trim((string) ($section['custom_title'] ?? ''));
+        if ($customTitle === '' && isset($items[0])) {
+            $customTitle = trim((string) ($items[0]['title'] ?? $items[0]['label'] ?? ''));
+        }
+
         return array_merge($section, [
             'id' => $key,
             'key' => $key,
             'title' => $title,
             'label' => $title,
+            'custom_title' => $customTitle !== '' ? $customTitle : $title,
             'color' => $color,
             'items' => $items,
         ], self::collapsedFlags());

@@ -1565,6 +1565,7 @@ class Index extends Component
         $navConfig = $this->company->normalizedNavConfig();
         $itemOverrides = collect($navConfig['items'])->keyBy('key');
         $sectionOrderOverrides = collect($navConfig['sections'])->pluck('order', 'key');
+        $sectionTitleOverrides = collect($navConfig['sections'])->pluck('custom_title', 'key');
 
         // Resolve every compiled item's effective section/parent/order/
         // visibility, keyed by item key so parent lookups below are O(1).
@@ -1687,6 +1688,8 @@ class Index extends Component
             $sections[] = [
                 'key' => $sectionKey,
                 'label' => $compiledByKey[$sectionKey]['label'],
+                'custom_title' => trim((string) $sectionTitleOverrides->get($sectionKey))
+                    ?: ($items[0]['label'] ?? $compiledByKey[$sectionKey]['label']),
                 'items' => array_map(
                     fn ($i) => ['key' => $i['key'], 'label' => $i['label'], 'visible' => $i['visible'], 'children' => $i['children']],
                     $items

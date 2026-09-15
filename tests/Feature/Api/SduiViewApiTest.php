@@ -110,6 +110,8 @@ class SduiViewApiTest extends TestCase
         $this->assertSame($builder['tree_data'], $builder['sections']);
         $this->assertNotEmpty($builder['nav_config']['items']);
         $this->assertSame('cashier_sales', $builder['tree_data'][0]['key']);
+        $this->assertSame('Point of Sale', $builder['tree_data'][0]['custom_title']);
+        $this->assertSame('Point of Sale', $builder['nav_config']['sections'][0]['custom_title']);
         $this->assertNotEmpty($builder['tree_data'][0]['items']);
 
         $settings = collect($builder['tree_data'])

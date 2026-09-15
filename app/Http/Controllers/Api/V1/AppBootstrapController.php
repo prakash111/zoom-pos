@@ -15,6 +15,7 @@ use App\Services\Sdui\SchemaResponse;
 use App\Services\Tenancy\TenantSampleDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -175,12 +176,26 @@ class AppBootstrapController extends Controller
             return response()->json(['success' => false, 'error' => 'Validation error.', 'details' => $validator->errors()], 422);
         }
 
-        $navConfig = $navigation->normalize($validator->validated());
-        $company->update(['nav_config' => $navConfig]);
+        $validated = $validator->validated();
+        if (empty($validated['sections']) || (empty($validated['items']) && empty($validated['tree']))) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid menu configuration.',
+            ], 422);
+        }
+
+        $navConfig = $navigation->normalize($validated);
+        $company->forceFill(['nav_config' => $navConfig])->saveOrFail();
+        Cache::forget("tenant_{$company->id}_drawer_menu");
+
+        // Return the value read through the same cast/normalizer used by the
+        // next bootstrap request. This makes a failed database round-trip
+        // visible immediately instead of optimistically echoing the payload.
+        $persistedNav = $company->fresh()->normalizedNavConfig();
 
         AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'nav_config']);
 
-        return response()->json(['success' => true, 'message' => 'Navigation menu updated.', 'nav' => $navConfig]);
+        return response()->json(['success' => true, 'message' => 'Navigation menu updated.', 'nav' => $persistedNav]);
     }
 
     /**

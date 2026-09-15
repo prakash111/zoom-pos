@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Services\Navigation\TenantNavigationConfigService;
 use App\Services\Navigation\TenantNavRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,10 +17,10 @@ class NavigationController extends Controller
     /**
      * Get Drawer Menu SDUI Schema with clickable parent tiles & dividers.
      *
-     * @param  Request|null  $request
+     * @param  Request  $request
      * @return JsonResponse
      */
-    public function getDrawerMenu(?Request $request = null): JsonResponse
+    public function getDrawerMenu(Request $request): JsonResponse
     {
         $menuComponents = $this->getDrawerMenuComponents($request);
 
@@ -36,8 +37,27 @@ class NavigationController extends Controller
      * @param  Request|null  $request
      * @return array<int, array<string, mixed>>
      */
-    public function getDrawerMenuComponents(?Request $request = null): array
+    public function getDrawerMenuComponents(?Request $request = null, ?Company $company = null): array
     {
+        if ($company === null && $request !== null) {
+            try {
+                $company = $this->resolveCompany($request);
+            } catch (\Throwable) {
+                // Public/legacy callers without tenant context retain the
+                // static compatibility menu below.
+            }
+        }
+
+        // An authenticated tenant's persisted hierarchy always wins. The
+        // registry decorates the saved keys with current route/icon metadata
+        // while preserving section, parent, visibility, and custom-title
+        // overrides from companies.nav_config.
+        if ($company !== null) {
+            return $this->formatCustomMenuComponents(
+                TenantNavRegistry::getEffectiveNavForTenant($company)
+            );
+        }
+
         $menuComponents = [];
 
         // HOME
@@ -151,6 +171,102 @@ class NavigationController extends Controller
     }
 
     /**
+     * @param  list<array<string, mixed>>  $sections
+     * @return list<array<string, mixed>>
+     */
+    private function formatCustomMenuComponents(array $sections): array
+    {
+        $components = [[
+            'type' => 'list_tile',
+            'key' => 'home',
+            'title' => 'Home',
+            'icon' => 'home',
+            'action_type' => 'NAVIGATE_TO',
+            'route' => '/dashboard',
+        ]];
+
+        foreach ($sections as $section) {
+            if (! is_array($section)) {
+                continue;
+            }
+
+            $items = array_values(array_filter(
+                is_array($section['items'] ?? null) ? $section['items'] : [],
+                static fn ($item): bool => is_array($item) && ($item['visible'] ?? true) !== false
+            ));
+            if ($items === []) {
+                continue;
+            }
+
+            $sectionKey = trim((string) ($section['key'] ?? $section['id'] ?? ''));
+            $sectionTitle = trim((string) ($section['custom_title'] ?? ''));
+            if ($sectionTitle === '') {
+                $sectionTitle = trim((string) ($items[0]['title'] ?? $items[0]['label'] ?? $section['title'] ?? $section['label'] ?? ''));
+            }
+
+            $components[] = ['type' => 'divider', 'section_key' => $sectionKey];
+            if ($sectionTitle !== '') {
+                $components[] = [
+                    'type' => 'section_header',
+                    'section_key' => $sectionKey,
+                    'title' => $sectionTitle,
+                ];
+            }
+
+            foreach ($items as $item) {
+                $component = $this->formatCustomMenuItem($item, $sectionKey, null, 0);
+                if ($component !== null) {
+                    $components[] = $component;
+                }
+            }
+        }
+
+        return $components;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>|null
+     */
+    private function formatCustomMenuItem(array $item, string $sectionKey, ?string $parentKey, int $level): ?array
+    {
+        if (($item['visible'] ?? true) === false) {
+            return null;
+        }
+
+        $key = trim((string) ($item['key'] ?? $item['id'] ?? ''));
+        if ($key === '') {
+            return null;
+        }
+
+        $route = trim((string) ($item['route'] ?? $item['target_endpoint'] ?? $item['endpoint'] ?? ''));
+        $children = [];
+        foreach (is_array($item['children'] ?? null) ? $item['children'] : [] as $child) {
+            if (! is_array($child)) {
+                continue;
+            }
+            $formatted = $this->formatCustomMenuItem($child, $sectionKey, $key, $level + 1);
+            if ($formatted !== null) {
+                $children[] = $formatted;
+            }
+        }
+
+        return [
+            'type' => 'list_tile',
+            'key' => $key,
+            'section' => $sectionKey,
+            'parent' => $parentKey,
+            'parent_id' => $parentKey,
+            'level' => min(TenantNavigationConfigService::MAX_LEVEL, max(0, $level)),
+            'title' => (string) ($item['title'] ?? $item['label'] ?? $key),
+            'icon' => (string) ($item['icon'] ?? 'widgets'),
+            'action_type' => 'NAVIGATE_TO',
+            'route' => $route,
+            'children' => $children,
+        ];
+    }
+
+    /**
      * Get Drawer Navigation with both legacy sections and SDUI components.
      *
      * @param  Request  $request
@@ -167,7 +283,7 @@ class NavigationController extends Controller
 
         $drawerHeader = $company ? $company->getDrawerHeaderPayload() : [];
         $sections = $company ? TenantNavRegistry::getEffectiveNavForTenant($company) : [];
-        $menuComponents = $this->getDrawerMenuComponents($request);
+        $menuComponents = $this->getDrawerMenuComponents($request, $company);
 
         return response()->json([
             'success'         => true,
