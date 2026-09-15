@@ -35,11 +35,21 @@ class NavigationMenuController extends Controller
         try {
             $company = $this->resolveCompany($request);
             if ($company) {
-                $tenantId = $tenantId ?: $company->id;
+                $tenantId = $company->id ?? $tenantId;
             }
         } catch (\Throwable) {
             if ($tenantId) {
                 $company = Company::find($tenantId);
+            }
+        }
+
+        if (! $company && $tenantId) {
+            $company = Company::where('id', (string) $tenantId)
+                ->orWhere('slug', (string) $tenantId)
+                ->orWhere('unique_account_id', (string) $tenantId)
+                ->first();
+            if ($company) {
+                $tenantId = $company->id;
             }
         }
 
@@ -59,19 +69,22 @@ class NavigationMenuController extends Controller
         $navConfig = $normalizer->normalize($request->all());
 
         if ($tenantId) {
+            $tenantIdStr = (string) $tenantId;
             // Persist as JSON string to tenant_settings
             if (Schema::hasTable('tenant_settings')) {
                 DB::table('tenant_settings')->updateOrInsert(
-                    ['tenant_id' => $tenantId, 'key' => 'navigation_menu_custom'],
+                    ['tenant_id' => $tenantIdStr, 'key' => 'navigation_menu_custom'],
                     [
                         'value'      => json_encode(! empty($sections) ? $sections : $navConfig['tree']),
                         'updated_at' => now(),
+                        'created_at' => now(),
                     ]
                 );
             }
 
             // Invalidate runtime cache
-            Cache::forget("tenant_{$tenantId}_drawer_menu");
+            Cache::forget("tenant_{$tenantIdStr}_drawer_menu");
+            Cache::forget("navigation_menu_{$tenantIdStr}");
         }
 
         if ($company) {
@@ -80,7 +93,9 @@ class NavigationMenuController extends Controller
                 'navigation_menu_customization' => $navConfig['tree'],
             ])->save();
 
-            Cache::forget("tenant_{$company->id}_drawer_menu");
+            $cidStr = (string) $company->id;
+            Cache::forget("tenant_{$cidStr}_drawer_menu");
+            Cache::forget("navigation_menu_{$cidStr}");
             if ($user) {
                 AuditLog::record('company.settings_updated', $company->id, $user->id, ['section' => 'nav_config']);
             }

@@ -190,17 +190,20 @@ class AppBootstrapController extends Controller
             'navigation_menu_customization' => $navConfig['tree'],
         ])->saveOrFail();
 
+        $companyIdStr = (string) $company->id;
         if (\Illuminate\Support\Facades\Schema::hasTable('tenant_settings')) {
             \Illuminate\Support\Facades\DB::table('tenant_settings')->updateOrInsert(
-                ['tenant_id' => $company->id, 'key' => 'navigation_menu_custom'],
+                ['tenant_id' => $companyIdStr, 'key' => 'navigation_menu_custom'],
                 [
                     'value'      => json_encode($navConfig['tree']),
                     'updated_at' => now(),
+                    'created_at' => now(),
                 ]
             );
         }
 
-        Cache::forget("tenant_{$company->id}_drawer_menu");
+        Cache::forget("tenant_{$companyIdStr}_drawer_menu");
+        Cache::forget("navigation_menu_{$companyIdStr}");
 
         // Return the value read through the same cast/normalizer used by the
         // next bootstrap request. This makes a failed database round-trip

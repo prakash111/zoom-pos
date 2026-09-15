@@ -11,7 +11,7 @@ return new class extends Migration
         if (! Schema::hasTable('tenant_settings')) {
             Schema::create('tenant_settings', function (Blueprint $table) {
                 $table->id();
-                $table->unsignedBigInteger('tenant_id')->index();
+                $table->string('tenant_id', 191)->index();
                 $table->string('key')->index();
                 $table->longText('value')->nullable();
                 $table->timestamps();
