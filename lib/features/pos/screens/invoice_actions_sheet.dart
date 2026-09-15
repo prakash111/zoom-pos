@@ -39,6 +39,7 @@ class InvoiceActionsData {
     this.dueAmount = 0,
     this.pdfPathOverride,
     this.actionsPathOverride,
+    this.batchDispatchEndpoint,
   });
 
   final String documentType; // 'invoice' | 'quotation'
@@ -76,6 +77,10 @@ class InvoiceActionsData {
   /// reminders point this at their four-action schema so the native POS sheet
   /// shows exactly WhatsApp and Email after its two print utilities.
   final String? actionsPathOverride;
+
+  /// When set, delivery rows become selectable checkboxes and are submitted
+  /// together through this endpoint with one request.
+  final String? batchDispatchEndpoint;
 
   String get _pdfPath {
     if ((pdfPathOverride ?? '').isNotEmpty) return pdfPathOverride!;
@@ -135,6 +140,8 @@ class _InvoiceActionsSheetContentState
   List<Map<String, dynamic>> _channels = const [];
   bool _channelsLoading = true;
   String? _channelsError;
+  final Set<String> _selectedChannels = <String>{'whatsapp', 'email'};
+  bool _isDispatching = false;
 
   @override
   void initState() {
@@ -218,6 +225,17 @@ class _InvoiceActionsSheetContentState
       if (!mounted) return;
       setState(() {
         _channels = channels;
+        final available = channels
+            .map(
+                (channel) => channel['channel']?.toString().toLowerCase() ?? '')
+            .where((channel) => channel.isNotEmpty)
+            .toSet();
+        _selectedChannels
+          ..removeWhere((channel) => !available.contains(channel))
+          ..addAll({'whatsapp', 'email'}.intersection(available));
+        if (_selectedChannels.isEmpty && available.isNotEmpty) {
+          _selectedChannels.add(available.first);
+        }
         _channelsLoading = false;
       });
     } catch (error) {
@@ -247,6 +265,38 @@ class _InvoiceActionsSheetContentState
       fallback: Theme.of(context).colorScheme.primary,
     );
 
+    final channelName = channel['channel']?.toString().toLowerCase() ?? '';
+    final batchMode = widget.data.batchDispatchEndpoint?.isNotEmpty == true;
+    if (batchMode) {
+      return CheckboxListTile(
+        key: ValueKey(channel['id'] ?? channel['channel'] ?? channel['title']),
+        value: _selectedChannels.contains(channelName),
+        onChanged: (selected) => setState(() {
+          if (selected == true) {
+            _selectedChannels.add(channelName);
+          } else {
+            _selectedChannels.remove(channelName);
+          }
+        }),
+        controlAffinity: ListTileControlAffinity.leading,
+        activeColor: const Color(0xFF10B981),
+        secondary: Icon(icon, color: color, size: 22),
+        title: Text(
+          channel['title']?.toString() ?? 'Send document',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        subtitle: channel['subtitle'] == null
+            ? null
+            : Text(
+                channel['subtitle'].toString(),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
+              ),
+      );
+    }
+
     return ListTile(
       key: ValueKey(channel['id'] ?? channel['channel'] ?? channel['title']),
       leading: Icon(icon, color: color, size: 22),
@@ -266,6 +316,65 @@ class _InvoiceActionsSheetContentState
       trailing: const Icon(Icons.send_outlined, size: 18),
       onTap: () => _executeChannel(context, channel),
     );
+  }
+
+  Future<void> _handleBatchDispatch() async {
+    final endpoint = widget.data.batchDispatchEndpoint;
+    if (endpoint == null || endpoint.isEmpty || _selectedChannels.isEmpty) {
+      ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+        const SnackBar(content: Text('Please select at least one channel.')),
+      );
+      return;
+    }
+    var phone = widget.data.customerPhone;
+    var email = widget.data.customerEmail;
+    if (_selectedChannels.any((c) => c == 'sms' || c == 'whatsapp') &&
+        (phone == null || phone.trim().isEmpty)) {
+      phone = await showDialog<String>(
+        context: widget.parentContext,
+        builder: (_) => const _RecipientDialog(type: 'phone'),
+      );
+      if (phone == null || phone.trim().isEmpty) return;
+    }
+    if (_selectedChannels.contains('email') &&
+        (email == null || email.trim().isEmpty)) {
+      email = await showDialog<String>(
+        context: widget.parentContext,
+        builder: (_) => const _RecipientDialog(type: 'email'),
+      );
+      if (email == null || email.trim().isEmpty) return;
+    }
+    setState(() => _isDispatching = true);
+    try {
+      final response = await widget.apiClient.requestAbsolute(
+        endpoint,
+        method: 'POST',
+        data: {
+          'document_id': widget.data.documentId,
+          'document_type': widget.data.documentType,
+          'channels': _selectedChannels.toList(),
+          'phone': phone,
+          'email': email,
+        },
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+        SnackBar(
+          content: Text(response['message']?.toString() ??
+              'Dispatched successfully via selected channels.'),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+          SnackBar(content: Text('Dispatch failed: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDispatching = false);
+    }
   }
 
   Future<void> _executeChannel(
@@ -444,6 +553,37 @@ class _InvoiceActionsSheetContentState
             else
               for (final channel in _channels)
                 _buildChannelTile(context, channel),
+            if (widget.data.batchDispatchEndpoint?.isNotEmpty == true &&
+                _channels.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    onPressed: _isDispatching ? null : _handleBatchDispatch,
+                    icon: _isDispatching
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.send_rounded, size: 18),
+                    label: Text(_isDispatching
+                        ? 'Dispatching...'
+                        : 'Send to Selected Channels'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
           ],
         ),

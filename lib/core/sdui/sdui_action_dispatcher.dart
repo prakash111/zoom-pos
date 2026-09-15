@@ -631,6 +631,7 @@ class SduiActionDispatcher {
       lines: lines,
       pdfPathOverride: nonEmpty(data['pdf_endpoint']),
       actionsPathOverride: nonEmpty(data['actions_endpoint']),
+      batchDispatchEndpoint: nonEmpty(data['batch_dispatch_endpoint']),
     );
 
     if (!context.mounted) return;

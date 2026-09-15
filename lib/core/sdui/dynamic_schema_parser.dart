@@ -1070,7 +1070,7 @@ class DynamicSchemaParser {
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        color: isDark ? const Color(0xFF0B1120) : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
@@ -4335,6 +4335,14 @@ class _SduiCreatableSelectState extends State<_SduiCreatableSelect> {
         children: [
           DropdownButtonFormField<String>(
             initialValue: _custom ? _customValue : _selected,
+            dropdownColor: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF131E29)
+                : null,
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : null,
+            ),
             autovalidateMode: AutovalidateMode.onUserInteraction,
             decoration: InputDecoration(
               labelText: label,
