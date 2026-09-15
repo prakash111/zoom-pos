@@ -53,7 +53,7 @@ class ReceivablesController extends Controller
         $gstin = $document->company?->gstin ?: 'N/A';
         $previewEndpoint = "/api/v1/tenant/documents/{$documentType}/{$document->id}/preview-modal";
         $nativeData = SchemaResponse::postSaleActionData($document);
-        $nativeData['actions_endpoint'] = "/api/v1/tenant/receivables/{$document->id}/reminder-sheet?document_type={$documentType}";
+        $nativeData['actions_endpoint'] = "/api/v1/tenant/documents/{$documentType}/{$document->id}/actions-sheet";
         $nativeAction = [
             'type' => 'show_post_sale_sheet',
             'action_type' => 'show_post_sale_sheet',

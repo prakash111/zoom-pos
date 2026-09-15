@@ -41,7 +41,7 @@ class NotificationAlertService
             $balanceColumn = $this->balanceDueColumn();
             $due = (float) ($invoice->{$balanceColumn} ?? $invoice->due_amount ?? $invoice->total ?? 0);
             $postSaleData = SchemaResponse::postSaleActionData($invoice);
-            $postSaleData['actions_endpoint'] = "/api/v1/tenant/receivables/{$invoice->id}/reminder-sheet?document_type={$postSaleData['document_type']}";
+            $postSaleData['actions_endpoint'] = "/api/v1/tenant/documents/{$postSaleData['document_type']}/{$invoice->id}/actions-sheet";
             $alerts->push([
                 'type' => 'notification_item',
                 'id' => (string) $invoice->id,
@@ -57,7 +57,7 @@ class NotificationAlertService
                     'action_type' => 'show_post_sale_sheet',
                     'data' => $postSaleData,
                 ],
-                'modal_endpoint' => "/api/v1/tenant/receivables/{$invoice->id}/reminder-sheet",
+                'modal_endpoint' => "/api/v1/tenant/documents/{$postSaleData['document_type']}/{$invoice->id}/actions-sheet",
                 'background_color' => 'theme.surface',
                 'divider_color' => 'theme.divider',
                 'text_color' => 'theme.textPrimary',

@@ -8,6 +8,8 @@ use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\Quotation;
 use App\Models\Sale;
+use App\Models\CustomNotificationChannel;
+use App\Services\Notifications\CustomChannelDispatcherService;
 use App\Services\Notifications\TenantNotificationDispatcherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -116,7 +118,7 @@ class UnifiedDispatchController extends Controller
             'document_id' => ['required'],
             'document_type' => ['nullable', 'string', 'in:invoice,invoice_reminder,sale,receipt'],
             'channels' => ['required', 'array', 'min:1'],
-            'channels.*' => ['string', 'in:sms,whatsapp,email,webhook,custom_webhook'],
+            'channels.*' => ['string', 'max:120'],
             'phone' => ['nullable', 'string'],
             'email' => ['nullable', 'email'],
         ]);
@@ -134,13 +136,50 @@ class UnifiedDispatchController extends Controller
 
         $phone = trim((string) ($validated['phone'] ?? '')) ?: ($document->customer?->phone ?? $document->customer_phone ?? null);
         $email = trim((string) ($validated['email'] ?? '')) ?: ($document->customer?->email ?? $document->customer_email ?? null);
-        $channels = array_values(array_unique(array_map(
-            fn ($channel) => $channel === 'webhook' ? 'custom_webhook' : $channel,
-            $validated['channels']
-        )));
+        $channels = array_values(array_unique(array_map('strtolower', $validated['channels'])));
+        $builtInChannels = ['sms', 'whatsapp', 'email', 'webhook', 'custom_webhook'];
+        foreach ($channels as $channel) {
+            if (in_array($channel, $builtInChannels, true)) {
+                continue;
+            }
+            if (! preg_match('/^custom:(\d+)$/', $channel, $matches)) {
+                return response()->json(['success' => false, 'message' => "Unsupported channel '{$channel}' ."], 422);
+            }
+            $custom = CustomNotificationChannel::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where('is_active', true)
+                ->find((int) $matches[1]);
+            if (! $custom) {
+                return response()->json(['success' => false, 'message' => 'One or more custom channels are inactive or unavailable.'], 422);
+            }
+        }
 
         $dispatcher = app(TenantNotificationDispatcherService::class);
-        $results = $dispatcher->dispatchReceipt($company, $document, $channels, $phone, $email);
+        $standardChannels = array_values(array_intersect($channels, $builtInChannels));
+        $results = $standardChannels === []
+            ? []
+            : $dispatcher->dispatchReceipt($company, $document, $standardChannels, $phone, $email);
+        $customDispatcher = app(CustomChannelDispatcherService::class);
+        foreach ($channels as $channel) {
+            if (! str_starts_with($channel, 'custom:')) {
+                continue;
+            }
+            $custom = CustomNotificationChannel::withoutGlobalScope('company')
+                ->where('company_id', $company->id)
+                ->where('is_active', true)
+                ->find((int) substr($channel, 7));
+            $customResult = $customDispatcher->dispatch($custom, [
+                'customer_name' => $document->customer?->name ?? $document->customer_name ?? 'Valued Customer',
+                'customer_phone' => $phone,
+                'customer_email' => $email,
+                'document_id' => (string) $document->id,
+                'document_number' => $document->sale_number,
+                'document_type' => $resolvedType,
+                'amount' => (float) ($document->total ?? 0),
+                'due_amount' => (float) ($document->due_amount ?? 0),
+            ]);
+            $results[$channel] = $customResult + ['name' => $custom->name];
+        }
         $successful = [];
         $failed = [];
         foreach ($channels as $channel) {

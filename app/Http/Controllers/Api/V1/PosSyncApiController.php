@@ -4512,7 +4512,7 @@ class PosSyncApiController extends Controller
             'receivables' => collect($sales->items())->map(function (Sale $sale) {
                 $postSaleData = SchemaResponse::postSaleActionData($sale);
                 $documentType = str_starts_with(strtoupper((string) $sale->sale_number), 'POS-') ? 'sale' : 'invoice';
-                $postSaleData['actions_endpoint'] = "/api/v1/tenant/receivables/{$sale->id}/reminder-sheet?document_type={$documentType}";
+                $postSaleData['actions_endpoint'] = "/api/v1/tenant/documents/{$documentType}/{$sale->id}/actions-sheet";
                 $nativeSheetAction = [
                     'type' => 'show_post_sale_sheet',
                     'action_type' => 'show_post_sale_sheet',
@@ -4539,7 +4539,7 @@ class PosSyncApiController extends Controller
                     // the exact native POS post-sale bottom-sheet contract.
                     'action' => $nativeSheetAction,
                     'on_tap' => $nativeSheetAction,
-                    'modal_endpoint' => "/api/v1/tenant/receivables/{$sale->id}/reminder-sheet",
+                    'modal_endpoint' => "/api/v1/tenant/documents/{$documentType}/{$sale->id}/actions-sheet",
                     'post_sale_sheet' => [
                         'action' => 'show_post_sale_sheet',
                         'data' => $postSaleData,
