@@ -10,6 +10,7 @@ import 'package:zoom_pos_mobile/core/sdui/sdui_component_registry.dart';
 import 'package:zoom_pos_mobile/core/sdui/sdui_icon_registry.dart';
 import 'package:zoom_pos_mobile/core/widgets/sdui/sdui_containers.dart';
 import 'package:zoom_pos_mobile/core/widgets/sdui/sdui_controls.dart';
+import 'package:zoom_pos_mobile/core/widgets/split_navigation_tile.dart';
 import 'package:zoom_pos_mobile/features/pos/screens/pos_screen.dart';
 import 'package:zoom_pos_mobile/features/sales/screens/sales_screen.dart';
 
@@ -414,6 +415,7 @@ void main() {
     testWidgets(
         'SduiSideDrawerContainer renders hierarchical sub-items with branch indicator',
         (tester) async {
+      final tappedKeys = <String>[];
       final sections = [
         const SduiNavSectionSchema(
           key: 'admin',
@@ -448,7 +450,7 @@ void main() {
             drawer: SduiSideDrawerContainer(
               sections: sections,
               selectedKey: 'settings_mode',
-              onItemTap: (_) {},
+              onItemTap: (item) => tappedKeys.add(item.key),
             ),
             body: Builder(
               builder: (context) => ElevatedButton(
@@ -464,12 +466,19 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Store Settings'), findsOneWidget);
-      expect(find.byType(ExpansionTile), findsOneWidget);
+      expect(find.byType(SplitNavigationTile), findsOneWidget);
       // Collapsed by default even though a descendant is the selected item —
       // parent branches must never auto-expand on load.
       expect(find.text('Store Operating Mode'), findsNothing);
 
       await tester.tap(find.text('Store Settings'));
+      await tester.pumpAndSettle();
+
+      expect(tappedKeys, ['settings']);
+      expect(find.text('Store Operating Mode'), findsNothing);
+
+      await tester
+          .tap(find.byKey(const ValueKey('sdui-drawer-expand-settings')));
       await tester.pumpAndSettle();
 
       expect(find.text('Store Operating Mode'), findsOneWidget);
@@ -478,9 +487,7 @@ void main() {
   });
 
   group('BootstrapCache SDUI Integration', () {
-    test(
-        'empty cache reports navigation loading before disk hydration',
-        () {
+    test('empty cache reports navigation loading before disk hydration', () {
       final cache = BootstrapCache.instance;
       cache.menuStructure = [];
       expect(cache.effectiveSections, isEmpty);
@@ -543,7 +550,9 @@ void main() {
       expect(section.items.first.title, 'Point of Sale');
     });
 
-    test('effectiveSections falls back to baseline sections when hydrated cache is empty', () async {
+    test(
+        'effectiveSections falls back to baseline sections when hydrated cache is empty',
+        () async {
       SharedPreferences.setMockInitialValues({
         'zoom_pos.bootstrap.menu': jsonEncode([]),
       });

@@ -14,6 +14,7 @@ import 'package:zoom_pos_mobile/core/sdui/models/sdui_models.dart';
 import 'package:zoom_pos_mobile/core/services/dynamic_string_service.dart';
 import 'package:zoom_pos_mobile/core/services/sync/sync_engine.dart';
 import 'package:zoom_pos_mobile/core/storage/app_preferences.dart';
+import 'package:zoom_pos_mobile/core/widgets/split_navigation_tile.dart';
 import 'package:zoom_pos_mobile/features/auth/auth_provider.dart';
 import 'package:zoom_pos_mobile/features/auth/auth_repository.dart';
 import 'package:zoom_pos_mobile/features/auth/screens/auth_gate.dart';
@@ -406,7 +407,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // The parent is an expandable branch and the children live inside it.
-      final branch = find.widgetWithText(ExpansionTile, 'Store Settings');
+      final branch = find.widgetWithText(SplitNavigationTile, 'Store Settings');
       expect(branch, findsOneWidget);
       expect(
         find.descendant(

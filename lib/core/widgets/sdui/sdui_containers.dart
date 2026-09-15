@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../sdui/models/sdui_models.dart';
 import '../../sdui/sdui_icon_registry.dart';
+import '../split_navigation_tile.dart';
 
 /// Agnostic header bar for SDUI screens.
 class SduiHeaderBar extends StatelessWidget implements PreferredSizeWidget {
@@ -217,11 +218,11 @@ class SduiSideDrawerContainer extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
                   for (final section in sections) ...[
-                    if (section.title.isNotEmpty)
+                    if (section.displayTitle.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 16, 16, 6),
                         child: Text(
-                          section.title.toUpperCase(),
+                          section.displayTitle.toUpperCase(),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -298,12 +299,17 @@ class SduiSideDrawerContainer extends StatelessWidget {
       final iconData = SduiIconRegistry.resolve(item.icon);
       final isSelected = item.key == selectedKey;
 
-      return ExpansionTile(
+      return SplitNavigationTile(
         key: PageStorageKey<String>(
             'sdui-drawer-branch-${section.key}-${item.key}'),
-        tilePadding: EdgeInsets.only(left: 12.0 + (depth * 20.0), right: 12.0),
-        childrenPadding: EdgeInsets.zero,
+        mainTileKey: ValueKey('sdui-drawer-item-${item.key}'),
+        expandButtonKey: ValueKey('sdui-drawer-expand-${item.key}'),
+        contentPadding:
+            EdgeInsets.only(left: 12.0 + (depth * 20.0), right: 4.0),
         initiallyExpanded: false,
+        selected: isSelected,
+        selectedColor: theme.colorScheme.primary,
+        iconColor: theme.colorScheme.onSurfaceVariant,
         leading: Icon(
           iconData,
           size: depth == 0 ? 20 : 18,
@@ -324,6 +330,7 @@ class SduiSideDrawerContainer extends StatelessWidget {
         children: [
           for (final child in children) buildNode(child, depth + 1),
         ],
+        onTap: () => onItemTap(item),
       );
     }
 

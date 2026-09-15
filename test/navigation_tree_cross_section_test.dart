@@ -65,15 +65,19 @@ void main() {
 
     // Falls back to the built-in catalog: "Point of Sale" starts under
     // "Cashier & Sales"; we drag it into "Financial Management".
-    expect(find.text('Point of Sale'), findsOneWidget);
+    expect(find.text('Point of Sale'), findsWidgets);
     expect(find.text('Financial Management'), findsOneWidget);
     expect(
       find.textContaining('drag it onto another section'),
       findsOneWidget,
     );
+    await tester.enterText(
+      find.byKey(const ValueKey('section-title-cashier_sales')),
+      'Cashier & Sales',
+    );
 
-    final gesture =
-        await tester.startGesture(tester.getCenter(find.text('Point of Sale')));
+    final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('item_cashier_sales_pos'))));
     await tester.pump(const Duration(milliseconds: 700)); // long-press fires
     await gesture.moveTo(tester.getCenter(find.text('Financial Management')));
     await tester.pump();
@@ -89,6 +93,12 @@ void main() {
     expect(captured, isNotNull);
     final pos = captured!.items.firstWhere((item) => item.key == 'pos');
     expect(pos.section, 'financial_mgmt');
+    expect(
+      captured.sections
+          .firstWhere((section) => section.key == 'cashier_sales')
+          .customTitle,
+      'Cashier & Sales',
+    );
     // The item left its old section entirely — no stale duplicate.
     expect(captured.items.where((item) => item.key == 'pos').length, 1);
   });

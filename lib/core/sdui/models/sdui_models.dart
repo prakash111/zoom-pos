@@ -262,14 +262,20 @@ class SduiNavSectionSchema {
   const SduiNavSectionSchema({
     required this.key,
     required this.title,
+    this.customTitle,
     this.color,
     this.items = const [],
   });
 
   final String key;
   final String title;
+  final String? customTitle;
   final String? color;
   final List<SduiNavItemSchema> items;
+
+  String get displayTitle => customTitle?.isNotEmpty == true
+      ? customTitle!
+      : (firstItem?.title.isNotEmpty == true ? firstItem!.title : title);
 
   SduiNavItemSchema? get firstItem => items.isEmpty ? null : items.first;
   List<SduiNavItemSchema> get subItems =>
@@ -355,6 +361,9 @@ class SduiNavSectionSchema {
     return SduiNavSectionSchema(
       key: key,
       title: rawTitle.isNotEmpty ? rawTitle : key,
+      customTitle: json['custom_title']?.toString().trim().isNotEmpty == true
+          ? json['custom_title'].toString().trim()
+          : (parsedItems.isNotEmpty ? parsedItems.first.title : null),
       color: json['color']?.toString() ?? json['header_color']?.toString(),
       items: parsedItems,
     );
@@ -365,6 +374,7 @@ class SduiNavSectionSchema {
         'id': key,
         'title': title,
         'label': title,
+        if (customTitle?.isNotEmpty == true) 'custom_title': customTitle,
         if (color != null) 'color': color,
         'items': items.map((i) => i.toJson()).toList(),
         if (firstItem != null) 'first_item': firstItem!.toJson(),

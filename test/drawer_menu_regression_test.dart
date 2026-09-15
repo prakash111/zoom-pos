@@ -460,8 +460,24 @@ void main() {
       // 1. Verify tenant business type badge renders RETAIL (not empty oval)
       expect(find.text('RETAIL'), findsOneWidget);
 
-      // 2. Verify all 5 core Cashier & Sales items are present as ListTiles and lead_management is absent
+      // 2. The custom section heading is separate from its actionable parent.
+      expect(find.text('POINT OF SALE'), findsOneWidget);
       expect(find.byKey(const ValueKey('drawer-item-pos')), findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-sales')), findsNothing);
+      expect(find.byKey(const ValueKey('drawer-item-lead_management')),
+          findsNothing);
+
+      expect(find.byKey(const ValueKey('drawer-section-divider-cashier_sales')),
+          findsOneWidget);
+      final pointOfSaleParent = tester
+          .widget<ListTile>(find.byKey(const ValueKey('drawer-item-pos')));
+      expect(pointOfSaleParent.onTap, isNotNull);
+      expect(pointOfSaleParent.trailing, isNull);
+
+      // Only the independent chevron expands the section children.
+      await tester.tap(find.byKey(const ValueKey('drawer-expand-pos')));
+      await tester.pumpAndSettle();
+
       expect(find.byKey(const ValueKey('drawer-item-sales')), findsOneWidget);
       expect(
           find.byKey(const ValueKey('drawer-item-quotations')), findsOneWidget);
@@ -469,29 +485,18 @@ void main() {
           findsOneWidget);
       expect(
           find.byKey(const ValueKey('drawer-item-customers')), findsOneWidget);
-      expect(find.byKey(const ValueKey('drawer-item-lead_management')),
-          findsNothing);
-
-      // The old static category heading is gone. Point of Sale is now the
-      // actionable first-item parent and a divider introduces its section.
-      expect(find.text('Cashier & Sales'), findsNothing);
-      expect(find.byKey(const ValueKey('drawer-section-divider-cashier_sales')),
-          findsOneWidget);
-      final pointOfSaleParent = tester
-          .widget<ListTile>(find.byKey(const ValueKey('drawer-item-pos')));
-      expect(pointOfSaleParent.onTap, isNotNull);
-      expect(pointOfSaleParent.trailing, isA<Icon>());
 
       final salesChild = tester
           .widget<ListTile>(find.byKey(const ValueKey('drawer-item-sales')));
       expect(salesChild.contentPadding,
           const EdgeInsets.only(left: 46, right: 12));
 
-      // 3. Verify Point of Sale is NOT an ExpansionTile
+      // 3. The parent no longer uses ExpansionTile's row-wide tap handler.
       expect(
           find.byKey(
               const PageStorageKey<String>('drawer-branch-cashier_sales-pos')),
-          findsNothing);
+          findsOneWidget);
+      expect(find.byType(ExpansionTile), findsNothing);
 
       // 4. Verify user avatar and logout button are rendered
       expect(find.text('prakash'), findsOneWidget);

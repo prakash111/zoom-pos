@@ -23,6 +23,7 @@ import '../../core/storage/app_preferences.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/widgets/coming_soon_screen.dart';
+import '../../core/widgets/split_navigation_tile.dart';
 import '../../core/widgets/tappable_scale.dart';
 import '../../l10n/app_localizations.dart';
 import '../analytics/analytics_repository.dart';
@@ -184,7 +185,7 @@ List<_NavSection> _serverDrivenSections() {
         section.key,
         (l10n) => BootstrapCache.instance.resolveNavigationLabel(
           section.key,
-          l10n.text(section.title, fallback: section.title),
+          l10n.text(section.displayTitle, fallback: section.displayTitle),
         ),
         tiles,
         headerColor: section.color != null
@@ -209,6 +210,9 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
   final compiled = _serverDrivenSections();
   final nav = BootstrapCache.instance.navConfig;
   final itemOverrides = {for (final item in nav.items) item.key: item};
+  final sectionOverrides = {
+    for (final section in nav.sections) section.key: section,
+  };
   final sectionOrderOverrides = {
     for (final section in nav.sections) section.key: section.order,
   };
@@ -365,15 +369,6 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
       final candidate =
           rawParent == null || rawParent.isEmpty ? null : rawParent;
 
-      // POS is an executable primary transaction screen and must never have children.
-      // Furthermore, cashier_sales items must always be top-level root items.
-      if (candidate == 'pos' ||
-          row.tile.key == 'pos' ||
-          entry.key == 'cashier_sales') {
-        safeParent[row.tile.key] = null;
-        continue;
-      }
-
       var cursor = candidate;
       var valid = true;
       var depth = 0;
@@ -434,9 +429,12 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
       }
     }
 
+    final customTitle = sectionOverrides[entry.key]?.customTitle?.trim();
     result.add(_NavSection(
       entry.key,
-      sectionMetaByKey[entry.key]!.header,
+      customTitle?.isNotEmpty == true
+          ? (_) => customTitle!
+          : sectionMetaByKey[entry.key]!.header,
       orderedTiles,
       headerColor: sectionMetaByKey[entry.key]!.headerColor,
       parentByKey: parentByKey,
@@ -966,8 +964,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             (childrenByParent[parent] ??= []).add(tile);
           }
 
-          Widget buildBranch(_FeatureTile tile, int depth) {
-            final nested = childrenByParent[tile.key] ?? const <_FeatureTile>[];
+          Widget buildBranch(
+            _FeatureTile tile,
+            int depth, {
+            List<_FeatureTile>? childOverride,
+            bool sectionParent = false,
+          }) {
+            final nested = childOverride ??
+                childrenByParent[tile.key] ??
+                const <_FeatureTile>[];
             final index = indexByKey[tile.key]!;
             final padding = EdgeInsets.only(
               left: 16 + depth * 30,
@@ -1000,9 +1005,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                     Icon(
                       tile.icon,
-                      size: depth == 0 ? 24 : 18,
-                      color:
-                          isSelected ? selectedItemColor : unselectedIconColor,
+                      size: sectionParent ? 22 : (depth == 0 ? 24 : 18),
+                      color: sectionParent
+                          ? const Color(0xFFF97316)
+                          : (isSelected
+                              ? selectedItemColor
+                              : unselectedIconColor),
                     ),
                   ],
                 ),
@@ -1011,9 +1019,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       tile.key, tile.titleOf(l10n)),
                   style: TextStyle(
                     fontSize: depth > 0 ? 13 : 14,
-                    fontWeight: isSelected
+                    fontWeight: sectionParent || isSelected
                         ? FontWeight.w700
                         : (depth > 0 ? FontWeight.w500 : FontWeight.w500),
+                    letterSpacing: sectionParent ? 0.2 : null,
                     color: isSelected ? selectedItemColor : unselectedItemColor,
                   ),
                 ),
@@ -1022,16 +1031,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
               );
             }
 
-            return ExpansionTile(
+            return SplitNavigationTile(
               key: PageStorageKey<String>(
                 'drawer-branch-${section.key}-${tile.key}',
               ),
-              tilePadding: padding,
-              childrenPadding: EdgeInsets.zero,
-              iconColor: selectedItemColor,
-              collapsedIconColor: unselectedIconColor,
-              textColor: selectedItemColor,
-              collapsedTextColor: unselectedItemColor,
+              mainTileKey: ValueKey('drawer-item-${tile.key}'),
+              expandButtonKey: ValueKey('drawer-expand-${tile.key}'),
+              contentPadding: padding,
+              iconColor: unselectedIconColor,
+              selectedColor: selectedItemColor,
+              selected: isSelected,
+              dense: depth > 0,
               leading: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1048,21 +1058,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                   Icon(
                     tile.icon,
-                    size: depth == 0 ? 24 : 20,
-                    color: isSelected ? selectedItemColor : unselectedIconColor,
+                    size: sectionParent ? 22 : (depth == 0 ? 24 : 20),
+                    color: sectionParent
+                        ? const Color(0xFFF97316)
+                        : (isSelected
+                            ? selectedItemColor
+                            : unselectedIconColor),
                   ),
                 ],
               ),
-              // Parent branches always mount collapsed; they open only when the
-              // user taps them (PageStorageKey keeps that choice for the session).
               initiallyExpanded: false,
-              maintainState: true,
-              shape: const Border(),
-              collapsedShape: const Border(),
               title: Text(
                 bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
                 style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: sectionParent || isSelected
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                  letterSpacing: sectionParent ? 0.2 : null,
                   color: isSelected ? selectedItemColor : unselectedItemColor,
                 ),
               ),
@@ -1073,6 +1085,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     math.min(depth + 1, _maximumNavigationDepth),
                   ),
               ],
+              onTap: () => openTile(tile),
             );
           }
 
@@ -1082,11 +1095,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   (section.parentByKey[tile.key] == null ||
                       section.parentByKey[tile.key] == firstItem.key))
               .toList();
-          final firstIndex = indexByKey[firstItem.key]!;
-          final firstSelected = _dockIndex == firstIndex;
-          final firstHasKids =
-              (childrenByParent[firstItem.key] ?? const <_FeatureTile>[]).isNotEmpty;
-
           children.add(Padding(
             key: ValueKey('drawer-section-divider-${section.key}'),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1097,43 +1105,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ));
 
-          if (firstHasKids) {
-            children.add(buildBranch(firstItem, 0));
-          } else {
-            children.add(ListTile(
-              key: ValueKey('drawer-item-${firstItem.key}'),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              leading: Icon(
-                firstItem.icon,
-                size: 22,
-                color: const Color(0xFFF97316),
-              ),
-              title: Text(
-                bootstrap.resolveNavigationLabel(
-                    firstItem.key, firstItem.titleOf(l10n)),
+          final sectionTitle = section.header?.call(l10n) ?? '';
+          if (sectionTitle.isNotEmpty) {
+            children.add(Padding(
+              key: ValueKey('drawer-section-title-${section.key}'),
+              padding: const EdgeInsets.fromLTRB(20, 4, 16, 4),
+              child: Text(
+                sectionTitle.toUpperCase(),
                 style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
-                  color: firstSelected ? selectedItemColor : unselectedItemColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: section.headerColor ?? unselectedIconColor,
                 ),
               ),
-              trailing: sectionChildren.isNotEmpty
-                  ? Icon(
-                      Icons.keyboard_arrow_down,
-                      size: 18,
-                      color: unselectedIconColor,
-                    )
-                  : null,
-              selected: firstSelected,
-              onTap: () => openTile(firstItem),
             ));
-
-            for (final child in sectionChildren) {
-              children.add(buildBranch(child, 1));
-            }
           }
+
+          children.add(buildBranch(
+            firstItem,
+            0,
+            childOverride: sectionChildren,
+            sectionParent: true,
+          ));
         }
 
         final hasChangePassword = navSections.any(
@@ -1404,8 +1398,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         (childrenByParent[parent] ??= []).add(tile);
       }
 
-      Widget branch(_FeatureTile tile, int depth) {
-        final nested = childrenByParent[tile.key] ?? const <_FeatureTile>[];
+      Widget branch(
+        _FeatureTile tile,
+        int depth, {
+        List<_FeatureTile>? childOverride,
+        bool sectionParent = false,
+      }) {
+        final nested = childOverride ??
+            childrenByParent[tile.key] ??
+            const <_FeatureTile>[];
         final index = indexByKey[tile.key]!;
         final selected = _dockIndex == index;
         final labelColor =
@@ -1414,13 +1415,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
           style: TextStyle(
             fontSize: depth > 0 ? 13 : 14,
-            fontWeight: selected
+            fontWeight: sectionParent || selected
                 ? FontWeight.w700
                 : (depth > 0 ? FontWeight.w500 : FontWeight.normal),
+            letterSpacing: sectionParent ? 0.2 : null,
             color: labelColor,
           ),
         );
-        final leading = Icon(tile.icon, size: depth == 0 ? 22 : 18);
+        final leading = Icon(
+          tile.icon,
+          size: depth == 0 ? 22 : 18,
+          color: sectionParent ? const Color(0xFFF97316) : null,
+        );
         final pad = EdgeInsets.only(left: 12 + depth * 20, right: 8);
 
         if (nested.isEmpty) {
@@ -1435,21 +1441,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
 
-        return ExpansionTile(
+        return SplitNavigationTile(
           key: PageStorageKey<String>('rail-branch-${section.key}-${tile.key}'),
-          tilePadding: pad,
-          childrenPadding: EdgeInsets.zero,
+          mainTileKey: ValueKey('rail-item-${tile.key}'),
+          expandButtonKey: ValueKey('rail-expand-${tile.key}'),
+          contentPadding: pad,
           dense: true,
-          shape: const Border(),
-          collapsedShape: const Border(),
+          selected: selected,
+          selectedColor: Theme.of(context).colorScheme.primary,
+          iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
           initiallyExpanded: true,
-          maintainState: true,
           leading: leading,
           title: label,
           children: [
             for (final child in nested)
               branch(child, math.min(depth + 1, _maximumNavigationDepth)),
           ],
+          onTap: () => _onDockItemSelected(context, index),
         );
       }
 
@@ -1459,12 +1467,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               (section.parentByKey[tile.key] == null ||
                   section.parentByKey[tile.key] == firstItem.key))
           .toList();
-      final firstIndex = indexByKey[firstItem.key]!;
-      final firstSelected = _dockIndex == firstIndex;
-
-      final firstHasKids =
-          (childrenByParent[firstItem.key] ?? const <_FeatureTile>[]).isNotEmpty;
-
       rows.add(Padding(
         key: ValueKey('rail-section-divider-${section.key}'),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1475,43 +1477,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ));
 
-      if (firstHasKids) {
-        rows.add(branch(firstItem, 0));
-      } else {
-        rows.add(ListTile(
-          key: ValueKey('rail-item-${firstItem.key}'),
-          dense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-          leading: Icon(
-            firstItem.icon,
-            size: 22,
-            color: const Color(0xFFF97316),
-          ),
-          title: Text(
-            bootstrap.resolveNavigationLabel(
-                firstItem.key, firstItem.titleOf(l10n)),
+      final sectionTitle = section.header?.call(l10n) ?? '';
+      if (sectionTitle.isNotEmpty) {
+        rows.add(Padding(
+          key: ValueKey('rail-section-title-${section.key}'),
+          padding: const EdgeInsets.fromLTRB(14, 2, 10, 4),
+          child: Text(
+            sectionTitle.toUpperCase(),
             style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
-              color: firstSelected ? Theme.of(context).colorScheme.primary : null,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+              color: section.headerColor ??
+                  Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
-          trailing: sectionChildren.isNotEmpty
-              ? Icon(
-                  Icons.keyboard_arrow_down,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                )
-              : null,
-          selected: firstSelected,
-          onTap: () => _onDockItemSelected(context, firstIndex),
         ));
-
-        for (final child in sectionChildren) {
-          rows.add(branch(child, 1));
-        }
       }
+
+      rows.add(branch(
+        firstItem,
+        0,
+        childOverride: sectionChildren,
+        sectionParent: true,
+      ));
     }
 
     // Width is owned by the enclosing [DockRailSlot] (viewport-clamped);

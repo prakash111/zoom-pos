@@ -61,12 +61,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sales'), findsOneWidget);
-    expect(find.text('Point of Sale'), findsOneWidget);
+    expect(find.text('Point of Sale'), findsWidgets);
     expect(find.text('Sales History'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('NavMenuSettingsTab renders standalone with self-scaffold, header, and sections', (tester) async {
+  testWidgets(
+      'NavMenuSettingsTab renders standalone with self-scaffold, header, and sections',
+      (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         localizationsDelegates: [
@@ -87,11 +89,13 @@ void main() {
     expect(find.text('Sub-Menu · 30 px'), findsOneWidget);
     expect(find.text('Sub-Sub-Menu · 60 px'), findsOneWidget);
     expect(find.text('Cashier & Sales'), findsOneWidget);
-    expect(find.text('Point of Sale'), findsOneWidget);
+    expect(find.text('Point of Sale'), findsWidgets);
     expect(find.byType(ElevatedButton), findsOneWidget);
   });
 
-  testWidgets('DynamicSchemaPage renders full navigation schema with sections and save button', (tester) async {
+  testWidgets(
+      'DynamicSchemaPage renders full navigation schema with sections and save button',
+      (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -190,7 +194,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Navigation Menu Customization'), findsOneWidget);
     expect(find.text('Cashier & Sales'), findsOneWidget);
-    expect(find.text('Point of Sale'), findsOneWidget);
+    expect(find.text('Point of Sale'), findsWidgets);
     expect(find.text('Sales History'), findsOneWidget);
   });
 }

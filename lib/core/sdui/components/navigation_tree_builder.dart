@@ -41,10 +41,16 @@ class NavTileDescriptor {
 }
 
 class NavSectionDescriptor {
-  const NavSectionDescriptor(this.key, this.label, this.tiles);
+  const NavSectionDescriptor(
+    this.key,
+    this.label,
+    this.tiles, {
+    this.customTitle,
+  });
   final String key;
   final String label;
   final List<NavTileDescriptor> tiles;
+  final String? customTitle;
 }
 
 class _WorkingItem {
@@ -63,10 +69,14 @@ class _WorkingItem {
 
 class _WorkingSection {
   _WorkingSection(
-      {required this.key, required this.label, required this.tiles});
+      {required this.key,
+      required this.label,
+      required this.customTitle,
+      required this.tiles});
 
   final String key;
   final String label;
+  String customTitle;
   List<_WorkingItem> tiles;
 }
 
@@ -189,6 +199,9 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     final sectionOrderOverrides = {
       for (final section in _initialConfig.sections) section.key: section.order
     };
+    final sectionOverrides = {
+      for (final section in _initialConfig.sections) section.key: section
+    };
     final grouped =
         <String, List<({int order, int fallback, _WorkingItem item})>>{};
 
@@ -227,6 +240,14 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       final section = _WorkingSection(
         key: entry.key,
         label: meta.label,
+        customTitle:
+            sectionOverrides[entry.key]?.customTitle?.trim().isNotEmpty == true
+                ? sectionOverrides[entry.key]!.customTitle!.trim()
+                : (meta.customTitle?.trim().isNotEmpty == true
+                    ? meta.customTitle!.trim()
+                    : (entry.value.isNotEmpty
+                        ? entry.value.first.item.label
+                        : meta.label)),
         tiles: [for (final row in entry.value) row.item],
       );
       _repairAndArrange(section);
@@ -238,6 +259,9 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         final sec = _WorkingSection(
           key: s.key,
           label: s.label,
+          customTitle: s.customTitle?.trim().isNotEmpty == true
+              ? s.customTitle!.trim()
+              : (s.tiles.isNotEmpty ? s.tiles.first.label : s.label),
           tiles: [
             for (final t in s.tiles)
               _WorkingItem(key: t.key, label: t.label, visible: true)
@@ -302,8 +326,9 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
 
         collectTyped(rawSection.items);
         if (rawSection.key.isNotEmpty && tiles.isNotEmpty) {
-          parsed.add(
-              NavSectionDescriptor(rawSection.key, rawSection.title, tiles));
+          parsed.add(NavSectionDescriptor(
+              rawSection.key, rawSection.title, tiles,
+              customTitle: rawSection.customTitle));
         }
         continue;
       }
@@ -313,6 +338,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       final key = (section['key'] ?? section['id'])?.toString() ?? '';
       if (key.isEmpty) continue;
       final title = (section['title'] ?? section['label'])?.toString() ?? key;
+      final customTitle = section['custom_title']?.toString();
       final tiles = <NavTileDescriptor>[];
       final seen = <String>{};
 
@@ -333,7 +359,8 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
 
       collectMaps(section['items'] ?? section['children']);
       if (tiles.isNotEmpty) {
-        parsed.add(NavSectionDescriptor(key, title, tiles));
+        parsed.add(
+            NavSectionDescriptor(key, title, tiles, customTitle: customTitle));
       }
     }
 
@@ -680,7 +707,15 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       await _repository.updateNavConfig(NavConfig(
         sections: [
           for (var index = 0; index < _sections.length; index++)
-            NavSectionOrder(key: _sections[index].key, order: index),
+            NavSectionOrder(
+              key: _sections[index].key,
+              order: index,
+              customTitle: _sections[index].customTitle.trim().isNotEmpty
+                  ? _sections[index].customTitle.trim()
+                  : (_sections[index].tiles.isNotEmpty
+                      ? _sections[index].tiles.first.label
+                      : _sections[index].label),
+            ),
         ],
         items: items,
       ));
@@ -927,12 +962,39 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 12, 6),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Expanded(
-                            child: Text(
-                              _sections[sectionIndex].label,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _sections[sectionIndex].label,
+                                  style: TextStyle(
+                                    color: scheme.onSurfaceVariant,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                TextFormField(
+                                  key: ValueKey(
+                                      'section-title-${_sections[sectionIndex].key}'),
+                                  initialValue:
+                                      _sections[sectionIndex].customTitle,
+                                  maxLength: 120,
+                                  decoration: InputDecoration(
+                                    labelText: 'Custom section title',
+                                    hintText: tiles.isNotEmpty
+                                        ? tiles.first.label
+                                        : _sections[sectionIndex].label,
+                                    counterText: '',
+                                    isDense: true,
+                                  ),
+                                  onChanged: (value) => _sections[sectionIndex]
+                                      .customTitle = value,
+                                ),
+                              ],
                             ),
                           ),
                           ReorderableDragStartListener(
@@ -948,8 +1010,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                     ),
                     if (tiles.isEmpty)
                       Padding(
-                        padding:
-                            const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
                         child: Text(
                           active
                               ? 'Release to add the item here'

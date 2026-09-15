@@ -239,18 +239,30 @@ class TenantSettingsBundle {
 
 /// One section's position override — see [NavConfig].
 class NavSectionOrder {
-  const NavSectionOrder({required this.key, required this.order});
+  const NavSectionOrder({
+    required this.key,
+    required this.order,
+    this.customTitle,
+  });
 
   factory NavSectionOrder.fromJson(Map<String, dynamic> json) {
     return NavSectionOrder(
         key: json['key'] as String? ?? '',
-        order: (json['order'] as num?)?.toInt() ?? 0);
+        order: (json['order'] as num?)?.toInt() ?? 0,
+        customTitle: json['custom_title']?.toString().trim().isNotEmpty == true
+            ? json['custom_title'].toString().trim()
+            : null);
   }
 
   final String key;
   final int order;
+  final String? customTitle;
 
-  Map<String, dynamic> toJson() => {'key': key, 'order': order};
+  Map<String, dynamic> toJson() => {
+        'key': key,
+        'order': order,
+        if (customTitle?.isNotEmpty == true) 'custom_title': customTitle,
+      };
 }
 
 /// One nav destination's canonical placement. [parent] / [parentId] names
@@ -345,27 +357,29 @@ class NavConfig {
             .toList()
         : <NavItemConfig>[];
 
-    final rawItems = flatItems.isNotEmpty ? flatItems : _flattenTree(json['tree']);
+    final rawItems =
+        flatItems.isNotEmpty ? flatItems : _flattenTree(json['tree']);
     final sanitizedItems = rawItems.map((item) {
-      if (item.section == 'cashier_sales' && (
-          item.key == 'lead_management' ||
-          item.key == 'leads' ||
-          item.key.startsWith('lead_') ||
-          item.key.contains('lead')
-      )) {
+      if (item.section == 'cashier_sales' &&
+          (item.key == 'lead_management' ||
+              item.key == 'leads' ||
+              item.key.startsWith('lead_') ||
+              item.key.contains('lead'))) {
         return item.copyWith(section: 'lead_ops');
       }
       return item;
     }).toList();
 
+    final rawSections = json['sections'] is List
+        ? json['sections'] as List
+        : (json['tree'] is List ? json['tree'] as List : const []);
+
     return NavConfig(
-      sections: json['sections'] is List
-          ? (json['sections'] as List)
-              .whereType<Map>()
-              .map((section) =>
-                  NavSectionOrder.fromJson(Map<String, dynamic>.from(section)))
-              .toList()
-          : const [],
+      sections: rawSections
+          .whereType<Map>()
+          .map((section) =>
+              NavSectionOrder.fromJson(Map<String, dynamic>.from(section)))
+          .toList(),
       items: sanitizedItems,
     );
   }
@@ -484,6 +498,8 @@ class NavConfig {
         {
           'key': orderedSections[order].key,
           'order': order,
+          if (orderedSections[order].customTitle?.isNotEmpty == true)
+            'custom_title': orderedSections[order].customTitle,
           'items': buildNodes(orderedSections[order].key, null, 0),
         },
     ];

@@ -17,7 +17,9 @@ void main() {
   group('NavConfig hierarchy contract', () {
     test('reads parent_id and recursively serializes three levels', () {
       final config = NavConfig(
-        sections: const [NavSectionOrder(key: 'main', order: 0)],
+        sections: const [
+          NavSectionOrder(key: 'main', order: 0, customTitle: 'Cashier & Sales')
+        ],
         items: [
           const NavItemConfig(
             key: 'root',
@@ -62,6 +64,9 @@ void main() {
           ((child['children'] as List).single) as Map<String, dynamic>;
 
       expect(flat[1]['parent_id'], 'root');
+      expect(
+          (json['sections'] as List).first['custom_title'], 'Cashier & Sales');
+      expect(tree['custom_title'], 'Cashier & Sales');
       expect(flat[1]['level'], 1);
       expect(roots.map((item) => item['key']), ['root', 'second-root']);
       expect(child['key'], 'child');
@@ -100,6 +105,21 @@ void main() {
       expect(config.items.map((item) => item.key), ['root', 'child']);
       expect(config.items.last.parentId, 'root');
       expect(config.items.last.level, 1);
+    });
+
+    test('reads a custom section title from a tree-only response', () {
+      final config = NavConfig.fromJson({
+        'tree': [
+          {
+            'key': 'main',
+            'order': 0,
+            'custom_title': 'Products & Inventory',
+            'items': <dynamic>[],
+          },
+        ],
+      });
+
+      expect(config.sections.single.customTitle, 'Products & Inventory');
     });
   });
 }
