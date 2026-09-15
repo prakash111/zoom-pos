@@ -1,9 +1,9 @@
 <?php
 
-namespace AppConsole\Commands;
+namespace App\Console\Commands;
 
-use AppModelsPlatformBranding;
-use IlluminateConsoleCommand;
+use App\Models\PlatformBranding;
+use Illuminate\Console\Command;
 
 class SeedLandingContentCommand extends Command
 {
