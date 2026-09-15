@@ -504,7 +504,22 @@ class TenantNavRegistry
      */
     public static function buildCustomNavTree(Company $company): ?array
     {
-        $raw = $company->nav_config ?? $company->navigation_menu_customization;
+        $raw = null;
+        if (\Illuminate\Support\Facades\Schema::hasTable('tenant_settings')) {
+            $customSetting = \Illuminate\Support\Facades\DB::table('tenant_settings')
+                ->where('tenant_id', $company->id)
+                ->where('key', 'navigation_menu_custom')
+                ->value('value');
+            if (! empty($customSetting)) {
+                $decoded = json_decode($customSetting, true);
+                if (is_array($decoded) && ! empty($decoded)) {
+                    $raw = $decoded;
+                }
+            }
+        }
+        if (empty($raw)) {
+            $raw = $company->nav_config ?? $company->navigation_menu_customization;
+        }
         if (! is_array($raw) || empty($raw)) {
             return null;
         }
@@ -517,6 +532,11 @@ class TenantNavRegistry
         } elseif (! empty($raw['items']) && is_array($raw['items'])) {
             $normalized = app(TenantNavigationConfigService::class)->normalize($raw);
             $tree = $normalized['tree'] ?? null;
+        } elseif (isset($raw[0]['key']) && isset($raw[0]['items'])) {
+            $tree = $raw;
+        } elseif (! empty($raw['sections']) && is_array($raw['sections'])) {
+            $normalized = app(TenantNavigationConfigService::class)->normalize($raw);
+            $tree = $normalized['tree'] ?? $raw['sections'];
         }
 
         if (empty($tree)) {
@@ -583,15 +603,27 @@ class TenantNavRegistry
             $decorated['target_endpoint'] = $meta['target_endpoint'] ?? ('/api/tenant/views/'.str_replace('_', '-', $k));
             $decorated['permission'] = $meta['permission'] ?? null;
 
-            if ($parentId !== null) {
+            // Store Settings must always be an independent root item (never nested under subscription)
+            if ($k === 'settings') {
+                $parentId = null;
+            }
+
+            if ($parentId !== null && $k !== 'settings') {
                 $decorated['parent'] = $parentId;
                 $decorated['parent_id'] = $parentId;
                 $decorated['type'] = 'link';
+            } else {
+                $decorated['parent'] = null;
+                $decorated['parent_id'] = null;
             }
 
             $children = [];
             foreach ($node['children'] ?? [] as $child) {
                 if (is_array($child)) {
+                    $childKey = trim((string) ($child['key'] ?? $child['id'] ?? ''));
+                    if ($childKey === 'settings') {
+                        continue;
+                    }
                     $decChild = $decorateNode($child, $k);
                     if ($decChild !== null) {
                         $children[] = $decChild;
@@ -628,12 +660,40 @@ class TenantNavRegistry
             ];
 
             $decoratedItems = [];
+            $extractedRoots = [];
+
             foreach ($treeSection['items'] ?? [] as $itemNode) {
                 if (is_array($itemNode)) {
-                    $dec = $decorateNode($itemNode, null);
+                    $extractSettings = function (array &$node) use (&$extractSettings, &$extractedRoots): void {
+                        if (! empty($node['children']) && is_array($node['children'])) {
+                            $cleanChildren = [];
+                            foreach ($node['children'] as $child) {
+                                if (is_array($child)) {
+                                    $ck = trim((string) ($child['key'] ?? $child['id'] ?? ''));
+                                    if ($ck === 'settings') {
+                                        $extractedRoots[] = $child;
+                                    } else {
+                                        $cleanChildren[] = $child;
+                                        $extractSettings($child);
+                                    }
+                                }
+                            }
+                            $node['children'] = $cleanChildren;
+                        }
+                    };
+                    $copyNode = $itemNode;
+                    $extractSettings($copyNode);
+                    $dec = $decorateNode($copyNode, null);
                     if ($dec !== null) {
                         $decoratedItems[] = $dec;
                     }
+                }
+            }
+
+            foreach ($extractedRoots as $ext) {
+                $decExt = $decorateNode($ext, null);
+                if ($decExt !== null) {
+                    $decoratedItems[] = $decExt;
                 }
             }
 

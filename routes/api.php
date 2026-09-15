@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\InvoicePreviewController;
 use App\Http\Controllers\Api\LeadController;
 use App\Http\Controllers\Api\LicenseActivationController;
 use App\Http\Controllers\Api\NavigationController;
+use App\Http\Controllers\Api\NavigationMenuController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\QuotationController;
 use App\Http\Controllers\Api\ReceivablesController;
@@ -632,6 +633,16 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::get('/v1/navigation/menu', [NavigationController::class, 'getDrawerMenu']);
     Route::get('/tenant/drawer/menu', [NavigationController::class, 'getDrawerMenu']);
     Route::get('/app/drawer/menu', [NavigationController::class, 'getDrawerMenu']);
+
+    // Navigation Menu Customization Persistence
+    Route::post('/navigation/menu', [NavigationMenuController::class, 'saveMenuSettings']);
+    Route::post('/drawer/menu', [NavigationMenuController::class, 'saveMenuSettings']);
+    Route::post('/drawer-menu', [NavigationMenuController::class, 'saveMenuSettings']);
+    Route::post('/menu', [NavigationMenuController::class, 'saveMenuSettings']);
+    Route::post('/tenant/navigation/menu', [NavigationMenuController::class, 'saveMenuSettings']);
+    Route::post('/app/navigation/menu', [NavigationMenuController::class, 'saveMenuSettings']);
+    Route::post('/settings/navigation-menu', [NavigationMenuController::class, 'saveMenuSettings']);
+    Route::post('/tenant/settings/navigation-menu', [NavigationMenuController::class, 'saveMenuSettings']);
 
     // Dynamic Theme Tokens & Zero-White-Leak Surface
     Route::get('/tenant/theme', [SettingsApiController::class, 'getTheme']);

@@ -185,7 +185,21 @@ class AppBootstrapController extends Controller
         }
 
         $navConfig = $navigation->normalize($validated);
-        $company->forceFill(['nav_config' => $navConfig])->saveOrFail();
+        $company->forceFill([
+            'nav_config' => $navConfig,
+            'navigation_menu_customization' => $navConfig['tree'],
+        ])->saveOrFail();
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('tenant_settings')) {
+            \Illuminate\Support\Facades\DB::table('tenant_settings')->updateOrInsert(
+                ['tenant_id' => $company->id, 'key' => 'navigation_menu_custom'],
+                [
+                    'value'      => json_encode($navConfig['tree']),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+
         Cache::forget("tenant_{$company->id}_drawer_menu");
 
         // Return the value read through the same cast/normalizer used by the

@@ -308,6 +308,7 @@ class TenantNavigationConfigService
             if (isset($items[$rootKey])) {
                 $items[$rootKey]['parent'] = null;
                 $items[$rootKey]['parent_id'] = null;
+                $items[$rootKey]['level'] = 0;
             }
         }
 

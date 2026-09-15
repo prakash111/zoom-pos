@@ -39,12 +39,40 @@ class NavigationController extends Controller
      */
     public function getDrawerMenuComponents(?Request $request = null, ?Company $company = null): array
     {
+        $tenantId = null;
         if ($company === null && $request !== null) {
             try {
                 $company = $this->resolveCompany($request);
             } catch (\Throwable) {
                 // Public/legacy callers without tenant context retain the
                 // static compatibility menu below.
+            }
+        }
+
+        if ($company !== null) {
+            $tenantId = $company->id;
+        } else {
+            $user = auth()->user() ?? auth('tenant_api')->user() ?? auth('web')->user();
+            if ($user) {
+                $tenantId = $user->tenant_id ?? $user->company_id;
+                if ($tenantId) {
+                    $company = Company::find($tenantId);
+                }
+            }
+        }
+
+        // Check for saved custom layout FIRST from tenant_settings
+        if ($tenantId && \Illuminate\Support\Facades\Schema::hasTable('tenant_settings')) {
+            $customSetting = \Illuminate\Support\Facades\DB::table('tenant_settings')
+                ->where('tenant_id', $tenantId)
+                ->where('key', 'navigation_menu_custom')
+                ->value('value');
+
+            if (! empty($customSetting)) {
+                $customSections = json_decode($customSetting, true);
+                if (is_array($customSections) && ! empty($customSections)) {
+                    return $this->formatCustomMenuComponents($customSections);
+                }
             }
         }
 
@@ -239,10 +267,20 @@ class NavigationController extends Controller
             return null;
         }
 
+        // Store Settings must always be an independent root item (never nested under subscription)
+        if ($key === 'settings') {
+            $parentKey = null;
+            $level = 0;
+        }
+
         $route = trim((string) ($item['route'] ?? $item['target_endpoint'] ?? $item['endpoint'] ?? ''));
         $children = [];
         foreach (is_array($item['children'] ?? null) ? $item['children'] : [] as $child) {
             if (! is_array($child)) {
+                continue;
+            }
+            $childKey = trim((string) ($child['key'] ?? $child['id'] ?? ''));
+            if ($childKey === 'settings') {
                 continue;
             }
             $formatted = $this->formatCustomMenuItem($child, $sectionKey, $key, $level + 1);

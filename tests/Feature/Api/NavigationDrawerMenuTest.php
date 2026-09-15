@@ -317,4 +317,74 @@ class NavigationDrawerMenuTest extends TestCase
         $this->assertSame('settings', $settings['children'][0]['parent_id']);
         $this->assertSame([], $subscription['children']);
     }
+
+    public function test_save_menu_settings_persists_to_tenant_settings_and_drawer_reads_it(): void
+    {
+        $payload = [
+            'sections' => [
+                [
+                    'key' => 'administration',
+                    'order' => 0,
+                    'custom_title' => 'Admin Suite',
+                    'items' => [
+                        [
+                            'key' => 'subscription',
+                            'title' => 'Subscription & Billing',
+                            'visible' => true,
+                            'children' => [],
+                        ],
+                        [
+                            'key' => 'settings',
+                            'title' => 'Store Settings',
+                            'visible' => true,
+                            'children' => [
+                                [
+                                    'key' => 'settings_profile',
+                                    'title' => 'Store Profile',
+                                    'visible' => true,
+                                    'children' => [],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $saveResponse = $this->withToken($this->token)
+            ->postJson('/api/navigation/menu', $payload)
+            ->assertOk()
+            ->assertJson([
+                'success' => true,
+                'message' => 'Navigation layout saved successfully.',
+            ]);
+
+        // Verify tenant_settings has persisted record
+        $this->assertDatabaseHas('tenant_settings', [
+            'tenant_id' => $this->company->id,
+            'key' => 'navigation_menu_custom',
+        ]);
+
+        // Verify getDrawerMenu returns customized layout
+        $drawerResponse = $this->withToken($this->token)
+            ->getJson('/api/navigation/menu')
+            ->assertOk();
+
+        $components = collect($drawerResponse->json('components'));
+        $adminHeader = $components->first(
+            fn (array $c) => ($c['type'] ?? null) === 'section_header' && ($c['section_key'] ?? null) === 'administration'
+        );
+        $this->assertNotNull($adminHeader);
+        $this->assertSame('Admin Suite', $adminHeader['title']);
+
+        $settings = $components->firstWhere('key', 'settings');
+        $this->assertNotNull($settings);
+        $this->assertNull($settings['parent_id']);
+        $this->assertSame(0, $settings['level']);
+
+        $subscription = $components->firstWhere('key', 'subscription');
+        $this->assertNotNull($subscription);
+        $this->assertSame([], $subscription['children']);
+    }
 }
+
