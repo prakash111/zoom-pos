@@ -210,6 +210,18 @@ class SchemaValidator
             $errors[] = "{$path}.url: is required for [open_url]";
         }
 
+        if ($type === 'open_receipt_preview') {
+            $endpoint = trim((string) ($action['endpoint'] ?? ''));
+            $pdfEndpoint = trim((string) ($action['pdf_endpoint'] ?? ''));
+            if (! str_starts_with($endpoint, '/api/') || ! str_contains($pdfEndpoint, '/pdf-stream')) {
+                $errors[] = "{$path}: [open_receipt_preview] requires same-origin preview and PDF stream endpoints";
+            }
+        }
+
+        if ($type === 'trigger_thermal_print' && empty($action['document_id'])) {
+            $errors[] = "{$path}.document_id: is required for [trigger_thermal_print]";
+        }
+
         if ($type === 'show_post_sale_sheet') {
             $data = $action['data'] ?? null;
             if (! is_array($data) || trim((string) ($data['invoice_number'] ?? '')) === '') {

@@ -206,7 +206,11 @@
                     <h4 class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">{{ __('Credit Sales & Deferred Orders') }}</h4>
                     <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
                         @forelse ($creditSales as $cs)
-                            <div class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between gap-3 text-xs">
+                            <div @class([
+                                'p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 text-xs',
+                                'dark:bg-[#132A24] dark:border-emerald-500/30' => $cs->payment_status === 'paid',
+                                'dark:bg-[#182230] dark:border-slate-700' => $cs->payment_status !== 'paid',
+                            ])>
                                 <div>
                                     <div class="flex items-center gap-2">
                                         <strong class="font-mono text-slate-900 dark:text-white">#{{ $cs->sale_number }}</strong>

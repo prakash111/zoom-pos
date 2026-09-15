@@ -273,7 +273,7 @@
                                     @endif
 
                                     <button type="button" x-data
-                                            x-on:click="$dispatch('open-sdui-sheet', { endpoint: @js(route('tenant.documents.preview-modal', ['type' => 'invoice', 'id' => $inv->id])) })"
+                                            x-on:click="$dispatch('open-sdui-sheet', { endpoint: @js('/api/v1/tenant/receivables/'.$inv->id.'/reminder-sheet') })"
                                             class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 font-bold text-[10px] transition" title="{{ __("Print receipt/invoice") }}">
                                         🖨️
                                     </button>

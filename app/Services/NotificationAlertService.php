@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Reminder;
 use App\Models\Sale;
 use App\Models\TenantNotification;
+use App\Services\Sdui\SchemaResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -38,6 +39,8 @@ class NotificationAlertService
         foreach ($this->dueInvoices($companyId) as $invoice) {
             $reference = $invoice->sale_number ?: (string) $invoice->id;
             $due = (float) ($invoice->due_amount ?? $invoice->total ?? 0);
+            $postSaleData = SchemaResponse::postSaleActionData($invoice);
+            $postSaleData['actions_endpoint'] = "/api/v1/tenant/receivables/{$invoice->id}/reminder-sheet?document_type={$postSaleData['document_type']}";
             $alerts->push([
                 'type' => 'notification_item',
                 'id' => (string) $invoice->id,
@@ -47,13 +50,13 @@ class NotificationAlertService
                 'title' => "Due Payment: #{$reference}",
                 'subtitle' => $invoice->company?->formatMoney($due).' overdue from '.($invoice->customer?->name ?: ($invoice->customer_name ?: 'Client')),
                 'timestamp' => optional($invoice->due_date)->toIso8601String(),
-                'action_type' => 'OPEN_BOTTOM_SHEET',
-                'route' => "/api/v1/tenant/documents/invoice/{$invoice->id}/preview-modal",
+                'action_type' => 'SHOW_POST_SALE_SHEET',
                 'action' => [
-                    'type' => 'OPEN_BOTTOM_SHEET',
-                    'title' => "Preview & Dispatch #{$reference}",
-                    'endpoint' => "/api/v1/tenant/documents/invoice/{$invoice->id}/preview-modal",
+                    'type' => 'show_post_sale_sheet',
+                    'action_type' => 'show_post_sale_sheet',
+                    'data' => $postSaleData,
                 ],
+                'modal_endpoint' => "/api/v1/tenant/receivables/{$invoice->id}/reminder-sheet",
                 'background_color' => 'theme.surface',
                 'divider_color' => 'theme.divider',
                 'text_color' => 'theme.textPrimary',

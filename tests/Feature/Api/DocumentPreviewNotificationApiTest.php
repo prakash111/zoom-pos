@@ -113,10 +113,18 @@ class DocumentPreviewNotificationApiTest extends TestCase
                 ->assertJsonPath('schema.theme.canvas', 'theme.canvas')
                 ->assertJsonPath('schema.theme.divider', 'theme.divider')
                 ->assertJsonPath('schema.theme.text_primary', 'theme.textPrimary')
+                ->assertJsonPath('schema.background_color', '#0B1120')
+                ->assertJsonPath('schema.loading_background_color', '#0B1120')
+                ->assertJsonPath('schema.empty_background_color', '#0F172A')
                 ->assertJsonPath('schema.components.0.type', 'segmented_tabs')
                 ->assertJsonPath('schema.components.0.active_value', 'thermal_58mm')
+                ->assertJsonPath('schema.components.0.active_background_color', '#10B981')
+                ->assertJsonPath('schema.components.0.inactive_background_color', '#1E293B')
                 ->assertJsonCount(4, 'schema.components.0.options')
-                ->assertJsonPath('schema.components.1.type', 'document_preview_card');
+                ->assertJsonPath('schema.components.1.type', 'document_preview_card')
+                ->assertJsonPath('schema.components.1.background_color', '#0F172A')
+                ->assertJsonPath('schema.components.1.loading_background_color', '#0B1120')
+                ->assertJsonPath('schema.components.1.empty_text_color', '#CBD5E1');
 
             $components = collect($response->json('schema.components'));
             $this->assertTrue($components->contains(fn (array $component) => ($component['channel'] ?? null) === 'sms'));
@@ -172,10 +180,16 @@ class DocumentPreviewNotificationApiTest extends TestCase
             ->assertJsonPath('unread_count', 3)
             ->assertJsonPath('schema.type', 'bottom_sheet');
 
-        $categories = collect($feed->json('schema.components'))->pluck('category')->filter();
+        $alertItems = collect($feed->json('schema.components'))
+            ->flatMap(fn (array $component) => $component['children'] ?? [])
+            ->where('type', 'notification_item');
+        $categories = $alertItems->pluck('category');
         $this->assertTrue($categories->contains('invoice'));
         $this->assertTrue($categories->contains('lead'));
         $this->assertTrue($categories->contains('quotation'));
+        $invoiceAlert = $alertItems->firstWhere('category', 'invoice');
+        $this->assertSame('show_post_sale_sheet', $invoiceAlert['action']['type']);
+        $this->assertStringContainsString('/pdf-stream', $invoiceAlert['action']['data']['pdf_endpoint']);
         $this->assertEmpty(app(SchemaValidator::class)->validate($feed->json('schema')));
     }
 

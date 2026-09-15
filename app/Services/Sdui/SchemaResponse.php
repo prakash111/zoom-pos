@@ -4,6 +4,7 @@ namespace App\Services\Sdui;
 
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\LeadController;
+use App\Http\Controllers\Api\NavigationController;
 use App\Http\Controllers\Api\QuotationController;
 use App\Http\Controllers\Api\V1\SettingsApiController;
 use App\Http\Controllers\Api\V1\TenantAppPreferencesController;
@@ -92,6 +93,7 @@ class SchemaResponse
         'add_to_cart', 'open_remote_sheet', 'open_bottom_sheet', 'open_url', 'show_post_sale_sheet',
         'load_rx_to_pos', 'load_repair_to_pos', 'filter_view', 'show_ticket_share_sheet',
         'trigger_print', 'reload_component', 'refresh_sheet', 'refresh_dashboard', 'thermal_print', 'system_share_file',
+        'open_receipt_preview', 'trigger_thermal_print',
     ];
 
     // =========================================================================
@@ -781,7 +783,9 @@ class SchemaResponse
         $tax = round((float) ($sale->tax_amount ?? 0), 2);
         $discount = round((float) ($sale->discount ?? 0), 2);
         $subtotal = round((float) $sale->total - $tax + $discount, 2);
-        $paid = round((float) ($sale->paid_amount ?: $total), 2);
+        // Zero is meaningful for credit/receivable sales; only a genuinely
+        // absent legacy value falls back to the settled total.
+        $paid = round((float) ($sale->paid_amount ?? $total), 2);
         $due = round((float) ($sale->due_amount ?? 0), 2);
         $taxBase = max(0.01, $subtotal - $discount);
         $taxRate = $tax > 0 ? round($tax / $taxBase * 100, 2) : 0.0;
@@ -803,6 +807,9 @@ class SchemaResponse
 
         $country = strtoupper(trim((string) ($company?->country ?? '')));
         $isIndia = in_array($country, ['IN', 'IND', 'INDIA'], true) || $currency === '₹';
+        $documentType = $sale->operation_type === 'quotation'
+            ? 'quotation'
+            : (str_starts_with(strtoupper((string) $sale->sale_number), 'POS-') ? 'sale' : 'invoice');
 
         $publicLink = '';
         try {
@@ -812,6 +819,8 @@ class SchemaResponse
         }
 
         return [
+            'document_id' => $sale->id,
+            'document_type' => $documentType,
             'invoice_number' => $sale->sale_number,
             'sale_id' => $sale->id,
             'customer_name' => (string) ($sale->customer?->name ?? $sale->customer_name ?? ''),
@@ -4140,8 +4149,8 @@ class SchemaResponse
                 self::row([
                     self::icon('receipt_long', ['color' => '#059669', 'size' => 24]),
                     self::column([
-                        self::text("Invoice #{$s->sale_number}", 'title_medium', ['bold' => true]),
-                        self::text("{$customerName} • {$itemsCount} items", 'body_small', ['color' => '#64748b']),
+                        self::text("Invoice #{$s->sale_number}", 'title_medium', ['bold' => true, 'color' => '#F8FAFC']),
+                        self::text("{$customerName} • {$itemsCount} items", 'body_small', ['color' => '#CBD5E1']),
                         self::text($s->created_at?->format('M d, Y · h:i A') ?? 'Recent', 'body_small', ['color' => '#94a3b8']),
                     ]),
                     self::column([
@@ -4151,8 +4160,8 @@ class SchemaResponse
                 ]),
                 self::divider(),
                 self::row([
-                    self::text('Paid: '.$currency.number_format((float) ($s->paid_amount ?: $s->total), 2), 'body_small', ['bold' => true]),
-                    self::text('Due: '.$currency.number_format((float) ($s->due_amount ?: 0), 2), 'body_small', ['color' => (float) $s->due_amount > 0 ? '#ef4444' : '#64748b', 'bold' => true]),
+                    self::text('Paid: '.$currency.number_format((float) ($s->paid_amount ?: $s->total), 2), 'body_small', ['bold' => true, 'color' => '#E2E8F0']),
+                    self::text('Due: '.$currency.number_format((float) ($s->due_amount ?: 0), 2), 'body_small', ['color' => (float) $s->due_amount > 0 ? '#FCA5A5' : '#CBD5E1', 'bold' => true]),
                     $methodBadge,
                 ]),
                 self::divider(),
@@ -4182,6 +4191,13 @@ class SchemaResponse
                         reload: false
                     ), 'print'),
                 ]),
+            ], [
+                'color' => $isPaid ? '#132A24' : '#182230',
+                'background_color' => $isPaid ? '#132A24' : '#182230',
+                'border_color' => $isPaid ? '#10B981' : '#334155',
+                'border_opacity' => $isPaid ? 0.3 : 1,
+                'border_radius' => 10,
+                'elevation' => 0,
             ]);
         }
 
@@ -4385,6 +4401,13 @@ class SchemaResponse
     {
         $customers = Customer::withoutGlobalScope('company')
             ->where('company_id', $company->id)
+            ->with(['sales' => function ($query) use ($company) {
+                $query->withoutGlobalScope('company')
+                    ->where('company_id', $company->id)
+                    ->where('due_amount', '>', 0)
+                    ->where(fn ($operation) => $operation->whereNull('operation_type')->orWhere('operation_type', 'sale'))
+                    ->latest('created_at');
+            }])
             ->orderByDesc('created_at')
             ->limit(30)
             ->get();
@@ -4396,6 +4419,7 @@ class SchemaResponse
         $customerCards = [];
         foreach ($customers as $c) {
             $due = (float) $c->due_balance;
+            $dueDocument = $c->sales->first();
             $dueBadge = $due > 0
                 ? self::badge("Due: {$currency}".number_format($due, 2), '#ef4444', 'subtle')
                 : self::badge('No Due', '#10b981', 'subtle');
@@ -4425,7 +4449,7 @@ class SchemaResponse
                     ]),
                 ]),
                 self::divider(),
-                self::wrap((function () use ($c, $due, $currency, $company) {
+                self::wrap((function () use ($c, $due, $currency, $dueDocument) {
                     $btns = [
                         self::buttonPrimary('Record Payment', self::openModalAction("Record Payment - {$c->name}", [
                             self::text("Customer Khata Settlement: {$c->name}", 'title_medium', ['bold' => true]),
@@ -4454,51 +4478,13 @@ class SchemaResponse
                         ]), 'menu_book'),
                     ];
 
-                    if ($due > 0) {
-                        $enabled = [];
-                        try {
-                            $enabled = app(TenantNotificationDispatcherService::class)->getEnabledChannels($company);
-                        } catch (\Throwable) {
-                        }
-
-                        $remindChannels = [];
-                        if (! empty($enabled['whatsapp'])) {
-                            $remindChannels[] = self::checkbox('channels[]', 'Send via WhatsApp', true);
-                        }
-                        if (! empty($enabled['sms'])) {
-                            $remindChannels[] = self::checkbox('channels[]', 'Send via SMS', true);
-                        }
-                        if (! empty($enabled['email'])) {
-                            $remindChannels[] = self::checkbox('channels[]', 'Send via Email', true);
-                        }
-
-                        $remindModal = [
-                            self::text('Send Payment Due Reminder', 'title_medium', ['bold' => true]),
-                            self::text("Customer: {$c->name}", 'body_medium'),
-                            self::text("Outstanding Due: {$currency}".number_format($due, 2), 'body_large', ['bold' => true, 'color' => '#dc2626']),
-                            self::divider(),
-                        ];
-
-                        if (! empty($remindChannels)) {
-                            $remindModal[] = self::text('Active Delivery Channels', 'label_medium', ['bold' => true]);
-                            $remindModal = array_merge($remindModal, $remindChannels);
-                            $remindModal[] = self::divider();
-                        }
-
-                        $remindModal[] = self::textInput('recipient_phone', 'Customer Mobile Number', (string) ($c->phone ?? ''), ['placeholder' => 'e.g. 919876543210', 'keyboard_type' => 'phone']);
-                        $remindModal[] = self::textInput('recipient_email', 'Customer Email Address', (string) ($c->email ?? ''), ['placeholder' => 'client@example.com', 'keyboard_type' => 'email']);
-                        $remindModal[] = self::buttonPrimary('Send Due Reminder', self::formSubmitAction(
-                            '/api/v1/tenant/notifications/dispatch',
-                            'POST',
-                            'Due reminder dispatched successfully!',
-                            payload: [
-                                'document_type' => 'due_reminder',
-                                'customer_id' => (string) $c->id,
-                                'due_amount' => $due,
-                            ]
-                        ), 'notification_important');
-
-                        $btns[] = self::buttonOutlined('Due Reminder', self::openModalAction("Send Reminder - {$c->name}", $remindModal), 'notification_important');
+                    if ($due > 0 && $dueDocument instanceof Sale) {
+                        $reminderData = self::postSaleActionData($dueDocument);
+                        $reminderData['actions_endpoint'] = "/api/v1/tenant/receivables/{$dueDocument->id}/reminder-sheet?document_type={$reminderData['document_type']}";
+                        $btns[] = self::buttonOutlined('Due Reminder', [
+                            'type' => 'show_post_sale_sheet',
+                            'data' => $reminderData,
+                        ], 'notification_important');
                     }
 
                     return $btns;
@@ -5083,24 +5069,66 @@ class SchemaResponse
      */
     public static function hardwareSetupView(Company $company): array
     {
-        return self::screen('Printer & Hardware Setup', [
+        $schema = self::screen('Printer & Hardware Setup', [
+            [
+                'type' => 'segmented_tabs',
+                'param_name' => 'connection_type',
+                'active_value' => 'bluetooth',
+                'options' => [
+                    ['label' => 'Bluetooth', 'value' => 'bluetooth', 'selected' => true],
+                    ['label' => 'USB', 'value' => 'usb', 'selected' => false],
+                    ['label' => 'Network', 'value' => 'network', 'selected' => false],
+                ],
+                'active_background_color' => '#10B981',
+                'active_text_color' => '#0B1120',
+                'inactive_background_color' => '#1E293B',
+                'inactive_text_color' => '#94A3B8',
+                'border_color' => '#334155',
+                'style' => [
+                    'activeBackgroundColor' => '#10B981',
+                    'activeTextColor' => '#0B1120',
+                    'inactiveBackgroundColor' => '#1E293B',
+                    'inactiveTextColor' => '#94A3B8',
+                ],
+            ],
+            [
+                'type' => 'empty_state',
+                'icon' => 'print_disabled',
+                'title' => 'No Bluetooth printer paired',
+                'message' => 'No paired Bluetooth printers found. Pair a printer in your device settings, then return here to refresh.',
+                'background_color' => '#0F172A',
+                'border_color' => '#334155',
+                'text_color' => '#E2E8F0',
+                'secondary_text_color' => '#94A3B8',
+                'icon_color' => '#10B981',
+                'style' => [
+                    'backgroundColor' => '#0F172A',
+                    'borderColor' => '#334155',
+                    'textColor' => '#E2E8F0',
+                ],
+            ],
             self::card([
                 self::text('Device pairing happens on the terminal', 'title_medium', ['bold' => true]),
-                self::text('Open this screen from the ZoomNearby app on the phone or tablet that is physically connected to the printer. There you can pair a Bluetooth, USB (OTG) or network (LAN/WiFi, port 9100) thermal printer, choose 58mm or 80mm paper, and run a test print.', 'body_small', ['color' => '#6b7280']),
+                self::text('Open this screen from the ZoomNearby app on the phone or tablet that is physically connected to the printer. There you can pair a Bluetooth, USB (OTG) or network (LAN/WiFi, port 9100) thermal printer, choose 58mm or 80mm paper, and run a test print.', 'body_small', ['color' => '#CBD5E1']),
                 self::divider(),
-                self::text('The selected printer and paper width are stored on that device and used automatically for every receipt, invoice and repair/pickup token — across all operating modes.', 'body_small', ['color' => '#6b7280']),
-            ]),
+                self::text('The selected printer and paper width are stored on that device and used automatically for every receipt, invoice and repair/pickup token — across all operating modes.', 'body_small', ['color' => '#CBD5E1']),
+            ], ['color' => '#182230', 'border_color' => '#334155']),
             self::card([
                 self::text('Receipt content & footers', 'label_large', ['bold' => true]),
-                self::text('Prefixes, disclaimers and bank details printed on those receipts are configured under Receipt Settings.', 'body_small', ['color' => '#6b7280']),
+                self::text('Prefixes, disclaimers and bank details printed on those receipts are configured under Receipt Settings.', 'body_small', ['color' => '#CBD5E1']),
                 self::divider(),
                 self::buttonOutlined(
                     'Open Receipt Settings',
                     self::navigateAction('/api/tenant/views/settings-receipts', 'dynamic_page', 'Receipt Settings'),
                     'receipt_long',
                 ),
-            ]),
+            ], ['color' => '#182230', 'border_color' => '#334155']),
         ]);
+
+        $schema['background_color'] = '#0B1120';
+        $schema['surface_color'] = '#182230';
+
+        return $schema;
     }
 
     public static function financialView(Company $company): array
@@ -6325,7 +6353,7 @@ class SchemaResponse
 
     public static function drawerMenuView(Company $company): array
     {
-        $components = app(\App\Http\Controllers\Api\NavigationController::class)
+        $components = app(NavigationController::class)
             ->getDrawerMenuComponents(company: $company);
 
         return self::screen('Navigation Drawer', $components, 'scroll_view');

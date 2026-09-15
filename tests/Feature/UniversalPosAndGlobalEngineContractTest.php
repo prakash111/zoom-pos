@@ -143,6 +143,13 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
             $this->assertArrayHasKey('cart_bar', $schema);
             $this->assertNotEmpty($schema['cart_bar']['checkout_sheet_endpoint']);
 
+            if ($schema['banner'] !== null) {
+                $this->assertSame('#2A1E17', $schema['banner']['background_color']);
+                $this->assertSame('#D97706', $schema['banner']['border_color']);
+                $this->assertSame('#FCD34D', $schema['banner']['text_color']);
+                $this->assertSame('#10B981', $schema['banner']['action_text_color']);
+            }
+
             // SDUI Schema Validator must pass cleanly
             $errors = app(SchemaValidator::class)->validate($schema);
             $this->assertEmpty($errors, "Schema validation failed for {$vertical}: ".json_encode($errors));

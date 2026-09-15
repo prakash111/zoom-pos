@@ -1557,6 +1557,23 @@ class UniversalPosBuilder
         $schema['banner'] = $registerOpen ? null : [
             'icon' => 'info_outline',
             'message' => 'No cash register is open. Sales can continue outside a register session.',
+            'variant' => 'warning',
+            'background_color' => '#2A1E17',
+            'border_color' => '#D97706',
+            'border_width' => 1,
+            'border_radius' => 8,
+            'text_color' => '#FCD34D',
+            'font_size' => 12,
+            'action_label' => 'Open',
+            'action_text_color' => '#10B981',
+            'action_font_weight' => 'bold',
+            'style' => [
+                'backgroundColor' => '#2A1E17',
+                'borderColor' => '#D97706',
+                'borderWidth' => 1,
+                'borderRadius' => 8,
+                'textColor' => '#FCD34D',
+            ],
             'action' => SchemaResponse::navigateAction('/api/tenant/views/cash-register', title: 'Cash Register'),
         ];
         $schema['search'] = [

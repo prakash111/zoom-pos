@@ -3,8 +3,8 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Company;
-use App\Models\CustomNotificationChannel;
 use App\Models\Customer;
+use App\Models\CustomNotificationChannel;
 use App\Models\Plan;
 use App\Models\Quotation;
 use App\Models\Sale;
@@ -423,10 +423,47 @@ class OmnichannelRegistryEngineTest extends TestCase
         $reminderSheet = $this->withToken($this->token)
             ->getJson("/api/v1/tenant/receivables/{$sale->id}/reminder-sheet")
             ->assertOk()
-            ->assertJsonPath('type', 'bottom_sheet');
+            ->assertJsonPath('type', 'bottom_sheet')
+            ->assertJsonPath('title', 'INV-2026-001')
+            ->assertJsonPath('subtitle', 'GSTIN: 27BBBBB0000B1Z6')
+            ->assertJsonPath('background_color', '#131E29')
+            ->assertJsonPath('document_type', 'invoice')
+            ->assertJsonPath('native_action.type', 'show_post_sale_sheet')
+            ->assertJsonPath('native_action.data.document_type', 'invoice')
+            ->assertJsonPath('native_action.data.actions_endpoint', "/api/v1/tenant/receivables/{$sale->id}/reminder-sheet?document_type=invoice")
+            ->assertJsonPath('post_sale_sheet.action', 'show_post_sale_sheet')
+            ->assertJsonPath('post_sale_sheet.data.pdf_endpoint', "/api/tenant/invoices/{$sale->id}/pdf-stream");
 
         $reminderComponents = collect($reminderSheet->json('components'));
-        $this->assertTrue($reminderComponents->contains(fn ($c) => ($c['channel'] ?? null) === 'sms'));
+        $this->assertSame([
+            'Preview & Print',
+            'Print on receipt printer',
+            'Send via WhatsApp',
+            'Send via Email',
+        ], $reminderComponents->pluck('title')->all());
+        $this->assertSame('OPEN_RECEIPT_PREVIEW', $reminderComponents[0]['action_type']);
+        $this->assertSame('TRIGGER_THERMAL_PRINT', $reminderComponents[1]['action_type']);
+        $this->assertStringNotContainsString('OPEN_URL', json_encode($reminderSheet->json(), JSON_UNESCAPED_SLASHES));
+        $this->assertEmpty(app(SchemaValidator::class)->validate($reminderSheet->json('schema')));
+
+        $posSale = Sale::create([
+            'company_id' => $this->company->id,
+            'customer_id' => $this->customer->id,
+            'user_id' => $this->user->id,
+            'sale_number' => 'POS-63776202',
+            'operation_type' => 'sale',
+            'total' => 75,
+            'paid_amount' => 25,
+            'due_amount' => 50,
+            'status' => 'completed',
+        ]);
+
+        $this->withToken($this->token)
+            ->getJson("/api/v1/tenant/receivables/{$posSale->id}/reminder-sheet")
+            ->assertOk()
+            ->assertJsonPath('title', 'POS-63776202')
+            ->assertJsonPath('document_type', 'sale')
+            ->assertJsonPath('components.0.action.document_type', 'sale');
     }
 
     public function test_real_mobile_app_routes_return_omnichannel_channels_and_sms(): void

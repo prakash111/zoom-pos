@@ -7,6 +7,7 @@
     x-data="{
         visible: false,
         loading: false,
+        previewLoading: true,
         dispatching: false,
         error: '',
         schema: { title: '', components: [] },
@@ -22,6 +23,7 @@
 
             this.visible = true;
             this.loading = true;
+            this.previewLoading = true;
             this.error = '';
             document.documentElement.classList.add('overflow-hidden');
 
@@ -88,6 +90,16 @@
                 window.open(action.url || component.url, '_blank', 'noopener,noreferrer');
                 return;
             }
+            if (type === 'OPEN_RECEIPT_PREVIEW') {
+                await this.show(action.endpoint || component.endpoint, true);
+                return;
+            }
+            if (type === 'TRIGGER_THERMAL_PRINT' || type === 'THERMAL_PRINT') {
+                window.dispatchEvent(new CustomEvent('toast', {
+                    detail: { type: 'info', message: 'Receipt-printer actions are available in the ZoomNearby terminal app.' }
+                }));
+                return;
+            }
             if (type === 'OPEN_BOTTOM_SHEET') {
                 await this.show(action.endpoint || component.route, true);
                 return;
@@ -152,7 +164,7 @@
         x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="translate-y-0"
         x-transition:leave-end="translate-y-full"
-        class="fixed inset-x-0 bottom-0 z-[100001] mx-auto flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        class="fixed inset-x-0 bottom-0 z-[100001] mx-auto flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-[#131E29]"
         data-theme-surface="theme.surface"
         data-theme-canvas="theme.canvas"
         role="dialog"
@@ -181,7 +193,7 @@
             >&times;</button>
         </header>
 
-        <div class="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6 dark:bg-slate-950" data-theme-canvas="theme.canvas">
+        <div class="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6 dark:bg-[#0B1120]" data-theme-canvas="theme.canvas">
             <div x-show="loading" class="flex min-h-52 flex-col items-center justify-center gap-3 text-sm font-bold text-slate-500 dark:text-slate-400">
                 <span class="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600 dark:border-slate-700 dark:border-t-blue-400"></span>
                 <span>Loading…</span>
@@ -193,13 +205,13 @@
                 <template x-for="(component, index) in (schema.components || [])" :key="component.id || component.type + '-' + index">
                     <div>
                         <template x-if="component.type === 'segmented_tabs'">
-                            <div class="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-slate-700 dark:bg-slate-900" data-theme-surface="theme.surface" data-theme-divider="theme.divider">
+                            <div class="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-slate-700 dark:bg-[#1E293B]" data-theme-surface="theme.surface" data-theme-divider="theme.divider">
                                 <template x-for="option in component.options" :key="option.value">
                                     <button
                                         type="button"
                                         x-on:click="selectFormat(component, option)"
                                         class="shrink-0 rounded-xl px-3 py-2 text-xs font-extrabold transition"
-                                        :class="component.active_value === option.value ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+                                        :class="component.active_value === option.value ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-600 hover:bg-slate-100 dark:bg-[#1E293B] dark:text-slate-400 dark:hover:bg-slate-700'"
                                         x-text="option.label"
                                     ></button>
                                 </template>
@@ -207,12 +219,18 @@
                         </template>
 
                         <template x-if="component.type === 'document_preview_card'">
-                            <article class="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900" data-theme-surface="theme.surface" data-theme-divider="theme.divider">
-                                <div class="overflow-auto rounded-xl bg-slate-100 p-2 dark:bg-slate-950" data-theme-canvas="theme.canvas">
+                            <article class="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-[#0F172A]" data-theme-surface="theme.surface" data-theme-divider="theme.divider">
+                                <div class="relative min-h-[420px] overflow-auto rounded-xl bg-[#0F172A] p-2" data-theme-canvas="theme.canvas">
+                                    <div x-show="previewLoading" class="absolute inset-0 z-10 flex min-h-[420px] flex-col items-center justify-center gap-3 rounded-xl bg-[#0B1120] text-sm font-bold text-slate-300">
+                                        <span class="h-8 w-8 animate-spin rounded-full border-4 border-slate-700 border-t-emerald-500"></span>
+                                        <span>Loading document…</span>
+                                    </div>
                                     <iframe
                                         :src="component.render_url"
                                         :title="'Document preview: ' + component.format"
-                                        class="mx-auto block h-[54dvh] min-h-[420px] w-full rounded-lg border-0 bg-white"
+                                        x-on:load="previewLoading = false"
+                                        class="mx-auto block h-[54dvh] min-h-[420px] w-full rounded-lg border-0 bg-[#0B1120] transition-opacity duration-150"
+                                        :class="previewLoading ? 'opacity-0' : 'opacity-100'"
                                         :style="component.format === 'thermal_58mm' ? 'max-width: 360px' : (component.format === 'thermal_80mm' ? 'max-width: 460px' : (component.format === 'slip' ? 'max-width: 390px' : 'max-width: 820px'))"
                                     ></iframe>
                                 </div>
@@ -237,7 +255,7 @@
                                 type="button"
                                 x-on:click="execute(component)"
                                 :disabled="dispatching"
-                                class="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-700 dark:hover:bg-blue-950/30"
+                                class="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-60 dark:border-slate-700 dark:bg-[#131E29] dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
                                 data-theme-surface="theme.surface"
                                 data-theme-divider="theme.divider"
                             >
@@ -252,9 +270,9 @@
                         </template>
 
                         <template x-if="component.type === 'empty_state'">
-                            <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900" data-theme-surface="theme.surface" data-theme-divider="theme.divider">
+                            <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-[#0F172A]" data-theme-surface="theme.surface" data-theme-divider="theme.divider">
                                 <div class="mb-2 text-3xl" x-text="iconFor(component.icon)"></div>
-                                <p class="text-sm font-semibold text-slate-600 dark:text-slate-300" x-text="component.message"></p>
+                                <p class="text-sm font-semibold text-slate-600 dark:text-slate-200" x-text="component.message"></p>
                             </div>
                         </template>
                     </div>

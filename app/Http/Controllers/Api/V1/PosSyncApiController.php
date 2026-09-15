@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\ReceivablesController;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
@@ -34,6 +35,7 @@ use App\Services\Modular\ModuleRegistry;
 use App\Services\Notifications\TenantNotificationDispatcherService;
 use App\Services\Payment\SubscriptionPaymentGatewayService;
 use App\Services\Sdui\SchemaResponse;
+use App\Services\SmsGatewayService;
 use App\Services\TaxCalculationService;
 use App\Services\TaxEngineService;
 use App\Services\Tenancy\TenantProvisioningService;
@@ -2913,7 +2915,7 @@ class PosSyncApiController extends Controller
                     'phone' => $c->phone ?? '',
                     'email' => $c->email ?? '',
                     'company_name' => $companyName,
-                    'due_amount' => $c->due_balance > 0 ? 'Due: ' . number_format((float) $c->due_balance, 2) : null,
+                    'due_amount' => $c->due_balance > 0 ? 'Due: '.number_format((float) $c->due_balance, 2) : null,
                     'avatar_icon' => 'person',
                     'badge_due_bg' => 'rgba(239, 68, 68, 0.15)',
                     'badge_due_tx' => '#F87171',
@@ -2932,17 +2934,17 @@ class PosSyncApiController extends Controller
             'success' => true,
             'count' => $customers->count(),
             'theme' => [
-                'container_bg'     => '#1E293B',    // High-contrast slate surface
+                'container_bg' => '#1E293B',    // High-contrast slate surface
                 'dropdown_surface' => '#1E293B',
                 'popup_background' => '#1E293B',
-                'surface'          => '#1E293B',
-                'card'             => '#1E293B',
-                'border_color'     => '#334155',    // Slate divider
-                'title_color'      => '#F8FAFC',    // High-contrast white
-                'sub_color'        => '#94A3B8',    // Slate-400
-                'text_color'       => '#F8FAFC',
-                'badge_due_bg'     => 'rgba(239, 68, 68, 0.15)',
-                'badge_due_tx'     => '#F87171',
+                'surface' => '#1E293B',
+                'card' => '#1E293B',
+                'border_color' => '#334155',    // Slate divider
+                'title_color' => '#F8FAFC',    // High-contrast white
+                'sub_color' => '#94A3B8',    // Slate-400
+                'text_color' => '#F8FAFC',
+                'badge_due_bg' => 'rgba(239, 68, 68, 0.15)',
+                'badge_due_tx' => '#F87171',
             ],
             'data' => $customers,
             'customers' => $customers,
@@ -3087,6 +3089,16 @@ class PosSyncApiController extends Controller
                 'payment_method' => $sale->payment_method,
                 'status' => $sale->payment_status,
                 'items_count' => count((array) ($sale->items ?: [])),
+                'background_color' => '#182230',
+                'border_color' => '#334155',
+                'text_color' => '#F8FAFC',
+                'secondary_text_color' => '#CBD5E1',
+                'style' => [
+                    'backgroundColor' => '#182230',
+                    'borderColor' => '#334155',
+                    'borderWidth' => 1,
+                    'borderRadius' => 10,
+                ],
             ];
 
             foreach ($sale->payments as $pay) {
@@ -3099,6 +3111,19 @@ class PosSyncApiController extends Controller
                     'payment_method' => $pay->payment_method,
                     'reference' => $pay->reference_number,
                     'notes' => $pay->notes,
+                    'background_color' => '#132A24',
+                    'border_color' => '#10B981',
+                    'border_opacity' => 0.3,
+                    'text_color' => '#F8FAFC',
+                    'secondary_text_color' => '#CBD5E1',
+                    'amount_text_color' => '#6EE7B7',
+                    'style' => [
+                        'backgroundColor' => '#132A24',
+                        'borderColor' => '#10B981',
+                        'borderOpacity' => 0.3,
+                        'borderWidth' => 1,
+                        'borderRadius' => 10,
+                    ],
                 ];
             }
         }
@@ -3451,8 +3476,10 @@ class PosSyncApiController extends Controller
                         'text' => $label,
                         'variant' => $isPaid ? 'success' : 'warning',
                         'color' => $isPaid ? '#10B981' : '#F59E0B',
-                        'background_color' => $isPaid ? '#E8F5E9' : '#FEF3C7',
-                        'text_color' => $isPaid ? '#1B5E20' : '#B45309',
+                        'background_color' => $isPaid ? '#132A24' : '#2A1E17',
+                        'border_color' => $isPaid ? '#10B981' : '#D97706',
+                        'border_opacity' => $isPaid ? 0.3 : 1,
+                        'text_color' => $isPaid ? '#D1FAE5' : '#FCD34D',
                         'white_space' => 'nowrap',
                     ],
                     'amount' => (float) $s->total,
@@ -4472,6 +4499,7 @@ class PosSyncApiController extends Controller
 
         $sales = Sale::withoutGlobalScope('company')
             ->where('company_id', $company->id)
+            ->where(fn ($operation) => $operation->whereNull('operation_type')->orWhere('operation_type', 'sale'))
             ->where('status', '!=', 'cancelled')
             ->where('due_amount', '>', 0)
             ->with('customer')
@@ -4481,45 +4509,60 @@ class PosSyncApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'receivables' => collect($sales->items())->map(fn (Sale $sale) => [
-                'sale_id' => (string) ($sale->external_id ?: $sale->id),
-                'sale_number' => $sale->sale_number,
-                'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? 'Walk-in',
-                'phone' => $sale->customer?->phone,
-                'email' => $sale->customer?->email,
-                'date' => $sale->created_at?->toIso8601String(),
-                'due_date' => $sale->due_date?->toIso8601String(),
-                'due_reminder_at' => $sale->due_reminder_at?->toIso8601String(),
-                'due_reminder_sent_at' => $sale->due_reminder_sent_at?->toIso8601String(),
-                'total' => (float) $sale->total,
-                'paid_amount' => (float) $sale->paid_amount,
-                'due_amount' => (float) $sale->due_amount,
-                'status' => $sale->payment_status,
-                // SDUI row actions. The reminder action deliberately opens the
-                // same registry-backed sheet used by POS document previews.
-                'actions' => [
-                    [
-                        'label' => 'Schedule push reminder',
-                        'icon' => 'schedule',
-                        'action' => [
-                            'type' => 'OPEN_DIALOG',
-                            'action_type' => 'OPEN_DIALOG',
-                            'title' => 'Schedule push reminder',
-                            'endpoint' => "/api/v1/tenant/receivables/{$sale->id}/reminder",
+            'receivables' => collect($sales->items())->map(function (Sale $sale) {
+                $postSaleData = SchemaResponse::postSaleActionData($sale);
+                $documentType = str_starts_with(strtoupper((string) $sale->sale_number), 'POS-') ? 'sale' : 'invoice';
+                $postSaleData['actions_endpoint'] = "/api/v1/tenant/receivables/{$sale->id}/reminder-sheet?document_type={$documentType}";
+                $nativeSheetAction = [
+                    'type' => 'show_post_sale_sheet',
+                    'action_type' => 'show_post_sale_sheet',
+                    'data' => $postSaleData,
+                ];
+
+                return [
+                    'sale_id' => (string) ($sale->external_id ?: $sale->id),
+                    'document_id' => (string) $sale->id,
+                    'document_type' => $documentType,
+                    'sale_number' => $sale->sale_number,
+                    'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? 'Walk-in',
+                    'phone' => $sale->customer?->phone,
+                    'email' => $sale->customer?->email,
+                    'date' => $sale->created_at?->toIso8601String(),
+                    'due_date' => $sale->due_date?->toIso8601String(),
+                    'due_reminder_at' => $sale->due_reminder_at?->toIso8601String(),
+                    'due_reminder_sent_at' => $sale->due_reminder_sent_at?->toIso8601String(),
+                    'total' => (float) $sale->total,
+                    'paid_amount' => (float) $sale->paid_amount,
+                    'due_amount' => (float) $sale->due_amount,
+                    'status' => $sale->payment_status,
+                    // Card taps and the visible reminder affordance both use
+                    // the exact native POS post-sale bottom-sheet contract.
+                    'action' => $nativeSheetAction,
+                    'on_tap' => $nativeSheetAction,
+                    'modal_endpoint' => "/api/v1/tenant/receivables/{$sale->id}/reminder-sheet",
+                    'post_sale_sheet' => [
+                        'action' => 'show_post_sale_sheet',
+                        'data' => $postSaleData,
+                    ],
+                    'actions' => [
+                        [
+                            'label' => 'Schedule push reminder',
+                            'icon' => 'schedule',
+                            'action' => [
+                                'type' => 'OPEN_DIALOG',
+                                'action_type' => 'OPEN_DIALOG',
+                                'title' => 'Schedule push reminder',
+                                'endpoint' => "/api/v1/pos/receivables/{$sale->id}/reminder",
+                            ],
+                        ],
+                        [
+                            'label' => 'Send Reminder',
+                            'icon' => 'send',
+                            'action' => $nativeSheetAction,
                         ],
                     ],
-                    [
-                        'label' => 'Send Reminder',
-                        'icon' => 'send',
-                        'action' => [
-                            'type' => 'OPEN_BOTTOM_SHEET',
-                            'action_type' => 'OPEN_BOTTOM_SHEET',
-                            'title' => 'Send Payment Reminder',
-                            'endpoint' => "/api/v1/tenant/receivables/{$sale->id}/reminder-sheet",
-                        ],
-                    ],
-                ],
-            ])->values(),
+                ];
+            })->values(),
             'total' => $sales->total(),
             'current_page' => $sales->currentPage(),
             'last_page' => $sales->lastPage(),
@@ -4535,7 +4578,7 @@ class PosSyncApiController extends Controller
         $company = $this->resolveCompany($request);
 
         if ($request->isMethod('get')) {
-            return app(\App\Http\Controllers\Api\ReceivablesController::class)->reminderSheet($request, $sale);
+            return app(ReceivablesController::class)->reminderSheet($request, $sale);
         }
 
         $validator = Validator::make($request->all(), [
@@ -4566,7 +4609,7 @@ class PosSyncApiController extends Controller
             }
 
             $smsBody = $delivery->buildDueReminderMessage($saleModel);
-            $res = \App\Services\SmsGatewayService::send($phone, $smsBody, $company->id);
+            $res = SmsGatewayService::send($phone, $smsBody, $company->id);
 
             AuditLog::record('pos.delivery_dispatched', $company->id, $this->resolveUser($request, $company)?->id, [
                 'type' => 'sms',

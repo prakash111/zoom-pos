@@ -1091,7 +1091,26 @@ class PosSyncApiTest extends TestCase
 
         $ledgerRes->assertStatus(200)
             ->assertJsonPath('success', true)
-            ->assertJsonPath('customer.balance_due', 100);
+            ->assertJsonPath('customer.balance_due', 100)
+            ->assertJsonPath('ledger.0.background_color', '#182230')
+            ->assertJsonPath('ledger.0.border_color', '#334155')
+            ->assertJsonPath('ledger.0.text_color', '#F8FAFC');
+
+        $dueRow = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
+            ->getJson('/api/v1/pos/receivables/due')
+            ->assertOk()
+            ->assertJsonPath('receivables.0.sale_number', 'POS-CREDIT-01')
+            ->assertJsonPath('receivables.0.action.type', 'show_post_sale_sheet')
+            ->assertJsonPath('receivables.0.action.data.document_type', 'sale')
+            ->assertJsonPath('receivables.0.action.data.actions_endpoint', "/api/v1/tenant/receivables/{$sale->id}/reminder-sheet?document_type=sale")
+            ->assertJsonPath('receivables.0.on_tap.type', 'show_post_sale_sheet')
+            ->assertJsonPath('receivables.0.actions.1.action.type', 'show_post_sale_sheet')
+            ->assertJsonPath('receivables.0.document_type', 'sale')
+            ->json('receivables.0');
+        $this->assertStringContainsString('/pdf-stream', $dueRow['action']['data']['pdf_endpoint']);
+        $this->assertEqualsWithDelta(0.0, (float) $dueRow['action']['data']['paid_amount'], 0.01);
+        $this->assertEqualsWithDelta(100.0, (float) $dueRow['action']['data']['due_amount'], 0.01);
+        $this->assertArrayNotHasKey('url', $dueRow['action']);
 
         // 4. Record Payment ($40)
         $payRes = $this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
@@ -1108,6 +1127,16 @@ class PosSyncApiTest extends TestCase
         $sale->refresh();
         $this->assertEquals(40.00, $sale->paid_amount);
         $this->assertEquals(60.00, $sale->due_amount);
+
+        $paymentEntry = collect($this->withHeaders(['Authorization' => 'Bearer '.$this->apiKey->token])
+            ->getJson("/api/v1/pos/customers/{$custId}/ledger")
+            ->assertOk()
+            ->json('ledger'))
+            ->firstWhere('type', 'payment');
+        $this->assertSame('#132A24', $paymentEntry['background_color']);
+        $this->assertSame('#10B981', $paymentEntry['border_color']);
+        $this->assertSame(0.3, $paymentEntry['border_opacity']);
+        $this->assertSame('#F8FAFC', $paymentEntry['text_color']);
     }
 
     public function test_sync_push_rejects_due_sale_without_customer(): void
@@ -1340,12 +1369,15 @@ class PosSyncApiTest extends TestCase
         $this->assertSame('success', $rows['TXN-PAID']['status_color']);
         $this->assertSame('success', $rows['TXN-PAID']['badge']['variant']);
         $this->assertSame('#10B981', $rows['TXN-PAID']['badge']['color']);
-        $this->assertSame('#E8F5E9', $rows['TXN-PAID']['badge']['background_color']);
+        $this->assertSame('#132A24', $rows['TXN-PAID']['badge']['background_color']);
+        $this->assertSame('#D1FAE5', $rows['TXN-PAID']['badge']['text_color']);
         $this->assertSame('nowrap', $rows['TXN-PAID']['badge']['white_space']);
 
         $this->assertSame('pending', $rows['TXN-DUE']['status_key']);
         $this->assertSame('warning', $rows['TXN-DUE']['status_color']);
         $this->assertSame('#F59E0B', $rows['TXN-DUE']['badge']['color']);
+        $this->assertSame('#2A1E17', $rows['TXN-DUE']['badge']['background_color']);
+        $this->assertSame('#FCD34D', $rows['TXN-DUE']['badge']['text_color']);
 
         // Compact "j M" date (e.g. "9 Sep"), not "09-09-2026".
         $this->assertSame($at->format('j M'), $rows['TXN-PAID']['date']);
