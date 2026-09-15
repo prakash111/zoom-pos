@@ -51,8 +51,6 @@ class PlatformBranding extends Model
 
     protected function casts(): array
     {
-        $layout = (string) ($meta['layout'] ?? 'default');
-
         return [
             'smtp_password' => \App\Casts\SafeEncryptedString::class,
             'expiration_reminder_thresholds' => 'array',
@@ -263,6 +261,7 @@ class PlatformBranding extends Model
     public function sectionMeta(string $section): array
     {
         $meta = $this->landing_section_meta[$section] ?? [];
+        $layout = (string) ($meta['layout'] ?? 'default');
         return [
             'title' => trim((string) ($meta['title'] ?? '')),
             'subtitle' => trim((string) ($meta['subtitle'] ?? '')),
