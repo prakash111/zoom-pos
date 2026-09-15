@@ -386,5 +386,54 @@ class NavigationDrawerMenuTest extends TestCase
         $this->assertNotNull($subscription);
         $this->assertSame([], $subscription['children']);
     }
+
+    public function test_flat_item_list_breaks_out_of_parent_when_level_is_zero(): void
+    {
+        $controller = new \App\Http\Controllers\Api\NavigationMenuController;
+
+        $rawItems = [
+            ['key' => 'settings_profile', 'title' => 'Store Profile', 'level' => 0, 'parent_id' => null, 'visible' => true],
+            ['key' => 'languages', 'title' => 'Languages & Translations', 'level' => 0, 'parent_id' => null, 'visible' => true],
+            ['key' => 'staff', 'title' => 'Users & Permissions', 'level' => 1, 'parent_id' => 'languages', 'visible' => true],
+            ['key' => 'roles', 'title' => 'Roles & Access Levels', 'level' => 1, 'parent_id' => 'languages', 'visible' => true],
+            ['key' => 'devices', 'title' => 'Terminals & Devices', 'level' => 0, 'parent_id' => null, 'visible' => true],
+            ['key' => 'hardware_printer', 'title' => 'Printer & Hardware Setup', 'level' => 0, 'parent_id' => null, 'visible' => true],
+            ['key' => 'change_password', 'title' => 'Change Password', 'level' => 0, 'parent_id' => null, 'visible' => true],
+        ];
+
+        $components = collect($controller->formatCustomMenuComponents($rawItems));
+
+        $storeProfile = $components->firstWhere('key', 'settings_profile');
+        $this->assertNotNull($storeProfile);
+        $this->assertSame(0, $storeProfile['level']);
+        $this->assertNull($storeProfile['parent_id']);
+        $this->assertSame([], $storeProfile['children']);
+
+        $languages = $components->firstWhere('key', 'languages');
+        $this->assertNotNull($languages);
+        $this->assertSame(0, $languages['level']);
+        $this->assertNull($languages['parent_id']);
+        $this->assertCount(2, $languages['children']);
+        $this->assertSame('staff', $languages['children'][0]['key']);
+        $this->assertSame('roles', $languages['children'][1]['key']);
+
+        $devices = $components->firstWhere('key', 'devices');
+        $this->assertNotNull($devices);
+        $this->assertSame(0, $devices['level']);
+        $this->assertNull($devices['parent_id']);
+        $this->assertSame([], $devices['children']);
+
+        $printer = $components->firstWhere('key', 'hardware_printer');
+        $this->assertNotNull($printer);
+        $this->assertSame(0, $printer['level']);
+        $this->assertNull($printer['parent_id']);
+        $this->assertSame([], $printer['children']);
+
+        $password = $components->firstWhere('key', 'change_password');
+        $this->assertNotNull($password);
+        $this->assertSame(0, $password['level']);
+        $this->assertNull($password['parent_id']);
+        $this->assertSame([], $password['children']);
+    }
 }
 

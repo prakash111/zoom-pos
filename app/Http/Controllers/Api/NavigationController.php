@@ -204,52 +204,7 @@ class NavigationController extends Controller
      */
     private function formatCustomMenuComponents(array $sections): array
     {
-        $components = [[
-            'type' => 'list_tile',
-            'key' => 'home',
-            'title' => 'Home',
-            'icon' => 'home',
-            'action_type' => 'NAVIGATE_TO',
-            'route' => '/dashboard',
-        ]];
-
-        foreach ($sections as $section) {
-            if (! is_array($section)) {
-                continue;
-            }
-
-            $items = array_values(array_filter(
-                is_array($section['items'] ?? null) ? $section['items'] : [],
-                static fn ($item): bool => is_array($item) && ($item['visible'] ?? true) !== false
-            ));
-            if ($items === []) {
-                continue;
-            }
-
-            $sectionKey = trim((string) ($section['key'] ?? $section['id'] ?? ''));
-            $sectionTitle = trim((string) ($section['custom_title'] ?? ''));
-            if ($sectionTitle === '') {
-                $sectionTitle = trim((string) ($items[0]['title'] ?? $items[0]['label'] ?? $section['title'] ?? $section['label'] ?? ''));
-            }
-
-            $components[] = ['type' => 'divider', 'section_key' => $sectionKey];
-            if ($sectionTitle !== '') {
-                $components[] = [
-                    'type' => 'section_header',
-                    'section_key' => $sectionKey,
-                    'title' => $sectionTitle,
-                ];
-            }
-
-            foreach ($items as $item) {
-                $component = $this->formatCustomMenuItem($item, $sectionKey, null, 0);
-                if ($component !== null) {
-                    $components[] = $component;
-                }
-            }
-        }
-
-        return $components;
+        return (new NavigationMenuController)->formatCustomMenuComponents($sections);
     }
 
     /**

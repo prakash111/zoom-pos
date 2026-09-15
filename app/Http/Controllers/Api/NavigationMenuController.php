@@ -213,6 +213,17 @@ class NavigationMenuController extends Controller
             'route' => '/dashboard',
         ]];
 
+        $isFlatList = ! empty($sections) && isset($sections[0]) && is_array($sections[0]) && ! isset($sections[0]['items']);
+
+        if ($isFlatList) {
+            $formattedItems = $this->buildComponentsFromFlatItems($sections, '');
+            foreach ($formattedItems as $c) {
+                $components[] = $c;
+            }
+
+            return $components;
+        }
+
         foreach ($sections as $section) {
             if (! is_array($section)) {
                 continue;
@@ -241,15 +252,85 @@ class NavigationMenuController extends Controller
                 ];
             }
 
-            foreach ($items as $item) {
-                $component = $this->formatCustomMenuItem($item, $sectionKey, null, 0);
-                if ($component !== null) {
-                    $components[] = $component;
-                }
+            $formattedItems = $this->buildComponentsFromFlatItems($items, $sectionKey);
+            foreach ($formattedItems as $component) {
+                $components[] = $component;
             }
         }
 
         return $components;
+    }
+
+    /**
+     * Sequential hierarchy builder that breaks out of the active parent whenever
+     * an item has level === 0 (or indent === 0 / parent_id === null).
+     *
+     * @param  list<array<string, mixed>>  $rawItems
+     * @param  string  $sectionKey
+     * @return list<array<string, mixed>>
+     */
+    public function buildComponentsFromFlatItems(array $rawItems, string $sectionKey = ''): array
+    {
+        $formattedComponents = [];
+        $currentRoot = null;
+
+        foreach ($rawItems as $item) {
+            if (! is_array($item) || ($item['visible'] ?? true) === false) {
+                continue;
+            }
+
+            $key = trim((string) ($item['key'] ?? $item['id'] ?? ''));
+            if ($key === '') {
+                continue;
+            }
+
+            $level = (int) ($item['level'] ?? $item['indent'] ?? 0);
+            $parentId = $item['parent_id'] ?? $item['parent'] ?? null;
+            if ($parentId !== null) {
+                $parentId = trim((string) $parentId);
+                if ($parentId === '') {
+                    $parentId = null;
+                }
+            }
+
+            // Forced root items like settings are always root
+            if ($key === 'settings') {
+                $level = 0;
+                $parentId = null;
+            }
+
+            $isRoot = ($level === 0 && empty($parentId));
+
+            // If it's a Main Menu item, reset active parent
+            if ($isRoot) {
+                // Push previous root if existing
+                if ($currentRoot !== null) {
+                    $formattedComponents[] = $currentRoot;
+                }
+
+                $currentRoot = $this->formatCustomMenuItem($item, $sectionKey, null, 0);
+            } else {
+                // Sub-menu item
+                $parentKey = $parentId ?? ($currentRoot !== null ? ($currentRoot['key'] ?? null) : null);
+                $childNode = $this->formatCustomMenuItem($item, $sectionKey, $parentKey, max(1, $level));
+
+                if ($childNode !== null) {
+                    if ($currentRoot !== null) {
+                        $currentRoot['children'][] = $childNode;
+                    } else {
+                        // Fallback if list starts without a root
+                        $formattedComponents[] = $childNode;
+                    }
+                }
+            }
+        }
+
+        // Flush final root node
+        if ($currentRoot !== null) {
+            $formattedComponents[] = $currentRoot;
+        }
+
+        return $formattedComponents;
     }
 
     /**
