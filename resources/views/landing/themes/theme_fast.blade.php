@@ -29,6 +29,11 @@
         ['📊', __('Real-Time Financial & Ledger Control'), __('Automated register X/Z reconciliation, payable/receivable balances and compliance-ready tax invoices.')],
         ['🏢', __('Multi-Location Enterprise Workspaces'), __('Isolated tenant databases, custom domains and granular role permissions from one till to a national franchise.')],
     ]);
+    $heroProducts = $branding->landingList('hero.products', [
+        ['☕ Artisan Coffee Roast 1kg', '$14.50', __('In Stock'), 'emerald'],
+        ['🫒 Gourmet Truffle Oil 500ml', '$18.20', __('In Stock'), 'emerald'],
+        ['🌾 Organic Almond Flour 1kg', '$8.90', __('Low Stock'), 'amber'],
+    ]);
 
     $faqs = $branding->landingFaqs();
 
@@ -79,11 +84,15 @@
                 <div class="lg:col-span-5">
                     <div class="{{ $card }} shadow-xl p-5 sm:p-6">
                         <div class="flex items-center justify-between pb-3 border-b {{ $rule }} text-xs">
-                            <span class="font-black text-slate-900 dark:text-white">{{ __('Smart POS & Inventory') }}</span>
-                            <span class="text-emerald-600 dark:text-emerald-400 font-bold">● {{ __('Live') }}</span>
+                            <span class="font-black text-slate-900 dark:text-white">{{ $branding->landingText('hero.dashboard_title', __('Smart POS & Inventory')) }}</span>
+                            <span class="text-emerald-600 dark:text-emerald-400 font-bold">● {{ $branding->landingText('hero.dashboard_status', __('Live')) }}</span>
                         </div>
                         <div class="mt-4 space-y-2">
-                            @foreach ([['☕ Artisan Coffee Roast 1kg', '$14.50', __('In Stock'), 'emerald'], ['🫒 Gourmet Truffle Oil 500ml', '$18.20', __('In Stock'), 'emerald'], ['🌾 Organic Almond Flour 1kg', '$8.90', __('Low Stock'), 'amber']] as [$name, $price, $tag, $c])
+                            @foreach ($heroProducts as $product)
+                                @php($name = $product[0] ?? ($product['name'] ?? ''))
+                                @php($price = $product[1] ?? ($product['price'] ?? ''))
+                                @php($tag = $product[2] ?? ($product['status'] ?? ''))
+                                @php($c = $product[3] ?? 'emerald')
                                 <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 text-xs">
                                     <span class="font-medium text-slate-700 dark:text-slate-200">{{ $name }}</span>
                                     <span class="flex items-center gap-2">
@@ -94,8 +103,8 @@
                             @endforeach
                         </div>
                         <div class="mt-3 flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-lime/15 border border-brand-lime/30 text-xs">
-                            <span class="font-bold text-emerald-700 dark:text-brand-lime">{{ __('Total') }} ({{ __('Split Cash / Card') }})</span>
-                            <span class="font-black text-slate-900 dark:text-white">$41.60</span>
+                            <span class="font-bold text-emerald-700 dark:text-brand-lime">{{ $branding->landingText('hero.total_label', __('Total')) }} ({{ $branding->landingText('hero.payment_label', __('Split Cash / Card')) }})</span>
+                            <span class="font-black text-slate-900 dark:text-white">{{ $branding->landingText('hero.total_amount', '$41.60') }}</span>
                         </div>
                     </div>
                 </div>
