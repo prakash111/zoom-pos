@@ -2735,6 +2735,31 @@ class DynamicSchemaParser {
     final baseAction = schema['action'] is Map
         ? Map<String, dynamic>.from(schema['action'] as Map)
         : <String, dynamic>{};
+    final selectedBackground = _semanticColor(
+      context,
+      schema['active_background_color'],
+      fallback: theme.colorScheme.primaryContainer,
+    );
+    final selectedText = _semanticColor(
+      context,
+      schema['active_text_color'],
+      fallback: theme.colorScheme.onPrimaryContainer,
+    );
+    final unselectedBackground = _semanticColor(
+      context,
+      schema['inactive_background_color'],
+      fallback: theme.colorScheme.surface,
+    );
+    final unselectedText = _semanticColor(
+      context,
+      schema['inactive_text_color'],
+      fallback: theme.colorScheme.onSurfaceVariant,
+    );
+    final border = _semanticColor(
+      context,
+      schema['border_color'],
+      fallback: theme.dividerColor,
+    );
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -2752,16 +2777,13 @@ class DynamicSchemaParser {
                 selected: selected,
                 showCheckmark: selected,
                 label: Text(context.tr(option['label']?.toString() ?? value)),
-                selectedColor: theme.colorScheme.primaryContainer,
-                backgroundColor: theme.colorScheme.surface,
+                selectedColor: selectedBackground,
+                backgroundColor: unselectedBackground,
                 side: BorderSide(
-                  color:
-                      selected ? theme.colorScheme.primary : theme.dividerColor,
+                  color: selected ? selectedBackground : border,
                 ),
                 labelStyle: TextStyle(
-                  color: selected
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onSurfaceVariant,
+                  color: selected ? selectedText : unselectedText,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
                 onSelected: selected || baseAction.isEmpty
@@ -5734,8 +5756,8 @@ class _CustomerSelectorState extends State<_CustomerSelector> {
                               fontSize: 13)),
                       subtitle: cPhone.isNotEmpty
                           ? Text(cPhone,
-                              style: TextStyle(
-                                  color: subtitleColor, fontSize: 12))
+                              style:
+                                  TextStyle(color: subtitleColor, fontSize: 12))
                           : null,
                       trailing: due > 0
                           ? Text('Due: $currency${due.toStringAsFixed(2)}',

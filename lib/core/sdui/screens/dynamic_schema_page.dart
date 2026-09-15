@@ -65,6 +65,31 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
 
   final Map<String, dynamic> _formValues = {};
 
+  bool get _isDocumentPreview =>
+      (widget.endpoint ?? '').contains('/documents/') &&
+      (widget.endpoint ?? '').contains('preview');
+
+  Color _pageBackground(BuildContext context, {bool loading = false}) {
+    final rawStyle = _schema?['style'];
+    final style = rawStyle is Map
+        ? Map<String, dynamic>.from(rawStyle)
+        : const <String, dynamic>{};
+    final raw = loading
+        ? (_schema == null ? null : _schema!['loading_background_color'])
+        : ((_schema == null ? null : _schema!['background_color']) ??
+            style['backgroundColor']);
+    if (raw != null && raw.toString().trim().isNotEmpty) {
+      return SduiIconRegistry.parseColor(
+        raw.toString(),
+        fallback: Theme.of(context).scaffoldBackgroundColor,
+      );
+    }
+    if (_isDocumentPreview && Theme.of(context).brightness == Brightness.dark) {
+      return loading ? const Color(0xFF0B1120) : const Color(0xFF0F172A);
+    }
+    return Theme.of(context).scaffoldBackgroundColor;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -311,7 +336,12 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
         setFormValue: _setFormValue,
         dispatchAction: _dispatchAction,
         apiClient: client,
-        child: Builder(builder: _buildBody),
+        child: Builder(
+          builder: (context) => ColoredBox(
+            color: _pageBackground(context, loading: _isLoading),
+            child: _buildBody(context),
+          ),
+        ),
       );
     }
 
@@ -349,6 +379,7 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
       dispatchAction: _dispatchAction,
       apiClient: client,
       child: Scaffold(
+        backgroundColor: _pageBackground(context, loading: _isLoading),
         appBar: AppBar(
           title: Text(context.tr(displayTitle)),
           automaticallyImplyLeading: showBackButton,
@@ -374,7 +405,10 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
 
   Widget _buildBody(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return ColoredBox(
+        color: _pageBackground(context, loading: true),
+        child: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     if (_errorMessage != null) {
@@ -404,7 +438,7 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
     }
 
     if (_schema == null) {
-      return const SizedBox.shrink();
+      return ColoredBox(color: _pageBackground(context));
     }
 
     final layout =

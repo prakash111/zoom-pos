@@ -6,11 +6,27 @@ import 'package:flutter/material.dart';
 /// field set (no subtitle/badge/on_tap slot) — see the design note in
 /// `screens/universal_pos_screen.dart`.
 class PosScreenBanner {
-  PosScreenBanner({required this.message, this.icon, this.action});
+  PosScreenBanner({
+    required this.message,
+    this.icon,
+    this.action,
+    this.backgroundColor,
+    this.borderColor,
+    this.textColor,
+    this.actionTextColor,
+    this.actionLabel,
+    this.borderRadius = 8,
+  });
 
   final String message;
   final String? icon;
   final Map<String, dynamic>? action;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final Color? textColor;
+  final Color? actionTextColor;
+  final String? actionLabel;
+  final double borderRadius;
 
   static PosScreenBanner? fromJson(Map<String, dynamic>? json) {
     if (json == null) return null;
@@ -23,7 +39,22 @@ class PosScreenBanner {
       action: json['action'] is Map
           ? Map<String, dynamic>.from(json['action'] as Map)
           : null,
+      backgroundColor: _parseNullableColor(json['background_color']),
+      borderColor: _parseNullableColor(json['border_color']),
+      textColor: _parseNullableColor(json['text_color']),
+      actionTextColor: _parseNullableColor(json['action_text_color']),
+      actionLabel: json['action_label']?.toString(),
+      borderRadius: (json['border_radius'] as num?)?.toDouble() ?? 8,
     );
+  }
+
+  static Color? _parseNullableColor(dynamic raw) {
+    final hex = raw?.toString().trim();
+    if (hex == null || hex.isEmpty) return null;
+    var value = hex.replaceFirst('#', '');
+    if (value.length == 6) value = 'FF$value';
+    final parsed = int.tryParse(value, radix: 16);
+    return parsed == null ? null : Color(parsed);
   }
 }
 
@@ -85,7 +116,8 @@ class PosCatalogItem {
       imageUrl: json['image_url']?.toString(),
       stock: (json['stock'] as num?)?.toInt(),
       badge: json['badge'] is Map
-          ? PosCatalogBadge.fromJson(Map<String, dynamic>.from(json['badge'] as Map))
+          ? PosCatalogBadge.fromJson(
+              Map<String, dynamic>.from(json['badge'] as Map))
           : null,
       onTap: json['on_tap'] is Map
           ? Map<String, dynamic>.from(json['on_tap'] as Map)
@@ -141,7 +173,9 @@ class PosScreenModel {
     return PosScreenModel(
       title: schema['title']?.toString() ?? 'Point of Sale',
       banner: PosScreenBanner.fromJson(
-        schema['banner'] is Map ? Map<String, dynamic>.from(schema['banner'] as Map) : null,
+        schema['banner'] is Map
+            ? Map<String, dynamic>.from(schema['banner'] as Map)
+            : null,
       ),
       searchPlaceholder: search['placeholder']?.toString() ?? 'Search...',
       scannerEnabled: search['scanner_enabled'] != false,
@@ -153,9 +187,10 @@ class PosScreenModel {
           .whereType<Map>()
           .map((i) => PosCatalogItem.fromJson(Map<String, dynamic>.from(i)))
           .toList(),
-      checkoutSheetEndpoint: cartBar['checkout_sheet_endpoint']?.toString() ?? '',
-      cartLabelTemplate:
-          cartBar['label_template']?.toString() ?? 'View Cart · {count} items · {total}',
+      checkoutSheetEndpoint:
+          cartBar['checkout_sheet_endpoint']?.toString() ?? '',
+      cartLabelTemplate: cartBar['label_template']?.toString() ??
+          'View Cart · {count} items · {total}',
     );
   }
 }

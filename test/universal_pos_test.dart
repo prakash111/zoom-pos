@@ -117,6 +117,11 @@ void main() {
         'banner': {
           'message': 'No cash register is open.',
           'icon': 'info_outline',
+          'background_color': '#2A1E17',
+          'border_color': '#D97706',
+          'text_color': '#FCD34D',
+          'action_text_color': '#10B981',
+          'action_label': 'Open',
           'action': {
             'type': 'navigate',
             'endpoint': '/api/tenant/views/cash-register'
@@ -159,6 +164,11 @@ void main() {
 
       expect(model.title, 'Pharmacy Counter POS');
       expect(model.banner?.message, 'No cash register is open.');
+      expect(model.banner?.backgroundColor, const Color(0xFF2A1E17));
+      expect(model.banner?.borderColor, const Color(0xFFD97706));
+      expect(model.banner?.textColor, const Color(0xFFFCD34D));
+      expect(model.banner?.actionTextColor, const Color(0xFF10B981));
+      expect(model.banner?.actionLabel, 'Open');
       expect(model.searchPlaceholder, 'Search medicines...');
       expect(model.scannerEnabled, isTrue);
       expect(model.categories, hasLength(2));
@@ -395,7 +405,8 @@ void main() {
       });
       await tester.pumpAndSettle();
 
-      final page = tester.widget<DynamicSchemaPage>(find.byType(DynamicSchemaPage));
+      final page =
+          tester.widget<DynamicSchemaPage>(find.byType(DynamicSchemaPage));
       expect(page.endpoint,
           '/api/tenant/views/pharmacy-batches?tab=active&q=metformin');
       expect(page.endpoint, isNot(contains('stock_qty')));

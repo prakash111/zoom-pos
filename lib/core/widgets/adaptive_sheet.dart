@@ -13,11 +13,14 @@ Future<T?> showAdaptiveSheet<T>(
   BuildContext context, {
   required WidgetBuilder builder,
   bool isScrollControlled = false,
+  Color? backgroundColor,
 }) {
   if (isWide(context)) {
     return showDialog<T>(
       context: context,
       builder: (dialogContext) => Dialog(
+        backgroundColor: backgroundColor,
+        surfaceTintColor: Colors.transparent,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
@@ -36,7 +39,7 @@ Future<T?> showAdaptiveSheet<T>(
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: isScrollControlled,
-    backgroundColor: Theme.of(context).colorScheme.surface,
+    backgroundColor: backgroundColor ?? Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
     builder: builder,

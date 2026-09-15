@@ -53,16 +53,22 @@ class _DueReceivablesScreenState extends State<DueReceivablesScreen> {
       },
     );
 
-    // The endpoint returns the complete SDUI sheet. The dispatcher renders
-    // every configured channel (SMS, WhatsApp Business, SMTP, webhooks, and
-    // future tenant-defined channels) without a client-side tile list.
-    await dispatcher.dispatch(context, {
-      'type': 'OPEN_BOTTOM_SHEET',
-      'action_type': 'OPEN_BOTTOM_SHEET',
-      'title': 'Send Payment Reminder',
-      'endpoint':
-          '/api/v1/tenant/receivables/${Uri.encodeComponent(receivable.saleId)}/reminder-sheet',
-    });
+    // Current responses carry the exact native POS post-sale action, so a
+    // card tap opens the shared receipt sheet immediately with no browser or
+    // generic SDUI modal in between. The remote endpoint remains a safe
+    // compatibility path for an older cached receivables response; the
+    // dispatcher promotes its `native_action` to this same sheet.
+    await dispatcher.dispatch(
+      context,
+      receivable.nativeAction ??
+          {
+            'type': 'OPEN_BOTTOM_SHEET',
+            'action_type': 'OPEN_BOTTOM_SHEET',
+            'title': receivable.saleNumber,
+            'endpoint':
+                '/api/v1/tenant/receivables/${Uri.encodeComponent(receivable.documentId)}/reminder-sheet?document_type=${Uri.encodeQueryComponent(receivable.documentType)}',
+          },
+    );
   }
 
   Future<void> _scheduleReminder(ReceivableModel receivable) async {
@@ -178,6 +184,7 @@ class _DueReceivablesScreenState extends State<DueReceivablesScreen> {
                 final r = receivables[index];
                 return Card(
                   child: ListTile(
+                    onTap: () => _openReminderSheet(r),
                     title: Row(
                       children: [
                         Expanded(

@@ -23,7 +23,7 @@ class GlobalPrinterSetupScreen extends StatefulWidget {
 }
 
 class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
-  static const _greenHex = Color(0xFF15803D);
+  static const _greenHex = Color(0xFF10B981);
 
   final _service = ThermalPrinterService();
 
@@ -235,6 +235,7 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
   }
 
   Widget _connectionCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -248,6 +249,33 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
             SizedBox(
               width: double.infinity,
               child: SegmentedButton<PrinterConnectionType>(
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return _greenHex;
+                    }
+                    return isDark
+                        ? const Color(0xFF1E293B)
+                        : Theme.of(context).colorScheme.surface;
+                  }),
+                  foregroundColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return const Color(0xFF0B1120);
+                    }
+                    return isDark
+                        ? const Color(0xFF94A3B8)
+                        : Theme.of(context).colorScheme.onSurfaceVariant;
+                  }),
+                  side: WidgetStateProperty.resolveWith((states) {
+                    return BorderSide(
+                      color: states.contains(WidgetState.selected)
+                          ? _greenHex
+                          : (isDark
+                              ? const Color(0xFF334155)
+                              : Theme.of(context).dividerColor),
+                    );
+                  }),
+                ),
                 segments: const [
                   ButtonSegment(
                     value: PrinterConnectionType.bluetooth,
@@ -306,11 +334,16 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
   }
 
   Widget _activeDeviceCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
-      color: Colors.green.shade50,
+      color: isDark ? const Color(0xFF132A24) : Colors.green.shade50,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.green.shade300),
+        side: BorderSide(
+          color:
+              isDark ? _greenHex.withValues(alpha: 0.3) : Colors.green.shade300,
+        ),
       ),
       child: ListTile(
         leading: const Icon(Icons.check_circle, color: _greenHex),
@@ -327,6 +360,7 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
   }
 
   Widget _discoveryForType() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (_selectedType) {
       case PrinterConnectionType.bluetooth:
         return Column(
@@ -353,14 +387,28 @@ class _GlobalPrinterSetupScreenState extends State<GlobalPrinterSetupScreen> {
             ),
             if (!_isScanning && _btDevices.isEmpty)
               Card(
+                color: isDark
+                    ? const Color(0xFF182230)
+                    : Theme.of(context).colorScheme.surface,
+                surfaceTintColor: Colors.transparent,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: const Padding(
-                  padding: EdgeInsets.all(16),
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : Theme.of(context).dividerColor,
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
                   child: Text(
                     'No paired Bluetooth printers found. Pair the printer in '
                     'Android Settings → Connected Devices, then tap Re-scan.',
-                    style: TextStyle(color: Colors.black54),
+                    style: TextStyle(
+                      color: isDark
+                          ? const Color(0xFFE2E8F0)
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               )

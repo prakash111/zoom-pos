@@ -15,6 +15,11 @@ void main() {
           'type': 'segmented_tabs',
           'param_name': 'format',
           'active_value': 'a4',
+          'active_background_color': '#10B981',
+          'active_text_color': '#0B1120',
+          'inactive_background_color': '#1E293B',
+          'inactive_text_color': '#94A3B8',
+          'border_color': '#334155',
           'options': const [
             {'label': 'Standard A4', 'value': 'a4'},
             {'label': '80mm POS', 'value': 'thermal_80mm'},
@@ -100,6 +105,12 @@ void main() {
     expect(find.text('Consulting Service'), findsOneWidget);
     expect(find.text('Dispatch Document'), findsOneWidget);
     expect(find.text('Share via WhatsApp'), findsOneWidget);
+    final chips =
+        tester.widgetList<ChoiceChip>(find.byType(ChoiceChip)).toList();
+    expect(chips.first.selectedColor, const Color(0xFF10B981));
+    expect(chips.first.labelStyle?.color, const Color(0xFF0B1120));
+    expect(chips[1].backgroundColor, const Color(0xFF1E293B));
+    expect(chips[1].labelStyle?.color, const Color(0xFF94A3B8));
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('58mm Receipt'));

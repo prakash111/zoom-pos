@@ -193,23 +193,51 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
         if (pos.registerOpen == false)
           Container(
             width: double.infinity,
-            color: Colors.orange.shade50,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF2A1E17)
+                  : const Color(0xFFFEF3C7),
+              border: Border.all(
+                color: const Color(0xFFD97706),
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: Row(
               children: [
-                Icon(Icons.info_outline,
-                    size: 18, color: Colors.orange.shade800),
+                Icon(
+                  Icons.info_outline,
+                  size: 18,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFFCD34D)
+                      : const Color(0xFFD97706),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(l10n.text(
-                    'registerOptionalBanner',
-                    fallback:
-                        'No cash register is open. Sales can continue outside a register session.',
-                  )),
+                  child: Text(
+                    l10n.text(
+                      'registerOptionalBanner',
+                      fallback:
+                          'No cash register is open. Sales can continue outside a register session.',
+                    ),
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFFFCD34D)
+                          : const Color(0xFF854D0E),
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
                 TextButton(
                   onPressed: () => _openRegisterPrompt(context),
-                  child: Text(l10n.open),
+                  child: Text(
+                    l10n.open,
+                    style: const TextStyle(
+                      color: Color(0xFF10B981),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),

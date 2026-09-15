@@ -387,7 +387,14 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final viewerBackground =
+        isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9);
+    final loadingBackground =
+        isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC);
+
     return Scaffold(
+      backgroundColor: viewerBackground,
       appBar: AppBar(
         title: Text('Preview ${widget.data.documentType}'),
         leading: IconButton(
@@ -450,9 +457,28 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
               // backdrop instead of stretching edge to edge on desktop.
               maxPageWidth: _format.isThermal ? 400 : 794,
               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              scrollViewDecoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              loadingWidget: ColoredBox(
+                color: loadingBackground,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: isDark ? const Color(0xFF10B981) : null,
+                  ),
+                ),
               ),
+              onError: (context, error) => ColoredBox(
+                color: viewerBackground,
+                child: Center(
+                  child: Text(
+                    'Document preview could not be generated.',
+                    style: TextStyle(
+                      color: isDark
+                          ? const Color(0xFFCBD5E1)
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+              scrollViewDecoration: BoxDecoration(color: viewerBackground),
               pdfPreviewPageDecoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(4),

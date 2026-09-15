@@ -1,10 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zoom_pos_mobile/features/settings/screens/global_printer_setup_screen.dart';
 import 'package:zoom_pos_mobile/features/settings/screens/printer_selection_dialog.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('hardware setup uses crisp dark segmented and empty states',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(
+      MaterialApp(
+        themeMode: ThemeMode.dark,
+        darkTheme: ThemeData.dark(),
+        home: const GlobalPrinterSetupScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final segmented = tester.widget<SegmentedButton<PrinterConnectionType>>(
+        find.byType(SegmentedButton<PrinterConnectionType>));
+    expect(
+      segmented.style?.backgroundColor?.resolve({WidgetState.selected}),
+      const Color(0xFF10B981),
+    );
+    expect(
+      segmented.style?.foregroundColor?.resolve({WidgetState.selected}),
+      const Color(0xFF0B1120),
+    );
+    expect(
+      segmented.style?.backgroundColor?.resolve(<WidgetState>{}),
+      const Color(0xFF1E293B),
+    );
+    expect(
+      segmented.style?.foregroundColor?.resolve(<WidgetState>{}),
+      const Color(0xFF94A3B8),
+    );
+
+    final emptyText = find.textContaining('No paired Bluetooth printers');
+    expect(emptyText, findsOneWidget);
+    expect(
+        tester.widget<Text>(emptyText).style?.color, const Color(0xFFE2E8F0));
+    final emptyCard = tester.widget<Card>(
+      find.ancestor(of: emptyText, matching: find.byType(Card)).first,
+    );
+    expect(emptyCard.color, const Color(0xFF182230));
+  });
 
   testWidgets('opens on an explicit picker, not a forced scan', (tester) async {
     SharedPreferences.setMockInitialValues({});

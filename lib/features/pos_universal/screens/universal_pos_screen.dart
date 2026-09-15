@@ -134,8 +134,9 @@ class _UniversalPosScreenState extends State<UniversalPosScreen> {
 
     final item = Map<String, dynamic>.from(rawItem);
     final quantityField = item['quantity_field']?.toString();
-    final quantitySource =
-        quantityField != null ? (_formValues[quantityField] ?? item['quantity'] ?? 1) : (item['quantity'] ?? 1);
+    final quantitySource = quantityField != null
+        ? (_formValues[quantityField] ?? item['quantity'] ?? 1)
+        : (item['quantity'] ?? 1);
     final quantity = int.tryParse('$quantitySource') ?? 1;
 
     _cart.add(
@@ -205,7 +206,8 @@ class _UniversalPosScreenState extends State<UniversalPosScreen> {
     if (model == null) return;
 
     if (_cart.isEmpty) {
-      _showToast('Your cart is empty. Add items before checking out.', isError: true);
+      _showToast('Your cart is empty. Add items before checking out.',
+          isError: true);
       return;
     }
 
@@ -263,7 +265,8 @@ class _UniversalPosScreenState extends State<UniversalPosScreen> {
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: _openCheckout,
                   icon: const Icon(Icons.shopping_cart_checkout),
@@ -271,7 +274,8 @@ class _UniversalPosScreenState extends State<UniversalPosScreen> {
                     model.cartLabelTemplate
                         .replaceAll('{count}', '${_cart.count}')
                         .replaceAll('{total}', formatter.format(_cart.total)),
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -293,24 +297,59 @@ class _UniversalPosScreenState extends State<UniversalPosScreen> {
 
     final banner = model.banner;
     final items = _filteredItems;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       children: [
         if (banner != null)
           Container(
             width: double.infinity,
-            color: Colors.orange.shade50,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? (banner.backgroundColor ?? const Color(0xFF2A1E17))
+                  : const Color(0xFFFEF3C7),
+              border: Border.all(
+                color: banner.borderColor ?? const Color(0xFFD97706),
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(banner.borderRadius),
+            ),
             child: Row(
               children: [
-                Icon(SduiIconRegistry.resolve(banner.icon, fallback: Icons.info_outline),
-                    size: 18, color: Colors.orange.shade800),
+                Icon(
+                    SduiIconRegistry.resolve(banner.icon,
+                        fallback: Icons.info_outline),
+                    size: 18,
+                    color: isDark
+                        ? (banner.textColor ?? const Color(0xFFFCD34D))
+                        : const Color(0xFFD97706)),
                 const SizedBox(width: 8),
-                Expanded(child: Text(context.tr(banner.message))),
+                Expanded(
+                  child: Text(
+                    context.tr(banner.message),
+                    style: TextStyle(
+                      color: isDark
+                          ? (banner.textColor ?? const Color(0xFFFCD34D))
+                          : const Color(0xFF854D0E),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
                 if (banner.action != null)
                   TextButton(
-                    onPressed: () => _dispatcher.dispatch(context, banner.action!),
-                    child: Text(context.tr(banner.action!['title']?.toString() ?? 'Open')),
+                    onPressed: () =>
+                        _dispatcher.dispatch(context, banner.action!),
+                    child: Text(
+                      context.tr(banner.actionLabel ??
+                          banner.action!['title']?.toString() ??
+                          'Open'),
+                      style: TextStyle(
+                        color:
+                            banner.actionTextColor ?? const Color(0xFF10B981),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -335,7 +374,8 @@ class _UniversalPosScreenState extends State<UniversalPosScreen> {
                   if (_searchController.text.isNotEmpty)
                     IconButton(
                       icon: const Icon(Icons.clear),
-                      onPressed: () => setState(() => _searchController.clear()),
+                      onPressed: () =>
+                          setState(() => _searchController.clear()),
                     ),
                 ],
               ),
@@ -355,7 +395,8 @@ class _UniversalPosScreenState extends State<UniversalPosScreen> {
                     child: ChoiceChip(
                       label: Text(context.tr(category.label)),
                       selected: _selectedCategoryId == category.id,
-                      onSelected: (_) => setState(() => _selectedCategoryId = category.id),
+                      onSelected: (_) =>
+                          setState(() => _selectedCategoryId = category.id),
                     ),
                   ),
               ],

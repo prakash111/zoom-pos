@@ -609,8 +609,8 @@ class SduiActionDispatcher {
     }
 
     final invoiceData = InvoiceActionsData(
-      documentType: 'invoice',
-      documentId: (data['sale_id'] ?? '').toString(),
+      documentType: (data['document_type'] ?? 'invoice').toString(),
+      documentId: (data['document_id'] ?? data['sale_id'] ?? '').toString(),
       documentNumber: (data['invoice_number'] ?? '').toString(),
       companyName: (data['company_name'] ?? '').toString(),
       customerName: nonEmpty(data['customer_name']),
@@ -630,6 +630,7 @@ class SduiActionDispatcher {
       dueAmount: toDouble(data['due_amount']),
       lines: lines,
       pdfPathOverride: nonEmpty(data['pdf_endpoint']),
+      actionsPathOverride: nonEmpty(data['actions_endpoint']),
     );
 
     if (!context.mounted) return;
@@ -653,6 +654,23 @@ class SduiActionDispatcher {
     Map<String, dynamic> sheetSchema;
     try {
       final res = await _request(sheetEndpoint, method: 'GET');
+      final nativeAction = res['native_action'];
+      if (nativeAction is Map &&
+          _canonicalActionType(
+                  nativeAction['type'] ?? nativeAction['action_type']) ==
+              'show_post_sale_sheet' &&
+          nativeAction['data'] is Map) {
+        if (context.mounted) {
+          await _showPostSaleSheet(context, nativeAction['data']);
+        }
+        return;
+      }
+      if (_isPostSaleSheetResponse(res)) {
+        if (context.mounted) {
+          await _showPostSaleSheet(context, res['post_sale_sheet']['data']);
+        }
+        return;
+      }
       final raw = res['schema'] ?? res['cart_sheet'] ?? res;
       if (raw is Map<String, dynamic>) {
         sheetSchema = raw;

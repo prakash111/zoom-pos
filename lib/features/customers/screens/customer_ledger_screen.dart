@@ -19,7 +19,8 @@ final _dateFormat = DateFormat('MMM d, y');
 /// loading state locally rather than through [CustomersProvider] since it's
 /// scoped to a single customer (see CustomersProvider's doc comment).
 class CustomerLedgerScreen extends StatefulWidget {
-  const CustomerLedgerScreen({super.key, required this.customer, required this.repository});
+  const CustomerLedgerScreen(
+      {super.key, required this.customer, required this.repository});
 
   final CustomerModel customer;
   final CustomersRepository repository;
@@ -41,11 +42,13 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
     _future = widget.repository.fetchLedger(widget.customer.id);
   }
 
-  Future<void> _recordPayment(CustomerModel customer, CurrencyFormatter formatter) async {
+  Future<void> _recordPayment(
+      CustomerModel customer, CurrencyFormatter formatter) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) => RecordPaymentSheet(
         repository: widget.repository,
         customerId: customer.id,
@@ -94,12 +97,15 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                     label: const Text('Record payment'),
                   ),
                 const SizedBox(height: 20),
-                Text('Transaction history', style: Theme.of(context).textTheme.titleMedium),
+                Text('Transaction history',
+                    style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 if (ledger.entries.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: Text('No transactions yet.', style: TextStyle(color: Colors.grey.shade600))),
+                    child: Center(
+                        child: Text('No transactions yet.',
+                            style: TextStyle(color: Colors.grey.shade600))),
                   )
                 else
                   for (final entry in ledger.entries) ...[
@@ -135,13 +141,16 @@ class _BalanceCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Balance due', style: TextStyle(color: Colors.grey.shade600)),
+                    Text('Balance due',
+                        style: TextStyle(color: Colors.grey.shade600)),
                     Text(
                       formatter.format(customer.balanceDue),
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: customer.hasBalanceDue ? Colors.red.shade400 : Colors.green.shade600,
+                        color: customer.hasBalanceDue
+                            ? Colors.red.shade400
+                            : Colors.green.shade600,
                       ),
                     ),
                   ],
@@ -150,8 +159,11 @@ class _BalanceCard extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('Loyalty points', style: TextStyle(color: Colors.grey.shade600)),
-                      Text('${customer.loyaltyPoints}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Loyalty points',
+                          style: TextStyle(color: Colors.grey.shade600)),
+                      Text('${customer.loyaltyPoints}',
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
                     ],
                   ),
               ],
@@ -176,33 +188,74 @@ class _LedgerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final date = entry.date == null ? '' : _dateFormat.format(TenantTimeService.instance.toTenantTime(entry.date!));
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final date = entry.date == null
+        ? ''
+        : _dateFormat
+            .format(TenantTimeService.instance.toTenantTime(entry.date!));
+    final invoiceSurface =
+        isDark ? const Color(0xFF182230) : theme.colorScheme.surface;
+    final paymentSurface =
+        isDark ? const Color(0xFF132A24) : Colors.green.shade50;
+    final invoiceBorder = isDark ? const Color(0xFF334155) : theme.dividerColor;
+    final paymentBorder = isDark
+        ? const Color(0xFF10B981).withValues(alpha: 0.3)
+        : Colors.green.shade200;
+    final primaryText =
+        isDark ? const Color(0xFFF8FAFC) : theme.colorScheme.onSurface;
+    final secondaryText =
+        isDark ? const Color(0xFFCBD5E1) : theme.colorScheme.onSurfaceVariant;
 
     if (entry.isInvoice) {
       return Card(
+        color: invoiceSurface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: invoiceBorder),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              Icon(Icons.receipt_long_outlined, color: Theme.of(context).colorScheme.primary),
+              Icon(Icons.receipt_long_outlined,
+                  color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Sale #${entry.saleNumber}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                    Text(date, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                    Text(
+                      'Sale #${entry.saleNumber}',
+                      style: TextStyle(
+                        color: primaryText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(date,
+                        style: TextStyle(color: secondaryText, fontSize: 12)),
                   ],
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(formatter.format(entry.total ?? 0), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    formatter.format(entry.total ?? 0),
+                    style: TextStyle(
+                      color: primaryText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   if ((entry.dueAmount ?? 0) > 0)
-                    Text('${formatter.format(entry.dueAmount!)} due', style: TextStyle(color: Colors.red.shade400, fontSize: 12))
+                    Text('${formatter.format(entry.dueAmount!)} due',
+                        style:
+                            TextStyle(color: Colors.red.shade400, fontSize: 12))
                   else
-                    Text('Paid', style: TextStyle(color: Colors.green.shade600, fontSize: 12)),
+                    Text('Paid',
+                        style: TextStyle(
+                            color: Colors.green.shade600, fontSize: 12)),
                 ],
               ),
             ],
@@ -212,12 +265,20 @@ class _LedgerTile extends StatelessWidget {
     }
 
     return Card(
-      color: Colors.green.shade50,
+      color: paymentSurface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: paymentBorder),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Icon(Icons.payments_outlined, color: Colors.green.shade700),
+            Icon(
+              Icons.payments_outlined,
+              color: isDark ? const Color(0xFF34D399) : Colors.green.shade700,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -225,18 +286,27 @@ class _LedgerTile extends StatelessWidget {
                 children: [
                   Text(
                     'Payment · Sale #${entry.saleNumber}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: primaryText,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   Text(
-                    [date, if (entry.paymentMethod != null) entry.paymentMethod!].join(' · '),
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    [
+                      date,
+                      if (entry.paymentMethod != null) entry.paymentMethod!
+                    ].join(' · '),
+                    style: TextStyle(color: secondaryText, fontSize: 12),
                   ),
                 ],
               ),
             ),
             Text(
               '+${formatter.format(entry.amount ?? 0)}',
-              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.green.shade700),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isDark ? const Color(0xFF6EE7B7) : Colors.green.shade700,
+              ),
             ),
           ],
         ),

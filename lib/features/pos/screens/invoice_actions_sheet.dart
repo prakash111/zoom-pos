@@ -38,6 +38,7 @@ class InvoiceActionsData {
     this.paidAmount,
     this.dueAmount = 0,
     this.pdfPathOverride,
+    this.actionsPathOverride,
   });
 
   final String documentType; // 'invoice' | 'quotation'
@@ -71,6 +72,11 @@ class InvoiceActionsData {
   /// than the `/api/v1/pos` sale/quotation PDF endpoints.
   final String? pdfPathOverride;
 
+  /// Optional SDUI endpoint used to populate delivery rows. Receivable
+  /// reminders point this at their four-action schema so the native POS sheet
+  /// shows exactly WhatsApp and Email after its two print utilities.
+  final String? actionsPathOverride;
+
   String get _pdfPath {
     if ((pdfPathOverride ?? '').isNotEmpty) return pdfPathOverride!;
     return documentType == 'quotation'
@@ -93,9 +99,13 @@ bool get _supportsThermalPrint =>
 Future<void> showInvoiceActionsSheet(
     BuildContext context, InvoiceActionsData data) {
   final apiClient = context.read<ApiClient>();
+  final background = Theme.of(context).brightness == Brightness.dark
+      ? const Color(0xFF131E29)
+      : Theme.of(context).colorScheme.surface;
 
   return showAdaptiveSheet(
     context,
+    backgroundColor: background,
     builder: (sheetContext) => _InvoiceActionsSheetContent(
       parentContext: context,
       apiClient: apiClient,
@@ -154,6 +164,8 @@ class _InvoiceActionsSheetContentState
           ? '/api/v1/tenant/quotations/$documentId/actions-sheet'
           : '/api/v1/tenant/invoices/$documentId/actions-sheet';
       final endpoints = [
+        if ((widget.data.actionsPathOverride ?? '').isNotEmpty)
+          widget.data.actionsPathOverride!,
         // These are the established invoice/quotation SDUI routes used by
         // existing tenants and older server deployments.
         legacyActionsPath,
@@ -353,6 +365,13 @@ class _InvoiceActionsSheetContentState
   Widget build(BuildContext context) {
     final data = widget.data;
     final apiClient = widget.apiClient;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark
+        ? const Color(0xFFF8FAFC)
+        : Theme.of(context).colorScheme.onSurface;
+    final secondaryText = isDark
+        ? const Color(0xFF94A3B8)
+        : Theme.of(context).colorScheme.onSurfaceVariant;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -366,16 +385,15 @@ class _InvoiceActionsSheetContentState
                 children: [
                   Text(
                     data.documentNumber,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: primaryText,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   if ((data.taxId ?? '').isNotEmpty)
                     Text(
                       '${data.isIndia ? 'GSTIN' : 'Tax ID'}: ${data.taxId}',
-                      style:
-                          TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                      style: TextStyle(color: secondaryText, fontSize: 11),
                     ),
                 ],
               ),
@@ -529,7 +547,14 @@ class _InvoicePreviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final viewerBackground =
+        isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9);
+    final loadingBackground =
+        isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC);
+
     return Scaffold(
+      backgroundColor: viewerBackground,
       appBar: AppBar(title: Text(data.documentNumber)),
       body: PdfPreview(
         build: (format) async => Uint8List.fromList(
@@ -558,9 +583,32 @@ class _InvoicePreviewScreen extends StatelessWidget {
         // stretched across the whole desktop window.
         maxPageWidth: 820,
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        scrollViewDecoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        loadingWidget: ColoredBox(
+          color: loadingBackground,
+          child: Center(
+            child: CircularProgressIndicator(
+              color: isDark ? const Color(0xFF10B981) : null,
+            ),
+          ),
         ),
+        onError: (context, error) => ColoredBox(
+          color: viewerBackground,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Document preview could not be loaded.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark
+                      ? const Color(0xFFCBD5E1)
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        ),
+        scrollViewDecoration: BoxDecoration(color: viewerBackground),
         pdfPreviewPageDecoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(4),
