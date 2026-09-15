@@ -51,6 +51,8 @@ class PlatformBranding extends Model
 
     protected function casts(): array
     {
+        $layout = (string) ($meta['layout'] ?? 'default');
+
         return [
             'smtp_password' => \App\Casts\SafeEncryptedString::class,
             'expiration_reminder_thresholds' => 'array',
@@ -268,7 +270,7 @@ class PlatformBranding extends Model
             'background' => $this->hexOr($meta['background'] ?? null, 'transparent'),
             'text' => $this->hexOr($meta['text'] ?? null, 'inherit'),
             'accent' => $this->hexOr($meta['accent'] ?? null, $this->landing_accent_color ?: '#d7f24e'),
-            'layout' => in_array(($meta['layout'] ?? 'default'), ['default', 'centered', 'wide', 'compact'], true) ? $meta['layout'] : 'default',
+            'layout' => in_array($layout, ['default', 'centered', 'wide', 'compact'], true) ? $layout : 'default',
         ];
     }
 
