@@ -265,7 +265,11 @@ class _InvoiceActionsSheetContentState
       fallback: Theme.of(context).colorScheme.primary,
     );
 
-    final channelName = channel['channel']?.toString().toLowerCase() ?? '';
+    final channelType = channel['channel']?.toString().toLowerCase() ?? '';
+    final channelId = channel['channel_id']?.toString();
+    final channelName = channelType == 'custom' && channelId != null
+        ? 'custom:$channelId'
+        : channelType;
     final batchMode = widget.data.batchDispatchEndpoint?.isNotEmpty == true;
     if (batchMode) {
       return CheckboxListTile(
