@@ -230,12 +230,22 @@ class Index extends Component
      * @var array<string, array{title: string, subtitle: string}>
      */
     public array $sectionMeta = [
-        'hero' => ['title' => '', 'subtitle' => ''],
-        'features' => ['title' => '', 'subtitle' => ''],
-        'downloads' => ['title' => '', 'subtitle' => ''],
-        'pricing' => ['title' => '', 'subtitle' => ''],
-        'faq' => ['title' => '', 'subtitle' => ''],
+        'hero' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'trust_bar' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'features' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#ffffff', 'accent' => '#10b981'],
+        'solutions' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'downloads' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'stats' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'about' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#10b981'],
+        'testimonials' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'pricing' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'faq' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'contact' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#ffffff', 'accent' => '#10b981'],
+        'cta' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
     ];
+
+    /** Comma-separated section slugs; saved order is used by compatible themes. */
+    public string $landingSectionOrder = 'hero,trust_bar,features,solutions,downloads,stats,about,testimonials,pricing,faq,contact,cta';
 
     /** @var array<int, array{q: string, a: string}> */
     public array $landingFaqs = [];
@@ -245,6 +255,10 @@ class Index extends Component
 
     /** @var array<int, array{quote: string, name: string, role: string}> */
     public array $landingTestimonials = [];
+
+    public string $landingFeaturesJson = '';
+
+    public string $landingTestimonialsJson = '';
 
     // --- TAB 4: CUSTOM PAGES (CMS) ---
     public string $pageSearch = '';
@@ -319,6 +333,7 @@ class Index extends Component
         $this->landingHeroBannerImageUrl = (string) ($branding->landing_hero_banner_image_url ?? '');
 
         $cfg = $branding->landing_sections_config ?? [];
+        $this->landingSectionOrder = implode(',', $branding->landingSectionOrder());
         $this->sectionTrustBar = (bool) ($cfg['trust_bar'] ?? true);
         $this->sectionFeatures = (bool) ($cfg['features'] ?? true);
         $this->sectionSolutions = (bool) ($cfg['solutions'] ?? true);
@@ -342,6 +357,9 @@ class Index extends Component
             $this->sectionMeta[$key] = [
                 'title' => (string) ($meta[$key]['title'] ?? ''),
                 'subtitle' => (string) ($meta[$key]['subtitle'] ?? ''),
+                'body' => (string) ($meta[$key]['body'] ?? ''),
+                'background' => (string) ($meta[$key]['background'] ?? ($this->sectionMeta[$key]['background'] ?? '#ffffff')),
+                'accent' => (string) ($meta[$key]['accent'] ?? ($this->sectionMeta[$key]['accent'] ?? '#10b981')),
             ];
         }
 
@@ -367,6 +385,8 @@ class Index extends Component
             ])
             ->values()
             ->all();
+        $this->landingFeaturesJson = json_encode($this->landingFeatures, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
+        $this->landingTestimonialsJson = json_encode($this->landingTestimonials, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
 
         $this->landingTheme = (string) setting('landing_page_theme', 'theme_fast');
 
@@ -929,10 +949,14 @@ class Index extends Component
             'landingHeroCtaSecondaryText' => ['nullable', 'string', 'max:100'],
             'landingHeroCtaSecondaryUrl' => ['nullable', 'string', 'max:500'],
             'landingHeroBannerImageUrl' => ['nullable', 'string', 'max:500'],
+            'landingSectionOrder' => ['nullable', 'string', 'max:500'],
             'landingPlaystoreUrl' => ['nullable', 'url', 'max:500'],
             'landingWindowsUrl' => ['nullable', 'url', 'max:500'],
             'sectionMeta.*.title' => ['nullable', 'string', 'max:255'],
             'sectionMeta.*.subtitle' => ['nullable', 'string', 'max:500'],
+            'sectionMeta.*.body' => ['nullable', 'string', 'max:2000'],
+            'sectionMeta.*.background' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'sectionMeta.*.accent' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'landingFaqs' => ['array', 'max:20'],
             'landingFaqs.*.q' => ['nullable', 'string', 'max:255'],
             'landingFaqs.*.a' => ['nullable', 'string', 'max:1000'],
@@ -944,7 +968,20 @@ class Index extends Component
             'landingTestimonials.*.quote' => ['nullable', 'string', 'max:500'],
             'landingTestimonials.*.name' => ['nullable', 'string', 'max:120'],
             'landingTestimonials.*.role' => ['nullable', 'string', 'max:160'],
+            'landingFeaturesJson' => ['nullable', 'string', 'max:50000'],
+            'landingTestimonialsJson' => ['nullable', 'string', 'max:50000'],
         ]);
+
+        foreach (['landingFeaturesJson' => 'landingFeatures', 'landingTestimonialsJson' => 'landingTestimonials'] as $jsonKey => $arrayKey) {
+            if (filled($this->{$jsonKey})) {
+                $decoded = json_decode($this->{$jsonKey}, true);
+                if (! is_array($decoded)) {
+                    $this->addError($jsonKey, 'Enter valid JSON array data.');
+                    return;
+                }
+                $this->{$arrayKey} = $decoded;
+            }
+        }
 
         if ($this->logoImage) {
             $logoPath = $this->logoImage->store('branding', 'public');
@@ -988,10 +1025,17 @@ class Index extends Component
         foreach ($this->sectionMeta as $key => $meta) {
             $title = trim((string) ($meta['title'] ?? ''));
             $subtitle = trim((string) ($meta['subtitle'] ?? ''));
-            if ($title !== '' || $subtitle !== '') {
-                $sectionMeta[$key] = ['title' => $title, 'subtitle' => $subtitle];
+            $body = trim((string) ($meta['body'] ?? ''));
+            $background = preg_match('/^#[0-9A-Fa-f]{6}$/', (string) ($meta['background'] ?? '')) ? strtoupper($meta['background']) : null;
+            $accent = preg_match('/^#[0-9A-Fa-f]{6}$/', (string) ($meta['accent'] ?? '')) ? strtoupper($meta['accent']) : null;
+            if ($title !== '' || $subtitle !== '' || $body !== '' || $background || $accent) {
+                $sectionMeta[$key] = compact('title', 'subtitle', 'body', 'background', 'accent');
             }
         }
+
+        $allowedOrder = ['hero', 'trust_bar', 'features', 'solutions', 'downloads', 'stats', 'about', 'testimonials', 'pricing', 'faq', 'contact', 'cta'];
+        $order = array_values(array_unique(array_filter(array_map('trim', explode(',', $this->landingSectionOrder)), fn ($key) => in_array($key, $allowedOrder, true))));
+        $sectionsConfig['order'] = array_values(array_unique(array_merge($order, array_diff($allowedOrder, $order))));
 
         $faqs = collect($this->landingFaqs)
             ->map(fn ($row) => ['q' => trim((string) ($row['q'] ?? '')), 'a' => trim((string) ($row['a'] ?? ''))])

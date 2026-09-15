@@ -240,6 +240,38 @@ class PlatformBranding extends Model
         return (bool) ($this->landing_sections_config[$section] ?? $default);
     }
 
+    /**
+     * Ordered landing sections. Older installations stored only boolean
+     * flags, so the legacy order remains the safe fallback.
+     */
+    public function landingSectionOrder(): array
+    {
+        $default = ['hero', 'trust_bar', 'features', 'solutions', 'downloads', 'stats', 'about', 'testimonials', 'pricing', 'faq', 'contact', 'cta'];
+        $configured = $this->landing_sections_config['order'] ?? [];
+        if (! is_array($configured)) {
+            return $default;
+        }
+
+        $allowed = array_flip($default);
+        $ordered = array_values(array_filter(array_map('strval', $configured), fn ($key) => isset($allowed[$key])));
+        return array_values(array_unique(array_merge($ordered, array_diff($default, $ordered))));
+    }
+
+    /** Return all editable presentation tokens for a section. */
+    public function sectionMeta(string $section): array
+    {
+        $meta = $this->landing_section_meta[$section] ?? [];
+        return [
+            'title' => trim((string) ($meta['title'] ?? '')),
+            'subtitle' => trim((string) ($meta['subtitle'] ?? '')),
+            'body' => trim((string) ($meta['body'] ?? '')),
+            'background' => $this->hexOr($meta['background'] ?? null, 'transparent'),
+            'text' => $this->hexOr($meta['text'] ?? null, 'inherit'),
+            'accent' => $this->hexOr($meta['accent'] ?? null, $this->landing_accent_color ?: '#d7f24e'),
+            'layout' => in_array(($meta['layout'] ?? 'default'), ['default', 'centered', 'wide', 'compact'], true) ? $meta['layout'] : 'default',
+        ];
+    }
+
     /** Section title override configured by the SuperAdmin, or the given default. */
     public function getSectionTitle(string $section, string $default = ''): string
     {

@@ -340,12 +340,17 @@
                 <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('Section Headings') }}</label>
                 <p class="text-[11px] text-slate-400 -mt-2">{{ __('Leave blank to use the built-in default text.') }}</p>
 
+                <div class="p-3 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 space-y-2">
+                    <label class="block text-xs font-black text-slate-700 dark:text-slate-300">{{ __('Section display order') }}</label>
+                    <input type="text" wire:model="landingSectionOrder" placeholder="hero,trust_bar,features,..."
+                           class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono">
+                    <p class="text-[11px] text-slate-500">{{ __('Use section slugs separated by commas. Any omitted section is appended automatically.') }}</p>
+                </div>
                 @foreach ([
-                    'hero' => __('Hero'),
-                    'features' => __('Features'),
-                    'downloads' => __('Downloads'),
-                    'pricing' => __('Pricing'),
-                    'faq' => __('FAQ'),
+                    'hero' => __('Hero'), 'trust_bar' => __('Trust Bar'), 'features' => __('Features'),
+                    'solutions' => __('Solutions'), 'downloads' => __('Downloads'), 'stats' => __('Stats'),
+                    'about' => __('About'), 'testimonials' => __('Testimonials'), 'pricing' => __('Pricing'),
+                    'faq' => __('FAQ'), 'contact' => __('Contact'), 'cta' => __('Call to Action'),
                 ] as $key => $label)
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
                         <div class="md:col-span-2 text-xs font-black text-slate-600 dark:text-slate-300">{{ $label }}</div>
@@ -353,6 +358,10 @@
                                class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs">
                         <input type="text" wire:model="sectionMeta.{{ $key }}.subtitle" placeholder="{{ __('Subtitle') }}"
                                class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs">
+                        <input type="text" wire:model="sectionMeta.{{ $key }}.body" placeholder="{{ __('Body / supporting copy (optional)') }}"
+                               class="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs md:col-span-2">
+                        <div class="flex items-center gap-2"><label class="text-[11px] text-slate-500">{{ __('Background') }}</label><input type="color" wire:model="sectionMeta.{{ $key }}.background" class="h-8 w-12 rounded cursor-pointer"></div>
+                        <div class="flex items-center gap-2"><label class="text-[11px] text-slate-500">{{ __('Accent') }}</label><input type="color" wire:model="sectionMeta.{{ $key }}.accent" class="h-8 w-12 rounded cursor-pointer"></div>
                     </div>
                 @endforeach
             </div>
@@ -379,6 +388,20 @@
                 @empty
                     <p class="text-[11px] text-slate-400">{{ __('No custom FAQ entries — a default set is shown on the landing page. Add entries here to override it.') }}</p>
                 @endforelse
+            </div>
+
+            <!-- Advanced content editors: JSON keeps the complete card data editable without code deploys. -->
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('Feature cards (JSON)') }}</label>
+                    <textarea wire:model="landingFeaturesJson" rows="8" class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono" placeholder='[{"icon":"📦","title":"...","body":"..."}]'></textarea>
+                    @error('landingFeaturesJson') <p class="text-[11px] text-rose-500 font-bold">{{ $message }}</p> @enderror
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('Testimonials (JSON)') }}</label>
+                    <textarea wire:model="landingTestimonialsJson" rows="8" class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono" placeholder='[{"quote":"...","name":"...","role":"..."}]'></textarea>
+                    @error('landingTestimonialsJson') <p class="text-[11px] text-rose-500 font-bold">{{ $message }}</p> @enderror
+                </div>
             </div>
 
             <!-- Landing Page Section Toggles -->

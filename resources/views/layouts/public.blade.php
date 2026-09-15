@@ -42,6 +42,7 @@
             --color-brand-emerald: {{ $publicBranding->landing_primary_color ?: '#10b981' }};
             --color-brand-lime: {{ $publicBranding->landing_accent_color ?: '#d7f24e' }};
             --color-brand-teal: {{ $publicBranding->primary_color ?: '#0c5966' }};
+            --landing-content-max: 80rem;
         }
         html { background: #f8fafc; }
         html.dark { background: #020617; }
@@ -49,6 +50,22 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, ui-sans-serif, system-ui, Helvetica, Arial, sans-serif; }
         html.dark body { background: #020617; color: #f1f5f9; }
         [x-cloak] { display: none !important; }
+        .landing-section { width: 100%; overflow: hidden; }
+        .landing-section > * { min-width: 0; }
+        .landing-section img, .landing-section video { max-width: 100%; height: auto; }
+        .landing-section [class*="grid"] { min-width: 0; }
+        @media (max-width: 640px) {
+            .landing-section { scroll-margin-top: 4.5rem; }
+            .landing-section h1 { font-size: clamp(2rem, 10vw, 3rem); }
+            .landing-section h2 { font-size: clamp(1.65rem, 8vw, 2.4rem); }
+        }
+        @foreach ($publicBranding->landingSectionOrder() as $landingSectionIndex => $landingSectionKey)
+            @php($landingMeta = $publicBranding->sectionMeta($landingSectionKey))
+            @if ($landingMeta['background'] !== 'transparent')
+                #{{ $landingSectionKey }} { background-color: {{ $landingMeta['background'] }}; }
+            @endif
+            #{{ $landingSectionKey === 'hero' ? 'showcase' : $landingSectionKey }} { --landing-section-accent: {{ $landingMeta['accent'] }}; order: {{ $landingSectionIndex + 1 }}; }
+        @endforeach
     </style>
 
     {{-- Public stylesheet (scoped ~9 KB gzip for the fast theme, full app.css

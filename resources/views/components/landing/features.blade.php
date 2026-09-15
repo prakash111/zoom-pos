@@ -89,8 +89,8 @@
             <span class="w-1.5 h-1.5 rounded-full bg-brand-lime"></span>
             {{ __('Unified Operations Suite') }}
         </span>
-        <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white">{{ __('Everything your business needs, in one unified engine') }}</h2>
-        <p class="mt-3 text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">{{ __("From real-time warehouse stock tracking to front-counter barcode POS and back-of-house kitchen display, it's all synchronized.") }}</p>
+        <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white">{{ $branding->getSectionTitle('features', __('Everything your business needs, in one unified engine')) }}</h2>
+        <p class="mt-3 text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">{{ $branding->getSectionSubtitle('features', __("From real-time warehouse stock tracking to front-counter barcode POS and back-of-house kitchen display, it's all synchronized.")) }}</p>
     </div>
 
     <div x-data="{ tab: '{{ $firstTab }}' }" class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 lg:gap-8 items-start">

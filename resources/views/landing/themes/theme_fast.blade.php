@@ -32,7 +32,7 @@
 @endphp
 
 @section('content')
-<div class="bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+<div class="landing-page flex flex-col bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
 
     {{-- 1. Hero --------------------------------------------------------------}}
     @if ($branding->isSectionEnabled('hero'))
@@ -98,7 +98,7 @@
 
     {{-- 2. Hardware trust strip ----------------------------------------------}}
     @if ($branding->isSectionEnabled('trust_bar'))
-        <section class="border-b {{ $rule }}">
+        <section id="trust_bar" class="border-b {{ $rule }}">
             <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <p class="text-center text-[11px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-5">
                     {{ __('Works out of the box with your existing retail & dining hardware') }}
@@ -163,7 +163,7 @@
             <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
                 <div class="max-w-2xl">
                     <span class="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-lime-100 text-lime-800 border border-lime-200 dark:bg-brand-lime/10 dark:text-brand-lime dark:border-brand-lime/20">{{ __('Architected For Scale') }}</span>
-                    <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">{{ __('Engineered for reliability under peak pressure') }}</h2>
+                    <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">{{ $branding->getSectionTitle('solutions', __('Engineered for reliability under peak pressure')) }}</h2>
                 </div>
                 <div class="mt-10 grid sm:grid-cols-2 gap-6">
                     @foreach ([
@@ -194,7 +194,7 @@
 
     {{-- 7. Stats ------------------------------------------------------------------}}
     @if ($branding->isSectionEnabled('stats'))
-        <section class="border-y {{ $rule }}">
+        <section id="stats" class="border-y {{ $rule }}">
             <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
                 @foreach ($stats as [$value, $label])
                     <div>
@@ -212,9 +212,9 @@
         <section id="about" class="scroll-mt-20">
             <div class="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
                 <span class="{{ $badge }}">{{ __('Our Mission') }}</span>
-                <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">{{ __('Built for high-velocity stores & modern commerce') }}</h2>
+                <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">{{ $branding->getSectionTitle('about', __('Built for high-velocity stores & modern commerce')) }}</h2>
                 <p class="mt-5 text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed">
-                    {{ $branding->platform_name }} {{ __('gives retailers, restaurateurs and growing enterprises point-of-sale and inventory infrastructure that keeps executing under peak pressure — from a single busy counter to nationwide multi-terminal operations.') }}
+                    {{ $branding->getSectionSubtitle('about', $branding->platform_name.' '. __('gives retailers, restaurateurs and growing enterprises point-of-sale and inventory infrastructure that keeps executing under peak pressure — from a single busy counter to nationwide multi-terminal operations.')) }}
                 </p>
             </div>
         </section>
@@ -222,9 +222,9 @@
 
     {{-- 9. Testimonials --------------------------------------------------------}}
     @if ($branding->isSectionEnabled('testimonials'))
-        <section class="border-y {{ $rule }} {{ $altBg }}">
+        <section id="testimonials" class="border-y {{ $rule }} {{ $altBg }}">
             <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
-                <h2 class="text-center text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white mb-12">{{ __('Trusted by market leaders worldwide') }}</h2>
+                <h2 class="text-center text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white mb-12">{{ $branding->getSectionTitle('testimonials', __('Trusted by market leaders worldwide')) }}</h2>
                 <div class="grid md:grid-cols-3 gap-6">
                     @foreach ($branding->landingTestimonials() as $t)
                         <figure class="p-6 {{ $card }} flex flex-col">
@@ -343,8 +343,8 @@
             <div class="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
                 <div class="text-center mb-10">
                     <span class="{{ $badge }}">{{ __('Get In Touch') }}</span>
-                    <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">{{ __('Questions before you sign up?') }}</h2>
-                    <p class="mt-2 text-sm {{ $muted }}">{{ __("Send our team a note and we'll reply within 24 hours.") }}</p>
+                    <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">{{ $branding->getSectionTitle('contact', __('Questions before you sign up?')) }}</h2>
+                    <p class="mt-2 text-sm {{ $muted }}">{{ $branding->getSectionSubtitle('contact', __("Send our team a note and we'll reply within 24 hours.")) }}</p>
                 </div>
                 <x-landing.contact-form />
             </div>
@@ -353,10 +353,10 @@
 
     {{-- 13. Final CTA ----------------------------------------------------------}}
     @if ($branding->isSectionEnabled('cta'))
-        <section class="border-t {{ $rule }} {{ $altBg }}">
+        <section id="cta" class="border-t {{ $rule }} {{ $altBg }}">
             <div class="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-20 text-center">
-                <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">{{ __('Ready to speed up your counter?') }}</h2>
-                <p class="mt-3 text-sm {{ $muted }}">{{ __('Create your store workspace in minutes. No card required.') }}</p>
+                <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">{{ $branding->getSectionTitle('cta', __('Ready to speed up your counter?')) }}</h2>
+                <p class="mt-3 text-sm {{ $muted }}">{{ $branding->getSectionSubtitle('cta', __('Create your store workspace in minutes. No card required.')) }}</p>
                 <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
                     <a href="{{ route('tenant.register') }}" class="px-6 py-3 rounded-full bg-brand-lime hover:bg-brand-lime-dark text-slate-950 text-sm font-black shadow-lg shadow-brand-lime/25 transition active:scale-95">
                         {{ $ctaPrimaryText }} →

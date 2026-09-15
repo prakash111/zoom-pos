@@ -1,4 +1,5 @@
-@props([])
+@props(['branding' => null])
+@php($branding = $branding ?? \App\Models\PlatformBranding::current())
 
 @php
     $pillars = [
@@ -86,7 +87,7 @@
                 {{ __('Architected For Scale') }}
             </span>
             <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
-                {{ __('Engineered for maximum reliability under peak pressure') }}
+                {{ $branding->getSectionTitle('solutions', __('Engineered for maximum reliability under peak pressure')) }}
             </h2>
 
             <div class="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">

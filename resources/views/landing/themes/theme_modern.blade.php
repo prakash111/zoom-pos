@@ -20,7 +20,7 @@
 
     {{-- 4. Scale & Architecture Value Pillars --}}
     @if ($branding->isSectionEnabled('solutions'))
-        <x-landing.pillars />
+        <x-landing.pillars :branding="$branding" />
     @endif
 
     {{-- 5. Custom CMS Page Body Content (If authoring via TinyMCE) --}}
