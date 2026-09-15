@@ -192,6 +192,8 @@ class AppTheme {
       listTileTheme: ListTileThemeData(
         iconColor: colorScheme.onSurfaceVariant,
         textColor: bodyColor,
+        selectedColor: headingColor,
+        selectedTileColor: colorScheme.primary.withValues(alpha: 0.10),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -271,6 +273,7 @@ class AppTheme {
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: cardColor,
+        textStyle: TextStyle(color: headingColor, fontSize: 13),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),

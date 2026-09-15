@@ -1294,9 +1294,7 @@ class DynamicSchemaParser {
           child: Text(
             context.tr(optLabel),
             style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : null,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ));
@@ -1307,9 +1305,7 @@ class DynamicSchemaParser {
           child: Text(
             context.tr(str),
             style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : null,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ));
@@ -1324,9 +1320,10 @@ class DynamicSchemaParser {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: DropdownButtonFormField<String>(
         initialValue: effectiveValue,
-        dropdownColor: isDark ? const Color(0xFF1E293B) : null,
+        dropdownColor:
+            isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFFFF),
         style: TextStyle(
-          color: isDark ? const Color(0xFFF8FAFC) : null,
+          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
           fontSize: 14,
         ),
         autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -4356,11 +4353,11 @@ class _SduiCreatableSelectState extends State<_SduiCreatableSelect> {
             initialValue: _custom ? _customValue : _selected,
             dropdownColor: Theme.of(context).brightness == Brightness.dark
                 ? const Color(0xFF131E29)
-                : null,
+                : const Color(0xFFFFFFFF),
             style: TextStyle(
               color: Theme.of(context).brightness == Brightness.dark
                   ? Colors.white
-                  : null,
+                  : const Color(0xFF0F172A),
             ),
             autovalidateMode: AutovalidateMode.onUserInteraction,
             decoration: InputDecoration(
@@ -4382,11 +4379,18 @@ class _SduiCreatableSelectState extends State<_SduiCreatableSelect> {
             items: [
               for (final p in _presets)
                 DropdownMenuItem(
-                    value: p.value, child: Text(context.tr(p.label))),
+                  value: p.value,
+                  child: Text(context.tr(p.label),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface)),
+                ),
               DropdownMenuItem(
                 value: _customValue,
                 child: Text(customLabel,
-                    style: const TextStyle(fontStyle: FontStyle.italic)),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontStyle: FontStyle.italic,
+                    )),
               ),
             ],
             onChanged: disabled
@@ -4670,7 +4674,10 @@ class _SearchableOptionSheetState extends State<_SearchableOptionSheet> {
                       dense: true,
                       selected: selected,
                       selectedTileColor: scheme.primary.withValues(alpha: 0.10),
-                      title: Text(o.label),
+                      title: Text(
+                        o.label,
+                        style: TextStyle(color: scheme.onSurface),
+                      ),
                       trailing: selected
                           ? Icon(Icons.check, color: scheme.primary, size: 20)
                           : null,
