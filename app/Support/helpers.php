@@ -157,11 +157,13 @@ if (! function_exists('tenant_setting')) {
                 return $fallback;
             }
 
+            // Do not expose or implicitly enable a platform SMS gateway for
+            // tenants that have not configured one themselves.
             return [
-                'gateway_url' => 'https://sms.zoomnearby.com/api/v1/messages/send?phone={phone}&message={message}',
+                'gateway_url' => '',
                 'method' => 'GET',
-                'api_token' => '4HIXpW0OPsnPpzzebeA5KI7rI4fnAi7utMu5jwYl8dada339',
-                'is_enabled' => true,
+                'api_token' => '',
+                'is_enabled' => false,
             ];
         }
 
@@ -259,7 +261,7 @@ if (! function_exists('tenant_set_setting')) {
                 [
                     'tenant_id' => $companyId,
                     'provider' => \App\Models\TenantNotificationGateway::PROVIDER_GENERIC_HTTP,
-                    'is_enabled' => true,
+                    'is_enabled' => (bool) ($arr['is_enabled'] ?? false),
                     'credentials' => [
                         'url' => $gwUrl,
                         'method' => $gwMethod,

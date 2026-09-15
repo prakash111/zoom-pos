@@ -5922,18 +5922,12 @@ class SchemaResponse
             }
         }
 
-        if (empty($creds['url'])) {
-            $creds['url'] = 'https://sms.zoomnearby.com/api/v1/messages/send?phone={phone}&message={message}';
-        }
         if (empty($creds['method'])) {
             $creds['method'] = 'GET';
         }
-        if (empty($creds['api_key'])) {
-            $creds['api_key'] = '4HIXpW0OPsnPpzzebeA5KI7rI4fnAi7utMu5jwYl8dada339';
-        }
 
         $activeProvider = $gw?->provider ?? 'generic_http';
-        $isEnabled = (bool) ($gw?->is_enabled ?? true);
+        $isEnabled = (bool) ($gw?->is_enabled ?? false);
         $testPhone = (string) ($company->phone ?: '+91 80 4111 8080');
 
         return [
@@ -6010,16 +6004,12 @@ class SchemaResponse
             ->first();
 
         $creds = (array) ($gw?->credentials ?? []);
-        if (empty($creds['host'])) {
-            $fallback = app(InvoiceDeliveryService::class)->getSmtpConfig($company);
-            $creds['host'] = $fallback['host'] ?? '';
-            $creds['port'] = $fallback['port'] ?? 587;
-            $creds['username'] = $fallback['username'] ?? '';
-            $creds['password'] = $fallback['password'] ?? '';
-            $creds['encryption'] = $fallback['encryption'] ?? 'tls';
-            $creds['from_address'] = $fallback['from_address'] ?? $company->email;
-            $creds['from_name'] = $fallback['from_name'] ?? $company->name;
-        }
+        // Settings UI must show only this tenant's credentials. Platform
+        // SMTP is used for system mail/OTP, never copied into tenant forms.
+        $creds['port'] = $creds['port'] ?? 587;
+        $creds['encryption'] = $creds['encryption'] ?? 'tls';
+        $creds['from_address'] = $creds['from_address'] ?? $company->email;
+        $creds['from_name'] = $creds['from_name'] ?? $company->name;
 
         return [
             self::card([

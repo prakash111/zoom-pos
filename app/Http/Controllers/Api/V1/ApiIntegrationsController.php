@@ -139,19 +139,12 @@ class ApiIntegrationsController extends Controller
                     return response()->json(['success' => false, 'error' => 'Validation failed.', 'details' => $validator->errors()], 422);
                 }
 
-                $isEnabled = $request->boolean('sms_is_enabled', $request->boolean('is_enabled', true));
+                $isEnabled = $request->boolean('sms_is_enabled', $request->boolean('is_enabled', false));
                 $provider = $request->input('sms_provider', $request->input('provider', 'generic_http'));
 
                 $genericUrl = $request->input('generic_sms_url', $request->input('gateway_url', $request->input('url', '')));
-                if (empty($genericUrl) && $provider === TenantNotificationGateway::PROVIDER_GENERIC_HTTP) {
-                    $genericUrl = 'https://sms.zoomnearby.com/api/v1/messages/send?phone={phone}&message={message}';
-                }
-
                 $genericMethod = strtoupper($request->input('generic_sms_method', $request->input('method', 'GET')));
                 $genericApiKey = $request->input('generic_sms_api_key', $request->input('api_token', $request->input('api_key', '')));
-                if (empty($genericApiKey) && $provider === TenantNotificationGateway::PROVIDER_GENERIC_HTTP) {
-                    $genericApiKey = '4HIXpW0OPsnPpzzebeA5KI7rI4fnAi7utMu5jwYl8dada339';
-                }
 
                 $credentials = [
                     'account_sid' => $request->input('sms_twilio_sid', $request->input('account_sid', '')),
@@ -182,6 +175,7 @@ class ApiIntegrationsController extends Controller
                         'gateway_url' => $genericUrl,
                         'method'      => $genericMethod,
                         'api_token'   => $genericApiKey,
+                        'is_enabled'  => $isEnabled,
                     ]);
                 }
 

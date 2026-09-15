@@ -430,7 +430,7 @@ class OmnichannelRegistryEngineTest extends TestCase
             ->assertJsonPath('document_type', 'invoice')
             ->assertJsonPath('native_action.type', 'show_post_sale_sheet')
             ->assertJsonPath('native_action.data.document_type', 'invoice')
-            ->assertJsonPath('native_action.data.actions_endpoint', "/api/v1/tenant/receivables/{$sale->id}/reminder-sheet?document_type=invoice")
+            ->assertJsonPath('native_action.data.actions_endpoint', "/api/v1/tenant/documents/invoice/{$sale->id}/actions-sheet")
             ->assertJsonPath('post_sale_sheet.action', 'show_post_sale_sheet')
             ->assertJsonPath('post_sale_sheet.data.pdf_endpoint', "/api/tenant/invoices/{$sale->id}/pdf-stream");
 
