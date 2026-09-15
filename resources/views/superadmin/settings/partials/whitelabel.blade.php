@@ -390,18 +390,12 @@
                 @endforelse
             </div>
 
-            <!-- Advanced content editors: JSON keeps the complete card data editable without code deploys. -->
-            <div class="pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div class="space-y-2">
-                    <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('Feature cards (JSON)') }}</label>
-                    <textarea wire:model="landingFeaturesJson" rows="8" class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono" placeholder='[{"icon":"📦","title":"...","body":"..."}]'></textarea>
-                    @error('landingFeaturesJson') <p class="text-[11px] text-rose-500 font-bold">{{ $message }}</p> @enderror
-                </div>
-                <div class="space-y-2">
-                    <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('Testimonials (JSON)') }}</label>
-                    <textarea wire:model="landingTestimonialsJson" rows="8" class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono" placeholder='[{"quote":"...","name":"...","role":"..."}]'></textarea>
-                    @error('landingTestimonialsJson') <p class="text-[11px] text-rose-500 font-bold">{{ $message }}</p> @enderror
-                </div>
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-5">
+                <x-superadmin.landing-repeater title="Hero highlights" type="highlight" :items="$landingHeroHighlights" :fields="['Label']" />
+                <x-superadmin.landing-repeater title="Hero dashboard products" type="product" :items="$landingHeroProducts" :fields="['Product','Price','Status','Tone']" />
+                <x-superadmin.landing-repeater title="Hardware trust cards" type="hardware" :items="$landingHardwareItems" :fields="['Label','Tag']" />
+                <x-superadmin.landing-repeater title="Stats & metrics" type="stat" :items="$landingStats" :fields="['Value','Label']" />
+                <x-superadmin.landing-repeater title="Solution cards" type="solution" :items="$landingSolutions" :fields="['Icon','Title','Description']" />
             </div>
 
             <div class="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">

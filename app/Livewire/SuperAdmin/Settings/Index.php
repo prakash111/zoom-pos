@@ -265,6 +265,12 @@ class Index extends Component
 
     public string $landingCustomHtml = '';
 
+    public array $landingHeroHighlights = [];
+    public array $landingHeroProducts = [];
+    public array $landingHardwareItems = [];
+    public array $landingStats = [];
+    public array $landingSolutions = [];
+
     // --- TAB 4: CUSTOM PAGES (CMS) ---
     public string $pageSearch = '';
 
@@ -394,6 +400,12 @@ class Index extends Component
         $this->landingTestimonialsJson = json_encode($this->landingTestimonials, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
         $this->landingContentJson = json_encode($branding->landing_content ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
         $this->landingCustomHtml = (string) data_get($branding->landing_content ?? [], 'html', '');
+        $content = $branding->landing_content ?? [];
+        $this->landingHeroHighlights = array_values(data_get($content, 'hero.highlights', []));
+        $this->landingHeroProducts = array_values(data_get($content, 'hero.products', []));
+        $this->landingHardwareItems = array_values(data_get($content, 'trust.hardware', []));
+        $this->landingStats = array_values(data_get($content, 'stats', []));
+        $this->landingSolutions = array_values(data_get($content, 'solutions.items', []));
 
         $this->landingTheme = (string) setting('landing_page_theme', 'theme_fast');
 
@@ -919,6 +931,29 @@ class Index extends Component
         $this->landingFaqs = array_values($this->landingFaqs);
     }
 
+    public function addLandingItem(string $type): void
+    {
+        $map = [
+            'highlight' => ['property' => 'landingHeroHighlights', 'value' => ''],
+            'product' => ['property' => 'landingHeroProducts', 'value' => ['', '', '', 'emerald']],
+            'hardware' => ['property' => 'landingHardwareItems', 'value' => ['', '']],
+            'stat' => ['property' => 'landingStats', 'value' => ['', '']],
+            'solution' => ['property' => 'landingSolutions', 'value' => ['', '', '']],
+        ];
+        if (isset($map[$type]) && count($this->{$map[$type]['property']}) < 20) {
+            $this->{$map[$type]['property']}[] = $map[$type]['value'];
+        }
+    }
+
+    public function removeLandingItem(string $type, int $index): void
+    {
+        $properties = ['highlight' => 'landingHeroHighlights', 'product' => 'landingHeroProducts', 'hardware' => 'landingHardwareItems', 'stat' => 'landingStats', 'solution' => 'landingSolutions'];
+        if (isset($properties[$type])) {
+            unset($this->{$properties[$type]}[$index]);
+            $this->{$properties[$type]} = array_values($this->{$properties[$type]});
+        }
+    }
+
     public function removeAuthBanner(): void
     {
         $this->authBannerImage = null;
@@ -979,6 +1014,16 @@ class Index extends Component
             'landingTestimonialsJson' => ['nullable', 'string', 'max:50000'],
             'landingContentJson' => ['nullable', 'string', 'max:100000'],
             'landingCustomHtml' => ['nullable', 'string', 'max:500000'],
+            'landingHeroHighlights' => ['array', 'max:12'],
+            'landingHeroHighlights.*' => ['nullable', 'string', 'max:120'],
+            'landingHeroProducts' => ['array', 'max:12'],
+            'landingHeroProducts.*' => ['array', 'max:4'],
+            'landingHardwareItems' => ['array', 'max:12'],
+            'landingHardwareItems.*' => ['array', 'max:2'],
+            'landingStats' => ['array', 'max:8'],
+            'landingStats.*' => ['array', 'max:2'],
+            'landingSolutions' => ['array', 'max:12'],
+            'landingSolutions.*' => ['array', 'max:3'],
         ]);
 
         foreach (['landingFeaturesJson' => 'landingFeatures', 'landingTestimonialsJson' => 'landingTestimonials'] as $jsonKey => $arrayKey) {
@@ -1002,6 +1047,11 @@ class Index extends Component
         if (filled($this->landingCustomHtml)) {
             $landingContent['html'] = $this->landingCustomHtml;
         }
+        if ($this->landingHeroHighlights !== []) $landingContent['hero']['highlights'] = array_values(array_filter(array_map('trim', $this->landingHeroHighlights)));
+        if ($this->landingHeroProducts !== []) $landingContent['hero']['products'] = array_values($this->landingHeroProducts);
+        if ($this->landingHardwareItems !== []) $landingContent['trust']['hardware'] = array_values($this->landingHardwareItems);
+        if ($this->landingStats !== []) $landingContent['stats'] = array_values($this->landingStats);
+        if ($this->landingSolutions !== []) $landingContent['solutions']['items'] = array_values($this->landingSolutions);
 
         if ($this->logoImage) {
             $logoPath = $this->logoImage->store('branding', 'public');
