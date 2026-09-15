@@ -16,6 +16,15 @@
     // Only the fast theme has a light palette; the four legacy themes are
     // dark-committed, so pin them to dark regardless of the viewer toggle.
     $publicForceDark = $publicTheme !== 'theme_fast';
+    $landingSectionCss = '';
+    foreach ($publicBranding->landingSectionOrder() as $landingSectionIndex => $landingSectionKey) {
+        $landingMeta = $publicBranding->sectionMeta($landingSectionKey);
+        $selector = $landingSectionKey === 'hero' ? 'showcase' : $landingSectionKey;
+        if ($landingMeta['background'] !== 'transparent') {
+            $landingSectionCss .= "#{$selector}{background-color:{$landingMeta['background']};}";
+        }
+        $landingSectionCss .= "#{$selector}{--landing-section-accent:{$landingMeta['accent']};order:".($landingSectionIndex + 1).";}";
+    }
 @endphp
 <!DOCTYPE html>
 <html lang="{{ $publicActiveLang?->code ?? 'en' }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="scroll-smooth {{ $publicForceDark ? 'dark' : '' }}" x-data="{ dark: document.documentElement.classList.contains('dark') }" x-init="$watch('dark', v => { localStorage.setItem('theme', v ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', v) })">
@@ -59,13 +68,7 @@
             .landing-section h1 { font-size: clamp(2rem, 10vw, 3rem); }
             .landing-section h2 { font-size: clamp(1.65rem, 8vw, 2.4rem); }
         }
-        @foreach ($publicBranding->landingSectionOrder() as $landingSectionIndex => $landingSectionKey)
-            @php($landingMeta = $publicBranding->sectionMeta($landingSectionKey))
-            @if ($landingMeta['background'] !== 'transparent')
-                #{{ $landingSectionKey }} { background-color: {{ $landingMeta['background'] }}; }
-            @endif
-            #{{ $landingSectionKey === 'hero' ? 'showcase' : $landingSectionKey }} { --landing-section-accent: {{ $landingMeta['accent'] }}; order: {{ $landingSectionIndex + 1 }}; }
-        @endforeach
+        {!! $landingSectionCss !!}
     </style>
 
     {{-- Public stylesheet (scoped ~9 KB gzip for the fast theme, full app.css
