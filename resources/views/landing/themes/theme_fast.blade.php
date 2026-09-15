@@ -15,12 +15,20 @@
 
     $features = $branding->landingFeatures();
 
-    $stats = [
+    $stats = $branding->landingList('stats', [
         ['2,500,000+', __('Transactions Processed')],
         ['1,200+', __('Active Business Outlets')],
         ['99.99%', __('Platform Uptime SLA')],
         ['< 20ms', __('Auth & Checkout Latency')],
-    ];
+    ]);
+    $highlights = $branding->landingList('hero.highlights', [__('Barcode & Touch POS'), __('Live Stock Alerts'), __('Restaurant Floor KOT'), __('Offline First Sync')]);
+    $hardware = $branding->landingList('trust.hardware', [['Barcode Scanners', 'Instant Scan'], ['Thermal Receipt Printers', '80mm / 58mm'], ['Card Readers & Terminals', 'EMV & NFC'], ['Smart Cash Drawers', 'Auto Kick'], ['Kitchen Display Screens', 'Live KDS']]);
+    $solutions = $branding->landingList('solutions.items', [
+        ['⚡', __('Sub-Second Speed & Offline-Ready'), __('Checkout keeps running if the internet drops. Sales queue safely and sync automatically on reconnect.')],
+        ['💳', __('Direct Card Issuing & Split Payments'), __('Issue virtual and physical cards, set spend controls, and take multi-tender checkouts without extra merchant accounts.')],
+        ['📊', __('Real-Time Financial & Ledger Control'), __('Automated register X/Z reconciliation, payable/receivable balances and compliance-ready tax invoices.')],
+        ['🏢', __('Multi-Location Enterprise Workspaces'), __('Isolated tenant databases, custom domains and granular role permissions from one till to a national franchise.')],
+    ]);
 
     $faqs = $branding->landingFaqs();
 
@@ -62,10 +70,9 @@
                     @endif
 
                     <div class="mt-8 pt-6 border-t {{ $rule }} flex flex-wrap gap-x-6 gap-y-2 text-xs font-bold {{ $muted }}">
-                        <span>✓ {{ __('Barcode & Touch POS') }}</span>
-                        <span>✓ {{ __('Live Stock Alerts') }}</span>
-                        <span>✓ {{ __('Restaurant Floor KOT') }}</span>
-                        <span>✓ {{ __('Offline First Sync') }}</span>
+                        @foreach ($highlights as $highlight)
+                            <span>✓ {{ is_array($highlight) ? ($highlight['label'] ?? '') : $highlight }}</span>
+                        @endforeach
                     </div>
                 </div>
 
@@ -104,7 +111,9 @@
                     {{ __('Works out of the box with your existing retail & dining hardware') }}
                 </p>
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-center">
-                    @foreach ([['Barcode Scanners', 'Instant Scan'], ['Thermal Receipt Printers', '80mm / 58mm'], ['Card Readers & Terminals', 'EMV & NFC'], ['Smart Cash Drawers', 'Auto Kick'], ['Kitchen Display Screens', 'Live KDS']] as [$label, $tag])
+                    @foreach ($hardware as $item)
+                        @php($label = $item[0] ?? ($item['label'] ?? ''))
+                        @php($tag = $item[1] ?? ($item['tag'] ?? ''))
                         <div class="p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
                             <div class="text-xs font-black text-slate-900 dark:text-white leading-tight">{{ __($label) }}</div>
                             <div class="text-[10px] {{ $muted }} mt-1">{{ __($tag) }}</div>
@@ -166,12 +175,10 @@
                     <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">{{ $branding->getSectionTitle('solutions', __('Engineered for reliability under peak pressure')) }}</h2>
                 </div>
                 <div class="mt-10 grid sm:grid-cols-2 gap-6">
-                    @foreach ([
-                        ['⚡', __('Sub-Second Speed & Offline-Ready'), __('Checkout keeps running if the internet drops. Sales queue safely and sync automatically on reconnect.')],
-                        ['💳', __('Direct Card Issuing & Split Payments'), __('Issue virtual and physical cards, set spend controls, and take multi-tender checkouts without extra merchant accounts.')],
-                        ['📊', __('Real-Time Financial & Ledger Control'), __('Automated register X/Z reconciliation, payable/receivable balances and compliance-ready tax invoices.')],
-                        ['🏢', __('Multi-Location Enterprise Workspaces'), __('Isolated tenant databases, custom domains and granular role permissions from one till to a national franchise.')],
-                    ] as [$icon, $title, $body])
+                    @foreach ($solutions as $item)
+                        @php($icon = $item[0] ?? ($item['icon'] ?? '✨'))
+                        @php($title = $item[1] ?? ($item['title'] ?? ''))
+                        @php($body = $item[2] ?? ($item['body'] ?? ''))
                         <div class="p-6 {{ $card }}">
                             <div class="text-xl mb-3">{{ $icon }}</div>
                             <h3 class="text-base font-black text-slate-900 dark:text-white">{{ $title }}</h3>

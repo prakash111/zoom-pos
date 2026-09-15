@@ -282,6 +282,13 @@ class PlatformBranding extends Model
         return filled($value) ? trim((string) $value) : $default;
     }
 
+    /** Resolve editable list content (highlights, stats, hardware, etc.). */
+    public function landingList(string $key, array $default = []): array
+    {
+        $value = data_get($this->landing_content ?? [], $key);
+        return is_array($value) && $value !== [] ? $value : $default;
+    }
+
     /** Section title override configured by the SuperAdmin, or the given default. */
     public function getSectionTitle(string $section, string $default = ''): string
     {
