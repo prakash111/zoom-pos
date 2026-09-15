@@ -217,6 +217,11 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                 compiledByKey.containsKey(override!.section)
             ? override.section!
             : section.key;
+        final effectiveParent = tile.key == 'settings'
+            ? null
+            : (override != null
+                ? (override.level == 0 ? null : override.parentId)
+                : null);
         (grouped[targetSection] ??= []).add((
           order: override?.order ?? index,
           fallback: fallback++,
@@ -224,7 +229,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             key: tile.key,
             label: tile.label,
             visible: override?.visible ?? true,
-            parentKey: override?.parentId,
+            parentKey: effectiveParent,
           ),
         ));
       }
@@ -371,6 +376,9 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     final byKey = {for (final tile in section.tiles) tile.key: tile};
 
     for (final tile in section.tiles) {
+      if (tile.key == 'settings') {
+        tile.parentKey = null;
+      }
       var cursor = tile.parentKey;
       final seen = <String>{tile.key};
       var depth = 0;
@@ -580,9 +588,12 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         _maximumNavigationLevel - _subtreeHeight(section, itemIndex);
     var targetDepth = math.min(requestedDepth, maximumDepth);
 
-    // WordPress's top-item rule: a row with nothing above it has no
-    // possible parent, regardless of how far right the pointer travelled.
-    if (itemIndex == 0) {
+    // Store Settings is strictly a top-level Main Menu root item (level 0).
+    if (dragged.key == 'settings') {
+      targetDepth = 0;
+    } else if (itemIndex == 0) {
+      // WordPress's top-item rule: a row with nothing above it has no
+      // possible parent, regardless of how far right the pointer travelled.
       targetDepth = 0;
     } else {
       targetDepth = math.min(
@@ -679,8 +690,17 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     setState(() {
       final itemIndex = section.tiles.indexOf(item);
       if (itemIndex < 0) return;
+      if (requestedDepth == 0 || item.key == 'settings') {
+        item.parentKey = null;
+      }
       _applyRequestedDepth(
-          section, itemIndex, requestedDepth.clamp(0, _maximumNavigationLevel));
+        section,
+        itemIndex,
+        item.key == 'settings' ? 0 : requestedDepth.clamp(0, _maximumNavigationLevel),
+      );
+      if (requestedDepth == 0 || item.key == 'settings') {
+        item.parentKey = null;
+      }
       _repairAndArrange(section);
     });
   }
@@ -734,7 +754,11 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     final target = await showDialog<_WorkingSection>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Move "${item.label}" to section'),
+        backgroundColor: const Color(0xFF1E293B),
+        title: Text(
+          'Move "${item.label}" to section',
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -744,14 +768,20 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                   ListTile(
                     key: ValueKey('move-target-${section.key}'),
                     contentPadding: EdgeInsets.zero,
-                    title: Text(section.customTitle.trim().isNotEmpty
-                        ? section.customTitle.trim()
-                        : section.label),
+                    title: Text(
+                      section.customTitle.trim().isNotEmpty
+                          ? section.customTitle.trim()
+                          : section.label,
+                      style: const TextStyle(color: Colors.white),
+                    ),
                     subtitle: section.customTitle.trim().isNotEmpty &&
                             section.customTitle.trim() != section.label
-                        ? Text(section.label)
+                        ? Text(
+                            section.label,
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          )
                         : null,
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white54),
                     onTap: () => Navigator.of(dialogContext).pop(section),
                   ),
             ],
@@ -760,7 +790,10 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+            child: Text(
+              MaterialLocalizations.of(context).cancelButtonLabel,
+              style: const TextStyle(color: Colors.white70),
+            ),
           ),
         ],
       ),

@@ -363,9 +363,12 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
 
     for (final row in rows) {
       final item = itemOverrides[row.tile.key];
-      final rawParent = item?.parentId ??
-          item?.parent ??
-          sectionMetaByKey[entry.key]?.parentByKey[row.tile.key];
+      // Store Settings must NEVER be trapped under Subscription & Billing or any parent.
+      final rawParent = row.tile.key == 'settings'
+          ? null
+          : (item != null
+              ? (item.level == 0 ? null : (item.parentId ?? item.parent))
+              : sectionMetaByKey[entry.key]?.parentByKey[row.tile.key]);
       final candidate =
           rawParent == null || rawParent.isEmpty ? null : rawParent;
 
@@ -381,9 +384,14 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
           valid = false;
           break;
         }
-        cursor = itemOverrides[cursor]?.parentId ??
-            itemOverrides[cursor]?.parent ??
-            sectionMetaByKey[entry.key]?.parentByKey[cursor];
+        cursor = cursor == 'settings'
+            ? null
+            : (itemOverrides[cursor] != null
+                ? (itemOverrides[cursor]!.level == 0
+                    ? null
+                    : (itemOverrides[cursor]!.parentId ??
+                        itemOverrides[cursor]!.parent))
+                : sectionMetaByKey[entry.key]?.parentByKey[cursor]);
       }
       safeParent[row.tile.key] = valid ? candidate : null;
     }
