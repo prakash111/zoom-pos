@@ -80,15 +80,18 @@ class _WorkingSection {
   List<_WorkingItem> tiles;
 }
 
-/// Payload carried while an item is long-pressed and dragged across section
-/// cards. The vertical within-section reorder still runs through
-/// [ReorderableListView]; this covers the free-form "move into any section"
-/// gesture.
-class _NavDragData {
-  const _NavDragData(this.sectionIndex, this.itemKey, this.label);
-  final int sectionIndex;
-  final String itemKey;
-  final String label;
+/// One row in the editor's single reorder surface. Section headers are real
+/// boundaries in the same list as menu items, so crossing a header changes an
+/// item's assigned section instead of handing the drag to another list.
+class _UnifiedNavEntry {
+  const _UnifiedNavEntry.section(this.section) : item = null;
+
+  const _UnifiedNavEntry.item(this.section, this.item);
+
+  final _WorkingSection section;
+  final _WorkingItem? item;
+
+  bool get isSectionHeader => item == null;
 }
 
 /// Store-wide WordPress-style navigation outline editor. Vertical dragging
@@ -228,27 +231,24 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     }
 
     final sections = <_WorkingSection>[];
-    for (final entry in grouped.entries) {
-      final meta = compiledByKey[entry.key];
-      if (meta == null) continue;
-      entry.value.sort((first, second) {
+    for (final meta in compiled) {
+      final rows = grouped[meta.key] ?? [];
+      rows.sort((first, second) {
         final byOrder = first.order.compareTo(second.order);
         return byOrder != 0
             ? byOrder
             : first.fallback.compareTo(second.fallback);
       });
       final section = _WorkingSection(
-        key: entry.key,
+        key: meta.key,
         label: meta.label,
         customTitle:
-            sectionOverrides[entry.key]?.customTitle?.trim().isNotEmpty == true
-                ? sectionOverrides[entry.key]!.customTitle!.trim()
+            sectionOverrides[meta.key]?.customTitle?.trim().isNotEmpty == true
+                ? sectionOverrides[meta.key]!.customTitle!.trim()
                 : (meta.customTitle?.trim().isNotEmpty == true
                     ? meta.customTitle!.trim()
-                    : (entry.value.isNotEmpty
-                        ? entry.value.first.item.label
-                        : meta.label)),
-        tiles: [for (final row in entry.value) row.item],
+                    : (rows.isNotEmpty ? rows.first.item.label : meta.label)),
+        tiles: [for (final row in rows) row.item],
       );
       _repairAndArrange(section);
       sections.add(section);
@@ -325,7 +325,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         }
 
         collectTyped(rawSection.items);
-        if (rawSection.key.isNotEmpty && tiles.isNotEmpty) {
+        if (rawSection.key.isNotEmpty) {
           parsed.add(NavSectionDescriptor(
               rawSection.key, rawSection.title, tiles,
               customTitle: rawSection.customTitle));
@@ -358,10 +358,8 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       }
 
       collectMaps(section['items'] ?? section['children']);
-      if (tiles.isNotEmpty) {
-        parsed.add(
-            NavSectionDescriptor(key, title, tiles, customTitle: customTitle));
-      }
+      parsed.add(
+          NavSectionDescriptor(key, title, tiles, customTitle: customTitle));
     }
 
     return parsed;
@@ -456,6 +454,47 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     return height;
   }
 
+  List<_UnifiedNavEntry> _unifiedEntries() {
+    return [
+      for (final section in _sections) ...[
+        _UnifiedNavEntry.section(section),
+        for (final item in section.tiles) _UnifiedNavEntry.item(section, item),
+      ],
+    ];
+  }
+
+  /// Rebuilds section membership from the position of the nearest preceding
+  /// header. This is the single source of truth after a drag: there are no
+  /// independent child reorder lists whose callbacks can snap a row back.
+  void _reassignSections(List<_UnifiedNavEntry> entries) {
+    final orderedSections = entries
+        .where((entry) => entry.isSectionHeader)
+        .map((entry) => entry.section)
+        .toList();
+    if (orderedSections.isEmpty) return;
+
+    for (final section in orderedSections) {
+      section.tiles = [];
+    }
+
+    // A section header is always rendered first after rebuilding. If the
+    // first header itself was dragged below one of its rows, those leading
+    // rows remain assigned to that first available section.
+    var currentSection = orderedSections.first;
+    for (final entry in entries) {
+      if (entry.isSectionHeader) {
+        currentSection = entry.section;
+      } else {
+        currentSection.tiles.add(entry.item!);
+      }
+    }
+
+    _sections = orderedSections;
+    for (final section in _sections) {
+      _repairAndArrange(section);
+    }
+  }
+
   void _beginItemPointer(
       int sectionIndex, int itemIndex, PointerDownEvent event) {
     final section = _sections[sectionIndex];
@@ -507,6 +546,30 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     }
   }
 
+  void _onUnifiedDragStart(int index) {
+    final entries = _unifiedEntries();
+    if (index < 0 || index >= entries.length) return;
+    final entry = entries[index];
+    if (entry.isSectionHeader) {
+      _dragSectionIndex = _sections.indexOf(entry.section);
+      _dragItemKey = null;
+      _dragStartX = null;
+      _dragStartDepth = 0;
+      _dragPreviewDepth = 0;
+      _dragMaximumDepth = _maximumNavigationLevel;
+      _dragReorderApplied = false;
+      _dragFinalizeTimer?.cancel();
+      _dragDepthNotifier.value = 0;
+      return;
+    }
+
+    final sectionIndex = _sections.indexOf(entry.section);
+    final itemIndex = entry.section.tiles.indexOf(entry.item!);
+    if (sectionIndex >= 0 && itemIndex >= 0) {
+      _onItemDragStart(sectionIndex, itemIndex);
+    }
+  }
+
   int _applyRequestedDepth(
     _WorkingSection section,
     int itemIndex,
@@ -542,33 +605,64 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     return parentKey == null ? 0 : targetDepth;
   }
 
-  void _onItemReorder(int sectionIndex, int oldIndex, int newIndex) {
+  void _onUnifiedReorder(int oldIndex, int newIndex) {
     _dragFinalizeTimer?.cancel();
     setState(() {
-      final section = _sections[sectionIndex];
-      if (oldIndex < 0 || oldIndex >= section.tiles.length) return;
+      final entries = _unifiedEntries();
+      if (oldIndex < 0 || oldIndex >= entries.length) return;
 
-      final dragged = section.tiles[oldIndex];
-      final startDepth = _depthOf(section, dragged.key);
-      final endIndex = _subtreeEnd(section, oldIndex);
-      final block = section.tiles.sublist(oldIndex, endIndex);
-      final descendantCount = block.length - 1;
+      final draggedEntry = entries[oldIndex];
+      if (draggedEntry.isSectionHeader) {
+        final header = entries.removeAt(oldIndex);
+        entries.insert(newIndex.clamp(0, entries.length), header);
+        _reassignSections(entries);
+        _dragReorderApplied = true;
+        return;
+      }
 
-      // Flutter's onReorderItem already adjusts for the dragged row's
-      // removal. Account only for the additional descendant rows that this
-      // tree editor carries with their parent.
+      final sourceSection = draggedEntry.section;
+      final sourceItemIndex = sourceSection.tiles.indexOf(draggedEntry.item!);
+      if (sourceItemIndex < 0) return;
+
+      final dragged = draggedEntry.item!;
+      final startDepth = _depthOf(sourceSection, dragged.key);
+      final subtreeEnd = _subtreeEnd(sourceSection, sourceItemIndex);
+      final blockLength = subtreeEnd - sourceItemIndex;
+      final block = entries.sublist(oldIndex, oldIndex + blockLength);
+
+      // onReorderItem reports an index after removing only the dragged row.
+      // We also carry its descendants, so compensate for those extra rows
+      // when the subtree moves down.
       var insertionIndex = newIndex;
-      if (insertionIndex > oldIndex) insertionIndex -= descendantCount;
-      section.tiles.removeRange(oldIndex, endIndex);
-      insertionIndex = insertionIndex.clamp(0, section.tiles.length);
-      section.tiles.insertAll(insertionIndex, block);
+      if (insertionIndex > oldIndex) insertionIndex -= blockLength - 1;
+      entries.removeRange(oldIndex, oldIndex + blockLength);
+      insertionIndex = insertionIndex.clamp(0, entries.length);
+      entries.insertAll(insertionIndex, block);
+      _reassignSections(entries);
 
-      final requestedDepth =
-          _dragItemKey == dragged.key ? _dragPreviewDepth : startDepth;
-      _dragPreviewDepth =
-          _applyRequestedDepth(section, insertionIndex, requestedDepth);
+      final targetSection = _sections.firstWhere(
+        (section) => section.tiles.any((item) => item.key == dragged.key),
+      );
+      final targetItemIndex =
+          targetSection.tiles.indexWhere((item) => item.key == dragged.key);
+
+      if (targetSection.key != sourceSection.key) {
+        // Crossing a header always makes the moved subtree's first row a new
+        // Main Menu item. Descendants keep their internal relationships.
+        dragged.parentKey = null;
+        _dragPreviewDepth = 0;
+        _repairAndArrange(targetSection);
+      } else {
+        final requestedDepth =
+            _dragItemKey == dragged.key ? _dragPreviewDepth : startDepth;
+        _dragPreviewDepth = _applyRequestedDepth(
+          targetSection,
+          targetItemIndex,
+          requestedDepth,
+        );
+        _repairAndArrange(targetSection);
+      }
       _dragDepthNotifier.value = _dragPreviewDepth;
-      _repairAndArrange(section);
       _dragReorderApplied = true;
     });
 
@@ -578,6 +672,17 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       const Duration(milliseconds: 16),
       _finishItemDrag,
     );
+  }
+
+  void _changeItemDepth(
+      _WorkingSection section, _WorkingItem item, int requestedDepth) {
+    setState(() {
+      final itemIndex = section.tiles.indexOf(item);
+      if (itemIndex < 0) return;
+      _applyRequestedDepth(
+          section, itemIndex, requestedDepth.clamp(0, _maximumNavigationLevel));
+      _repairAndArrange(section);
+    });
   }
 
   void _scheduleFinishItemDrag() {
@@ -626,25 +731,38 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
 
   Future<void> _moveItemToSection(
       _WorkingSection fromSection, _WorkingItem item) async {
-    final target = await showModalBottomSheet<_WorkingSection>(
+    final target = await showDialog<_WorkingSection>(
       context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Move to section',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            for (final section in _sections)
-              if (section.key != fromSection.key)
-                ListTile(
-                  title: Text(section.label),
-                  onTap: () => Navigator.of(sheetContext).pop(section),
-                ),
-          ],
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Move "${item.label}" to section'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final section in _sections)
+                if (section.key != fromSection.key)
+                  ListTile(
+                    key: ValueKey('move-target-${section.key}'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(section.customTitle.trim().isNotEmpty
+                        ? section.customTitle.trim()
+                        : section.label),
+                    subtitle: section.customTitle.trim().isNotEmpty &&
+                            section.customTitle.trim() != section.label
+                        ? Text(section.label)
+                        : null,
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                    onTap: () => Navigator.of(dialogContext).pop(section),
+                  ),
+            ],
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+          ),
+        ],
       ),
     );
     if (target == null) return;
@@ -654,8 +772,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   }
 
   /// Detaches the item (and its contiguous subtree block) from one section and
-  /// appends it to another as a top-level row. Shared by the "Move to section"
-  /// menu and the cross-section drag-and-drop drop handler.
+  /// appends it to another as a top-level row.
   void _moveItemBetweenSections(int fromIndex, String itemKey, int toIndex) {
     if (fromIndex == toIndex) return;
     if (fromIndex < 0 || fromIndex >= _sections.length) return;
@@ -720,7 +837,12 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         items: items,
       ));
       if (!mounted) return;
-      unawaited(context.read<LocaleProvider>().refreshFromServer());
+      // Wait for the bootstrap response that contains the newly decorated
+      // menu_structure. Applying the flat nav config alone does not replace
+      // the drawer's current section tree, so returning early could show the
+      // old layout until a later restart/locale refresh.
+      await context.read<LocaleProvider>().refreshFromServer();
+      if (!mounted) return;
       messenger.showSnackBar(
           SnackBar(content: Text(context.tr('Navigation menu updated.'))));
     } on ApiException catch (error) {
@@ -731,6 +853,22 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   }
 
   Widget _dragProxy(Widget child, int index, Animation<double> animation) {
+    final entries = _unifiedEntries();
+    final isSectionHeader =
+        index >= 0 && index < entries.length && entries[index].isSectionHeader;
+    if (isSectionHeader) {
+      return AnimatedBuilder(
+        animation: animation,
+        child: child,
+        builder: (context, proxyChild) => Material(
+          elevation: 3 + animation.value * 5,
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          child: proxyChild,
+        ),
+      );
+    }
+
     return ValueListenableBuilder<int>(
       valueListenable: _dragDepthNotifier,
       child: child,
@@ -787,7 +925,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     );
   }
 
-  Widget _buildItemRow(int sectionIndex, int itemIndex) {
+  Widget _buildItemRow(int sectionIndex, int itemIndex, int unifiedIndex) {
     final section = _sections[sectionIndex];
     final tile = section.tiles[itemIndex];
     final actualDepth = _depthOf(section, tile.key);
@@ -796,7 +934,8 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     final displayDepth = isDragging ? _dragPreviewDepth : actualDepth;
     final colorScheme = Theme.of(context).colorScheme;
 
-    final row = AnimatedContainer(
+    return AnimatedContainer(
+      key: ValueKey('nav-item-${tile.key}'),
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeOut,
       margin: EdgeInsets.only(
@@ -831,24 +970,32 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             child:
                 Text(tile.label, maxLines: 2, overflow: TextOverflow.ellipsis),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                child: Text(
-                  navigationLevelLabel(displayDepth),
-                  style:
-                      const TextStyle(fontSize: 9, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
+          PopupMenuButton<int>(
+            key: ValueKey('nav-level-${tile.key}'),
+            tooltip: 'Change menu level',
+            initialValue: actualDepth,
+            icon: const Icon(Icons.format_indent_increase, size: 18),
+            onSelected: (level) => _changeItemDepth(section, tile, level),
+            itemBuilder: (context) {
+              final maximumDepth = itemIndex == 0
+                  ? 0
+                  : math.min(
+                      _maximumNavigationLevel -
+                          _subtreeHeight(section, itemIndex),
+                      _depthOf(section, section.tiles[itemIndex - 1].key) + 1,
+                    );
+              return [
+                for (var level = 0; level <= maximumDepth; level++)
+                  PopupMenuItem<int>(
+                    key: ValueKey('nav-level-option-${tile.key}-$level'),
+                    value: level,
+                    child: Text(navigationLevelLabel(level)),
+                  ),
+              ];
+            },
           ),
           IconButton(
+            key: ValueKey('nav-move-${tile.key}'),
             visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.drive_file_move_outline, size: 19),
             tooltip: 'Move to section',
@@ -861,7 +1008,8 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                 _beginItemPointer(sectionIndex, itemIndex, event),
             onPointerMove: (event) => _handleItemPointerMove(tile.key, event),
             child: ReorderableDragStartListener(
-              index: itemIndex,
+              key: ValueKey('nav-drag-${tile.key}'),
+              index: unifiedIndex,
               child: Tooltip(
                 message:
                     'Drag vertically to reorder and left/right to change level',
@@ -875,42 +1023,74 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         ],
       ),
     );
+  }
 
-    // The drag handle keeps the vertical reorder + indent gesture. A
-    // long-press anywhere else on the row starts a cross-section drag: drop
-    // it on any other section card to re-home the item.
-    return LongPressDraggable<_NavDragData>(
-      key: ValueKey('item_${section.key}_${tile.key}'),
-      data: _NavDragData(sectionIndex, tile.key, tile.label),
-      maxSimultaneousDrags: 1,
-      hapticFeedbackOnStart: true,
-      feedback: Material(
-        elevation: 6,
+  Widget _buildSectionHeader(int sectionIndex, int unifiedIndex) {
+    final section = _sections[sectionIndex];
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      key: ValueKey('nav-section-${section.key}'),
+      margin: const EdgeInsets.fromLTRB(0, 10, 0, 4),
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        color: colorScheme.surface,
-        child: Container(
-          constraints: const BoxConstraints(minWidth: 160, maxWidth: 280),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: colorScheme.primary, width: 2),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.drive_file_move_outline,
-                  size: 18, color: colorScheme.primary),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(tile.label,
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
+        side: BorderSide(
+          color: scheme.outlineVariant.withValues(alpha: 0.55),
         ),
       ),
-      childWhenDragging: Opacity(opacity: 0.35, child: row),
-      child: row,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    section.label,
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    key: ValueKey('section-title-${section.key}'),
+                    initialValue: section.customTitle,
+                    maxLength: 120,
+                    decoration: InputDecoration(
+                      labelText: 'Custom section title',
+                      hintText: section.tiles.isNotEmpty
+                          ? section.tiles.first.label
+                          : section.label,
+                      helperText: section.tiles.isEmpty
+                          ? 'Empty section — drop an item below this header'
+                          : null,
+                      counterText: '',
+                      isDense: true,
+                    ),
+                    onChanged: (value) => section.customTitle = value,
+                  ),
+                ],
+              ),
+            ),
+            ReorderableDragStartListener(
+              key: ValueKey('nav-section-drag-${section.key}'),
+              index: unifiedIndex,
+              child: Tooltip(
+                message: 'Drag section boundary',
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Icon(Icons.drag_handle, color: Colors.grey.shade400),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -918,6 +1098,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   Widget build(BuildContext context) {
     _ensureSectionsLoaded();
     final embeddedInSduiScrollView = widget.schema != null;
+    final entries = _unifiedEntries();
 
     final sectionList = ReorderableListView(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
@@ -926,125 +1107,28 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
           ? const NeverScrollableScrollPhysics()
           : null,
       buildDefaultDragHandles: false,
-      onReorderItem: (oldIndex, newIndex) {
-        setState(() {
-          final section = _sections.removeAt(oldIndex);
-          _sections.insert(newIndex, section);
-        });
-      },
+      proxyDecorator: _dragProxy,
+      onReorderStart: _onUnifiedDragStart,
+      onReorderEnd: (_) => _scheduleFinishItemDrag(),
+      onReorderItem: _onUnifiedReorder,
       children: [
-        for (var sectionIndex = 0;
-            sectionIndex < _sections.length;
-            sectionIndex++)
-          DragTarget<_NavDragData>(
-            key: ValueKey('section_${_sections[sectionIndex].key}'),
-            onWillAcceptWithDetails: (details) =>
-                details.data.sectionIndex != sectionIndex,
-            onAcceptWithDetails: (details) => _moveItemBetweenSections(
-                details.data.sectionIndex, details.data.itemKey, sectionIndex),
-            builder: (context, candidate, rejected) {
-              final active = candidate.isNotEmpty;
-              final scheme = Theme.of(context).colorScheme;
-              final tiles = _sections[sectionIndex].tiles;
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 6),
-                clipBehavior: Clip.hardEdge,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: active
-                      ? BorderSide(color: scheme.primary, width: 2)
-                      : BorderSide(
-                          color: scheme.outlineVariant.withValues(alpha: 0.4)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 12, 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _sections[sectionIndex].label,
-                                  style: TextStyle(
-                                    color: scheme.onSurfaceVariant,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                TextFormField(
-                                  key: ValueKey(
-                                      'section-title-${_sections[sectionIndex].key}'),
-                                  initialValue:
-                                      _sections[sectionIndex].customTitle,
-                                  maxLength: 120,
-                                  decoration: InputDecoration(
-                                    labelText: 'Custom section title',
-                                    hintText: tiles.isNotEmpty
-                                        ? tiles.first.label
-                                        : _sections[sectionIndex].label,
-                                    counterText: '',
-                                    isDense: true,
-                                  ),
-                                  onChanged: (value) => _sections[sectionIndex]
-                                      .customTitle = value,
-                                ),
-                              ],
-                            ),
-                          ),
-                          ReorderableDragStartListener(
-                            index: sectionIndex,
-                            child: Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: Icon(Icons.drag_handle,
-                                  color: Colors.grey.shade400),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (tiles.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-                        child: Text(
-                          active
-                              ? 'Release to add the item here'
-                              : 'Empty — drag a menu item onto this section',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      )
-                    else
-                      ReorderableListView(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        buildDefaultDragHandles: false,
-                        proxyDecorator: _dragProxy,
-                        onReorderStart: (index) =>
-                            _onItemDragStart(sectionIndex, index),
-                        onReorderEnd: (_) => _scheduleFinishItemDrag(),
-                        onReorderItem: (oldIndex, newIndex) =>
-                            _onItemReorder(sectionIndex, oldIndex, newIndex),
-                        children: [
-                          for (var itemIndex = 0;
-                              itemIndex < tiles.length;
-                              itemIndex++)
-                            _buildItemRow(sectionIndex, itemIndex),
-                        ],
-                      ),
-                    const SizedBox(height: 6),
-                  ],
-                ),
-              );
-            },
-          ),
+        for (var unifiedIndex = 0;
+            unifiedIndex < entries.length;
+            unifiedIndex++)
+          if (entries[unifiedIndex].isSectionHeader)
+            _buildSectionHeader(
+              _sections.indexOf(entries[unifiedIndex].section),
+              unifiedIndex,
+            )
+          else
+            _buildItemRow(
+              _sections.indexOf(entries[unifiedIndex].section),
+              entries[unifiedIndex]
+                  .section
+                  .tiles
+                  .indexOf(entries[unifiedIndex].item!),
+              unifiedIndex,
+            ),
       ],
     );
 
@@ -1069,7 +1153,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
           child: Text(
-            'Tip: long-press an item and drag it onto another section to move it there.',
+            'Tip: drag any item across a section header, or use its move button for a quick transfer.',
             style: TextStyle(
               fontSize: 11,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
