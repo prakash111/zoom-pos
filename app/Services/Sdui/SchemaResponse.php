@@ -839,6 +839,9 @@ class SchemaResponse
             'paid_amount' => $paid,
             'due_amount' => $due,
             'pdf_endpoint' => "/api/tenant/invoices/{$sale->id}/pdf-stream",
+            'batch_dispatch_endpoint' => $documentType === 'quotation'
+                ? null
+                : '/api/v1/tenant/dispatch/batch',
             'share_text' => trim(sprintf(
                 'Thank you for your business! Your receipt for %s%s%s',
                 $sale->sale_number,

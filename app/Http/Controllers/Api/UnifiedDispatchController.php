@@ -107,6 +107,68 @@ class UnifiedDispatchController extends Controller
     }
 
     /**
+     * Dispatch one sale/invoice through several enabled channels in one
+     * request. The client uses this for the checkbox-based POS action sheet.
+     */
+    public function batchDispatch(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'document_id' => ['required'],
+            'document_type' => ['nullable', 'string', 'in:invoice,invoice_reminder,sale,receipt'],
+            'channels' => ['required', 'array', 'min:1'],
+            'channels.*' => ['string', 'in:sms,whatsapp,email,webhook,custom_webhook'],
+            'phone' => ['nullable', 'string'],
+            'email' => ['nullable', 'email'],
+        ]);
+
+        $company = $this->resolveCompany($request);
+        $requestedType = match ($validated['document_type'] ?? 'invoice') {
+            'sale', 'receipt' => 'sale',
+            default => 'invoice',
+        };
+        [$document, $resolvedType] = $this->resolveDocument(
+            $company,
+            $requestedType,
+            $validated['document_id']
+        );
+
+        $phone = trim((string) ($validated['phone'] ?? '')) ?: ($document->customer?->phone ?? $document->customer_phone ?? null);
+        $email = trim((string) ($validated['email'] ?? '')) ?: ($document->customer?->email ?? $document->customer_email ?? null);
+        $channels = array_values(array_unique(array_map(
+            fn ($channel) => $channel === 'webhook' ? 'custom_webhook' : $channel,
+            $validated['channels']
+        )));
+
+        $dispatcher = app(TenantNotificationDispatcherService::class);
+        $results = $dispatcher->dispatchReceipt($company, $document, $channels, $phone, $email);
+        $successful = [];
+        $failed = [];
+        foreach ($channels as $channel) {
+            $key = $channel === 'custom_webhook' ? 'webhook' : $channel;
+            $result = $results[$key] ?? null;
+            if (($result['success'] ?? false) === true) {
+                $successful[] = ucfirst($key);
+            } else {
+                $failed[$key] = $result['message'] ?? $result['error'] ?? 'No recipient or configured gateway.';
+            }
+        }
+
+        $message = $successful
+            ? 'Dispatched via: '.implode(', ', $successful)
+            : 'No selected channel could be dispatched.';
+
+        return response()->json([
+            'success' => $successful !== [],
+            'message' => $message,
+            'document_id' => (string) $document->id,
+            'document_type' => $resolvedType,
+            'channels' => $channels,
+            'results' => $results,
+            'failed' => $failed,
+        ], $successful !== [] ? 200 : 422);
+    }
+
+    /**
      * Polymorphic document resolver supporting ID, sale_number, external_id,
      * and numeric suffix lookups across Quotation and Sale models.
      *

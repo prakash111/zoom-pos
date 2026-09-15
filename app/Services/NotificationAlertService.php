@@ -38,7 +38,8 @@ class NotificationAlertService
 
         foreach ($this->dueInvoices($companyId) as $invoice) {
             $reference = $invoice->sale_number ?: (string) $invoice->id;
-            $due = (float) ($invoice->due_amount ?? $invoice->total ?? 0);
+            $balanceColumn = $this->balanceDueColumn();
+            $due = (float) ($invoice->{$balanceColumn} ?? $invoice->due_amount ?? $invoice->total ?? 0);
             $postSaleData = SchemaResponse::postSaleActionData($invoice);
             $postSaleData['actions_endpoint'] = "/api/v1/tenant/receivables/{$invoice->id}/reminder-sheet?document_type={$postSaleData['document_type']}";
             $alerts->push([
@@ -161,6 +162,8 @@ class NotificationAlertService
 
     private function dueInvoicesQuery(mixed $companyId): Builder
     {
+        $balanceColumn = $this->balanceDueColumn();
+
         return Sale::withoutGlobalScope('company')
             ->where(function ($q) use ($companyId) {
                 $q->where('company_id', $companyId);
@@ -171,7 +174,7 @@ class NotificationAlertService
             ->where(function ($query) {
                 $query->where('operation_type', 'sale')->orWhereNull('operation_type');
             })
-            ->where('due_amount', '>', 0)
+            ->where($balanceColumn, '>', 0)
             ->whereNotNull('due_date')
             ->whereDate('due_date', '<=', now())
             ->when(Schema::hasColumn('sales', 'due_reminder_dismissed_at'), function ($q) {
@@ -185,6 +188,11 @@ class NotificationAlertService
                         ->where('notification_type', 'invoice');
                 });
             });
+    }
+
+    private function balanceDueColumn(): string
+    {
+        return Schema::hasColumn('sales', 'balance_due') ? 'balance_due' : 'due_amount';
     }
 
     private function leadRemindersQuery(mixed $companyId): Builder

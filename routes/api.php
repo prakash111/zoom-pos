@@ -298,6 +298,8 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     // Central Unified Dispatch Route & Handlers
     Route::post('/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
     Route::post('/v1/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
+    Route::post('/tenant/dispatch/batch', [UnifiedDispatchController::class, 'batchDispatch']);
+    Route::post('/v1/tenant/dispatch/batch', [UnifiedDispatchController::class, 'batchDispatch']);
     Route::post('/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
 
     // Document Action & Invoice Preview Bottom Sheets
@@ -1157,6 +1159,8 @@ Route::prefix('v1/pos')->group(function () {
 Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::post('/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
     Route::post('/v1/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
+    Route::post('/tenant/dispatch/batch', [UnifiedDispatchController::class, 'batchDispatch']);
+    Route::post('/v1/tenant/dispatch/batch', [UnifiedDispatchController::class, 'batchDispatch']);
 
     Route::post('/tenant/settings/sms-gateway', [TenantSettingsController::class, 'saveSmsCredentials']);
     Route::post('/v1/tenant/settings/sms-gateway', [TenantSettingsController::class, 'saveSmsCredentials']);
