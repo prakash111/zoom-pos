@@ -1289,11 +1289,30 @@ class DynamicSchemaParser {
             opt['label']?.toString() ?? opt['name']?.toString() ?? '';
         final optVal =
             opt['value']?.toString() ?? opt['code']?.toString() ?? optLabel;
-        options.add(
-            DropdownMenuItem(value: optVal, child: Text(context.tr(optLabel))));
+        options.add(DropdownMenuItem(
+          value: optVal,
+          child: Text(
+            context.tr(optLabel),
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : null,
+            ),
+          ),
+        ));
       } else {
         final str = opt.toString();
-        options.add(DropdownMenuItem(value: str, child: Text(context.tr(str))));
+        options.add(DropdownMenuItem(
+          value: str,
+          child: Text(
+            context.tr(str),
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : null,
+            ),
+          ),
+        ));
       }
     }
 
