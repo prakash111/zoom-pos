@@ -503,5 +503,169 @@ void main() {
       expect(find.text('prakash@example.com'), findsOneWidget);
       expect(find.widgetWithText(ListTile, 'Log Out'), findsOneWidget);
     });
+
+    testWidgets(
+        'Main Menu items with level 0 render as independent roots not trapped in Store Profile',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 1100);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final user = UserModel(
+        id: 'u1',
+        companyId: 'c1',
+        name: 'prakash',
+        email: 'prakash@example.com',
+        role: 'admin',
+        permissions: const {'*': true},
+      );
+
+      final company = CompanyModel(
+        id: 'c1',
+        name: 'ZoomNearby',
+        planName: 'Pro',
+        tradeName: 'ZoomNearby',
+        businessType: 'RETAIL',
+        posMode: 'general',
+        currency: 'USD',
+        currencySymbol: '\$',
+      );
+
+      BootstrapCache.instance.menuStructure = const [
+        SduiNavSectionSchema(
+          key: 'administration',
+          title: 'Administration & Settings',
+          items: [
+            SduiNavItemSchema(
+              key: 'settings_profile',
+              title: 'Store Profile',
+              icon: 'storefront',
+            ),
+            SduiNavItemSchema(
+              key: 'languages',
+              title: 'Languages & Translations',
+              icon: 'translate',
+            ),
+            SduiNavItemSchema(
+              key: 'staff',
+              title: 'Users & Permissions',
+              icon: 'badge',
+            ),
+            SduiNavItemSchema(
+              key: 'roles',
+              title: 'Roles & Access Levels',
+              icon: 'admin_panel_settings',
+            ),
+            SduiNavItemSchema(
+              key: 'devices',
+              title: 'Terminals & Devices',
+              icon: 'devices_other',
+            ),
+            SduiNavItemSchema(
+              key: 'hardware_printer',
+              title: 'Printer & Hardware Setup',
+              icon: 'print',
+            ),
+            SduiNavItemSchema(
+              key: 'change_password',
+              title: 'Change Password',
+              icon: 'lock_reset',
+            ),
+          ],
+        ),
+      ];
+      addTearDown(() => BootstrapCache.instance.menuStructure = []);
+
+      BootstrapCache.instance.navConfig = NavConfig(
+        sections: const [NavSectionOrder(key: 'administration', order: 0)],
+        items: [
+          const NavItemConfig(
+            key: 'settings_profile',
+            section: 'administration',
+            level: 0,
+            order: 0,
+            visible: true,
+          ),
+          const NavItemConfig(
+            key: 'languages',
+            section: 'administration',
+            level: 0,
+            order: 1,
+            visible: true,
+          ),
+          const NavItemConfig(
+            key: 'staff',
+            section: 'administration',
+            parent: 'languages',
+            level: 1,
+            order: 2,
+            visible: true,
+          ),
+          const NavItemConfig(
+            key: 'roles',
+            section: 'administration',
+            parent: 'languages',
+            level: 1,
+            order: 3,
+            visible: true,
+          ),
+          const NavItemConfig(
+            key: 'devices',
+            section: 'administration',
+            level: 0,
+            order: 4,
+            visible: true,
+          ),
+          const NavItemConfig(
+            key: 'hardware_printer',
+            section: 'administration',
+            level: 0,
+            order: 5,
+            visible: true,
+          ),
+          const NavItemConfig(
+            key: 'change_password',
+            section: 'administration',
+            level: 0,
+            order: 6,
+            visible: true,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(_buildTestApp(user: user, company: company));
+      await tester.pumpAndSettle();
+
+      final scaffoldState = tester.state<ScaffoldState>(find.byType(Scaffold));
+      scaffoldState.openDrawer();
+      await tester.pumpAndSettle();
+
+      // Store Profile is a standalone tile at depth 0, NOT an accordion containing the other items
+      expect(find.byKey(const ValueKey('drawer-item-settings_profile')), findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-expand-settings_profile')), findsNothing);
+
+      // Languages & Translations, Devices, Hardware Printer, Change Password are all visible at root level
+      expect(find.byKey(const ValueKey('drawer-item-languages')), findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-devices')), findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-hardware_printer')), findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-change_password')), findsOneWidget);
+
+      // Sub-items of languages (staff, roles) are not visible until languages is expanded
+      expect(find.byKey(const ValueKey('drawer-item-staff')), findsNothing);
+      expect(find.byKey(const ValueKey('drawer-item-roles')), findsNothing);
+
+      // Expand languages
+      await tester.tap(find.byKey(const ValueKey('drawer-expand-languages')));
+      await tester.pumpAndSettle();
+
+      // Now staff and roles appear
+      expect(find.byKey(const ValueKey('drawer-item-staff')), findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-roles')), findsOneWidget);
+
+      // Verify indentation: staff has left padding 46 (16 + 1 * 30)
+      final staffTile = tester.widget<ListTile>(find.byKey(const ValueKey('drawer-item-staff')));
+      expect(staffTile.contentPadding, const EdgeInsets.only(left: 46, right: 12));
+    });
   });
 }

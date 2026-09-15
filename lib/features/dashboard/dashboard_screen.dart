@@ -367,7 +367,9 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
       final rawParent = row.tile.key == 'settings'
           ? null
           : (item != null
-              ? (item.level == 0 ? null : (item.parentId ?? item.parent))
+              ? (item.level == 0 || item.parentId == null || item.parentId!.isEmpty
+                  ? null
+                  : (item.parentId ?? item.parent))
               : sectionMetaByKey[entry.key]?.parentByKey[row.tile.key]);
       final candidate =
           rawParent == null || rawParent.isEmpty ? null : rawParent;
@@ -387,7 +389,9 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
         cursor = cursor == 'settings'
             ? null
             : (itemOverrides[cursor] != null
-                ? (itemOverrides[cursor]!.level == 0
+                ? (itemOverrides[cursor]!.level == 0 ||
+                        itemOverrides[cursor]!.parentId == null ||
+                        itemOverrides[cursor]!.parentId!.isEmpty
                     ? null
                     : (itemOverrides[cursor]!.parentId ??
                         itemOverrides[cursor]!.parent))
@@ -962,14 +966,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _onDockItemSelected(context, index);
         }
 
+        final itemOverrides = {
+          for (final item in bootstrap.navConfig.items) item.key: item
+        };
+
         for (final section in navSections) {
-          final childrenByParent = <String?, List<_FeatureTile>>{};
+          if (section.tiles.isEmpty) continue;
           final firstItem = section.tiles.first;
+
+          final rootItems = <_FeatureTile>[];
+          final childrenByParent = <String?, List<_FeatureTile>>{};
+          _FeatureTile? activeParent;
+
           for (final tile in section.tiles) {
-            final parent = tile.key == firstItem.key
-                ? null
-                : section.parentByKey[tile.key];
-            (childrenByParent[parent] ??= []).add(tile);
+            final override = itemOverrides[tile.key];
+            // Check if the item is explicitly a Main Menu (level 0)
+            final bool isMainMenu = override != null
+                ? (override.level == 0 ||
+                    override.parentId == null ||
+                    override.parentId!.isEmpty)
+                : (tile.key == 'settings' ||
+                    tile.key == firstItem.key ||
+                    (section.key != 'cashier_sales' &&
+                        section.parentByKey[tile.key] == null));
+
+            if (isMainMenu) {
+              activeParent = tile;
+              rootItems.add(tile);
+            } else {
+              final targetParentKey = (override != null &&
+                      override.parentId != null &&
+                      override.parentId!.isNotEmpty)
+                  ? override.parentId!
+                  : (section.parentByKey[tile.key] ??
+                      activeParent?.key ??
+                      firstItem.key);
+              (childrenByParent[targetParentKey] ??= []).add(tile);
+            }
           }
 
           Widget buildBranch(
@@ -1097,12 +1130,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
           }
 
-          final sectionChildren = section.tiles
-              .where((tile) =>
-                  tile.key != firstItem.key &&
-                  (section.parentByKey[tile.key] == null ||
-                      section.parentByKey[tile.key] == firstItem.key))
-              .toList();
           children.add(Padding(
             key: ValueKey('drawer-section-divider-${section.key}'),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1130,12 +1157,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ));
           }
 
-          children.add(buildBranch(
-            firstItem,
-            0,
-            childOverride: sectionChildren,
-            sectionParent: true,
-          ));
+          for (final root in rootItems) {
+            children.add(buildBranch(
+              root,
+              0,
+              childOverride: childrenByParent[root.key],
+              sectionParent: true,
+            ));
+          }
         }
 
         final hasChangePassword = navSections.any(
