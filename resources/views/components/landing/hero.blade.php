@@ -46,17 +46,17 @@
 
             <!-- Center Nav Links -->
             <nav class="hidden md:flex items-center gap-6 lg:gap-8 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                <a href="#showcase" class="hover:text-slate-950 dark:hover:text-white transition">{{ __('Platform') }}</a>
-                <a href="#features" class="hover:text-slate-950 dark:hover:text-white transition">{{ __('Products') }}</a>
-                <a href="#solutions" class="hover:text-slate-950 dark:hover:text-white transition">{{ __('Solutions') }}</a>
-                <a href="#pricing" class="hover:text-slate-950 dark:hover:text-white transition">{{ __('Pricing') }}</a>
-                <a href="#about" class="hover:text-slate-950 dark:hover:text-white transition">{{ __('Company') }}</a>
+                <a href="#showcase" class="hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.platform', __('Platform')) }}</a>
+                <a href="#features" class="hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.products', __('Products')) }}</a>
+                <a href="#solutions" class="hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.solutions', __('Solutions')) }}</a>
+                <a href="#pricing" class="hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.pricing', __('Pricing')) }}</a>
+                <a href="#about" class="hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.company', __('Company')) }}</a>
             </nav>
 
             <!-- Right Actions -->
             <div class="flex items-center gap-4 text-xs font-bold">
-                <a href="#contact" class="hidden sm:inline-block text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white transition">{{ __('Documentation') }}</a>
-                <a href="{{ route('tenant.login') }}" class="text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white transition">{{ __('Sign in') }}</a>
+                <a href="#contact" class="hidden sm:inline-block text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.documentation', __('Documentation')) }}</a>
+                <a href="{{ route('tenant.login') }}" class="text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.sign_in', __('Sign in')) }}</a>
                 <a href="{{ $ctaPrimaryUrl }}" class="px-5 py-2.5 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 hover:bg-slate-800 dark:hover:bg-slate-100 transition shadow-md shadow-slate-900/10 active:scale-95">
                     {{ $ctaPrimaryText }}
                 </a>

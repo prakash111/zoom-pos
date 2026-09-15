@@ -47,6 +47,7 @@ class PlatformBranding extends Model
         'landing_windows_url', 'landing_windows_enabled',
         'landing_section_meta', 'landing_faqs',
         'landing_features', 'landing_testimonials',
+        'landing_content',
     ];
 
     protected function casts(): array
@@ -63,6 +64,7 @@ class PlatformBranding extends Model
             'landing_faqs' => 'array',
             'landing_features' => 'array',
             'landing_testimonials' => 'array',
+            'landing_content' => 'array',
         ];
     }
 
@@ -271,6 +273,13 @@ class PlatformBranding extends Model
             'accent' => $this->hexOr($meta['accent'] ?? null, $this->landing_accent_color ?: '#d7f24e'),
             'layout' => in_array($layout, ['default', 'centered', 'wide', 'compact'], true) ? $layout : 'default',
         ];
+    }
+
+    /** Resolve any landing-page copy key with a built-in fallback. */
+    public function landingText(string $key, string $default = ''): string
+    {
+        $value = data_get($this->landing_content ?? [], $key);
+        return filled($value) ? trim((string) $value) : $default;
     }
 
     /** Section title override configured by the SuperAdmin, or the given default. */

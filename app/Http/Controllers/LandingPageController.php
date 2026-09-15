@@ -47,6 +47,9 @@ class LandingPageController extends Controller
         });
 
         $view = "landing.themes.{$theme}";
+        if (filled(data_get($branding->landing_content ?? [], 'html'))) {
+            $view = 'landing.custom';
+        }
         if (! view()->exists($view)) {
             $view = 'landing.themes.'.self::DEFAULT_THEME;
         }

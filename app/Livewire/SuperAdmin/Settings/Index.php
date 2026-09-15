@@ -260,6 +260,11 @@ class Index extends Component
 
     public string $landingTestimonialsJson = '';
 
+    /** Complete override map for every visible landing-page label/copy. */
+    public string $landingContentJson = '';
+
+    public string $landingCustomHtml = '';
+
     // --- TAB 4: CUSTOM PAGES (CMS) ---
     public string $pageSearch = '';
 
@@ -387,6 +392,8 @@ class Index extends Component
             ->all();
         $this->landingFeaturesJson = json_encode($this->landingFeatures, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
         $this->landingTestimonialsJson = json_encode($this->landingTestimonials, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
+        $this->landingContentJson = json_encode($branding->landing_content ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
+        $this->landingCustomHtml = (string) data_get($branding->landing_content ?? [], 'html', '');
 
         $this->landingTheme = (string) setting('landing_page_theme', 'theme_fast');
 
@@ -970,6 +977,8 @@ class Index extends Component
             'landingTestimonials.*.role' => ['nullable', 'string', 'max:160'],
             'landingFeaturesJson' => ['nullable', 'string', 'max:50000'],
             'landingTestimonialsJson' => ['nullable', 'string', 'max:50000'],
+            'landingContentJson' => ['nullable', 'string', 'max:100000'],
+            'landingCustomHtml' => ['nullable', 'string', 'max:500000'],
         ]);
 
         foreach (['landingFeaturesJson' => 'landingFeatures', 'landingTestimonialsJson' => 'landingTestimonials'] as $jsonKey => $arrayKey) {
@@ -981,6 +990,17 @@ class Index extends Component
                 }
                 $this->{$arrayKey} = $decoded;
             }
+        }
+        $landingContent = [];
+        if (filled($this->landingContentJson)) {
+            $landingContent = json_decode($this->landingContentJson, true);
+            if (! is_array($landingContent)) {
+                $this->addError('landingContentJson', 'Enter a valid JSON object of copy overrides.');
+                return;
+            }
+        }
+        if (filled($this->landingCustomHtml)) {
+            $landingContent['html'] = $this->landingCustomHtml;
         }
 
         if ($this->logoImage) {
@@ -1093,6 +1113,7 @@ class Index extends Component
             'landing_faqs' => $faqs ?: null,
             'landing_features' => $features ?: null,
             'landing_testimonials' => $testimonials ?: null,
+            'landing_content' => $landingContent ?: null,
         ]);
 
         \Illuminate\Support\Facades\Cache::forget('public_settings');

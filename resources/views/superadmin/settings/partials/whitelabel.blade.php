@@ -404,6 +404,18 @@
                 </div>
             </div>
 
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('All landing-page copy overrides (JSON)') }}</label>
+                <textarea wire:model="landingContentJson" rows="12" class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono" placeholder='{"hero.badge":"Your text","nav.platform":"Platform"}'></textarea>
+                <p class="text-[11px] text-slate-500">{{ __('Use dot-separated keys. Any text not listed keeps its built-in translation. This editor covers navigation, labels, headings, buttons, cards and footer copy.') }}</p>
+                @error('landingContentJson') <p class="text-[11px] text-rose-500 font-bold">{{ $message }}</p> @enderror
+            </div>
+            <div class="space-y-2">
+                <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('Complete landing page HTML override (optional)') }}</label>
+                <textarea wire:model="landingCustomHtml" rows="10" class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono" placeholder="<section>...</section>"></textarea>
+                <p class="text-[11px] text-slate-500">{{ __('When provided, this replaces the built-in landing sections. HTML is sanitized before publishing, so every word and layout element can be edited from this panel.') }}</p>
+            </div>
+
             <!-- Landing Page Section Toggles -->
             <div class="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
                 <label class="block text-xs font-black uppercase tracking-wider text-slate-500">{{ __('Enabled Landing Page Sections') }}</label>
