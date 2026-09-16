@@ -261,6 +261,7 @@ class TenantNavRegistry
             $custom = self::buildCustomNavTree($tenant);
             if (! empty($custom)) {
                 $sections = array_values(array_map([self::class, 'normalizeSection'], $custom));
+                $sections = self::consolidateCoreSections($sections);
                 $sections = self::filterDomainMismatches($sections, $tenant);
 
                 return self::withActionableSectionParents(
@@ -270,6 +271,7 @@ class TenantNavRegistry
             }
         } elseif (is_object($tenant) && ! empty($tenant->navigation_menu_customization)) {
             $sections = array_values(array_map([self::class, 'normalizeSection'], (array) $tenant->navigation_menu_customization));
+            $sections = self::consolidateCoreSections($sections);
             $sections = self::filterDomainMismatches($sections, $tenant);
 
             return self::withActionableSectionParents(
@@ -565,6 +567,32 @@ class TenantNavRegistry
                 $sections[$target]['items'][] = $item;
             }
             unset($sections[$i]);
+        }
+        // Consignments is a peer transaction action, never a quotation
+        // submenu. Promote it from legacy nested children in saved layouts.
+        if (isset($index['cashier_sales'])) {
+            $cashier = $index['cashier_sales'];
+            $promoted = [];
+            $walk = function (array &$items) use (&$walk, &$promoted): void {
+                foreach ($items as &$item) {
+                    if (strtolower((string) ($item['key'] ?? '')) === 'consignments') {
+                        $promoted[] = $item;
+                        $item = null;
+                        continue;
+                    }
+                    if (! empty($item['children']) && is_array($item['children'])) {
+                        $walk($item['children']);
+                        $item['children'] = array_values(array_filter($item['children']));
+                        if ($item['children'] === []) unset($item['children']);
+                    }
+                }
+                $items = array_values(array_filter($items));
+            };
+            $items = $sections[$cashier]['items'] ?? [];
+            $walk($items);
+            foreach ($promoted as $item) {
+                $sections[$cashier]['items'][] = $item;
+            }
         }
         return array_values($sections);
     }
