@@ -485,8 +485,8 @@ class PosSyncApiController extends Controller
         $demoAccounts = [];
         if ($demoMode) {
             // Keep the mobile quick-fill accounts aligned with the credentials
-            // advertised on the tenant web login. The legacy aliases below
-            // remain available for older clients and existing demo data.
+            // advertised on the tenant web login. Return one canonical chip
+            // per workspace so legacy aliases cannot create duplicates.
             $demoAccounts[] = [
                 'label' => 'All Modules / Enterprise',
                 'store_type' => 'ENTERPRISE_OMNICHANNEL',
@@ -502,14 +502,6 @@ class PosSyncApiController extends Controller
             ] as $account) {
                 $account['password'] = 'demo1234';
                 $demoAccounts[] = $account;
-            }
-            foreach (DemoAccountsSeeder::ACCOUNTS as $storeType => $meta) {
-                $demoAccounts[] = [
-                    'label' => $meta['label'],
-                    'store_type' => $storeType,
-                    'email' => $meta['email'],
-                    'password' => DemoAccountsSeeder::PASSWORD,
-                ];
             }
         }
 
