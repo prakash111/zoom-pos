@@ -528,6 +528,7 @@ class TenantNavRegistry
             'sales' => 'cashier_sales', 'quotations' => 'cashier_sales', 'consignments' => 'cashier_sales',
             'customers' => 'cashier_sales', 'inventory' => 'products_inventory', 'digital_catalog' => 'products_inventory',
             'finance' => 'financial_management', 'dispatch_omnichannel' => 'cashier_sales',
+            'api_integrations' => 'administration', 'api' => 'administration',
         ];
         $index = [];
         foreach ($sections as $i => $section) {
@@ -542,6 +543,9 @@ class TenantNavRegistry
                 $itemKey = (string) ($item['key'] ?? $item['id'] ?? '');
                 if ($itemKey !== '' && collect($sections[$target]['items'] ?? [])->contains(fn ($existing) => (string) ($existing['key'] ?? $existing['id'] ?? '') === $itemKey)) continue;
                 $title = (string) ($item['title'] ?? $item['label'] ?? '');
+                if ($module === 'api_integrations' || $module === 'api') {
+                    $title = 'API & Webhook Integrations';
+                }
                 $item['title'] = $item['label'] = preg_replace('/\s+POS$/i', '', $title);
                 $sections[$target]['items'][] = $item;
             }
