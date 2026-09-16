@@ -151,6 +151,18 @@ class NavigationMenuController extends Controller
             }
         }
 
+        $selectedColor = null;
+        if ($tenantId) {
+            $preferences = \App\Models\TenantSetting::get($tenantId, 'app_preferences', []);
+            if (is_array($preferences)) {
+                $selectedColor = $preferences['drawer_text_icon_color']
+                    ?? $preferences['drawer_text_and_icons']
+                    ?? $preferences['drawer_icon_color']
+                    ?? $preferences['drawer_text_color']
+                    ?? null;
+            }
+        }
+
         // 1. Check for saved custom layout FIRST from tenant_settings
         if ($tenantId && Schema::hasTable('tenant_settings')) {
             $customSetting = DB::table('tenant_settings')
@@ -161,7 +173,7 @@ class NavigationMenuController extends Controller
             if (! empty($customSetting)) {
                 $sections = json_decode($customSetting, true);
                 if (is_array($sections) && ! empty($sections)) {
-                    $components = $this->formatCustomMenuComponents($sections);
+                    $components = $this->formatCustomMenuComponents($sections, $selectedColor);
 
                     return response()->json([
                         'success'    => true,
@@ -176,7 +188,7 @@ class NavigationMenuController extends Controller
         if ($company !== null) {
             $customTree = TenantNavRegistry::buildCustomNavTree($company);
             if (! empty($customTree)) {
-                $components = $this->formatCustomMenuComponents($customTree);
+                $components = $this->formatCustomMenuComponents($customTree, $selectedColor);
 
                 return response()->json([
                     'success'    => true,
@@ -187,7 +199,7 @@ class NavigationMenuController extends Controller
         }
 
         // 3. Fallback to default structure only if user never customized it
-        $defaultComponents = $this->getDefaultMenuComponents();
+        $defaultComponents = $this->getDefaultMenuComponents($request, $company, $selectedColor);
 
         return response()->json([
             'success'    => true,
@@ -200,23 +212,40 @@ class NavigationMenuController extends Controller
      * Format custom sections into SDUI drawer components.
      *
      * @param  list<array<string, mixed>>  $sections
+     * @param  string|null  $selectedColor
      * @return list<array<string, mixed>>
      */
-    public function formatCustomMenuComponents(array $sections): array
+    public function formatCustomMenuComponents(array $sections, ?string $selectedColor = null): array
     {
-        $components = [[
+        $sections = $this->sanitizeConsignmentsHierarchy($sections);
+        $homeItem = [
             'type' => 'list_tile',
             'key' => 'home',
             'title' => 'Home',
             'icon' => 'home',
             'action_type' => 'NAVIGATE_TO',
             'route' => '/dashboard',
-        ]];
+        ];
+
+        if ($selectedColor !== null && $selectedColor !== '') {
+            $homeItem['icon_color'] = $selectedColor;
+            $homeItem['leading'] = [
+                'type' => 'icon',
+                'name' => 'home',
+                'color' => $selectedColor,
+            ];
+            $homeItem['style'] = [
+                'textColor' => $selectedColor,
+                'iconColor' => $selectedColor,
+            ];
+        }
+
+        $components = [$homeItem];
 
         $isFlatList = ! empty($sections) && isset($sections[0]) && is_array($sections[0]) && ! isset($sections[0]['items']);
 
         if ($isFlatList) {
-            $formattedItems = $this->buildComponentsFromFlatItems($sections, '');
+            $formattedItems = $this->buildComponentsFromFlatItems($sections, '', $selectedColor);
             foreach ($formattedItems as $c) {
                 $components[] = $c;
             }
@@ -252,7 +281,7 @@ class NavigationMenuController extends Controller
                 ];
             }
 
-            $formattedItems = $this->buildComponentsFromFlatItems($items, $sectionKey);
+            $formattedItems = $this->buildComponentsFromFlatItems($items, $sectionKey, $selectedColor);
             foreach ($formattedItems as $component) {
                 $components[] = $component;
             }
@@ -261,15 +290,56 @@ class NavigationMenuController extends Controller
         return $components;
     }
 
+    /** Ensure legacy saved menus cannot render Consignments beneath Quotations. */
+    private function sanitizeConsignmentsHierarchy(array $sections): array
+    {
+        $promoted = [];
+        $walk = function (array &$items) use (&$walk, &$promoted): void {
+            foreach ($items as &$item) {
+                if (! is_array($item)) continue;
+                if (strtolower((string) ($item['key'] ?? $item['id'] ?? '')) === 'consignments') {
+                    $promoted[] = $item;
+                    $item = null;
+                    continue;
+                }
+                if (isset($item['children']) && is_array($item['children'])) {
+                    $walk($item['children']);
+                    $item['children'] = array_values(array_filter($item['children']));
+                    if ($item['children'] === []) unset($item['children']);
+                }
+            }
+            $items = array_values(array_filter($items));
+        };
+        foreach ($sections as &$section) {
+            if (! isset($section['items']) || ! is_array($section['items'])) continue;
+            foreach ($section['items'] as &$item) {
+                if (is_array($item) && isset($item['children']) && is_array($item['children'])) {
+                    $walk($item['children']);
+                    $item['children'] = array_values(array_filter($item['children']));
+                    if ($item['children'] === []) unset($item['children']);
+                }
+            }
+        }
+        foreach ($sections as &$section) {
+            if (($section['key'] ?? $section['id'] ?? '') === 'cashier_sales' && $promoted) {
+                $existing = array_map(fn ($i) => (string) ($i['key'] ?? $i['id'] ?? ''), $section['items'] ?? []);
+                foreach ($promoted as $item) if (! in_array('consignments', $existing, true)) { $section['items'][] = $item; $existing[] = 'consignments'; }
+                break;
+            }
+        }
+        return $sections;
+    }
+
     /**
      * Sequential hierarchy builder that breaks out of the active parent whenever
      * an item has level === 0 (or indent === 0 / parent_id === null).
      *
      * @param  list<array<string, mixed>>  $rawItems
      * @param  string  $sectionKey
+     * @param  string|null  $selectedColor
      * @return list<array<string, mixed>>
      */
-    public function buildComponentsFromFlatItems(array $rawItems, string $sectionKey = ''): array
+    public function buildComponentsFromFlatItems(array $rawItems, string $sectionKey = '', ?string $selectedColor = null): array
     {
         $formattedComponents = [];
         $currentRoot = null;
@@ -308,11 +378,11 @@ class NavigationMenuController extends Controller
                     $formattedComponents[] = $currentRoot;
                 }
 
-                $currentRoot = $this->formatCustomMenuItem($item, $sectionKey, null, 0);
+                $currentRoot = $this->formatCustomMenuItem($item, $sectionKey, null, 0, $selectedColor);
             } else {
                 // Sub-menu item
                 $parentKey = $parentId ?? ($currentRoot !== null ? ($currentRoot['key'] ?? null) : null);
-                $childNode = $this->formatCustomMenuItem($item, $sectionKey, $parentKey, max(1, $level));
+                $childNode = $this->formatCustomMenuItem($item, $sectionKey, $parentKey, max(1, $level), $selectedColor);
 
                 if ($childNode !== null) {
                     if ($currentRoot !== null) {
@@ -337,9 +407,13 @@ class NavigationMenuController extends Controller
      * Format an individual custom item node.
      *
      * @param  array<string, mixed>  $item
+     * @param  string  $sectionKey
+     * @param  string|null  $parentKey
+     * @param  int  $level
+     * @param  string|null  $selectedColor
      * @return array<string, mixed>|null
      */
-    private function formatCustomMenuItem(array $item, string $sectionKey, ?string $parentKey, int $level): ?array
+    private function formatCustomMenuItem(array $item, string $sectionKey, ?string $parentKey, int $level, ?string $selectedColor = null): ?array
     {
         if (($item['visible'] ?? true) === false) {
             return null;
@@ -367,13 +441,13 @@ class NavigationMenuController extends Controller
             if ($childKey === 'settings') {
                 continue;
             }
-            $formatted = $this->formatCustomMenuItem($child, $sectionKey, $key, $level + 1);
+            $formatted = $this->formatCustomMenuItem($child, $sectionKey, $key, $level + 1, $selectedColor);
             if ($formatted !== null) {
                 $children[] = $formatted;
             }
         }
 
-        return [
+        $node = [
             'type' => 'list_tile',
             'key' => $key,
             'section' => $sectionKey,
@@ -386,15 +460,32 @@ class NavigationMenuController extends Controller
             'route' => $route,
             'children' => $children,
         ];
+
+        return TenantNavRegistry::formatDrawerItem($node, $selectedColor);
+    }
+
+    /**
+     * Format a drawer item ensuring explicit icon color and leading component.
+     *
+     * @param  array<string, mixed>  $item
+     * @param  string|null  $selectedColor
+     * @return array<string, mixed>
+     */
+    public function formatDrawerItem(array $item, ?string $selectedColor = null): array
+    {
+        return TenantNavRegistry::formatDrawerItem($item, $selectedColor);
     }
 
     /**
      * Default drawer menu components fallback.
      *
+     * @param  Request|null  $request
+     * @param  Company|null  $company
+     * @param  string|null  $selectedColor
      * @return list<array<string, mixed>>
      */
-    public function getDefaultMenuComponents(): array
+    public function getDefaultMenuComponents(?Request $request = null, ?Company $company = null, ?string $selectedColor = null): array
     {
-        return (new NavigationController)->getDrawerMenuComponents();
+        return (new NavigationController)->getDrawerMenuComponents($request, $company, $selectedColor);
     }
 }
