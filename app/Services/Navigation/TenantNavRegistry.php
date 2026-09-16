@@ -334,8 +334,11 @@ class TenantNavRegistry
             $licensed = ['retail'];
         }
 
-        // 1. Core Retail / POS Sections
-        if (in_array('retail', $licensed, true)) {
+        // 1. Core Retail / POS Sections. Specialized verticals provide their
+        // own checkout and sales entries, so do not add the generic cashier
+        // section alongside pharmacy/restaurant/salon navigation.
+        $specializedVertical = (bool) array_intersect($licensed, ['pharmacy', 'restaurant', 'service_booking', 'repair_technician']);
+        if (in_array('retail', $licensed, true) && ! $specializedVertical) {
             $sections[] = self::getRetailSalesSection();
             $sections[] = self::getInventorySection();
             $sections[] = self::getFinancialSection();
@@ -506,7 +509,7 @@ class TenantNavRegistry
 
         // Single-mode vertical stores (e.g. restaurant-only) without retail still receive
         // inventory and financial management sections.
-        if (! in_array('retail', $licensed, true)) {
+        if (! in_array('retail', $licensed, true) || $specializedVertical) {
             if (! in_array('products_inventory', array_column($sections, 'key'), true)) {
                 $sections[] = self::getInventorySection();
             }
@@ -959,8 +962,8 @@ class TenantNavRegistry
         return self::normalizeSection([
             'id' => 'financial_management',
             'key' => 'financial_management',
-            'label' => 'Financial Management',
-            'title' => 'Financial Management',
+            'label' => 'Finance & Targets',
+            'title' => 'Finance & Targets',
             'color' => '#0f766e',
             'items' => [
                 ['key' => 'cash_register', 'label' => 'Cash Register', 'title' => 'Cash Register', 'icon' => 'savings', 'component' => 'cash_register', 'permission' => 'cash_register', 'target_endpoint' => '/api/tenant/views/cash-register'],
