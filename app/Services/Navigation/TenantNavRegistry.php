@@ -194,6 +194,18 @@ class TenantNavRegistry
                 continue;
             }
             $secKey = strtolower(trim((string) ($section['key'] ?? $section['id'] ?? '')));
+            // Specialized verticals already expose their own checkout and
+            // customer/sales entries. Drop legacy fallback sections that used
+            // to be emitted as isolated "CUSTOMERS POS" / "SALES POS" blocks.
+            if (($isRepair || $isSalon || in_array('pharmacy', $modes, true) || in_array('restaurant', $modes, true))
+                && in_array($secKey, ['customers_operations', 'customer_operations', 'sales_operations', 'customers_pos', 'sales_pos'], true)) {
+                continue;
+            }
+            if (($isRepair || $isSalon || in_array('pharmacy', $modes, true) || in_array('restaurant', $modes, true))
+                && count((array) ($section['items'] ?? [])) === 1
+                && str_ends_with(strtolower((string) ($section['title'] ?? $section['label'] ?? '')), ' pos')) {
+                continue;
+            }
             if ($isSalon && ! $isRepair && in_array($secKey, ['repair_operations', 'repair_service', 'spare_parts_inventory'], true)) {
                 continue;
             }
