@@ -111,11 +111,10 @@ class TenantNavRegistry
                 break;
             }
         }
-        if (! $isLeadManagement && $tenant instanceof Company) {
-            $isLeadManagement = $tenant->hasModule('leadmanagement') || $tenant->hasModule('lead_management') || $tenant->hasModule('leads');
-        }
-        if (! $isLeadManagement && ! $hasModuleWhitelist) {
-            $isLeadManagement = ModuleRegistry::isActive('leadmanagement');
+        if ($tenant instanceof Company) {
+            $isLeadManagement = $tenant->hasModule('leadmanagement');
+        } else {
+            $isLeadManagement = false;
         }
 
         $filterItems = function (array $items, string $currentSecKey = '') use (&$filterItems, $isRepair, $isSalon, $isLeadManagement): array {
@@ -129,7 +128,7 @@ class TenantNavRegistry
                 $target = strtolower(trim((string) ($item['target_endpoint'] ?? '')));
                 $title = strtolower(trim((string) ($item['title'] ?? $item['label'] ?? '')));
 
-                // Lead Management is a separate vertical module (lead_ops) and must NEVER be mixed inside core cashier/sales or other sections
+                // Keep the optional Lead Management extension in its own section.
                 if ($currentSecKey !== 'lead_ops' && (
                     $key === 'lead_management'
                     || $key === 'leads'
@@ -219,10 +218,25 @@ class TenantNavRegistry
      * grouped in strict sequence and Administration anchored at the bottom.
      *
      * @param  Company|string|null  $tenant
+     * @param  string|null  $selectedColor
      * @return list<array<string, mixed>>
      */
-    public static function getEffectiveNavForTenant(mixed $tenant): array
+    public static function getEffectiveNavForTenant(mixed $tenant, ?string $selectedColor = null): array
     {
+        if ($selectedColor === null) {
+            $tenantId = $tenant instanceof Company ? $tenant->id : (is_numeric($tenant) ? $tenant : null);
+            if ($tenantId) {
+                $preferences = \App\Models\TenantSetting::get($tenantId, 'app_preferences', []);
+                if (is_array($preferences)) {
+                    $selectedColor = $preferences['drawer_text_icon_color']
+                        ?? $preferences['drawer_text_and_icons']
+                        ?? $preferences['drawer_icon_color']
+                        ?? $preferences['drawer_text_color']
+                        ?? null;
+                }
+            }
+        }
+
         $labels = [];
         if ($tenant instanceof Company && is_array($tenant->navigation_labels)) {
             $labels = $tenant->navigation_labels;
@@ -238,7 +252,8 @@ class TenantNavRegistry
                 $sections = self::filterDomainMismatches($sections, $tenant);
 
                 return self::withActionableSectionParents(
-                    self::applyNavigationLabels($sections, $labels)
+                    self::applyNavigationLabels($sections, $labels),
+                    $selectedColor
                 );
             }
         } elseif (is_object($tenant) && ! empty($tenant->navigation_menu_customization)) {
@@ -246,7 +261,8 @@ class TenantNavRegistry
             $sections = self::filterDomainMismatches($sections, $tenant);
 
             return self::withActionableSectionParents(
-                self::applyNavigationLabels($sections, $labels)
+                self::applyNavigationLabels($sections, $labels),
+                $selectedColor
             );
         }
 
@@ -254,7 +270,8 @@ class TenantNavRegistry
         $sections = self::filterDomainMismatches($sections, $tenant);
 
         return self::withActionableSectionParents(
-            self::applyNavigationLabels($sections, $labels)
+            self::applyNavigationLabels($sections, $labels),
+            $selectedColor
         );
     }
 
@@ -375,6 +392,9 @@ class TenantNavRegistry
         // 6. Future Dynamic Modules (Auto-registered via ModuleRegistry)
         foreach ($licensed as $mod) {
             if (! in_array($mod, ['retail', 'restaurant', 'pharmacy', 'service_booking', 'repair_technician'], true)) {
+                if (ModuleRegistry::isExtension($mod) && (! $tenant instanceof Company || ! $tenant->hasModule($mod))) {
+                    continue;
+                }
                 $generic = self::buildGenericModuleSection($mod);
                 if ($generic !== null) {
                     $sections[] = self::normalizeSection($generic);
@@ -393,6 +413,10 @@ class TenantNavRegistry
 
                 foreach ($activePackageModules as $pkgModule) {
                     $pkgSlug = $pkgModule->slug;
+
+                    if ($pkgModule->isExtension() && (! $tenant instanceof Company || ! $tenant->hasModule($pkgSlug))) {
+                        continue;
+                    }
 
                     // A package row can be flagged active in the DB while its
                     // files never landed under modules/<key>/ (fresh deploy,
@@ -494,7 +518,36 @@ class TenantNavRegistry
         // 8. Administration & Settings (Strictly at the bottom)
         $sections[] = self::getAdministrationSection();
 
-        return self::filterDomainMismatches(array_values($sections), $tenant);
+        return self::filterDomainMismatches(self::consolidateCoreSections(array_values($sections)), $tenant);
+    }
+
+    /** Consolidate dynamically registered core modules into the standard drawer groups. */
+    private static function consolidateCoreSections(array $sections): array
+    {
+        $targets = [
+            'sales' => 'cashier_sales', 'quotations' => 'cashier_sales', 'consignments' => 'cashier_sales',
+            'customers' => 'cashier_sales', 'inventory' => 'products_inventory', 'digital_catalog' => 'products_inventory',
+            'finance' => 'financial_management', 'dispatch_omnichannel' => 'cashier_sales',
+        ];
+        $index = [];
+        foreach ($sections as $i => $section) {
+            $index[(string) ($section['key'] ?? '')] = $i;
+        }
+        foreach ($sections as $i => $section) {
+            $key = strtolower((string) ($section['key'] ?? ''));
+            $module = preg_replace('/_operations$/', '', $key);
+            if (! isset($targets[$module]) || ! isset($index[$targets[$module]]) || $targets[$module] === $key) continue;
+            $target = $index[$targets[$module]];
+            foreach ((array) ($section['items'] ?? []) as $item) {
+                $itemKey = (string) ($item['key'] ?? $item['id'] ?? '');
+                if ($itemKey !== '' && collect($sections[$target]['items'] ?? [])->contains(fn ($existing) => (string) ($existing['key'] ?? $existing['id'] ?? '') === $itemKey)) continue;
+                $title = (string) ($item['title'] ?? $item['label'] ?? '');
+                $item['title'] = $item['label'] = preg_replace('/\s+POS$/i', '', $title);
+                $sections[$target]['items'][] = $item;
+            }
+            unset($sections[$i]);
+        }
+        return array_values($sections);
     }
 
     /**
@@ -1403,15 +1456,18 @@ class TenantNavRegistry
     }
 
     /**
+     * @param  bool|string  $isRestaurantOrMode
+     * @param  string|null  $selectedColor
      * @return list<array<string, mixed>>
      */
-    public static function sectionsFor(bool|string $isRestaurantOrMode): array
+    public static function sectionsFor(bool|string $isRestaurantOrMode, ?string $selectedColor = null): array
     {
         if (is_bool($isRestaurantOrMode)) {
             $raw = $isRestaurantOrMode ? self::restaurantSections() : self::retailSections();
 
             return self::withActionableSectionParents(
-                array_values(array_map([self::class, 'normalizeSection'], $raw))
+                array_values(array_map([self::class, 'normalizeSection'], $raw)),
+                $selectedColor
             );
         }
 
@@ -1455,18 +1511,21 @@ class TenantNavRegistry
         $normalized = array_values(array_map([self::class, 'normalizeSection'], $sections));
 
         return self::withActionableSectionParents(
-            self::filterDomainMismatches($normalized, $isRestaurantOrMode)
+            self::filterDomainMismatches($normalized, $isRestaurantOrMode),
+            $selectedColor
         );
     }
 
     /**
      * Return enriched menu structure for a given mode.
      *
+     * @param  string  $mode
+     * @param  string|null  $selectedColor
      * @return list<array<string, mixed>>
      */
-    public static function menuStructureForMode(string $mode): array
+    public static function menuStructureForMode(string $mode, ?string $selectedColor = null): array
     {
-        return self::getEffectiveNavForTenant($mode);
+        return self::getEffectiveNavForTenant($mode, $selectedColor);
     }
 
     /**
@@ -1475,18 +1534,59 @@ class TenantNavRegistry
      * The legacy `items` list remains intact for older clients.
      *
      * @param  list<array<string, mixed>>  $sections
+     * @param  string|null  $selectedColor
      * @return list<array<string, mixed>>
      */
-    public static function withActionableSectionParents(array $sections): array
+    public static function withActionableSectionParents(array $sections, ?string $selectedColor = null): array
     {
-        return array_values(array_map(function (array $section): array {
+        $textColor = $selectedColor ?: '#F97316';
+
+        return array_values(array_map(function (array $section) use ($textColor, $selectedColor): array {
             $items = array_values(array_filter(
                 $section['items'] ?? [],
                 static fn ($item): bool => is_array($item)
             ));
 
-            $asActionableItem = static function (array $item): array {
+            $asActionableItem = static function (array $item) use ($selectedColor): array {
                 $route = trim((string) ($item['route'] ?? $item['target_endpoint'] ?? $item['endpoint'] ?? ''));
+                $iconName = (string) ($item['icon'] ?? 'widgets');
+
+                if ($selectedColor !== null && $selectedColor !== '') {
+                    $item['icon_color'] = $selectedColor;
+                    $item['leading'] = [
+                        'type' => 'icon',
+                        'name' => $iconName,
+                        'color' => $selectedColor,
+                    ];
+                    $item['style'] = array_merge((array) ($item['style'] ?? []), [
+                        'textColor' => $selectedColor,
+                        'iconColor' => $selectedColor,
+                    ]);
+                }
+
+                if (isset($item['children']) && is_array($item['children'])) {
+                    $formattedChildren = [];
+                    foreach ($item['children'] as $child) {
+                        if (is_array($child)) {
+                            $childIcon = (string) ($child['icon'] ?? 'widgets');
+                            if ($selectedColor !== null && $selectedColor !== '') {
+                                $child['icon_color'] = $selectedColor;
+                                $child['leading'] = [
+                                    'type' => 'icon',
+                                    'name' => $childIcon,
+                                    'color' => $selectedColor,
+                                ];
+                                $child['style'] = array_merge((array) ($child['style'] ?? []), [
+                                    'textColor' => $selectedColor,
+                                    'iconColor' => $selectedColor,
+                                ]);
+                            }
+                            $formattedChildren[] = $child;
+                        }
+                    }
+                    $item['children'] = $formattedChildren;
+                }
+
                 if ($route === '') {
                     return $item;
                 }
@@ -1510,15 +1610,25 @@ class TenantNavRegistry
                 $firstItem['type'] = 'list_tile';
                 $firstItem['style'] = array_merge([
                     'fontWeight' => 'bold',
-                    'textColor' => '#F97316',
+                    'textColor' => $textColor,
                 ], (array) ($firstItem['style'] ?? []));
+                $firstItem['style']['textColor'] = $textColor;
+                if ($selectedColor !== null && $selectedColor !== '') {
+                    $firstItem['style']['iconColor'] = $selectedColor;
+                    $firstItem['icon_color'] = $selectedColor;
+                    $firstItem['leading'] = [
+                        'type' => 'icon',
+                        'name' => (string) ($firstItem['icon'] ?? 'widgets'),
+                        'color' => $selectedColor,
+                    ];
+                }
             }
 
             $subItems = array_map($asActionableItem, array_slice($items, 1));
             $firstRoute = $firstItem ? ($firstItem['route'] ?? $firstItem['target_endpoint'] ?? '') : '';
             $firstIcon = $firstItem['icon'] ?? ($section['icon'] ?? 'folder');
 
-            return array_merge($section, [
+            $decoratedSection = array_merge($section, [
                 'type' => 'list_tile',
                 'action_type' => 'NAVIGATE_TO',
                 'route' => $firstRoute,
@@ -1526,7 +1636,7 @@ class TenantNavRegistry
                 'icon' => $firstIcon,
                 'style' => [
                     'fontWeight' => 'bold',
-                    'textColor' => '#F97316',
+                    'textColor' => $textColor,
                 ],
                 'action' => [
                     'type' => 'NAVIGATE_TO',
@@ -1547,7 +1657,68 @@ class TenantNavRegistry
                     'vertical_padding' => 8,
                 ],
             ]);
+
+            if ($selectedColor !== null && $selectedColor !== '') {
+                $decoratedSection['style']['iconColor'] = $selectedColor;
+                $decoratedSection['icon_color'] = $selectedColor;
+                $decoratedSection['leading'] = [
+                    'type' => 'icon',
+                    'name' => $firstIcon,
+                    'color' => $selectedColor,
+                ];
+                $decoratedSection['items'] = array_map(function (array $item) use ($asActionableItem): array {
+                    return $asActionableItem($item);
+                }, $items);
+            }
+
+            return $decoratedSection;
         }, $sections));
+    }
+
+    /**
+     * Format a drawer item ensuring explicit icon color and leading component
+     * adopt the tenant's configured preference color token without hardcoding orange.
+     *
+     * @param  array<string, mixed>  $item
+     * @param  string|null  $selectedColor
+     * @return array<string, mixed>
+     */
+    public static function formatDrawerItem(array $item, ?string $selectedColor = null): array
+    {
+        $iconName = (string) ($item['icon'] ?? 'widgets');
+        $item['icon'] = $iconName;
+
+        if ($selectedColor !== null && $selectedColor !== '') {
+            $item['icon_color'] = $selectedColor;
+            $item['leading'] = [
+                'type' => 'icon',
+                'name' => $iconName,
+                'color' => $selectedColor,
+            ];
+            $style = (array) ($item['style'] ?? []);
+            $style['textColor'] = $selectedColor;
+            $style['iconColor'] = $selectedColor;
+            $item['style'] = $style;
+        } else {
+            if (isset($item['icon_color']) && ($item['icon_color'] === '#F97316' || $item['icon_color'] === '#EA580C')) {
+                unset($item['icon_color']);
+            }
+            if (isset($item['leading']) && is_array($item['leading']) && isset($item['leading']['color']) && ($item['leading']['color'] === '#F97316' || $item['leading']['color'] === '#EA580C')) {
+                $item['leading']['color'] = null;
+            }
+        }
+
+        if (isset($item['children']) && is_array($item['children'])) {
+            $formattedChildren = [];
+            foreach ($item['children'] as $child) {
+                if (is_array($child)) {
+                    $formattedChildren[] = self::formatDrawerItem($child, $selectedColor);
+                }
+            }
+            $item['children'] = $formattedChildren;
+        }
+
+        return $item;
     }
 
     /**
