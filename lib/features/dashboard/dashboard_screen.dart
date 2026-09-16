@@ -31,6 +31,7 @@ import 'widgets/dock_rail_slot.dart';
 import 'widgets/oroit_dashboard.dart';
 import 'widgets/posh_dashboard.dart';
 import '../auth/auth_provider.dart';
+import '../navigation/presentation/widgets/app_drawer.dart';
 import '../sales/screens/sales_screen.dart';
 import '../settings/screens/app_preferences_screen.dart';
 import '../settings/screens/change_password_screen.dart';
@@ -830,11 +831,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             (isLightDrawerBg
                 ? const Color(0xFF334155) // slate-700
                 : const Color(0xFFE2E8F0)); // slate-200
-        final unselectedIconColor =
-            tp.drawerTextColor?.withValues(alpha: 0.85) ??
-                (isLightDrawerBg
-                    ? const Color(0xFF64748B) // slate-500
-                    : const Color(0xFF94A3B8)); // slate-400
+        final unselectedIconColor = tp.drawerTextColor ??
+            (isLightDrawerBg
+                ? const Color(0xFF64748B) // slate-500
+                : const Color(0xFF94A3B8)); // slate-400
         final selectedItemColor = primaryColor;
 
         final children = <Widget>[
@@ -1047,10 +1047,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Icon(
                       tile.icon,
                       size: sectionParent ? 22 : (depth == 0 ? 24 : 18),
-                      color: sectionParent
-                          ? const Color(0xFFF97316)
-                          : (isSelected
-                              ? selectedItemColor
+                      color: isSelected
+                          ? selectedItemColor
+                          : (depth > 0
+                              ? unselectedIconColor.withValues(alpha: 0.85)
                               : unselectedIconColor),
                     ),
                   ],
@@ -1100,10 +1100,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Icon(
                     tile.icon,
                     size: sectionParent ? 22 : (depth == 0 ? 24 : 20),
-                    color: sectionParent
-                        ? const Color(0xFFF97316)
-                        : (isSelected
-                            ? selectedItemColor
+                    color: isSelected
+                        ? selectedItemColor
+                        : (depth > 0
+                            ? unselectedIconColor.withValues(alpha: 0.85)
                             : unselectedIconColor),
                   ),
                 ],
@@ -1151,7 +1151,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.8,
-                  color: section.headerColor ?? unselectedIconColor,
+                  color: resolveItemColor(
+                    section.headerColor,
+                    tp.drawerTextColor?.withValues(alpha: 0.85) ??
+                        unselectedIconColor,
+                  ),
                 ),
               ),
             ));
@@ -1390,6 +1394,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final l10n = AppLocalizations.of(context);
     final auth = context.read<AuthProvider>();
     final bootstrap = context.watch<BootstrapCache>();
+    final tp = context.watch<ThemeProvider>();
     final navSections = _sectionsFor(auth.company, auth.user);
 
     final indexByKey = <String, int>{};
@@ -1462,7 +1467,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final leading = Icon(
           tile.icon,
           size: depth == 0 ? 22 : 18,
-          color: sectionParent ? const Color(0xFFF97316) : null,
+          color: selected
+              ? Theme.of(context).colorScheme.primary
+              : (tp.drawerTextColor ??
+                  (sectionParent
+                      ? (Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFFE2E8F0)
+                          : const Color(0xFF334155))
+                      : null)),
         );
         final pad = EdgeInsets.only(left: 12 + depth * 20, right: 8);
 
