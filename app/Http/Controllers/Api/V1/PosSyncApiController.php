@@ -484,6 +484,25 @@ class PosSyncApiController extends Controller
         $demoMode = (bool) config('app.demo_mode');
         $demoAccounts = [];
         if ($demoMode) {
+            // Keep the mobile quick-fill accounts aligned with the credentials
+            // advertised on the tenant web login. The legacy aliases below
+            // remain available for older clients and existing demo data.
+            $demoAccounts[] = [
+                'label' => 'All Modules / Enterprise',
+                'store_type' => 'ENTERPRISE_OMNICHANNEL',
+                'email' => 'demo@zoomnearby.com',
+                'password' => 'demo1234',
+            ];
+            foreach ([
+                ['label' => 'Retail', 'store_type' => 'RETAIL', 'email' => 'retail.demo@zoomnearby.com'],
+                ['label' => 'Cafe & Restaurant', 'store_type' => 'RESTAURANT', 'email' => 'restaurant.demo@zoomnearby.com'],
+                ['label' => 'Pharmacy', 'store_type' => 'PHARMACY', 'email' => 'pharmacy.demo@zoomnearby.com'],
+                ['label' => 'Repair', 'store_type' => 'REPAIR', 'email' => 'repairs.demo@zoomnearby.com'],
+                ['label' => 'Salon', 'store_type' => 'SALON', 'email' => 'salon.demo@zoomnearby.com'],
+            ] as $account) {
+                $account['password'] = 'demo1234';
+                $demoAccounts[] = $account;
+            }
             foreach (DemoAccountsSeeder::ACCOUNTS as $storeType => $meta) {
                 $demoAccounts[] = [
                     'label' => $meta['label'],
