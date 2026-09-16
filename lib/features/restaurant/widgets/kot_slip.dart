@@ -77,6 +77,24 @@ Future<void> showKotTicketSheet(BuildContext context, KitchenTicketModel kot) {
             ),
             const SizedBox(height: 12),
             Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(sheetContext).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _KotChannel(icon: Icons.print, label: 'Thermal', color: Colors.green, onTap: () => printKitchenTicket(context, kot)),
+                  _KotChannel(icon: Icons.chat, label: 'WhatsApp', color: const Color(0xFF25D366), onTap: () => _kotUnavailable(context, 'WhatsApp')),
+                  _KotChannel(icon: Icons.sms, label: 'SMS', color: Colors.blue, onTap: () => _kotUnavailable(context, 'SMS')),
+                  _KotChannel(icon: Icons.email, label: 'Email', color: Colors.indigo, onTap: () => _kotUnavailable(context, 'Email')),
+                  _KotChannel(icon: Icons.picture_as_pdf, label: 'PDF', color: Colors.red, onTap: () => _kotUnavailable(context, 'PDF')),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -139,6 +157,27 @@ Future<void> showKotTicketSheet(BuildContext context, KitchenTicketModel kot) {
       ),
     ),
   );
+}
+
+class _KotChannel extends StatelessWidget {
+  const _KotChannel({required this.icon, required this.label, required this.color, required this.onTap});
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+          child: Column(children: [Icon(icon, color: color, size: 19), const SizedBox(height: 3), Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600))]),
+        ),
+      );
+}
+
+void _kotUnavailable(BuildContext context, String channel) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$channel dispatch can be configured in Settings.')));
 }
 
 /// Prints [kot] to the saved Bluetooth thermal printer and reports the outcome
