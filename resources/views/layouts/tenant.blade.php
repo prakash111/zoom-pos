@@ -836,7 +836,7 @@
                             </div>
                         </div>
 
-                    @elseif (! $isPharmacy && ! $isSalon && ! $isRepair
+                    @elseif ($isAllModulesDemo || (! $isPharmacy && ! $isSalon && ! $isRepair)
                         && ! in_array(strtoupper((string) (auth()->user()?->company?->business_type
                             ?? auth()->user()?->company?->store_type ?? '')), ['SALON', 'PHARMACY', 'RESTAURANT', 'REPAIR', 'REPAIRS'], true))
                         <!-- GENERAL RETAIL DRAWER ITEMS -->
@@ -869,15 +869,6 @@
                                 @endif
                             </div>
                         </div>
-
-                        @if ($canLeads)
-                            <div data-section-key="lead_ops">
-                                <div class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 px-3">{{ __('Lead Operations') }}</div>
-                                <div class="space-y-1">
-                                    <x-nav.drawer-item item-key="lead_management" :route="route('tenant.leads.index')" title="{{ __('Lead Management') }}" subtitle="{{ __('Pipeline, follow-ups & auto-sync CRM') }}">🎯</x-nav.drawer-item>
-                                </div>
-                            </div>
-                        @endif
 
                         @if ($canFinance)
                             <div data-section-key="financial_management">
@@ -919,6 +910,18 @@
                                 @if ($canCatalog)
                                     <x-nav.drawer-item item-key="catalog" :route="route('tenant.catalog.index')" title="{{ __('Online Digital Catalog') }}" subtitle="{{ __('Shareable web catalog & WhatsApp store') }}">🌐</x-nav.drawer-item>
                                 @endif
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Lead Management is an optional extension, but when it
+                         is enabled it must be visible for every vertical and
+                         for the all-modules enterprise workspace. --}}
+                    @if ($canLeads)
+                        <div data-section-key="lead_ops">
+                            <div class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 px-3">{{ __('Lead Operations') }}</div>
+                            <div class="space-y-1">
+                                <x-nav.drawer-item item-key="lead_management" :route="route('tenant.leads.index')" title="{{ __('Lead Management') }}" subtitle="{{ __('Pipeline, follow-ups & auto-sync CRM') }}">🎯</x-nav.drawer-item>
                             </div>
                         </div>
                     @endif

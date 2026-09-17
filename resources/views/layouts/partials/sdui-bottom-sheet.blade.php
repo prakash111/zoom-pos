@@ -105,7 +105,21 @@
                 return;
             }
             if (type === 'NAVIGATE_TO') {
-                window.location.assign(action.route || component.route);
+                const target = action.route || action.endpoint || component.route || '';
+                if (!target) return;
+                // API navigation targets return an SDUI schema. Keep those
+                // destinations inside the current sheet; normal web routes
+                // still perform a regular page navigation.
+                if (target.startsWith('/api/')) {
+                    await this.show(target, true);
+                } else {
+                    window.location.assign(target);
+                }
+                return;
+            }
+            if (type === 'SHOW_POST_SALE_SHEET') {
+                const target = action.endpoint || component.modal_endpoint || component.endpoint || '';
+                if (target) await this.show(target, true);
                 return;
             }
             if (type !== 'SUBMIT_FORM') return;
@@ -267,6 +281,31 @@
                                 </span>
                                 <span class="shrink-0 text-slate-400">›</span>
                             </button>
+                        </template>
+
+                        <template x-if="component.type === 'row'">
+                            <div class="flex items-center justify-between gap-3 px-1 py-1">
+                                <span class="text-sm font-black text-slate-900 dark:text-slate-100" x-text="component.children?.[0]?.value || ''"></span>
+                                <button x-show="component.children?.[1]?.type === 'button_danger'" type="button" x-on:click="execute(component.children[1])" class="rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300" x-text="component.children?.[1]?.label || 'Clear'"></button>
+                            </div>
+                        </template>
+
+                        <template x-if="component.type === 'divider'">
+                            <div class="h-px bg-slate-200 dark:bg-slate-700"></div>
+                        </template>
+
+                        <template x-if="component.type === 'column'">
+                            <div class="space-y-1">
+                                <template x-for="child in (component.children || [])" :key="child.id || child.type">
+                                    <template x-if="child.type === 'notification_item'">
+                                        <button type="button" x-on:click="execute(child)" class="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-[#131E29] dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30">
+                                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg dark:bg-slate-800" x-text="iconFor(child.leading?.icon || child.icon)"></span>
+                                            <span class="min-w-0 flex-1"><strong class="block truncate text-sm text-slate-900 dark:text-slate-100" x-text="child.title"></strong><span class="mt-0.5 block text-xs text-slate-500 dark:text-slate-400" x-text="child.subtitle"></span><span x-show="child.timestamp" class="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400" x-text="formatTimestamp(child.timestamp)"></span></span>
+                                            <span class="shrink-0 text-slate-400">›</span>
+                                        </button>
+                                    </template>
+                                </template>
+                            </div>
                         </template>
 
                         <template x-if="component.type === 'empty_state'">

@@ -45,6 +45,11 @@ class TenantNavigationComposer
         $isRepair = $company->hasModule('repair_technician') || $company->hasModule('repairtechnician')
             || in_array($activeVertical, ['repair', 'repairs', 'electronics_service'], true) || in_array($type, ['REPAIR', 'REPAIRS'], true);
         $isLeadManagement = $company->hasModule('leadmanagement') || $company->hasModule('lead_management');
+        $isAllModulesDemo = $company->is_demo
+            && in_array(strtolower((string) $company->email), [
+                'demo@zoomnearby.com',
+                'allmodules.demo@zoomnearby.com',
+            ], true);
 
         $isQuotes = $this->request->routeIs('tenant.quotes.*') || $this->request->routeIs('tenant.quotations.*');
         $isSalesTargets = $this->request->routeIs('tenant.sales-targets.*');
@@ -73,6 +78,7 @@ class TenantNavigationComposer
             'isSalon' => $isSalon,
             'isRepair' => $isRepair,
             'isLeadManagement' => $isLeadManagement,
+            'isAllModulesDemo' => $isAllModulesDemo,
             'isVerticalStore' => $isPharmacy || $isSalon || $isRepair || ($hasRestaurant && ! $isRestaurantMode),
             'isPosScreen' => $this->request->routeIs('tenant.sales.create') || $this->request->routeIs('tenant.restaurant.pos'),
 
