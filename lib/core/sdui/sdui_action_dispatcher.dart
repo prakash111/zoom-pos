@@ -11,6 +11,7 @@ import '../../features/pos/screens/invoice_actions_sheet.dart';
 import '../../features/quotations/quotations_provider.dart';
 import '../../features/quotations/quotations_repository.dart';
 import '../../features/quotations/screens/quotation_form_sheet.dart';
+import '../../features/repair/ticket_share_sheet.dart';
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../config/app_config.dart';
@@ -224,6 +225,10 @@ class SduiActionDispatcher {
                   'endpoint': '/api/tenant/repair/tickets/$ticketId/share-sheet',
                   'title': 'Share Repair Ticket',
                 }, client);
+              } else {
+                // Older servers may not include ticket_id yet; retain the
+                // compatibility sheet until that response is upgraded.
+                await showTicketShareSheet(context, share);
               }
             }
             if (context.mounted &&

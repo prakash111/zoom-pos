@@ -65,9 +65,15 @@ jobs:
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_PATH"
           fi
 
-          if [ ! -f "$KEYSTORE_PATH" ]; then
-            echo "::error::Keystore not found at $KEYSTORE_PATH"
-            exit 1
+          if [ ! -s "$KEYSTORE_PATH" ]; then
+            echo "No signing keystore secret supplied; generating an ephemeral CI keystore."
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -storepass "$STORE_PASS" \
+              -keypass "$KEY_PASS" \
+              -alias "$ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 3650 \
+              -dname "CN=ZoomNearby CI, OU=Build, O=ZoomNearby, C=IN"
           fi
 
           cat <<KEYPROP > android/key.properties
