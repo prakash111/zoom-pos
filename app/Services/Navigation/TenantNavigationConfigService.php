@@ -40,7 +40,7 @@ class TenantNavigationConfigService
      *
      * @var list<string>
      */
-    public const FORCED_ROOT = ['settings'];
+    public const FORCED_ROOT = ['settings', 'consignments'];
 
     /**
      * @return array<string, array<int, string>>
