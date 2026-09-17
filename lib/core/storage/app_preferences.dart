@@ -19,7 +19,8 @@ class AppPreferences {
   Future<String> readBaseUrl() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(_baseUrlKey) ?? AppConfig.defaultBaseUrl;
+      return _normalizeBaseUrl(
+          prefs.getString(_baseUrlKey) ?? AppConfig.defaultBaseUrl);
     } catch (e) {
       debugPrint('AppPreferences.readBaseUrl error: $e');
       return AppConfig.defaultBaseUrl;
@@ -29,11 +30,25 @@ class AppPreferences {
   Future<void> saveBaseUrl(String url) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final normalized = url.trim().replaceAll(RegExp(r'/+$'), '');
+      final normalized = _normalizeBaseUrl(url);
       await prefs.setString(_baseUrlKey, normalized);
     } catch (e) {
       debugPrint('AppPreferences.saveBaseUrl error: $e');
     }
+  }
+
+  /// The API client owns the `/api/v1/pos` suffix. Older app builds allowed
+  /// users to save a complete API URL, which made requests target
+  /// `/api/v1/pos/api/v1/pos/...` after an upgrade and left POS on its loading
+  /// spinner. Keep only the scheme, host, and any intentional deployment
+  /// sub-path here.
+  static String _normalizeBaseUrl(String value) {
+    var normalized = value.trim().replaceAll(RegExp(r'/+$'), '');
+    normalized = normalized.replaceFirst(
+        RegExp(r'/api/v1/pos$', caseSensitive: false), '');
+    normalized = normalized.replaceFirst(
+        RegExp(r'/api/v1$', caseSensitive: false), '');
+    return normalized.replaceFirst(RegExp(r'/api$', caseSensitive: false), '');
   }
 
   /// The locale code (e.g. `en`, `ar`, `hi`) used both for this app's own
