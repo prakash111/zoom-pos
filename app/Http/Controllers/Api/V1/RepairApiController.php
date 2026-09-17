@@ -17,6 +17,7 @@ use App\Models\Sale;
 use App\Models\User;
 use App\Services\Auth\PermissionChecker;
 use App\Services\Documents\DocumentNumberService;
+use App\Services\Dispatch\DocumentDispatchService;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\OmnichannelRegistryService;
 use App\Services\Pos\Adapters\RepairCartAdapter;
@@ -39,6 +40,7 @@ class RepairApiController extends Controller
         protected PermissionChecker $permissionChecker,
         protected RepairNotificationService $notificationService,
         protected InvoiceDeliveryService $invoiceDeliveryService,
+        protected DocumentDispatchService $documentDispatchService,
     ) {}
 
     /**
@@ -906,10 +908,15 @@ class RepairApiController extends Controller
         $sheetEndpoint = "{$endpointPrefix}/repair/tickets/{$ticket->id}/share-sheet";
         $renderUrl = "{$endpointPrefix}/repair/tickets/{$ticket->id}/intake-sheet?format={$format}";
         $formatLabel = data_get(collect($formats)->firstWhere('value', $format), 'label', 'Standard A4');
-        $waUrl = RepairNotificationService::whatsAppUrl($message, $phone);
-        $emailUrl = $email !== ''
-            ? 'mailto:'.rawurlencode($email).'?subject='.rawurlencode("Repair Ticket #{$reference}").'&body='.rawurlencode($message)
-            : 'mailto:?subject='.rawurlencode("Repair Ticket #{$reference}").'&body='.rawurlencode($message);
+        $dispatchEndpoint = "{$endpointPrefix}/repair/tickets/{$ticket->id}/dispatch";
+        $settings = (array) ($company->api_settings ?? []);
+        $whatsappConfigured = filter_var($settings['whatsapp_api_enabled'] ?? false, FILTER_VALIDATE_BOOL)
+            && filled($settings['whatsapp_api_url'] ?? null)
+            && filled($settings['whatsapp_api_token'] ?? null);
+        $emailConfigured = filter_var($settings['smtp_enabled'] ?? false, FILTER_VALIDATE_BOOL)
+            && filled($settings['smtp_host'] ?? null)
+            && filled($settings['smtp_username'] ?? null)
+            && filled($settings['smtp_password'] ?? null);
 
         $components = [
             [
@@ -946,21 +953,27 @@ class RepairApiController extends Controller
             ],
             [
                 'type' => 'list_tile', 'title' => 'Send via WhatsApp',
-                'subtitle' => $phone !== '' ? "to {$phone}" : 'Choose a contact in WhatsApp',
+                'subtitle' => $phone !== ''
+                    ? 'to '.$phone.' · '.($whatsappConfigured ? 'Tenant API' : 'Platform service')
+                    : 'Customer phone is not linked',
                 'leading' => ['type' => 'icon', 'icon' => 'chat', 'color' => '#25D366'],
-                'action' => ['type' => 'OPEN_URL', 'url' => $waUrl],
+                'action' => [
+                    'type' => 'SUBMIT_FORM', 'endpoint' => $dispatchEndpoint, 'method' => 'POST',
+                    'data' => ['channel' => 'whatsapp', 'recipient' => $phone],
+                    'feedback' => $whatsappConfigured ? 'Sent via tenant WhatsApp API.' : 'Sent via platform WhatsApp service.',
+                ],
             ],
             [
                 'type' => 'list_tile', 'title' => 'Send via Email',
-                'subtitle' => $email !== '' ? "to {$email}" : 'Choose an email recipient',
+                'subtitle' => $email !== ''
+                    ? 'to '.$email.' · '.($emailConfigured ? 'Tenant SMTP' : 'System mailer')
+                    : 'Customer email is not linked',
                 'leading' => ['type' => 'icon', 'icon' => 'mark_email_read', 'color' => '#818CF8'],
-                'action' => ['type' => 'OPEN_URL', 'url' => $emailUrl],
-            ],
-            [
-                'type' => 'list_tile', 'title' => 'Print on receipt printer',
-                'subtitle' => 'Bluetooth / network thermal printer',
-                'leading' => ['type' => 'icon', 'icon' => 'print'],
-                'action' => ['type' => 'THERMAL_PRINT', 'document_id' => (string) $ticket->id, 'document_type' => 'repair'],
+                'action' => [
+                    'type' => 'SUBMIT_FORM', 'endpoint' => $dispatchEndpoint, 'method' => 'POST',
+                    'data' => ['channel' => 'email', 'recipient' => $email],
+                    'feedback' => $emailConfigured ? 'Sent via tenant SMTP.' : 'Sent via system mailer.',
+                ],
             ],
         ];
 
@@ -977,6 +990,45 @@ class RepairApiController extends Controller
                 'components' => $components,
             ],
         ]);
+    }
+
+    /** Dispatch a repair ticket directly to its linked customer contact. */
+    public function ticketsDispatch(Request $request, string $id): JsonResponse
+    {
+        $this->authorizeAction($request, 'view');
+        $company = $this->resolveCompany($request);
+        $ticket = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)
+            ->with(['customer'])->find($id);
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Repair ticket not found.'], 404);
+        }
+
+        $channel = strtolower((string) $request->input('channel'));
+        $customerName = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Customer');
+        $phone = $ticket->customer?->phone ?: ($ticket->customer_phone ?: '');
+        $email = $ticket->customer?->email ?: ($ticket->customer_email ?: '');
+        $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'Device';
+        $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
+        $message = "Hello {$customerName}, your repair ticket #{$ticket->ticket_number} for {$device} is ready. Track status: {$trackingUrl}";
+
+        if ($channel === 'whatsapp') {
+            $recipient = preg_replace('/[^0-9+]/', '', (string) ($request->input('recipient') ?: $phone));
+            if ($recipient === '') return response()->json(['success' => false, 'error' => 'Customer phone is not linked.'], 422);
+            $result = $this->documentDispatchService->dispatchWhatsApp($company, $recipient, $message, url("/api/tenant/repair/tickets/{$ticket->id}/intake-sheet"));
+        } elseif ($channel === 'email') {
+            $recipient = trim((string) ($request->input('recipient') ?: $email));
+            if (! filter_var($recipient, FILTER_VALIDATE_EMAIL)) return response()->json(['success' => false, 'error' => 'Customer email is not linked.'], 422);
+            $html = '<p>'.e($message).'</p><p>Ticket: <strong>'.e($ticket->ticket_number).'</strong></p>';
+            $result = $this->documentDispatchService->dispatchEmail($company, $recipient, "Repair Ticket #{$ticket->ticket_number}", $html);
+        } else {
+            return response()->json(['success' => false, 'error' => 'Unsupported dispatch channel.'], 422);
+        }
+
+        return response()->json([
+            'success' => (bool) ($result['success'] ?? false),
+            'message' => ($result['success'] ?? false) ? 'Repair ticket sent to the linked customer.' : ($result['error'] ?? 'Dispatch failed.'),
+            'channel' => $result['channel'] ?? $channel,
+        ], ($result['success'] ?? false) ? 200 : 422);
     }
 
     /**

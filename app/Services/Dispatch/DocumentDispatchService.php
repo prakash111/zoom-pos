@@ -81,7 +81,14 @@ class DocumentDispatchService
                     'password' => $password,
                     'timeout' => 15,
                 ]);
-                Mail::mailer('tenant_dispatch')->to($recipientEmail)->send($mailable);
+                $mailer = Mail::mailer('tenant_dispatch');
+                if (is_string($mailable)) {
+                    $mailer->html($mailable, fn ($message) => $message
+                        ->to($recipientEmail)
+                        ->subject($subject));
+                } else {
+                    $mailer->to($recipientEmail)->send($mailable);
+                }
 
                 return ['success' => true, 'status' => 'sent', 'channel' => 'tenant_smtp'];
             } catch (\Throwable $e) {
@@ -93,7 +100,14 @@ class DocumentDispatchService
         }
 
         try {
-            Mail::mailer(config('mail.default'))->to($recipientEmail)->send($mailable);
+            $mailer = Mail::mailer(config('mail.default'));
+            if (is_string($mailable)) {
+                $mailer->html($mailable, fn ($message) => $message
+                    ->to($recipientEmail)
+                    ->subject($subject));
+            } else {
+                $mailer->to($recipientEmail)->send($mailable);
+            }
 
             return ['success' => true, 'status' => 'sent', 'channel' => 'system_email'];
         } catch (\Throwable $e) {

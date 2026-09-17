@@ -268,6 +268,7 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
                 Route::get('/tickets', Tickets::class)->middleware('tenant.permission:repair,view')->name('tickets');
                 Route::get('/tickets/{ticket}', TicketDetail::class)->middleware('tenant.permission:repair,view')->name('ticket');
                 Route::get('/tickets/{ticket}/share-sheet', [RepairApiController::class, 'ticketsShareDispatchSheet'])->middleware('tenant.permission:repair,view')->name('ticket.share-sheet');
+                Route::post('/tickets/{ticket}/dispatch', [RepairApiController::class, 'ticketsDispatch'])->middleware('tenant.permission:repair,view')->name('ticket.dispatch');
                 Route::get('/categories', App\Livewire\Tenant\Repair\Categories::class)->middleware('tenant.permission:repair,diagnose')->name('categories');
             });
 

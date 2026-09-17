@@ -567,6 +567,7 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
         Route::post('/tickets/{id}/status', [RepairApiController::class, 'ticketsUpdateStatus'])->middleware('tenant.api.permission:repair,diagnose');
         Route::match(['get', 'post'], '/tickets/{id}/share', [RepairApiController::class, 'ticketsShareSheet'])->middleware('tenant.api.permission:repair,view');
         Route::get('/tickets/{id}/share-sheet', [RepairApiController::class, 'ticketsShareDispatchSheet'])->middleware('tenant.api.permission:repair,view');
+        Route::post('/tickets/{id}/dispatch', [RepairApiController::class, 'ticketsDispatch'])->middleware('tenant.api.permission:repair,view');
         Route::post('/tickets/{id}/assign', [RepairApiController::class, 'ticketsAssign'])->middleware('tenant.api.permission:repair,assign');
         Route::post('/tickets/{id}/parts', [RepairApiController::class, 'ticketsAddPart'])->middleware('tenant.api.permission:repair,diagnose');
         Route::delete('/tickets/{ticketId}/parts/{partId}', [RepairApiController::class, 'ticketsRemovePart'])->middleware('tenant.api.permission:repair,diagnose');
@@ -1094,6 +1095,7 @@ Route::prefix('v1/pos')->group(function () {
             Route::post('/tickets/{id}/status', [RepairApiController::class, 'ticketsUpdateStatus'])->middleware('tenant.api.permission:repair,diagnose');
         Route::match(['get', 'post'], '/tickets/{id}/share', [RepairApiController::class, 'ticketsShareSheet'])->middleware('tenant.api.permission:repair,view');
         Route::get('/tickets/{id}/share-sheet', [RepairApiController::class, 'ticketsShareDispatchSheet'])->middleware('tenant.api.permission:repair,view');
+        Route::post('/tickets/{id}/dispatch', [RepairApiController::class, 'ticketsDispatch'])->middleware('tenant.api.permission:repair,view');
             Route::post('/tickets/{id}/assign', [RepairApiController::class, 'ticketsAssign'])->middleware('tenant.api.permission:repair,assign');
             Route::post('/tickets/{id}/parts', [RepairApiController::class, 'ticketsAddPart'])->middleware('tenant.api.permission:repair,diagnose');
             Route::delete('/tickets/{ticketId}/parts/{partId}', [RepairApiController::class, 'ticketsRemovePart'])->middleware('tenant.api.permission:repair,diagnose');
