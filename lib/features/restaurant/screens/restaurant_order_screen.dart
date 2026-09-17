@@ -9,6 +9,7 @@ import '../../../core/models/customer_model.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/models/restaurant_models.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
+import '../../../core/sdui/screens/dynamic_schema_page.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
@@ -286,10 +287,22 @@ class _RestaurantOrderScreenState extends State<RestaurantOrderScreen> {
         _committedItems = result.sale.items;
         _draftItems = [];
       });
-      // Open the KOT as a modal thermal-ticket preview (Print KOT / Close)
-      // instead of a transient snackbar. Not awaited — `_isSending` is reset
-      // in `finally` and the sheet outlives this method.
-      unawaited(showKotTicketSheet(context, result.kot));
+      // Open the shared dispatch sheet. Preview & Print then loads the
+      // authenticated KOT document schema using the real ticket id.
+      unawaited(showKotTicketSheet(
+        context,
+        result.kot,
+        onPreviewPdf: () {
+          if (!mounted) return;
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => DynamicSchemaPage(
+              endpoint:
+                  '/api/v1/tenant/documents/kot/${Uri.encodeComponent(result.kot.id)}/preview-modal',
+              initialTitle: result.kot.kotNumber,
+            ),
+          ));
+        },
+      ));
     } on ApiException catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context)
