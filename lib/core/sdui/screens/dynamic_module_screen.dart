@@ -2,179 +2,55 @@ import 'package:flutter/material.dart';
 import '../models/sdui_models.dart';
 import '../sdui_icon_registry.dart';
 
-/// Agnostic layout shell for server-driven business modules.
-///
-/// Renders pluggable business modes delivered dynamically from the Laravel
-/// backend (e.g. Pharmacy POS, Service/Salon POS, Laundry, Hotel, etc.)
-/// without requiring mobile client recompilation.
+/// Shared visual shell for every server-driven vertical module. New modules
+/// only provide metadata and action keys from Laravel.
 class DynamicModuleScreen extends StatelessWidget {
-  const DynamicModuleScreen({
-    super.key,
-    required this.module,
-    this.onAction,
-  });
-
+  const DynamicModuleScreen({super.key, required this.module, this.onAction});
   final ModuleSchema module;
   final void Function(String actionKey)? onAction;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final iconData = SduiIconRegistry.resolve(module.icon, fallback: Icons.apps);
-
+    final scheme = Theme.of(context).colorScheme;
+    final accent = _accent(module.id, scheme);
+    final icon = SduiIconRegistry.resolve(module.icon, fallback: Icons.apps_rounded);
+    final features = module.features.entries.where((e) => e.value == true).map((e) => _label(e.key)).where((e) => e.isNotEmpty).toList();
+    final actions = _actions(module.id);
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Icon(iconData, size: 22),
-            const SizedBox(width: 8),
-            Expanded(child: Text(module.title, overflow: TextOverflow.ellipsis)),
-          ],
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            elevation: 0,
-            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: theme.colorScheme.primary,
-                        child: Icon(iconData, color: Colors.white, size: 26),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              module.title,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (module.description.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  module.description,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Active Module Capabilities',
-                    style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final entry in module.features.entries)
-                        if (entry.value == true)
-                          Chip(
-                            avatar: const Icon(Icons.check_circle, size: 16, color: Colors.green),
-                            label: Text(
-                              _formatFeatureKey(entry.key),
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            backgroundColor: Colors.white,
-                          ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Quick Actions',
-            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          _ModuleActionTile(
-            title: 'Launch Point of Sale',
-            subtitle: 'Open terminal configured for ${module.title}',
-            icon: Icons.point_of_sale_outlined,
-            onTap: () => onAction?.call('pos'),
-          ),
-          const SizedBox(height: 8),
-          _ModuleActionTile(
-            title: 'Catalog & Inventory',
-            subtitle: 'Manage items, pricing, and stock',
-            icon: Icons.inventory_2_outlined,
-            onTap: () => onAction?.call('inventory'),
-          ),
-          const SizedBox(height: 8),
-          _ModuleActionTile(
-            title: 'Transaction History',
-            subtitle: 'View invoices, tickets, and receipts',
-            icon: Icons.receipt_long_outlined,
-            onTap: () => onAction?.call('sales'),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(module.title, overflow: TextOverflow.ellipsis), actions: [IconButton(onPressed: () => _showInfo(context, features), icon: const Icon(Icons.info_outline_rounded)), const SizedBox(width: 8)]),
+      body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 32), children: [
+        _Hero(module: module, icon: icon, accent: accent, featureCount: features.length),
+        const SizedBox(height: 24),
+        _Heading(title: 'Start here', subtitle: 'Common tasks for ${module.title}'),
+        const SizedBox(height: 12),
+        LayoutBuilder(builder: (_, c) => GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: c.maxWidth >= 680 ? 3 : 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: c.maxWidth >= 680 ? 1.8 : 1.3, children: [for (final a in actions) _ActionCard(action: a, accent: accent, onTap: () => onAction?.call(a.key))])),
+        if (features.isNotEmpty) ...[const SizedBox(height: 24), _Heading(title: 'Included in this workspace', subtitle: 'Capabilities enabled for your tenant'), const SizedBox(height: 12), _FeatureCard(features: features, accent: accent)],
+        const SizedBox(height: 24), _HowItWorks(accent: accent, customerLinking: module.cartConfiguration.showCustomerSelector),
+      ]),
     );
   }
 
-  static String _formatFeatureKey(String key) {
-    return key
-        .replaceAll('has_', '')
-        .replaceAll('_', ' ')
-        .split(' ')
-        .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '')
-        .join(' ');
+  List<_Action> _actions(String id) {
+    final base = <_Action>[const _Action('pos', 'Open Point of Sale', 'Start a checkout', Icons.point_of_sale_rounded), const _Action('inventory', 'Manage Catalog', 'Items, rates & stock', Icons.inventory_2_rounded), const _Action('sales', 'View Transactions', 'Invoices and history', Icons.receipt_long_rounded)];
+    final key = id.toLowerCase();
+    if (key.contains('salon') || key.contains('booking')) return [const _Action('pos', 'Start Checkout', 'Bill a service or product', Icons.content_cut_rounded), const _Action('book', 'New Appointment', 'Reserve a time slot', Icons.event_available_rounded), const _Action('calendar', 'Booking Calendar', 'See staff availability', Icons.calendar_month_rounded), ...base.skip(1)];
+    if (key.contains('repair') || key.contains('service')) return [const _Action('intake', 'New Repair Ticket', 'Register a device', Icons.add_task_rounded), const _Action('tickets', 'Ticket Register', 'Track open repairs', Icons.assignment_rounded), const _Action('pos', 'Repair Checkout', 'Collect payment at handover', Icons.point_of_sale_rounded), ...base.skip(1)];
+    if (key.contains('pharmacy')) return [const _Action('pos', 'Pharmacy Checkout', 'Bill medicines safely', Icons.local_pharmacy_rounded), const _Action('prescriptions', 'New Prescription', 'Record patient intake', Icons.medical_information_rounded), const _Action('batches', 'Batches & Expiry', 'Monitor medicine stock', Icons.event_busy_rounded), ...base.skip(1)];
+    if (key.contains('restaurant') || key.contains('cafe')) return [const _Action('pos', 'Restaurant POS', 'Take an order', Icons.restaurant_rounded), const _Action('tables', 'Dining Floor', 'Manage tables and seats', Icons.table_restaurant_rounded), const _Action('kds', 'Kitchen Display', 'Follow live KOTs', Icons.soup_kitchen_rounded), ...base.skip(1)];
+    return base;
   }
+
+  void _showInfo(BuildContext context, List<String> features) => showModalBottomSheet<void>(context: context, showDragHandle: true, builder: (_) => SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(20, 4, 20, 24), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [Text(module.title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)), const SizedBox(height: 8), Text(module.description.isEmpty ? 'This workspace is configured for your business.' : module.description), if (features.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 14), child: Text('${features.length} active capabilities', style: Theme.of(context).textTheme.labelLarge))])));
+
+  static String _label(String key) => key.replaceFirst(RegExp(r'^(has_|can_)'), '').replaceAll('_', ' ').split(' ').where((e) => e.isNotEmpty).map((e) => '${e[0].toUpperCase()}${e.substring(1)}').join(' ');
+  static Color _accent(String id, ColorScheme s) { final k = id.toLowerCase(); if (k.contains('pharmacy')) return const Color(0xFF0F8F83); if (k.contains('repair') || k.contains('service')) return const Color(0xFF2563EB); if (k.contains('salon') || k.contains('booking')) return const Color(0xFFDB2777); return s.primary; }
 }
 
-class _ModuleActionTile extends StatelessWidget {
-  const _ModuleActionTile({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-          child: Icon(icon, color: Theme.of(context).colorScheme.primary),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-        onTap: onTap,
-      ),
-    );
-  }
-}
+class _Hero extends StatelessWidget { const _Hero({required this.module, required this.icon, required this.accent, required this.featureCount}); final ModuleSchema module; final IconData icon; final Color accent; final int featureCount; @override Widget build(BuildContext c) => Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(gradient: LinearGradient(colors: [accent.withValues(alpha: .95), accent.withValues(alpha: .62)]), borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: accent.withValues(alpha: .2), blurRadius: 18, offset: const Offset(0, 8))]), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 54, height: 54, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .16), borderRadius: BorderRadius.circular(16)), child: Icon(icon, color: Colors.white, size: 28)), const SizedBox(width: 16), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(module.title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)), const SizedBox(height: 6), Text(module.description.isEmpty ? 'Everything your team needs, in one place.' : module.description, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, height: 1.35)), const SizedBox(height: 14), Wrap(spacing: 8, runSpacing: 6, children: [_Pill(icon: Icons.check_circle_outline_rounded, text: featureCount == 0 ? 'Ready to use' : '$featureCount features active'), const _Pill(icon: Icons.cloud_done_outlined, text: 'Synced workspace')])]))])); }
+class _Pill extends StatelessWidget { const _Pill({required this.icon, required this.text}); final IconData icon; final String text; @override Widget build(BuildContext c) => Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6), decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(20)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: Colors.white70, size: 14), const SizedBox(width: 5), Text(text, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600))])); }
+class _Heading extends StatelessWidget { const _Heading({required this.title, required this.subtitle}); final String title, subtitle; @override Widget build(BuildContext c) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(c).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)), const SizedBox(height: 3), Text(subtitle, style: Theme.of(c).textTheme.bodySmall?.copyWith(color: Theme.of(c).colorScheme.onSurfaceVariant))]); }
+class _Action { const _Action(this.key, this.title, this.subtitle, this.icon); final String key, title, subtitle; final IconData icon; }
+class _ActionCard extends StatelessWidget { const _ActionCard({required this.action, required this.accent, required this.onTap}); final _Action action; final Color accent; final VoidCallback onTap; @override Widget build(BuildContext c) => Material(color: Theme.of(c).colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(18), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Container(width: 36, height: 36, decoration: BoxDecoration(color: accent.withValues(alpha: .12), borderRadius: BorderRadius.circular(11)), child: Icon(action.icon, color: accent, size: 20)), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(action.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)), const SizedBox(height: 3), Text(action.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: Theme.of(c).colorScheme.onSurfaceVariant))])] ))); }
+class _FeatureCard extends StatelessWidget { const _FeatureCard({required this.features, required this.accent}); final List<String> features; final Color accent; @override Widget build(BuildContext c) => Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Theme.of(c).colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(18)), child: Wrap(spacing: 8, runSpacing: 8, children: features.map((f) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), decoration: BoxDecoration(color: accent.withValues(alpha: .1), borderRadius: BorderRadius.circular(20)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.check_circle_rounded, color: accent, size: 15), const SizedBox(width: 5), Text(f, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600))])).toList())); }
+class _HowItWorks extends StatelessWidget { const _HowItWorks({required this.accent, required this.customerLinking}); final Color accent; final bool customerLinking; @override Widget build(BuildContext c) => Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: accent.withValues(alpha: .07), border: Border.all(color: accent.withValues(alpha: .18)), borderRadius: BorderRadius.circular(18)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Icon(Icons.lightbulb_outline_rounded, color: accent, size: 20), const SizedBox(width: 8), Text('How this workspace works', style: TextStyle(fontWeight: FontWeight.w800, color: accent))]), const SizedBox(height: 12), const _Step('1', 'Choose a task above to get started.'), const _Step('2', 'Complete the details and save your work.'), const _Step('3', 'Your team sees the update everywhere instantly.'), if (customerLinking) const _Step('4', 'Link a customer to keep history and follow-ups together.') ])); }
+class _Step extends StatelessWidget { const _Step(this.number, this.text); final String number, text; @override Widget build(BuildContext c) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [Container(width: 22, height: 22, alignment: Alignment.center, decoration: BoxDecoration(color: Theme.of(c).colorScheme.surface, shape: BoxShape.circle), child: Text(number, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))), const SizedBox(width: 9), Expanded(child: Text(text, style: const TextStyle(fontSize: 12)))])); }
