@@ -189,6 +189,29 @@ class TenantNavRegistry
         };
 
         $result = [];
+        $specialized = $isRepair || $isSalon || in_array('pharmacy', $modes, true) || in_array('restaurant', $modes, true);
+        if ($specialized) {
+            $consignmentItems = [];
+            foreach ($sections as $idx => $candidate) {
+                $key = strtolower(trim((string) ($candidate['key'] ?? $candidate['id'] ?? '')));
+                if ($key !== 'cashier_sales') continue;
+                foreach ((array) ($candidate['items'] ?? []) as $item) {
+                    if (strtolower((string) ($item['key'] ?? $item['id'] ?? '')) === 'consignments') $consignmentItems[] = $item;
+                }
+                unset($sections[$idx]);
+            }
+            if ($consignmentItems) {
+                foreach ($sections as &$candidate) {
+                    $key = strtolower(trim((string) ($candidate['key'] ?? $candidate['id'] ?? '')));
+                    if ($key !== 'administration' && ! empty($candidate['items'])) {
+                        $candidate['items'] = array_merge($candidate['items'], $consignmentItems);
+                        break;
+                    }
+                }
+                unset($candidate);
+            }
+            $sections = array_values($sections);
+        }
         foreach ($sections as $section) {
             if (! is_array($section)) {
                 continue;
@@ -197,7 +220,7 @@ class TenantNavRegistry
             // Specialized verticals already expose their own checkout and
             // customer/sales entries. Drop legacy fallback sections that used
             // to be emitted as isolated "CUSTOMERS POS" / "SALES POS" blocks.
-            if (($isRepair || $isSalon || in_array('pharmacy', $modes, true) || in_array('restaurant', $modes, true))
+            if ($specialized
                 && in_array($secKey, ['customers_operations', 'customer_operations', 'sales_operations', 'customers_pos', 'sales_pos'], true)) {
                 continue;
             }
