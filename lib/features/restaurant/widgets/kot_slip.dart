@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/models/restaurant_models.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 
 /// Plain-text body lines for a Kitchen Order Ticket thermal slip — mirrors the
 /// web `KotController::print()` layout: table / service / server, then each
@@ -51,128 +52,209 @@ List<String> kitchenTicketSlipLines(KitchenTicketModel kot) {
   return lines;
 }
 
-/// A dismissible bottom sheet that shows the KOT as a monospace thermal
-/// ticket (white paper facsimile, dashed rules) with **Print KOT** and
-/// **Close** — replaces the transient "sent to kitchen" snackbar.
+/// Opens the same document-dispatch workflow used by invoices and due
+/// payments. The ticket itself is deliberately not embedded as a white paper
+/// card here; preview/print is an explicit action in the shared dark sheet.
 Future<void> showKotTicketSheet(BuildContext context, KitchenTicketModel kot) {
-  final lines = kitchenTicketSlipLines(kot);
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (sheetContext) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.receipt_long, size: 20),
-                const SizedBox(width: 8),
-                Text('Kitchen Order Ticket',
-                    style: Theme.of(sheetContext).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(sheetContext).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _KotChannel(icon: Icons.print, label: 'Thermal', color: Colors.green, onTap: () => printKitchenTicket(context, kot)),
-                  _KotChannel(icon: Icons.chat, label: 'WhatsApp', color: const Color(0xFF25D366), onTap: () => _kotUnavailable(context, 'WhatsApp')),
-                  _KotChannel(icon: Icons.sms, label: 'SMS', color: Colors.blue, onTap: () => _kotUnavailable(context, 'SMS')),
-                  _KotChannel(icon: Icons.email, label: 'Email', color: Colors.indigo, onTap: () => _kotUnavailable(context, 'Email')),
-                  _KotChannel(icon: Icons.picture_as_pdf, label: 'PDF', color: Colors.red, onTap: () => _kotUnavailable(context, 'PDF')),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white, // a thermal receipt is white paper
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFCBD5E1)),
-              ),
-              child: DefaultTextStyle(
-                style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontFamilyFallback: ['Courier', 'monospace'],
-                    fontSize: 12.5,
-                    height: 1.5,
-                    color: Color(0xFF0F172A)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Center(
-                        child: Text('KITCHEN ORDER TICKET',
-                            style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontWeight: FontWeight.bold))),
-                    Center(
-                        child: Text(kot.kotNumber,
-                            style: const TextStyle(
-                                fontFamily: 'monospace',
-                                fontWeight: FontWeight.bold))),
-                    const Text('--------------------------------'),
-                    for (final l in lines) Text(l.isEmpty ? ' ' : l),
-                    const Text('--------------------------------'),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(sheetContext).pop(),
-                    child: const Text('Close'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.of(sheetContext).pop();
-                      printKitchenTicket(context, kot);
-                    },
-                    icon: const Icon(Icons.print_outlined, size: 18),
-                    label: const Text('Print KOT'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+  return showAdaptiveSheet<void>(
+    context,
+    backgroundColor: const Color(0xFF131D2D),
+    builder: (sheetContext) => KotUnifiedDispatchSheet(
+      kotNumber: kot.kotNumber,
+      tableDetails: _kotTableDetails(kot),
+      onPreviewPdf: () => _kotUnavailable(context, 'Preview'),
+      onThermalPrint: () => printKitchenTicket(context, kot),
+      onDispatch: (sendWhatsApp, sendEmail) {
+        final channels = <String>[
+          if (sendWhatsApp) 'WhatsApp',
+          if (sendEmail) 'Email',
+        ];
+        if (channels.isEmpty) {
+          _kotUnavailable(context, 'Dispatch');
+        } else {
+          _kotUnavailable(context, channels.join(' + '));
+        }
+      },
     ),
   );
 }
 
-class _KotChannel extends StatelessWidget {
-  const _KotChannel({required this.icon, required this.label, required this.color, required this.onTap});
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
+String _kotTableDetails(KitchenTicketModel kot) {
+  final table = (kot.tableName ?? kot.serviceType).trim();
+  final sentAt = kot.createdAt?.toLocal();
+  if (sentAt == null) return 'Table: $table';
+  final hh = sentAt.hour.toString().padLeft(2, '0');
+  final mm = sentAt.minute.toString().padLeft(2, '0');
+  return 'Table: $table • Sent at $hh:$mm';
+}
+
+/// Standard document dispatch sheet for kitchen tickets. It intentionally
+/// matches the invoice/due-payment sheet: centered document identity, stacked
+/// actions, channel toggles, and one primary dispatch action.
+class KotUnifiedDispatchSheet extends StatefulWidget {
+  const KotUnifiedDispatchSheet({
+    super.key,
+    required this.kotNumber,
+    required this.tableDetails,
+    required this.onPreviewPdf,
+    required this.onThermalPrint,
+    required this.onDispatch,
+  });
+
+  final String kotNumber;
+  final String tableDetails;
+  final VoidCallback onPreviewPdf;
+  final VoidCallback onThermalPrint;
+  final void Function(bool sendWhatsApp, bool sendEmail) onDispatch;
+
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-          child: Column(children: [Icon(icon, color: color, size: 19), const SizedBox(height: 3), Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600))]),
+  State<KotUnifiedDispatchSheet> createState() =>
+      _KotUnifiedDispatchSheetState();
+}
+
+class _KotUnifiedDispatchSheetState extends State<KotUnifiedDispatchSheet> {
+  bool _sendWhatsApp = true;
+  bool _sendEmail = false;
+
+  @override
+  Widget build(BuildContext context) {
+    const muted = Color(0xFF94A3B8);
+    const accent = Color(0xFF10B981);
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          MediaQuery.of(context).viewInsets.bottom + 20,
         ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Center(
+              child: Column(
+                children: [
+                  Text(widget.kotNumber,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: .5)),
+                  const SizedBox(height: 4),
+                  Text(widget.tableDetails,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: muted, fontSize: 12)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            _KotActionTile(
+              icon: Icons.picture_as_pdf_outlined,
+              title: 'Preview & Print',
+              subtitle: 'View ticket details, print, or share',
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onPreviewPdf();
+              },
+            ),
+            _KotActionTile(
+              icon: Icons.print_outlined,
+              title: 'Print on receipt printer',
+              subtitle: 'Bluetooth / Network thermal printer',
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onThermalPrint();
+              },
+            ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _sendWhatsApp,
+              activeColor: accent,
+              checkColor: Colors.white,
+              controlAffinity: ListTileControlAffinity.leading,
+              onChanged: (value) =>
+                  setState(() => _sendWhatsApp = value ?? false),
+              title: const Text('Send via WhatsApp',
+                  style: TextStyle(color: Colors.white, fontSize: 14)),
+              subtitle: const Text('Enter phone number or kitchen group',
+                  style: TextStyle(color: muted, fontSize: 12)),
+              secondary: const Icon(Icons.chat, color: Color(0xFF25D366), size: 20),
+            ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _sendEmail,
+              activeColor: accent,
+              checkColor: Colors.white,
+              controlAffinity: ListTileControlAffinity.leading,
+              onChanged: (value) => setState(() => _sendEmail = value ?? false),
+              title: const Text('Send via Email',
+                  style: TextStyle(color: Colors.white, fontSize: 14)),
+              subtitle: const Text('Enter kitchen or manager email address',
+                  style: TextStyle(color: muted, fontSize: 12)),
+              secondary: const Icon(Icons.email_outlined,
+                  color: Color(0xFF6366F1), size: 20),
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onDispatch(_sendWhatsApp, _sendEmail);
+              },
+              icon: const Icon(Icons.send_rounded, size: 16),
+              label: const Text('Send to Selected Channels',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              style: FilledButton.styleFrom(
+                backgroundColor: accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _KotActionTile extends StatelessWidget {
+  const _KotActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(icon, color: Colors.white70, size: 22),
+        title: Text(title,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500)),
+        subtitle: Text(subtitle,
+            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+        onTap: onTap,
       );
 }
 
