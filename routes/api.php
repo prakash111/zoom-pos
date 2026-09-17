@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DispatchController;
 use App\Http\Controllers\Api\DocumentActionController;
+use App\Http\Controllers\Api\DocumentDispatchController;
 use App\Http\Controllers\Api\DocumentPreviewController;
 use App\Http\Controllers\Api\InvoiceController as ApiInvoiceController;
 use App\Http\Controllers\Api\InvoicePreviewController;
@@ -14,8 +15,10 @@ use App\Http\Controllers\Api\NavigationMenuController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\QuotationController;
 use App\Http\Controllers\Api\ReceivablesController;
+use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\TenantSettingsController;
 use App\Http\Controllers\Api\UnifiedDispatchController;
+use App\Http\Controllers\SuperAdmin\TenantController as SuperAdminTenantController;
 use App\Http\Controllers\Api\V1\AiImageApiController;
 use App\Http\Controllers\Api\V1\ApiIntegrationsController;
 use App\Http\Controllers\Api\V1\AppBootstrapController;
@@ -296,6 +299,10 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::post('/dispatch/{type}/{id}', [DispatchController::class, 'dispatchDocument'])->middleware('tenant.api.permission:pos,create');
 
     // Central Unified Dispatch Route & Handlers
+    Route::get('/tenant/documents/{type}/{id}/dispatch-options', [DocumentDispatchController::class, 'getDispatchOptions']);
+    Route::get('/v1/tenant/documents/{type}/{id}/dispatch-options', [DocumentDispatchController::class, 'getDispatchOptions']);
+    Route::post('/tenant/documents/dispatch', [DocumentDispatchController::class, 'dispatchDocument']);
+    Route::post('/v1/tenant/documents/dispatch', [DocumentDispatchController::class, 'dispatchDocument']);
     Route::post('/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
     Route::post('/v1/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
     Route::post('/tenant/dispatch/batch', [UnifiedDispatchController::class, 'batchDispatch']);
@@ -430,6 +437,12 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
 
     // Custom Roles & Granular Permissions — unversioned tenant URLs emitted by
     // the SDUI "Manage Roles" screen (mirrors the /v1/pos/roles endpoints).
+    Route::get('/tenant/roles/schema', [RolePermissionController::class, 'getPermissionsSchema'])->middleware('tenant.api.permission:users,view');
+    Route::get('/tenant/permissions', [RolePermissionController::class, 'getPermissionsSchema'])->middleware('tenant.api.permission:users,view');
+    Route::get('/roles/schema', [RolePermissionController::class, 'getPermissionsSchema'])->middleware('tenant.api.permission:users,view');
+    Route::get('/permissions', [RolePermissionController::class, 'getPermissionsSchema'])->middleware('tenant.api.permission:users,view');
+    Route::get('/v1/tenant/roles/schema', [RolePermissionController::class, 'getPermissionsSchema'])->middleware('tenant.api.permission:users,view');
+    Route::get('/v1/tenant/permissions', [RolePermissionController::class, 'getPermissionsSchema'])->middleware('tenant.api.permission:users,view');
     Route::get('/tenant/roles', [RoleApiController::class, 'index'])->middleware('tenant.api.permission:users,view');
     Route::post('/tenant/roles', [RoleApiController::class, 'store'])->middleware('tenant.api.permission:users,create');
     Route::match(['put', 'patch'], '/tenant/roles/{id}', [RoleApiController::class, 'update'])->middleware('tenant.api.permission:users,edit');
@@ -692,6 +705,17 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::post('/tenant/settings/app-preferences/notifications/upload-audio', [TenantAppPreferencesController::class, 'uploadAudio'])->middleware('tenant.api.permission:settings,edit');
     Route::post('/app/settings/app-preferences/notifications/upload-audio', [TenantAppPreferencesController::class, 'uploadAudio'])->middleware('tenant.api.permission:settings,edit');
     Route::post('/v1/tenant/settings/app-preferences/notifications/upload-audio', [TenantAppPreferencesController::class, 'uploadAudio'])->middleware('tenant.api.permission:settings,edit');
+
+    // Tenant App Preferences & Drawer Color Palette Routes
+    Route::match(['get', 'post', 'put'], '/tenant/preferences', [\App\Http\Controllers\Api\AppPreferenceController::class, 'updatePreferences']);
+    Route::match(['get', 'post', 'put'], '/app/preferences', [\App\Http\Controllers\Api\AppPreferenceController::class, 'updatePreferences']);
+    Route::match(['get', 'post', 'put'], '/v1/tenant/preferences', [\App\Http\Controllers\Api\AppPreferenceController::class, 'updatePreferences']);
+    Route::match(['get', 'post', 'put'], '/tenant/app-preferences', [\App\Http\Controllers\Api\AppPreferenceController::class, 'updatePreferences']);
+    Route::match(['get', 'post', 'put'], '/app/app-preferences', [\App\Http\Controllers\Api\AppPreferenceController::class, 'updatePreferences']);
+    Route::match(['get', 'post', 'put'], '/v1/tenant/app-preferences', [\App\Http\Controllers\Api\AppPreferenceController::class, 'updatePreferences']);
+    Route::match(['get', 'post', 'put'], '/tenant/settings/app-preferences/drawer', [\App\Http\Controllers\Api\AppPreferenceController::class, 'updatePreferences']);
+    Route::match(['get', 'post', 'put'], '/app/settings/app-preferences/drawer', [\App\Http\Controllers\Api\AppPreferenceController::class, 'updatePreferences']);
+    Route::match(['get', 'post', 'put'], '/v1/tenant/settings/app-preferences/drawer', [\App\Http\Controllers\Api\AppPreferenceController::class, 'updatePreferences']);
 
     Route::delete('/tenant/products/{id}', [PosSyncApiController::class, 'inventoryDestroyProduct'])->middleware('tenant.api.permission:products,edit');
     Route::delete('/app/products/{id}', [PosSyncApiController::class, 'inventoryDestroyProduct'])->middleware('tenant.api.permission:products,edit');
@@ -1117,6 +1141,8 @@ Route::prefix('v1/pos')->group(function () {
         Route::put('/users/{id}/permissions', [PermissionApiController::class, 'update'])->middleware('tenant.api.permission:users,edit');
 
         // Custom Roles & Granular Permissions
+        Route::get('/roles/schema', [RolePermissionController::class, 'getPermissionsSchema'])->middleware('tenant.api.permission:users,view');
+        Route::get('/permissions', [RolePermissionController::class, 'getPermissionsSchema'])->middleware('tenant.api.permission:users,view');
         Route::get('/roles', [RoleApiController::class, 'index'])->middleware('tenant.api.permission:users,view');
         Route::post('/roles', [RoleApiController::class, 'store'])->middleware('tenant.api.permission:users,create');
         Route::match(['put', 'patch'], '/roles/{id}', [RoleApiController::class, 'update'])->middleware('tenant.api.permission:users,edit');
@@ -1172,3 +1198,6 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::post('/tenant/settings/sms-gateway/test', [TenantSettingsController::class, 'sendTestSms']);
     Route::post('/v1/tenant/settings/sms-gateway/test', [TenantSettingsController::class, 'sendTestSms']);
 });
+
+Route::match(['post', 'put'], '/superadmin/tenants/{tenantId}/modules', [SuperAdminTenantController::class, 'updateModules']);
+Route::match(['post', 'put'], '/v1/superadmin/tenants/{tenantId}/modules', [SuperAdminTenantController::class, 'updateModules']);

@@ -52,6 +52,11 @@ return [
         'item_id' => env('ENVATO_ITEM_ID'),
     ],
 
+    'platform_whatsapp' => [
+        'url' => env('PLATFORM_WHATSAPP_URL'),
+        'token' => env('PLATFORM_WHATSAPP_TOKEN'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | License Server

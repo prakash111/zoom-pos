@@ -45,8 +45,10 @@ class OmnichannelRegistryService
         }
         $waExplicitlyDisabled = (isset($waSettings['is_enabled']) && ! $waSettings['is_enabled'])
             || (isset($waSettings['enabled']) && ! $waSettings['enabled']);
-        $waEnabled = ! $waExplicitlyDisabled
-            && (! empty($waSettings['enabled']) || ! empty($waSettings['is_enabled']) || (function_exists('tenant_setting') && tenant_setting($tenantId, 'enable_whatsapp', true)));
+        // Keep the action available even when a tenant gateway is disabled or
+        // incomplete. The dispatch service will route through the platform
+        // WhatsApp provider (or its final compatibility fallback).
+        $waEnabled = true;
 
         if ($waEnabled) {
             $isMetaApi = ($waSettings['provider'] ?? '') === 'meta_cloud_api' && ! empty($waSettings['access_token']);
@@ -156,7 +158,8 @@ class OmnichannelRegistryService
             && (! empty($smtpSettings['enabled']) || ! empty($smtpSettings['is_enabled']) || (function_exists('tenant_setting') && tenant_setting($tenantId, 'enable_smtp', false)));
         $hasSmtpHost = ! empty($smtpSettings['host']);
 
-        if (! $smtpExplicitlyDisabled && ($smtpEnabled || $hasSmtpHost || config('mail.default'))) {
+        // System mail remains a valid fallback when custom SMTP is disabled.
+        if ($smtpEnabled || $hasSmtpHost || config('mail.default')) {
             $hostLabel = ! empty($smtpSettings['host']) ? " ({$smtpSettings['host']})" : '';
 
             $channelItems[] = [
