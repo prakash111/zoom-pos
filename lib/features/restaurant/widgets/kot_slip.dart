@@ -74,19 +74,6 @@ Future<void> showKotTicketSheet(
   );
 }
 
-String _kotTableDetails(KitchenTicketModel kot) {
-  final table = (kot.tableName ?? kot.serviceType).trim();
-  final sentAt = kot.createdAt?.toLocal();
-  if (sentAt == null) return 'Table: $table';
-  final hh = sentAt.hour.toString().padLeft(2, '0');
-  final mm = sentAt.minute.toString().padLeft(2, '0');
-  return 'Table: $table • Sent at $hh:$mm';
-}
-
-/// Standard document dispatch sheet for kitchen tickets. It intentionally
-/// matches the invoice/due-payment sheet: centered document identity, stacked
-/// actions, channel toggles, and one primary dispatch action.
-
 /// Prints [kot] to the saved Bluetooth thermal printer and reports the outcome
 /// through the nearest [ScaffoldMessenger]. Safe to call from any screen that
 /// has a Scaffold above it.
