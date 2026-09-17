@@ -4,15 +4,16 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/sdui/sdui_icon_registry.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
-import '../../../core/widgets/adaptive_sheet.dart';
+import '../../../core/widgets/unified_document_dispatch_sheet.dart';
 import '../../settings/screens/printer_selection_dialog.dart';
+
+export '../../../core/widgets/unified_document_dispatch_sheet.dart';
 
 /// Everything the actions sheet needs to preview/print/share a document,
 /// independent of whether it backs a Sale or a Quotation.
@@ -103,20 +104,32 @@ bool get _supportsThermalPrint =>
 
 Future<void> showInvoiceActionsSheet(
     BuildContext context, InvoiceActionsData data) {
-  final apiClient = context.read<ApiClient>();
-  final background = Theme.of(context).brightness == Brightness.dark
-      ? const Color(0xFF131E29)
-      : Theme.of(context).colorScheme.surface;
-
-  return showAdaptiveSheet(
-    context,
-    backgroundColor: background,
-    builder: (sheetContext) => _InvoiceActionsSheetContent(
-      parentContext: context,
-      apiClient: apiClient,
-      data: data,
-    ),
+  final unified = UnifiedDocumentDispatchData(
+    documentType: data.documentType,
+    documentId: data.documentId,
+    documentNumber: data.documentNumber,
+    companyName: data.companyName,
+    customerName: data.customerName,
+    customerPhone: data.customerPhone,
+    customerEmail: data.customerEmail,
+    taxId: data.taxId,
+    taxLabel: data.taxLabel,
+    isIndia: data.isIndia,
+    lines: data.lines,
+    subtotal: data.subtotal,
+    discount: data.discount,
+    tax: data.tax,
+    total: data.total,
+    taxRate: data.taxRate,
+    paidAmount: data.paidAmount,
+    dueAmount: data.dueAmount,
+    currencySymbol: data.currencySymbol,
+    pdfPathOverride: data.pdfPathOverride,
+    actionsPathOverride: data.actionsPathOverride,
+    dispatchEndpoint: data.batchDispatchEndpoint ?? '/api/v1/documents/dispatch',
   );
+
+  return showUnifiedDocumentDispatchSheet(context, unified);
 }
 
 class _InvoiceActionsSheetContent extends StatefulWidget {

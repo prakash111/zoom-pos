@@ -172,7 +172,7 @@ Widget buildDrawerItemTile(
   EdgeInsetsGeometry? contentPadding,
 }) {
   final IconData effectiveIcon =
-      iconData ?? (icon is IconData ? icon as IconData : Icons.circle_outlined);
+      iconData ?? (icon is IconData ? icon : Icons.circle_outlined);
   final Color effectiveColor =
       isSelected ? (selectedColor ?? activeColor) : activeColor;
 
@@ -210,7 +210,7 @@ Widget buildSubMenuItemTile(
   EdgeInsetsGeometry? contentPadding,
 }) {
   final IconData effectiveIcon = iconData ??
-      (icon is IconData ? icon as IconData : Icons.subdirectory_arrow_right);
+      (icon is IconData ? icon : Icons.subdirectory_arrow_right);
   final Color effectiveColor = isSelected
       ? (selectedColor ?? activeColor)
       : activeColor.withValues(alpha: 0.85);

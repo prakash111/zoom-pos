@@ -24,14 +24,30 @@ class AppTheme {
   static const Color surface = lightBg;
 
   // --- Dark enterprise-desktop palette -------------------------------------
-  static const Color darkBg = Color(0xFF0F172A); // slate-900
-  static const Color darkCard = Color(0xFF1E293B); // slate-800
-  static const Color darkBorder = Color(0xFF334155); // slate-700
-  static const Color darkHeading = Color(0xFFF8FAFC); // slate-50
+  static const Color darkBg = Color(0xFF0B1120); // Deep Slate (#0B1120)
+  static const Color darkCard = Color(0xFF131D2D); // Elevated Midnight Navy (#131D2D)
+  static const Color darkBorder = Color(0xFF1E293B); // Soft Slate (#1E293B)
+  static const Color darkHeading = Color(0xFFF8FAFC); // Pure High-Contrast White (#F8FAFC)
   static const Color darkBody = Color(0xFFCBD5E1); // slate-300
-  static const Color darkMuted = Color(0xFF94A3B8); // slate-400
+  static const Color darkMuted = Color(0xFF94A3B8); // Muted Slate (#94A3B8)
+  static const Color darkInput = Color(0xFF1E293B); // Soft Slate (#1E293B)
 
-  static const Color darkSurface = darkBg;
+  static const Color darkSurface = darkCard;
+
+  // --- Accents & Statuses ---------------------------------------------------
+  static const Color success = Color(0xFF10B981); // Emerald Green
+  static const Color activeLink = Color(0xFF38BDF8); // Sky Blue
+  static const Color brandAccent = Color(0xFF6366F1); // Indigo
+  static const Color warning = Color(0xFFF59E0B); // Amber
+  static const Color danger = Color(0xFFEF4444); // Rose Red
+
+  // --- Light Theme (Receipts, Thermal Previews & Print Layouts) -------------
+  static const Color thermalBg = Color(0xFFFFFFFF);
+  static const Color thermalText = Color(0xFF0F172A);
+  static const Color paidBadgeBg = Color(0xFFECFDF5);
+  static const Color paidBadgeText = Color(0xFF065F46);
+  static const Color unpaidBadgeBg = Color(0xFFFEF2F2);
+  static const Color unpaidBadgeText = Color(0xFF991B1B);
 
   /// Black or white, whichever reads on [bg] — for text/icons sitting on a
   /// brand-coloured surface.
@@ -136,7 +152,7 @@ class AppTheme {
       borderColor: darkBorder,
       appBarBg: darkCard,
       appBarFg: darkHeading,
-      inputFill: darkCard,
+      inputFill: darkInput,
       drawerBg: _overrideFor(drawerBg, Brightness.dark) ?? darkCard,
       bodyColor: darkBody,
       headingColor: darkHeading,

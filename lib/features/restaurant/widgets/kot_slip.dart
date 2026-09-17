@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../../../core/models/restaurant_models.dart';
-import '../../../core/api/api_client.dart';
-import '../../../core/sdui/screens/dynamic_schema_page.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
-import '../../../core/widgets/adaptive_sheet.dart';
+import '../../../core/widgets/unified_document_dispatch_sheet.dart';
 
 /// Plain-text body lines for a Kitchen Order Ticket thermal slip — mirrors the
 /// web `KotController::print()` layout: table / service / server, then each
@@ -56,39 +53,39 @@ List<String> kitchenTicketSlipLines(KitchenTicketModel kot) {
 }
 
 /// Opens the same document-dispatch workflow used by invoices and due
-/// payments. The ticket itself is deliberately not embedded as a white paper
-/// card here; preview/print is an explicit action in the shared dark sheet.
+/// payments. Uses the shared UnifiedDocumentDispatchSheet.
 Future<void> showKotTicketSheet(
   BuildContext context,
   KitchenTicketModel kot, {
   VoidCallback? onPreviewPdf,
   void Function(bool sendWhatsApp, bool sendEmail)? onDispatch,
 }) {
-  // In production the API client is always available, so use the shared
-  // server-driven sheet. The local fallback keeps isolated widget tests and
-  // offline startup usable until bootstrap has provided the client.
-  ApiClient? apiClient;
-  try { apiClient = context.read<ApiClient>(); } catch (_) {}
-  if (apiClient == null) {
-    return showAdaptiveSheet<void>(
-      context,
-      backgroundColor: const Color(0xFF131D2D),
-      builder: (_) => KotUnifiedDispatchSheet(
-        kotNumber: kot.kotNumber,
-        tableDetails: _kotTableDetails(kot),
-        onPreviewPdf: onPreviewPdf ?? _noop,
-        onThermalPrint: () => printKitchenTicket(context, kot),
-        onDispatch: onDispatch ?? (_, __) {},
-      ),
-    );
-  }
-  final endpoint =
-      '/api/v1/tenant/documents/kot/${Uri.encodeComponent(kot.id)}/preview-modal';
-  return showAdaptiveSheet<void>(
-    context,
-    backgroundColor: const Color(0xFF131D2D),
-    builder: (_) => DynamicSchemaPage(endpoint: endpoint, apiClient: apiClient, embedded: true),
+  final docNumber = kot.kotNumber.trim().isEmpty
+      ? '#KOT-${kot.id}'
+      : kot.kotNumber.trim();
+
+  final data = UnifiedDocumentDispatchData(
+    documentType: 'kot',
+    documentId: kot.id,
+    documentNumber: docNumber,
+    companyName: 'Kitchen Order Ticket',
+    tableName: kot.tableName ?? kot.serviceType,
+    status: kot.status,
+    formattedTimestamp: _kotTableDetails(kot),
+    lines: kot.items.map((item) {
+      return ReceiptLine(
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: 0.0,
+        lineTotal: 0.0,
+      );
+    }).toList(),
+    pdfPathOverride: '/api/v1/tenant/documents/kot/${Uri.encodeComponent(kot.id)}/preview-modal',
+    onPreviewPdf: onPreviewPdf,
+    onDispatch: onDispatch ?? (_, __) {},
   );
+
+  return showUnifiedDocumentDispatchSheet(context, data);
 }
 
 String _kotTableDetails(KitchenTicketModel kot) {
@@ -270,7 +267,6 @@ class _KotActionTile extends StatelessWidget {
       );
 }
 
-void _noop() {}
 
 /// Prints [kot] to the saved Bluetooth thermal printer and reports the outcome
 /// through the nearest [ScaffoldMessenger]. Safe to call from any screen that

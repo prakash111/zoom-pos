@@ -4,12 +4,48 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/services/thermal/thermal_printer_service.dart';
+import '../../core/widgets/unified_document_dispatch_sheet.dart';
 import '../settings/screens/printer_selection_dialog.dart';
+
+export '../../core/widgets/unified_document_dispatch_sheet.dart';
 
 bool get _supportsThermalPrint =>
     !kIsWeb &&
     (defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS);
+
+/// Omnichannel Document Dispatch sheet for Repair Job Sheets, Technician Work Orders,
+/// and Repair Estimates. Uses the unified design tokens and SDUI dispatch.
+Future<void> showRepairUnifiedDispatchSheet(
+  BuildContext context,
+  Map<String, dynamic> ticket,
+) {
+  final id = ticket['id']?.toString() ?? ticket['ticket_id']?.toString() ?? '';
+  final device = ticket['device']?.toString() ?? '';
+  final status = ticket['status']?.toString() ?? 'Intake';
+  final customerName = ticket['customer_name']?.toString();
+  final customerPhone = ticket['customer_phone']?.toString();
+  final customerEmail = ticket['customer_email']?.toString();
+  final defect = ticket['defect']?.toString();
+
+  final docNumber = id.isEmpty ? 'TICKET' : (id.startsWith('#') ? id : '#REP-$id');
+
+  final data = UnifiedDocumentDispatchData(
+    documentType: 'job_sheet',
+    documentId: id,
+    documentNumber: docNumber,
+    companyName: ticket['company_name']?.toString() ?? 'Service & Repairs',
+    customerName: customerName,
+    customerPhone: customerPhone,
+    customerEmail: customerEmail,
+    deviceModel: device,
+    defect: defect,
+    status: status,
+    pdfPathOverride: '/api/tenant/repair/tickets/$id/intake-sheet',
+  );
+
+  return showUnifiedDocumentDispatchSheet(context, data);
+}
 
 /// Native bottom sheet shown after a repair ticket is created, instead of a
 /// forced `wa.me` app switch. Nothing leaves the app until the user picks a
