@@ -54,3 +54,12 @@
         </div>
     </div>
 @endif
+
+@if (($isPharmacy || $isSalon || $isRepair || $hasRestaurant) && $canConsignments)
+    <div data-section-key="vertical_dispatch">
+        <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Sales & Dispatch') }}</div>
+        <div class="space-y-1">
+            <x-nav.drawer-item item-key="consignments" :route="route('tenant.consignments.index')" title="{{ __('Consignments') }}" subtitle="{{ __('Dispatch and consignment tracking') }}">🚚</x-nav.drawer-item>
+        </div>
+    </div>
+@endif

@@ -836,7 +836,9 @@
                             </div>
                         </div>
 
-                    @elseif (! $isPharmacy && ! $isSalon && ! $isRepair)
+                    @elseif (! $isPharmacy && ! $isSalon && ! $isRepair
+                        && ! in_array(strtoupper((string) (auth()->user()?->company?->business_type
+                            ?? auth()->user()?->company?->store_type ?? '')), ['SALON', 'PHARMACY', 'RESTAURANT', 'REPAIR', 'REPAIRS'], true))
                         <!-- GENERAL RETAIL DRAWER ITEMS -->
                         <div data-section-key="cashier_sales">
                             <div class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 px-3">{{ __('Cashier & Sales') }}</div>
@@ -856,6 +858,10 @@
 
                                 @if ($canQuotes)
                                     <x-nav.drawer-item item-key="quotations" :route="route('tenant.quotes.index')" title="{{ __('Quotations & Proposals') }}" subtitle="{{ __('Quotes, estimates & 1-click sales conversion') }}">📑</x-nav.drawer-item>
+                                @endif
+
+                                @if ($canConsignments)
+                                    <x-nav.drawer-item item-key="consignments" :route="route('tenant.consignments.index')" title="{{ __('Consignments') }}" subtitle="{{ __('Dispatch and consignment tracking') }}">🚚</x-nav.drawer-item>
                                 @endif
 
                                 @if ($canCustomers)
