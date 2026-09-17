@@ -75,11 +75,18 @@ List<NavGroupItem> buildDrawerHierarchy(List<RawMenuItem> flatList) {
   for (final item in flatList) {
     // Consignments is always a root sibling of Quotations, including when a
     // stale cached menu still carries a parent id or indentation.
-    final bool isConsignments = item.id == 'consignments';
-    final bool hasParent = !isConsignments &&
+    final bool isFlatCoreAction = <String>{
+      'pos',
+      'sales',
+      'quotations',
+      'consignments',
+      'customers',
+      'cash_register',
+    }.contains(item.id);
+    final bool hasParent = !isFlatCoreAction &&
         item.parentId != null &&
         item.parentId!.isNotEmpty;
-    final bool isSubMenu = !isConsignments &&
+    final bool isSubMenu = !isFlatCoreAction &&
         (item.level > 0 || item.indent > 0) &&
         hasParent;
     final bool isMainMenu =

@@ -227,9 +227,21 @@ class SduiNavItemSchema {
     // (and cached SDUI responses) incorrectly put it under Quotations. Keep
     // the drawer and the navigation editor on the same canonical shape even
     // while those stale payloads are being refreshed.
-    final normalizedParent = key == 'consignments' ? null : rawParent;
-    final normalizedChildren =
-        key == 'consignments' ? const <SduiNavItemSchema>[] : parsedChildren;
+    final isFlatCoreAction = <String>{
+      'pos',
+      'sales',
+      'quotations',
+      'consignments',
+      'customers',
+      'cash_register',
+    }.contains(key);
+    final normalizedParent = isFlatCoreAction ? null : rawParent;
+    final normalizedChildren = isFlatCoreAction
+        ? const <SduiNavItemSchema>[]
+        : parsedChildren;
+    final normalizedType = normalizedChildren.isNotEmpty
+        ? 'accordion'
+        : 'link';
 
     return SduiNavItemSchema(
       key: key,
@@ -239,8 +251,8 @@ class SduiNavItemSchema {
       permission: json['permission']?.toString(),
       parent: normalizedParent,
       parentId: normalizedParent,
-      type: json['type']?.toString() ??
-          (normalizedChildren.isNotEmpty ? 'accordion' : 'link'),
+      // Never trust a stale `type: accordion` when the item has no children.
+      type: normalizedType,
       targetEndpoint: json['target_endpoint']?.toString() ??
           json['endpoint']?.toString() ??
           json['route']?.toString(),
