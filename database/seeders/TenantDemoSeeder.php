@@ -267,7 +267,7 @@ class TenantDemoSeeder extends Seeder
                 // 8. Demo Credit Sales & Accounts Receivables Entries
                 Sale::withoutGlobalScopes()->create([
                     'company_id' => $companyId,
-                    'sale_number' => 'INV-REC-001',
+                    'sale_number' => 'INV-001',
                     'customer_id' => $customerModels[0]->id ?? null,
                     'customer_name' => $customerModels[0]->name ?? 'John Doe',
                     'user_id' => $userId,
@@ -290,7 +290,7 @@ class TenantDemoSeeder extends Seeder
 
                 Sale::withoutGlobalScopes()->create([
                     'company_id' => $companyId,
-                    'sale_number' => 'INV-REC-002',
+                    'sale_number' => 'INV-002',
                     'customer_id' => $customerModels[2]->id ?? null,
                     'customer_name' => $customerModels[2]->name ?? 'Alex Rivera',
                     'user_id' => $userId,
@@ -313,7 +313,7 @@ class TenantDemoSeeder extends Seeder
                 // 9. Demo Quotations matching 1131w-Zy7QIPVSff8.png
                 Sale::withoutGlobalScopes()->create([
                     'company_id' => $companyId,
-                    'sale_number' => 'QUO-0001',
+                    'sale_number' => 'QUO-001',
                     'customer_id' => $customerModels[1]->id ?? null,
                     'customer_name' => 'Salford & Co.',
                     'user_id' => $userId,

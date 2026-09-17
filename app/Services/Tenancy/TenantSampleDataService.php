@@ -74,31 +74,31 @@ class TenantSampleDataService
         $profiles = [
             'retail' => [
                 'trade' => 'Metro Retail Mart', 'emoji' => '🛒', 'color' => '#2563EB',
-                'inv' => 'INV', 'quo' => 'QUO',
+                'inv' => 'INV-', 'quo' => 'QUO-',
                 'address' => '14 Market Street, MG Road', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'postal' => '560001',
                 'phone' => '+91 80 4000 1200', 'website' => 'https://metromart.demo',
             ],
             'restaurant' => [
                 'trade' => 'The Copper Kettle Café', 'emoji' => '🍽️', 'color' => '#D97706',
-                'inv' => 'BILL', 'quo' => 'PARTY',
+                'inv' => 'INV-', 'quo' => 'QUO-',
                 'address' => '2 Brigade Lane, Indiranagar', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'postal' => '560038',
                 'phone' => '+91 80 4111 8080', 'website' => 'https://copperkettle.demo',
             ],
             'pharmacy' => [
                 'trade' => 'CareFirst Pharmacy', 'emoji' => '💊', 'color' => '#059669',
-                'inv' => 'RX', 'quo' => 'EST',
+                'inv' => 'INV-', 'quo' => 'QUO-',
                 'address' => '7 Health Avenue, Jayanagar', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'postal' => '560011',
                 'phone' => '+91 80 2233 4455', 'website' => 'https://carefirst.demo',
             ],
             'repair_technician' => [
                 'trade' => 'FixPoint Device Repairs', 'emoji' => '🔧', 'color' => '#0284C7',
-                'inv' => 'RPR', 'quo' => 'RQT',
+                'inv' => 'INV-', 'quo' => 'QUO-',
                 'address' => '19 Tech Park Road, Koramangala', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'postal' => '560095',
                 'phone' => '+91 80 5566 7788', 'website' => 'https://fixpoint.demo',
             ],
             'service_booking' => [
                 'trade' => 'Lumière Salon & Spa', 'emoji' => '✂️', 'color' => '#7C3AED',
-                'inv' => 'SAL', 'quo' => 'PKG',
+                'inv' => 'INV-', 'quo' => 'QUO-',
                 'address' => '5 Boulevard Court, HSR Layout', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'postal' => '560102',
                 'phone' => '+91 80 6677 9900', 'website' => 'https://lumiere.demo',
             ],
@@ -202,6 +202,9 @@ class TenantSampleDataService
     private function putDemoAsset(string $name, string $svg): string
     {
         $path = 'demo-branding/'.$name;
+        if (str_starts_with($svg, 'data:image/svg+xml;base64,')) {
+            $svg = base64_decode(substr($svg, strlen('data:image/svg+xml;base64,')), true) ?: $svg;
+        }
         Storage::disk('public')->put($path, $svg);
 
         return $path;
@@ -891,7 +894,7 @@ class TenantSampleDataService
             $isDone = $k['status'] === KitchenTicket::STATUS_SERVED;
             $kotSale = Sale::withoutGlobalScopes()->firstOrCreate([
                 'company_id' => $companyId,
-                'sale_number' => 'DEMO-RESTAURANT-KOT-'.($ix + 2),
+                    'sale_number' => 'KOT-'.str_pad((string) ($ix + 2), 3, '0', STR_PAD_LEFT),
             ], [
                 'operation_type' => 'sale',
                 'user_id' => $admin?->id,
@@ -1848,7 +1851,7 @@ class TenantSampleDataService
             if ($done) {
                 $bookingSale = Sale::withoutGlobalScopes()->firstOrCreate([
                     'company_id' => $companyId,
-                    'sale_number' => 'DEMO-SERVICEBOOKING-BOOK-'.($ix + 2),
+                    'sale_number' => 'BKG-'.str_pad((string) ($ix + 2), 3, '0', STR_PAD_LEFT),
                 ], [
                     'operation_type' => 'sale',
                     'customer_id' => $cust->id,
