@@ -223,20 +223,28 @@ class SduiNavItemSchema {
                 .toLowerCase()
                 .replaceAll(RegExp(r'[^a-z0-9_]+'), '_'));
 
+    // Consignments is a top-level navigation action. Older server payloads
+    // (and cached SDUI responses) incorrectly put it under Quotations. Keep
+    // the drawer and the navigation editor on the same canonical shape even
+    // while those stale payloads are being refreshed.
+    final normalizedParent = key == 'consignments' ? null : rawParent;
+    final normalizedChildren =
+        key == 'consignments' ? const <SduiNavItemSchema>[] : parsedChildren;
+
     return SduiNavItemSchema(
       key: key,
       title: rawTitle.isNotEmpty ? rawTitle : key,
       icon: json['icon']?.toString() ?? 'widgets',
       component: json['component']?.toString() ?? (key.isNotEmpty ? key : null),
       permission: json['permission']?.toString(),
-      parent: rawParent,
-      parentId: rawParent,
+      parent: normalizedParent,
+      parentId: normalizedParent,
       type: json['type']?.toString() ??
-          (parsedChildren.isNotEmpty ? 'accordion' : 'link'),
+          (normalizedChildren.isNotEmpty ? 'accordion' : 'link'),
       targetEndpoint: json['target_endpoint']?.toString() ??
           json['endpoint']?.toString() ??
           json['route']?.toString(),
-      children: parsedChildren,
+      children: normalizedChildren,
     );
   }
 

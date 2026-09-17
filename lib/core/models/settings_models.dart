@@ -360,6 +360,12 @@ class NavConfig {
     final rawItems =
         flatItems.isNotEmpty ? flatItems : _flattenTree(json['tree']);
     final sanitizedItems = rawItems.map((item) {
+      // Consignments is always a root-level sibling of Quotations. Older
+      // saved trees may still carry a quotation parent; normalize it here so
+      // the Flutter drawer and navigation editor share the same SSOT.
+      if (item.key == 'consignments') {
+        return item.copyWith(clearParent: true, level: 0, children: const []);
+      }
       if (item.section == 'cashier_sales' &&
           (item.key == 'lead_management' ||
               item.key == 'leads' ||

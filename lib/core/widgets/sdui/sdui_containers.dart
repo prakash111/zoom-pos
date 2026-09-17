@@ -269,7 +269,11 @@ class SduiSideDrawerContainer extends StatelessWidget {
     }
 
     for (final item in itemsByKey.values) {
-      final candidate = item.effectiveParentId ?? inferredParent[item.key];
+      // Defense in depth for stale/cached schemas that bypass the parser:
+      // Consignments must always be a root-level sibling of Quotations.
+      final candidate = item.key == 'consignments'
+          ? null
+          : (item.effectiveParentId ?? inferredParent[item.key]);
       String? cursor = candidate;
       final chain = <String>{item.key};
       var valid = true;
