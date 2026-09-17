@@ -55,10 +55,11 @@ class AppBootstrapController extends Controller
         }
 
         $activeMode = strtolower(trim(ModuleRegistry::resolveActiveMode($company)));
-        $allModules = ModuleRegistry::allModules();
+        $allModules = ModuleRegistry::modulesFor($company);
         $availableModes = ModuleRegistry::availableModes($company);
         $activeModule = ModuleRegistry::getModule($activeMode);
         $menuStructure = TenantNavRegistry::getEffectiveNavForTenant($company);
+        $navigationConfigVersion = sha1((string) json_encode($menuStructure));
 
         $translationVersion = $localization->translationVersion($locale, $company->id);
         $effectiveTradeName = $company->getEffectiveTradeName();
@@ -79,6 +80,11 @@ class AppBootstrapController extends Controller
             'locale' => $locale,
             'header' => $drawerHeader,
             'drawer_header' => $drawerHeader,
+            'store_name' => $company->display_name,
+            'business_name' => $company->display_name,
+            'tenant_name' => $company->display_name,
+            'title' => $company->display_name,
+            'display_name' => $company->display_name,
             'business_type' => $businessType,
             'plan_features' => $activeFeatures,
             'features' => $activeFeatures,
@@ -86,6 +92,8 @@ class AppBootstrapController extends Controller
                 'id' => (string) $company->id,
                 'name' => $company->display_name,
                 'business_name' => $company->display_name,
+                'tenant_name' => $company->display_name,
+                'title' => $company->display_name,
                 'trade_name' => $effectiveTradeName,
                 'trading_name' => $effectiveTradeName,
                 'display_name' => $company->display_name,
@@ -106,6 +114,7 @@ class AppBootstrapController extends Controller
                 'navigation_labels' => $company->navigation_labels ?? new \stdClass,
                 'form_field_customizations' => $company->form_field_customizations ?? new \stdClass,
                 'drawer_header' => $drawerHeader,
+                'header' => $drawerHeader,
             ],
             'navigation_labels' => $company->navigation_labels ?? new \stdClass,
             'form_field_customizations' => $company->form_field_customizations ?? new \stdClass,
@@ -117,6 +126,8 @@ class AppBootstrapController extends Controller
             'store_types' => $availableModes,
             'menu_structure' => $menuStructure,
             'navigation' => $menuStructure,
+            'navigation_schema_version' => 2,
+            'navigation_config_version' => $navigationConfigVersion,
             'theme' => $company->getThemeTokens(),
             'screens' => SchemaResponse::screenDirectory($company),
             'schema_contract' => SchemaResponse::contract(),
@@ -159,7 +170,7 @@ class AppBootstrapController extends Controller
             ],
             // Reserved for tenant-wide status/announcement banners.
             'messages' => [],
-        ])->header('ETag', '"'.$translationVersion.'"');
+        ])->header('ETag', '"'.$translationVersion.'-'.$navigationConfigVersion.'"');
     }
 
     /**

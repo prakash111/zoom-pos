@@ -40,7 +40,18 @@ class TenantNavigationConfigService
      *
      * @var list<string>
      */
-    public const FORCED_ROOT = ['settings', 'consignments'];
+    public const FORCED_ROOT = [
+        'settings',
+        // Core commerce actions are always independent siblings. Older
+        // editors could persist these under POS or Consignments; normalize
+        // them at the API boundary so every client receives one shape.
+        'pos',
+        'sales',
+        'quotations',
+        'consignments',
+        'customers',
+        'cash_register',
+    ];
 
     /**
      * @return array<string, array<int, string>>
@@ -170,18 +181,6 @@ class TenantNavigationConfigService
             $customTitle = trim((string) ($row['custom_title'] ?? ''));
             if ($customTitle === '') {
                 $customTitle = trim((string) ($treeSection['custom_title'] ?? ''));
-            }
-            if ($customTitle === '') {
-                $items = is_array($row['items'] ?? null)
-                    ? $row['items']
-                    : (is_array($treeSection['items'] ?? null) ? $treeSection['items'] : []);
-                foreach ($items as $item) {
-                    if (! is_array($item) || ! empty($item['parent_id'] ?? $item['parent'] ?? null)) {
-                        continue;
-                    }
-                    $customTitle = trim((string) ($item['title'] ?? $item['label'] ?? ''));
-                    break;
-                }
             }
 
             $sections[$key] = ['key' => $key, 'order' => max(0, (int) ($row['order'] ?? $index))];
