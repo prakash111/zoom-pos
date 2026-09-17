@@ -1,0 +1,163 @@
+SERVER-DRIVEN ANDROID NAVIGATION PLAN
+=====================================
+
+Goal
+----
+Manage Android navigation from the server so menu changes do not require Dart
+changes or a new Play Store release.
+
+1. Canonical bootstrap endpoint
+--------------------------------
+Use one endpoint for the complete tenant configuration:
+
+GET /api/v1/bootstrap
+
+Return a versioned navigation schema:
+
+{
+  "schema_version": 2,
+  "config_version": 18,
+  "navigation": {
+    "sections": [
+      {
+        "id": "retail_cashier",
+        "title": "Retail & Cashier",
+        "items": [
+          {
+            "id": "pos",
+            "title": "Point of Sale",
+            "icon": "point_of_sale",
+            "route": "/tenant/pos",
+            "visible": true,
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}
+
+2. Single source of truth
+-------------------------
+Store the active structure in companies.nav_config or a dedicated
+tenant_navigation table. The Navigation Management screen must read and save
+this exact structure. The drawer and the editor must never use separate menu
+arrays.
+
+3. Generic Flutter renderer
+---------------------------
+Flutter should render only generic schema types:
+
+- section
+- link
+- accordion when children is non-empty
+- visibility and permission rules
+- route/action handling
+
+Do not add module-specific rules such as "if item.key == consignments" to the
+Flutter drawer. A menu item with an empty children list must always render as a
+flat ListTile.
+
+4. Server-side module and permission filtering
+----------------------------------------------
+Each item may include:
+
+{
+  "required_module": "consignments",
+  "permission": "consignments.view",
+  "visible": true
+}
+
+The backend must remove unavailable or unauthorized items before returning the
+bootstrap response. Flutter should not decide which tenant modules exist.
+
+5. Stable identifiers
+---------------------
+Use permanent IDs such as pos, sales, quotations, consignments, customers, and
+cash_register. Titles, icons, order, grouping, visibility, and routes can then
+change on the server without changing Dart code.
+
+6. Validation and sanitization
+------------------------------
+Validate every saved navigation configuration on the backend:
+
+- reject duplicate IDs
+- remove invalid routes
+- prevent parent cycles
+- remove empty children arrays
+- force core commerce actions to the root level
+- remove stale accordion and parent flags
+- filter items by enabled modules and permissions
+
+7. Versioning and migration
+----------------------------
+Return schema_version and config_version. Migrate old nested layouts on the
+server before they are returned. Keep Flutter compatibility for older schema
+versions during rollout, then remove legacy support after all active clients
+have upgraded.
+
+8. Offline and cache behavior
+-----------------------------
+Flutter should:
+
+- display the last valid navigation cache immediately
+- request the latest bootstrap response in the background
+- replace the cache only after schema validation succeeds
+- retain the previous valid cache when the request fails
+- fall back to Home, Settings, and Sign Out if no valid cache exists
+
+9. Remove hardcoded business menus
+-----------------------------------
+Remove hardcoded Retail, Pharmacy, Restaurant, Salon, Repair, and Cashier menu
+trees from DashboardScreen and AppDrawer. Keep only a minimal emergency menu:
+
+- Home
+- Settings
+- Sign Out
+
+All business navigation must come from the bootstrap response.
+
+10. Administration workflow
+---------------------------
+Super Admin controls available modules and extension access. Tenant admins can
+reorder or rename permitted items. Saving the Navigation Management screen
+updates nav_config, increments config_version, and invalidates the tenant
+navigation cache.
+
+11. Recommended implementation order
+-------------------------------------
+1. Finalize the backend navigation schema and validator.
+2. Make the bootstrap endpoint return the normalized schema.
+3. Add server-side module and permission filtering.
+4. Update Navigation Management to edit the same schema.
+5. Refactor Flutter NavigationProvider to consume bootstrap navigation.
+6. Replace DashboardScreen and AppDrawer hierarchy logic with a generic
+   recursive renderer.
+7. Add local caching and schema validation.
+8. Remove module-specific Flutter fallback logic.
+9. Test retail, restaurant, pharmacy, salon, repair, and all-modules tenants.
+10. Deploy backend configuration changes without requiring a mobile release.
+
+Target architecture
+-------------------
+
+Super Admin / Tenant Navigation Editor
+                  |
+                  v
+          companies.nav_config
+                  |
+                  v
+          GET /api/v1/bootstrap
+                  |
+                  v
+          Flutter NavigationProvider
+                  |
+                  v
+          Generic Drawer Renderer
+
+Result
+------
+Menu labels, order, grouping, routes, visibility, permissions, and enabled
+extensions can be changed from the server. Dart code remains unchanged for
+normal navigation updates, and Play Store releases are needed only for actual
+application behavior changes.
