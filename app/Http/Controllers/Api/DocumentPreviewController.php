@@ -236,18 +236,34 @@ class DocumentPreviewController extends Controller
             ->where(function ($query) use ($id) {
                 $query->where('id', $id)->orWhere('kot_number', $id);
             })
-            ->with(['company', 'table'])
+            ->with(['company', 'table', 'sale.saleItems.product'])
             ->firstOrFail();
 
-        $items = collect($kot->items ?? [])->map(function (array $item) {
+        $saleItems = $kot->sale?->saleItems ?? collect();
+        $items = collect($kot->items ?? [])->values()->map(function (array $item, int $index) use ($saleItems) {
             $quantity = (float) ($item['quantity'] ?? $item['qty'] ?? 1);
+            $saleItem = $saleItems->first(function ($candidate) use ($item) {
+                return ($candidate->name ?? '') !== ''
+                    && ($candidate->name ?? '') === ($item['name'] ?? '');
+            }) ?? $saleItems->get($index);
+            $unitPrice = (float) ($item['unit_price'] ?? $item['price'] ?? 0);
+            if ($unitPrice <= 0 && $saleItem) {
+                $unitPrice = (float) ($saleItem->unit_price ?? 0);
+            }
+            if ($unitPrice <= 0 && $saleItem?->product) {
+                $unitPrice = (float) ($saleItem->product->sale_price
+                    ?? $saleItem->product->price ?? 0);
+            }
             return [
                 'name' => (string) ($item['name'] ?? 'Item'),
                 'quantity' => $quantity,
-                'unit_price' => 0,
-                'line_total' => 0,
+                'unit_price' => $unitPrice,
+                'line_total' => $unitPrice * $quantity,
             ];
         })->values()->all();
+
+        $calculatedSubtotal = collect($items)->sum('line_total');
+        $taxAmount = (float) ($kot->sale?->tax_amount ?? 0);
 
         $reference = (string) $kot->kot_number;
         $table = $kot->table_name ?: ($kot->table?->name ?? ucfirst((string) $kot->service_type));
@@ -280,10 +296,10 @@ class DocumentPreviewController extends Controller
                         'customer_name' => "Table: {$table}",
                         'lines' => $items,
                         'currency_symbol' => '',
-                        'subtotal' => 0,
+                        'subtotal' => $calculatedSubtotal,
                         'discount' => 0,
-                        'tax_amount' => 0,
-                        'total_amount' => 0,
+                        'tax_amount' => $taxAmount,
+                        'total_amount' => $calculatedSubtotal + $taxAmount,
                         'notes' => $kot->kitchen_notes ?? '',
                     ],
                     'summary' => [
