@@ -61,8 +61,10 @@ class ApiIntegrationsController extends Controller
                 $validator = Validator::make($request->all(), [
                     'whatsapp_is_enabled' => ['nullable'],
                     'is_enabled' => ['nullable'],
-                    'whatsapp_provider' => ['nullable', 'string', 'in:meta_cloud_api,twilio'],
-                    'provider' => ['nullable', 'string', 'in:meta_cloud_api,twilio'],
+                    'whatsapp_provider' => ['nullable', 'string', 'in:meta_cloud_api,twilio,unofficial_http'],
+                    'provider' => ['nullable', 'string', 'in:meta_cloud_api,twilio,unofficial_http'],
+                    'unofficial_whatsapp_url' => ['nullable', 'string', 'max:500'],
+                    'unofficial_whatsapp_token' => ['nullable', 'string'],
                     'meta_phone_number_id' => ['nullable', 'string', 'max:100'],
                     'phone_number_id' => ['nullable', 'string', 'max:100'],
                     'meta_waba_id' => ['nullable', 'string', 'max:100'],
@@ -85,6 +87,15 @@ class ApiIntegrationsController extends Controller
 
                 $isEnabled = $request->boolean('whatsapp_is_enabled', $request->boolean('is_enabled', false));
                 $provider = $request->input('whatsapp_provider', $request->input('provider', 'meta_cloud_api'));
+                $existingWhatsapp = TenantNotificationGateway::withoutGlobalScope('company')
+                    ->where('company_id', $company->id)
+                    ->where('channel', TenantNotificationGateway::CHANNEL_WHATSAPP)
+                    ->first();
+                $existingWhatsappCreds = (array) ($existingWhatsapp?->credentials ?? []);
+                $unofficialToken = $request->input('unofficial_whatsapp_token', $request->input('api_token', ''));
+                if ($unofficialToken === '') {
+                    $unofficialToken = $existingWhatsappCreds['api_token'] ?? '';
+                }
 
                 $credentials = [
                     'phone_number_id' => $request->input('meta_phone_number_id', $request->input('phone_number_id', '')),
@@ -94,6 +105,8 @@ class ApiIntegrationsController extends Controller
                     'account_sid' => $request->input('twilio_account_sid', $request->input('account_sid', '')),
                     'auth_token' => $request->input('twilio_auth_token', $request->input('auth_token', '')),
                     'from_number' => $request->input('twilio_from_number', $request->input('from_number', '')),
+                    'url' => $request->input('unofficial_whatsapp_url', $request->input('url', '')),
+                    'api_token' => $unofficialToken,
                 ];
 
                 TenantNotificationGateway::withoutGlobalScope('company')->updateOrCreate(

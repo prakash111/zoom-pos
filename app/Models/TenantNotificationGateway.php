@@ -19,6 +19,7 @@ class TenantNotificationGateway extends Model
     public const PROVIDER_TWILIO = 'twilio';
     public const PROVIDER_MSG91 = 'msg91';
     public const PROVIDER_GENERIC_HTTP = 'generic_http';
+    public const PROVIDER_UNOFFICIAL_HTTP = 'unofficial_http';
     public const PROVIDER_SMTP = 'smtp';
     public const PROVIDER_WEBHOOK = 'generic_webhook';
 
@@ -96,6 +97,7 @@ class TenantNotificationGateway extends Model
         return match ($this->channel) {
             self::CHANNEL_WHATSAPP => match ($this->provider) {
                 self::PROVIDER_TWILIO => filled($creds['account_sid'] ?? null) && filled($creds['auth_token'] ?? null),
+                self::PROVIDER_UNOFFICIAL_HTTP => filled($creds['url'] ?? null) && filled($creds['api_token'] ?? ($creds['api_key'] ?? null)),
                 default => filled($creds['phone_number_id'] ?? null) && filled($creds['access_token'] ?? null),
             },
             self::CHANNEL_SMS => match ($this->provider) {

@@ -97,7 +97,7 @@
             <!-- Provider Selection -->
             <div>
                 <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">{{ __('Active WhatsApp Provider') }}</label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <label @class(['p-4 rounded-2xl border cursor-pointer transition-all flex items-center gap-3', 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20' => $whatsappProvider === 'meta_cloud_api', 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40' => $whatsappProvider !== 'meta_cloud_api'])>
                         <input type="radio" name="whatsapp_provider" wire:model.live="whatsappProvider" value="meta_cloud_api" class="text-emerald-600 focus:ring-0">
                         <div>
@@ -113,8 +113,25 @@
                             <div class="text-[11px] text-slate-500">{{ __('Programmable Messaging WhatsApp sandbox or approved number') }}</div>
                         </div>
                     </label>
+
+                    <label @class(['p-4 rounded-2xl border cursor-pointer transition-all flex items-center gap-3', 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20' => $whatsappProvider === 'unofficial_http', 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40' => $whatsappProvider !== 'unofficial_http'])>
+                        <input type="radio" name="whatsapp_provider" wire:model.live="whatsappProvider" value="unofficial_http" class="text-emerald-600 focus:ring-0">
+                        <div>
+                            <div class="text-xs font-black text-slate-900 dark:text-white">{{ __('Unofficial / Self-hosted API') }}</div>
+                            <div class="text-[11px] text-amber-600">{{ __('For an approved private bridge or WAPI provider') }}</div>
+                        </div>
+                    </label>
                 </div>
             </div>
+
+            @if($whatsappProvider === 'unofficial_http')
+                <div class="p-5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60 space-y-4">
+                    <div class="text-xs font-black text-slate-900 dark:text-white">{{ __('Unofficial WhatsApp API Credentials') }}</div>
+                    <p class="text-[11px] text-amber-700 dark:text-amber-300">{{ __('Use only a provider and account permitted by applicable WhatsApp policies.') }}</p>
+                    <input type="url" wire:model="unofficialWhatsappUrl" placeholder="https://gateway.example/messages" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white">
+                    <input type="password" wire:model="unofficialWhatsappToken" placeholder="{{ ($company->is_demo ?? false) || str_ends_with(strtolower((string) $company->email), '@zoomnearby.com') ? __('Configured (hidden)') : __('Bearer token') }}" autocomplete="new-password" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white">
+                </div>
+            @endif
 
             <!-- Meta Cloud API Credentials Form -->
             @if($whatsappProvider === 'meta_cloud_api')

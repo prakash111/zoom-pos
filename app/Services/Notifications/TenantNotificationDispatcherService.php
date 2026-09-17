@@ -126,6 +126,32 @@ class TenantNotificationDispatcherService
 
         $gateway = $this->getGateway($company, TenantNotificationGateway::CHANNEL_WHATSAPP);
 
+        // Unofficial/self-hosted WhatsApp HTTP providers (for example WAPI,
+        // Baileys or a tenant's private bridge). Keep this opt-in and fall
+        // through to the existing official/platform routes on failure.
+        if ($gateway && $gateway->is_enabled && $gateway->provider === TenantNotificationGateway::PROVIDER_UNOFFICIAL_HTTP) {
+            $creds = (array) $gateway->credentials;
+            $url = trim((string) ($creds['url'] ?? ''));
+            $token = trim((string) ($creds['api_token'] ?? ($creds['api_key'] ?? '')));
+            if ($url !== '' && $token !== '') {
+                try {
+                    $endpoint = str_replace(['{phone}', '{to}', '{message}'], [$sanitizedPhone, $sanitizedPhone, rawurlencode($message)], $url);
+                    $response = Http::withToken($token)->acceptJson()->timeout(15)->post($endpoint, [
+                        'phone' => $sanitizedPhone,
+                        'to' => $sanitizedPhone,
+                        'message' => $message,
+                    ]);
+                    if ($response->successful()) {
+                        $this->logMessageQueue($company->id, 'whatsapp', $sanitizedPhone, $message, 'sent');
+                        return ['success' => true, 'status' => 'sent', 'provider' => 'unofficial_http', 'message' => 'WhatsApp delivered via private gateway.'];
+                    }
+                    Log::warning('Unofficial WhatsApp gateway failed; using fallback.', ['company_id' => $company->id, 'status' => $response->status()]);
+                } catch (\Throwable $e) {
+                    Log::warning('Unofficial WhatsApp gateway exception; using fallback.', ['company_id' => $company->id, 'error' => $e->getMessage()]);
+                }
+            }
+        }
+
         // Twilio WhatsApp Provider
         if ($gateway && $gateway->is_enabled && $gateway->provider === TenantNotificationGateway::PROVIDER_TWILIO) {
             $creds = (array) $gateway->credentials;

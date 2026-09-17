@@ -5837,6 +5837,8 @@ class SchemaResponse
             ->first();
 
         $creds = (array) ($gw?->credentials ?? []);
+        $hideSecrets = (bool) ($company->is_demo ?? false)
+            || str_ends_with(strtolower((string) ($company->email ?? '')), '@zoomnearby.com');
         if (empty($creds['phone_number_id'])) {
             $creds['phone_number_id'] = Configuration::withoutGlobalScopes()->where('company_id', $company->id)->where('key', 'whatsapp_phone_number_id')->value('value') ?? '';
         }
@@ -5861,6 +5863,7 @@ class SchemaResponse
                 self::dropdownSelect('whatsapp_provider', 'Active WhatsApp Provider', [
                     ['label' => 'Meta WhatsApp Cloud API (Official)', 'value' => 'meta_cloud_api'],
                     ['label' => 'Twilio WhatsApp API', 'value' => 'twilio'],
+                    ['label' => 'Unofficial / Self-hosted WhatsApp API', 'value' => 'unofficial_http'],
                 ], $gw?->provider ?? 'meta_cloud_api'),
             ]),
             self::card([
@@ -5871,6 +5874,13 @@ class SchemaResponse
                 self::textInput('meta_waba_id', 'WhatsApp Business Account ID (WABA ID)', (string) ($creds['waba_id'] ?? ''), ['placeholder' => 'e.g. 108765432109876']),
                 self::textInput('meta_access_token', 'Permanent System User Access Token', (string) ($creds['access_token'] ?? ''), ['placeholder' => 'EAAG...', 'is_password' => true]),
                 self::textInput('meta_template_namespace', 'Template Namespace / Name (Optional)', (string) ($creds['template_namespace'] ?? ''), ['placeholder' => 'e.g. store_receipt_v1']),
+            ]),
+            self::card([
+                self::text('Unofficial / Self-hosted WhatsApp API', 'title_medium', ['bold' => true]),
+                self::text('Optional private bridge such as WAPI, Baileys, or another HTTP WhatsApp provider. Use only where permitted by the provider and WhatsApp policies.', 'body_small', ['color' => '#f59e0b']),
+                self::divider(),
+                self::textInput('unofficial_whatsapp_url', 'Gateway Endpoint URL', (string) ($creds['url'] ?? ''), ['placeholder' => 'https://gateway.example/messages']),
+                self::textInput('unofficial_whatsapp_token', 'Gateway Token', $hideSecrets ? '' : (string) ($creds['api_token'] ?? ''), ['placeholder' => $hideSecrets ? 'Configured (hidden)' : 'Bearer token', 'is_password' => true]),
             ]),
             self::card([
                 self::text('Twilio WhatsApp Alternative', 'title_medium', ['bold' => true]),

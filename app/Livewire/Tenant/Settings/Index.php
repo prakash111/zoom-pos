@@ -184,7 +184,7 @@ class Index extends Component
 
     // 1. WhatsApp Business Gateway
     public bool $whatsappEnabled = false;
-    public string $whatsappProvider = 'meta_cloud_api'; // meta_cloud_api, twilio
+    public string $whatsappProvider = 'meta_cloud_api'; // meta_cloud_api, twilio, unofficial_http
     public string $metaPhoneNumberId = '';
     public string $metaWabaId = '';
     public string $metaAccessToken = '';
@@ -192,6 +192,8 @@ class Index extends Component
     public string $twilioWhatsappSid = '';
     public string $twilioWhatsappToken = '';
     public string $twilioWhatsappFrom = '';
+    public string $unofficialWhatsappUrl = '';
+    public string $unofficialWhatsappToken = '';
     public string $whatsappTestPhone = '';
     public string $whatsappTestResult = '';
     public string $whatsappTestStatus = '';
@@ -454,6 +456,8 @@ class Index extends Component
             ->where('company_id', $this->company->id)
             ->get()
             ->keyBy('channel');
+        $hideDemoSecrets = (bool) ($this->company->is_demo ?? false)
+            || str_ends_with(strtolower((string) $this->company->email), '@zoomnearby.com');
 
         // WhatsApp Gateway
         $waGw = $gateways->get(TenantNotificationGateway::CHANNEL_WHATSAPP);
@@ -467,13 +471,13 @@ class Index extends Component
         $this->twilioWhatsappSid = (string) ($waCreds['account_sid'] ?? '');
         $this->twilioWhatsappToken = (string) ($waCreds['auth_token'] ?? '');
         $this->twilioWhatsappFrom = (string) ($waCreds['from_number'] ?? '');
+        $this->unofficialWhatsappUrl = (string) ($waCreds['url'] ?? '');
+        $this->unofficialWhatsappToken = $hideDemoSecrets ? '' : (string) ($waCreds['api_token'] ?? '');
         $this->whatsappTestPhone = (string) ($this->company->phone ?? '');
 
         // SMS Gateway
         $smsGw = $gateways->get(TenantNotificationGateway::CHANNEL_SMS);
         $smsCreds = (array) ($smsGw?->credentials ?? []);
-        $hideDemoSecrets = (bool) ($this->company->is_demo ?? false)
-            || str_ends_with(strtolower((string) $this->company->email), '@zoomnearby.com');
         $this->smsEnabled = (bool) ($smsGw?->is_enabled ?? false);
         $this->smsProvider = (string) ($smsGw?->provider ?: 'twilio');
         $this->smsTwilioSid = (string) ($smsCreds['account_sid'] ?? '');
@@ -867,6 +871,11 @@ class Index extends Component
 
     public function saveWhatsAppGateway(): void
     {
+        $existing = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $this->company->id)
+            ->where('channel', TenantNotificationGateway::CHANNEL_WHATSAPP)
+            ->first();
+        $existingCreds = (array) ($existing?->credentials ?? []);
         $credentials = [
             'phone_number_id' => trim($this->metaPhoneNumberId),
             'waba_id' => trim($this->metaWabaId),
@@ -875,6 +884,8 @@ class Index extends Component
             'account_sid' => trim($this->twilioWhatsappSid),
             'auth_token' => trim($this->twilioWhatsappToken),
             'from_number' => trim($this->twilioWhatsappFrom),
+            'url' => trim($this->unofficialWhatsappUrl),
+            'api_token' => trim($this->unofficialWhatsappToken) ?: ($existingCreds['api_token'] ?? ''),
         ];
 
         TenantNotificationGateway::withoutGlobalScope('company')->updateOrCreate(
