@@ -268,8 +268,26 @@ class NavigationMenuController extends Controller
 
             $sectionKey = trim((string) ($section['key'] ?? $section['id'] ?? ''));
             $sectionTitle = trim((string) ($section['custom_title'] ?? ''));
+            $legacySectionTitles = [
+                'cashier_sales' => ['Point of Sale', 'Cashier & Sales'],
+                'financial_management' => ['Cash Register', 'Accounts Receivable', 'Financial Management'],
+                'restaurant_operations' => ['Restaurant Operations'],
+                'pharmacy_management' => ['PHARMACY OPERATIONS', 'New Prescription Intake'],
+                'salon_bookings' => ['Book Service / Appointment'],
+                'repair_service' => ['REPAIR OPERATIONS & SALES', 'Repair Workbench'],
+            ];
+            if ($sectionTitle === '' || in_array($sectionTitle, $legacySectionTitles[$sectionKey] ?? [], true)) {
+                $sectionTitle = trim((string) ($section['title'] ?? $section['label'] ?? ''));
+            }
             if ($sectionTitle === '') {
-                $sectionTitle = trim((string) ($items[0]['title'] ?? $items[0]['label'] ?? $section['title'] ?? $section['label'] ?? ''));
+                $sectionTitle = [
+                    'cashier_sales' => 'Retail & Cashier',
+                    'financial_management' => 'Finance & Targets',
+                    'restaurant_operations' => 'Cafe & Restaurant',
+                    'pharmacy_management' => 'Pharmacy & Healthcare',
+                    'salon_bookings' => 'Salon & Bookings',
+                    'repair_service' => 'Service & Repairs',
+                ][$sectionKey] ?? '';
             }
 
             $components[] = ['type' => 'divider', 'section_key' => $sectionKey];
@@ -294,10 +312,11 @@ class NavigationMenuController extends Controller
     private function sanitizeConsignmentsHierarchy(array $sections): array
     {
         $promoted = [];
-        $walk = function (array &$items) use (&$walk, &$promoted): void {
+        $flatCoreKeys = ['pos', 'sales', 'quotations', 'consignments', 'customers', 'cash_register'];
+        $walk = function (array &$items) use (&$walk, &$promoted, $flatCoreKeys): void {
             foreach ($items as &$item) {
                 if (! is_array($item)) continue;
-                if (strtolower((string) ($item['key'] ?? $item['id'] ?? '')) === 'consignments') {
+                if (in_array(strtolower((string) ($item['key'] ?? $item['id'] ?? '')), $flatCoreKeys, true)) {
                     $promoted[] = $item;
                     $item = null;
                     continue;
@@ -323,7 +342,13 @@ class NavigationMenuController extends Controller
         foreach ($sections as &$section) {
             if (($section['key'] ?? $section['id'] ?? '') === 'cashier_sales' && $promoted) {
                 $existing = array_map(fn ($i) => (string) ($i['key'] ?? $i['id'] ?? ''), $section['items'] ?? []);
-                foreach ($promoted as $item) if (! in_array('consignments', $existing, true)) { $section['items'][] = $item; $existing[] = 'consignments'; }
+                foreach ($promoted as $item) {
+                    $key = (string) ($item['key'] ?? $item['id'] ?? '');
+                    if ($key !== '' && ! in_array($key, $existing, true)) {
+                        $section['items'][] = $item;
+                        $existing[] = $key;
+                    }
+                }
                 break;
             }
         }
@@ -369,6 +394,13 @@ class NavigationMenuController extends Controller
                 $parentId = null;
             }
 
+            // Core commerce links are always standalone siblings. Ignore
+            // stale parent/indent metadata from older saved drawer layouts.
+            if (in_array($key, ['pos', 'sales', 'quotations', 'consignments', 'customers', 'cash_register'], true)) {
+                $level = 0;
+                $parentId = null;
+            }
+
             $isRoot = ($level === 0 && empty($parentId));
 
             // If it's a Main Menu item, reset active parent
@@ -386,6 +418,7 @@ class NavigationMenuController extends Controller
 
                 if ($childNode !== null) {
                     if ($currentRoot !== null) {
+                        $currentRoot['children'] ??= [];
                         $currentRoot['children'][] = $childNode;
                     } else {
                         // Fallback if list starts without a root
@@ -432,7 +465,10 @@ class NavigationMenuController extends Controller
 
         $route = trim((string) ($item['route'] ?? $item['target_endpoint'] ?? $item['endpoint'] ?? ''));
         $children = [];
-        foreach (is_array($item['children'] ?? null) ? $item['children'] : [] as $child) {
+        $rawChildren = in_array($key, ['pos', 'sales', 'quotations', 'consignments', 'customers', 'cash_register'], true)
+            ? []
+            : (is_array($item['children'] ?? null) ? $item['children'] : []);
+        foreach ($rawChildren as $child) {
             if (! is_array($child)) {
                 continue;
             }
@@ -458,8 +494,14 @@ class NavigationMenuController extends Controller
             'icon' => (string) ($item['icon'] ?? 'widgets'),
             'action_type' => 'NAVIGATE_TO',
             'route' => $route,
-            'children' => $children,
         ];
+
+        // Flat links must not carry an empty children collection. Some mobile
+        // clients interpret the presence of that key (or a stale accordion
+        // flag) as an expandable tile.
+        if ($children !== []) {
+            $node['children'] = $children;
+        }
 
         return TenantNavRegistry::formatDrawerItem($node, $selectedColor);
     }
