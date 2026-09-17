@@ -1559,7 +1559,11 @@ class Index extends Component
      */
     private function buildNavSections(): array
     {
-        $compiled = TenantNavRegistry::sectionsFor($this->company->isRestaurantMode());
+        // Use the tenant's actual vertical so the editor mirrors the drawer
+        // (pharmacy/salon/repair sections must not fall back to retail).
+        $compiled = TenantNavRegistry::sectionsFor(
+            $this->company->operating_mode ?: ($this->company->pos_mode ?: $this->company->isRestaurantMode())
+        );
         $compiledByKey = collect($compiled)->keyBy('key');
 
         $navConfig = $this->company->normalizedNavConfig();
@@ -1598,6 +1602,9 @@ class Index extends Component
         // the web/mobile UI's own nesting guards, so a parent already at
         // depth 2 can't take on more children.
         foreach ($resolved as $key => &$row) {
+            if ($key === 'consignments') {
+                $row['parent'] = null;
+            }
             if (! $row['parent']) {
                 continue;
             }
@@ -1687,9 +1694,11 @@ class Index extends Component
 
             $sections[] = [
                 'key' => $sectionKey,
-                'label' => $compiledByKey[$sectionKey]['label'],
-                'custom_title' => trim((string) $sectionTitleOverrides->get($sectionKey))
-                    ?: ($items[0]['label'] ?? $compiledByKey[$sectionKey]['label']),
+                'label' => $sectionKey === 'financial_management' ? 'Finance & Accounts' : $compiledByKey[$sectionKey]['label'],
+                'custom_title' => $sectionKey === 'financial_management'
+                    ? 'Finance & Accounts'
+                    : (trim((string) $sectionTitleOverrides->get($sectionKey))
+                        ?: ($items[0]['label'] ?? $compiledByKey[$sectionKey]['label'])),
                 'items' => array_map(
                     fn ($i) => ['key' => $i['key'], 'label' => $i['label'], 'visible' => $i['visible'], 'children' => $i['children']],
                     $items
