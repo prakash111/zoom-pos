@@ -40,17 +40,106 @@ class DynamicModuleScreen extends StatelessWidget {
     return base;
   }
 
-  void _showInfo(BuildContext context, List<String> features) => showModalBottomSheet<void>(context: context, showDragHandle: true, builder: (_) => SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(20, 4, 20, 24), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [Text(module.title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)), const SizedBox(height: 8), Text(module.description.isEmpty ? 'This workspace is configured for your business.' : module.description), if (features.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 14), child: Text('${features.length} active capabilities', style: Theme.of(context).textTheme.labelLarge))])));
+  void _showInfo(BuildContext context, List<String> features) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(module.title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text(module.description.isEmpty ? 'This workspace is configured for your business.' : module.description),
+              if (features.isNotEmpty)
+                Padding(padding: const EdgeInsets.only(top: 14), child: Text('${features.length} active capabilities', style: Theme.of(context).textTheme.labelLarge)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   static String _label(String key) => key.replaceFirst(RegExp(r'^(has_|can_)'), '').replaceAll('_', ' ').split(' ').where((e) => e.isNotEmpty).map((e) => '${e[0].toUpperCase()}${e.substring(1)}').join(' ');
   static Color _accent(String id, ColorScheme s) { final k = id.toLowerCase(); if (k.contains('pharmacy')) return const Color(0xFF0F8F83); if (k.contains('repair') || k.contains('service')) return const Color(0xFF2563EB); if (k.contains('salon') || k.contains('booking')) return const Color(0xFFDB2777); return s.primary; }
 }
-
 class _Hero extends StatelessWidget { const _Hero({required this.module, required this.icon, required this.accent, required this.featureCount}); final ModuleSchema module; final IconData icon; final Color accent; final int featureCount; @override Widget build(BuildContext c) => Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(gradient: LinearGradient(colors: [accent.withValues(alpha: .95), accent.withValues(alpha: .62)]), borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: accent.withValues(alpha: .2), blurRadius: 18, offset: const Offset(0, 8))]), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 54, height: 54, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .16), borderRadius: BorderRadius.circular(16)), child: Icon(icon, color: Colors.white, size: 28)), const SizedBox(width: 16), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(module.title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)), const SizedBox(height: 6), Text(module.description.isEmpty ? 'Everything your team needs, in one place.' : module.description, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, height: 1.35)), const SizedBox(height: 14), Wrap(spacing: 8, runSpacing: 6, children: [_Pill(icon: Icons.check_circle_outline_rounded, text: featureCount == 0 ? 'Ready to use' : '$featureCount features active'), const _Pill(icon: Icons.cloud_done_outlined, text: 'Synced workspace')])]))])); }
 class _Pill extends StatelessWidget { const _Pill({required this.icon, required this.text}); final IconData icon; final String text; @override Widget build(BuildContext c) => Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6), decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(20)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: Colors.white70, size: 14), const SizedBox(width: 5), Text(text, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600))])); }
 class _Heading extends StatelessWidget { const _Heading({required this.title, required this.subtitle}); final String title, subtitle; @override Widget build(BuildContext c) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(c).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)), const SizedBox(height: 3), Text(subtitle, style: Theme.of(c).textTheme.bodySmall?.copyWith(color: Theme.of(c).colorScheme.onSurfaceVariant))]); }
 class _Action { const _Action(this.key, this.title, this.subtitle, this.icon); final String key, title, subtitle; final IconData icon; }
-class _ActionCard extends StatelessWidget { const _ActionCard({required this.action, required this.accent, required this.onTap}); final _Action action; final Color accent; final VoidCallback onTap; @override Widget build(BuildContext c) => Material(color: Theme.of(c).colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(18), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Container(width: 36, height: 36, decoration: BoxDecoration(color: accent.withValues(alpha: .12), borderRadius: BorderRadius.circular(11)), child: Icon(action.icon, color: accent, size: 20)), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(action.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)), const SizedBox(height: 3), Text(action.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: Theme.of(c).colorScheme.onSurfaceVariant))])] ))); }
-class _FeatureCard extends StatelessWidget { const _FeatureCard({required this.features, required this.accent}); final List<String> features; final Color accent; @override Widget build(BuildContext c) => Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Theme.of(c).colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(18)), child: Wrap(spacing: 8, runSpacing: 8, children: features.map((f) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), decoration: BoxDecoration(color: accent.withValues(alpha: .1), borderRadius: BorderRadius.circular(20)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.check_circle_rounded, color: accent, size: 15), const SizedBox(width: 5), Text(f, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600))])).toList())); }
-class _HowItWorks extends StatelessWidget { const _HowItWorks({required this.accent, required this.customerLinking}); final Color accent; final bool customerLinking; @override Widget build(BuildContext c) => Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: accent.withValues(alpha: .07), border: Border.all(color: accent.withValues(alpha: .18)), borderRadius: BorderRadius.circular(18)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Icon(Icons.lightbulb_outline_rounded, color: accent, size: 20), const SizedBox(width: 8), Text('How this workspace works', style: TextStyle(fontWeight: FontWeight.w800, color: accent))]), const SizedBox(height: 12), const _Step('1', 'Choose a task above to get started.'), const _Step('2', 'Complete the details and save your work.'), const _Step('3', 'Your team sees the update everywhere instantly.'), if (customerLinking) const _Step('4', 'Link a customer to keep history and follow-ups together.') ])); }
-class _Step extends StatelessWidget { const _Step(this.number, this.text); final String number, text; @override Widget build(BuildContext c) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [Container(width: 22, height: 22, alignment: Alignment.center, decoration: BoxDecoration(color: Theme.of(c).colorScheme.surface, shape: BoxShape.circle), child: Text(number, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))), const SizedBox(width: 9), Expanded(child: Text(text, style: const TextStyle(fontSize: 12)))])); }
+class _ActionCard extends StatelessWidget {
+  const _ActionCard({required this.action, required this.accent, required this.onTap});
+  final _Action action;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(width: 36, height: 36, decoration: BoxDecoration(color: accent.withValues(alpha: .12), borderRadius: BorderRadius.circular(11)), child: Icon(action.icon, color: accent, size: 20)),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(action.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 3),
+                Text(action.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FeatureCard extends StatelessWidget {
+  const _FeatureCard({required this.features, required this.accent});
+  final List<String> features;
+  final Color accent;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(18)),
+    child: Wrap(spacing: 8, runSpacing: 8, children: features.map((f) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), decoration: BoxDecoration(color: accent.withValues(alpha: .1), borderRadius: BorderRadius.circular(20)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.check_circle_rounded, color: accent, size: 15), const SizedBox(width: 5), Text(f, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600))]))).toList()),
+  );
+}
+
+class _HowItWorks extends StatelessWidget {
+  const _HowItWorks({required this.accent, required this.customerLinking});
+  final Color accent;
+  final bool customerLinking;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(color: accent.withValues(alpha: .07), border: Border.all(color: accent.withValues(alpha: .18)), borderRadius: BorderRadius.circular(18)),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Icon(Icons.lightbulb_outline_rounded, color: accent, size: 20), const SizedBox(width: 8), Text('How this workspace works', style: TextStyle(fontWeight: FontWeight.w800, color: accent))]),
+      const SizedBox(height: 12),
+      const _Step('1', 'Choose a task above to get started.'),
+      const _Step('2', 'Complete the details and save your work.'),
+      const _Step('3', 'Your team sees the update everywhere instantly.'),
+      if (customerLinking) const _Step('4', 'Link a customer to keep history and follow-ups together.'),
+    ]),
+  );
+}
+
+class _Step extends StatelessWidget {
+  const _Step(this.number, this.text);
+  final String number;
+  final String text;
+  @override
+  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [Container(width: 22, height: 22, alignment: Alignment.center, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, shape: BoxShape.circle), child: Text(number, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))), const SizedBox(width: 9), Expanded(child: Text(text, style: const TextStyle(fontSize: 12)))]));
+}
