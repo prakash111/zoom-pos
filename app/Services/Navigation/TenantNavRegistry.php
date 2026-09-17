@@ -62,6 +62,11 @@ class TenantNavRegistry
                 $norm = match ($norm) {
                     'general', 'general_retail' => 'retail',
                     'food_restaurant' => 'restaurant',
+                    // Restaurant aliases are persisted by older seeders and
+                    // consumed by mobile clients. They all activate the same
+                    // Restaurant Operations section rather than becoming
+                    // generic orphan menu sections.
+                    'dining_tables', 'kitchen_display', 'kds', 'kot' => 'restaurant',
                     'repair', 'repairs', 'technician', 'repair_technician', 'repairtechnician' => 'repair_technician',
                     'salon', 'service_booking' => 'service_booking',
                     'lead', 'leads', 'lead_management' => 'leadmanagement',
@@ -353,6 +358,7 @@ class TenantNavRegistry
                 $norm = match ($norm) {
                     'general', 'general_retail' => 'retail',
                     'food_restaurant' => 'restaurant',
+                    'dining_tables', 'kitchen_display', 'kds', 'kot' => 'restaurant',
                     'repair', 'repairs', 'technician', 'repair_technician', 'repairtechnician' => 'repair_technician',
                     'salon', 'service_booking' => 'service_booking',
                     'lead', 'leads', 'lead_management' => 'leadmanagement',
