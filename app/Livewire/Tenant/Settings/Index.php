@@ -472,17 +472,19 @@ class Index extends Component
         // SMS Gateway
         $smsGw = $gateways->get(TenantNotificationGateway::CHANNEL_SMS);
         $smsCreds = (array) ($smsGw?->credentials ?? []);
+        $hideDemoSecrets = (bool) ($this->company->is_demo ?? false)
+            || str_ends_with(strtolower((string) $this->company->email), '@zoomnearby.com');
         $this->smsEnabled = (bool) ($smsGw?->is_enabled ?? false);
         $this->smsProvider = (string) ($smsGw?->provider ?: 'twilio');
         $this->smsTwilioSid = (string) ($smsCreds['account_sid'] ?? '');
-        $this->smsTwilioToken = (string) ($smsCreds['auth_token'] ?? '');
+        $this->smsTwilioToken = $hideDemoSecrets ? '' : (string) ($smsCreds['auth_token'] ?? '');
         $this->smsTwilioFrom = (string) ($smsCreds['from_number'] ?? '');
-        $this->msg91AuthKey = (string) ($smsCreds['auth_key'] ?? '');
+        $this->msg91AuthKey = $hideDemoSecrets ? '' : (string) ($smsCreds['auth_key'] ?? '');
         $this->msg91SenderId = (string) ($smsCreds['sender_id'] ?? '');
         $this->msg91DltTemplateId = (string) ($smsCreds['dlt_template_id'] ?? '');
         $this->genericSmsUrl = (string) ($smsCreds['url'] ?? '');
         $this->genericSmsMethod = (string) ($smsCreds['method'] ?? 'POST');
-        $this->genericSmsApiKey = (string) ($smsCreds['api_key'] ?? '');
+        $this->genericSmsApiKey = $hideDemoSecrets ? '' : (string) ($smsCreds['api_key'] ?? '');
         $this->smsTestPhone = (string) ($this->company->phone ?? '');
 
         // Custom SMTP Gateway
@@ -908,16 +910,21 @@ class Index extends Component
 
     public function saveSmsGateway(): void
     {
+        $existing = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where('company_id', $this->company->id)
+            ->where('channel', TenantNotificationGateway::CHANNEL_SMS)
+            ->first();
+        $existingCreds = (array) ($existing?->credentials ?? []);
         $credentials = [
             'account_sid' => trim($this->smsTwilioSid),
-            'auth_token' => trim($this->smsTwilioToken),
+            'auth_token' => trim($this->smsTwilioToken) ?: ($existingCreds['auth_token'] ?? ''),
             'from_number' => trim($this->smsTwilioFrom),
-            'auth_key' => trim($this->msg91AuthKey),
+            'auth_key' => trim($this->msg91AuthKey) ?: ($existingCreds['auth_key'] ?? ''),
             'sender_id' => trim($this->msg91SenderId),
             'dlt_template_id' => trim($this->msg91DltTemplateId),
             'url' => trim($this->genericSmsUrl),
             'method' => $this->genericSmsMethod,
-            'api_key' => trim($this->genericSmsApiKey),
+            'api_key' => trim($this->genericSmsApiKey) ?: ($existingCreds['api_key'] ?? ''),
         ];
 
         TenantNotificationGateway::withoutGlobalScope('company')->updateOrCreate(

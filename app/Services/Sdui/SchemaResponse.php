@@ -5932,6 +5932,10 @@ class SchemaResponse
 
         $activeProvider = $gw?->provider ?? 'generic_http';
         $isEnabled = (bool) ($gw?->is_enabled ?? false);
+        // Demo workspaces may use a shared gateway for realistic delivery,
+        // but credentials must never be sent back to the client schema.
+        $hideSecrets = (bool) ($company->is_demo ?? false)
+            || str_ends_with(strtolower((string) ($company->email ?? '')), '@zoomnearby.com');
         $testPhone = (string) ($company->phone ?: '+91 80 4111 8080');
 
         return [
@@ -5956,14 +5960,14 @@ class SchemaResponse
                 self::text('Global SMS delivery via Twilio Programmable SMS.', 'body_small', ['color' => '#94a3b8']),
                 self::divider(),
                 self::textInput('sms_twilio_sid', 'Twilio Account SID', (string) ($creds['account_sid'] ?? ''), ['placeholder' => 'AC...']),
-                self::textInput('sms_twilio_token', 'Twilio Auth Token', (string) ($creds['auth_token'] ?? ''), ['placeholder' => 'Auth Token', 'is_password' => true]),
+                self::textInput('sms_twilio_token', 'Twilio Auth Token', $hideSecrets ? '' : (string) ($creds['auth_token'] ?? ''), ['placeholder' => $hideSecrets ? 'Configured (hidden)' : 'Auth Token', 'is_password' => true]),
                 self::textInput('sms_twilio_from', 'From Phone Number / Sender ID', (string) ($creds['from_number'] ?? ''), ['placeholder' => 'e.g. +12025550192']),
             ]),
             self::card([
                 self::text('MSG91 (India DLT Compliant)', 'title_medium', ['bold' => true]),
                 self::text('DLT compliant transactional SMS service for Indian telecom compliance.', 'body_small', ['color' => '#94a3b8']),
                 self::divider(),
-                self::textInput('msg91_auth_key', 'MSG91 Auth Key', (string) ($creds['auth_key'] ?? ''), ['placeholder' => 'Auth Key', 'is_password' => true]),
+                self::textInput('msg91_auth_key', 'MSG91 Auth Key', $hideSecrets ? '' : (string) ($creds['auth_key'] ?? ''), ['placeholder' => $hideSecrets ? 'Configured (hidden)' : 'Auth Key', 'is_password' => true]),
                 self::textInput('msg91_sender_id', 'Approved 6-Character Sender ID', (string) ($creds['sender_id'] ?? ''), ['placeholder' => 'e.g. ZOOMNB']),
                 self::textInput('msg91_dlt_template_id', 'DLT Template / Flow ID', (string) ($creds['dlt_template_id'] ?? ''), ['placeholder' => 'e.g. 64b3...']),
             ]),
@@ -5976,7 +5980,7 @@ class SchemaResponse
                     ['label' => 'POST', 'value' => 'POST'],
                     ['label' => 'GET', 'value' => 'GET'],
                 ], $creds['method'] ?? 'GET'),
-                self::textInput('generic_sms_api_key', 'API Key / Bearer Token (Optional)', (string) ($creds['api_key'] ?? ''), ['is_password' => true]),
+                self::textInput('generic_sms_api_key', 'API Key / Bearer Token (Optional)', $hideSecrets ? '' : (string) ($creds['api_key'] ?? ''), ['placeholder' => $hideSecrets ? 'Configured (hidden)' : 'API key / Bearer token', 'is_password' => true]),
             ]),
             self::buttonPrimary('Save SMS Credentials', self::formSubmitAction(
                 '/api/v1/tenant/api-integrations/sms',

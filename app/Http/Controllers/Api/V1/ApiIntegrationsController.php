@@ -145,6 +145,16 @@ class ApiIntegrationsController extends Controller
                 $genericUrl = $request->input('generic_sms_url', $request->input('gateway_url', $request->input('url', '')));
                 $genericMethod = strtoupper($request->input('generic_sms_method', $request->input('method', 'GET')));
                 $genericApiKey = $request->input('generic_sms_api_key', $request->input('api_token', $request->input('api_key', '')));
+                $existingSmsGateway = TenantNotificationGateway::withoutGlobalScope('company')
+                    ->where('company_id', $company->id)
+                    ->where('channel', TenantNotificationGateway::CHANNEL_SMS)
+                    ->first();
+                $existingSmsCredentials = (array) ($existingSmsGateway?->credentials ?? []);
+                // Secret fields are intentionally blank in demo schemas. Keep
+                // the encrypted server value when a demo user saves settings.
+                if ($genericApiKey === '' && ! empty($existingSmsCredentials['api_key'])) {
+                    $genericApiKey = $existingSmsCredentials['api_key'];
+                }
 
                 $credentials = [
                     'account_sid' => $request->input('sms_twilio_sid', $request->input('account_sid', '')),
