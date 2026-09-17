@@ -82,6 +82,20 @@
             return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
         },
 
+        browserEndpoint(endpoint) {
+            const value = String(endpoint || '');
+            // SDUI schemas are shared with Flutter and therefore use the
+            // bearer-authenticated API path. Browser requests use the active
+            // Laravel session and must target the equivalent tenant route.
+            return value
+                .replace(/^\/api\/v1\/tenant\/dispatch(?=\/|$)/, '/tenant/dispatch')
+                .replace(/^\/api\/tenant\/dispatch(?=\/|$)/, '/tenant/dispatch')
+                .replace(/^\/api\/v1\/tenant\/documents\//, '/tenant/documents/')
+                .replace(/^\/api\/tenant\/documents\//, '/tenant/documents/')
+                .replace(/^\/api\/v1\/tenant\/views\/leads\/(.+)$/, '/tenant/leads/$1')
+                .replace(/^\/api\/tenant\/views\/leads\/(.+)$/, '/tenant/leads/$1');
+        },
+
         async execute(component) {
             const action = component?.action || component?.on_tap || {};
             const type = String(action.type || component?.action_type || '').toUpperCase();
@@ -91,7 +105,7 @@
                 return;
             }
             if (type === 'OPEN_RECEIPT_PREVIEW') {
-                await this.show(action.endpoint || component.endpoint, true);
+                await this.show(this.browserEndpoint(action.endpoint || component.endpoint), true);
                 return;
             }
             if (type === 'TRIGGER_THERMAL_PRINT' || type === 'THERMAL_PRINT') {
@@ -101,7 +115,7 @@
                 return;
             }
             if (type === 'OPEN_BOTTOM_SHEET') {
-                await this.show(action.endpoint || component.route, true);
+                await this.show(this.browserEndpoint(action.endpoint || component.route), true);
                 return;
             }
             if (type === 'NAVIGATE_TO') {
@@ -111,14 +125,14 @@
                 // destinations inside the current sheet; normal web routes
                 // still perform a regular page navigation.
                 if (target.startsWith('/api/')) {
-                    await this.show(target, true);
+                    await this.show(this.browserEndpoint(target), true);
                 } else {
                     window.location.assign(target);
                 }
                 return;
             }
             if (type === 'SHOW_POST_SALE_SHEET') {
-                const target = action.endpoint || component.modal_endpoint || component.endpoint || '';
+                const target = this.browserEndpoint(action.endpoint || component.modal_endpoint || component.endpoint || '');
                 if (target) await this.show(target, true);
                 return;
             }
@@ -127,7 +141,7 @@
             this.dispatching = true;
             this.error = '';
             try {
-                const response = await fetch(action.endpoint || component.endpoint, {
+                const response = await fetch(this.browserEndpoint(action.endpoint || component.endpoint), {
                     method: action.method || component.method || 'POST',
                     credentials: 'same-origin',
                     headers: {

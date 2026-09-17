@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Sync\CatalogViewController;
 use App\Http\Controllers\Api\DispatchController as ApiDispatchController;
+use App\Http\Controllers\Api\UnifiedDispatchController;
+use App\Http\Controllers\Api\DocumentActionController as ApiDocumentActionController;
 use App\Http\Controllers\Api\DocumentPreviewController as ApiDocumentPreviewController;
 use App\Http\Controllers\Api\NotificationController as ApiNotificationController;
 use App\Http\Controllers\Tenant\Auth\PasswordResetController;
@@ -133,14 +135,35 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
             // endpoints so browser and Flutter surfaces stay in sync.
             Route::get('/notifications/feed', [ApiNotificationController::class, 'feed'])
                 ->name('notifications.feed');
+            Route::post('/notifications/clear-all', [ApiNotificationController::class, 'clearAll'])
+                ->name('notifications.clear-all');
+            Route::post('/notifications/{type}/{id}/dismiss', [ApiNotificationController::class, 'dismiss'])
+                ->name('notifications.dismiss');
+            Route::post('/notifications/{id}/dismiss', [ApiNotificationController::class, 'dismiss'])
+                ->name('notifications.dismiss.simple');
             Route::get('/documents/{type}/{id}/preview-modal', [ApiDocumentPreviewController::class, 'previewModal'])
                 ->name('documents.preview-modal');
             Route::get('/documents/{type}/{id}/render-html', [ApiDocumentPreviewController::class, 'renderHtml'])
                 ->name('documents.render-html');
+            Route::get('/documents/{type}/{id}/actions-sheet', [ApiDocumentActionController::class, 'actionsSheet'])
+                ->middleware('tenant.permission:sales,view')
+                ->name('documents.actions-sheet');
             Route::post('/dispatch/sms', [ApiDispatchController::class, 'dispatchSms'])
                 ->name('dispatch.sms');
             Route::post('/dispatch/email', [ApiDispatchController::class, 'dispatchEmail'])
                 ->name('dispatch.email');
+            // Browser-session equivalents of the SDUI dispatch endpoints.
+            // The mobile client uses /api/v1/... with a bearer token; the web
+            // dashboard must stay on the auth:web session and CSRF cookie.
+            Route::post('/dispatch/send', [UnifiedDispatchController::class, 'dispatch'])
+                ->middleware('tenant.permission:pos,create')
+                ->name('dispatch.send');
+            Route::post('/dispatch/batch', [UnifiedDispatchController::class, 'batchDispatch'])
+                ->middleware('tenant.permission:pos,create')
+                ->name('dispatch.batch');
+            Route::post('/dispatch/batch-send', [UnifiedDispatchController::class, 'batchDispatch'])
+                ->middleware('tenant.permission:pos,create')
+                ->name('dispatch.batch-send');
             Route::post('/dispatch/{type}/{id}', [ApiDispatchController::class, 'dispatchDocument'])
                 ->name('dispatch.document');
 
