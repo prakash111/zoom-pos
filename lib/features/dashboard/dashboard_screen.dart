@@ -982,10 +982,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final override = itemOverrides[tile.key];
             // Check if the item is explicitly a Main Menu (level 0)
             final bool isMainMenu = override != null
-                ? (override.level == 0 ||
+                ? (tile.key == 'consignments' ||
+                    override.level == 0 ||
                     override.parentId == null ||
                     override.parentId!.isEmpty)
-                : (tile.key == 'settings' ||
+                : (tile.key == 'consignments' ||
+                    tile.key == 'settings' ||
                     tile.key == firstItem.key ||
                     (section.key != 'cashier_sales' &&
                         section.parentByKey[tile.key] == null));

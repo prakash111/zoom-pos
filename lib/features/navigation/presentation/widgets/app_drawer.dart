@@ -73,8 +73,15 @@ List<NavGroupItem> buildDrawerHierarchy(List<RawMenuItem> flatList) {
   NavGroupItem? activeParent;
 
   for (final item in flatList) {
-    final bool hasParent = item.parentId != null && item.parentId!.isNotEmpty;
-    final bool isSubMenu = (item.level > 0 || item.indent > 0) && hasParent;
+    // Consignments is always a root sibling of Quotations, including when a
+    // stale cached menu still carries a parent id or indentation.
+    final bool isConsignments = item.id == 'consignments';
+    final bool hasParent = !isConsignments &&
+        item.parentId != null &&
+        item.parentId!.isNotEmpty;
+    final bool isSubMenu = !isConsignments &&
+        (item.level > 0 || item.indent > 0) &&
+        hasParent;
     final bool isMainMenu =
         !isSubMenu && (item.level == 0 || item.indent == 0 || !hasParent);
 
