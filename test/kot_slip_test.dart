@@ -68,7 +68,7 @@ void main() {
     expect(lines, contains('2 x Truffle Mushroom Burger'));
   });
 
-  testWidgets('showKotTicketSheet renders a modal ticket with Print / Close',
+  testWidgets('showKotTicketSheet renders the unified dispatch sheet',
       (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -84,18 +84,20 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Kitchen Order Ticket'), findsOneWidget);
-    expect(find.text('KITCHEN ORDER TICKET'), findsOneWidget); // slip header
     expect(find.text('KOT-DEMO-002'), findsOneWidget);
-    expect(find.text('2 x Truffle Mushroom Burger'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Print KOT'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, 'Close'), findsOneWidget);
+    expect(find.text('Table: T-04 • Sent at 14:05'), findsOneWidget);
+    expect(find.text('Preview & Print'), findsOneWidget);
+    expect(find.text('Print on receipt printer'), findsOneWidget);
+    expect(find.text('Send via WhatsApp'), findsOneWidget);
+    expect(find.text('Send via Email'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Send to Selected Channels'),
+        findsOneWidget);
 
     // No transient snackbar for the KOT feedback.
     expect(find.byType(SnackBar), findsNothing);
 
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Close'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Send to Selected Channels'));
     await tester.pumpAndSettle();
-    expect(find.text('Kitchen Order Ticket'), findsNothing);
+    expect(find.text('KOT-DEMO-002'), findsNothing);
   });
 }
