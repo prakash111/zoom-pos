@@ -55,26 +55,24 @@ List<String> kitchenTicketSlipLines(KitchenTicketModel kot) {
 /// Opens the same document-dispatch workflow used by invoices and due
 /// payments. The ticket itself is deliberately not embedded as a white paper
 /// card here; preview/print is an explicit action in the shared dark sheet.
-Future<void> showKotTicketSheet(BuildContext context, KitchenTicketModel kot) {
+Future<void> showKotTicketSheet(
+  BuildContext context,
+  KitchenTicketModel kot, {
+  VoidCallback? onPreviewPdf,
+  void Function(bool sendWhatsApp, bool sendEmail)? onDispatch,
+}) {
   return showAdaptiveSheet<void>(
     context,
     backgroundColor: const Color(0xFF131D2D),
     builder: (sheetContext) => KotUnifiedDispatchSheet(
       kotNumber: kot.kotNumber,
       tableDetails: _kotTableDetails(kot),
-      onPreviewPdf: () => _kotUnavailable(context, 'Preview'),
+      // A caller can provide the real KOT preview route. The default is an
+      // intentional no-op: opening the sheet must never fall back to the old
+      // Settings snackbar or dismiss itself through a feature guard.
+      onPreviewPdf: onPreviewPdf ?? _noop,
       onThermalPrint: () => printKitchenTicket(context, kot),
-      onDispatch: (sendWhatsApp, sendEmail) {
-        final channels = <String>[
-          if (sendWhatsApp) 'WhatsApp',
-          if (sendEmail) 'Email',
-        ];
-        if (channels.isEmpty) {
-          _kotUnavailable(context, 'Dispatch');
-        } else {
-          _kotUnavailable(context, channels.join(' + '));
-        }
-      },
+      onDispatch: onDispatch ?? (_, __) {},
     ),
   );
 }
@@ -258,9 +256,7 @@ class _KotActionTile extends StatelessWidget {
       );
 }
 
-void _kotUnavailable(BuildContext context, String channel) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$channel dispatch can be configured in Settings.')));
-}
+void _noop() {}
 
 /// Prints [kot] to the saved Bluetooth thermal printer and reports the outcome
 /// through the nearest [ScaffoldMessenger]. Safe to call from any screen that
