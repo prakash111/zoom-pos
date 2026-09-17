@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\Auth\PermissionChecker;
 use App\Services\Documents\DocumentNumberService;
 use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\OmnichannelRegistryService;
 use App\Services\Pos\Adapters\RepairCartAdapter;
 use App\Services\Pos\UniversalPosBuilder;
 use App\Services\Repair\RepairNotificationService;
@@ -858,6 +859,122 @@ class RepairApiController extends Controller
                 'whatsapp_url' => $whatsappUrl,
                 'print_url' => $printUrl,
                 'tracking_url' => $trackingUrl,
+            ],
+        ]);
+    }
+
+    /**
+     * Unified document dispatch sheet for an existing repair ticket.
+     * The response follows the same SDUI contract as invoice/quotation
+     * preview sheets, so both web and mobile can render it without a client
+     * release. Customer contact fields are resolved from the linked customer
+     * first, with the ticket snapshot as a fallback.
+     * GET /api/tenant/repair/tickets/{id}/share-sheet
+     */
+    public function ticketsShareDispatchSheet(Request $request, string $id): JsonResponse
+    {
+        $this->authorizeAction($request, 'view');
+        $company = $this->resolveCompany($request);
+        $ticket = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['items.product', 'customer', 'category', 'technician'])
+            ->find($id);
+
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Repair ticket not found.'], 404);
+        }
+
+        $customer = $ticket->customer;
+        $customerName = $customer?->name ?: ($ticket->customer_name ?: 'Walk-in Customer');
+        $phone = $customer?->phone ?: ($ticket->customer_phone ?: '');
+        $email = $customer?->email ?: ($ticket->customer_email ?: '');
+        $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'Device';
+        $reference = (string) $ticket->ticket_number;
+        $trackingUrl = route('repair.portal.track', $reference);
+        $message = "Hello {$customerName}, your repair ticket #{$reference} for {$device} is ready. Track status: {$trackingUrl}";
+        $formats = [
+            ['label' => 'Standard A4', 'value' => 'a4'],
+            ['label' => '80mm POS', 'value' => 'thermal_80mm'],
+            ['label' => '58mm Receipt', 'value' => 'thermal_58mm'],
+            ['label' => 'Mobile Slip', 'value' => 'slip'],
+        ];
+        $format = strtolower((string) $request->input('format', 'a4'));
+        if (! in_array($format, array_column($formats, 'value'), true)) {
+            $format = 'a4';
+        }
+        $endpointPrefix = $request->is('api/*') ? '/api/tenant' : '/tenant';
+        $sheetEndpoint = "{$endpointPrefix}/repair/tickets/{$ticket->id}/share-sheet";
+        $renderUrl = "{$endpointPrefix}/repair/tickets/{$ticket->id}/intake-sheet?format={$format}";
+        $formatLabel = data_get(collect($formats)->firstWhere('value', $format), 'label', 'Standard A4');
+        $waUrl = RepairNotificationService::whatsAppUrl($message, $phone);
+        $emailUrl = $email !== ''
+            ? 'mailto:'.rawurlencode($email).'?subject='.rawurlencode("Repair Ticket #{$reference}").'&body='.rawurlencode($message)
+            : 'mailto:?subject='.rawurlencode("Repair Ticket #{$reference}").'&body='.rawurlencode($message);
+
+        $components = [
+            [
+                'type' => 'segmented_tabs',
+                'param_name' => 'format',
+                'active_value' => $format,
+                'options' => $formats,
+                'action' => ['type' => 'RELOAD_COMPONENT', 'endpoint' => $sheetEndpoint, 'refresh_in_place' => true],
+                'active_background_color' => '#10B981',
+                'active_text_color' => '#0B1120',
+                'inactive_background_color' => '#1E293B',
+                'inactive_text_color' => '#94A3B8',
+                'border_color' => '#334155',
+            ],
+            [
+                'type' => 'document_preview_card',
+                'format' => $format,
+                'paper' => ['label' => $formatLabel],
+                'render_url' => url($renderUrl),
+                'document' => [
+                    'company_name' => $company->display_name ?? ($company->name ?? 'Store'),
+                    'document_label' => 'REPAIR INTAKE TICKET',
+                    'reference' => $reference,
+                    'customer_name' => $customerName,
+                    'customer_phone' => $phone,
+                    'device' => $device,
+                    'notes' => $ticket->issue_description ?: $ticket->reported_defect,
+                ],
+                'summary' => [
+                    'client_name' => $customerName,
+                    'client_phone' => $phone,
+                    'item_count' => $ticket->items?->count() ?? 0,
+                ],
+            ],
+            [
+                'type' => 'list_tile', 'title' => 'Send via WhatsApp',
+                'subtitle' => $phone !== '' ? "to {$phone}" : 'Choose a contact in WhatsApp',
+                'leading' => ['type' => 'icon', 'icon' => 'chat', 'color' => '#25D366'],
+                'action' => ['type' => 'OPEN_URL', 'url' => $waUrl],
+            ],
+            [
+                'type' => 'list_tile', 'title' => 'Send via Email',
+                'subtitle' => $email !== '' ? "to {$email}" : 'Choose an email recipient',
+                'leading' => ['type' => 'icon', 'icon' => 'mark_email_read', 'color' => '#818CF8'],
+                'action' => ['type' => 'OPEN_URL', 'url' => $emailUrl],
+            ],
+            [
+                'type' => 'list_tile', 'title' => 'Print on receipt printer',
+                'subtitle' => 'Bluetooth / network thermal printer',
+                'leading' => ['type' => 'icon', 'icon' => 'print'],
+                'action' => ['type' => 'THERMAL_PRINT', 'document_id' => (string) $ticket->id, 'document_type' => 'repair'],
+            ],
+        ];
+
+        return response()->json([
+            'success' => true,
+            'type' => 'bottom_sheet',
+            'title' => "Repair Ticket #{$reference}",
+            'header' => ['title' => $reference, 'subtitle' => "{$device} • {$customerName}"],
+            'components' => $components,
+            'schema' => [
+                'type' => 'bottom_sheet',
+                'title' => "Repair Ticket #{$reference}",
+                'header' => ['title' => $reference, 'subtitle' => "{$device} • {$customerName}"],
+                'components' => $components,
             ],
         ]);
     }

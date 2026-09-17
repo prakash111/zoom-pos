@@ -15,6 +15,7 @@ use App\Http\Controllers\Tenant\NavigationMenuController;
 use App\Http\Controllers\Tenant\PwaManifestController;
 use App\Http\Controllers\Tenant\QuotationController;
 use App\Http\Controllers\Tenant\RepairPortalController;
+use App\Http\Controllers\Api\V1\RepairApiController;
 use App\Http\Controllers\Tenant\Restaurant\KotController;
 use App\Http\Controllers\Tenant\Restaurant\TableOrderController;
 use App\Http\Controllers\Tenant\SubscriptionInvoiceController;
@@ -266,6 +267,7 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
                 Route::get('/', App\Livewire\Tenant\Repair\Dashboard::class)->middleware('tenant.permission:repair,view')->name('dashboard');
                 Route::get('/tickets', Tickets::class)->middleware('tenant.permission:repair,view')->name('tickets');
                 Route::get('/tickets/{ticket}', TicketDetail::class)->middleware('tenant.permission:repair,view')->name('ticket');
+                Route::get('/tickets/{ticket}/share-sheet', [RepairApiController::class, 'ticketsShareDispatchSheet'])->middleware('tenant.permission:repair,view')->name('ticket.share-sheet');
                 Route::get('/categories', App\Livewire\Tenant\Repair\Categories::class)->middleware('tenant.permission:repair,diagnose')->name('categories');
             });
 

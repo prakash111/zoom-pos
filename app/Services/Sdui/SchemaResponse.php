@@ -90,7 +90,7 @@ class SchemaResponse
 
     public const ACTION_TYPES = [
         'navigate', 'navigate_to', 'form_submit', 'submit_form', 'api_post', 'open_modal', 'navigate_back', 'pop',
-        'add_to_cart', 'open_remote_sheet', 'open_bottom_sheet', 'open_url', 'show_post_sale_sheet',
+        'add_to_cart', 'open_remote_sheet', 'open_bottom_sheet', 'open_quotation_modal', 'open_url', 'show_post_sale_sheet',
         'load_rx_to_pos', 'load_repair_to_pos', 'filter_view', 'show_ticket_share_sheet',
         'trigger_print', 'reload_component', 'refresh_sheet', 'refresh_dashboard', 'thermal_print', 'system_share_file',
         'open_receipt_preview', 'trigger_thermal_print',
@@ -1171,7 +1171,7 @@ class SchemaResponse
 
     public static function screen(string $title, array $components, string $layout = 'scroll_view', array $options = []): array
     {
-        return [
+        return array_merge([
             'type' => 'screen',
             'schema_version' => self::SCHEMA_VERSION,
             'key' => $options['key'] ?? null,
@@ -1184,7 +1184,7 @@ class SchemaResponse
             ],
             'components' => $components,
             'fab' => $options['fab'] ?? null,
-        ];
+        ], $options);
     }
 
     public static function sheet(string $title, array $components, string $layout = 'scroll_view', array $options = []): array
@@ -3144,12 +3144,15 @@ class SchemaResponse
         // `action: show_ticket_share_sheet`, so the existing dispatcher pops
         // the native WhatsApp / Thermal Print / System Share bottom sheet.
         // No wa.me force-redirect, no Flutter changes.
+        // Use the same remote document-dispatch sheet as invoices and
+        // quotations. This keeps repair sharing in one place (format picker,
+        // preview, WhatsApp, email and print) and avoids the legacy contact
+        // prompt that ignored the ticket's linked customer.
         $shareButton = self::buttonOutlined(
             'Share Ticket',
-            self::formSubmitAction(
-                "/api/tenant/repair/tickets/{$ticket->id}/share",
-                'POST',
-                'Opening share options…',
+            self::openRemoteSheetAction(
+                "/api/tenant/repair/tickets/{$ticket->id}/share-sheet",
+                'Share Repair Ticket',
             ),
             'share',
         );
@@ -4936,9 +4939,10 @@ class SchemaResponse
             $roleCards[] = self::card($rowComponents, ['padding' => 12, 'border_radius' => 12]);
         }
 
-        // Grouped permission toggles — one collapsed accordion per module.
+        // Grouped permission toggles — dynamically filtered by tenant-enabled modules.
         $permissionGroups = [];
-        foreach (PermissionChecker::MODULES as $moduleSlug => $moduleLabel) {
+        $activeModules = \App\Http\Controllers\Api\RolePermissionController::getFilteredModulesForTenant($company);
+        foreach ($activeModules as $moduleSlug => $moduleLabel) {
             $checks = [];
             foreach (PermissionChecker::getActionsForModule($moduleSlug) as $actionSlug => $actionLabel) {
                 $checks[] = self::checkbox("perm__{$moduleSlug}__{$actionSlug}", $actionLabel, false);
@@ -6349,7 +6353,19 @@ class SchemaResponse
         $components = app(NavigationController::class)
             ->getDrawerMenuComponents(company: $company);
 
-        return self::screen('Navigation Drawer', $components, 'scroll_view');
+        return self::screen(
+            $company->display_name ?: 'Navigation Drawer',
+            $components,
+            'scroll_view',
+            [
+                'header' => $company->getDrawerHeaderPayload(),
+                'drawer_header' => $company->getDrawerHeaderPayload(),
+                'store_name' => $company->display_name,
+                'business_name' => $company->display_name,
+                'tenant_name' => $company->display_name,
+                'title' => $company->display_name,
+            ]
+        );
     }
 
     /**

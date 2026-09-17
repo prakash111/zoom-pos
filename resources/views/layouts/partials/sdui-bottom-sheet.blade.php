@@ -92,6 +92,8 @@
                 .replace(/^\/api\/tenant\/dispatch(?=\/|$)/, '/tenant/dispatch')
                 .replace(/^\/api\/v1\/tenant\/documents\//, '/tenant/documents/')
                 .replace(/^\/api\/tenant\/documents\//, '/tenant/documents/')
+                .replace(/^\/api\/v1\/tenant\/repair\//, '/tenant/repair/')
+                .replace(/^\/api\/tenant\/repair\//, '/tenant/repair/')
                 .replace(/^\/api\/v1\/tenant\/views\/leads\/(.+)$/, '/tenant/leads/$1')
                 .replace(/^\/api\/tenant\/views\/leads\/(.+)$/, '/tenant/leads/$1');
         },
