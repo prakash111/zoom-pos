@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\Sale;
+use App\Models\KitchenTicket;
 use App\Services\OmnichannelRegistryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,6 +38,9 @@ class DocumentPreviewController extends Controller
         }
 
         $normalizedType = $this->normalizeType($type);
+        if ($normalizedType === 'kot') {
+            return $this->kotPreviewModal($request, $tenantId, $id, $format);
+        }
         $document = $this->findDocument($tenantId, $normalizedType, $id);
 
         $reference = $document->sale_number ?: "DOC-{$document->id}";
@@ -216,11 +220,83 @@ class DocumentPreviewController extends Controller
     private function normalizeType(string $type): string
     {
         return match (strtolower($type)) {
+            'kot', 'kitchen_order_ticket', 'kitchen-ticket' => 'kot',
             'quotation', 'quote' => 'quotation',
             'invoice' => 'invoice',
             'sale', 'receipt', 'sales_receipt' => 'sale',
             default => abort(404, 'Document type not supported'),
         };
+    }
+
+    private function kotPreviewModal(Request $request, mixed $tenantId, int|string $id, string $format): JsonResponse
+    {
+        $kot = KitchenTicket::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $tenantId)
+            ->where(function ($query) use ($id) {
+                $query->where('id', $id)->orWhere('kot_number', $id);
+            })
+            ->with(['company', 'table'])
+            ->firstOrFail();
+
+        $items = collect($kot->items ?? [])->map(function (array $item) {
+            $quantity = (float) ($item['quantity'] ?? $item['qty'] ?? 1);
+            return [
+                'name' => (string) ($item['name'] ?? 'Item'),
+                'quantity' => $quantity,
+                'unit_price' => 0,
+                'line_total' => 0,
+            ];
+        })->values()->all();
+
+        $reference = (string) $kot->kot_number;
+        $table = $kot->table_name ?: ($kot->table?->name ?? ucfirst((string) $kot->service_type));
+        $sentAt = optional($kot->sent_to_kitchen_at ?? $kot->created_at)->format('H:i');
+        $company = $kot->company;
+        $renderUrl = url("/tenant/restaurant/kot/{$kot->id}/print");
+
+        $schema = [
+            'type' => 'bottom_sheet',
+            'schema_version' => 1,
+            'title' => "Preview & Dispatch #{$reference}",
+            'header' => [
+                'title' => $reference,
+                'subtitle' => "Table: {$table} • Sent at {$sentAt}",
+            ],
+            'background_color' => '#0B1120',
+            'components' => [
+                [
+                    'type' => 'document_preview_card',
+                    'format' => $format === 'a4' ? 'slip' : $format,
+                    'background_color' => '#0F172A',
+                    'border_color' => '#334155',
+                    'document' => [
+                        'company_name' => $company?->display_name ?? ($company?->name ?? 'Store'),
+                        'tax_label' => 'Kitchen Order Ticket',
+                        'tax_id' => $reference,
+                        'document_label' => 'KITCHEN ORDER TICKET',
+                        'reference' => $reference,
+                        'date' => optional($kot->created_at)->format('d M Y H:i'),
+                        'customer_name' => "Table: {$table}",
+                        'lines' => $items,
+                        'currency_symbol' => '',
+                        'subtotal' => 0,
+                        'discount' => 0,
+                        'tax_amount' => 0,
+                        'total_amount' => 0,
+                        'notes' => $kot->kitchen_notes ?? '',
+                    ],
+                    'summary' => [
+                        'client_name' => "Table: {$table}",
+                        'item_count' => count($items),
+                        'notes' => $kot->kitchen_notes ?? '',
+                    ],
+                    'render_url' => $renderUrl,
+                ],
+            ],
+        ];
+
+        return response()->json(['success' => true, 'schema' => $schema] + $schema);
     }
 
     private function findDocument(mixed $tenantId, string $type, int|string $id): Sale
