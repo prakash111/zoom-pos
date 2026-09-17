@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../api/api_client.dart';
 import '../../api/api_exception.dart';
@@ -393,6 +394,22 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
         body: Builder(
           builder: (bodyContext) => _buildBody(bodyContext),
         ),
+        bottomNavigationBar: _isDocumentPreview
+            ? _DocumentPreviewBottomBar(
+                onPrint: () {
+                  final action = _schema?['print_action'];
+                  if (action is Map) {
+                    _dispatchAction(Map<String, dynamic>.from(action));
+                  } else {
+                    _showToast('Print options are available in the dispatch sheet.');
+                  }
+                },
+                onShare: () {
+                  final title = displayTitle;
+                  Share.share('{$title}\n${widget.endpoint ?? ''}');
+                },
+              )
+            : null,
         floatingActionButton: fabConfig != null
             ? Builder(
                 builder: (fabContext) =>
@@ -511,6 +528,37 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
           : content,
     );
   }
+}
+
+class _DocumentPreviewBottomBar extends StatelessWidget {
+  const _DocumentPreviewBottomBar({required this.onPrint, required this.onShare});
+
+  final VoidCallback onPrint;
+  final VoidCallback onShare;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        color: const Color(0xFF0B1120),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 32),
+        child: SafeArea(
+          top: false,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.print_outlined, color: Colors.white, size: 26),
+                tooltip: 'Print',
+                onPressed: onPrint,
+              ),
+              IconButton(
+                icon: const Icon(Icons.share_outlined, color: Colors.white, size: 26),
+                tooltip: 'Share',
+                onPressed: onShare,
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 /// Shown above a schema page whose layout was restored from [SchemaCache]
