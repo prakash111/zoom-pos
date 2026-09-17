@@ -142,7 +142,30 @@ class DocumentPreviewController extends Controller
                 ],
             ],
 
-            // 3. Dispatch Channel Actions (Dynamically Loaded)
+            // 3. Shared document actions (the same contract used by POS).
+            [
+                'type' => 'list_tile',
+                'title' => 'Preview & Print',
+                'subtitle' => 'View the document, print, or share the file',
+                'leading' => ['type' => 'icon', 'icon' => 'picture_as_pdf', 'size' => 22],
+                'action' => ['type' => 'OPEN_URL', 'url' => "/tenant/documents/{$normalizedType}/{$document->id}/pdf"],
+            ],
+            [
+                'type' => 'list_tile',
+                'title' => 'Print on receipt printer',
+                'subtitle' => 'Bluetooth or network thermal printer',
+                'leading' => ['type' => 'icon', 'icon' => 'print', 'size' => 22],
+                'action' => ['type' => 'THERMAL_PRINT', 'document_id' => $document->id],
+            ],
+            [
+                'type' => 'list_tile',
+                'title' => 'Share as PDF file',
+                'subtitle' => 'Send the document PDF via any app',
+                'leading' => ['type' => 'icon', 'icon' => 'share', 'size' => 22],
+                'action' => ['type' => 'SYSTEM_SHARE_FILE', 'url' => "/tenant/documents/{$normalizedType}/{$document->id}/pdf"],
+            ],
+
+            // 4. Dispatch Channel Actions (Dynamically Loaded)
             [
                 'type' => 'section_header',
                 'title' => 'Dispatch Document',
@@ -153,10 +176,17 @@ class DocumentPreviewController extends Controller
             ...$availableChannels,
         ];
 
+        // Preserve the legacy invoice route's visible title while using the
+        // same unified schema and renderer as every other document flow.
+        $legacyInvoiceRoute = $request->is('*invoices/preview-sheet') || $request->is('*invoices/*/preview-sheet');
+        $sheetTitle = $normalizedType === 'invoice' && $legacyInvoiceRoute
+            ? 'Invoice Preview'
+            : "Preview & Dispatch #{$reference}";
+
         $schema = [
             'type' => 'bottom_sheet',
             'schema_version' => 1,
-            'title' => "Preview & Dispatch #{$reference}",
+            'title' => $sheetTitle,
             'header' => [
                 'title' => $reference,
                 'subtitle' => 'GSTIN: '.$gstin,
