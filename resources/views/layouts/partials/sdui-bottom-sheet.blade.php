@@ -124,8 +124,14 @@
                 // API navigation targets return an SDUI schema. Keep those
                 // destinations inside the current sheet; normal web routes
                 // still perform a regular page navigation.
-                if (target.startsWith('/api/')) {
-                    await this.show(this.browserEndpoint(target), true);
+                const browserTarget = this.browserEndpoint(target);
+                if (browserTarget !== target) {
+                    // This target has an explicit browser equivalent (for
+                    // example a lead reminder detail page). Do not fetch its
+                    // HTML through response.json(); navigate to the page.
+                    window.location.assign(browserTarget);
+                } else if (target.startsWith('/api/')) {
+                    await this.show(target, true);
                 } else {
                     window.location.assign(target);
                 }
