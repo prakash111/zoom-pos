@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/models/restaurant_models.dart';
+import '../../../core/sdui/screens/dynamic_schema_page.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/widgets/adaptive_sheet.dart';
 
@@ -61,19 +62,15 @@ Future<void> showKotTicketSheet(
   VoidCallback? onPreviewPdf,
   void Function(bool sendWhatsApp, bool sendEmail)? onDispatch,
 }) {
+  // KOT sharing is server-driven, just like invoice/quotation/POS sharing.
+  // Keep the optional callbacks for source compatibility, but do not render
+  // the legacy hardcoded sheet: its channel toggles could not dispatch.
+  final endpoint =
+      '/api/v1/tenant/documents/kot/${Uri.encodeComponent(kot.id)}/preview-modal';
   return showAdaptiveSheet<void>(
     context,
     backgroundColor: const Color(0xFF131D2D),
-    builder: (sheetContext) => KotUnifiedDispatchSheet(
-      kotNumber: kot.kotNumber,
-      tableDetails: _kotTableDetails(kot),
-      // A caller can provide the real KOT preview route. The default is an
-      // intentional no-op: opening the sheet must never fall back to the old
-      // Settings snackbar or dismiss itself through a feature guard.
-      onPreviewPdf: onPreviewPdf ?? _noop,
-      onThermalPrint: () => printKitchenTicket(context, kot),
-      onDispatch: onDispatch ?? (_, __) {},
-    ),
+    builder: (_) => DynamicSchemaPage(endpoint: endpoint, embedded: true),
   );
 }
 
