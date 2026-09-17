@@ -973,6 +973,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         for (final section in navSections) {
           if (section.tiles.isEmpty) continue;
           final firstItem = section.tiles.first;
+          const flatCoreKeys = <String>{
+            'pos',
+            'sales',
+            'quotations',
+            'consignments',
+            'customers',
+            'cash_register',
+          };
 
           final rootItems = <_FeatureTile>[];
           final childrenByParent = <String?, List<_FeatureTile>>{};
@@ -982,11 +990,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final override = itemOverrides[tile.key];
             // Check if the item is explicitly a Main Menu (level 0)
             final bool isMainMenu = override != null
-                ? (tile.key == 'consignments' ||
+                ? (flatCoreKeys.contains(tile.key) ||
                     override.level == 0 ||
                     override.parentId == null ||
                     override.parentId!.isEmpty)
-                : (tile.key == 'consignments' ||
+                : (flatCoreKeys.contains(tile.key) ||
                     tile.key == 'settings' ||
                     tile.key == firstItem.key ||
                     (section.key != 'cashier_sales' &&
@@ -1435,10 +1443,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     for (final section in navSections) {
       final childrenByParent = <String?, List<_FeatureTile>>{};
-      final firstItem = section.tiles.first;
+      const flatCoreKeys = <String>{
+        'pos',
+        'sales',
+        'quotations',
+        'consignments',
+        'customers',
+        'cash_register',
+      };
       for (final tile in section.tiles) {
-        final parent =
-            tile.key == firstItem.key ? null : section.parentByKey[tile.key];
+        final parent = flatCoreKeys.contains(tile.key)
+            ? null
+            : section.parentByKey[tile.key];
         (childrenByParent[parent] ??= []).add(tile);
       }
 
@@ -1512,12 +1528,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
 
-      final sectionChildren = section.tiles
-          .where((tile) =>
-              tile.key != firstItem.key &&
-              (section.parentByKey[tile.key] == null ||
-                  section.parentByKey[tile.key] == firstItem.key))
-          .toList();
+      final rootItems = childrenByParent[null] ?? const <_FeatureTile>[];
       rows.add(Padding(
         key: ValueKey('rail-section-divider-${section.key}'),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1546,12 +1557,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ));
       }
 
-      rows.add(branch(
-        firstItem,
-        0,
-        childOverride: sectionChildren,
-        sectionParent: true,
-      ));
+      for (final root in rootItems) {
+        rows.add(branch(
+          root,
+          0,
+          childOverride: childrenByParent[root.key],
+          sectionParent: true,
+        ));
+      }
     }
 
     // Width is owned by the enclosing [DockRailSlot] (viewport-clamped);
