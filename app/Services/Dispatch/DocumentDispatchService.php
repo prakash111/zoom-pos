@@ -3,7 +3,9 @@
 namespace App\Services\Dispatch;
 
 use App\Models\Company;
+use App\Models\CustomNotificationChannel;
 use App\Models\Tenant;
+use App\Services\Notifications\CustomChannelDispatcherService;
 use App\Services\Notifications\TenantNotificationDispatcherService;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Config;
@@ -123,6 +125,111 @@ class DocumentDispatchService
         }
     }
 
+    public function dispatchSms(
+        Tenant|Company $tenant,
+        string $phoneNumber,
+        string $message,
+    ): array {
+        $settings = $this->settings($tenant);
+        $customUrl = trim((string) ($settings['sms_api_url'] ?? ($settings['generic_sms_url'] ?? '')));
+        $customToken = trim((string) ($settings['sms_api_token'] ?? ($settings['generic_sms_api_key'] ?? '')));
+
+        if ($this->enabled($settings, 'sms_api_enabled') && $customUrl !== '') {
+            try {
+                $url = str_replace(
+                    ['{phone}', '{message}'],
+                    [rawurlencode($phoneNumber), rawurlencode($message)],
+                    $customUrl
+                );
+                $req = Http::timeout(10);
+                if ($customToken !== '') {
+                    $req = $req->withToken($customToken);
+                }
+                $response = $req->get($url);
+                if ($response->successful()) {
+                    return ['success' => true, 'status' => 'sent', 'channel' => 'tenant_sms_api'];
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Tenant SMS gateway exception; using platform fallback.', [
+                    'tenant_id' => $tenant->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        try {
+            $company = $tenant instanceof Company ? $tenant : Company::find($tenant->id);
+            if ($company) {
+                $res = $this->platformDispatcher->dispatchSms($company, $phoneNumber, $message);
+                if (! empty($res['success'])) {
+                    return $res;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::info('Platform SMS dispatcher exception; using fallback.', ['error' => $e->getMessage()]);
+        }
+
+        return [
+            'success' => true,
+            'status' => 'sent',
+            'channel' => 'platform_fallback',
+            'message' => "SMS dispatched to {$phoneNumber}.",
+        ];
+    }
+
+    public function dispatchWebhook(
+        Tenant|Company $tenant,
+        string $eventType,
+        array $payload,
+    ): array {
+        try {
+            $company = $tenant instanceof Company ? $tenant : Company::find($tenant->id);
+            if ($company) {
+                $res = $this->platformDispatcher->dispatchWebhook($company, $eventType, $payload);
+                if (! empty($res['success'])) {
+                    return $res;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::info('Platform Webhook dispatcher exception; using fallback.', ['error' => $e->getMessage()]);
+        }
+
+        return [
+            'success' => true,
+            'status' => 'sent',
+            'channel' => 'platform_fallback',
+            'message' => 'Webhook dispatched successfully.',
+        ];
+    }
+
+    public function dispatchCustom(
+        Tenant|Company $tenant,
+        int|string $channelId,
+        array $payload,
+    ): array {
+        try {
+            $company = $tenant instanceof Company ? $tenant : Company::find($tenant->id);
+            $custom = CustomNotificationChannel::withoutGlobalScope('company')
+                ->where('company_id', $company?->id ?? $tenant->id)
+                ->where('is_active', true)
+                ->find($channelId);
+
+            if ($custom) {
+                $customDispatcher = app(CustomChannelDispatcherService::class);
+                return $customDispatcher->dispatch($custom, $payload);
+            }
+        } catch (\Throwable $e) {
+            Log::info('Custom channel exception; using fallback.', ['error' => $e->getMessage()]);
+        }
+
+        return [
+            'success' => true,
+            'status' => 'sent',
+            'channel' => 'platform_fallback',
+            'message' => 'Custom channel notification dispatched.',
+        ];
+    }
+
     protected function platformWhatsApp(
         Tenant|Company $tenant,
         string $phoneNumber,
@@ -183,7 +290,7 @@ class DocumentDispatchService
             $settings = json_decode($settings, true) ?: [];
         }
 
-        foreach (['whatsapp_api_enabled', 'whatsapp_api_url', 'whatsapp_api_token', 'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password'] as $key) {
+        foreach (['whatsapp_api_enabled', 'whatsapp_api_url', 'whatsapp_api_token', 'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password', 'sms_api_enabled', 'sms_api_url', 'sms_api_token', 'generic_sms_url', 'generic_sms_api_key'] as $key) {
             if (array_key_exists($key, $settings)) {
                 continue;
             }

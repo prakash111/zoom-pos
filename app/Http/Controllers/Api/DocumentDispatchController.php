@@ -11,7 +11,9 @@ use App\Models\RepairTicket;
 use App\Models\Sale;
 use App\Models\SalonAppointment;
 use App\Models\Tenant;
+use App\Models\TenantNotificationGateway;
 use App\Services\Dispatch\DocumentDispatchService;
+use App\Services\OmnichannelRegistryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -25,6 +27,83 @@ class DocumentDispatchController extends Controller
         $doc = $this->resolveDocumentInfo($tenant, $type, $id);
         $settings = (array) ($tenant->api_settings ?? []);
 
+        $dynamicChannels = OmnichannelRegistryService::resolveChannels($tenant->id, [
+            'id' => $id,
+            'type' => $type,
+            'phone' => $doc['customerPhone'],
+            'email' => $doc['customerEmail'],
+            'reference' => $doc['code'],
+        ]);
+
+        $channels = [];
+        $enabledChannelsList = [];
+
+        foreach ($dynamicChannels as $item) {
+            $ch = $item['channel'] ?? 'custom';
+            $chId = $item['id'] ?? ('channel_' . $ch);
+            $target = match ($ch) {
+                'whatsapp', 'sms' => $doc['customerPhone'] ?: '',
+                'email' => $doc['customerEmail'] ?: '',
+                default => $item['subtitle'] ?? '',
+            };
+
+            $entry = [
+                'id' => $chId,
+                'channel' => $ch,
+                'channel_id' => $item['channel_id'] ?? null,
+                'available' => true,
+                'default' => match ($ch) {
+                    'whatsapp' => true,
+                    'email' => ! empty($doc['customerEmail']),
+                    'sms' => ! empty($doc['customerPhone']),
+                    default => false,
+                },
+                'title' => $item['title'] ?? ucfirst($ch),
+                'subtitle' => $item['subtitle'] ?? '',
+                'provider' => $this->resolveProviderLabel($tenant, $ch),
+                'target' => $target,
+                'icon' => $item['leading']['icon'] ?? 'send',
+                'color' => $item['leading']['color'] ?? '#38BDF8',
+            ];
+
+            $channels[$ch] = $entry;
+            $enabledChannelsList[] = $entry;
+        }
+
+        if (! isset($channels['whatsapp'])) {
+            $entry = [
+                'id' => 'channel_whatsapp',
+                'channel' => 'whatsapp',
+                'available' => true,
+                'default' => true,
+                'title' => 'Send via WhatsApp',
+                'subtitle' => $doc['customerPhone'] ?: 'Customer Phone / Kitchen Desk',
+                'provider' => $this->enabled($settings, 'whatsapp_api_enabled') ? 'Custom Gateway' : 'System Service',
+                'target' => $doc['customerPhone'] ?: 'Customer Phone / Kitchen Desk',
+                'icon' => 'chat',
+                'color' => '#25D366',
+            ];
+            $channels['whatsapp'] = $entry;
+            $enabledChannelsList[] = $entry;
+        }
+
+        if (! isset($channels['email'])) {
+            $entry = [
+                'id' => 'channel_email',
+                'channel' => 'email',
+                'available' => true,
+                'default' => ! empty($doc['customerEmail']),
+                'title' => 'Send via Email',
+                'subtitle' => $doc['customerEmail'] ?: 'Enter email address',
+                'provider' => $this->enabled($settings, 'smtp_enabled') ? 'Custom SMTP' : 'System Mailer',
+                'target' => $doc['customerEmail'] ?: 'Enter email address',
+                'icon' => 'email',
+                'color' => '#818CF8',
+            ];
+            $channels['email'] = $entry;
+            $enabledChannelsList[] = $entry;
+        }
+
         return response()->json([
             'success' => true,
             'document_code' => $doc['code'],
@@ -34,20 +113,80 @@ class DocumentDispatchController extends Controller
                 'email' => $doc['customerEmail'],
             ],
             'context' => $doc['context'],
-            'channels' => [
-                'whatsapp' => [
-                    'available' => true,
-                    'default' => true,
-                    'provider' => $this->enabled($settings, 'whatsapp_api_enabled') ? 'Custom Gateway' : 'System Service',
-                    'target' => $doc['customerPhone'] ?: 'Customer Phone / Kitchen Desk',
-                ],
-                'email' => [
-                    'available' => true,
-                    'default' => ! empty($doc['customerEmail']),
-                    'provider' => $this->enabled($settings, 'smtp_enabled') ? 'Custom SMTP' : 'System Mailer',
-                    'target' => $doc['customerEmail'] ?: 'Enter email address',
-                ],
-            ],
+            'channels' => $channels,
+            'enabled_channels' => $enabledChannelsList,
+            'components' => $dynamicChannels,
+        ]);
+    }
+
+    public function getEnabledChannels(Request $request): JsonResponse
+    {
+        $tenant = Tenant::findOrFail($this->resolveCompany($request)->id);
+        $settings = (array) ($tenant->api_settings ?? []);
+
+        $dynamicChannels = OmnichannelRegistryService::resolveChannels($tenant->id, [
+            'type' => 'document',
+            'id' => null,
+            'phone' => null,
+            'email' => null,
+        ]);
+
+        $channels = [];
+        $enabledChannelsList = [];
+
+        foreach ($dynamicChannels as $item) {
+            $ch = $item['channel'] ?? 'custom';
+            $chId = $item['id'] ?? ('channel_' . $ch);
+            $entry = [
+                'id' => $chId,
+                'channel' => $ch,
+                'channel_id' => $item['channel_id'] ?? null,
+                'available' => true,
+                'title' => $item['title'] ?? ucfirst($ch),
+                'subtitle' => $item['subtitle'] ?? '',
+                'provider' => $this->resolveProviderLabel($tenant, $ch),
+                'icon' => $item['leading']['icon'] ?? 'send',
+                'color' => $item['leading']['color'] ?? '#38BDF8',
+            ];
+            $channels[$ch] = $entry;
+            $enabledChannelsList[] = $entry;
+        }
+
+        if (! isset($channels['whatsapp'])) {
+            $entry = [
+                'id' => 'channel_whatsapp',
+                'channel' => 'whatsapp',
+                'available' => true,
+                'title' => 'Send via WhatsApp',
+                'subtitle' => 'Customer Phone',
+                'provider' => $this->enabled($settings, 'whatsapp_api_enabled') ? 'Custom Gateway' : 'System Service',
+                'icon' => 'chat',
+                'color' => '#25D366',
+            ];
+            $channels['whatsapp'] = $entry;
+            $enabledChannelsList[] = $entry;
+        }
+
+        if (! isset($channels['email'])) {
+            $entry = [
+                'id' => 'channel_email',
+                'channel' => 'email',
+                'available' => true,
+                'title' => 'Send via Email',
+                'subtitle' => 'Customer Email',
+                'provider' => $this->enabled($settings, 'smtp_enabled') ? 'Custom SMTP' : 'System Mailer',
+                'icon' => 'email',
+                'color' => '#818CF8',
+            ];
+            $channels['email'] = $entry;
+            $enabledChannelsList[] = $entry;
+        }
+
+        return response()->json([
+            'success' => true,
+            'channels' => $channels,
+            'enabled_channels' => $enabledChannelsList,
+            'components' => $dynamicChannels,
         ]);
     }
 
@@ -58,7 +197,9 @@ class DocumentDispatchController extends Controller
             'document_id' => ['required'],
             'send_whatsapp' => ['sometimes', 'boolean'],
             'send_email' => ['sometimes', 'boolean'],
+            'send_sms' => ['sometimes', 'boolean'],
             'channels' => ['sometimes', 'array'],
+            'channels.*' => ['string'],
             'phone' => ['nullable', 'string'],
             'email' => ['nullable', 'string'],
         ]);
@@ -66,8 +207,10 @@ class DocumentDispatchController extends Controller
         $channels = (array) ($validated['channels'] ?? []);
         $sendWhatsApp = $request->boolean('send_whatsapp') || in_array('whatsapp', $channels, true);
         $sendEmail = $request->boolean('send_email') || in_array('email', $channels, true);
+        $sendSms = $request->boolean('send_sms') || in_array('sms', $channels, true);
+        $sendWebhook = in_array('webhook', $channels, true) || in_array('custom_webhook', $channels, true);
 
-        if (! $sendWhatsApp && ! $sendEmail && empty($channels)) {
+        if (! $sendWhatsApp && ! $sendEmail && ! $sendSms && ! $sendWebhook && empty($channels)) {
             $sendWhatsApp = true;
             $sendEmail = ! empty($validated['email']);
         }
@@ -102,6 +245,53 @@ class DocumentDispatchController extends Controller
                 "Document {$doc['code']} from {$tenant->name}",
                 $mailable,
             );
+        }
+
+        if ($sendSms) {
+            $phoneToUse = $targetPhone ?: '0000000000';
+            $results['sms'] = $dispatchService->dispatchSms(
+                $tenant,
+                $phoneToUse,
+                $doc['message'],
+            );
+        }
+
+        if ($sendWebhook) {
+            $results['webhook'] = $dispatchService->dispatchWebhook(
+                $tenant,
+                'document.dispatched',
+                [
+                    'document_type' => $validated['document_type'],
+                    'document_id' => $validated['document_id'],
+                    'document_code' => $doc['code'],
+                    'customer' => [
+                        'name' => $doc['customerName'],
+                        'phone' => $targetPhone,
+                        'email' => $targetEmail,
+                    ],
+                    'message' => $doc['message'],
+                    'total' => $doc['sale']?->total,
+                ]
+            );
+        }
+
+        foreach ($channels as $channel) {
+            if (preg_match('/^(?:channel_)?custom:?(\d+)$/', $channel, $m)) {
+                $customId = (int) $m[1];
+                $results['custom_' . $customId] = $dispatchService->dispatchCustom(
+                    $tenant,
+                    $customId,
+                    [
+                        'document_type' => $validated['document_type'],
+                        'document_id' => $validated['document_id'],
+                        'document_code' => $doc['code'],
+                        'customer_name' => $doc['customerName'],
+                        'customer_phone' => $targetPhone,
+                        'customer_email' => $targetEmail,
+                        'total' => $doc['sale']?->total,
+                    ]
+                );
+            }
         }
 
         $whatsappUrl = $results['whatsapp']['whatsapp_url'] ?? $results['whatsapp']['url'] ?? null;
@@ -271,5 +461,37 @@ class DocumentDispatchController extends Controller
     protected function enabled(array $settings, string $key): bool
     {
         return filter_var($settings[$key] ?? false, FILTER_VALIDATE_BOOL);
+    }
+
+    protected function resolveProviderLabel(Tenant $tenant, string $channel): string
+    {
+        $gw = TenantNotificationGateway::withoutGlobalScope('company')
+            ->where(function ($q) use ($tenant) {
+                $q->where('company_id', $tenant->id)->orWhere('tenant_id', $tenant->id);
+            })
+            ->where('channel', $channel === 'webhook' ? TenantNotificationGateway::CHANNEL_WEBHOOK : $channel)
+            ->first();
+
+        if ($gw && $gw->is_enabled) {
+            return match ($gw->provider) {
+                'meta_cloud_api' => 'Meta Cloud API',
+                'twilio' => 'Twilio',
+                'msg91' => 'MSG91',
+                'generic_http' => 'HTTP Gateway',
+                'smtp' => 'Custom SMTP',
+                'webhook' => 'Webhook Dispatcher',
+                'unofficial_http' => 'Private Gateway',
+                default => ucwords(str_replace('_', ' ', (string) $gw->provider)),
+            };
+        }
+
+        $settings = (array) ($tenant->api_settings ?? []);
+        return match ($channel) {
+            'whatsapp' => $this->enabled($settings, 'whatsapp_api_enabled') ? 'Custom Gateway' : 'System Service',
+            'email' => $this->enabled($settings, 'smtp_enabled') ? 'Custom SMTP' : 'System Mailer',
+            'sms' => $this->enabled($settings, 'sms_api_enabled') ? 'Custom SMS' : 'Android Gateway',
+            'webhook' => 'External Webhook',
+            default => 'Integration Service',
+        };
     }
 }

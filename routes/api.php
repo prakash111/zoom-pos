@@ -299,6 +299,10 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::post('/dispatch/{type}/{id}', [DispatchController::class, 'dispatchDocument'])->middleware('tenant.api.permission:pos,create');
 
     // Central Unified Dispatch Route & Handlers
+    Route::get('/tenant/dispatch/channels', [DocumentDispatchController::class, 'getEnabledChannels']);
+    Route::get('/v1/tenant/dispatch/channels', [DocumentDispatchController::class, 'getEnabledChannels']);
+    Route::get('/documents/channels', [DocumentDispatchController::class, 'getEnabledChannels']);
+    Route::get('/v1/documents/channels', [DocumentDispatchController::class, 'getEnabledChannels']);
     Route::get('/tenant/documents/{type}/{id}/dispatch-options', [DocumentDispatchController::class, 'getDispatchOptions']);
     Route::get('/v1/tenant/documents/{type}/{id}/dispatch-options', [DocumentDispatchController::class, 'getDispatchOptions']);
     Route::get('/documents/{type}/{id}/dispatch-options', [DocumentDispatchController::class, 'getDispatchOptions']);

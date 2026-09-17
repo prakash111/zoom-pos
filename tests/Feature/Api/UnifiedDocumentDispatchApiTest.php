@@ -298,4 +298,88 @@ class UnifiedDocumentDispatchApiTest extends TestCase
                 ->assertJsonPath('schema.components.1.type', 'document_preview_card');
         }
     }
+
+    public function test_dispatch_options_automatically_fetches_enabled_channels_from_settings(): void
+    {
+        // Enable SMS and Webhook in integration settings (TenantNotificationGateway)
+        \App\Models\TenantNotificationGateway::create([
+            'company_id' => $this->company->id,
+            'tenant_id' => $this->company->id,
+            'channel' => \App\Models\TenantNotificationGateway::CHANNEL_SMS,
+            'provider' => \App\Models\TenantNotificationGateway::PROVIDER_GENERIC_HTTP,
+            'is_enabled' => true,
+            'credentials' => [
+                'url' => 'https://sms.example.test/send?to={phone}&msg={message}',
+                'method' => 'GET',
+            ],
+        ]);
+
+        \App\Models\TenantNotificationGateway::create([
+            'company_id' => $this->company->id,
+            'tenant_id' => $this->company->id,
+            'channel' => \App\Models\TenantNotificationGateway::CHANNEL_WEBHOOK,
+            'provider' => \App\Models\TenantNotificationGateway::PROVIDER_WEBHOOK,
+            'is_enabled' => true,
+            'credentials' => [
+                'url' => 'https://webhook.site/dispatch-listener',
+                'method' => 'POST',
+            ],
+        ]);
+
+        $sale = Sale::create([
+            'company_id' => $this->company->id,
+            'customer_id' => $this->customer->id,
+            'user_id' => $this->user->id,
+            'sale_number' => 'INV-2026-99',
+            'operation_type' => 'sale',
+            'items' => [['name' => 'Widget Pro', 'quantity' => 1, 'unit_price' => 250, 'line_total' => 250]],
+            'total' => 250,
+            'tax_amount' => 0,
+            'paid_amount' => 250,
+            'due_amount' => 0,
+            'payment_status' => 'paid',
+            'status' => 'completed',
+        ]);
+
+        // 1. Check dispatch-options endpoint returns all enabled channels
+        $response = $this->withToken($this->token)
+            ->getJson("/api/v1/documents/sale/{$sale->id}/dispatch-options")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('channels.whatsapp.available', true)
+            ->assertJsonPath('channels.email.available', true)
+            ->assertJsonPath('channels.sms.available', true)
+            ->assertJsonPath('channels.webhook.available', true);
+
+        $enabledChannelKeys = collect($response->json('enabled_channels'))->pluck('channel')->all();
+        $this->assertContains('whatsapp', $enabledChannelKeys);
+        $this->assertContains('sms', $enabledChannelKeys);
+        $this->assertContains('email', $enabledChannelKeys);
+        $this->assertContains('webhook', $enabledChannelKeys);
+
+        // 2. Check general enabled channels endpoint
+        $channelsResponse = $this->withToken($this->token)
+            ->getJson('/api/v1/documents/channels')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('channels.sms.available', true)
+            ->assertJsonPath('channels.webhook.available', true);
+
+        // 3. Dispatch via all enabled channels (SMS, Webhook, WhatsApp, Email)
+        $dispatchResponse = $this->withToken($this->token)
+            ->postJson('/api/v1/documents/dispatch', [
+                'document_type' => 'sale',
+                'document_id' => $sale->id,
+                'channels' => ['whatsapp', 'sms', 'email', 'webhook'],
+                'phone' => '+91 98765 11111',
+                'email' => 'dev@example.test',
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertTrue($dispatchResponse->json('results.whatsapp.success'));
+        $this->assertTrue($dispatchResponse->json('results.sms.success'));
+        $this->assertTrue($dispatchResponse->json('results.email.success'));
+        $this->assertTrue($dispatchResponse->json('results.webhook.success'));
+    }
 }
