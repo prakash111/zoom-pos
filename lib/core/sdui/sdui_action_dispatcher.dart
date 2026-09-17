@@ -11,7 +11,6 @@ import '../../features/pos/screens/invoice_actions_sheet.dart';
 import '../../features/quotations/quotations_provider.dart';
 import '../../features/quotations/quotations_repository.dart';
 import '../../features/quotations/screens/quotation_form_sheet.dart';
-import '../../features/repair/ticket_share_sheet.dart';
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../config/app_config.dart';
@@ -211,7 +210,21 @@ class SduiActionDispatcher {
                   : (res['ticket'] is Map
                       ? Map<String, dynamic>.from(res['ticket'] as Map)
                       : <String, dynamic>{});
-              await showTicketShareSheet(context, share);
+              // Keep legacy create-ticket responses compatible, but render
+              // the same server-driven dispatch sheet used by POS/invoices.
+              // This removes the old wa.me/system-share sheet and lets the
+              // backend bind delivery to the ticket's customer contact.
+              final ticketId = share['ticket_id']?.toString() ??
+                  (res['ticket'] is Map
+                      ? (res['ticket']['id']?.toString() ?? '')
+                      : '');
+              if (ticketId.isNotEmpty) {
+                await _openRemoteSheet(context, {
+                  'type': 'open_remote_sheet',
+                  'endpoint': '/api/tenant/repair/tickets/$ticketId/share-sheet',
+                  'title': 'Share Repair Ticket',
+                }, client);
+              }
             }
             if (context.mounted &&
                 redirectRoute != null &&
