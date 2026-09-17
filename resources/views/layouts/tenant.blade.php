@@ -21,10 +21,15 @@
         // Per-user dock position, server-persisted, seeds first paint before
         // localStorage (anti-flicker) and Alpine take over.
         $dockPosition = auth()->user()?->dock_position ?: 'left';
+        // Logo and favicon values may be stored as relative storage paths
+        // (for example, demo-branding/retail-logo.svg). Always resolve them
+        // through the Company model so browser URLs are absolute and valid.
+        $tenantLogoUrl = $tenantCompany?->getLogoUrl();
+        $tenantFaviconUrl = $tenantCompany?->getFaviconUrl();
     @endphp
     <title>{{ $title ?? 'POS & Store Manager' }} — {{ auth()->user()?->company?->name ?? config('app.name') }}</title>
-    @if (auth()->user()?->company?->favicon)
-        <link rel="icon" href="{{ auth()->user()->company->favicon }}">
+    @if ($tenantFaviconUrl)
+        <link rel="icon" href="{{ $tenantFaviconUrl }}">
     @endif
     <link rel="manifest" href="{{ route('tenant.pwa.manifest') }}" crossorigin="use-credentials">
     <link rel="apple-touch-icon" href="{{ asset('pwa/icon-192.png') }}">
@@ -196,8 +201,8 @@
                 
                 <!-- Expanded Brand Header -->
                 <div x-show="layout === 'expanded' || position === 'top' || position === 'bottom'" class="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                    @if (auth()->user()?->company?->logo)
-                        <img src="{{ auth()->user()->company->logo }}" alt="{{ auth()->user()->company->name }}" class="w-7 h-7 sm:w-8 sm:h-8 object-contain rounded-xl bg-white/10 p-1 border border-white/15 shrink-0">
+                    @if ($tenantLogoUrl)
+                        <img src="{{ $tenantLogoUrl }}" alt="{{ $tenantCompany?->name ?? config('app.name') }}" class="w-7 h-7 sm:w-8 sm:h-8 object-contain rounded-xl bg-white/10 p-1 border border-white/15 shrink-0">
                     @else
                         <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white/20 text-white flex items-center justify-center font-black text-xs sm:text-sm shrink-0">
                             {{ substr(auth()->user()?->company?->name ?? 'Z', 0, 1) }}
@@ -733,8 +738,8 @@
                 <!-- Header inside toggle menu -->
                 <div class="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-5">
                     <div class="flex items-center gap-3">
-                        @if (auth()->user()?->company?->logo)
-                            <img src="{{ auth()->user()->company->logo }}" alt="{{ auth()->user()->company->name }}" class="w-10 h-10 object-contain rounded-2xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700 shadow-md">
+                        @if ($tenantLogoUrl)
+                            <img src="{{ $tenantLogoUrl }}" alt="{{ $tenantCompany?->name ?? config('app.name') }}" class="w-10 h-10 object-contain rounded-2xl bg-slate-50 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700 shadow-md">
                         @else
                             <div class="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-md">
                                 {{ substr(auth()->user()?->company?->name ?? 'Z', 0, 1) }}
