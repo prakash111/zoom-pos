@@ -228,9 +228,13 @@ class Show extends Component
 
         $companyId = $this->quote->company_id;
         $company = Company::find($companyId);
-        $prefix = $company?->invoice_prefix ?: 'INV-';
+        $prefix = trim((string) ($company?->invoice_prefix ?: 'INV-'));
+        if ($prefix === '' || strlen($prefix) > 8) {
+            $prefix = 'INV-';
+        }
+        $prefix = str_ends_with($prefix, '-') ? $prefix : $prefix.'-';
         $count = Sale::where('operation_type', 'sale')->count() + 1;
-        $saleNumber = $prefix.sprintf('%04d', $count);
+        $saleNumber = $prefix.sprintf('%03d', $count);
 
         $sale = DB::transaction(function () use ($companyId, $saleNumber) {
             foreach ($this->quote->items ?? [] as $item) {

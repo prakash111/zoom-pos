@@ -3,7 +3,9 @@
 namespace App\Livewire\Tenant\Quotes;
 
 use App\Models\AuditLog;
+use App\Models\Company;
 use App\Models\Customer;
+use App\Models\Lead;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Sale;
@@ -11,6 +13,7 @@ use App\Models\TaxRule;
 use App\Models\User;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Modules\leadmanagement\Models\LeadActivity;
 
 #[Layout('layouts.tenant', ['title' => 'New Quotation'])]
 class Create extends Component
@@ -84,9 +87,13 @@ class Create extends Component
             ->orderBy('name')
             ->get();
 
-        $prefix = $company?->quotation_prefix ?: 'QUO-';
+        $prefix = trim((string) ($company?->quotation_prefix ?: 'QUO-'));
+        if ($prefix === '' || strlen($prefix) > 8) {
+            $prefix = 'QUO-';
+        }
+        $prefix = str_ends_with($prefix, '-') ? $prefix : $prefix.'-';
         $count = Sale::where('operation_type', 'quotation')->count() + 1;
-        $this->quoteNumber = $prefix.sprintf('%04d', $count);
+        $this->quoteNumber = $prefix.sprintf('%03d', $count);
 
         $this->availableTaxRules = TaxRule::query()
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
@@ -125,7 +132,8 @@ class Create extends Component
         $this->paymentMethod = $this->agreedPaymentMethod;
 
         if ($leadIdQuery = request()->query('lead_id')) {
-            $lead = \App\Models\Lead::find($leadIdQuery);
+            abort_unless($company?->hasModule('leadmanagement'), 403, 'Lead Management is not activated for this store.');
+            $lead = Lead::find($leadIdQuery);
             if ($lead) {
                 $this->leadId = $lead->id;
                 if ($lead->customer_id) {
@@ -348,6 +356,10 @@ class Create extends Component
         $paymentMethodToSave = $this->agreedPaymentMethod ?: ($this->paymentMethod ?: 'cash');
         $notesToSave = filled($this->quoteNotes) ? $this->quoteNotes : ($this->notes ?: null);
 
+        if ($this->leadId) {
+            abort_unless(Company::find($companyId)?->hasModule('leadmanagement'), 403, 'Lead Management is not activated for this store.');
+        }
+
         $quote = Sale::create([
             'company_id' => $companyId,
             'sale_number' => $this->quoteNumber,
@@ -372,10 +384,10 @@ class Create extends Component
         ]);
 
         if ($this->leadId) {
-            $lead = \App\Models\Lead::find($this->leadId);
+            $lead = Lead::find($this->leadId);
             if ($lead) {
                 $lead->update(['stage' => 'proposal_sent']);
-                \Modules\leadmanagement\Models\LeadActivity::create([
+                LeadActivity::create([
                     'company_id' => $companyId,
                     'lead_id' => $lead->id,
                     'type' => 'note',
