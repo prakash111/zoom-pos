@@ -267,95 +267,6 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
     );
   }
 
-  final cashierRows = tilesBySection['cashier_sales'] ??= [];
-  // Ensure any lead management items are completely purged from cashierRows
-  cashierRows.removeWhere((r) =>
-      r.tile.key == 'lead_management' ||
-      r.tile.key == 'leads' ||
-      r.tile.key.startsWith('lead_') ||
-      r.tile.key.contains('lead'));
-  final existingCashierKeys = {for (final r in cashierRows) r.tile.key};
-
-  final coreCashierItems = <({
-    String key,
-    String title,
-    String icon,
-    String component,
-    String permission,
-    String endpoint
-  })>[
-    (
-      key: 'pos',
-      title: 'Point of Sale',
-      icon: 'point_of_sale',
-      component: 'pos',
-      permission: 'pos',
-      endpoint: '/tenant/views/pos'
-    ),
-    (
-      key: 'sales',
-      title: 'Sales & Invoices',
-      icon: 'receipt_long',
-      component: 'sales',
-      permission: 'sales',
-      endpoint: '/tenant/views/sales'
-    ),
-    (
-      key: 'quotations',
-      title: 'Quotations & Proposals',
-      icon: 'description',
-      component: 'quotations',
-      permission: 'quotes',
-      endpoint: '/tenant/views/quotations'
-    ),
-    (
-      key: 'consignments',
-      title: 'Consignments',
-      icon: 'local_shipping',
-      component: 'consignments',
-      permission: 'consignments',
-      endpoint: '/consignments'
-    ),
-    (
-      key: 'customers',
-      title: 'Customers & CRM',
-      icon: 'people',
-      component: 'customers',
-      permission: 'customers',
-      endpoint: '/customers'
-    ),
-  ];
-
-  for (var i = 0; i < coreCashierItems.length; i++) {
-    final core = coreCashierItems[i];
-    if (!existingCashierKeys.contains(core.key)) {
-      final override = itemOverrides[core.key];
-      if (override != null && !override.visible) continue;
-
-      final tile = _FeatureTile(
-        core.key,
-        (l10n) => BootstrapCache.instance.resolveNavigationLabel(
-          core.key,
-          l10n.text(core.title, fallback: core.title),
-        ),
-        SduiIconRegistry.resolve(core.icon),
-        SduiComponentRegistry.instance.resolve(
-          core.component,
-          targetEndpoint: core.endpoint,
-          title: core.title,
-        ),
-        core.permission,
-      );
-      if (tile.visibleTo(user)) {
-        cashierRows.add((
-          order: i,
-          fallback: fallback++,
-          tile: tile,
-        ));
-      }
-    }
-  }
-
   final result = <_NavSection>[];
   for (final entry in tilesBySection.entries) {
     final rows = entry.value;
@@ -973,14 +884,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         for (final section in navSections) {
           if (section.tiles.isEmpty) continue;
           final firstItem = section.tiles.first;
-          const flatCoreKeys = <String>{
-            'pos',
-            'sales',
-            'quotations',
-            'consignments',
-            'customers',
-            'cash_register',
-          };
 
           final rootItems = <_FeatureTile>[];
           final childrenByParent = <String?, List<_FeatureTile>>{};
@@ -990,12 +893,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final override = itemOverrides[tile.key];
             // Check if the item is explicitly a Main Menu (level 0)
             final bool isMainMenu = override != null
-                ? (flatCoreKeys.contains(tile.key) ||
-                    override.level == 0 ||
+                ? (override.level == 0 ||
                     override.parentId == null ||
                     override.parentId!.isEmpty)
-                : (flatCoreKeys.contains(tile.key) ||
-                    tile.key == 'settings' ||
+                : (tile.key == 'settings' ||
                     tile.key == firstItem.key ||
                     (section.key != 'cashier_sales' &&
                         section.parentByKey[tile.key] == null));
@@ -1443,18 +1344,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     for (final section in navSections) {
       final childrenByParent = <String?, List<_FeatureTile>>{};
-      const flatCoreKeys = <String>{
-        'pos',
-        'sales',
-        'quotations',
-        'consignments',
-        'customers',
-        'cash_register',
-      };
       for (final tile in section.tiles) {
-        final parent = flatCoreKeys.contains(tile.key)
-            ? null
-            : section.parentByKey[tile.key];
+        final parent = section.parentByKey[tile.key];
         (childrenByParent[parent] ??= []).add(tile);
       }
 
