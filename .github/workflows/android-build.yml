@@ -67,6 +67,7 @@ jobs:
 
           if [ ! -s "$KEYSTORE_PATH" ]; then
             echo "No signing keystore secret supplied; generating an ephemeral CI keystore."
+            rm -f "$KEYSTORE_PATH"
             keytool -genkeypair -v \
               -keystore "$KEYSTORE_PATH" \
               -storepass "$STORE_PASS" \
