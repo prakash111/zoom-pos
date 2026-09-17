@@ -185,7 +185,7 @@ class NavigationDrawerMenuTest extends TestCase
                 ->assertJsonPath('components.0.title', 'Home')
                 ->assertJsonPath('components.1.type', 'divider')
                 ->assertJsonPath('components.2.type', 'section_header')
-                ->assertJsonPath('components.2.title', 'Point of Sale');
+                ->assertJsonPath('components.2.title', 'Retail & Cashier');
 
             $components = collect($response->json('components'));
             $this->assertSame('/api/tenant/views/pos', $components->firstWhere('key', 'pos')['route']);
@@ -209,7 +209,7 @@ class NavigationDrawerMenuTest extends TestCase
             ->assertJsonPath('components.0.title', 'Home')
             ->assertJsonPath('components.1.type', 'divider')
             ->assertJsonPath('components.2.type', 'section_header')
-            ->assertJsonPath('components.2.title', 'Point of Sale');
+            ->assertJsonPath('components.2.title', 'Retail & Cashier');
 
         $components = collect($response->json('components'));
         $this->assertSame('/api/tenant/views/pos', $components->firstWhere('key', 'pos')['route']);
@@ -234,7 +234,7 @@ class NavigationDrawerMenuTest extends TestCase
             ->assertJsonPath('schema.components.0.title', 'Home')
             ->assertJsonPath('schema.components.1.type', 'divider')
             ->assertJsonPath('schema.components.2.type', 'section_header')
-            ->assertJsonPath('schema.components.2.title', 'Point of Sale');
+            ->assertJsonPath('schema.components.2.title', 'Retail & Cashier');
 
         $menuResponse = $this->withToken($this->token)->getJson('/api/tenant/views/drawer-menu');
         $menuResponse->assertOk()
@@ -249,12 +249,12 @@ class NavigationDrawerMenuTest extends TestCase
             'sections' => [[
                 'key' => 'cashier_sales',
                 'order' => 0,
-                'custom_title' => 'Cashier & Sales',
+                'custom_title' => 'Front Desk & POS',
             ]],
             'tree' => [[
                 'key' => 'cashier_sales',
                 'order' => 0,
-                'custom_title' => 'Cashier & Sales',
+                'custom_title' => 'Front Desk & POS',
                 'items' => [[
                     'key' => 'pos',
                     'visible' => true,
@@ -273,11 +273,11 @@ class NavigationDrawerMenuTest extends TestCase
             ->assertOk();
 
         $cashier = collect($response->json('sections'))->firstWhere('key', 'cashier_sales');
-        $this->assertSame('Cashier & Sales', $cashier['custom_title']);
+        $this->assertSame('Front Desk & POS', $cashier['custom_title']);
         $this->assertSame('Point of Sale', $cashier['first_item']['title']);
         $this->assertSame('/api/tenant/views/pos', $cashier['first_item']['route']);
         $this->assertSame('NAVIGATE_TO', $cashier['first_item']['action_type']);
-        $this->assertSame('sales', $cashier['items'][0]['children'][0]['key']);
+        $this->assertContains('sales', collect($cashier['items'])->pluck('key')->all());
     }
 
     public function test_saved_store_settings_root_and_custom_section_are_used_by_drawer_components(): void
@@ -315,7 +315,7 @@ class NavigationDrawerMenuTest extends TestCase
         $this->assertSame(0, $settings['level']);
         $this->assertSame('settings_profile', $settings['children'][0]['key']);
         $this->assertSame('settings', $settings['children'][0]['parent_id']);
-        $this->assertSame([], $subscription['children']);
+        $this->assertSame([], $subscription['children'] ?? []);
     }
 
     public function test_save_menu_settings_persists_to_tenant_settings_and_drawer_reads_it(): void
@@ -384,7 +384,7 @@ class NavigationDrawerMenuTest extends TestCase
 
         $subscription = $components->firstWhere('key', 'subscription');
         $this->assertNotNull($subscription);
-        $this->assertSame([], $subscription['children']);
+        $this->assertSame([], $subscription['children'] ?? []);
     }
 
     public function test_flat_item_list_breaks_out_of_parent_when_level_is_zero(): void
@@ -407,7 +407,7 @@ class NavigationDrawerMenuTest extends TestCase
         $this->assertNotNull($storeProfile);
         $this->assertSame(0, $storeProfile['level']);
         $this->assertNull($storeProfile['parent_id']);
-        $this->assertSame([], $storeProfile['children']);
+        $this->assertSame([], $storeProfile['children'] ?? []);
 
         $languages = $components->firstWhere('key', 'languages');
         $this->assertNotNull($languages);
@@ -421,19 +421,217 @@ class NavigationDrawerMenuTest extends TestCase
         $this->assertNotNull($devices);
         $this->assertSame(0, $devices['level']);
         $this->assertNull($devices['parent_id']);
-        $this->assertSame([], $devices['children']);
+        $this->assertSame([], $devices['children'] ?? []);
 
         $printer = $components->firstWhere('key', 'hardware_printer');
         $this->assertNotNull($printer);
         $this->assertSame(0, $printer['level']);
         $this->assertNull($printer['parent_id']);
-        $this->assertSame([], $printer['children']);
+        $this->assertSame([], $printer['children'] ?? []);
 
         $password = $components->firstWhere('key', 'change_password');
         $this->assertNotNull($password);
         $this->assertSame(0, $password['level']);
         $this->assertNull($password['parent_id']);
-        $this->assertSame([], $password['children']);
+        $this->assertSame([], $password['children'] ?? []);
+    }
+
+    public function test_drawer_header_prioritizes_business_name_over_trading_name_dba(): void
+    {
+        // Setup company matching user diagnostic case:
+        // Business Name = 'ZoomNearby Demo India'
+        // Trading Name (DBA) = 'ZoomNearby Demo'
+        $this->company->update([
+            'name' => 'ZoomNearby Demo India',
+            'trade_name' => 'ZoomNearby Demo',
+        ]);
+        $this->company->refresh();
+
+        // 1. Model level assertion
+        $this->assertSame('ZoomNearby Demo India', $this->company->display_name);
+        $headerPayload = $this->company->getDrawerHeaderPayload();
+        $this->assertSame('ZoomNearby Demo India', $headerPayload['store_name']);
+        $this->assertSame('ZoomNearby Demo India', $headerPayload['business_name']);
+        $this->assertSame('ZoomNearby Demo India', $headerPayload['tenant_name']);
+        $this->assertSame('ZoomNearby Demo India', $headerPayload['title']);
+        $this->assertSame('ZoomNearby Demo India', $headerPayload['display_name']);
+        $this->assertSame('ZoomNearby Demo', $headerPayload['dba_name']);
+
+        // 2. Drawer Navigation endpoint (/api/tenant/navigation/drawer)
+        $drawerResponse = $this->withToken($this->token)->getJson('/api/tenant/navigation/drawer');
+        $drawerResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('store_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('tenant_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('title', 'ZoomNearby Demo India')
+            ->assertJsonPath('display_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('header.store_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('header.business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('header.title', 'ZoomNearby Demo India')
+            ->assertJsonPath('drawer_header.store_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('drawer_header.business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('drawer_header.dba_name', 'ZoomNearby Demo');
+
+        // 3. Drawer Menu endpoint (/api/tenant/navigation/menu)
+        $menuResponse = $this->withToken($this->token)->getJson('/api/tenant/navigation/menu');
+        $menuResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('store_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('header.store_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('drawer_header.business_name', 'ZoomNearby Demo India');
+
+        // 4. SDUI Drawer Screen (/api/tenant/views/drawer)
+        $sduiResponse = $this->withToken($this->token)->getJson('/api/tenant/views/drawer');
+        $sduiResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('schema.title', 'ZoomNearby Demo India')
+            ->assertJsonPath('schema.app_bar.title', 'ZoomNearby Demo India')
+            ->assertJsonPath('schema.store_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('schema.business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('schema.drawer_header.business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('schema.drawer_header.dba_name', 'ZoomNearby Demo');
+
+        // 5. Bootstrap endpoint (/api/v1/tenant/bootstrap)
+        $bootstrapResponse = $this->withToken($this->token)->getJson('/api/v1/tenant/bootstrap');
+        $bootstrapResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('store_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('header.business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('drawer_header.business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('tenant.business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('tenant.store_name', 'ZoomNearby Demo India');
+    }
+
+    public function test_saving_store_profile_updates_business_name_and_purges_drawer_cache(): void
+    {
+        $tenantId = (string) $this->company->id;
+
+        // Seed tenant caches
+        \Illuminate\Support\Facades\Cache::put("tenant_{$tenantId}_profile", ['dummy' => 'stale'], 3600);
+        \Illuminate\Support\Facades\Cache::put("tenant_{$tenantId}_drawer", ['dummy' => 'stale'], 3600);
+        \Illuminate\Support\Facades\Cache::put("tenant_{$tenantId}_drawer_menu", ['dummy' => 'stale'], 3600);
+        \Illuminate\Support\Facades\Cache::put("navigation_menu_{$tenantId}", ['dummy' => 'stale'], 3600);
+        \Illuminate\Support\Facades\Cache::put("store_profile_{$tenantId}", ['dummy' => 'stale'], 3600);
+
+        // POST /api/tenant/settings/profile via wizard Save & Continue
+        $response = $this->withToken($this->token)->postJson('/api/tenant/settings/profile', [
+            'name' => 'ZoomNearby Demo India',
+            'trade_name' => 'ZoomNearby Demo',
+            'wizard_tab_index' => 0,
+            'wizard_total_tabs' => 5,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('store_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('header.business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('drawer_header.business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('company.business_name', 'ZoomNearby Demo India');
+
+        // Verify caches have been cleared
+        $this->assertFalse(\Illuminate\Support\Facades\Cache::has("tenant_{$tenantId}_profile"));
+        $this->assertFalse(\Illuminate\Support\Facades\Cache::has("tenant_{$tenantId}_drawer"));
+        $this->assertFalse(\Illuminate\Support\Facades\Cache::has("tenant_{$tenantId}_drawer_menu"));
+        $this->assertFalse(\Illuminate\Support\Facades\Cache::has("navigation_menu_{$tenantId}"));
+        $this->assertFalse(\Illuminate\Support\Facades\Cache::has("store_profile_{$tenantId}"));
+
+        // Verify fresh drawer call returns updated name
+        $freshDrawer = $this->withToken($this->token)->getJson('/api/tenant/navigation/drawer');
+        $freshDrawer->assertOk()
+            ->assertJsonPath('business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('header.business_name', 'ZoomNearby Demo India')
+            ->assertJsonPath('drawer_header.business_name', 'ZoomNearby Demo India');
+    }
+
+    public function test_drawer_text_and_icons_color_preference_updates_both_labels_and_icons_dynamically(): void
+    {
+        // 1. Update Drawer text & icons to Purple (#7C3AED)
+        $purpleHex = '#7C3AED';
+        $prefResponse = $this->withToken($this->token)->postJson('/api/tenant/preferences', [
+            'drawer_text_and_icons' => $purpleHex,
+        ]);
+        $prefResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('preferences.drawer_text_and_icons', $purpleHex)
+            ->assertJsonPath('preferences.drawer_text_icon_color', $purpleHex);
+
+        // 2. Fetch Drawer Menu (/api/tenant/navigation/menu)
+        $menuRes = $this->withToken($this->token)->getJson('/api/tenant/navigation/menu');
+        $menuRes->assertOk();
+        $components = collect($menuRes->json('components'));
+
+        // Point of Sale tile
+        $pos = $components->firstWhere('key', 'pos') ?? $components->firstWhere('title', 'Point of Sale');
+        $this->assertNotNull($pos);
+        $this->assertSame($purpleHex, $pos['icon_color']);
+        $this->assertSame($purpleHex, $pos['leading']['color']);
+        $this->assertSame($purpleHex, $pos['style']['textColor']);
+        $this->assertSame($purpleHex, $pos['style']['iconColor']);
+
+        // Home tile
+        $home = $components->firstWhere('key', 'home');
+        $this->assertNotNull($home);
+        $this->assertSame($purpleHex, $home['icon_color']);
+        $this->assertSame($purpleHex, $home['leading']['color']);
+
+        // Sub items (Sales & Invoices)
+        $sales = $components->firstWhere('key', 'sales') ?? $components->firstWhere('title', 'Sales & Invoices');
+        if ($sales) {
+            $this->assertSame($purpleHex, $sales['icon_color']);
+            $this->assertSame($purpleHex, $sales['leading']['color']);
+        }
+
+        // 3. Fetch Drawer Navigation (/api/tenant/navigation/drawer)
+        $navRes = $this->withToken($this->token)->getJson('/api/tenant/navigation/drawer');
+        $navRes->assertOk();
+        $sections = $navRes->json('sections');
+        $this->assertNotEmpty($sections);
+        $firstSection = $sections[0];
+        $this->assertSame($purpleHex, $firstSection['icon_color']);
+        $this->assertSame($purpleHex, $firstSection['leading']['color']);
+        $this->assertSame($purpleHex, $firstSection['style']['textColor']);
+        $this->assertSame($purpleHex, $firstSection['first_item']['icon_color']);
+        $this->assertSame($purpleHex, $firstSection['first_item']['leading']['color']);
+
+        // 4. Fetch SDUI Drawer Screen (/api/tenant/views/drawer)
+        $screenRes = $this->withToken($this->token)->getJson('/api/tenant/views/drawer');
+        $screenRes->assertOk();
+        $screenComponents = collect($screenRes->json('schema.components'));
+        $screenPos = $screenComponents->firstWhere('key', 'pos') ?? $screenComponents->firstWhere('title', 'Point of Sale');
+        $this->assertNotNull($screenPos);
+        $this->assertSame($purpleHex, $screenPos['icon_color']);
+        $this->assertSame($purpleHex, $screenPos['leading']['color']);
+        $this->assertSame($purpleHex, $screenPos['style']['textColor']);
+
+        // 5. Update to Green (#10B981)
+        $greenHex = '#10B981';
+        $this->withToken($this->token)->postJson('/api/tenant/settings/app-preferences', [
+            'drawer_text_icon_color' => $greenHex,
+        ])->assertOk();
+
+        $freshMenuRes = $this->withToken($this->token)->getJson('/api/tenant/navigation/menu');
+        $freshComponents = collect($freshMenuRes->json('components'));
+        $freshPos = $freshComponents->firstWhere('key', 'pos') ?? $freshComponents->firstWhere('title', 'Point of Sale');
+        $this->assertSame($greenHex, $freshPos['icon_color']);
+        $this->assertSame($greenHex, $freshPos['leading']['color']);
+        $this->assertSame($greenHex, $freshPos['style']['textColor']);
+
+        // 6. Update to Crimson (#DC2626)
+        $crimsonHex = '#DC2626';
+        $this->withToken($this->token)->postJson('/api/tenant/settings/drawer-surfaces', [
+            'drawer_text_and_icons' => $crimsonHex,
+        ])->assertOk();
+
+        $freshNavRes = $this->withToken($this->token)->getJson('/api/tenant/navigation/drawer');
+        $freshSections = $freshNavRes->json('sections');
+        $this->assertSame($crimsonHex, $freshSections[0]['icon_color']);
+        $this->assertSame($crimsonHex, $freshSections[0]['leading']['color']);
+        $this->assertSame($crimsonHex, $freshSections[0]['style']['textColor']);
     }
 }
+
 

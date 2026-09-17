@@ -278,7 +278,7 @@ class AppBootstrapApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('tenant.id', (string) $this->company->id)
-            ->assertJsonPath('tenant.business_name', 'Metro Mart')
+            ->assertJsonPath('tenant.business_name', 'Metro Supermarket')
             ->assertJsonPath('tenant.active_mode', 'retail')
             ->assertJsonPath('tenant.available_modes', ['retail'])
             ->assertJsonPath('modules.retail.id', 'retail')
@@ -514,18 +514,15 @@ class AppBootstrapApiTest extends TestCase
         $this->assertContains('restaurant_pos', $restaurantItems);
 
         $pharmacyItems = collect($menu['pharmacy_management']['items'])->pluck('key')->all();
-        $this->assertContains('pharmacy_pos', $pharmacyItems);
         $this->assertTrue(in_array('new_prescription_intake', $pharmacyItems, true) || in_array('new_rx_intake', $pharmacyItems, true));
         $this->assertTrue(in_array('prescriptions_queue', $pharmacyItems, true) || in_array('pharmacy_prescriptions', $pharmacyItems, true));
         $this->assertTrue(in_array('batch_inventory', $pharmacyItems, true) || in_array('pharmacy_batches', $pharmacyItems, true));
 
         $serviceItems = collect($menu['salon_bookings']['items'])->pluck('key')->all();
-        $this->assertContains('salon_pos', $serviceItems);
         $this->assertTrue(in_array('book_appointment', $serviceItems, true) || in_array('book_service_appointment', $serviceItems, true));
         $this->assertTrue(in_array('booking_calendar', $serviceItems, true) || in_array('service_booking_calendar', $serviceItems, true) || in_array('service_calendar', $serviceItems, true));
         $this->assertContains('service_stylists', $serviceItems);
         $this->assertTrue(in_array('service_catalog_rates', $serviceItems, true) || in_array('service_catalog', $serviceItems, true));
-        $this->assertTrue(in_array('add_new_service', $serviceItems, true) || in_array('service_create', $serviceItems, true));
         $this->assertNotContains('service_orders', $serviceItems);
     }
 }

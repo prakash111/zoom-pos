@@ -44,6 +44,31 @@ class Calendar extends Component
 
     public $advancePaid = 0;
 
+    public string $activeCategory = 'Hair';
+
+    public ?string $stylistFilter = null;
+
+    public array $cartServices = [];
+
+    public function selectCategory(string $category): void
+    {
+        $this->activeCategory = $category;
+    }
+
+    public function toggleCartService(int $serviceId): void
+    {
+        if (in_array($serviceId, $this->cartServices, true)) {
+            $this->cartServices = array_values(array_diff($this->cartServices, [$serviceId]));
+        } else {
+            $this->cartServices[] = $serviceId;
+        }
+    }
+
+    public function clearCart(): void
+    {
+        $this->cartServices = [];
+    }
+
     public function mount(): void
     {
         $this->date ??= Carbon::today()->toDateString();
@@ -154,16 +179,26 @@ class Calendar extends Component
                 $q->whereBetween('starts_at', [$day->copy()->startOfDay()->utc(), $day->copy()->endOfDay()->utc()])
                     ->orWhereDate('starts_at', $day->toDateString());
             })
+            ->when($this->stylistFilter, fn ($q) => $q->where('specialist_id', $this->stylistFilter))
             ->orderBy('starts_at')
             ->get();
+
+        $allServices = Product::where('active', true)
+            ->where(fn ($q) => $q->where('type', 'service')->orWhere('duration_minutes', '>', 0)->orWhere('category_type', 'salon'))
+            ->orderBy('name')
+            ->get(['id', 'name', 'duration_minutes', 'sale_price', 'category_type']);
+
+        $cartItems = $allServices->whereIn('id', $this->cartServices)->values();
+        $cartTotal = $cartItems->sum('sale_price');
 
         return view('livewire.tenant.salon.calendar', [
             'appointments' => $appointments,
             'timezone' => $timezone,
-            'services' => Product::where('active', true)
-                ->where(fn ($q) => $q->where('type', 'service')->orWhere('duration_minutes', '>', 0)->orWhere('category_type', 'salon'))
-                ->orderBy('name')->get(['id', 'name', 'duration_minutes', 'sale_price']),
+            'services' => $allServices,
             'specialists' => User::where('is_specialist', true)->where('status', 'approved')->orderBy('name')->get(['id', 'name']),
+            'categories' => ['Hair', 'Spa', 'Facials', 'Add-ons'],
+            'cartItems' => $cartItems,
+            'cartTotal' => $cartTotal,
         ]);
     }
 }

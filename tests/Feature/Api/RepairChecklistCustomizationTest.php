@@ -83,11 +83,10 @@ class RepairChecklistCustomizationTest extends TestCase
         if (($node['type'] ?? null) === $type) {
             $out[] = $node;
         }
-        foreach (['components', 'children'] as $bucket) {
-            foreach ($node[$bucket] ?? [] as $child) {
-                if (is_array($child)) {
-                    $out = array_merge($out, $this->allOfType($child, $type));
-                }
+        $sub = $node['components'] ?? $node['children'] ?? [];
+        foreach ($sub as $child) {
+            if (is_array($child)) {
+                $out = array_merge($out, $this->allOfType($child, $type));
             }
         }
 

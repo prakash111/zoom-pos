@@ -32,6 +32,9 @@ class PermissionChecker
         'settings' => 'Store Settings & SMTP',
         'users' => 'Users & Permissions',
         'leads' => 'Lead Management System',
+        'restaurant' => 'Restaurant POS Terminal',
+        'pharmacy' => 'Pharmacy POS & Checkout',
+        'salon' => 'Salon POS & Checkout',
     ];
 
     public const ACTIONS = [
@@ -191,15 +194,68 @@ class PermissionChecker
             'convert' => 'Convert leads to customers & invoices',
             'export' => 'Export leads data',
         ],
+        'restaurant' => [
+            'view' => 'Access floor plan, dining tables & active orders',
+            'create' => 'Open dining tables & create KOT orders',
+            'edit' => 'Modify table orders, transfer tables & split checks',
+            'delete' => 'Void KOT items or cancel dining orders',
+            'manage_tables' => 'Configure dining rooms, tables & floor plans',
+            'manage_kot' => 'Dispatch to kitchen & manage kitchen display (KDS)',
+            'settle' => 'Settle table bills & process checkout',
+            'export' => 'Export restaurant sales & dining reports',
+        ],
+        'pharmacy' => [
+            'view' => 'Access pharmacy checkout, patient queue & prescriptions',
+            'create' => 'Intake prescriptions & dispense medications',
+            'edit' => 'Update drug dosages, substitutes & dispensing notes',
+            'delete' => 'Cancel prescriptions or void dispensed items',
+            'manage_batches' => 'Manage drug batches, expiry dates & lot numbers',
+            'verify_rx' => 'Doctor & pharmacist prescription verification',
+            'export' => 'Export controlled substance logs & dispensing reports',
+        ],
+        'salon' => [
+            'view' => 'Access appointment calendar & staff roster',
+            'create' => 'Book client appointments & service sessions',
+            'edit' => 'Reschedule appointments & modify service packages',
+            'delete' => 'Cancel appointments or remove booked services',
+            'manage_stylists' => 'Assign stylists, specialists & chair schedules',
+            'checkout' => 'Process salon checkout, tips & commission splits',
+            'export' => 'Export appointments & stylist commission reports',
+        ],
     ];
+
+    public static function canonicalModuleSlug(string $module): string
+    {
+        $slug = strtolower(trim($module));
+
+        return match ($slug) {
+            'food_restaurant', 'restaurant_pos' => 'restaurant',
+            'pharmacy_pos', 'chemist' => 'pharmacy',
+            'service_booking', 'salon_pos', 'beauty', 'spa', 'wellness' => 'salon',
+            'repairs', 'repair_technician', 'repairtechnician', 'technician' => 'repair',
+            'quotations', 'quote' => 'quotes',
+            'inventory', 'product' => 'products',
+            'lead', 'leadmanagement', 'lead_management' => 'leads',
+            'service_order' => 'service_orders',
+            default => $slug,
+        };
+    }
 
     public static function getActionsForModule(string $module): array
     {
-        return self::MODULE_ACTIONS[$module] ?? self::ACTIONS;
+        $canonical = self::canonicalModuleSlug($module);
+
+        return self::MODULE_ACTIONS[$canonical] ?? self::MODULE_ACTIONS[$module] ?? self::ACTIONS;
     }
 
     public static function getActionDescription(string $module, string $action): string
     {
+        $canonical = self::canonicalModuleSlug($module);
+
+        if (isset(self::MODULE_ACTIONS[$canonical][$action])) {
+            return self::MODULE_ACTIONS[$canonical][$action];
+        }
+
         if (isset(self::MODULE_ACTIONS[$module][$action])) {
             return self::MODULE_ACTIONS[$module][$action];
         }
@@ -214,13 +270,19 @@ class PermissionChecker
 
     public function allows(User $user, string $module, string $action): bool
     {
+        $canonical = self::canonicalModuleSlug($module);
+        // Tenant owners and explicit role grants cannot activate an extension.
+        if ($canonical === 'leads' && ! $user->company?->hasModule('leadmanagement')) {
+            return false;
+        }
+
         if ($user->isPrivilegedRole()) {
             return true;
         }
 
         $perm = Permission::query()
             ->where('user_id', $user->id)
-            ->where('module', $module)
+            ->whereIn('module', array_unique([$module, $canonical]))
             ->where('action', $action)
             ->first();
 
@@ -260,8 +322,10 @@ class PermissionChecker
         }
 
         $map = self::$roleMapCache[$cacheKey] ?? self::getRoleDefaults($role);
+        $canonical = self::canonicalModuleSlug($module);
+        $allowed = $map[$module] ?? $map[$canonical] ?? [];
 
-        return in_array($action, $map[$module] ?? [], true);
+        return in_array($action, $allowed, true);
     }
 
     /**
@@ -316,6 +380,9 @@ class PermissionChecker
                     'settings' => ['view', 'edit'],
                     'users' => ['view'],
                     'leads' => ['view', 'view_any', 'create', 'edit', 'delete', 'assign', 'convert', 'export'],
+                    'restaurant' => ['view', 'create', 'edit', 'delete', 'manage_tables', 'manage_kot', 'settle', 'export'],
+                    'pharmacy' => ['view', 'create', 'edit', 'delete', 'manage_batches', 'verify_rx', 'export'],
+                    'salon' => ['view', 'create', 'edit', 'delete', 'manage_stylists', 'checkout', 'export'],
                 ];
 
             case User::ROLE_SALESPERSON:
@@ -333,6 +400,9 @@ class PermissionChecker
                     'cash_register' => ['view'],
                     'targets' => ['view'],
                     'leads' => ['view', 'create', 'edit', 'convert'],
+                    'restaurant' => ['view', 'create', 'edit', 'manage_kot', 'settle'],
+                    'pharmacy' => ['view', 'create', 'edit'],
+                    'salon' => ['view', 'create', 'edit', 'checkout'],
                 ];
 
             case User::ROLE_CASHIER:
@@ -348,6 +418,9 @@ class PermissionChecker
                     'products' => ['view'],
                     'cash_register' => ['view', 'create', 'edit', 'delete'],
                     'targets' => ['view'],
+                    'restaurant' => ['view', 'create', 'settle'],
+                    'pharmacy' => ['view', 'create'],
+                    'salon' => ['view', 'create', 'checkout'],
                 ];
 
             case User::ROLE_TECHNICIAN:

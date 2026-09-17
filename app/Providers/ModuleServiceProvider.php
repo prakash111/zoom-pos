@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Http\Middleware\EnsureTenantExtension;
 use App\Models\SduiModule;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -92,7 +93,7 @@ class ModuleServiceProvider extends ServiceProvider
 
         foreach ($activeModules as $module) {
             try {
-                $this->bootModule((string) $module->package_path);
+                $this->bootModule((string) $module->package_path, $module);
             } catch (Throwable $e) {
                 Log::warning("ModuleServiceProvider: failed booting module '{$module->slug}'.", [
                     'error' => $e->getMessage(),
@@ -105,8 +106,21 @@ class ModuleServiceProvider extends ServiceProvider
      * Wire one on-disk module directory into the app. Public + path-based so
      * it can be re-run after a runtime activate without rebooting the kernel.
      */
-    public function bootModule(string $packagePath): void
+    public function bootModule(string $packagePath, ?SduiModule $module = null): void
     {
+        // Calls made after an activation historically passed only the path.
+        // Recover the row when possible so extension routes from older ZIPs
+        // receive the same tenant entitlement guard as current packages.
+        if ($module === null) {
+            try {
+                if (Schema::hasTable('sdui_modules')) {
+                    $module = SduiModule::query()->where('package_path', $packagePath)->first();
+                }
+            } catch (Throwable) {
+                // Route loading remains usable during a fresh/unavailable DB.
+            }
+        }
+
         $base = base_path('modules/'.$packagePath);
         if ($packagePath === '' || ! is_dir($base)) {
             $base = base_path('module-packages/'.$packagePath);
@@ -123,11 +137,34 @@ class ModuleServiceProvider extends ServiceProvider
             $this->app->register($providerClass);
         }
 
-        // 2. Routes — the flat file, then split api/web files.
+        // 2. Routes — the flat file, then split api/web files. Keep a handle
+        // on routes added by this package so the entitlement middleware can
+        // also protect legacy packages whose own controllers predate it.
+        $routesBefore = [];
+        if ($module?->isExtension()) {
+            foreach ($this->app['router']->getRoutes()->getRoutes() as $route) {
+                $routesBefore[spl_object_id($route)] = true;
+            }
+        }
+
         foreach (['routes.php', 'routes/api.php', 'routes/web.php'] as $rel) {
             $file = $base.'/'.$rel;
             if (is_file($file)) {
                 $this->loadRoutesFrom($file);
+            }
+        }
+
+        if ($module?->isExtension()) {
+            $guard = EnsureTenantExtension::class.':'.$module->slug;
+            foreach ($this->app['router']->getRoutes()->getRoutes() as $route) {
+                if (isset($routesBefore[spl_object_id($route)])) {
+                    continue;
+                }
+
+                $middleware = $route->gatherMiddleware();
+                if (! in_array($guard, $middleware, true)) {
+                    $route->middleware($guard);
+                }
             }
         }
 

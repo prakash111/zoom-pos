@@ -3,6 +3,7 @@
 use App\Http\Controllers\Sync\CatalogViewController;
 use App\Http\Controllers\Api\DispatchController as ApiDispatchController;
 use App\Http\Controllers\Api\UnifiedDispatchController;
+use App\Http\Controllers\Api\DocumentDispatchController;
 use App\Http\Controllers\Api\DocumentActionController as ApiDocumentActionController;
 use App\Http\Controllers\Api\DocumentPreviewController as ApiDocumentPreviewController;
 use App\Http\Controllers\Api\NotificationController as ApiNotificationController;
@@ -167,6 +168,12 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
                 ->name('dispatch.batch-send');
             Route::post('/dispatch/{type}/{id}', [ApiDispatchController::class, 'dispatchDocument'])
                 ->name('dispatch.document');
+            Route::post('/documents/dispatch', [DocumentDispatchController::class, 'dispatchDocument'])
+                ->middleware('tenant.permission:pos,create')
+                ->name('documents.dispatch');
+            Route::get('/documents/{type}/{id}/dispatch-options', [DocumentDispatchController::class, 'getDispatchOptions'])
+                ->middleware('tenant.permission:sales,view')
+                ->name('documents.dispatch-options');
 
             Route::get('/products', Products\Index::class)->middleware('tenant.permission:products,view')->name('products.index');
             Route::get('/categories', Categories\Index::class)->middleware('tenant.permission:categories,view')->name('categories.index');
@@ -270,6 +277,10 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
                 Route::get('/tickets/{ticket}/share-sheet', [RepairApiController::class, 'ticketsShareDispatchSheet'])->middleware('tenant.permission:repair,view')->name('ticket.share-sheet');
                 Route::post('/tickets/{ticket}/dispatch', [RepairApiController::class, 'ticketsDispatch'])->middleware('tenant.permission:repair,view')->name('ticket.dispatch');
                 Route::get('/categories', App\Livewire\Tenant\Repair\Categories::class)->middleware('tenant.permission:repair,diagnose')->name('categories');
+            });
+            Route::middleware('tenant.vertical:repair_technician')->prefix('repairs')->group(function () {
+                Route::get('/', App\Livewire\Tenant\Repair\Dashboard::class)->middleware('tenant.permission:repair,view');
+                Route::get('/tickets', Tickets::class)->middleware('tenant.permission:repair,view');
             });
 
             Route::get('/catalog', Catalog\Index::class)->middleware('tenant.permission:catalog,view')->name('catalog.index');

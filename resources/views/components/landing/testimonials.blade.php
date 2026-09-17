@@ -1,4 +1,4 @@
-@props(['branding'])
+@props(['branding' => null])
 
 @php
     $branding = $branding ?? \App\Models\PlatformBranding::current();
@@ -11,14 +11,20 @@
             'avatar' => \App\Models\PlatformBranding::testimonialInitials($t['name']),
         ];
     }, $rawTestimonials);
+    $badge = $branding->getSectionBadge('testimonials', __('Proven Results'));
+    $title = $branding->getSectionTitle('testimonials', __('Trusted by Leading Online Brands & Retailers Worldwide'));
+    $subtitle = $branding->getSectionSubtitle('testimonials', __('See how omnichannel businesses use our cloud commerce engine to drive revenue and save hours every single day.'));
 @endphp
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
+<div id="testimonials" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
     <div class="text-center mb-12 sm:mb-16">
         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-3">
-            {{ __('Customer Validation') }}
+            {{ $badge }}
         </span>
-        <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white">{{ __('Trusted by market leaders worldwide') }}</h2>
+        <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white">{{ $title }}</h2>
+        @if ($subtitle)
+            <p class="mt-3 text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">{{ $subtitle }}</p>
+        @endif
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">

@@ -44,6 +44,11 @@ class TenantProvisioningService
             }
 
             $posMode = $data['pos_mode'] ?? 'general';
+            if (\App\Services\Modular\ModuleRegistry::isExtension($posMode)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'pos_mode' => 'Extensions cannot be selected as a registration operating mode.',
+                ]);
+            }
             $planName = $data['plan_name'] ?? 'trial';
             $activationCode = ! empty($data['activation_code']) ? trim($data['activation_code']) : null;
             $codeModel = null;

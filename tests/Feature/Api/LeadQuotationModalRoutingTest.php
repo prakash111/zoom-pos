@@ -6,9 +6,11 @@ use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Lead;
 use App\Models\Plan;
+use App\Models\SduiModule;
 use App\Models\TenantApiKey;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -29,6 +31,15 @@ class LeadQuotationModalRoutingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        File::copyDirectory(base_path('module-packages/leadmanagement'), base_path('modules/leadmanagement'));
+        $manifest = json_decode(File::get(base_path('modules/leadmanagement/module.json')), true);
+        SduiModule::create([
+            'slug' => 'leadmanagement', 'name' => $manifest['name'], 'type' => 'extension',
+            'source_type' => 'package', 'package_path' => 'leadmanagement',
+            'is_active' => true, 'requires_license' => true, 'license_status' => 'active',
+            'features' => $manifest['features'], 'navigation' => $manifest['navigation'],
+        ]);
 
         $this->artisan('migrate', [
             '--path' => base_path('module-packages/leadmanagement/Database/Migrations'),
@@ -51,6 +62,8 @@ class LeadQuotationModalRoutingTest extends TestCase
             'name' => 'Metro Retail Mart Pvt. Ltd.',
             'trade_name' => 'Metro Retail',
             'slug' => 'metro-retail',
+            'pos_mode' => 'retail',
+            'licensed_modules' => ['retail', 'leadmanagement'],
             'email' => 'owner@metroretail.test',
             'country' => 'IN',
             'currency' => 'INR',
@@ -97,6 +110,12 @@ class LeadQuotationModalRoutingTest extends TestCase
             'expected_value' => 25000.00,
             'notes' => 'Client requires thermal printer integration and barcode scanner.',
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        File::deleteDirectory(base_path('modules/leadmanagement'));
+        parent::tearDown();
     }
 
     public function test_lead_detail_action_buttons_route_create_quotation_to_create_modal(): void

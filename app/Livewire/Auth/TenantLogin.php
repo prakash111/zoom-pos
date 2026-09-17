@@ -26,8 +26,8 @@ class TenantLogin extends Component
     public function mount(): void
     {
         if (config('app.demo_mode') && ! Desktop::isRunning()) {
-            $this->identifier = 'admin@zoommarket.test';
-            $this->password = 'password123';
+            $this->identifier = 'demo@zoomnearby.com';
+            $this->password = 'demo1234';
         }
     }
 
@@ -38,8 +38,8 @@ class TenantLogin extends Component
         }
 
         if ($role === 'manager' || $role === 'admin') {
-            $this->identifier = 'admin@zoommarket.test';
-            $this->password = 'password123';
+            $this->identifier = 'demo@zoomnearby.com';
+            $this->password = 'demo1234';
         } elseif ($role === 'cashier') {
             $this->identifier = 'cashier@zoommarket.test';
             $this->password = 'password123';

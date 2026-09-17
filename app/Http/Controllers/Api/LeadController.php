@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Middleware\EnsureTenantExtension;
 use App\Models\Company;
 use App\Models\Lead;
 use App\Services\Auth\PermissionChecker;
 use App\Services\Sdui\SchemaResponse as S;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Schema;
 use Modules\leadmanagement\Http\Controllers\LeadModuleController;
 
@@ -15,8 +18,22 @@ use Modules\leadmanagement\Http\Controllers\LeadModuleController;
  * RESTful and SDUI API Controller for Lead Management.
  * Aliases and wraps Modules\leadmanagement\Http\Controllers\LeadModuleController.
  */
-class LeadController extends LeadModuleController
+class LeadController extends LeadModuleController implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [new Middleware(EnsureTenantExtension::class.':leadmanagement')];
+    }
+
+    protected function resolveCompany(Request $request): Company
+    {
+        $company = parent::resolveCompany($request);
+        abort_unless($company->hasModule('leadmanagement'), 403,
+            'Lead Management is not activated for your store by Super Admin.');
+
+        return $company;
+    }
+
     /**
      * SDUI Tabbed Lead Management View or JSON listing (`GET /api/v1/tenant/leads`, `/api/tenant/views/leads`).
      */

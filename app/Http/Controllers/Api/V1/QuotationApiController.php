@@ -139,6 +139,7 @@ class QuotationApiController extends Controller
         $resolvedLeadId = null;
         $lead = null;
         if (! empty($data['lead_id'])) {
+            abort_unless($company->hasModule('leadmanagement'), 403, 'Lead Management is not activated for this store.');
             $rawLeadId = $data['lead_id'];
             $lead = Lead::query()
                 ->where(function ($q) use ($company) {
@@ -282,7 +283,7 @@ class QuotationApiController extends Controller
             'items' => $items,
         ]);
 
-        if ($quote->lead_id && isset($data['status']) && in_array($data['status'], ['accepted', 'won'], true)) {
+        if ($quote->lead_id && $company->hasModule('leadmanagement') && isset($data['status']) && in_array($data['status'], ['accepted', 'won'], true)) {
             $lead = \App\Models\Lead::find($quote->lead_id);
             if ($lead) {
                 $lead->update([
@@ -389,7 +390,7 @@ class QuotationApiController extends Controller
 
             $quote->update(['status' => 'converted']);
 
-            if ($quote->lead_id) {
+            if ($quote->lead_id && $company->hasModule('leadmanagement')) {
                 $lead = \App\Models\Lead::find($quote->lead_id);
                 if ($lead) {
                     $lead->update([
@@ -485,6 +486,7 @@ class QuotationApiController extends Controller
         }
 
         if (! $customerId && ! empty($data['lead_id'])) {
+            abort_unless($company->hasModule('leadmanagement'), 403, 'Lead Management is not activated for this store.');
             $rawLeadId = $data['lead_id'];
             $lead = \App\Models\Lead::query()
                 ->where(function ($q) use ($company) {

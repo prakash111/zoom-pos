@@ -301,8 +301,12 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     // Central Unified Dispatch Route & Handlers
     Route::get('/tenant/documents/{type}/{id}/dispatch-options', [DocumentDispatchController::class, 'getDispatchOptions']);
     Route::get('/v1/tenant/documents/{type}/{id}/dispatch-options', [DocumentDispatchController::class, 'getDispatchOptions']);
+    Route::get('/documents/{type}/{id}/dispatch-options', [DocumentDispatchController::class, 'getDispatchOptions']);
+    Route::get('/v1/documents/{type}/{id}/dispatch-options', [DocumentDispatchController::class, 'getDispatchOptions']);
     Route::post('/tenant/documents/dispatch', [DocumentDispatchController::class, 'dispatchDocument']);
     Route::post('/v1/tenant/documents/dispatch', [DocumentDispatchController::class, 'dispatchDocument']);
+    Route::post('/documents/dispatch', [DocumentDispatchController::class, 'dispatchDocument']);
+    Route::post('/v1/documents/dispatch', [DocumentDispatchController::class, 'dispatchDocument']);
     Route::post('/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
     Route::post('/v1/tenant/dispatch/send', [UnifiedDispatchController::class, 'dispatch']);
     Route::post('/tenant/dispatch/batch', [UnifiedDispatchController::class, 'batchDispatch']);

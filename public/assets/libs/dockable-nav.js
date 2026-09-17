@@ -74,6 +74,7 @@
             showQuickMenu: false,
             showCustomizerModal: false,
             speedDialOpen: false,
+            currentPath: window.location.pathname,
 
             getDefaultKeys: function() {
                 if (this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin') {
@@ -201,6 +202,10 @@
                 this.applyDomAttributes();
                 this.applyDynamicCssVars();
 
+                document.addEventListener('livewire:navigated', function() {
+                    self.currentPath = window.location.pathname;
+                });
+
                 window.addEventListener('resize', function() {
                     if (self.position === 'floating' || self.mode === 'floating') {
                         self.clampCoordinates();
@@ -235,6 +240,42 @@
                 });
                 window.addEventListener('set-nav-text-active-color', function(e) {
                     if (e.detail && e.detail.color) self.setNavTextActiveColor(e.detail.color);
+                });
+                window.addEventListener('dock-nav-update', function(e) {
+                    if (!e.detail) return;
+                    if (e.detail.layout) self.layout = e.detail.layout;
+                    if (e.detail.position) {
+                        self.position = e.detail.position;
+                        if (e.detail.mode) self.mode = e.detail.mode;
+                    }
+                    if (e.detail.mode) self.mode = e.detail.mode;
+                    if (typeof e.detail.sticky !== 'undefined') self.sticky = !!e.detail.sticky;
+                    if (typeof e.detail.customBg !== 'undefined') self.customBg = e.detail.customBg;
+                    if (e.detail.uiAccentColor) {
+                        self.uiAccentColor = e.detail.uiAccentColor;
+                    }
+                    if (e.detail.navTextColor) {
+                        self.navTextColor = e.detail.navTextColor;
+                        document.documentElement.style.setProperty('--nav-item-color', self.navTextColor);
+                        document.documentElement.style.setProperty('--nav-inactive-color', self.navTextColor);
+                    }
+                    if (e.detail.navTextActiveColor) {
+                        self.navTextActiveColor = e.detail.navTextActiveColor;
+                        document.documentElement.style.setProperty('--nav-item-active-color', self.navTextActiveColor);
+                        document.documentElement.style.setProperty('--nav-active-color', self.navTextActiveColor);
+                    }
+                    if (e.detail.visibleAdminItems || e.detail.visibleItems) {
+                        var items = e.detail.visibleAdminItems || e.detail.visibleItems;
+                        self.visibleAdminItems = [].concat(items);
+                        self.visibleItems = [].concat(items);
+                        try {
+                            localStorage.setItem('nav_visible_items', JSON.stringify(items));
+                            localStorage.setItem('dock_visible_items', JSON.stringify(items));
+                        } catch(err) {}
+                    }
+                    self.applyDomAttributes();
+                    self.applyDynamicCssVars();
+                    self.saveState();
                 });
                 window.addEventListener('operating-mode-updated', function(e) {
                     if (e.detail && e.detail.mode) {
@@ -277,9 +318,11 @@
                 }
                 if (this.navTextColor) {
                     root.style.setProperty('--nav-item-color', this.navTextColor);
+                    root.style.setProperty('--nav-inactive-color', this.navTextColor);
                 }
                 if (this.navTextActiveColor) {
                     root.style.setProperty('--nav-item-active-color', this.navTextActiveColor);
+                    root.style.setProperty('--nav-active-color', this.navTextActiveColor);
                 }
             },
 
@@ -429,39 +472,90 @@
                 this.saveState();
             },
 
+            isCurrentRoute: function(href) {
+                try {
+                    var targetPath = new URL(href, window.location.origin).pathname;
+                    if (targetPath === this.currentPath) return true;
+                    if (targetPath !== '/' && targetPath !== '/superadmin' && targetPath !== '/superadmin/' && targetPath !== '/tenant' && targetPath !== '/tenant/') {
+                        var normalizedTarget = targetPath.endsWith('/') ? targetPath.slice(0, -1) : targetPath;
+                        var normalizedCurrent = this.currentPath.endsWith('/') ? this.currentPath.slice(0, -1) : this.currentPath;
+                        if (normalizedCurrent.indexOf(normalizedTarget + '/') === 0) {
+                            return true;
+                        }
+                    }
+                    return false;
+                } catch (e) {
+                    return false;
+                }
+            },
+
             isItemVisible: function(itemKey) {
+                var isAdmin = this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin';
+                if (isAdmin) {
+                    var list = (this.visibleAdminItems && this.visibleAdminItems.length > 0) ? this.visibleAdminItems : this.visibleItems;
+                    return Array.isArray(list) && list.indexOf(itemKey) !== -1;
+                }
                 var isRest = this.operatingMode === 'restaurant' || this.operatingMode === 'food_restaurant';
                 var itemDef = ALL_DOCK_ITEMS.find(function(i) { return i.key === itemKey; });
                 if (itemDef) {
                     if (!isRest && itemDef.mode === 'restaurant') return false;
                     if (isRest && itemDef.mode === 'retail') return false;
                 }
-                return this.visibleItems.indexOf(itemKey) !== -1;
+                return Array.isArray(this.visibleItems) && this.visibleItems.indexOf(itemKey) !== -1;
             },
 
             toggleItem: function(itemKey) {
-                var idx = this.visibleItems.indexOf(itemKey);
-                if (idx !== -1) {
-                    this.visibleItems.splice(idx, 1);
+                var isAdmin = this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin';
+                if (isAdmin) {
+                    if (!Array.isArray(this.visibleAdminItems)) this.visibleAdminItems = [];
+                    var aIdx = this.visibleAdminItems.indexOf(itemKey);
+                    if (aIdx !== -1) {
+                        this.visibleAdminItems.splice(aIdx, 1);
+                    } else {
+                        this.visibleAdminItems.push(itemKey);
+                    }
+                    this.visibleItems = [].concat(this.visibleAdminItems);
+                    this.persistAdminDock();
                 } else {
-                    this.visibleItems.push(itemKey);
+                    var idx = this.visibleItems.indexOf(itemKey);
+                    if (idx !== -1) {
+                        this.visibleItems.splice(idx, 1);
+                    } else {
+                        this.visibleItems.push(itemKey);
+                    }
+                    this.saveState();
                 }
-                this.saveState();
             },
 
             selectAllItems: function() {
-                this.visibleItems = this.availableDockItems.map(function(i) { return i.key; });
-                this.saveState();
+                var isAdmin = this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin';
+                if (isAdmin) {
+                    this.selectAllAdminItems();
+                } else {
+                    this.visibleItems = this.availableDockItems.map(function(i) { return i.key; });
+                    this.saveState();
+                }
             },
 
             selectDefaultItems: function() {
-                this.visibleItems = this.getDefaultKeys();
-                this.saveState();
+                var isAdmin = this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin';
+                if (isAdmin) {
+                    this.resetAdminDefaultItems();
+                } else {
+                    this.visibleItems = this.getDefaultKeys();
+                    this.saveState();
+                }
             },
 
             uncheckAllItems: function() {
-                this.visibleItems = [this.getDefaultKeys()[0] || 'home'];
-                this.saveState();
+                var isAdmin = this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin';
+                if (isAdmin) {
+                    this.visibleAdminItems = ['dashboard'];
+                    this.persistAdminDock();
+                } else {
+                    this.visibleItems = [this.getDefaultKeys()[0] || 'home'];
+                    this.saveState();
+                }
             },
 
             resetItems: function() {

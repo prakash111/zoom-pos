@@ -1,65 +1,62 @@
 @extends('layouts.public', ['branding' => $branding, 'footerPages' => $footerPages])
 
-@section('title', $branding->platform_name . ' — Modern Cloud POS & Smart Inventory SaaS')
-@section('meta_description', $branding->platform_name . ' — an all-in-one POS, multi-branch inventory, restaurant KOT, and finance automation platform for modern retail stores and food businesses.')
+@section('title', $branding->platform_name . ' — Fast Cloud POS, Omnichannel Commerce & Inventory')
+@section('meta_description', $branding->platform_name . ' — Unify your online storefront, barcode checkout, multi-warehouse stock, and WhatsApp invoicing into one lightning-fast cloud POS. Built to maximize sales online and in-store.')
 
 @section('content')
 
-    {{-- 1. Modern Aurora SaaS Hero --}}
-    <x-landing.hero :branding="$branding" />
+    @foreach ($branding->landingSectionOrder() as $section)
+        @if ($branding->isSectionEnabled($section))
+            @switch($section)
+                @case('hero')
+                    <x-landing.hero :branding="$branding" />
+                    @break
+                @case('trust_bar')
+                    <x-landing.trust-bar :branding="$branding" />
+                    @break
+                @case('features')
+                    <x-landing.features :branding="$branding" />
+                    @break
+                @case('solutions')
+                    <x-landing.pillars :branding="$branding" />
+                    @break
+                @case('downloads')
+                    <x-landing.downloads :branding="$branding" />
+                    @break
+                @case('stats')
+                    <x-landing.stats :branding="$branding" />
+                    @break
+                @case('about')
+                    <x-landing.about :branding="$branding" />
+                    @break
+                @case('testimonials')
+                    <x-landing.testimonials :branding="$branding" />
+                    @break
+                @case('pricing')
+                    @if ($plans->isNotEmpty())
+                        <x-landing.pricing :plans="$plans" :branding="$branding" />
+                    @endif
+                    @break
+                @case('faq')
+                    <x-landing.faq :branding="$branding" />
+                    @break
+                @case('contact')
+                    <x-landing.contact :branding="$branding" />
+                    @break
+                @case('cta')
+                    <x-landing.cta :branding="$branding" />
+                    @break
+            @endswitch
+        @endif
+    @endforeach
 
-    {{-- 2. Social Proof & Hardware Trust Bar --}}
-    @if ($branding->isSectionEnabled('trust_bar'))
-        <x-landing.trust-bar />
-    @endif
-
-    {{-- 3. Interactive Operations Suite (POS, Stock, Dining KOT, Finance) --}}
-    @if ($branding->isSectionEnabled('features'))
-        <x-landing.features :branding="$branding" />
-    @endif
-
-    {{-- 4. Scale & Architecture Value Pillars --}}
-    @if ($branding->isSectionEnabled('solutions'))
-        <x-landing.pillars :branding="$branding" />
-    @endif
-
-    {{-- 5. Custom CMS Page Body Content (If authoring via TinyMCE) --}}
+    {{-- Custom CMS Page Body Content (If authoring via TinyMCE) --}}
     @if (!empty($page->content))
         <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12">
             <div class="page-content rounded-3xl bg-slate-900/90 border border-white/10 p-8 sm:p-12 text-white shadow-2xl backdrop-blur-xl">
                 {!! clean_html($page->content) !!}
             </div>
         </div>
-    @endif
-
-    {{-- 6. Performance Telemetry & Counter Stats --}}
-    @if ($branding->isSectionEnabled('stats'))
-        <x-landing.stats />
-    @endif
-
-    {{-- 7. Platform Architecture & Story --}}
-    @if ($branding->isSectionEnabled('about'))
-        <x-landing.about :branding="$branding" />
-    @endif
-
-    {{-- 8. Customer Reviews & Trust Badges --}}
-    @if ($branding->isSectionEnabled('testimonials'))
-        <x-landing.testimonials :branding="$branding" />
-    @endif
-
-    {{-- 9. Subscription Plans & Billing Tiers --}}
-    @if ($branding->isSectionEnabled('pricing') && $plans->isNotEmpty())
-        <x-landing.pricing :plans="$plans" />
-    @endif
-
-    {{-- 10. Direct Sales & Technical Support Contact --}}
-    @if ($branding->isSectionEnabled('contact'))
-        <x-landing.contact />
-    @endif
-
-    {{-- 11. Final Conversion CTA Banner --}}
-    @if ($branding->isSectionEnabled('cta'))
-        <x-landing.cta />
     @endif
 
 @endsection

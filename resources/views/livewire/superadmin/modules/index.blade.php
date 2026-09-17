@@ -50,6 +50,9 @@
                             <span class="font-bold text-slate-900 dark:text-white text-sm">{{ $p['name'] }}</span>
                             <span class="font-mono text-[11px] text-slate-400">{{ $p['slug'] }}</span>
                         </div>
+                        @if (($p['type'] ?? 'core') === 'extension')
+                            <span class="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">{{ __('Optional Extension') }} · {{ __('Super Admin activation only') }}</span>
+                        @endif
                         @if (! empty($p['description']))
                             <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{{ $p['description'] }}</p>
                         @endif
@@ -105,7 +108,12 @@
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
                     @forelse ($modules as $module)
                         <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
-                            <td class="px-6 py-4 font-bold text-slate-900 dark:text-white">{{ $module->name }}</td>
+                            <td class="px-6 py-4 font-bold text-slate-900 dark:text-white">
+                                {{ $module->name }}
+                                @if ($module->isExtension())
+                                    <span class="block mt-1 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">{{ __('Extension') }} · {{ __('Super Admin activation only') }}</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 font-mono font-bold text-indigo-600 dark:text-indigo-400">{{ $module->slug }}</td>
                             <td class="px-6 py-4 text-slate-700 dark:text-slate-300">{{ $module->version ?? '—' }}</td>
                             <td class="px-6 py-4 text-slate-700 dark:text-slate-300">{{ $module->author ?? '—' }}</td>

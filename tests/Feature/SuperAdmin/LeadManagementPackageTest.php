@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SuperAdmin;
 
+use App\Http\Controllers\Api\LeadController;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\SduiModule;
@@ -13,12 +14,12 @@ use App\Services\Sdui\SchemaValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Modules\leadmanagement\Http\Controllers\LeadModuleController;
 use Modules\leadmanagement\Models\Lead;
 use Modules\leadmanagement\Models\LeadActivity;
-use Modules\leadmanagement\Models\LeadSource;
 use Tests\Concerns\ActsAsPlatformAdmin;
 use Tests\Concerns\LicensesModules;
 use Tests\TestCase;
@@ -36,6 +37,15 @@ class LeadManagementPackageTest extends TestCase
         'lead_mod_leads',
         'lead_mod_sources',
     ];
+
+    private string $superAdminId;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->superAdminId = (string) $this->actingAsSuperAdmin()->id;
+        Auth::shouldUse('web');
+    }
 
     protected function tearDown(): void
     {
@@ -81,6 +91,7 @@ class LeadManagementPackageTest extends TestCase
             'slug' => 'acme-crm',
             'status' => 'active',
             'pos_mode' => 'retail',
+            'licensed_modules' => ['retail', 'leadmanagement'],
             'currency' => 'USD',
             'currency_symbol' => '$',
         ]);
@@ -89,13 +100,15 @@ class LeadManagementPackageTest extends TestCase
         $module = $service->install($this->zipLeadPackage(), null);
         $this->assertSame('leadmanagement', $module->slug);
         $this->assertSame('package', $module->source_type);
+        $this->assertSame('extension', $module->type);
+        $this->assertFalse($module->registration_allowed);
         $this->assertFalse($module->is_active);
         $this->assertTrue(is_dir(base_path('modules/leadmanagement')));
         $this->assertFileExists(base_path('modules/leadmanagement/module.json'));
 
         // 2. License and Activate
         $this->licenseModule($module);
-        $service->activate($module, null);
+        $service->activate($module, $this->superAdminId);
 
         $this->assertTrue($module->fresh()->is_active);
         $this->assertTrue(Schema::hasTable('lead_mod_sources'));
@@ -118,7 +131,7 @@ class LeadManagementPackageTest extends TestCase
         $dashData = $dashResponse->getData(true);
         $this->assertTrue($dashData['success']);
         $this->assertSame('screen', $dashData['schema']['type']);
-        $this->assertEmpty($validator->validate($dashData['schema']));
+        $this->assertEmpty($validator->validate($dashData['schema']), json_encode($validator->validate($dashData['schema'])));
 
         // Sources CRUD
         $sourceReq = $this->tenantRequest($company, '/', 'POST', [
@@ -130,7 +143,7 @@ class LeadManagementPackageTest extends TestCase
         $sourceId = $sourceStoreData['id'];
 
         $sourcesViewData = $controller->sourcesView($this->tenantRequest($company))->getData(true);
-        $this->assertEmpty($validator->validate($sourcesViewData['schema']));
+        $this->assertEmpty($validator->validate($sourcesViewData['schema']), json_encode($validator->validate($sourcesViewData['schema'])));
         $this->assertStringContainsString('Google Search Ads', json_encode($sourcesViewData));
 
         // Leads CRUD
@@ -177,14 +190,14 @@ class LeadManagementPackageTest extends TestCase
 
         // Leads Pipeline View
         $leadsViewData = $controller->leadsView($this->tenantRequest($company))->getData(true);
-        $this->assertEmpty($validator->validate($leadsViewData['schema']));
+        $this->assertEmpty($validator->validate($leadsViewData['schema']), json_encode($validator->validate($leadsViewData['schema'])));
         $this->assertStringContainsString('Alice Johnson', json_encode($leadsViewData));
         $this->assertStringContainsString($leadCode, json_encode($leadsViewData));
 
         // Lead Detail View
         $detailReq = $this->tenantRequest($company, '/', 'GET', ['id' => $leadId]);
         $detailData = $controller->leadDetail($detailReq)->getData(true);
-        $this->assertEmpty($validator->validate($detailData['schema']));
+        $this->assertEmpty($validator->validate($detailData['schema']), json_encode($validator->validate($detailData['schema'])));
         $this->assertStringContainsString($leadCode, json_encode($detailData));
 
         // Schedule Follow-up Activity
@@ -249,6 +262,7 @@ class LeadManagementPackageTest extends TestCase
 
     public function test_lead_management_module_navigation_isolation_and_permission_gating(): void
     {
+        File::copyDirectory(base_path('module-packages/leadmanagement'), base_path('modules/leadmanagement'));
         SduiModule::create([
             'name' => 'Lead Management System',
             'slug' => 'leadmanagement',
@@ -256,6 +270,7 @@ class LeadManagementPackageTest extends TestCase
             'package_path' => 'leadmanagement',
             'is_active' => true,
             'requires_license' => true,
+            'license_status' => 'active',
             'navigation' => [
                 [
                     'key' => 'lead_ops',
@@ -349,12 +364,15 @@ class LeadManagementPackageTest extends TestCase
 
     public function test_lead_lookup_by_lead_code_and_id_and_prefix_variations(): void
     {
-        $this->artisan('migrate', ['--path' => 'module-packages/leadmanagement/Database/Migrations', '--realpath' => false]);
+        $service = app(ModulePackageService::class);
+        $module = $service->install($this->zipLeadPackage(), $this->superAdminId);
+        $this->licenseModule($module);
+        $service->activate($module, $this->superAdminId);
 
         $company = Company::create([
-            'id' => 'cmp_test_lookup_' . uniqid(),
+            'id' => 'cmp_test_lookup_'.uniqid(),
             'name' => 'Lookup Test Corp',
-            'slug' => 'lookup-test-' . uniqid(),
+            'slug' => 'lookup-test-'.uniqid(),
             'status' => 'active',
             'pos_mode' => 'retail',
             'currency' => 'USD',
@@ -365,7 +383,7 @@ class LeadManagementPackageTest extends TestCase
         $admin = User::create([
             'company_id' => $company->id,
             'name' => 'Lead Admin',
-            'email' => 'lookup_admin_' . uniqid() . '@example.test',
+            'email' => 'lookup_admin_'.uniqid().'@example.test',
             'password' => bcrypt('secret123'),
             'role' => 'administrator',
         ]);
@@ -385,7 +403,7 @@ class LeadManagementPackageTest extends TestCase
         ]);
 
         $this->actingAs($admin);
-        $controller = app(\App\Http\Controllers\Api\LeadController::class);
+        $controller = app(LeadController::class);
 
         // 1. Lookup by numeric ID
         $reqId = $this->tenantRequest($company, '/', 'GET', ['id' => (string) $lead->id]);

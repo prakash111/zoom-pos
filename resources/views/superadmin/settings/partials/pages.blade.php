@@ -12,17 +12,17 @@
                 </p>
             </div>
 
-            <div class="flex items-center gap-3">
-                <div class="relative">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+                <div class="relative w-full sm:w-auto">
                     <input type="text"
                            wire:model.live.debounce.300ms="pageSearch"
                            placeholder="{{ __('Search pages...') }}"
-                           class="px-4 py-2 pl-9 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white">
+                           class="w-full sm:w-64 px-4 py-2 pl-9 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white">
                     <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 </div>
 
                 <a wire:navigate.hover href="{{ route('superadmin.pages.create') }}"
-                   class="px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer shrink-0">
+                   class="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/30 cursor-pointer shrink-0">
                     <span>➕</span>
                     <span>{{ __('Create Page') }}</span>
                 </a>

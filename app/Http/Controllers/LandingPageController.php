@@ -42,6 +42,16 @@ class LandingPageController extends Controller
             return redirect('/tenant/login');
         }
 
+        // If homepage is configured to display a static CMS page (Permalink Landing Page Setup)
+        $homepageMode = data_get($branding->landing_content, 'homepage_mode', 'modular');
+        if ($homepageMode === 'static_page' && $branding->landing_page_id && $branding->landingPage && $branding->landingPage->is_active) {
+            return response()->view('public.page', [
+                'page' => $branding->landingPage,
+                'branding' => $branding,
+                'footerPages' => Page::where('is_active', true)->where('show_in_footer', true)->orderBy('title')->get(),
+            ]);
+        }
+
         $theme = cache()->rememberForever('app_landing_page_theme', function () {
             return setting('landing_page_theme', self::DEFAULT_THEME);
         });
@@ -74,7 +84,11 @@ class LandingPageController extends Controller
         }
 
         $version = Cache::get('landing_page_cache_version', 1);
-        $key = "landing_page:html:v{$version}:{$theme}:".app()->getLocale();
+        // Cached HTML includes Vite asset URLs. A new build must get fresh
+        // HTML because the previous hashed stylesheet may no longer exist.
+        $manifestPath = public_path('build/manifest.json');
+        $assetVersion = is_file($manifestPath) ? hash_file('xxh128', $manifestPath) : 'dev';
+        $key = "landing_page:html:v{$version}:{$theme}:{$assetVersion}:".app()->getLocale();
 
         $html = Cache::remember($key, now()->addHour(), $render);
 

@@ -24,6 +24,10 @@ class Prescriptions extends Component
     #[Url]
     public string $search = '';
 
+    public string $searchMode = 'brand'; // brand | generic
+
+    public int $expiryThresholdDays = 30;
+
     public bool $showForm = false;
 
     public string $patientName = '';
@@ -140,9 +144,23 @@ class Prescriptions extends Component
                 ->orWhere('patient_phone', 'like', "%{$term}%"));
         }
 
+        $company = auth()->user()->company;
+        $nearExpiryCount = \App\Models\PharmacyBatch::where('company_id', $company->id)
+            ->where('expiry_date', '<=', now()->addDays($this->expiryThresholdDays))
+            ->where('stock_qty', '>', 0)
+            ->count();
+
+        $batches = \App\Models\PharmacyBatch::where('company_id', $company->id)
+            ->where('stock_qty', '>', 0)
+            ->orderBy('expiry_date')
+            ->limit(10)
+            ->get();
+
         return view('livewire.tenant.pharmacy.prescriptions', [
             'prescriptions' => $query->limit(100)->get(),
             'pendingCount' => PharmacyPrescription::where('status', 'pending')->count(),
+            'nearExpiryCount' => $nearExpiryCount,
+            'batches' => $batches,
         ]);
     }
 }

@@ -3150,9 +3150,10 @@ class SchemaResponse
         // prompt that ignored the ticket's linked customer.
         $shareButton = self::buttonOutlined(
             'Share Ticket',
-            self::openRemoteSheetAction(
-                "/api/tenant/repair/tickets/{$ticket->id}/share-sheet",
-                'Share Repair Ticket',
+            self::formSubmitAction(
+                "/api/tenant/repair/tickets/{$ticket->id}/share",
+                'POST',
+                'Ticket shared.',
             ),
             'share',
         );

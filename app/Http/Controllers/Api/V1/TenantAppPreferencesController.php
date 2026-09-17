@@ -467,6 +467,11 @@ class TenantAppPreferencesController extends Controller
         $user = $this->resolveUser($request, $company);
         $tenantId = auth()->user()?->tenant_id ?? auth()->user()?->company_id ?? $company->id;
 
+        // If client submitted general app preferences (like drawer text & icons)
+        if ($request->has('drawer_text_icon_color') || $request->has('drawer_text_and_icons') || $request->has('drawer_text_color') || $request->has('drawer_icon_color') || $request->has('app_preferences')) {
+            return app(\App\Http\Controllers\Api\AppPreferenceController::class)->updatePreferences($request);
+        }
+
         // If client submitted full channels hierarchy
         if ($request->has('channels') && is_array($request->input('channels'))) {
             return $this->update($request);
@@ -608,6 +613,10 @@ class TenantAppPreferencesController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
+        if ($request->has('drawer_text_icon_color') || $request->has('drawer_text_and_icons') || $request->has('drawer_text_color') || $request->has('drawer_icon_color') || $request->has('app_preferences')) {
+            return app(\App\Http\Controllers\Api\AppPreferenceController::class)->updatePreferences($request);
+        }
+
         if ($request->has('delayed_orders_sound_type')) {
             return $this->saveNotificationPreferences($request);
         }

@@ -1,33 +1,25 @@
 @props(['branding' => null])
-@php($branding = $branding ?? \App\Models\PlatformBranding::current())
 
 @php
-    $pillars = [
-        [
-            'icon' => '⚡',
-            'tint' => 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
-            'title' => __('Sub-Second Speed & Offline-Ready'),
-            'body' => __('Checkout keeps running even if the internet drops. Sales queue safely in local storage and sync automatically the moment connection is restored.'),
-        ],
-        [
-            'icon' => '💳',
-            'tint' => 'bg-brand-lime/10 text-brand-lime border border-brand-lime/20',
-            'title' => __('Direct Card Issuing & Split Payments'),
-            'body' => __('Generate virtual and physical debit cards, manage spend controls, and process multi-tender checkouts without juggling separate merchant accounts.'),
-        ],
-        [
-            'icon' => '📊',
-            'tint' => 'bg-teal-500/10 text-teal-400 border border-teal-500/20',
-            'title' => __('Real-Time Financial & Ledger Control'),
-            'body' => __('Automated register X/Z shift reconciliation, payable/receivable balance sheets, and tax invoices ready for compliance without extra plugins.'),
-        ],
-        [
-            'icon' => '🏢',
-            'tint' => 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20',
-            'title' => __('Multi-Location Enterprise Workspaces'),
-            'body' => __('Scale from a single boutique till to a nationwide multi-store franchise with isolated tenant databases, custom domains, and granular role permissions.'),
-        ],
+    $branding = $branding ?? \App\Models\PlatformBranding::current();
+    $rawSolutions = $branding->landingSolutionsList();
+    $tints = [
+        'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+        'bg-brand-lime/10 text-brand-lime border border-brand-lime/20',
+        'bg-teal-500/10 text-teal-400 border border-teal-500/20',
+        'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20',
     ];
+    $pillars = array_map(function ($s, $i) use ($tints) {
+        return [
+            'icon' => $s['icon'] ?? '⚡',
+            'title' => $s['title'] ?? '',
+            'body' => $s['body'] ?? '',
+            'tint' => $tints[$i % count($tints)],
+        ];
+    }, $rawSolutions, array_keys($rawSolutions));
+    $solutionsBadge = $branding->getSectionBadge('solutions', __('Engineered For Maximum Conversion'));
+    $solutionsTitle = $branding->getSectionTitle('solutions', __('Why Modern Online Stores & Retailers Choose Our Platform'));
+    $solutionsSubtitle = $branding->getSectionSubtitle('solutions', __('Designed from the ground up to boost online revenue, eliminate inventory discrepancies, and keep counter checkouts flying during peak rushes.'));
 @endphp
 
 <div id="solutions" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 scroll-mt-20">
@@ -84,11 +76,14 @@
         <!-- 2x2 Value Pillars -->
         <div class="lg:col-span-7">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-lime/10 border border-brand-lime/20 text-brand-lime text-xs font-bold uppercase tracking-wider mb-3">
-                {{ __('Architected For Scale') }}
+                {{ $solutionsBadge }}
             </span>
             <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
-                {{ $branding->getSectionTitle('solutions', __('Engineered for maximum reliability under peak pressure')) }}
+                {{ $solutionsTitle }}
             </h2>
+            @if ($solutionsSubtitle)
+                <p class="mt-3 text-sm sm:text-base text-slate-400 leading-relaxed">{{ $solutionsSubtitle }}</p>
+            @endif
 
             <div class="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
                 @foreach ($pillars as $pillar)

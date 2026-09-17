@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Casts\SafeEncryptedString;
 use App\Services\Localization\LocalizationService;
+use App\Services\Modular\ModuleRegistry;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
@@ -10,8 +12,13 @@ use InvalidArgumentException;
 
 class SduiModule extends Model
 {
+    public const TYPE_CORE = 'core';
+
+    public const TYPE_EXTENSION = 'extension';
+
     protected $fillable = [
         'name',
+        'type',
         'slug',
         'description',
         'icon',
@@ -52,7 +59,7 @@ class SduiModule extends Model
             'sort_order' => 'integer',
             'installed_at' => 'datetime',
             'requires_license' => 'boolean',
-            'license_key_encrypted' => \App\Casts\SafeEncryptedString::class,
+            'license_key_encrypted' => SafeEncryptedString::class,
             'license_verified_at' => 'datetime',
             'license_expires_at' => 'datetime',
         ];
@@ -61,6 +68,12 @@ class SduiModule extends Model
     public function screens(): HasMany
     {
         return $this->hasMany(SduiScreen::class);
+    }
+
+    public function isExtension(): bool
+    {
+        return $this->type === self::TYPE_EXTENSION
+            || in_array(ModuleRegistry::canonicalKey($this->slug), config('modules.extensions', []), true);
     }
 
     /**
@@ -90,6 +103,16 @@ class SduiModule extends Model
     {
         static::saving(function (SduiModule $module): void {
             $module->slug = Str::slug($module->slug ?: $module->name);
+
+            if (in_array(ModuleRegistry::canonicalKey($module->slug), config('modules.extensions', []), true)) {
+                $module->type = self::TYPE_EXTENSION;
+            }
+            if (! in_array($module->type ?? self::TYPE_CORE, [self::TYPE_CORE, self::TYPE_EXTENSION], true)) {
+                throw new InvalidArgumentException('Invalid module type.');
+            }
+            if ($module->isExtension()) {
+                $module->registration_allowed = false;
+            }
 
             $navigation = $module->navigation ?? [];
             if (is_array($navigation)) {

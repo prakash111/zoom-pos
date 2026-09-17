@@ -196,22 +196,22 @@ class PlatformBranding extends Model
 
     public function getHeroBadge(): string
     {
-        return $this->landing_hero_badge ?: __('All-in-one POS, Inventory & Restaurant Platform');
+        return $this->landing_hero_badge ?: __('⚡ The #1 Omnichannel POS & Cloud Commerce Engine');
     }
 
     public function getHeroTitle(): string
     {
-        return $this->landing_hero_title ?: __('The Most Modern POS & Inventory Platform for Your Business');
+        return $this->landing_hero_title ?: __('Scale Your Store Sales Online & In-Person with Zero Downtime');
     }
 
     public function getHeroSubtitle(): string
     {
-        return $this->landing_hero_subtitle ?: __('Unified retail checkout, real-time stock inventory, dining floor KOT, and automated financial ledgers — all in one fast, offline-ready cloud platform.');
+        return $this->landing_hero_subtitle ?: __('Unify your online storefront, barcode checkout, multi-warehouse stock, and WhatsApp invoicing into one lightning-fast cloud POS. Built to turn internet visitors into repeat buyers and keep counters ringing up sales even offline.');
     }
 
     public function getHeroCtaPrimaryText(): string
     {
-        return $this->landing_hero_cta_primary_text ?: __('Start Free Trial');
+        return $this->landing_hero_cta_primary_text ?: __('Start Free Trial — Instant Access');
     }
 
     public function getHeroCtaPrimaryUrl(): string
@@ -265,6 +265,7 @@ class PlatformBranding extends Model
         $meta = $this->landing_section_meta[$section] ?? [];
         $layout = (string) ($meta['layout'] ?? 'default');
         return [
+            'badge' => trim((string) ($meta['badge'] ?? '')),
             'title' => trim((string) ($meta['title'] ?? '')),
             'subtitle' => trim((string) ($meta['subtitle'] ?? '')),
             'body' => trim((string) ($meta['body'] ?? '')),
@@ -303,6 +304,113 @@ class PlatformBranding extends Model
         $value = trim((string) ($this->landing_section_meta[$section]['subtitle'] ?? ''));
 
         return $value !== '' ? $value : $default;
+    }
+
+    /** Section badge override configured by the SuperAdmin, or the given default. */
+    public function getSectionBadge(string $section, string $default = ''): string
+    {
+        $value = trim((string) ($this->landing_section_meta[$section]['badge'] ?? ''));
+        if ($value !== '') {
+            return $value;
+        }
+
+        $contentBadge = trim((string) data_get($this->landing_content ?? [], "{$section}.badge", ''));
+        if ($contentBadge !== '') {
+            return $contentBadge;
+        }
+
+        return $default;
+    }
+
+    /** Section body override configured by the SuperAdmin, or the given default. */
+    public function getSectionBody(string $section, string $default = ''): string
+    {
+        $value = trim((string) ($this->landing_section_meta[$section]['body'] ?? ''));
+        if ($value !== '') {
+            return $value;
+        }
+
+        $contentBody = trim((string) data_get($this->landing_content ?? [], "{$section}.body", ''));
+        if ($contentBody !== '') {
+            return $contentBody;
+        }
+
+        return $default;
+    }
+
+    /** Resolved hardware cards with icon, label and tag. */
+    public function landingHardware(): array
+    {
+        $configured = $this->landingList('trust.hardware');
+        if (! empty($configured)) {
+            return array_map(function ($item) {
+                if (is_array($item)) {
+                    return [
+                        'label' => $item[0] ?? ($item['label'] ?? ''),
+                        'tag' => $item[1] ?? ($item['tag'] ?? ''),
+                        'icon' => $item[2] ?? ($item['icon'] ?? 'barcode'),
+                    ];
+                }
+                return ['label' => (string) $item, 'tag' => '', 'icon' => 'barcode'];
+            }, $configured);
+        }
+
+        return [
+            ['label' => 'Barcode & QR Scanners', 'icon' => 'barcode', 'tag' => 'Instant Zero-Latency Read'],
+            ['label' => 'Thermal Receipt Printers', 'icon' => 'printer', 'tag' => '58mm & 80mm ESC/POS'],
+            ['label' => 'Card Readers & QR Terminals', 'icon' => 'card', 'tag' => 'UPI, EMV & NFC Pay'],
+            ['label' => 'Smart Cash Drawers', 'icon' => 'drawer', 'tag' => 'Auto-Kick Trigger'],
+            ['label' => 'Kitchen & Packing Displays', 'icon' => 'display', 'tag' => 'Live KDS Workflow'],
+        ];
+    }
+
+    /** Resolved statistics and metrics counter pairs. */
+    public function landingStatsList(): array
+    {
+        $configured = $this->landingList('stats');
+        if (! empty($configured)) {
+            return array_map(function ($item) {
+                if (is_array($item)) {
+                    return [
+                        'value' => $item[0] ?? ($item['value'] ?? ''),
+                        'label' => $item[1] ?? ($item['label'] ?? ''),
+                    ];
+                }
+                return ['value' => '', 'label' => (string) $item];
+            }, $configured);
+        }
+
+        return [
+            ['value' => '2,500,000+', 'label' => __('Sales & Orders Processed')],
+            ['value' => '1,200+', 'label' => __('Thriving Store Outlets')],
+            ['value' => '99.99%', 'label' => __('Enterprise Uptime SLA')],
+            ['value' => '< 20ms', 'label' => __('Sub-Second Checkout Latency')],
+        ];
+    }
+
+    /** Resolved solution pillars cards with icon, title and description. */
+    public function landingSolutionsList(): array
+    {
+        $configured = $this->landingList('solutions.items');
+        if (! empty($configured)) {
+            return array_map(function ($item) {
+                if (is_array($item)) {
+                    return [
+                        'icon' => $item[0] ?? ($item['icon'] ?? '⚡'),
+                        'title' => $item[1] ?? ($item['title'] ?? ''),
+                        'body' => $item[2] ?? ($item['body'] ?? ''),
+                    ];
+                }
+                return ['icon' => '⚡', 'title' => (string) $item, 'body' => ''];
+            }, $configured);
+        }
+
+        return [
+            ['icon' => '🚀', 'title' => __('Drive Online & Foot-Traffic Sales'), 'body' => __('Attract internet buyers with instant digital menus, WhatsApp product sharing, QR payments, and digital receipts that capture customer contacts for repeat sales.')],
+            ['icon' => '⚡', 'title' => __('Sub-Second Speed & 100% Offline-Ready'), 'body' => __('Checkout keeps running smoothly when the internet drops. Sales queue safely on device and sync automatically on reconnect — zero lost revenue during peak rush.')],
+            ['icon' => '📦', 'title' => __('Live Stock Sync & Zero Overselling'), 'body' => __('Synchronize inventory across your online store, physical shops, and central warehouses in real time. Automatic low-stock triggers prevent embarrassing stockouts.')],
+            ['icon' => '🧾', 'title' => __('Automated Tax, Invoices & Ledgers'), 'body' => __('Generate compliant GST/VAT tax invoices, dispatch instant PDF receipts to WhatsApp/email, track customer credit limits, and automate daily shift cash reconciliation.')],
+        ];
     }
 
     /** Public Google Play Store URL, or null when disabled / blank. */
@@ -348,18 +456,15 @@ class PlatformBranding extends Model
         }
 
         return [
-            ['q' => __('Do I need to install anything to get started?'), 'a' => __('No. Create a workspace and start ringing up sales from any modern browser in minutes. Native Android and Windows apps are optional and add full-screen terminal mode, faster hardware access and offline-first speed.')],
-            ['q' => __('Does the POS keep working when the internet drops?'), 'a' => __('Yes. Checkout, product search, stock lookups and cash register actions all run from a local copy of your data. Sales made offline are queued safely and sync automatically the moment the connection returns — nothing is lost, and duplicates are prevented.')],
-            ['q' => __('Can I run more than one store, branch or warehouse?'), 'a' => __('Yes. A single workspace supports unlimited locations with a shared product catalogue, per-branch stock and pricing, inter-branch transfers with receiving audit trails, and consolidated reporting across the whole business.')],
-            ['q' => __('Which hardware does it support?'), 'a' => __('Any standard USB or Bluetooth barcode scanner, 80mm and 58mm thermal receipt printers, auto-kick cash drawers, EMV/NFC card readers, and Kitchen Display Screens. If it works with Windows or Android, it works here — no proprietary terminal to buy.')],
-            ['q' => __('Is it built for restaurants and cafés as well as retail?'), 'a' => __('Yes. Switch on restaurant mode for interactive dining floor plans, Kitchen Order Tickets routed to KDS screens, QR-code table ordering, per-seat items and modifiers, course pacing, and one-tap table merge or bill split.')],
-            ['q' => __('Are the tax invoices compliant?'), 'a' => __('Compliant tax invoices (VAT / GST / HSN) are generated automatically with correct tax breakdowns, sequential numbering, multi-currency pricing, and thermal or A4 PDF output that can be sent to the customer over WhatsApp or email instantly.')],
-            ['q' => __('Can I import my existing products and customers?'), 'a' => __('Yes. Bulk-import products, categories, barcodes, prices and stock from a CSV file, and add customers the same way, so you can move off spreadsheets or another POS without re-typing your catalogue.')],
-            ['q' => __('Can I control what each staff member can see and do?'), 'a' => __('Yes. Assign granular, per-module roles — for example a cashier who can sell but not edit prices or view reports — and every sensitive action is written to an audit log.')],
-            ['q' => __('Is my data secure and backed up?'), 'a' => __('Every tenant\'s data is fully isolated. All data is encrypted in transit and at rest, with automated cloud redundancy and point-in-time recovery.')],
-            ['q' => __('What do the native Android and Windows apps add?'), 'a' => __('A distraction-free full-screen till, quicker access to scanners, printers and cash drawers, remembered window size on desktop, and a hardened offline-first sync engine for busy counters and unreliable connections.')],
-            ['q' => __('Can I use my own brand, domain and pricing?'), 'a' => __('Yes. White-label the platform name, logo, favicon, colours and landing page, run it on your own custom domain, and publish your own subscription plans from the admin panel.')],
-            ['q' => __('Is there a free trial, and are there setup fees or contracts?'), 'a' => __('You can launch a workspace and evaluate the full system with no card required, no setup fee and no long-term contract. Upgrade, downgrade or cancel from the billing screen at any time.')],
+            ['q' => __('How does this platform help my online and retail store get more sales?'), 'a' => __('It seamlessly connects your physical counter and internet shoppers. You can publish an interactive digital catalog, share product links directly to customer WhatsApp, take contactless QR & card payments, and automatically capture customer contact details with digital receipts to drive high-converting repeat sales.')],
+            ['q' => __('Does the POS continue working when the internet drops?'), 'a' => __('Yes, 100%. Product lookup, barcode scanning, cart calculations, and checkout continue running locally on your device without pause. When internet connection returns, offline sales synchronize automatically in the background with zero data loss and zero duplicate entries.')],
+            ['q' => __('Can I manage both an online store and multiple retail branches?'), 'a' => __('Yes. A single workspace lets you manage unlimited physical branches, warehouses, and online catalogs with live synchronized stock, inter-branch transfers with receiving audits, branch-specific pricing, and unified executive analytics.')],
+            ['q' => __('Which hardware devices and printers are supported?'), 'a' => __('Any standard USB or Bluetooth barcode scanner, 80mm and 58mm thermal receipt printers, auto-kick cash drawers, EMV/NFC card terminals, and kitchen display monitors. If it connects to Windows, Android, or browser, it works out of the box — no expensive proprietary hardware to buy.')],
+            ['q' => __('Are tax invoices and receipts compliant with GST / VAT?'), 'a' => __('Yes. Tax invoices (GST, VAT, HSN/SAC) are generated automatically with itemized tax breakdowns, sequential numbering, thermal receipt formatting, and branded A4 PDF exports that can be sent straight to customers over WhatsApp or email.')],
+            ['q' => __('Can I migrate my existing products and customer data?'), 'a' => __('Yes. With our built-in bulk CSV import tool, you can upload your full product catalog, SKUs, barcodes, prices, stock levels, and customer records in minutes without typing them manually.')],
+            ['q' => __('Can I use this for restaurants, cafés, and bakeries too?'), 'a' => __('Yes. Simply toggle on restaurant mode to get interactive table floor plans, Kitchen Order Tickets (KOT) sent to kitchen screens, table QR code ordering, food modifiers, and one-tap bill splitting.')],
+            ['q' => __('Can I white-label this platform with my own brand and custom domain?'), 'a' => __('Yes. Customize your platform name, logo, favicon, accent colors, and custom domain to run a completely branded SaaS experience for your stores or clients.')],
+            ['q' => __('Is there a free trial, and do I need to enter credit card details?'), 'a' => __('You can launch your store workspace and test all features with zero risk. No credit card is required, no setup fees, and no long-term contracts. Upgrade or cancel anytime directly from your dashboard.')],
         ];
     }
 
@@ -392,16 +497,101 @@ class PlatformBranding extends Model
         }
 
         return [
-            ['icon' => '📦', 'title' => __('Smart Inventory & Stock Control'), 'body' => __('Real-time stock across every warehouse and branch, one-click barcode & SKU labels, batch and expiry tracking, and automatic low-stock re-order alerts — so you never oversell and shrinkage drops.'), 'mockup' => 'inventory'],
-            ['icon' => '🛒', 'title' => __('Lightning Retail POS'), 'body' => __('Sub-second barcode checkout, split cash / card / digital tender, customer credit accounts and held orders. Shorter queues at peak, and not a single lost sale.'), 'mockup' => 'pos'],
-            ['icon' => '🍽️', 'title' => __('Restaurant & Dining Service'), 'body' => __('Live floor plans, Kitchen Order Tickets routed to KDS screens, QR table ordering, per-seat modifiers, course pacing, table merge and bill split. Faster table turns with fewer kitchen mistakes.'), 'mockup' => 'restaurant'],
-            ['icon' => '🧾', 'title' => __('Finance, Tax & Invoicing'), 'body' => __('Compliant VAT / GST / HSN invoices generated automatically, multi-currency pricing, thermal and A4 receipts, instant WhatsApp or email delivery, and built-in AP / AR ledgers. Books that are always audit-ready.'), 'mockup' => 'finance'],
-            ['icon' => '⚡', 'title' => __('Offline-First Reliability'), 'body' => __('Keep selling when the internet drops. Transactions queue locally, sync automatically on reconnect, and survive a mid-sync crash without duplicates or corruption.')],
-            ['icon' => '💵', 'title' => __('Cash Register & Shift Control'), 'body' => __('Opening float, paid-in / paid-out, blind counts and automated X and Z shift reports give you tight, per-cashier cash accountability at every close.')],
-            ['icon' => '🧑‍🤝‍🧑', 'title' => __('Customers, Credit & Loyalty'), 'body' => __('Customer accounts with credit limits, statement-ready ledgers, payment histories and loyalty points — drive repeat business while keeping receivables under control.')],
-            ['icon' => '🏢', 'title' => __('Multi-Location Workspaces'), 'body' => __('Scale from one till to a nationwide franchise with isolated tenant data, a shared catalogue, per-branch pricing, consolidated reporting and your own custom domain.')],
-            ['icon' => '🔐', 'title' => __('Roles & Granular Permissions'), 'body' => __('Per-module access control — a cashier who can sell but not discount, a manager who can see reports but not payroll — with a full audit log of every sensitive action.')],
-            ['icon' => '📱', 'title' => __('Works On Every Device'), 'body' => __('The same system in any browser, plus native Android and Windows desktop apps for a full-screen till, faster hardware access and offline-first speed.')],
+            [
+                'icon' => '🌐',
+                'title' => __('Online Store & Digital Catalog'),
+                'body' => __("Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically."),
+                'mockup' => 'pos',
+            ],
+            [
+                'icon' => '🛒',
+                'title' => __('Sub-Second Barcode POS Checkout'),
+                'body' => __("Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster."),
+                'mockup' => 'pos',
+            ],
+            [
+                'icon' => '📦',
+                'title' => __('Omnichannel Inventory & Warehouse Sync'),
+                'body' => __("Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory."),
+                'mockup' => 'inventory',
+            ],
+            [
+                'icon' => '⚡',
+                'title' => __('Sub-Second 100% Offline-First POS Engine'),
+                'body' => __("Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours."),
+                'mockup' => 'pos',
+            ],
+            [
+                'icon' => '🧾',
+                'title' => __('Automated Tax Invoicing (GST/VAT) & WhatsApp Delivery'),
+                'body' => __("Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement."),
+                'mockup' => 'finance',
+            ],
+            [
+                'icon' => '💼',
+                'title' => __('Quotations, Estimates & Proforma Invoicing'),
+                'body' => __("Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow."),
+                'mockup' => 'finance',
+            ],
+            [
+                'icon' => '💵',
+                'title' => __('Cash Register Audit & Blind Shift Reconciliation'),
+                'body' => __("Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes."),
+                'mockup' => 'finance',
+            ],
+            [
+                'icon' => '📊',
+                'title' => __('Accounts Receivable (AR), Payables (AP) & Ledgers'),
+                'body' => __("Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms."),
+                'mockup' => 'finance',
+            ],
+            [
+                'icon' => '🧑‍🤝‍🧑',
+                'title' => __('Customer CRM, Lead Pipeline & Loyalty Points'),
+                'body' => __("360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks."),
+            ],
+            [
+                'icon' => '🍽️',
+                'title' => __('Restaurant Floor, Table QR & Kitchen KDS'),
+                'body' => __("Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead."),
+                'mockup' => 'restaurant',
+            ],
+            [
+                'icon' => '💊',
+                'title' => __('Pharmacy Drug Batch & Expiration Management'),
+                'body' => __("Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage."),
+            ],
+            [
+                'icon' => '🔧',
+                'title' => __('Repair Workshop & Service Ticket Management'),
+                'body' => __("Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency."),
+            ],
+            [
+                'icon' => '✂️',
+                'title' => __('Salon, Spa & Appointment Scheduling Calendar'),
+                'body' => __("Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts."),
+            ],
+            [
+                'icon' => '📈',
+                'title' => __('Sales Targets, Executive Analytics & Real-Time P&L'),
+                'body' => __("Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability."),
+                'mockup' => 'finance',
+            ],
+            [
+                'icon' => '🏢',
+                'title' => __('Multi-Branch Franchise & Centralized Control'),
+                'body' => __("Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide."),
+            ],
+            [
+                'icon' => '🔐',
+                'title' => __('Role-Based Permissions & Tamper-Proof Audit Logs'),
+                'body' => __("Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant."),
+            ],
+            [
+                'icon' => '📱',
+                'title' => __('Native Cross-Platform Apps (Web, Android, Windows)'),
+                'body' => __("Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware — tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks — saves thousands in initial setup and maintenance costs."),
+            ],
         ];
     }
 
@@ -428,9 +618,9 @@ class PlatformBranding extends Model
         }
 
         return [
-            ['quote' => __('We switched all our retail outlets over in one afternoon. Inventory clears immediately and end-of-day reconciliation takes seconds.'), 'name' => 'Alexander Hayes', 'role' => __('Operations Director · Apex Retail Group')],
-            ['quote' => __('The offline checkout saved us during a major fiber cut on a busy weekend. Not a single sale or customer was lost.'), 'name' => 'Elena Rostova', 'role' => __('Founder · Metro Gourmet Markets')],
-            ['quote' => __('POS, inventory and KOT kitchen displays in a single dashboard transformed our restaurant chain.'), 'name' => 'Tariq Mansour', 'role' => __('Head of Operations · Urban Dine Hospitality')],
+            ['quote' => __('Switching to this platform doubled our online order throughput while cutting counter checkout times in half. The live inventory sync between our web store and physical shops prevented overselling completely.'), 'name' => 'Marcus Vance', 'role' => __('Founder & CEO · Urban Horizon Omnichannel')],
+            ['quote' => __('During our holiday rush, our fiber internet went down for nearly three hours. The offline engine kept our counters ringing up sales without skipping a beat. It saved us thousands in lost sales.'), 'name' => 'Sophia Sterling', 'role' => __('Head of Operations · Sterling Luxury Retail')],
+            ['quote' => __('We run 6 restaurant and bakery outlets. Having table QR ordering, instant KOT kitchen display routing, and automated WhatsApp receipts in one system transformed our bottom line.'), 'name' => 'David Al-Mansoor', 'role' => __('Managing Director · Artisan Dine Group')],
         ];
     }
 

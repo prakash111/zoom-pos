@@ -54,6 +54,8 @@ if (! function_exists('get_appearance_settings')) {
 
         return [
             'theme' => setting('landing_page_theme', 'theme_fast'),
+            'landing_dark_bg' => setting('landing_dark_bg', '#0b0f19'),
+            'landing_sections_palette' => get_landing_sections_palette(),
             'primary_color' => $branding->primary_color ?? '#4f46e5',
             'landing_primary_color' => $branding->landing_primary_color ?? '#10b981',
             'landing_accent_color' => $branding->landing_accent_color ?? '#d7f24e',
@@ -63,6 +65,361 @@ if (! function_exists('get_appearance_settings')) {
             'favicon_url' => $branding->favicon_url,
             'support_email' => $branding->support_email,
             'support_phone' => $branding->support_phone,
+        ];
+    }
+}
+
+if (! function_exists('default_landing_sections_palette')) {
+    /** Default granular color pairs for public landing page sections. */
+    function default_landing_sections_palette(): array
+    {
+        return [
+            'hero' => [
+                'light_bg' => '#f8fafc',
+                'light_text' => '#0f172a',
+                'light_muted' => '#64748b',
+                'dark_bg' => '#0b0f19',
+                'dark_text' => '#f8fafc',
+                'dark_muted' => '#94a3b8',
+            ],
+            'features' => [
+                'light_bg' => '#ffffff',
+                'light_text' => '#0f172a',
+                'light_muted' => '#64748b',
+                'dark_bg' => '#0f172a',
+                'dark_text' => '#f8fafc',
+                'dark_muted' => '#94a3b8',
+            ],
+            'mission' => [
+                'light_bg' => '#ffffff',
+                'light_text' => '#0f172a',
+                'light_muted' => '#64748b',
+                'dark_bg' => '#0b0f19',
+                'dark_text' => '#f8fafc',
+                'dark_muted' => '#94a3b8',
+            ],
+            'pricing' => [
+                'light_bg' => '#ffffff',
+                'light_text' => '#0f172a',
+                'light_muted' => '#64748b',
+                'dark_bg' => '#0b0f19',
+                'dark_text' => '#f8fafc',
+                'dark_muted' => '#94a3b8',
+            ],
+            'faq' => [
+                'light_bg' => '#f8fafc',
+                'light_text' => '#0f172a',
+                'light_muted' => '#64748b',
+                'dark_bg' => '#0b0f19',
+                'dark_text' => '#f8fafc',
+                'dark_muted' => '#94a3b8',
+            ],
+            'cta' => [
+                'light_bg' => '#ffffff',
+                'light_text' => '#0f172a',
+                'light_muted' => '#64748b',
+                'dark_bg' => '#0b0f19',
+                'dark_text' => '#f8fafc',
+                'dark_muted' => '#94a3b8',
+            ],
+            'contact' => [
+                'light_bg' => '#ffffff',
+                'light_card_bg' => '#ffffff',
+                'light_text' => '#0f172a',
+                'light_muted' => '#64748b',
+                'dark_bg' => '#0b0f19',
+                'dark_card_bg' => '#131e29',
+                'dark_text' => '#f8fafc',
+                'dark_muted' => '#94a3b8',
+            ],
+        ];
+    }
+}
+
+if (! function_exists('get_landing_sections_palette')) {
+    /** Retrieve the cached or stored per-section palette with defaults fallback. */
+    function get_landing_sections_palette(): array
+    {
+        $defaults = default_landing_sections_palette();
+        $stored = null;
+        if (\Illuminate\Support\Facades\Schema::hasTable('system_settings')) {
+            $raw = \Illuminate\Support\Facades\DB::table('system_settings')->where('key', 'landing_sections_theme_palette')->value('value');
+            if ($raw) {
+                $stored = json_decode($raw, true);
+            }
+        }
+        if (! is_array($stored)) {
+            $val = setting('landing_sections_theme_palette');
+            $stored = is_array($val) ? $val : (is_string($val) ? json_decode($val, true) : null);
+        }
+
+        if (! is_array($stored)) {
+            return $defaults;
+        }
+
+        foreach ($defaults as $sec => $props) {
+            foreach ($props as $k => $defVal) {
+                if (empty($stored[$sec][$k])) {
+                    $stored[$sec][$k] = $defVal;
+                }
+            }
+        }
+
+        return $stored;
+    }
+}
+
+if (! function_exists('get_landing_matching_patterns')) {
+    /**
+     * Pre-defined harmonized matching color combination patterns for all landing page sections.
+     * Guarantees alternating rhythmic contrast, accessible typography, and matching dark/light modes.
+     */
+    function get_landing_matching_patterns(): array
+    {
+        return [
+            'obsidian' => [
+                'name' => 'Obsidian Executive',
+                'description' => 'Sophisticated Obsidian Navy & Slate rhythm with pure white highlights',
+                'color' => '#0b0f19',
+                'dark_bg' => '#0b0f19',
+                'palette' => [
+                    'hero' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#0b0f19', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'features' => [
+                        'light_bg' => '#f8fafc', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#0f172a', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'mission' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#0b0f19', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'pricing' => [
+                        'light_bg' => '#f8fafc', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#0f172a', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'faq' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#0b0f19', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'cta' => [
+                        'light_bg' => '#f8fafc', 'light_text' => '#0f172a', 'light_muted' => '#475569',
+                        'dark_bg' => '#0f172a', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'contact' => [
+                        'light_bg' => '#ffffff', 'light_card_bg' => '#ffffff', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#0b0f19', 'dark_card_bg' => '#131e29', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                ],
+            ],
+            'midnight' => [
+                'name' => 'Midnight Navy',
+                'description' => 'Deep ocean slate & navy alternating with crisp light gray surfaces',
+                'color' => '#0f172a',
+                'dark_bg' => '#0f172a',
+                'palette' => [
+                    'hero' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#0f172a', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'features' => [
+                        'light_bg' => '#f1f5f9', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#1e293b', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'mission' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#0f172a', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'pricing' => [
+                        'light_bg' => '#f1f5f9', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#1e293b', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'faq' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#0f172a', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'cta' => [
+                        'light_bg' => '#f1f5f9', 'light_text' => '#0f172a', 'light_muted' => '#475569',
+                        'dark_bg' => '#1e293b', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                    'contact' => [
+                        'light_bg' => '#ffffff', 'light_card_bg' => '#ffffff', 'light_text' => '#0f172a', 'light_muted' => '#64748b',
+                        'dark_bg' => '#0f172a', 'dark_card_bg' => '#1e293b', 'dark_text' => '#f8fafc', 'dark_muted' => '#94a3b8',
+                    ],
+                ],
+            ],
+            'emerald' => [
+                'name' => 'Deep Emerald',
+                'description' => 'FinTech & clean commerce deep emerald with fresh mint accents',
+                'color' => '#064e3b',
+                'dark_bg' => '#064e3b',
+                'palette' => [
+                    'hero' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#064e3b', 'light_muted' => '#047857',
+                        'dark_bg' => '#064e3b', 'dark_text' => '#ecfdf5', 'dark_muted' => '#6ee7b7',
+                    ],
+                    'features' => [
+                        'light_bg' => '#f0fdf4', 'light_text' => '#064e3b', 'light_muted' => '#047857',
+                        'dark_bg' => '#022c22', 'dark_text' => '#ecfdf5', 'dark_muted' => '#6ee7b7',
+                    ],
+                    'mission' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#064e3b', 'light_muted' => '#047857',
+                        'dark_bg' => '#064e3b', 'dark_text' => '#ecfdf5', 'dark_muted' => '#6ee7b7',
+                    ],
+                    'pricing' => [
+                        'light_bg' => '#f0fdf4', 'light_text' => '#064e3b', 'light_muted' => '#047857',
+                        'dark_bg' => '#022c22', 'dark_text' => '#ecfdf5', 'dark_muted' => '#6ee7b7',
+                    ],
+                    'faq' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#064e3b', 'light_muted' => '#047857',
+                        'dark_bg' => '#064e3b', 'dark_text' => '#ecfdf5', 'dark_muted' => '#6ee7b7',
+                    ],
+                    'cta' => [
+                        'light_bg' => '#f0fdf4', 'light_text' => '#064e3b', 'light_muted' => '#047857',
+                        'dark_bg' => '#022c22', 'dark_text' => '#ecfdf5', 'dark_muted' => '#6ee7b7',
+                    ],
+                    'contact' => [
+                        'light_bg' => '#ffffff', 'light_card_bg' => '#ffffff', 'light_text' => '#064e3b', 'light_muted' => '#047857',
+                        'dark_bg' => '#064e3b', 'dark_card_bg' => '#022c22', 'dark_text' => '#ecfdf5', 'dark_muted' => '#6ee7b7',
+                    ],
+                ],
+            ],
+            'indigo' => [
+                'name' => 'Royal Indigo',
+                'description' => 'Modern high-growth SaaS royal indigo with soft lavender undertones',
+                'color' => '#1e1b4b',
+                'dark_bg' => '#1e1b4b',
+                'palette' => [
+                    'hero' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#1e1b4b', 'light_muted' => '#4338ca',
+                        'dark_bg' => '#1e1b4b', 'dark_text' => '#e0e7ff', 'dark_muted' => '#a5b4fc',
+                    ],
+                    'features' => [
+                        'light_bg' => '#eef2ff', 'light_text' => '#1e1b4b', 'light_muted' => '#4338ca',
+                        'dark_bg' => '#312e81', 'dark_text' => '#e0e7ff', 'dark_muted' => '#a5b4fc',
+                    ],
+                    'mission' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#1e1b4b', 'light_muted' => '#4338ca',
+                        'dark_bg' => '#1e1b4b', 'dark_text' => '#e0e7ff', 'dark_muted' => '#a5b4fc',
+                    ],
+                    'pricing' => [
+                        'light_bg' => '#eef2ff', 'light_text' => '#1e1b4b', 'light_muted' => '#4338ca',
+                        'dark_bg' => '#312e81', 'dark_text' => '#e0e7ff', 'dark_muted' => '#a5b4fc',
+                    ],
+                    'faq' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#1e1b4b', 'light_muted' => '#4338ca',
+                        'dark_bg' => '#1e1b4b', 'dark_text' => '#e0e7ff', 'dark_muted' => '#a5b4fc',
+                    ],
+                    'cta' => [
+                        'light_bg' => '#eef2ff', 'light_text' => '#1e1b4b', 'light_muted' => '#4338ca',
+                        'dark_bg' => '#312e81', 'dark_text' => '#e0e7ff', 'dark_muted' => '#a5b4fc',
+                    ],
+                    'contact' => [
+                        'light_bg' => '#ffffff', 'light_card_bg' => '#ffffff', 'light_text' => '#1e1b4b', 'light_muted' => '#4338ca',
+                        'dark_bg' => '#1e1b4b', 'dark_card_bg' => '#312e81', 'dark_text' => '#e0e7ff', 'dark_muted' => '#a5b4fc',
+                    ],
+                ],
+            ],
+            'oled' => [
+                'name' => 'OLED Minimalist',
+                'description' => 'Ultra-clean high-contrast OLED monochrome black and pure white',
+                'color' => '#000000',
+                'dark_bg' => '#000000',
+                'palette' => [
+                    'hero' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#09090b', 'light_muted' => '#71717a',
+                        'dark_bg' => '#000000', 'dark_text' => '#ffffff', 'dark_muted' => '#a1a1aa',
+                    ],
+                    'features' => [
+                        'light_bg' => '#f4f4f5', 'light_text' => '#09090b', 'light_muted' => '#71717a',
+                        'dark_bg' => '#09090b', 'dark_text' => '#ffffff', 'dark_muted' => '#a1a1aa',
+                    ],
+                    'mission' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#09090b', 'light_muted' => '#71717a',
+                        'dark_bg' => '#000000', 'dark_text' => '#ffffff', 'dark_muted' => '#a1a1aa',
+                    ],
+                    'pricing' => [
+                        'light_bg' => '#f4f4f5', 'light_text' => '#09090b', 'light_muted' => '#71717a',
+                        'dark_bg' => '#09090b', 'dark_text' => '#ffffff', 'dark_muted' => '#a1a1aa',
+                    ],
+                    'faq' => [
+                        'light_bg' => '#ffffff', 'light_text' => '#09090b', 'light_muted' => '#71717a',
+                        'dark_bg' => '#000000', 'dark_text' => '#ffffff', 'dark_muted' => '#a1a1aa',
+                    ],
+                    'cta' => [
+                        'light_bg' => '#f4f4f5', 'light_text' => '#09090b', 'light_muted' => '#71717a',
+                        'dark_bg' => '#09090b', 'dark_text' => '#ffffff', 'dark_muted' => '#a1a1aa',
+                    ],
+                    'contact' => [
+                        'light_bg' => '#ffffff', 'light_card_bg' => '#ffffff', 'light_text' => '#09090b', 'light_muted' => '#71717a',
+                        'dark_bg' => '#000000', 'dark_card_bg' => '#121214', 'dark_text' => '#ffffff', 'dark_muted' => '#a1a1aa',
+                    ],
+                ],
+            ],
+        ];
+    }
+}
+
+if (! function_exists('apply_matching_landing_palette')) {
+    /**
+     * Persistently apply a harmonized matching color combination pattern across all landing page sections.
+     */
+    function apply_matching_landing_palette(string $themeKey = 'obsidian'): array
+    {
+        $patterns = get_landing_matching_patterns();
+        $selected = $patterns[$themeKey] ?? $patterns['obsidian'];
+
+        $palette = $selected['palette'];
+        $darkBg = $selected['dark_bg'];
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('system_settings')) {
+            \Illuminate\Support\Facades\DB::table('system_settings')->updateOrInsert(
+                ['key' => 'landing_sections_theme_palette'],
+                [
+                    'value'      => json_encode($palette),
+                    'updated_at' => now(),
+                ]
+            );
+
+            \Illuminate\Support\Facades\DB::table('system_settings')->updateOrInsert(
+                ['key' => 'landing_dark_bg'],
+                [
+                    'value'      => $darkBg,
+                    'updated_at' => now(),
+                ]
+            );
+
+            $existingConfig = \Illuminate\Support\Facades\DB::table('system_settings')->where('key', 'superadmin_theme_customization')->value('value');
+            $config = $existingConfig ? json_decode($existingConfig, true) : [];
+            $config['landing_dark_bg'] = $darkBg;
+            \Illuminate\Support\Facades\DB::table('system_settings')->updateOrInsert(
+                ['key' => 'superadmin_theme_customization'],
+                [
+                    'value'      => json_encode($config),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+
+        set_setting('landing_sections_theme_palette', json_encode($palette));
+        set_setting('landing_dark_bg', $darkBg);
+
+        \Illuminate\Support\Facades\Cache::forget('landing_sections_theme_palette');
+        \Illuminate\Support\Facades\Cache::forget('superadmin_theme_settings');
+        \Illuminate\Support\Facades\Cache::forget('landing_page_theme_config');
+        \Illuminate\Support\Facades\Cache::forget('app_landing_page_theme');
+        if (\Illuminate\Support\Facades\Cache::has('landing_page_cache_version')) {
+            \Illuminate\Support\Facades\Cache::increment('landing_page_cache_version');
+        } else {
+            \Illuminate\Support\Facades\Cache::forever('landing_page_cache_version', 2);
+        }
+
+        return [
+            'theme'   => $themeKey,
+            'name'    => $selected['name'],
+            'dark_bg' => $darkBg,
+            'palette' => $palette,
         ];
     }
 }
@@ -82,7 +439,9 @@ if (! function_exists('appearance_defaults')) {
             'uiAccentColor' => setting('appearance_ui_accent_color', '#4f46e5'),
             'navTextColor' => setting('appearance_nav_text_color', '#ffffff'),
             'navTextActiveColor' => setting('appearance_nav_text_active_color', '#60a5fa'),
-            'visibleItems' => is_array($items) && $items !== [] ? array_values($items) : ['dashboard', 'tenants', 'plans', 'settings', 'smtp'],
+            'landingDarkBg' => setting('landing_dark_bg', '#0b0f19'),
+            'landingSectionsPalette' => get_landing_sections_palette(),
+            'visibleItems' => is_array($items) && $items !== [] ? array_values($items) : ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'pages', 'settings', 'smtp'],
         ];
     }
 }

@@ -206,7 +206,7 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                @foreach (\App\Services\Modular\ModuleRegistry::allModules() as $modKey => $mod)
+                @foreach (\App\Services\Modular\ModuleRegistry::operatingModules() as $modKey => $mod)
                     @php
                         $g = $moduleGuard[$modKey] ?? ['premium' => false, 'licensed' => true, 'store_link' => null];
                         $locked = $g['premium'] && ! $g['licensed'];
@@ -305,7 +305,7 @@
             <div class="flex justify-end pt-2">
                 <button type="submit"
                         wire:loading.attr="disabled"
-                        class="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-lg shadow-indigo-600/30 flex items-center gap-2 cursor-pointer active:scale-95">
+                        class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95">
                     <span wire:loading.remove wire:target="saveGeneral">💾 {{ __('Save Platform Settings') }}</span>
                     <span wire:loading wire:target="saveGeneral">⏳ {{ __('Saving...') }}</span>
                 </button>

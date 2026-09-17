@@ -32,6 +32,40 @@ Route::middleware(EnsureAppIsInstalled::class)->get('/register', function () {
     return redirect()->route('tenant.register');
 })->name('register');
 
+// Demo branding assets are intentionally available at the tenant-prefixed
+// URLs used by seeded workspaces. Keep the file name constrained so this
+// cannot become an arbitrary storage-file endpoint.
+$serveDemoBranding = function (string $asset) {
+        abort_unless(preg_match('/^[A-Za-z0-9_.-]+$/', $asset) === 1, 404);
+
+        $path = storage_path('app/public/demo-branding/'.$asset);
+        abort_unless(is_file($path), 404);
+
+        $contents = file_get_contents($path);
+        // Older demo seeds stored the data URI itself. Serve its decoded SVG
+        // bytes so the public branding URL is a valid image either way.
+        if (is_string($contents) && str_starts_with($contents, 'data:image/svg+xml;base64,')) {
+            $contents = base64_decode(substr($contents, strlen('data:image/svg+xml;base64,')), true) ?: $contents;
+        }
+
+        if (is_string($contents) && str_starts_with(ltrim($contents), '<svg')) {
+            return response($contents, 200, [
+                'Content-Type' => 'image/svg+xml',
+                'Cache-Control' => 'public, max-age=86400',
+            ]);
+        }
+
+        return response()->file($path, [
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+};
+
+foreach (['/tenant/demo-branding/{asset}', '/demo-branding/{asset}'] as $demoBrandingPath) {
+    Route::middleware(EnsureAppIsInstalled::class)
+        ->get($demoBrandingPath, $serveDemoBranding)
+        ->where('asset', '[A-Za-z0-9_.-]+');
+}
+
 // 1-click demo sign-in (web panel). Disabled entirely unless DEMO_MODE=true.
 if (config('app.demo_mode')) {
     Route::middleware(EnsureAppIsInstalled::class)
@@ -132,4 +166,3 @@ Route::get('/tenant/views/invoices/create', function (\Illuminate\Http\Request $
 Route::get('/tenant/invoices/create', function (\Illuminate\Http\Request $request) {
     return app(\App\Http\Controllers\Api\InvoiceController::class)->createSchema($request);
 });
-

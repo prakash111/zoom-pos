@@ -26,7 +26,10 @@ class StoreProfileController extends Controller
             'success' => true,
             'store_name' => $company->display_name,
             'business_name' => $company->display_name,
+            'tenant_name' => $company->display_name,
+            'title' => $company->display_name,
             'trading_name' => $company->getEffectiveTradeName(),
+            'trade_name' => $company->getEffectiveTradeName(),
             'display_name' => $company->display_name,
             'header' => $drawerHeader,
             'drawer_header' => $drawerHeader,
@@ -34,10 +37,14 @@ class StoreProfileController extends Controller
                 'id' => (string) $company->id,
                 'name' => $company->display_name,
                 'business_name' => $company->display_name,
+                'tenant_name' => $company->display_name,
+                'title' => $company->display_name,
                 'trade_name' => $company->getEffectiveTradeName(),
                 'trading_name' => $company->getEffectiveTradeName(),
                 'display_name' => $company->display_name,
                 'store_name' => $company->display_name,
+                'header' => $drawerHeader,
+                'drawer_header' => $drawerHeader,
             ],
             'company' => $company,
         ]);
@@ -136,6 +143,13 @@ class StoreProfileController extends Controller
         Cache::forget("tenant_nav_{$tenantId}");
         Cache::forget("company_{$tenantId}");
         Cache::forget("tenant_executive_kpis_{$tenantId}");
+        Cache::forget("tenant_{$tenantId}_drawer");
+        Cache::forget("tenant_{$tenantId}_drawer_menu");
+        Cache::forget("navigation_menu_{$tenantId}");
+        Cache::forget("store_profile_{$tenantId}");
+        Cache::forget("tenant_store_profile_{$tenantId}");
+        Cache::forget("drawer_menu_{$tenantId}");
+        Cache::forget("tenant_{$tenantId}_menu");
         $freshCompany->flushTenantCaches();
 
         AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'store-profile']);
@@ -147,7 +161,10 @@ class StoreProfileController extends Controller
             'message' => 'Store profile updated successfully.',
             'store_name' => $freshCompany->display_name,
             'business_name' => $freshCompany->display_name,
+            'tenant_name' => $freshCompany->display_name,
+            'title' => $freshCompany->display_name,
             'trading_name' => $freshCompany->getEffectiveTradeName(),
+            'trade_name' => $freshCompany->getEffectiveTradeName(),
             'display_name' => $freshCompany->display_name,
             'header' => $drawerHeader,
             'drawer_header' => $drawerHeader,
@@ -156,10 +173,14 @@ class StoreProfileController extends Controller
                 'id' => (string) $freshCompany->id,
                 'name' => $freshCompany->display_name,
                 'business_name' => $freshCompany->display_name,
+                'tenant_name' => $freshCompany->display_name,
+                'title' => $freshCompany->display_name,
                 'trade_name' => $freshCompany->getEffectiveTradeName(),
                 'trading_name' => $freshCompany->getEffectiveTradeName(),
                 'display_name' => $freshCompany->display_name,
                 'store_name' => $freshCompany->display_name,
+                'header' => $drawerHeader,
+                'drawer_header' => $drawerHeader,
             ],
         ]);
     }

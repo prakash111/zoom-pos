@@ -5,6 +5,7 @@ namespace Modules\leadmanagement\Http\Controllers;
 use App\Http\Controllers\Api\LeadController;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureTenantExtension;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Reminder;
@@ -15,6 +16,8 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Schema;
 use Modules\leadmanagement\Models\Lead;
 use Modules\leadmanagement\Models\LeadActivity;
@@ -24,9 +27,25 @@ use Modules\leadmanagement\Services\LeadService;
 /**
  * Server-Driven UI + RESTful CRUD for the deeply integrated "leadmanagement" module.
  */
-class LeadModuleController extends Controller
+class LeadModuleController extends Controller implements HasMiddleware
 {
-    use ResolvesTenantSyncContext;
+    use ResolvesTenantSyncContext {
+        resolveCompany as private resolveTenantCompany;
+    }
+
+    public static function middleware(): array
+    {
+        return [new Middleware(EnsureTenantExtension::class.':leadmanagement')];
+    }
+
+    protected function resolveCompany(Request $request): Company
+    {
+        $company = $this->resolveTenantCompany($request);
+        abort_unless($company->hasModule('leadmanagement'), 403,
+            'Lead Management is not activated for your store by Super Admin.');
+
+        return $company;
+    }
 
     private const BASE = '/api/tenant/lead-module';
 

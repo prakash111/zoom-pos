@@ -3,20 +3,28 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureTenantExtension;
 use App\Models\Customer;
 use App\Models\Lead;
 use App\Models\User;
 use App\Services\LeadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Modules\leadmanagement\Models\LeadActivity;
 use Modules\leadmanagement\Models\LeadSource;
 
-class LeadWebController extends Controller
+class LeadWebController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [new Middleware(EnsureTenantExtension::class.':leadmanagement')];
+    }
+
     public function __construct(
         protected LeadService $leadService
     ) {

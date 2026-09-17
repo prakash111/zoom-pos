@@ -3,9 +3,11 @@
 namespace App\Services\Modular;
 
 use App\Models\AuditLog;
+use App\Models\Company;
 use App\Models\PlatformSystem;
 use App\Models\SduiModule;
 use App\Services\License\LicenseService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -15,6 +17,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
@@ -98,6 +101,10 @@ class ModulePackageService
             $module->refresh();
         }
 
+        if ($module->isExtension() && $adminUserId === null) {
+            return ['status' => true, 'message' => "\"{$module->name}\" installed and licensed. Super Admin must activate it in the panel.", 'module' => $module, 'activated' => false];
+        }
+
         try {
             $this->activate($module, $adminUserId);
 
@@ -158,6 +165,7 @@ class ModulePackageService
             ['slug' => $manifest['key']],
             [
                 'name' => $manifest['name'],
+                'type' => $manifest['type'],
                 'description' => $manifest['description'] ?? null,
                 'icon' => $manifest['icon'] ?? 'widgets',
                 'layout_type' => $manifest['layout_type'] ?? ($inheritsUi === 'universal_pos' ? 'universal_pos' : 'standard_grid'),
@@ -170,6 +178,8 @@ class ModulePackageService
                 'package_path' => $manifest['key'],
                 'installed_at' => now(),
                 'is_active' => false,
+                'registration_allowed' => $manifest['type'] === SduiModule::TYPE_EXTENSION
+                    ? false : ($existing?->registration_allowed ?? false),
                 'requires_license' => $manifest['requires_license'] ?? true,
             ]
         );
@@ -188,6 +198,13 @@ class ModulePackageService
     public function activate(SduiModule $module, int|string|null $adminUserId): void
     {
         $this->assertPackageModule($module);
+
+        if ($module->isExtension()) {
+            $this->assertSuperAdmin();
+            if ($adminUserId === null || (string) $adminUserId !== (string) auth('platform_web')->id()) {
+                throw new AuthorizationException('Extension activation must be requested by Super Admin from the panel.');
+            }
+        }
 
         // Licensing gate. Kept here (not only in the Livewire layer) so nothing
         // — a console command, a queued job, a future caller — can activate an
@@ -217,6 +234,34 @@ class ModulePackageService
         // A cached route/config/view table baked before this activation does
         // not know about the module's routes.php — flush so it resolves now.
         $this->flushPlatformCaches();
+    }
+
+    /** Existing tenant module assignments are the extension entitlement source. */
+    public function authorizeExtensionAssignment(Company $company, array $modules, string $field = 'modules'): void
+    {
+        $extensions = ModuleRegistry::extensionKeys();
+        $before = array_intersect(array_map([ModuleRegistry::class, 'canonicalKey'], array_filter((array) $company->licensed_modules, 'is_string')), $extensions);
+        $after = array_intersect($modules, $extensions);
+        $added = array_diff($after, $before);
+
+        if ($added !== [] || array_diff($before, $after) !== []) {
+            $this->assertSuperAdmin();
+        }
+        foreach ($added as $key) {
+            if (! ModuleRegistry::isActive($key)) {
+                throw ValidationException::withMessages([
+                    $field => 'Activate the extension in Super Admin → Modules before enabling it for a tenant.',
+                ]);
+            }
+        }
+    }
+
+    private function assertSuperAdmin(): void
+    {
+        $admin = auth('platform_web')->user();
+        if (! $admin?->isSuperAdmin() || $admin->status !== 'active') {
+            throw new AuthorizationException('Only Super Admin can activate or assign extensions from the Super Admin panel.');
+        }
     }
 
     public function deactivate(SduiModule $module, int|string|null $adminUserId): void
@@ -731,6 +776,13 @@ class ModulePackageService
         }
 
         $manifest['key'] = $key;
+
+        $type = $manifest['type'] ?? SduiModule::TYPE_CORE;
+        if (! in_array($type, [SduiModule::TYPE_CORE, SduiModule::TYPE_EXTENSION], true)) {
+            throw new InvalidArgumentException('module.json "type" must be "core" or "extension".');
+        }
+        $manifest['type'] = in_array($key, config('modules.extensions', []), true)
+            ? SduiModule::TYPE_EXTENSION : $type;
 
         // Every ZIP-installed module needs a license key to activate unless it
         // explicitly opts out. Built-in verticals never reach this path.

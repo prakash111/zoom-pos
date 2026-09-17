@@ -3,15 +3,23 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureTenantExtension;
 use App\Models\Company;
 use App\Models\Lead;
 use App\Models\Reminder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Modules\leadmanagement\Models\LeadActivity;
 
-class LeadReminderController extends Controller
+class LeadReminderController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [new Middleware(EnsureTenantExtension::class.':leadmanagement')];
+    }
+
     /**
      * Store a scheduled follow-up reminder for a lead.
      * Harmonizes all SDUI form field aliases (notes, reminder_notes, call_script, description, etc.)

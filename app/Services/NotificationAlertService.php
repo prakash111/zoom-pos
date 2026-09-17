@@ -8,6 +8,7 @@ use App\Models\TenantNotification;
 use App\Services\Sdui\SchemaResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class NotificationAlertService
@@ -27,14 +28,32 @@ class NotificationAlertService
         $storedNotifications = Schema::hasTable('tenant_notifications')
             ? $this->storedNotificationsQuery($companyId)->count()
             : 0;
+        $kitchenAlerts = $this->kitchenAlerts($companyId)->count();
 
-        return $dueInvoices + $leadReminders + $storedNotifications;
+        return $dueInvoices + $leadReminders + $storedNotifications + $kitchenAlerts;
     }
 
     /** @return Collection<int, array<string, mixed>> */
     public function alerts(mixed $companyId): Collection
     {
         $alerts = collect();
+
+        foreach ($this->kitchenAlerts($companyId) as $order) {
+            $reference = $order->reference_no ?: ($order->order_number ?: $order->id);
+            $alerts->push([
+                'type' => 'notification_item',
+                'id' => (string) $order->id,
+                'category' => 'kitchen',
+                'icon' => 'soup_kitchen',
+                'icon_color' => '#EF4444',
+                'title' => "Kitchen Alarm: KOT-{$reference}",
+                'subtitle' => ($order->order_type ?: 'Takeaway').' • '.ucfirst((string) $order->status),
+                'timestamp' => optional($order->created_at)->toIso8601String(),
+                'background_color' => 'theme.surface',
+                'divider_color' => 'theme.divider',
+                'text_color' => 'theme.textPrimary',
+            ]);
+        }
 
         foreach ($this->dueInvoices($companyId) as $invoice) {
             $reference = $invoice->sale_number ?: (string) $invoice->id;
@@ -121,6 +140,27 @@ class NotificationAlertService
         }
 
         return $alerts->sortByDesc('timestamp')->values();
+    }
+
+    private function kitchenAlerts(mixed $companyId): Collection
+    {
+        if (! $companyId || ! Schema::hasTable('kitchen_orders')) {
+            return collect();
+        }
+
+        $query = DB::table('kitchen_orders')
+            ->whereIn('status', ['ready', 'pending', 'preparing'])
+            ->latest('created_at')->limit(5);
+        $columns = Schema::getColumnListing('kitchen_orders');
+        if (in_array('company_id', $columns, true)) {
+            $query->where('company_id', $companyId);
+        } elseif (in_array('tenant_id', $columns, true)) {
+            $query->where('tenant_id', $companyId);
+        } else {
+            return collect();
+        }
+
+        return $query->get();
     }
 
     private function dueInvoices(mixed $companyId): Collection

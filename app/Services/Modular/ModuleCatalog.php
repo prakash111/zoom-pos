@@ -48,6 +48,8 @@ class ModuleCatalog
                 'slug' => $slug,
                 'name' => (string) ($p['name'] ?? $slug),
                 'description' => $p['description'] ?? null,
+                'type' => in_array($slug, config('modules.extensions', []), true)
+                    ? SduiModule::TYPE_EXTENSION : ($p['type'] ?? SduiModule::TYPE_CORE),
                 'price' => (float) ($p['price'] ?? 0),
                 'currency' => strtoupper((string) ($p['currency'] ?? $currency)),
             ];
@@ -60,6 +62,7 @@ class ModuleCatalog
                 'slug' => $r['slug'],
                 'name' => $r['name'],
                 'description' => $r['description'],
+                'type' => $r['type'],
                 'price' => round((float) ($ov['price'] ?? $r['price']), 2),
                 'currency' => strtoupper((string) ($ov['currency'] ?? $r['currency'])),
                 'store_link' => self::storeLink($r['slug']),

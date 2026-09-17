@@ -201,7 +201,7 @@ class SchemaValidator
             }
         }
 
-        if (in_array($type, ['open_remote_sheet', 'open_bottom_sheet'], true)
+        if (in_array($type, ['open_remote_sheet', 'open_bottom_sheet', 'open_quotation_modal'], true)
             && ! str_starts_with(trim((string) ($action['sheet_endpoint'] ?? $action['endpoint'] ?? '')), '/api/')) {
             $errors[] = "{$path}.sheet_endpoint: must be a same-origin /api/ path";
         }

@@ -38,7 +38,16 @@ return [
         ],
     ],
 
+    // Additive packages managed by Super Admin, never signup operating modes.
+    'extensions' => ['leadmanagement'],
+
     'catalog' => [
+        [
+            'slug' => 'leadmanagement',
+            'name' => 'Lead Management System',
+            'description' => 'Optional CRM extension for lead pipelines, follow-ups and customer conversion.',
+            'type' => 'extension',
+        ],
         [
             'slug' => 'pharmacy',
             'name' => 'Pharmacy POS Module',

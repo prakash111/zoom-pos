@@ -3,6 +3,7 @@
 namespace App\Livewire\SuperAdmin\Settings;
 
 use App\Models\AuditLog;
+use App\Models\MenuItem;
 use App\Models\Page;
 use App\Models\PlatformBranding;
 use App\Models\PlatformSystem;
@@ -141,6 +142,21 @@ class Index extends Component
     public int $alarmRepeatSeconds = 60;
 
     // --- TAB 3: WHITE-LABEL & BRANDING ---
+    public string $homepageMode = 'modular'; // 'modular' or 'static_page'
+
+    // Menu Management State
+    public string $menuLocation = 'header'; // 'header', 'footer_col_1', 'footer_col_2'
+    public string $newMenuTitle = '';
+    public string $newMenuUrl = '';
+    public ?int $newMenuPageId = null;
+    public bool $newMenuTargetBlank = false;
+
+    public ?int $editingMenuItemId = null;
+    public string $editingMenuItemTitle = '';
+    public string $editingMenuItemUrl = '';
+    public string $editingMenuItemTarget = '_self';
+    public bool $editingMenuItemActive = true;
+
     public string $platformName = '';
 
     public string $logoUrl = '';
@@ -230,18 +246,18 @@ class Index extends Component
      * @var array<string, array{title: string, subtitle: string}>
      */
     public array $sectionMeta = [
-        'hero' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
-        'trust_bar' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
-        'features' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#ffffff', 'accent' => '#10b981'],
-        'solutions' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
-        'downloads' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
-        'stats' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
-        'about' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#10b981'],
-        'testimonials' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
-        'pricing' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
-        'faq' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
-        'contact' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#ffffff', 'accent' => '#10b981'],
-        'cta' => ['title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'hero' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'trust_bar' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'features' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#ffffff', 'accent' => '#10b981'],
+        'solutions' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'downloads' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'stats' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'about' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#10b981'],
+        'testimonials' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'pricing' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
+        'faq' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#f8fafc', 'accent' => '#10b981'],
+        'contact' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#ffffff', 'accent' => '#10b981'],
+        'cta' => ['badge' => '', 'title' => '', 'subtitle' => '', 'body' => '', 'background' => '#0f172a', 'accent' => '#d7f24e'],
     ];
 
     /** Comma-separated section slugs; saved order is used by compatible themes. */
@@ -333,6 +349,7 @@ class Index extends Component
         $this->otpRegistrationEnabled = (bool) $branding->otp_registration_enabled;
         $this->landingPageEnabled = (bool) $branding->landing_page_enabled;
         $this->landingPageId = $branding->landing_page_id;
+        $this->homepageMode = (string) data_get($branding->landing_content, 'homepage_mode', ($branding->landing_page_id ? 'static_page' : 'modular'));
 
         $this->landingHeroBadge = (string) ($branding->landing_hero_badge ?? '');
         $this->landingHeroTitle = (string) ($branding->landing_hero_title ?? '');
@@ -366,6 +383,7 @@ class Index extends Component
         $meta = $branding->landing_section_meta ?? [];
         foreach (array_keys($this->sectionMeta) as $key) {
             $this->sectionMeta[$key] = [
+                'badge' => (string) ($meta[$key]['badge'] ?? ''),
                 'title' => (string) ($meta[$key]['title'] ?? ''),
                 'subtitle' => (string) ($meta[$key]['subtitle'] ?? ''),
                 'body' => (string) ($meta[$key]['body'] ?? ''),
@@ -378,15 +396,21 @@ class Index extends Component
             ->map(fn ($row) => ['q' => (string) ($row['q'] ?? ''), 'a' => (string) ($row['a'] ?? '')])
             ->values()
             ->all();
+        if (empty($this->landingFaqs)) {
+            $this->landingFaqs = $branding->landingFaqs();
+        }
 
         $this->landingFeatures = collect($branding->landing_features ?? [])
             ->map(fn ($row) => [
-                'icon' => (string) ($row['icon'] ?? ''),
+                'icon' => (string) ($row['icon'] ?? '✨'),
                 'title' => (string) ($row['title'] ?? ''),
                 'body' => (string) ($row['body'] ?? ''),
             ])
             ->values()
             ->all();
+        if (empty($this->landingFeatures)) {
+            $this->landingFeatures = $branding->landingFeatures();
+        }
 
         $this->landingTestimonials = collect($branding->landing_testimonials ?? [])
             ->map(fn ($row) => [
@@ -396,16 +420,73 @@ class Index extends Component
             ])
             ->values()
             ->all();
-        $this->landingFeaturesJson = json_encode($this->landingFeatures, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
-        $this->landingTestimonialsJson = json_encode($this->landingTestimonials, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
+        if (empty($this->landingTestimonials)) {
+            $this->landingTestimonials = $branding->landingTestimonials();
+        }
+
+        $this->landingFeaturesJson = '';
+        $this->landingTestimonialsJson = '';
         $this->landingContentJson = json_encode($branding->landing_content ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
         $this->landingCustomHtml = (string) data_get($branding->landing_content ?? [], 'html', '');
         $content = $branding->landing_content ?? [];
         $this->landingHeroHighlights = array_values(data_get($content, 'hero.highlights', []));
+        if (empty($this->landingHeroHighlights)) {
+            $this->landingHeroHighlights = [
+                'Sub-second barcode checkout',
+                'Offline-first synchronization',
+                'Multi-warehouse inventory tracking',
+                'Compliant tax invoicing (VAT/GST)',
+            ];
+        }
+
         $this->landingHeroProducts = array_values(data_get($content, 'hero.products', []));
         $this->landingHardwareItems = array_values(data_get($content, 'trust.hardware', []));
+        if (empty($this->landingHardwareItems)) {
+            $this->landingHardwareItems = [
+                ['label' => 'Barcode Scanners', 'tag' => 'Instant Scan', 'icon' => 'barcode'],
+                ['label' => 'Thermal Receipt Printers', 'tag' => '58mm / 80mm', 'icon' => 'printer'],
+                ['label' => 'Card Readers & Terminals', 'tag' => 'EMV & NFC', 'icon' => 'card'],
+                ['label' => 'Smart Cash Drawers', 'tag' => 'Auto Kick', 'icon' => 'drawer'],
+                ['label' => 'Kitchen Display Screens', 'tag' => 'Live KDS', 'icon' => 'display'],
+            ];
+        } else {
+            $this->landingHardwareItems = array_map(fn($h) => is_array($h) ? [
+                'label' => (string)($h['label'] ?? ($h[0] ?? '')),
+                'tag' => (string)($h['tag'] ?? ($h[1] ?? '')),
+                'icon' => (string)($h['icon'] ?? ($h[2] ?? 'barcode')),
+            ] : ['label' => (string)$h, 'tag' => '', 'icon' => 'barcode'], $this->landingHardwareItems);
+        }
+
         $this->landingStats = array_values(data_get($content, 'stats', []));
+        if (empty($this->landingStats)) {
+            $this->landingStats = [
+                ['value' => '2.5M+', 'label' => 'Transactions Processed'],
+                ['value' => '1,200+', 'label' => 'Active Business Outlets'],
+                ['value' => '99.99%', 'label' => 'Platform Uptime SLA'],
+                ['value' => '< 20ms', 'label' => 'Auth & Checkout Latency'],
+            ];
+        } else {
+            $this->landingStats = array_map(fn($s) => is_array($s) ? [
+                'value' => (string)($s['value'] ?? ($s[0] ?? '')),
+                'label' => (string)($s['label'] ?? ($s[1] ?? '')),
+            ] : ['value' => '', 'label' => (string)$s], $this->landingStats);
+        }
+
         $this->landingSolutions = array_values(data_get($content, 'solutions.items', []));
+        if (empty($this->landingSolutions)) {
+            $this->landingSolutions = [
+                ['icon' => '⚡', 'title' => 'Sub-Second Speed & Offline-Ready', 'body' => 'Checkout keeps running if the internet drops. Sales queue safely and sync automatically on reconnect.'],
+                ['icon' => '💳', 'title' => 'Direct Card Issuing & Split Payments', 'body' => 'Issue virtual and physical cards, set spend controls, and take multi-tender checkouts without extra merchant accounts.'],
+                ['icon' => '📊', 'title' => 'Real-Time Financial & Ledger Control', 'body' => 'Automated register X/Z reconciliation, payable/receivable balances and compliance-ready tax invoices.'],
+                ['icon' => '🏢', 'title' => 'Multi-Location Enterprise Workspaces', 'body' => 'Isolated tenant databases, custom domains and granular role permissions from one till to a national franchise.'],
+            ];
+        } else {
+            $this->landingSolutions = array_map(fn($sol) => is_array($sol) ? [
+                'icon' => (string)($sol['icon'] ?? ($sol[0] ?? '⚡')),
+                'title' => (string)($sol['title'] ?? ($sol[1] ?? '')),
+                'body' => (string)($sol['body'] ?? ($sol[2] ?? '')),
+            ] : ['icon' => '⚡', 'title' => (string)$sol, 'body' => ''], $this->landingSolutions);
+        }
 
         $this->landingTheme = (string) setting('landing_page_theme', 'theme_fast');
 
@@ -662,6 +743,8 @@ class Index extends Component
         $mode = in_array($appearance['mode'] ?? null, $allowedModes, true) ? $appearance['mode'] : 'docked';
         $visibleItems = array_values(array_intersect($allowedItems, (array) ($appearance['visibleItems'] ?? [])));
 
+        $landingDarkBg = $this->validatedColor($appearance['landingDarkBg'] ?? $appearance['landing_dark_bg'] ?? null, '#0b0f19');
+
         $values = [
             'appearance_nav_layout' => $layout,
             'appearance_nav_position' => $position,
@@ -670,7 +753,8 @@ class Index extends Component
             'appearance_ui_accent_color' => $this->validatedColor($appearance['uiAccentColor'] ?? null, '#4f46e5'),
             'appearance_nav_text_color' => $this->validatedColor($appearance['navTextColor'] ?? null, '#ffffff'),
             'appearance_nav_text_active_color' => $this->validatedColor($appearance['navTextActiveColor'] ?? null, '#60a5fa'),
-            'appearance_nav_visible_items' => json_encode($visibleItems ?: ['dashboard', 'tenants', 'plans', 'settings', 'smtp']),
+            'appearance_nav_visible_items' => json_encode($visibleItems ?: ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'pages', 'settings', 'smtp']),
+            'landing_dark_bg' => $landingDarkBg,
         ];
 
         foreach ($values as $key => $value) {
@@ -678,10 +762,82 @@ class Index extends Component
         }
         set_setting('appearance_defaults_version', (string) now()->getTimestampMs());
 
+        if (\Illuminate\Support\Facades\Schema::hasTable('system_settings')) {
+            $settings = \Illuminate\Support\Facades\DB::table('system_settings')->where('key', 'superadmin_theme_customization')->value('value');
+            $config = $settings ? json_decode($settings, true) : [];
+            $config['landing_dark_bg'] = $landingDarkBg;
+            \Illuminate\Support\Facades\DB::table('system_settings')->updateOrInsert(
+                ['key' => 'superadmin_theme_customization'],
+                [
+                    'value'      => json_encode($config),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+
+        $paletteInput = $appearance['palette'] ?? $appearance['landingSectionsPalette'] ?? $appearance['landing_sections_theme_palette'] ?? null;
+        if ($paletteInput !== null) {
+            $defaults = default_landing_sections_palette();
+            $sections = array_keys($defaults);
+
+            if (is_string($paletteInput)) {
+                $paletteInput = json_decode($paletteInput, true) ?: [];
+            }
+            if (! is_array($paletteInput)) {
+                $paletteInput = [];
+            }
+
+            $sanitizedPalette = [];
+            foreach ($sections as $sec) {
+                $sanitizedPalette[$sec] = [];
+                $secKeys = array_keys($defaults[$sec] ?? []);
+                foreach ($secKeys as $k) {
+                    $val = trim((string) ($paletteInput[$sec][$k] ?? $defaults[$sec][$k] ?? ''));
+                    if (! str_starts_with($val, '#') && ! empty($val)) {
+                        $val = '#' . $val;
+                    }
+                    if (empty($val) || ! preg_match('/^#[0-9a-fA-F]{3,8}$/', $val)) {
+                        $val = $defaults[$sec][$k] ?? '#ffffff';
+                    }
+                    $sanitizedPalette[$sec][$k] = $val;
+                }
+            }
+
+            if (\Illuminate\Support\Facades\Schema::hasTable('system_settings')) {
+                \Illuminate\Support\Facades\DB::table('system_settings')->updateOrInsert(
+                    ['key' => 'landing_sections_theme_palette'],
+                    [
+                        'value'      => json_encode($sanitizedPalette),
+                        'updated_at' => now(),
+                    ]
+                );
+            }
+            set_setting('landing_sections_theme_palette', json_encode($sanitizedPalette));
+            \Illuminate\Support\Facades\Cache::forget('landing_sections_theme_palette');
+        }
+
+        \Illuminate\Support\Facades\Cache::forget('superadmin_theme_settings');
+        \Illuminate\Support\Facades\Cache::forget('landing_page_theme_config');
+        \Illuminate\Support\Facades\Cache::forget('app_landing_page_theme');
+        if (\Illuminate\Support\Facades\Cache::has('landing_page_cache_version')) {
+            \Illuminate\Support\Facades\Cache::increment('landing_page_cache_version');
+        } else {
+            \Illuminate\Support\Facades\Cache::forever('landing_page_cache_version', 2);
+        }
+
         AuditLog::record('appearance.defaults_updated', null, auth('platform_web')->id(), ['after' => $values]);
         $this->dispatch('appearance-defaults-saved', defaults: appearance_defaults());
         $this->dispatch('notify', ['type' => 'success', 'message' => 'Global appearance defaults saved successfully.']);
         session()->flash('status', 'Global appearance defaults saved successfully.');
+    }
+
+    public function applyMatchingPalettePattern(string $themeKey = 'obsidian'): void
+    {
+        $result = apply_matching_landing_palette($themeKey);
+        AuditLog::record('appearance.matching_palette_applied', null, auth('platform_web')->id(), ['theme' => $themeKey]);
+        $this->dispatch('palette-pattern-applied', $result);
+        $this->dispatch('notify', ['type' => 'success', 'message' => "Harmonized '{$result['name']}' color pattern applied across all sections!"]);
+        session()->flash('status', "Harmonized '{$result['name']}' color pattern applied across all sections!");
     }
 
     public function saveSocialLogin(): void
@@ -708,7 +864,10 @@ class Index extends Component
 
     private function validatedColor(mixed $value, string $default): string
     {
-        $value = (string) $value;
+        $value = trim((string) $value);
+        if (! str_starts_with($value, '#') && ! empty($value)) {
+            $value = '#' . $value;
+        }
 
         return preg_match('/^#[0-9a-fA-F]{6}$/', $value) ? $value : $default;
     }
@@ -775,7 +934,7 @@ class Index extends Component
         // Never persist a key that is no longer a real store type — an
         // uninstalled / deactivated package module must not linger in this
         // list even if it was somehow still in the posted payload.
-        $validModeKeys = array_keys(ModuleRegistry::allModules());
+        $validModeKeys = array_keys(ModuleRegistry::operatingModules());
         $guard = $this->moduleGovernance();
         $this->enabledRegistrationModules = array_values(array_filter(
             array_intersect(array_values($this->enabledRegistrationModules), $validModeKeys),
@@ -931,27 +1090,120 @@ class Index extends Component
         $this->landingFaqs = array_values($this->landingFaqs);
     }
 
+    public function addFeature(): void
+    {
+        if (count($this->landingFeatures) < 30) {
+            $this->landingFeatures[] = ['icon' => '✨', 'title' => '', 'body' => ''];
+        }
+    }
+
+    public function removeFeature(int $index): void
+    {
+        unset($this->landingFeatures[$index]);
+        $this->landingFeatures = array_values($this->landingFeatures);
+    }
+
+    public function addTestimonial(): void
+    {
+        if (count($this->landingTestimonials) < 20) {
+            $this->landingTestimonials[] = ['quote' => '', 'name' => '', 'role' => ''];
+        }
+    }
+
+    public function removeTestimonial(int $index): void
+    {
+        unset($this->landingTestimonials[$index]);
+        $this->landingTestimonials = array_values($this->landingTestimonials);
+    }
+
+    public function addHardware(): void { $this->addHardwareItem(); }
+    public function removeHardware(int $index): void { $this->removeHardwareItem($index); }
+    public function addHardwareItem(): void
+    {
+        if (count($this->landingHardwareItems) < 20) {
+            $this->landingHardwareItems[] = ['label' => '', 'tag' => '', 'icon' => 'barcode'];
+        }
+    }
+    public function removeHardwareItem(int $index): void
+    {
+        unset($this->landingHardwareItems[$index]);
+        $this->landingHardwareItems = array_values($this->landingHardwareItems);
+    }
+
+    public function addSolution(): void
+    {
+        if (count($this->landingSolutions) < 20) {
+            $this->landingSolutions[] = ['icon' => '⚡', 'title' => '', 'body' => ''];
+        }
+    }
+    public function removeSolution(int $index): void
+    {
+        unset($this->landingSolutions[$index]);
+        $this->landingSolutions = array_values($this->landingSolutions);
+    }
+
+    public function addStat(): void
+    {
+        if (count($this->landingStats) < 15) {
+            $this->landingStats[] = ['value' => '', 'label' => ''];
+        }
+    }
+    public function removeStat(int $index): void
+    {
+        unset($this->landingStats[$index]);
+        $this->landingStats = array_values($this->landingStats);
+    }
+
+    public function addHeroHighlight(): void
+    {
+        if (count($this->landingHeroHighlights) < 20) {
+            $this->landingHeroHighlights[] = '';
+        }
+    }
+    public function removeHeroHighlight(int $index): void
+    {
+        unset($this->landingHeroHighlights[$index]);
+        $this->landingHeroHighlights = array_values($this->landingHeroHighlights);
+    }
+    public function addHighlight(): void { $this->addHeroHighlight(); }
+    public function removeHighlight(int $index): void { $this->removeHeroHighlight($index); }
+
+    public function addHeroProduct(): void
+    {
+        if (count($this->landingHeroProducts) < 15) {
+            $this->landingHeroProducts[] = ['name' => '', 'price' => '', 'status' => 'In Stock', 'tone' => 'emerald'];
+        }
+    }
+    public function removeHeroProduct(int $index): void
+    {
+        unset($this->landingHeroProducts[$index]);
+        $this->landingHeroProducts = array_values($this->landingHeroProducts);
+    }
+    public function addProduct(): void { $this->addHeroProduct(); }
+    public function removeProduct(int $index): void { $this->removeHeroProduct($index); }
+
     public function addLandingItem(string $type): void
     {
-        $map = [
-            'highlight' => ['property' => 'landingHeroHighlights', 'value' => ''],
-            'product' => ['property' => 'landingHeroProducts', 'value' => ['', '', '', 'emerald']],
-            'hardware' => ['property' => 'landingHardwareItems', 'value' => ['', '']],
-            'stat' => ['property' => 'landingStats', 'value' => ['', '']],
-            'solution' => ['property' => 'landingSolutions', 'value' => ['', '', '']],
-        ];
-        if (isset($map[$type]) && count($this->{$map[$type]['property']}) < 20) {
-            $this->{$map[$type]['property']}[] = $map[$type]['value'];
-        }
+        if ($type === 'highlight') $this->addHeroHighlight();
+        elseif ($type === 'product') $this->addHeroProduct();
+        elseif ($type === 'hardware') $this->addHardwareItem();
+        elseif ($type === 'stat') $this->addStat();
+        elseif ($type === 'solution') $this->addSolution();
+        elseif ($type === 'feature') $this->addFeature();
+        elseif ($type === 'testimonial') $this->addTestimonial();
+        elseif ($type === 'faq') $this->addFaq();
     }
 
     public function removeLandingItem(string $type, int $index): void
     {
-        $properties = ['highlight' => 'landingHeroHighlights', 'product' => 'landingHeroProducts', 'hardware' => 'landingHardwareItems', 'stat' => 'landingStats', 'solution' => 'landingSolutions'];
-        if (isset($properties[$type])) {
-            unset($this->{$properties[$type]}[$index]);
-            $this->{$properties[$type]} = array_values($this->{$properties[$type]});
-        }
+        if ($type === 'highlight') $this->removeHeroHighlight($index);
+        elseif ($type === 'product') $this->removeHeroProduct($index);
+        elseif ($type === 'hardware') $this->removeHardwareItem($index);
+        elseif ($type === 'stat') $this->removeStat($index);
+        elseif ($type === 'solution') $this->removeSolution($index);
+        elseif ($type === 'feature') $this->removeFeature($index);
+        elseif ($type === 'testimonial') $this->removeTestimonial($index);
+        elseif ($type === 'faq') $this->removeFaq($index);
     }
 
     public function removeAuthBanner(): void
@@ -963,6 +1215,236 @@ class Index extends Component
             'type' => 'success',
             'message' => 'Auth banner image removed.',
         ]);
+    }
+
+    public function updatedLandingPageId($value): void
+    {
+        if ($value) {
+            $this->homepageMode = 'static_page';
+        }
+    }
+
+    public function setHomepageMode(string $mode): void
+    {
+        if (in_array($mode, ['modular', 'static_page'], true)) {
+            $this->homepageMode = $mode;
+        }
+    }
+
+    public function setMenuLocation(string $loc): void
+    {
+        if (in_array($loc, ['header', 'footer_col_1', 'footer_col_2'], true)) {
+            $this->menuLocation = $loc;
+            $this->cancelEditMenuItem();
+        }
+    }
+
+    public function addAnchorMenuLink(string $title, string $anchor): void
+    {
+        $anchor = trim($anchor);
+        if (! str_starts_with($anchor, '#')) {
+            $anchor = '#' . ltrim($anchor, '/#');
+        }
+
+        $maxOrder = (int) MenuItem::where('location', $this->menuLocation)->max('order_index');
+
+        MenuItem::create([
+            'location' => $this->menuLocation,
+            'title' => trim($title),
+            'type' => 'anchor',
+            'url' => $anchor,
+            'page_id' => null,
+            'target' => '_self',
+            'order_index' => $maxOrder + 1,
+            'is_active' => true,
+        ]);
+
+        MenuItem::clearMenuCache($this->menuLocation);
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => __('Added section anchor link to menu.'),
+        ]);
+    }
+
+    public function addPageMenuLink(?int $pageId = null): void
+    {
+        $pId = $pageId ?: $this->newMenuPageId;
+        if (! $pId) {
+            return;
+        }
+
+        $page = Page::find($pId);
+        if (! $page) {
+            return;
+        }
+
+        $maxOrder = (int) MenuItem::where('location', $this->menuLocation)->max('order_index');
+
+        MenuItem::create([
+            'location' => $this->menuLocation,
+            'title' => $page->title,
+            'type' => 'page',
+            'url' => '/page/' . $page->slug,
+            'page_id' => $page->id,
+            'target' => '_self',
+            'order_index' => $maxOrder + 1,
+            'is_active' => true,
+        ]);
+
+        $this->newMenuPageId = null;
+        MenuItem::clearMenuCache($this->menuLocation);
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => __('Added CMS page link to menu.'),
+        ]);
+    }
+
+    public function addCustomMenuLink(): void
+    {
+        $this->validate([
+            'newMenuTitle' => 'required|string|max:100',
+            'newMenuUrl' => 'required|string|max:255',
+        ]);
+
+        $maxOrder = (int) MenuItem::where('location', $this->menuLocation)->max('order_index');
+
+        MenuItem::create([
+            'location' => $this->menuLocation,
+            'title' => trim($this->newMenuTitle),
+            'type' => 'custom',
+            'url' => trim($this->newMenuUrl),
+            'page_id' => null,
+            'target' => $this->newMenuTargetBlank ? '_blank' : '_self',
+            'order_index' => $maxOrder + 1,
+            'is_active' => true,
+        ]);
+
+        $this->newMenuTitle = '';
+        $this->newMenuUrl = '';
+        $this->newMenuTargetBlank = false;
+        MenuItem::clearMenuCache($this->menuLocation);
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => __('Added custom menu item.'),
+        ]);
+    }
+
+    public function moveMenuItemUp(int $id): void
+    {
+        $items = MenuItem::where('location', $this->menuLocation)->orderBy('order_index')->get();
+        $index = $items->search(fn ($i) => $i->id === $id);
+        if ($index === false || $index <= 0) {
+            return;
+        }
+
+        $current = $items[$index];
+        $prev = $items[$index - 1];
+
+        $prevOrder = $prev->order_index;
+        $currOrder = $current->order_index;
+
+        if ($prevOrder >= $currOrder) {
+            $prevOrder = $index - 1;
+            $currOrder = $index;
+        }
+
+        $current->update(['order_index' => $prevOrder]);
+        $prev->update(['order_index' => $currOrder]);
+
+        MenuItem::clearMenuCache($this->menuLocation);
+    }
+
+    public function moveMenuItemDown(int $id): void
+    {
+        $items = MenuItem::where('location', $this->menuLocation)->orderBy('order_index')->get();
+        $index = $items->search(fn ($i) => $i->id === $id);
+        if ($index === false || $index >= count($items) - 1) {
+            return;
+        }
+
+        $current = $items[$index];
+        $next = $items[$index + 1];
+
+        $nextOrder = $next->order_index;
+        $currOrder = $current->order_index;
+
+        if ($nextOrder <= $currOrder) {
+            $nextOrder = $index + 1;
+            $currOrder = $index;
+        }
+
+        $current->update(['order_index' => $nextOrder]);
+        $next->update(['order_index' => $currOrder]);
+
+        MenuItem::clearMenuCache($this->menuLocation);
+    }
+
+    public function toggleMenuItemActive(int $id): void
+    {
+        $item = MenuItem::findOrFail($id);
+        $item->update(['is_active' => ! $item->is_active]);
+        MenuItem::clearMenuCache($this->menuLocation);
+    }
+
+    public function deleteMenuItem(int $id): void
+    {
+        $item = MenuItem::findOrFail($id);
+        $location = $item->location;
+        $item->delete();
+        MenuItem::clearMenuCache($location);
+        if ($this->editingMenuItemId === $id) {
+            $this->cancelEditMenuItem();
+        }
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => __('Menu item deleted.'),
+        ]);
+    }
+
+    public function editMenuItem(int $id): void
+    {
+        $item = MenuItem::findOrFail($id);
+        $this->editingMenuItemId = $item->id;
+        $this->editingMenuItemTitle = $item->title;
+        $this->editingMenuItemUrl = $item->url;
+        $this->editingMenuItemTarget = $item->target ?: '_self';
+        $this->editingMenuItemActive = (bool) $item->is_active;
+    }
+
+    public function saveMenuItem(): void
+    {
+        if (! $this->editingMenuItemId) {
+            return;
+        }
+
+        $this->validate([
+            'editingMenuItemTitle' => 'required|string|max:100',
+            'editingMenuItemUrl' => 'required|string|max:255',
+        ]);
+
+        $item = MenuItem::findOrFail($this->editingMenuItemId);
+        $item->update([
+            'title' => trim($this->editingMenuItemTitle),
+            'url' => trim($this->editingMenuItemUrl),
+            'target' => $this->editingMenuItemTarget,
+            'is_active' => $this->editingMenuItemActive,
+        ]);
+
+        $this->cancelEditMenuItem();
+        MenuItem::clearMenuCache($item->location);
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => __('Menu item updated.'),
+        ]);
+    }
+
+    public function cancelEditMenuItem(): void
+    {
+        $this->editingMenuItemId = null;
+        $this->editingMenuItemTitle = '';
+        $this->editingMenuItemUrl = '';
+        $this->editingMenuItemTarget = '_self';
+        $this->editingMenuItemActive = true;
     }
 
     public function saveBranding(): void
@@ -994,19 +1476,20 @@ class Index extends Component
             'landingSectionOrder' => ['nullable', 'string', 'max:500'],
             'landingPlaystoreUrl' => ['nullable', 'url', 'max:500'],
             'landingWindowsUrl' => ['nullable', 'url', 'max:500'],
+            'sectionMeta.*.badge' => ['nullable', 'string', 'max:120'],
             'sectionMeta.*.title' => ['nullable', 'string', 'max:255'],
             'sectionMeta.*.subtitle' => ['nullable', 'string', 'max:500'],
             'sectionMeta.*.body' => ['nullable', 'string', 'max:2000'],
             'sectionMeta.*.background' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'sectionMeta.*.accent' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'landingFaqs' => ['array', 'max:20'],
+            'landingFaqs' => ['array', 'max:30'],
             'landingFaqs.*.q' => ['nullable', 'string', 'max:255'],
-            'landingFaqs.*.a' => ['nullable', 'string', 'max:1000'],
-            'landingFeatures' => ['nullable', 'array'],
+            'landingFaqs.*.a' => ['nullable', 'string', 'max:2000'],
+            'landingFeatures' => ['nullable', 'array', 'max:30'],
             'landingFeatures.*.icon' => ['nullable', 'string', 'max:16'],
             'landingFeatures.*.title' => ['nullable', 'string', 'max:120'],
             'landingFeatures.*.body' => ['nullable', 'string', 'max:500'],
-            'landingTestimonials' => ['nullable', 'array'],
+            'landingTestimonials' => ['nullable', 'array', 'max:20'],
             'landingTestimonials.*.quote' => ['nullable', 'string', 'max:500'],
             'landingTestimonials.*.name' => ['nullable', 'string', 'max:120'],
             'landingTestimonials.*.role' => ['nullable', 'string', 'max:160'],
@@ -1014,16 +1497,12 @@ class Index extends Component
             'landingTestimonialsJson' => ['nullable', 'string', 'max:50000'],
             'landingContentJson' => ['nullable', 'string', 'max:100000'],
             'landingCustomHtml' => ['nullable', 'string', 'max:500000'],
-            'landingHeroHighlights' => ['array', 'max:12'],
+            'landingHeroHighlights' => ['array', 'max:20'],
             'landingHeroHighlights.*' => ['nullable', 'string', 'max:120'],
-            'landingHeroProducts' => ['array', 'max:12'],
-            'landingHeroProducts.*' => ['array', 'max:4'],
-            'landingHardwareItems' => ['array', 'max:12'],
-            'landingHardwareItems.*' => ['array', 'max:2'],
-            'landingStats' => ['array', 'max:8'],
-            'landingStats.*' => ['array', 'max:2'],
-            'landingSolutions' => ['array', 'max:12'],
-            'landingSolutions.*' => ['array', 'max:3'],
+            'landingHeroProducts' => ['array', 'max:20'],
+            'landingHardwareItems' => ['array', 'max:20'],
+            'landingStats' => ['array', 'max:15'],
+            'landingSolutions' => ['array', 'max:20'],
         ]);
 
         foreach (['landingFeaturesJson' => 'landingFeatures', 'landingTestimonialsJson' => 'landingTestimonials'] as $jsonKey => $arrayKey) {
@@ -1049,9 +1528,43 @@ class Index extends Component
         }
         if ($this->landingHeroHighlights !== []) $landingContent['hero']['highlights'] = array_values(array_filter(array_map('trim', $this->landingHeroHighlights)));
         if ($this->landingHeroProducts !== []) $landingContent['hero']['products'] = array_values($this->landingHeroProducts);
-        if ($this->landingHardwareItems !== []) $landingContent['trust']['hardware'] = array_values($this->landingHardwareItems);
-        if ($this->landingStats !== []) $landingContent['stats'] = array_values($this->landingStats);
-        if ($this->landingSolutions !== []) $landingContent['solutions']['items'] = array_values($this->landingSolutions);
+        if ($this->landingHardwareItems !== []) {
+            $landingContent['trust']['hardware'] = collect($this->landingHardwareItems)
+                ->map(fn ($h) => [
+                    'label' => trim((string) ($h['label'] ?? ($h[0] ?? ''))),
+                    'tag' => trim((string) ($h['tag'] ?? ($h[1] ?? ''))),
+                    'icon' => trim((string) ($h['icon'] ?? ($h[2] ?? 'barcode'))),
+                ])
+                ->filter(fn ($h) => $h['label'] !== '')
+                ->values()
+                ->all();
+        }
+        if ($this->landingStats !== []) {
+            $landingContent['stats'] = collect($this->landingStats)
+                ->map(fn ($st) => [
+                    'value' => trim((string) ($st['value'] ?? ($st[0] ?? ''))),
+                    'label' => trim((string) ($st['label'] ?? ($st[1] ?? ''))),
+                ])
+                ->filter(fn ($st) => $st['value'] !== '' || $st['label'] !== '')
+                ->values()
+                ->all();
+        }
+        if ($this->landingSolutions !== []) {
+            $landingContent['solutions']['items'] = collect($this->landingSolutions)
+                ->map(fn ($s) => [
+                    'icon' => trim((string) ($s['icon'] ?? ($s[0] ?? '⚡'))) ?: '⚡',
+                    'title' => trim((string) ($s['title'] ?? ($s[1] ?? ''))),
+                    'body' => trim((string) ($s['body'] ?? ($s[2] ?? ''))),
+                ])
+                ->filter(fn ($s) => $s['title'] !== '')
+                ->values()
+                ->all();
+        }
+
+        if ($this->homepageMode === 'static_page' && empty($this->landingPageId)) {
+            $this->homepageMode = 'modular';
+        }
+        $landingContent['homepage_mode'] = $this->homepageMode;
 
         if ($this->logoImage) {
             $logoPath = $this->logoImage->store('branding', 'public');
@@ -1093,13 +1606,14 @@ class Index extends Component
 
         $sectionMeta = [];
         foreach ($this->sectionMeta as $key => $meta) {
+            $badge = trim((string) ($meta['badge'] ?? ''));
             $title = trim((string) ($meta['title'] ?? ''));
             $subtitle = trim((string) ($meta['subtitle'] ?? ''));
             $body = trim((string) ($meta['body'] ?? ''));
             $background = preg_match('/^#[0-9A-Fa-f]{6}$/', (string) ($meta['background'] ?? '')) ? strtoupper($meta['background']) : null;
             $accent = preg_match('/^#[0-9A-Fa-f]{6}$/', (string) ($meta['accent'] ?? '')) ? strtoupper($meta['accent']) : null;
-            if ($title !== '' || $subtitle !== '' || $body !== '' || $background || $accent) {
-                $sectionMeta[$key] = compact('title', 'subtitle', 'body', 'background', 'accent');
+            if ($badge !== '' || $title !== '' || $subtitle !== '' || $body !== '' || $background || $accent) {
+                $sectionMeta[$key] = compact('badge', 'title', 'subtitle', 'body', 'background', 'accent');
             }
         }
 
@@ -1166,8 +1680,11 @@ class Index extends Component
             'landing_content' => $landingContent ?: null,
         ]);
 
+        MenuItem::clearMenuCache();
         \Illuminate\Support\Facades\Cache::forget('public_settings');
         \Illuminate\Support\Facades\Cache::forget('platform_branding_settings');
+        \Illuminate\Support\Facades\Cache::forget('app_landing_page_theme');
+        \Illuminate\Support\Facades\Cache::increment('landing_page_cache_version');
 
         AuditLog::record('branding.updated', null, auth('platform_web')->id());
 
@@ -1223,6 +1740,8 @@ class Index extends Component
             'languageOptions' => PlatformRegionalService::languageOptions(),
             'timezoneOptions' => PlatformRegionalService::timezoneOptions(),
             'moduleGuard' => $this->moduleGovernance(),
+            'currentMenuItems' => MenuItem::where('location', $this->menuLocation)->orderBy('order_index')->get(),
+            'selectedLandingPage' => $this->landingPageId ? Page::find($this->landingPageId) : null,
         ]);
     }
 
@@ -1242,7 +1761,7 @@ class Index extends Component
             ->all();
 
         $guard = [];
-        foreach (array_keys(ModuleRegistry::allModules()) as $key) {
+        foreach (array_keys(ModuleRegistry::operatingModules()) as $key) {
             $isPremium = array_key_exists($key, $premium);
             $catalogSlug = $isPremium ? (string) $premium[$key] : $key;
 

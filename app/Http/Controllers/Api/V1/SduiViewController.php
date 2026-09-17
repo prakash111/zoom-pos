@@ -94,6 +94,15 @@ class SduiViewController extends Controller
                 }
                 return $this->maybeWizardAdvance($settingsController->updateNotificationSounds($request), $request, $company, $user);
 
+            case 'app-preferences':
+            case 'preferences':
+            case 'drawer-surfaces':
+            case 'surfaces':
+            case 'drawer':
+            case 'app-preference':
+            case 'app-preferences-drawer':
+                return app(\App\Http\Controllers\Api\AppPreferenceController::class)->updatePreferences($request);
+
             case 'repair-checklist':
             case 'repair-checklist-settings':
                 return $settingsController->updateRepairChecklist($request);
@@ -276,12 +285,17 @@ class SduiViewController extends Controller
             $payload['drawer_header'] = $drawerHeader;
             $payload['store_name'] = $fresh->display_name;
             $payload['business_name'] = $fresh->display_name;
+            $payload['tenant_name'] = $fresh->display_name;
+            $payload['title'] = $fresh->display_name;
             $payload['trading_name'] = $fresh->getEffectiveTradeName();
+            $payload['trade_name'] = $fresh->getEffectiveTradeName();
             $payload['display_name'] = $fresh->display_name;
             $payload['company'] = [
                 'id' => $fresh->id,
                 'name' => $fresh->display_name,
                 'business_name' => $fresh->display_name,
+                'tenant_name' => $fresh->display_name,
+                'title' => $fresh->display_name,
                 'trade_name' => $fresh->getEffectiveTradeName(),
                 'trading_name' => $fresh->getEffectiveTradeName(),
                 'store_name' => $fresh->display_name,
@@ -293,6 +307,8 @@ class SduiViewController extends Controller
                 'id' => (string) $fresh->id,
                 'name' => $fresh->display_name,
                 'business_name' => $fresh->display_name,
+                'tenant_name' => $fresh->display_name,
+                'title' => $fresh->display_name,
                 'trade_name' => $fresh->getEffectiveTradeName(),
                 'trading_name' => $fresh->getEffectiveTradeName(),
                 'display_name' => $fresh->display_name,

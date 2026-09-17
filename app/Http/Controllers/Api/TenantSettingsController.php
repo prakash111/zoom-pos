@@ -118,4 +118,12 @@ class TenantSettingsController extends Controller
             'details' => $result,
         ], 422);
     }
+
+    /**
+     * Update tenant app preferences including drawer text & icons palette.
+     */
+    public function updatePreferences(Request $request): JsonResponse
+    {
+        return app(\App\Http\Controllers\Api\AppPreferenceController::class)->updatePreferences($request);
+    }
 }

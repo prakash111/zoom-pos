@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
-use App\Models\Sale;
 use App\Models\KitchenTicket;
+use App\Models\PharmacyPrescription;
+use App\Models\RepairTicket;
+use App\Models\Sale;
+use App\Models\SalonAppointment;
 use App\Services\OmnichannelRegistryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,6 +43,15 @@ class DocumentPreviewController extends Controller
         $normalizedType = $this->normalizeType($type);
         if ($normalizedType === 'kot') {
             return $this->kotPreviewModal($request, $tenantId, $id, $format);
+        }
+        if ($normalizedType === 'repair') {
+            return $this->repairPreviewModal($request, $tenantId, $id, $format);
+        }
+        if ($normalizedType === 'prescription') {
+            return $this->prescriptionPreviewModal($request, $tenantId, $id, $format);
+        }
+        if ($normalizedType === 'appointment') {
+            return $this->appointmentPreviewModal($request, $tenantId, $id, $format);
         }
         $document = $this->findDocument($tenantId, $normalizedType, $id);
 
@@ -254,6 +266,9 @@ class DocumentPreviewController extends Controller
             'quotation', 'quote' => 'quotation',
             'invoice' => 'invoice',
             'sale', 'receipt', 'sales_receipt' => 'sale',
+            'repair', 'ticket', 'job_sheet', 'intake', 'repair_ticket' => 'repair',
+            'prescription', 'rx' => 'prescription',
+            'appointment', 'salon', 'salon_appointment' => 'appointment',
             default => abort(404, 'Document type not supported'),
         };
     }
@@ -338,6 +353,342 @@ class DocumentPreviewController extends Controller
                         'notes' => $kot->kitchen_notes ?? '',
                     ],
                     'render_url' => $renderUrl,
+                ],
+            ],
+        ];
+
+        return response()->json(['success' => true, 'schema' => $schema] + $schema);
+    }
+
+    private function repairPreviewModal(Request $request, mixed $tenantId, int|string $id, string $format): JsonResponse
+    {
+        $ticket = RepairTicket::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $tenantId)
+            ->where(function ($query) use ($id) {
+                $query->where('id', $id)->orWhere('ticket_number', $id);
+            })
+            ->with(['company', 'customer'])
+            ->firstOrFail();
+
+        $company = $ticket->company;
+        $customerName = $ticket->customer_name ?: ($ticket->customer?->name ?? 'Customer');
+        $phone = $ticket->customer_phone ?: ($ticket->customer?->phone ?? null);
+        $email = $ticket->customer?->email ?? null;
+        $device = trim(($ticket->brand ?? '') . ' ' . ($ticket->model ?? ''));
+        $reference = (string) $ticket->ticket_number;
+        $total = (float) $ticket->total_amount;
+        $renderUrl = url("/tenant/repair/tickets/{$ticket->id}/intake-sheet");
+
+        $items = [
+            [
+                'name' => "Repair Service: {$device}",
+                'quantity' => 1,
+                'unit_price' => (float) ($ticket->estimated_cost ?: $total),
+                'line_total' => (float) ($ticket->estimated_cost ?: $total),
+            ],
+        ];
+        if ((float) $ticket->diagnostic_fee > 0) {
+            $items[] = [
+                'name' => 'Diagnostic Fee',
+                'quantity' => 1,
+                'unit_price' => (float) $ticket->diagnostic_fee,
+                'line_total' => (float) $ticket->diagnostic_fee,
+            ];
+        }
+
+        $endpointPrefix = $request->is('api/*') ? '/api/v1/tenant' : '/tenant';
+        $reloadEndpoint = "{$endpointPrefix}/documents/repair/{$ticket->id}/preview-modal";
+
+        $schema = [
+            'type' => 'bottom_sheet',
+            'schema_version' => 1,
+            'title' => "Preview & Dispatch #{$reference}",
+            'header' => [
+                'title' => $reference,
+                'subtitle' => "Device: {$device} • Status: " . ucfirst($ticket->status ?? 'Intake'),
+            ],
+            'theme' => [
+                'surface' => 'theme.surface',
+                'canvas' => 'theme.canvas',
+                'divider' => 'theme.divider',
+                'text_primary' => 'theme.textPrimary',
+            ],
+            'background_color' => '#0B1120',
+            'loading_background_color' => '#0B1120',
+            'empty_background_color' => '#0F172A',
+            'components' => [
+                [
+                    'type' => 'segmented_tabs',
+                    'param_name' => 'format',
+                    'active_value' => $format,
+                    'options' => [
+                        ['label' => 'Standard A4', 'value' => 'a4'],
+                        ['label' => '80mm POS', 'value' => 'thermal_80mm'],
+                        ['label' => '58mm Receipt', 'value' => 'thermal_58mm'],
+                        ['label' => 'Mobile Slip', 'value' => 'slip'],
+                    ],
+                    'action' => [
+                        'type' => 'RELOAD_COMPONENT',
+                        'endpoint' => $reloadEndpoint,
+                        'refresh_in_place' => true,
+                    ],
+                    'active_background_color' => '#10B981',
+                    'active_text_color' => '#0B1120',
+                    'inactive_background_color' => '#1E293B',
+                    'inactive_text_color' => '#94A3B8',
+                ],
+                [
+                    'type' => 'document_preview_card',
+                    'format' => $format,
+                    'background_color' => '#0F172A',
+                    'border_color' => '#334155',
+                    'summary' => [
+                        'client_name' => $customerName,
+                        'client_phone' => $phone,
+                        'total_amount' => '₹' . number_format($total, 2),
+                        'item_count' => count($items),
+                    ],
+                    'render_url' => $renderUrl,
+                ],
+                [
+                    'type' => 'section_header',
+                    'title' => 'Dispatch Channels',
+                    'subtitle' => 'Share repair intake token or invoice with customer',
+                ],
+                [
+                    'type' => 'list_tile',
+                    'title' => 'Send via WhatsApp',
+                    'subtitle' => $phone ? "Send to {$phone}" : 'Customer WhatsApp',
+                    'leading' => ['icon' => 'chat'],
+                    'action' => [
+                        'type' => 'SUBMIT_FORM',
+                        'endpoint' => '/api/v1/documents/dispatch',
+                        'method' => 'POST',
+                        'payload' => [
+                            'document_type' => 'repair',
+                            'document_id' => $ticket->id,
+                            'channels' => ['whatsapp'],
+                            'phone' => $phone,
+                        ],
+                    ],
+                ],
+                [
+                    'type' => 'list_tile',
+                    'title' => 'Send via Email',
+                    'subtitle' => $email ? "Send to {$email}" : 'Customer Email',
+                    'leading' => ['icon' => 'email'],
+                    'action' => [
+                        'type' => 'SUBMIT_FORM',
+                        'endpoint' => '/api/v1/documents/dispatch',
+                        'method' => 'POST',
+                        'payload' => [
+                            'document_type' => 'repair',
+                            'document_id' => $ticket->id,
+                            'channels' => ['email'],
+                            'email' => $email,
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        return response()->json(['success' => true, 'schema' => $schema] + $schema);
+    }
+
+    private function prescriptionPreviewModal(Request $request, mixed $tenantId, int|string $id, string $format): JsonResponse
+    {
+        $rx = PharmacyPrescription::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $tenantId)
+            ->where(function ($query) use ($id) {
+                $query->where('id', $id)
+                    ->orWhere('prescription_number', $id)
+                    ->orWhere('prescription_code', $id);
+            })
+            ->with(['company'])
+            ->firstOrFail();
+
+        $company = $rx->company;
+        $patientName = $rx->patient_name ?: 'Patient';
+        $phone = $rx->patient_phone;
+        $doctor = $rx->doctor_name ? "Dr. {$rx->doctor_name}" : 'Attending Physician';
+        $reference = (string) $rx->prescription_number;
+        $renderUrl = url("/tenant/pharmacy/prescriptions");
+
+        $endpointPrefix = $request->is('api/*') ? '/api/v1/tenant' : '/tenant';
+        $reloadEndpoint = "{$endpointPrefix}/documents/prescription/{$rx->id}/preview-modal";
+
+        $schema = [
+            'type' => 'bottom_sheet',
+            'schema_version' => 1,
+            'title' => "Preview & Dispatch #{$reference}",
+            'header' => [
+                'title' => $reference,
+                'subtitle' => "Patient: {$patientName} • {$doctor}",
+            ],
+            'theme' => [
+                'surface' => 'theme.surface',
+                'canvas' => 'theme.canvas',
+                'divider' => 'theme.divider',
+                'text_primary' => 'theme.textPrimary',
+            ],
+            'background_color' => '#0B1120',
+            'loading_background_color' => '#0B1120',
+            'empty_background_color' => '#0F172A',
+            'components' => [
+                [
+                    'type' => 'segmented_tabs',
+                    'param_name' => 'format',
+                    'active_value' => $format,
+                    'options' => [
+                        ['label' => 'Standard A4', 'value' => 'a4'],
+                        ['label' => '80mm POS', 'value' => 'thermal_80mm'],
+                        ['label' => '58mm Receipt', 'value' => 'thermal_58mm'],
+                        ['label' => 'Mobile Slip', 'value' => 'slip'],
+                    ],
+                    'action' => [
+                        'type' => 'RELOAD_COMPONENT',
+                        'endpoint' => $reloadEndpoint,
+                        'refresh_in_place' => true,
+                    ],
+                    'active_background_color' => '#10B981',
+                    'active_text_color' => '#0B1120',
+                    'inactive_background_color' => '#1E293B',
+                    'inactive_text_color' => '#94A3B8',
+                ],
+                [
+                    'type' => 'document_preview_card',
+                    'format' => $format,
+                    'background_color' => '#0F172A',
+                    'border_color' => '#334155',
+                    'summary' => [
+                        'client_name' => $patientName,
+                        'client_phone' => $phone,
+                        'notes' => $doctor,
+                    ],
+                    'render_url' => $renderUrl,
+                ],
+                [
+                    'type' => 'section_header',
+                    'title' => 'Dispatch Channels',
+                    'subtitle' => 'Share prescription slip & dosage chart',
+                ],
+                [
+                    'type' => 'list_tile',
+                    'title' => 'Send via WhatsApp',
+                    'subtitle' => $phone ? "Send to {$phone}" : 'Patient WhatsApp',
+                    'leading' => ['icon' => 'chat'],
+                    'action' => [
+                        'type' => 'SUBMIT_FORM',
+                        'endpoint' => '/api/v1/documents/dispatch',
+                        'method' => 'POST',
+                        'payload' => [
+                            'document_type' => 'prescription',
+                            'document_id' => $rx->id,
+                            'channels' => ['whatsapp'],
+                            'phone' => $phone,
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        return response()->json(['success' => true, 'schema' => $schema] + $schema);
+    }
+
+    private function appointmentPreviewModal(Request $request, mixed $tenantId, int|string $id, string $format): JsonResponse
+    {
+        $apt = SalonAppointment::query()
+            ->withoutGlobalScope('company')
+            ->where('company_id', $tenantId)
+            ->where(function ($query) use ($id) {
+                $query->where('id', $id)->orWhere('appointment_number', $id);
+            })
+            ->with(['company', 'specialist', 'service'])
+            ->firstOrFail();
+
+        $company = $apt->company;
+        $customerName = $apt->customer_name ?: 'Client';
+        $phone = $apt->customer_phone;
+        $stylist = $apt->specialist?->name ? "Stylist: {$apt->specialist->name}" : 'Stylist Assigned';
+        $reference = (string) ($apt->appointment_number ?: "APT-{$apt->id}");
+        $renderUrl = url("/tenant/salon");
+
+        $endpointPrefix = $request->is('api/*') ? '/api/v1/tenant' : '/tenant';
+        $reloadEndpoint = "{$endpointPrefix}/documents/appointment/{$apt->id}/preview-modal";
+
+        $schema = [
+            'type' => 'bottom_sheet',
+            'schema_version' => 1,
+            'title' => "Preview & Dispatch #{$reference}",
+            'header' => [
+                'title' => $reference,
+                'subtitle' => "Client: {$customerName} • {$stylist}",
+            ],
+            'theme' => [
+                'surface' => 'theme.surface',
+                'canvas' => 'theme.canvas',
+                'divider' => 'theme.divider',
+                'text_primary' => 'theme.textPrimary',
+            ],
+            'background_color' => '#0B1120',
+            'loading_background_color' => '#0B1120',
+            'empty_background_color' => '#0F172A',
+            'components' => [
+                [
+                    'type' => 'segmented_tabs',
+                    'param_name' => 'format',
+                    'active_value' => $format,
+                    'options' => [
+                        ['label' => 'Standard A4', 'value' => 'a4'],
+                        ['label' => '80mm POS', 'value' => 'thermal_80mm'],
+                        ['label' => '58mm Receipt', 'value' => 'thermal_58mm'],
+                        ['label' => 'Mobile Slip', 'value' => 'slip'],
+                    ],
+                    'action' => [
+                        'type' => 'RELOAD_COMPONENT',
+                        'endpoint' => $reloadEndpoint,
+                        'refresh_in_place' => true,
+                    ],
+                    'active_background_color' => '#10B981',
+                    'active_text_color' => '#0B1120',
+                    'inactive_background_color' => '#1E293B',
+                    'inactive_text_color' => '#94A3B8',
+                ],
+                [
+                    'type' => 'document_preview_card',
+                    'format' => $format,
+                    'background_color' => '#0F172A',
+                    'border_color' => '#334155',
+                    'summary' => [
+                        'client_name' => $customerName,
+                        'client_phone' => $phone,
+                        'notes' => $stylist,
+                    ],
+                    'render_url' => $renderUrl,
+                ],
+                [
+                    'type' => 'section_header',
+                    'title' => 'Dispatch Channels',
+                    'subtitle' => 'Send appointment confirmation & reminders',
+                ],
+                [
+                    'type' => 'list_tile',
+                    'title' => 'Send via WhatsApp',
+                    'subtitle' => $phone ? "Send to {$phone}" : 'Client WhatsApp',
+                    'leading' => ['icon' => 'chat'],
+                    'action' => [
+                        'type' => 'SUBMIT_FORM',
+                        'endpoint' => '/api/v1/documents/dispatch',
+                        'method' => 'POST',
+                        'payload' => [
+                            'document_type' => 'appointment',
+                            'document_id' => $apt->id,
+                            'channels' => ['whatsapp'],
+                            'phone' => $phone,
+                        ],
+                    ],
                 ],
             ],
         ];

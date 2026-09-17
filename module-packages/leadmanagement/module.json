@@ -1,8 +1,10 @@
 {
     "key": "leadmanagement",
     "name": "Lead Management System",
-    "description": "Standalone CRM lead management vertical: lead pipeline, activity tracking, source attribution, and customer conversion.",
-    "version": "1.1.0",
+    "description": "Optional CRM extension: lead pipeline, activity tracking, source attribution, and customer conversion.",
+    "type": "extension",
+    "registration_allowed": false,
+    "version": "1.2.0",
     "author": "ZoomNearby",
     "icon": "leaderboard",
     "layout_type": "standard_grid",

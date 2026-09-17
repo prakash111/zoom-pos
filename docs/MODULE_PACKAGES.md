@@ -4,13 +4,14 @@
 on this platform's Perfex-style plugin engine
 (`App\Services\Modular\ModulePackageService`, Super Admin → Modules).
 
-Three are shipped here, extracted as self-contained verticals:
+These installable packages are maintained here:
 
 | Key | Name | Tables | API prefix |
 |---|---|---|---|
 | `pharmacy` | Pharmacy | `pharmacy_mod_drug_batches`, `pharmacy_mod_prescriptions`, `pharmacy_mod_prescription_items` | `/api/tenant/pharmacy-module` |
 | `repairtechnician` | Repair Technician | `repair_mod_device_categories`, `repair_mod_tickets`, `repair_mod_ticket_items` | `/api/tenant/repair-module` |
 | `salon` | Salon & Bookings | `salon_mod_services`, `salon_mod_stylists`, `salon_mod_appointments` | `/api/tenant/salon-module` |
+| `leadmanagement` | Lead Management (optional extension) | `lead_mod_leads`, `lead_mod_activities`, `lead_mod_sources` | `/api/tenant/lead-module` |
 
 The script ships with two **native** verticals — `retail` and `restaurant`
 (`ModuleRegistry::NATIVE`). Everything else — pharmacy, salon, repair — is a
@@ -24,6 +25,33 @@ An installed package is represented **once** in `ModuleRegistry::allModules()`,
 keyed by its canonical operating-mode id (so the `salon` package appears as
 `service_booking`, not both). `ModuleRegistry::canonicalKey()` collapses a
 slug to that id; `find()` / `isActive()` / `isInstalled()` accept either form.
+
+## Optional extensions
+
+`module.json` accepts `"type": "core"` (the default for existing packages) or
+`"type": "extension"`, stored in `sdui_modules.type`. Lead Management is an
+extension, including previously installed copies. `source_type` remains
+`package`, so ZIP installation, licensing, migrations and uninstall use the
+existing package lifecycle.
+
+Extensions are excluded from registration governance, tenant signup, primary
+operating-mode selectors, and `available_modes`. Only an active Super Admin
+session in the Super Admin panel may activate or assign an extension; signed
+license callbacks can install and license it but leave activation to Super Admin.
+
+After activating it in **Super Admin → Modules**, enable it under **Tenants →
+Tenant Detail → Optional Extensions** and save. An explicit entry in the
+tenant's existing `licensed_modules` array grants access while the package is
+active, licensed, unexpired and available to the package loader. Tenants without
+an assignment, including legacy tenants with no whitelist, receive no extension
+navigation, features or web/API access. Tenant-editable settings and role grants
+cannot activate it. Core module selection remains separate.
+
+Deactivation preserves data and tenant assignments; it blocks access until
+Super Admin reactivates the package. Core tenant edits preserve existing inactive
+extension assignments. Removing a tenant assignment or uninstalling also blocks
+access. Lead-linked quotation creation requires the extension; ordinary
+quotations continue working when the extension is disabled.
 
 ## Licensing
 

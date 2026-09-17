@@ -59,8 +59,8 @@
                 var layout = (saved && saved.layout) ? saved.layout : (defaults.layout || 'slim');
                 var theme = (saved && saved.theme) ? saved.theme : 'violet';
                 var sticky = (saved && typeof saved.sticky !== 'undefined') ? saved.sticky : (localStorage.getItem('nav_sticky') === 'true');
-                var navTextColor = (saved && saved.navTextColor) ? saved.navTextColor : (defaults.navTextColor || '#ffffff');
-                var navTextActive = (saved && saved.navTextActiveColor) ? saved.navTextActiveColor : (defaults.navTextActiveColor || '#60a5fa');
+                var navTextColor = (saved && saved.navTextColor) ? saved.navTextColor : (localStorage.getItem('nav_text_color') || defaults.navTextColor || '#ffffff');
+                var navTextActive = (saved && saved.navTextActiveColor) ? saved.navTextActiveColor : (localStorage.getItem('nav_text_active_color') || defaults.navTextActiveColor || '#60a5fa');
                 document.documentElement.setAttribute('data-dock-pos', pos);
                 document.documentElement.setAttribute('data-dock-mode', mode);
                 document.documentElement.setAttribute('data-nav-layout', layout);
@@ -68,6 +68,8 @@
                 document.documentElement.setAttribute('data-nav-sticky', sticky ? 'true' : 'false');
                 document.documentElement.style.setProperty('--nav-item-color', navTextColor);
                 document.documentElement.style.setProperty('--nav-item-active-color', navTextActive);
+                document.documentElement.style.setProperty('--nav-inactive-color', navTextColor);
+                document.documentElement.style.setProperty('--nav-active-color', navTextActive);
             } catch(e) {}
         })();
     </script>
@@ -77,16 +79,123 @@
             --sa-primary-color: {{ $saPrimaryColor }};
             --nav-item-color: #ffffff;
             --nav-item-active-color: #60a5fa;
+            --nav-inactive-color: var(--nav-item-color);
+            --nav-active-color: var(--nav-item-active-color);
         }
-        .dockable-nav-item:not([aria-selected="true"]) span,
-        .top-nav-item:not(.active) span {
-            color: var(--nav-item-color);
+
+        /* Inactive dock & top-bar nav items - text and icon inheritance */
+        .dockable-nav-item:not([aria-selected="true"]):not(.active),
+        .top-nav-item:not(.active),
+        .dock-nav-item:not(.active),
+        .dock-link:not(.active) {
+            color: var(--nav-item-color, var(--nav-inactive-color, #ffffff)) !important;
+        }
+        .dockable-nav-item:not([aria-selected="true"]):not(.active) span,
+        .top-nav-item:not(.active) span,
+        .dock-nav-item:not(.active) span,
+        .dock-link:not(.active) span {
+            color: var(--nav-item-color, var(--nav-inactive-color, #ffffff)) !important;
+        }
+        .dockable-nav-item:not([aria-selected="true"]):not(.active) svg,
+        .top-nav-item:not(.active) svg,
+        .dock-nav-item:not(.active) svg,
+        .dock-link:not(.active) svg,
+        .dockable-nav-item:not([aria-selected="true"]):not(.active) i,
+        .top-nav-item:not(.active) i,
+        .dock-nav-item:not(.active) i,
+        .dock-link:not(.active) i {
+            color: var(--nav-item-color, var(--nav-inactive-color, #ffffff)) !important;
+        }
+        .dockable-nav-item:not([aria-selected="true"]):not(.active) svg[stroke],
+        .dockable-nav-item:not([aria-selected="true"]):not(.active) svg [stroke],
+        .dockable-nav-item:not([aria-selected="true"]):not(.active) svg path[stroke],
+        .top-nav-item:not(.active) svg[stroke],
+        .top-nav-item:not(.active) svg [stroke],
+        .top-nav-item:not(.active) svg path[stroke],
+        .dock-nav-item:not(.active) svg[stroke],
+        .dock-nav-item:not(.active) svg [stroke],
+        .dock-nav-item:not(.active) svg path[stroke],
+        .dock-link:not(.active) svg[stroke],
+        .dock-link:not(.active) svg [stroke],
+        .dock-link:not(.active) svg path[stroke] {
+            stroke: var(--nav-item-color, var(--nav-inactive-color, #ffffff)) !important;
+        }
+        .dockable-nav-item:not([aria-selected="true"]):not(.active) svg[fill]:not([fill="none"]),
+        .dockable-nav-item:not([aria-selected="true"]):not(.active) svg [fill]:not([fill="none"]),
+        .dockable-nav-item:not([aria-selected="true"]):not(.active) svg path[fill]:not([fill="none"]),
+        .top-nav-item:not(.active) svg[fill]:not([fill="none"]),
+        .top-nav-item:not(.active) svg [fill]:not([fill="none"]),
+        .top-nav-item:not(.active) svg path[fill]:not([fill="none"]),
+        .dock-nav-item:not(.active) svg[fill]:not([fill="none"]),
+        .dock-nav-item:not(.active) svg [fill]:not([fill="none"]),
+        .dock-nav-item:not(.active) svg path[fill]:not([fill="none"]),
+        .dock-link:not(.active) svg[fill]:not([fill="none"]),
+        .dock-link:not(.active) svg [fill]:not([fill="none"]),
+        .dock-link:not(.active) svg path[fill]:not([fill="none"]) {
+            fill: var(--nav-item-color, var(--nav-inactive-color, #ffffff)) !important;
+        }
+
+        /* Active dock & top-bar nav items - text and icon inheritance */
+        .dockable-nav-item[aria-selected="true"],
+        .dockable-nav-item.active,
+        .top-nav-item.active,
+        .dock-nav-item.active,
+        .dock-link.active {
+            color: var(--nav-item-active-color, var(--nav-active-color, #60a5fa)) !important;
         }
         .dockable-nav-item[aria-selected="true"] span,
         .dockable-nav-item.active span,
-        .top-nav-item.active span {
-            color: var(--nav-item-active-color) !important;
+        .top-nav-item.active span,
+        .dock-nav-item.active span,
+        .dock-link.active span {
+            color: var(--nav-item-active-color, var(--nav-active-color, #60a5fa)) !important;
             font-weight: 700;
+        }
+        .dockable-nav-item[aria-selected="true"] svg,
+        .dockable-nav-item.active svg,
+        .top-nav-item.active svg,
+        .dock-nav-item.active svg,
+        .dock-link.active svg,
+        .dockable-nav-item[aria-selected="true"] i,
+        .dockable-nav-item.active i,
+        .top-nav-item.active i,
+        .dock-nav-item.active i,
+        .dock-link.active i {
+            color: var(--nav-item-active-color, var(--nav-active-color, #60a5fa)) !important;
+        }
+        .dockable-nav-item[aria-selected="true"] svg[stroke],
+        .dockable-nav-item[aria-selected="true"] svg [stroke],
+        .dockable-nav-item[aria-selected="true"] svg path[stroke],
+        .dockable-nav-item.active svg[stroke],
+        .dockable-nav-item.active svg [stroke],
+        .dockable-nav-item.active svg path[stroke],
+        .top-nav-item.active svg[stroke],
+        .top-nav-item.active svg [stroke],
+        .top-nav-item.active svg path[stroke],
+        .dock-nav-item.active svg[stroke],
+        .dock-nav-item.active svg [stroke],
+        .dock-nav-item.active svg path[stroke],
+        .dock-link.active svg[stroke],
+        .dock-link.active svg [stroke],
+        .dock-link.active svg path[stroke] {
+            stroke: var(--nav-item-active-color, var(--nav-active-color, #60a5fa)) !important;
+        }
+        .dockable-nav-item[aria-selected="true"] svg[fill]:not([fill="none"]),
+        .dockable-nav-item[aria-selected="true"] svg [fill]:not([fill="none"]),
+        .dockable-nav-item[aria-selected="true"] svg path[fill]:not([fill="none"]),
+        .dockable-nav-item.active svg[fill]:not([fill="none"]),
+        .dockable-nav-item.active svg [fill]:not([fill="none"]),
+        .dockable-nav-item.active svg path[fill]:not([fill="none"]),
+        .top-nav-item.active svg[fill]:not([fill="none"]),
+        .top-nav-item.active svg [fill]:not([fill="none"]),
+        .top-nav-item.active svg path[fill]:not([fill="none"]),
+        .dock-nav-item.active svg[fill]:not([fill="none"]),
+        .dock-nav-item.active svg [fill]:not([fill="none"]),
+        .dock-nav-item.active svg path[fill]:not([fill="none"]),
+        .dock-link.active svg[fill]:not([fill="none"]),
+        .dock-link.active svg [fill]:not([fill="none"]),
+        .dock-link.active svg path[fill]:not([fill="none"]) {
+            fill: var(--nav-item-active-color, var(--nav-active-color, #60a5fa)) !important;
         }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -203,7 +312,11 @@
             $isTenants = request()->routeIs('superadmin.tenants.*');
             $isPlans = request()->routeIs('superadmin.plans.*') || request()->routeIs('superadmin.payment-gateways.*');
             $isCodes = request()->routeIs('superadmin.activation-codes.*');
-            $isSettings = request()->routeIs('superadmin.settings.*') || request()->routeIs('superadmin.smtp.*') || request()->routeIs('superadmin.branding.*') || request()->routeIs('superadmin.tax.*') || request()->routeIs('superadmin.backups.*') || request()->routeIs('superadmin.modules.*') || request()->routeIs('superadmin.system.*') || request()->routeIs('superadmin.audit.*') || request()->routeIs('superadmin.pages.*') || request()->routeIs('superadmin.languages.*') || request()->routeIs('superadmin.menus.*');
+            $isTaxes = request()->routeIs('superadmin.tax.*');
+            $isMenus = request()->routeIs('superadmin.menus.*');
+            $isPages = request()->routeIs('superadmin.pages.*');
+            $isSmtp = request()->routeIs('superadmin.smtp.*');
+            $isSettings = request()->routeIs('superadmin.settings.*') || request()->routeIs('superadmin.branding.*') || request()->routeIs('superadmin.backups.*') || request()->routeIs('superadmin.modules.*') || request()->routeIs('superadmin.system.*') || request()->routeIs('superadmin.audit.*') || request()->routeIs('superadmin.languages.*');
         @endphp
         
         <!-- ==========================================
@@ -321,89 +434,232 @@
             </div>
 
             <!-- Navigation Links Container (Slim Mode) -->
-            <div x-show="layout === 'slim'"
+            <div data-dock-scroll-container
+                 x-ref="scrollNavContainer"
                  class="dockable-nav-container tab-scroll-container"
                  :class="{
                      'w-full flex flex-col items-center gap-4 sm:gap-5 my-auto': position === 'left' || position === 'right',
-                     'flex-1 flex flex-row items-center justify-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar mx-2 py-1': position === 'top' || position === 'bottom',
+                     'flex-1 flex flex-row items-center justify-start sm:justify-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar mx-2 py-1 scroll-smooth': position === 'top' || position === 'bottom',
                      'flex flex-row sm:flex-col items-center gap-2': position === 'floating'
                  }">
                 
-                <!-- 1. Home -->
-                <a wire:navigate.hover href="{{ route('superadmin.dashboard') }}"
+                <!-- 1. Dashboard Overview -->
+                <a x-show="isItemVisible('dashboard')"
+                   wire:navigate.hover href="{{ route('superadmin.dashboard') }}"
                    class="dockable-nav-item"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.dashboard') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isHome ? 'true' : 'false' }}"
                    :class="{
                        'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.dashboard') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.dashboard') }}')
                    }"
                    @class([
                        'transition-all group duration-200 cursor-pointer',
-                       'bg-white text-indigo-900 shadow-xl font-extrabold' => $isHome,
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isHome,
                        'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isHome,
                    ])
-                   title="{{ __('Dashboard') }}">
+                   title="{{ __('Dashboard Overview') }}">
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                     </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[11px] sm:text-xs' : 'text-xs whitespace-nowrap font-bold'">{{ __('Home') }}</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[11px] sm:text-xs' : 'text-xs whitespace-nowrap font-bold'">{{ __('Overview') }}</span>
                 </a>
 
-                <!-- 2. Tenants -->
-                <a wire:navigate.hover href="{{ route('superadmin.tenants.index') }}"
+                <!-- 2. Tenant Stores -->
+                <a x-show="isItemVisible('tenants')"
+                   wire:navigate.hover href="{{ route('superadmin.tenants.index') }}"
                    class="dockable-nav-item"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.tenants.index') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isTenants ? 'true' : 'false' }}"
                    :class="{
                        'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.tenants.index') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.tenants.index') }}')
                    }"
                    @class([
                        'transition-all group duration-200 cursor-pointer',
-                       'bg-white text-indigo-900 shadow-xl font-extrabold' => $isTenants,
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isTenants,
                        'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isTenants,
                    ])
-                   title="{{ __('Tenants & Stores') }}">
+                   title="{{ __('Tenant Stores') }}">
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                     <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Tenants') }}</span>
                 </a>
 
-                <!-- 3. Plans -->
-                <a wire:navigate.hover href="{{ route('superadmin.plans.index') }}"
+                <!-- 3. SaaS Plans & Pricing -->
+                <a x-show="isItemVisible('plans')"
+                   wire:navigate.hover href="{{ route('superadmin.plans.index') }}"
                    class="dockable-nav-item"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.plans.index') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isPlans ? 'true' : 'false' }}"
                    :class="{
                        'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.plans.index') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.plans.index') }}')
                    }"
                    @class([
                        'transition-all group duration-200 cursor-pointer',
-                       'bg-white text-indigo-900 shadow-xl font-extrabold' => $isPlans,
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isPlans,
                        'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isPlans,
                    ])
-                   title="{{ __('Subscription & Billing') }}">
+                   title="{{ __('SaaS Plans & Pricing') }}">
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                     </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Billing & Plans') }}</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Plans') }}</span>
                 </a>
 
-                <!-- 4. Activation Codes -->
-                <a wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}"
+                <!-- 4. Global Tax Engine -->
+                <a x-show="isItemVisible('taxes')"
+                   wire:navigate.hover href="{{ route('superadmin.tax.index') }}"
                    class="dockable-nav-item"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.tax.index') }}') ? 'true' : 'false'"
+                   aria-selected="{{ $isTaxes ? 'true' : 'false' }}"
+                   :class="{
+                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.tax.index') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.tax.index') }}')
+                   }"
+                   @class([
+                       'transition-all group duration-200 cursor-pointer',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isTaxes,
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isTaxes,
+                   ])
+                   title="{{ __('Global Tax Engine') }}">
+                    <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                    </svg>
+                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Taxes') }}</span>
+                </a>
+
+                <!-- 5. Menu Builder -->
+                <a x-show="isItemVisible('menus')"
+                   wire:navigate.hover href="{{ route('superadmin.menus.index') }}"
+                   class="dockable-nav-item"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.menus.index') }}') ? 'true' : 'false'"
+                   aria-selected="{{ $isMenus ? 'true' : 'false' }}"
+                   :class="{
+                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.menus.index') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.menus.index') }}')
+                   }"
+                   @class([
+                       'transition-all group duration-200 cursor-pointer',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isMenus,
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isMenus,
+                   ])
+                   title="{{ __('Menu Builder') }}">
+                    <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Menus') }}</span>
+                </a>
+
+                <!-- 6. CMS Custom Pages -->
+                <a x-show="isItemVisible('pages')"
+                   wire:navigate.hover href="{{ route('superadmin.pages.index') }}"
+                   class="dockable-nav-item"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.pages.index') }}') ? 'true' : 'false'"
+                   aria-selected="{{ $isPages ? 'true' : 'false' }}"
+                   :class="{
+                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.pages.index') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.pages.index') }}')
+                   }"
+                   @class([
+                       'transition-all group duration-200 cursor-pointer',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isPages,
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isPages,
+                   ])
+                   title="{{ __('CMS Custom Pages') }}">
+                    <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Pages') }}</span>
+                </a>
+
+                <!-- 7. Platform Settings -->
+                <a x-show="isItemVisible('settings')"
+                   wire:navigate.hover href="{{ route('superadmin.settings.index') }}"
+                   class="dockable-nav-item"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.settings.index') }}') ? 'true' : 'false'"
+                   aria-selected="{{ $isSettings ? 'true' : 'false' }}"
+                   :class="{
+                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.settings.index') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.settings.index') }}')
+                   }"
+                   @class([
+                       'transition-all group duration-200 cursor-pointer',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isSettings,
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isSettings,
+                   ])
+                   title="{{ __('Platform Settings') }}">
+                    <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Settings') }}</span>
+                </a>
+
+                <!-- 8. SMTP & Mail Config -->
+                <a x-show="isItemVisible('smtp')"
+                   wire:navigate.hover href="{{ route('superadmin.smtp.index') }}"
+                   class="dockable-nav-item"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.smtp.index') }}') ? 'true' : 'false'"
+                   aria-selected="{{ $isSmtp ? 'true' : 'false' }}"
+                   :class="{
+                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.smtp.index') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.smtp.index') }}')
+                   }"
+                   @class([
+                       'transition-all group duration-200 cursor-pointer',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isSmtp,
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isSmtp,
+                   ])
+                   title="{{ __('SMTP & Mail Config') }}">
+                    <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('SMTP') }}</span>
+                </a>
+
+                <!-- 9. Activation Codes / Licensing (Optional) -->
+                <a x-show="isItemVisible('codes')"
+                   wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}"
+                   class="dockable-nav-item"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.activation-codes.index') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isCodes ? 'true' : 'false' }}"
                    :class="{
                        'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.activation-codes.index') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.activation-codes.index') }}')
                    }"
                    @class([
                        'transition-all group duration-200 cursor-pointer',
-                       'bg-white text-indigo-900 shadow-xl font-extrabold' => $isCodes,
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isCodes,
                        'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isCodes,
                    ])
                    title="{{ __('Redeem License') }}">
@@ -412,40 +668,19 @@
                     </svg>
                     <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Licensing') }}</span>
                 </a>
-
-                <!-- 5. Settings -->
-                <a wire:navigate.hover href="{{ route('superadmin.settings.index') }}"
-                   class="dockable-nav-item"
-                   aria-selected="{{ $isSettings ? 'true' : 'false' }}"
-                   :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-                       'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating'
-                   }"
-                   @class([
-                       'transition-all group duration-200 cursor-pointer',
-                       'bg-white text-indigo-900 shadow-xl font-extrabold' => $isSettings,
-                       'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isSettings,
-                   ])
-                   title="{{ __('Settings') }}">
-                    <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Settings') }}</span>
-                </a>
             </div>
 
             <!-- Navigation Links (Expanded Layout with Categorized Groups) -->
             <div x-show="layout === 'expanded'"
+                 class="dockable-nav-container tab-scroll-container"
                  :class="{
                      'w-full space-y-4 my-2 flex-1 overflow-y-auto no-scrollbar': position === 'left' || position === 'right',
-                     'flex-1 flex flex-row items-center justify-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar mx-2 py-1': position === 'top' || position === 'bottom',
+                     'flex-1 flex flex-row items-center justify-start sm:justify-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar mx-2 py-1 scroll-smooth': position === 'top' || position === 'bottom',
                      'w-full flex flex-col gap-2 p-2': position === 'floating'
                  }">
                 
                 <!-- Category 1: Overview -->
-                <div :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
+                <div x-show="isItemVisible('dashboard')" :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
                         {{ __('Overview') }}
                     </div>
@@ -469,7 +704,7 @@
                 </div>
 
                 <!-- Category 2: Tenants -->
-                <div :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
+                <div x-show="isItemVisible('tenants')" :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
                         {{ __('Tenants & Stores') }}
                     </div>
@@ -492,12 +727,12 @@
                     </a>
                 </div>
 
-                <!-- Category 3: Subscriptions -->
-                <div :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
+                <!-- Category 3: Subscriptions & Taxes -->
+                <div x-show="isItemVisible('plans') || isItemVisible('taxes') || isItemVisible('codes')" :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
-                        {{ __('Billing & Licensing') }}
+                        {{ __('Billing & Taxes') }}
                     </div>
-                    <a wire:navigate.hover href="{{ route('superadmin.plans.index') }}"
+                    <a x-show="isItemVisible('plans')" wire:navigate.hover href="{{ route('superadmin.plans.index') }}"
                        :class="{
                            'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
                            'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
@@ -508,14 +743,32 @@
                            'text-white/80 hover:text-white hover:bg-white/15' => !$isPlans,
                        ])
                        title="{{ __('Plans & Pricing') }}">
-                        <span class="text-base shrink-0">💳</span>
+                        <span class="text-base shrink-0">👑</span>
                         <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
                             <div class="text-xs truncate">{{ __('Plans & Pricing') }}</div>
                             <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Subscription tiers & limits') }}</div>
                         </div>
                     </a>
 
-                    <a wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}"
+                    <a x-show="isItemVisible('taxes')" wire:navigate.hover href="{{ route('superadmin.tax.index') }}"
+                       :class="{
+                           'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
+                           'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
+                           'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
+                       }"
+                       @class([
+                           'bg-white text-indigo-900 shadow-md' => $isTaxes,
+                           'text-white/80 hover:text-white hover:bg-white/15' => !$isTaxes,
+                       ])
+                       title="{{ __('Global Tax Engine') }}">
+                        <span class="text-base shrink-0">⚖️</span>
+                        <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
+                            <div class="text-xs truncate">{{ __('Global Tax Engine') }}</div>
+                            <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('HSN/SAC & tax presets') }}</div>
+                        </div>
+                    </a>
+
+                    <a x-show="isItemVisible('codes')" wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}"
                        :class="{
                            'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
                            'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
@@ -534,12 +787,54 @@
                     </a>
                 </div>
 
-                <!-- Category 4: Settings -->
-                <div :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
+                <!-- Category 4: Content & Navigation -->
+                <div x-show="isItemVisible('menus') || isItemVisible('pages')" :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
+                    <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
+                        {{ __('Content & CMS') }}
+                    </div>
+                    <a x-show="isItemVisible('menus')" wire:navigate.hover href="{{ route('superadmin.menus.index') }}"
+                       :class="{
+                           'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
+                           'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
+                           'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
+                       }"
+                       @class([
+                           'bg-white text-indigo-900 shadow-md' => $isMenus,
+                           'text-white/80 hover:text-white hover:bg-white/15' => !$isMenus,
+                       ])
+                       title="{{ __('Menu Builder') }}">
+                        <span class="text-base shrink-0">🧭</span>
+                        <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
+                            <div class="text-xs truncate">{{ __('Menu Builder') }}</div>
+                            <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Header & footer navigation') }}</div>
+                        </div>
+                    </a>
+
+                    <a x-show="isItemVisible('pages')" wire:navigate.hover href="{{ route('superadmin.pages.index') }}"
+                       :class="{
+                           'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
+                           'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
+                           'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
+                       }"
+                       @class([
+                           'bg-white text-indigo-900 shadow-md' => $isPages,
+                           'text-white/80 hover:text-white hover:bg-white/15' => !$isPages,
+                       ])
+                       title="{{ __('CMS Custom Pages') }}">
+                        <span class="text-base shrink-0">📄</span>
+                        <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
+                            <div class="text-xs truncate">{{ __('CMS Custom Pages') }}</div>
+                            <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Landing & legal pages') }}</div>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- Category 5: Platform & Config -->
+                <div x-show="isItemVisible('settings') || isItemVisible('smtp')" :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
                         {{ __('System & Config') }}
                     </div>
-                    <a wire:navigate.hover href="{{ route('superadmin.settings.index') }}"
+                    <a x-show="isItemVisible('settings')" wire:navigate.hover href="{{ route('superadmin.settings.index') }}"
                        :class="{
                            'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
                            'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
@@ -553,7 +848,25 @@
                         <span class="text-base shrink-0">⚙️</span>
                         <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
                             <div class="text-xs truncate">{{ __('Platform Settings') }}</div>
-                            <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('SMTP, branding & backups') }}</div>
+                            <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Branding, themes & config') }}</div>
+                        </div>
+                    </a>
+
+                    <a x-show="isItemVisible('smtp')" wire:navigate.hover href="{{ route('superadmin.smtp.index') }}"
+                       :class="{
+                           'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
+                           'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
+                           'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
+                       }"
+                       @class([
+                           'bg-white text-indigo-900 shadow-md' => $isSmtp,
+                           'text-white/80 hover:text-white hover:bg-white/15' => !$isSmtp,
+                       ])
+                       title="{{ __('Global SMTP Config') }}">
+                        <span class="text-base shrink-0">✉️</span>
+                        <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
+                            <div class="text-xs truncate">{{ __('SMTP & Mail Config') }}</div>
+                            <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Email gateway & delivery') }}</div>
                         </div>
                     </a>
                 </div>
@@ -604,76 +917,139 @@
                 ⋮⋮
             </button>
 
-            <!-- 1. Home -->
-            <a wire:navigate.hover href="{{ route('superadmin.dashboard') }}"
+            <!-- 1. Dashboard Overview -->
+            <a x-show="isItemVisible('dashboard')" wire:navigate.hover href="{{ route('superadmin.dashboard') }}"
                class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.dashboard') }}') ? 'true' : 'false'"
                aria-selected="{{ $isHome ? 'true' : 'false' }}"
-               title="{{ __('Dashboard') }}">
+               title="{{ __('Dashboard Overview') }}">
                 <div @class([
                     'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400' => $isHome,
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isHome,
                     'bg-white/15 text-white hover:bg-white/30' => !$isHome,
-                ])>
+                ]) :class="isCurrentRoute('{{ route('superadmin.dashboard') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
                     📊
                 </div>
-                @if ($isHome)
-                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1"></span>
-                @endif
+                <span x-show="isCurrentRoute('{{ route('superadmin.dashboard') }}')" class="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1"></span>
             </a>
 
-            <!-- 2. Tenants -->
-            <a wire:navigate.hover href="{{ route('superadmin.tenants.index') }}"
+            <!-- 2. Tenant Stores -->
+            <a x-show="isItemVisible('tenants')" wire:navigate.hover href="{{ route('superadmin.tenants.index') }}"
                class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.tenants.index') }}') ? 'true' : 'false'"
                aria-selected="{{ $isTenants ? 'true' : 'false' }}"
-               title="{{ __('Tenants & Stores') }}">
+               title="{{ __('Tenant Stores') }}">
                 <div @class([
                     'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400' => $isTenants,
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isTenants,
                     'bg-white/15 text-white hover:bg-white/30' => !$isTenants,
-                ])>
+                ]) :class="isCurrentRoute('{{ route('superadmin.tenants.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
                     🏬
                 </div>
             </a>
 
-            <!-- 3. Plans -->
-            <a wire:navigate.hover href="{{ route('superadmin.plans.index') }}"
+            <!-- 3. SaaS Plans & Pricing -->
+            <a x-show="isItemVisible('plans')" wire:navigate.hover href="{{ route('superadmin.plans.index') }}"
                class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.plans.index') }}') ? 'true' : 'false'"
                aria-selected="{{ $isPlans ? 'true' : 'false' }}"
-               title="{{ __('Subscription Plans') }}">
+               title="{{ __('SaaS Plans & Pricing') }}">
                 <div @class([
                     'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400' => $isPlans,
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isPlans,
                     'bg-white/15 text-white hover:bg-white/30' => !$isPlans,
-                ])>
-                    💳
+                ]) :class="isCurrentRoute('{{ route('superadmin.plans.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
+                    👑
                 </div>
             </a>
 
-            <!-- 4. Codes -->
-            <a wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}"
+            <!-- 4. Global Tax Engine -->
+            <a x-show="isItemVisible('taxes')" wire:navigate.hover href="{{ route('superadmin.tax.index') }}"
                class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.tax.index') }}') ? 'true' : 'false'"
+               aria-selected="{{ $isTaxes ? 'true' : 'false' }}"
+               title="{{ __('Global Tax Engine') }}">
+                <div @class([
+                    'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isTaxes,
+                    'bg-white/15 text-white hover:bg-white/30' => !$isTaxes,
+                ]) :class="isCurrentRoute('{{ route('superadmin.tax.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
+                    ⚖️
+                </div>
+            </a>
+
+            <!-- 5. Menu Builder -->
+            <a x-show="isItemVisible('menus')" wire:navigate.hover href="{{ route('superadmin.menus.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.menus.index') }}') ? 'true' : 'false'"
+               aria-selected="{{ $isMenus ? 'true' : 'false' }}"
+               title="{{ __('Menu Builder') }}">
+                <div @class([
+                    'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isMenus,
+                    'bg-white/15 text-white hover:bg-white/30' => !$isMenus,
+                ]) :class="isCurrentRoute('{{ route('superadmin.menus.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
+                    🧭
+                </div>
+            </a>
+
+            <!-- 6. CMS Custom Pages -->
+            <a x-show="isItemVisible('pages')" wire:navigate.hover href="{{ route('superadmin.pages.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.pages.index') }}') ? 'true' : 'false'"
+               aria-selected="{{ $isPages ? 'true' : 'false' }}"
+               title="{{ __('CMS Custom Pages') }}">
+                <div @class([
+                    'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isPages,
+                    'bg-white/15 text-white hover:bg-white/30' => !$isPages,
+                ]) :class="isCurrentRoute('{{ route('superadmin.pages.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
+                    📄
+                </div>
+            </a>
+
+            <!-- 7. Platform Settings -->
+            <a x-show="isItemVisible('settings')" wire:navigate.hover href="{{ route('superadmin.settings.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.settings.index') }}') ? 'true' : 'false'"
+               aria-selected="{{ $isSettings ? 'true' : 'false' }}"
+               title="{{ __('Platform Settings') }}">
+                <div @class([
+                    'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isSettings,
+                    'bg-white/15 text-white hover:bg-white/30' => !$isSettings,
+                ]) :class="isCurrentRoute('{{ route('superadmin.settings.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
+                    ⚙️
+                </div>
+            </a>
+
+            <!-- 8. SMTP & Mail Config -->
+            <a x-show="isItemVisible('smtp')" wire:navigate.hover href="{{ route('superadmin.smtp.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.smtp.index') }}') ? 'true' : 'false'"
+               aria-selected="{{ $isSmtp ? 'true' : 'false' }}"
+               title="{{ __('SMTP & Mail Config') }}">
+                <div @class([
+                    'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isSmtp,
+                    'bg-white/15 text-white hover:bg-white/30' => !$isSmtp,
+                ]) :class="isCurrentRoute('{{ route('superadmin.smtp.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
+                    ✉️
+                </div>
+            </a>
+
+            <!-- 9. Activation Codes / Licensing -->
+            <a x-show="isItemVisible('codes')" wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.activation-codes.index') }}') ? 'true' : 'false'"
                aria-selected="{{ $isCodes ? 'true' : 'false' }}"
                title="{{ __('Licensing') }}">
                 <div @class([
                     'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400' => $isCodes,
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isCodes,
                     'bg-white/15 text-white hover:bg-white/30' => !$isCodes,
-                ])>
+                ]) :class="isCurrentRoute('{{ route('superadmin.activation-codes.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
                     🔑
-                </div>
-            </a>
-
-            <!-- 5. Settings -->
-            <a wire:navigate.hover href="{{ route('superadmin.settings.index') }}"
-               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
-               aria-selected="{{ $isSettings ? 'true' : 'false' }}"
-               title="{{ __('System Settings') }}">
-                <div @class([
-                    'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
-                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400' => $isSettings,
-                    'bg-white/15 text-white hover:bg-white/30' => !$isSettings,
-                ])>
-                    ⚙️
                 </div>
             </a>
 
@@ -717,24 +1093,49 @@
                  x-transition:leave-end="opacity-0 translate-y-4 scale-90"
                  class="flex flex-col items-end gap-2.5 p-3 rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/20 shadow-2xl text-xs font-bold text-white">
                 
-                <a wire:navigate.hover href="{{ route('superadmin.dashboard') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                <a x-show="isItemVisible('dashboard')" wire:navigate.hover href="{{ route('superadmin.dashboard') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
                     <span>{{ __('Overview') }}</span>
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">📊</span>
                 </a>
 
-                <a wire:navigate.hover href="{{ route('superadmin.tenants.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                <a x-show="isItemVisible('tenants')" wire:navigate.hover href="{{ route('superadmin.tenants.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
                     <span>{{ __('Stores') }}</span>
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">🏬</span>
                 </a>
 
-                <a wire:navigate.hover href="{{ route('superadmin.plans.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                <a x-show="isItemVisible('plans')" wire:navigate.hover href="{{ route('superadmin.plans.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
                     <span>{{ __('Plans') }}</span>
-                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">💳</span>
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">👑</span>
                 </a>
 
-                <a wire:navigate.hover href="{{ route('superadmin.settings.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                <a x-show="isItemVisible('taxes')" wire:navigate.hover href="{{ route('superadmin.tax.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                    <span>{{ __('Taxes') }}</span>
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">⚖️</span>
+                </a>
+
+                <a x-show="isItemVisible('menus')" wire:navigate.hover href="{{ route('superadmin.menus.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                    <span>{{ __('Menus') }}</span>
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">🧭</span>
+                </a>
+
+                <a x-show="isItemVisible('pages')" wire:navigate.hover href="{{ route('superadmin.pages.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                    <span>{{ __('Pages') }}</span>
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">📄</span>
+                </a>
+
+                <a x-show="isItemVisible('settings')" wire:navigate.hover href="{{ route('superadmin.settings.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
                     <span>{{ __('Settings') }}</span>
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">⚙️</span>
+                </a>
+
+                <a x-show="isItemVisible('smtp')" wire:navigate.hover href="{{ route('superadmin.smtp.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                    <span>{{ __('SMTP') }}</span>
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">✉️</span>
+                </a>
+
+                <a x-show="isItemVisible('codes')" wire:navigate.hover href="{{ route('superadmin.activation-codes.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                    <span>{{ __('Licensing') }}</span>
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">🔑</span>
                 </a>
 
                 <div class="w-full border-t border-white/10 my-1"></div>
@@ -872,13 +1273,13 @@
                     <div>
                         <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Platform & Maintenance') }}</div>
                         <div class="space-y-1">
-                            <a wire:navigate.hover href="{{ route('superadmin.branding.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                            <a wire:navigate.hover href="{{ route('superadmin.settings.index', ['tab' => 'whitelabel']) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     🎨
                                 </span>
                                 <div>
-                                    <div class="font-bold">{{ __('White-label Branding') }}</div>
-                                    <div class="text-[10px] text-slate-400 font-normal">{{ __('Logos, platform title & colors') }}</div>
+                                    <div class="font-bold">{{ __('White-label & Landing Setup') }}</div>
+                                    <div class="text-[10px] text-slate-400 font-normal">{{ __('Logos, menus & landing permalinks') }}</div>
                                 </div>
                             </a>
 
@@ -994,52 +1395,52 @@
              }">
             
             <!-- Top App Header Bar -->
-            <header class="h-16 sm:h-20 px-4 sm:px-8 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md sticky top-0 z-30">
+            <header class="h-16 sm:h-20 px-3 sm:px-8 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md sticky top-0 z-30">
                 
                 <!-- Left: Title & Platform Badge -->
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 mr-2">
                     <button type="button"
                             x-on:click="sidebarOpen = !sidebarOpen"
-                            class="p-2 -ml-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 md:hidden cursor-pointer"
+                            class="p-2 -ml-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 md:hidden cursor-pointer shrink-0"
                             title="Menu">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
                         </svg>
                     </button>
 
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 sm:gap-2">
+                            <h2 class="text-sm sm:text-lg font-black text-slate-900 dark:text-white tracking-tight leading-tight truncate">
                                 {{ $title ?? 'Super Admin' }}
                             </h2>
-                            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 shrink-0">
                                 🛡️ Platform Admin
                             </span>
                         </div>
-                        <p class="hidden sm:block text-[11px] text-slate-400 font-medium">
+                        <p class="hidden sm:block text-[11px] text-slate-400 font-medium truncate">
                             Multi-Tenant Control Center & System Administration
                         </p>
                     </div>
                 </div>
 
                 <!-- Right Header Actions (Fullscreen, Theme Toggle, Profile Menu) -->
-                <div class="flex items-center gap-2.5 sm:gap-3">
+                <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
 
-                    <!-- Fullscreen Toggle Button -->
+                    <!-- Fullscreen Toggle Button (Desktop/Tablet only) -->
                     <button type="button"
                             x-on:click="$store.fullscreen.toggle()"
-                            class="px-2.5 sm:px-3 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            class="hidden md:inline-flex px-2.5 sm:px-3 py-2 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold transition items-center gap-1.5 cursor-pointer shadow-2xs"
                             title="Toggle Fullscreen">
                         <template x-if="!$store.fullscreen.active">
                             <span class="flex items-center gap-1">
                                 <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
-                                <span class="hidden md:inline">{{ __("Fullscreen") }}</span>
+                                <span class="hidden lg:inline">{{ __("Fullscreen") }}</span>
                             </span>
                         </template>
                         <template x-if="$store.fullscreen.active">
                             <span class="flex items-center gap-1 text-amber-500">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                <span class="hidden md:inline">{{ __("Exit") }}</span>
+                                <span class="hidden lg:inline">{{ __("Exit") }}</span>
                             </span>
                         </template>
                     </button>
@@ -1054,11 +1455,11 @@
                         <button type="button"
                                 x-on:click="openLang = !openLang"
                                 x-on:click.outside="openLang = false"
-                                class="px-2.5 sm:px-3 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                class="w-9 h-9 sm:w-auto sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                                 title="Switch Language">
-                            <span class="text-sm">{{ $saActiveLang?->flag ?: '🌐' }}</span>
+                            <span class="text-sm leading-none">{{ $saActiveLang?->flag ?: '🌐' }}</span>
                             <span class="hidden md:inline uppercase text-[11px] font-mono">{{ $saActiveLang?->code ?? 'EN' }}</span>
-                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            <svg class="hidden md:block w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                         </button>
 
                         <div x-show="openLang"
@@ -1102,7 +1503,7 @@
                     <!-- Theme Toggle -->
                     <button type="button"
                             x-on:click="dark = !dark"
-                            class="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition active:scale-95 cursor-pointer shadow-2xs"
+                            class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition active:scale-95 cursor-pointer shadow-2xs shrink-0"
                             title="Toggle Dark/Light Mode">
                         <span x-show="!dark" class="text-sm">🌙</span>
                         <span x-show="dark" class="text-sm">☀️</span>
@@ -1112,14 +1513,14 @@
                     <div class="relative" x-data="{ open: false }" x-on:click.outside="open = false">
                         <button type="button"
                                 x-on:click="open = !open"
-                                class="flex items-center gap-2 p-1.5 sm:px-3 sm:py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer shadow-2xs">
-                            <div class="w-7 h-7 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xs font-black shadow-sm">
+                                class="flex items-center gap-1.5 sm:gap-2 p-1 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer shadow-2xs shrink-0">
+                            <div class="w-7 h-7 rounded-lg sm:rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xs font-black shadow-sm shrink-0">
                                 🛡️
                             </div>
-                            <span class="hidden md:inline text-xs font-bold text-slate-800 dark:text-slate-200">
+                            <span class="hidden md:inline text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">
                                 {{ auth('platform_web')->user()?->name ?? 'Platform Admin' }}
                             </span>
-                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                             </svg>
                         </button>

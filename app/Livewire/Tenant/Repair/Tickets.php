@@ -25,6 +25,9 @@ class Tickets extends Component
     public string $status = 'all';
 
     #[Url]
+    public string $viewMode = 'kanban'; // kanban | list
+
+    #[Url]
     public string $search = '';
 
     public bool $showForm = false;
@@ -135,6 +138,17 @@ class Tickets extends Component
         $this->redirectRoute('tenant.repair.ticket', $ticket->id, navigate: true);
     }
 
+    public function updateTicketStatus(int $id, string $newStatus): void
+    {
+        if (! array_key_exists($newStatus, RepairTicket::STATUSES)) {
+            return;
+        }
+
+        $ticket = RepairTicket::findOrFail($id);
+        $ticket->update(['status' => $newStatus]);
+        session()->flash('status', __('Ticket :n moved to :s.', ['n' => $ticket->ticket_number, 's' => RepairTicket::STATUSES[$newStatus]]));
+    }
+
     public function render()
     {
         $query = RepairTicket::with('technician:id,name')->latest();
@@ -153,8 +167,38 @@ class Tickets extends Component
                 ->orWhere('model', 'like', "%{$term}%"));
         }
 
+        $allTickets = $query->limit(150)->get();
+
+        $kanbanColumns = [
+            'intake' => [
+                'title' => 'Intake',
+                'statuses' => ['received'],
+                'accent' => 'sky',
+                'tickets' => $allTickets->filter(fn ($t) => in_array($t->status, ['received', null, ''], true)),
+            ],
+            'diagnostics' => [
+                'title' => 'Diagnostics',
+                'statuses' => ['diagnosing'],
+                'accent' => 'amber',
+                'tickets' => $allTickets->filter(fn ($t) => $t->status === 'diagnosing'),
+            ],
+            'parts_sourced' => [
+                'title' => 'Parts Sourced / In Progress',
+                'statuses' => ['waiting_parts', 'in_progress'],
+                'accent' => 'indigo',
+                'tickets' => $allTickets->filter(fn ($t) => in_array($t->status, ['waiting_parts', 'in_progress'], true)),
+            ],
+            'completed' => [
+                'title' => 'Completed / Delivered',
+                'statuses' => ['ready', 'delivered'],
+                'accent' => 'emerald',
+                'tickets' => $allTickets->filter(fn ($t) => in_array($t->status, ['ready', 'delivered'], true)),
+            ],
+        ];
+
         return view('livewire.tenant.repair.tickets', [
-            'tickets' => $query->limit(100)->get(),
+            'tickets' => $allTickets,
+            'kanbanColumns' => $kanbanColumns,
             'categories' => Category::where('active', true)
                 ->where(fn ($q) => $q->where('type', 'device')->orWhereNull('type'))
                 ->orderBy('name')->get(['id', 'name']),

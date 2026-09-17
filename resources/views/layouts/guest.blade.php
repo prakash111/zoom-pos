@@ -8,7 +8,6 @@
     $guestBrandName = $guestTenantCompany?->trade_name ?: ($guestTenantCompany?->name ?: ($dynamicName ?: ($branding?->platform_name ?? config('app.name', 'Smart Inventory'))));
     $guestLogoUrl = $guestTenantCompany?->getLogoUrl() ?: ($dynamicLogo ?: $branding?->getLogoPublicUrl());
     $guestFaviconUrl = $guestTenantCompany?->favicon ?: ($branding?->getFaviconPublicUrl() ?: $branding?->favicon_url);
-    $guestLetterMonogram = mb_strtoupper(mb_substr(trim($guestBrandName), 0, 1)) ?: 'S';
     $guestLocService = app(\App\Services\Localization\LocalizationService::class);
     $guestActiveLang = $guestLocService->getActiveLanguage();
     $guestLanguages = $guestLocService->getActiveLanguages();
@@ -20,6 +19,9 @@
     // Auth screens follow the selected landing theme: light for theme_fast,
     // dark for the four legacy (dark-committed) themes.
     $guestForceDark = setting('landing_page_theme', 'theme_fast') !== 'theme_fast';
+    $guestIsLogin = request()->routeIs('tenant.login', 'superadmin.login');
+    $guestIsRegister = request()->routeIs('tenant.register');
+    $guestAuthBannerEnabled = (bool) \App\Models\DynamicSetting::get('show_auth_banner', true);
     $guestNavLinks = $guestLandingEnabled ? [
         ['label' => __('Features'), 'url' => url('/') . '#features'],
         ['label' => __('Pricing'), 'url' => url('/') . '#pricing'],
@@ -27,7 +29,7 @@
     ] : [];
 @endphp
 <!DOCTYPE html>
-<html lang="{{ $guestActiveLang?->code ?? 'en' }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="{{ $guestForceDark ? 'dark' : '' }}" x-data="{ dark: document.documentElement.classList.contains('dark') }" x-init="$watch('dark', v => { localStorage.setItem('theme', v ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', v) }); document.documentElement.classList.toggle('dark', dark)">
+<html lang="{{ $guestActiveLang?->code ?? 'en' }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="{{ $guestForceDark ? 'dark' : '' }}" x-data="{ dark: document.documentElement.classList.contains('dark') }" x-init="$watch('dark', v => { try { localStorage.setItem('theme', v ? 'dark' : 'light') } catch (e) {}; document.documentElement.classList.toggle('dark', v) }); document.documentElement.classList.toggle('dark', dark)">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -46,9 +48,9 @@
             --color-brand-lime: {{ $branding->landing_accent_color ?: '#d7f24e' }};
             --color-brand-teal: {{ $branding->primary_color ?: '#0c5966' }};
         }
-        html { background: #f1f5f9; }
+        html { background: #f3f8ff; }
         html.dark { background: #020617; }
-        body { margin: 0; min-height: 100vh; background: #f1f5f9; color: #0f172a;
+        body { margin: 0; min-height: 100vh; background: #f3f8ff; color: #0f172a;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, ui-sans-serif, system-ui, Helvetica, Arial, sans-serif; }
         html.dark body { background: #020617; color: #f1f5f9; }
         [x-cloak] { display: none !important; }
@@ -60,43 +62,28 @@
     @vite(['resources/css/auth.css'])
     @livewireStyles
 </head>
-<body class="bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col justify-between p-3 sm:p-6 lg:p-10 font-sans antialiased relative overflow-x-hidden selection:bg-brand-lime selection:text-slate-900">
-    
+<body class="auth-page {{ $guestIsLogin ? 'auth-page--login' : ($guestIsRegister ? 'auth-page--register' : 'auth-page--standard') }} {{ !$guestAuthBannerEnabled ? 'auth-page--solo' : '' }} font-sans antialiased">
     @include('layouts.partials.preloader')
-
-    <!-- Ambient Aurora Canvas Background matching landing page -->
-    <div class="fixed inset-0 bg-slate-100 dark:bg-gradient-to-br dark:from-[#06242a] dark:via-[#09353c] dark:to-[#2b4414] -z-20"></div>
-
-    <!-- Soft radial glow orbs (decorative; hidden on phones / reduced-motion) -->
-    <div class="auth-ambient fixed top-1/4 -left-20 w-96 h-96 rounded-full bg-teal-400/20 blur-3xl pointer-events-none -z-10"></div>
-    <div class="auth-ambient fixed bottom-10 right-0 w-[500px] h-[500px] rounded-full bg-lime-400/15 blur-3xl pointer-events-none -z-10"></div>
 
     <!-- Top Floating Navigation Bar -->
     <header x-data="{ navOpen: false }"
-            class="w-full max-w-6xl mx-auto flex items-center justify-between gap-3 py-3 px-2 sm:px-4 z-30 mb-4 sm:mb-6 relative">
+            class="auth-header flex items-center justify-between gap-3 relative z-30">
 
         <!-- Brand Logo (links home when the landing page is live) -->
         <a @if($guestLandingEnabled) href="{{ url('/') }}" @endif
-           class="inline-flex items-center gap-2.5 group shrink-0 {{ $guestLandingEnabled ? '' : 'pointer-events-none' }}">
-            @if ($guestLogoUrl)
-                <img src="{{ $guestLogoUrl }}" alt="{{ $guestBrandName }}" class="h-8 w-auto object-contain">
-            @else
-                <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-lime to-emerald-400 p-1 flex items-center justify-center shadow-md shadow-emerald-400/30 group-hover:scale-105 transition-transform text-slate-950 font-black text-sm uppercase">
-                    {{ $guestLetterMonogram }}
-                </div>
-            @endif
-            <span class="text-sm sm:text-lg font-black tracking-tight text-slate-900 dark:text-white truncate max-w-[9rem] sm:max-w-none">{{ $guestBrandName }}</span>
+           class="auth-header-brand inline-flex shrink-0">
+            @include('auth.partials.brand', ['brandName' => $guestBrandName, 'logoUrl' => $guestLogoUrl])
         </a>
 
         @if ($guestLandingEnabled)
             {{-- Back to Home (compact, beside the logo on tablet+) --}}
-            <a href="{{ url('/') }}" class="group hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-xs font-bold text-slate-700 dark:text-white transition shrink-0">
+            <a href="{{ url('/') }}" class="auth-home-link group hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-xs font-bold text-slate-700 dark:text-white transition shrink-0">
                 <svg class="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
                 <span>{{ __('Back to Home') }}</span>
             </a>
 
             <!-- Desktop inline navigation -->
-            <nav class="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-white/10 backdrop-blur-md border border-slate-200 dark:border-white/15 rounded-full px-2 py-1">
+            <nav class="auth-header-nav hidden md:flex items-center gap-1 bg-slate-100 dark:bg-white/10 backdrop-blur-md border border-slate-200 dark:border-white/15 rounded-full px-2 py-1">
                 @foreach ($guestNavLinks as $link)
                     <a href="{{ $link['url'] }}" class="px-3.5 py-1.5 rounded-full text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition">{{ $link['label'] }}</a>
                 @endforeach
@@ -104,7 +91,7 @@
         @endif
 
         <!-- Right Quick Actions -->
-        <div class="flex items-center gap-2 sm:gap-2.5 shrink-0">
+        <div class="auth-header-actions flex items-center gap-2 sm:gap-2.5 shrink-0">
 
             {{-- Mobile navigation toggle --}}
             @if (!empty($guestNavLinks))
@@ -124,7 +111,7 @@
                             x-on:click.outside="openAuthLang = false"
                             class="p-2 sm:px-3 sm:py-2 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-slate-200 text-xs font-bold transition border border-slate-200 dark:border-white/15 flex items-center gap-1.5 cursor-pointer shadow-2xs"
                             title="{{ __('Switch Language') }}">
-                        <span class="text-sm">{{ $guestActiveLang?->flag ?: '🌐' }}</span>
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a18 18 0 0 1 0 18 18 18 0 0 1 0-18Z"/></svg>
                         <span class="hidden sm:inline uppercase text-[11px] font-mono font-bold">{{ $guestActiveLang?->code ?? 'EN' }}</span>
                         <svg class="w-3 h-3 text-slate-400 hidden sm:inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
                     </button>
@@ -146,7 +133,7 @@
                                 <a href="{{ route('locale.switch', $lang->code) }}"
                                    @class([
                                        'flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition',
-                                       'bg-brand-lime/20 text-brand-lime font-bold border border-brand-lime/30' => ($guestActiveLang?->code ?? 'en') === $lang->code,
+                                       'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800' => ($guestActiveLang?->code ?? 'en') === $lang->code,
                                        'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white' => ($guestActiveLang?->code ?? 'en') !== $lang->code,
                                    ])>
                                     <div class="flex items-center gap-2">
@@ -154,7 +141,7 @@
                                         <span>{{ $lang->native_name ?: $lang->name }}</span>
                                     </div>
                                     @if (($guestActiveLang?->code ?? 'en') === $lang->code)
-                                        <span class="text-brand-lime font-black text-xs">✓</span>
+                                        <span class="text-blue-600 dark:text-blue-300 font-black text-xs">✓</span>
                                     @endif
                                 </a>
                             @endforeach
@@ -166,8 +153,8 @@
             <button type="button" x-on:click="dark = !dark"
                     class="p-2.5 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 backdrop-blur-md border border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200 text-xs font-semibold transition"
                     title="{{ __('Toggle Theme') }}">
-                <span x-show="!dark">🌙</span>
-                <span x-show="dark">☀️</span>
+                <svg x-show="!dark" class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 13.2A9 9 0 0 1 10.8 3 9 9 0 1 0 21 13.2Z"/></svg>
+                <svg x-show="dark" x-cloak class="w-4 h-4 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path stroke-linecap="round" d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></svg>
             </button>
         </div>
 
@@ -189,35 +176,26 @@
                 @endforeach
                 <div class="mt-1 pt-2 border-t border-slate-200 dark:border-white/10 grid grid-cols-2 gap-1.5">
                     <a href="{{ route('tenant.login') }}" class="text-center px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 transition">{{ __('Sign in') }}</a>
-                    <a href="{{ route('tenant.register') }}" class="text-center px-3 py-2 rounded-xl text-xs font-black text-slate-950 bg-brand-lime hover:bg-brand-lime-dark transition">{{ __('Register') }}</a>
+                    <a href="{{ route('tenant.register') }}" class="text-center px-3 py-2 rounded-xl text-xs font-black text-white bg-blue-600 hover:bg-blue-700 transition">{{ __('Register') }}</a>
                 </div>
             </div>
         @endif
     </header>
 
-    <!-- Main Auth Card Outer Container (Matching Highnote Rounded Hero Card) -->
-    <div class="w-full max-w-6xl mx-auto my-auto rounded-[2.5rem] sm:rounded-[3rem] bg-white dark:bg-slate-950/90 backdrop-blur-2xl border border-slate-200 dark:border-white/15 shadow-xl dark:shadow-[0_30px_90px_-15px_rgba(0,0,0,0.5)] p-6 sm:p-10 md:p-12 relative overflow-hidden z-10">
-        
-        <!-- Vibrant Corner Glows -->
-        <div class="absolute -top-24 -right-24 w-80 h-80 bg-gradient-to-bl from-brand-lime/30 to-transparent rounded-full blur-3xl pointer-events-none -z-0"></div>
-        <div class="absolute -bottom-24 -left-24 w-80 h-80 bg-gradient-to-tr from-teal-400/20 to-transparent rounded-full blur-3xl pointer-events-none -z-0"></div>
-
-        <!-- Inner Content (Login / Register / Onboarding) -->
-        <div class="relative z-10 w-full">
-            @php($__flash = collect(['error', 'warning', 'status', 'success'])->first(fn ($k) => session($k)))
-            @if ($__flash)
-                <div class="mb-4 rounded-xl border px-4 py-3 text-xs font-semibold {{ in_array($__flash, ['error', 'warning']) ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' }}">
-                    {{ session($__flash) }}
-                </div>
-            @endif
-            {{ $slot ?? '' }}
-            @yield('content')
-        </div>
-
-    </div>
+    <!-- Main Auth Content Area -->
+    <main class="auth-main relative z-10">
+        @php($__flash = collect(['error', 'warning', 'status', 'success'])->first(fn ($k) => session($k)))
+        @if ($__flash)
+            <div role="status" class="auth-flash mb-4 rounded-xl border px-4 py-3 text-xs font-semibold {{ in_array($__flash, ['error', 'warning']) ? 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' }}">
+                {{ session($__flash) }}
+            </div>
+        @endif
+        {{ $slot ?? '' }}
+        @yield('content')
+    </main>
 
     <!-- Simple Modern Auth Footer -->
-    <div class="w-full max-w-6xl mx-auto py-6 px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-white/70 z-10">
+    <div class="auth-footer py-6 px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-white/70 z-10">
         <div class="flex items-center gap-2">
             <span>&copy; {{ now()->year }} {{ $guestBrandName }}.</span>
             <span>{{ __('All rights reserved.') }}</span>

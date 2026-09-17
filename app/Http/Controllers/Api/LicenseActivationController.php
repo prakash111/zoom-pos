@@ -81,7 +81,7 @@ class LicenseActivationController extends Controller
 
         $module->refresh();
         $activated = false;
-        if (! $module->is_active && File::exists(base_path('modules/'.$module->package_path.'/module.json'))) {
+        if (! $module->isExtension() && ! $module->is_active && File::exists(base_path('modules/'.$module->package_path.'/module.json'))) {
             try {
                 $packages->activate($module, null);
                 $activated = true;
@@ -90,7 +90,8 @@ class LicenseActivationController extends Controller
             }
         }
 
-        return response()->json(['status' => true, 'activated' => $activated, 'message' => 'Module licensed.']);
+        return response()->json(['status' => true, 'activated' => $activated, 'message' => $module->isExtension()
+            ? 'Extension licensed. Super Admin must activate it in the panel.' : 'Module licensed.']);
     }
 
     private function activateCore(string $key, ?string $expiresAt): JsonResponse

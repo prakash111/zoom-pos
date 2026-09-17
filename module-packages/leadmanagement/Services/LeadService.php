@@ -577,6 +577,7 @@ class LeadService
      */
     public function getCreateLeadSchema(Company $company, ?Lead $existingLead = null): array
     {
+        abort_unless($company->hasModule('leadmanagement'), 403, 'Lead Management is not activated for this store.');
         $reps = $this->getSalesReps($company);
         $repOptions = array_merge([['label' => '— Unassigned —', 'value' => '']], array_map(fn ($r) => [
             'label' => $r['label'],
@@ -727,6 +728,7 @@ class LeadService
      */
     public function getTabbedLeadManagementSchema(Company $company, ?User $user = null, ?string $activeTab = null): array
     {
+        abort_unless($company->hasModule('leadmanagement'), 403, 'Lead Management is not activated for this store.');
         $currency = $company->currency_symbol ?: ($company->currency ?: '₹');
 
         // Base query with tenant fallback, deleted_at check, and RBAC

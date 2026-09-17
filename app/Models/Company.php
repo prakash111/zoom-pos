@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Casts\SafeEncryptedString;
 use App\Models\Concerns\HasLegacyStringId;
+use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\TenantNavigationConfigService;
 use App\Services\Navigation\TenantNavRegistry;
 use App\Support\IdGenerator;
@@ -60,7 +62,7 @@ class Company extends Model
             'is_demo' => 'boolean',
             'drawer_gradient_enabled' => 'boolean',
             'tax_settings' => 'array',
-            'tax_api_key' => \App\Casts\SafeEncryptedString::class,
+            'tax_api_key' => SafeEncryptedString::class,
             'currency_decimals' => 'integer',
             'other_currencies' => 'array',
             'restaurant_mode_locked' => 'boolean',
@@ -135,6 +137,7 @@ class Company extends Model
 
         if (preg_match('#(?:https?://[^/]+)?/?storage/(.+)#i', $this->logo, $matches)) {
             $cleanPath = $matches[1];
+
             return Storage::disk('public')->url($cleanPath);
         }
 
@@ -167,6 +170,7 @@ class Company extends Model
 
         if (preg_match('#(?:https?://[^/]+)?/?storage/(.+)#i', $this->favicon, $matches)) {
             $cleanPath = $matches[1];
+
             return Storage::disk('public')->url($cleanPath);
         }
 
@@ -199,6 +203,7 @@ class Company extends Model
 
         if (preg_match('#(?:https?://[^/]+)?/?storage/(.+)#i', $this->drawer_cover, $matches)) {
             $cleanPath = $matches[1];
+
             return Storage::disk('public')->url($cleanPath);
         }
 
@@ -504,7 +509,7 @@ class Company extends Model
                 continue;
             }
             $clean = strtolower(trim($item));
-            $canonical = \App\Services\Modular\ModuleRegistry::canonicalKey($clean);
+            $canonical = ModuleRegistry::canonicalKey($clean);
             $key = match ($canonical) {
                 'general', 'general_retail', 'retail' => 'retail',
                 'food_restaurant', 'restaurant' => 'restaurant',
@@ -525,13 +530,21 @@ class Company extends Model
 
         $keys = array_values(array_unique($keys));
 
+        // Extensions require an explicit Super Admin assignment and an active,
+        // licensed installation. The primary POS mode never grants an extension.
+        $extensions = ModuleRegistry::extensionKeys();
+        $active = array_intersect($keys, $extensions) === [] ? [] : array_keys(ModuleRegistry::allModules());
+        $explicitModules = is_array($this->licensed_modules) && $this->licensed_modules !== [];
+        $keys = array_values(array_filter($keys, fn ($key) => ! in_array($key, $extensions, true)
+            || ($explicitModules && in_array($key, $active, true))));
+
         return $keys === [] ? ['retail'] : $keys;
     }
 
     public function hasModule(string $moduleKey): bool
     {
         $clean = strtolower(trim($moduleKey));
-        $canonical = \App\Services\Modular\ModuleRegistry::canonicalKey($clean);
+        $canonical = ModuleRegistry::canonicalKey($clean);
         $norm = match ($canonical) {
             'general', 'general_retail', 'retail' => 'retail',
             'food_restaurant', 'restaurant' => 'restaurant',
@@ -624,20 +637,20 @@ class Company extends Model
      * If drawer_background is empty or #FFFFFF (or white), default to null
      * so dark mode applies cleanly with zero white-leak.
      */
-    public function getDrawerBg(): ?string
+    public function getDrawerBg(): string
     {
         $raw = trim((string) $this->drawer_bg);
         $isUnconfiguredOrWhite = $raw === ''
             || in_array(strtolower($raw), ['#ffffff', '#fff', 'ffffff', 'fff', 'white'], true);
 
-        return $isUnconfiguredOrWhite ? null : $raw;
+        return $isUnconfiguredOrWhite ? '#FFF7ED' : $raw;
     }
 
     public function getThemeTokens(): array
     {
         $drawerBg = $this->getDrawerBg();
 
-        return [
+        $tokens = [
             'primary_color' => $this->getPrimaryColor(),
             'accent_color' => $this->getAccentColor(),
             'drawer_bg' => $drawerBg,
@@ -651,6 +664,18 @@ class Company extends Model
             'drawer_gradient_end' => $this->drawer_gradient_end ?? '#0F172A',
             'drawer_gradient_direction' => $this->drawer_gradient_direction ?? 'top_to_bottom',
         ];
+
+        $preferences = TenantSetting::get($this->id, 'app_preferences', []);
+        $drawerTextColor = is_array($preferences) ? ($preferences['drawer_text_icon_color'] ?? $preferences['drawer_text_and_icons'] ?? $preferences['drawer_icon_color'] ?? $preferences['drawer_text_color'] ?? null) : null;
+
+        if ($drawerTextColor !== null && $drawerTextColor !== '') {
+            $tokens['drawer_text_icon_color'] = $drawerTextColor;
+            $tokens['drawer_text_and_icons'] = $drawerTextColor;
+            $tokens['drawer_icon_color'] = $drawerTextColor;
+            $tokens['drawer_text_color'] = $drawerTextColor;
+        }
+
+        return $tokens;
     }
 
     public function getPosLayout(): string
@@ -752,12 +777,12 @@ class Company extends Model
      */
     public function getDisplayNameAttribute(): string
     {
-        if (!empty($this->trading_name)) {
-            return $this->trading_name;
+        if (! empty($this->business_name)) {
+            return $this->business_name;
         }
 
-        if (!empty($this->business_name)) {
-            return $this->business_name;
+        if (! empty($this->trading_name)) {
+            return $this->trading_name;
         }
 
         return $this->name ?? 'Store';
@@ -782,7 +807,6 @@ class Company extends Model
     {
         return $this->tax_id ?: ($this->attributes['gstin'] ?? 'N/A');
     }
-
 
     /**
      * Determine if a given name matches a known demo/sample data placeholder.
@@ -828,6 +852,10 @@ class Company extends Model
         return [
             'store_name' => $this->display_name,
             'business_name' => $this->display_name,
+            'tenant_name' => $this->display_name,
+            'title' => $this->display_name,
+            'name' => $this->display_name,
+            'display_name' => $this->display_name,
             'trading_name' => $this->display_name,
             'trade_name' => $this->display_name,
             'dba_name' => trim((string) ($this->attributes['trade_name'] ?? '')),
@@ -852,5 +880,12 @@ class Company extends Model
         Cache::forget("tenant_nav_{$tenantId}");
         Cache::forget("company_{$tenantId}");
         Cache::forget("tenant_executive_kpis_{$tenantId}");
+        Cache::forget("tenant_{$tenantId}_drawer");
+        Cache::forget("tenant_{$tenantId}_drawer_menu");
+        Cache::forget("navigation_menu_{$tenantId}");
+        Cache::forget("store_profile_{$tenantId}");
+        Cache::forget("tenant_store_profile_{$tenantId}");
+        Cache::forget("drawer_menu_{$tenantId}");
+        Cache::forget("tenant_{$tenantId}_menu");
     }
 }

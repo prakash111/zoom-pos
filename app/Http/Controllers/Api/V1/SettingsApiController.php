@@ -179,6 +179,8 @@ class SettingsApiController extends Controller
             'drawer_header' => $drawerHeader,
             'store_name' => $freshCompany->display_name,
             'business_name' => $freshCompany->display_name,
+            'tenant_name' => $freshCompany->display_name,
+            'title' => $freshCompany->display_name,
             'trading_name' => $freshCompany->display_name,
             'trade_name' => $freshCompany->display_name,
             'display_name' => $freshCompany->display_name,
@@ -186,6 +188,8 @@ class SettingsApiController extends Controller
                 'id' => $freshCompany->id,
                 'name' => $freshCompany->display_name,
                 'business_name' => $freshCompany->display_name,
+                'tenant_name' => $freshCompany->display_name,
+                'title' => $freshCompany->display_name,
                 'trade_name' => $freshCompany->display_name,
                 'trading_name' => $freshCompany->display_name,
                 'store_name' => $freshCompany->display_name,
@@ -216,6 +220,8 @@ class SettingsApiController extends Controller
                 'id' => (string) $freshCompany->id,
                 'name' => $freshCompany->display_name,
                 'business_name' => $freshCompany->display_name,
+                'tenant_name' => $freshCompany->display_name,
+                'title' => $freshCompany->display_name,
                 'trade_name' => $freshCompany->display_name,
                 'trading_name' => $freshCompany->display_name,
                 'display_name' => $freshCompany->display_name,
@@ -1307,12 +1313,31 @@ class SettingsApiController extends Controller
     {
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
-        $sections = TenantNavRegistry::getEffectiveNavForTenant($company);
+        $tenantId = $company->id ?? $user?->company_id ?? $user?->tenant_id;
+        $selectedColor = null;
+        if ($tenantId) {
+            $preferences = \App\Models\TenantSetting::get($tenantId, 'app_preferences', []);
+            if (is_array($preferences)) {
+                $selectedColor = $preferences['drawer_text_icon_color']
+                    ?? $preferences['drawer_text_and_icons']
+                    ?? $preferences['drawer_icon_color']
+                    ?? $preferences['drawer_text_color']
+                    ?? null;
+            }
+        }
+
+        $sections = TenantNavRegistry::getEffectiveNavForTenant($company, $selectedColor);
         $drawerHeader = $company->getDrawerHeaderPayload();
-        $menuComponents = app(\App\Http\Controllers\Api\NavigationController::class)->getDrawerMenuComponents($request);
+        $menuComponents = app(\App\Http\Controllers\Api\NavigationController::class)->getDrawerMenuComponents($request, $company, $selectedColor);
 
         return response()->json([
             'success'         => true,
+            'store_name'      => $company->display_name,
+            'business_name'   => $company->display_name,
+            'tenant_name'     => $company->display_name,
+            'display_name'    => $company->display_name,
+            'title'           => $company->display_name,
+            'store_type'      => $company->store_type,
             'header'          => $drawerHeader,
             'drawer_header'   => $drawerHeader,
             'sections'        => $sections,

@@ -41,6 +41,7 @@ class QuotationController extends Controller
 
         $lead = null;
         if ($leadId) {
+            abort_unless($company?->hasModule('leadmanagement'), 403, 'Lead Management is not activated for this store.');
             $lead = Lead::query()
                 ->where(function ($q) use ($tenantId) {
                     if ($tenantId) {
@@ -223,6 +224,7 @@ class QuotationController extends Controller
         $customer = null;
 
         if ($request->filled('lead_id')) {
+            abort_unless($company?->hasModule('leadmanagement'), 403, 'Lead Management is not activated for this store.');
             $leadQuery = Lead::query();
             if ($companyId) {
                 $leadQuery->where('company_id', $companyId);
@@ -1269,8 +1271,9 @@ class QuotationController extends Controller
         }
 
         $customer = $quotation->customer;
-        $phone = preg_replace('/[^0-9+]/', '', (string) ($customer?->phone ?? ($quotation->lead?->phone ?? '')));
-        $email = trim((string) ($customer?->email ?? ($quotation->lead?->email ?? '')));
+        $linkedLead = $company?->hasModule('leadmanagement') ? $quotation->lead : null;
+        $phone = preg_replace('/[^0-9+]/', '', (string) ($customer?->phone ?? ($linkedLead?->phone ?? '')));
+        $email = trim((string) ($customer?->email ?? ($linkedLead?->email ?? '')));
         $customerName = $customer?->name ?: ($quotation->customer_name ?: 'Client');
         $quoteRef = $quotation->quotation_number ?? $quotation->sale_number ?? (string) $quotation->id;
         $currency = $company?->currency_symbol ?: ($company?->currency ?: '₹');
@@ -1482,11 +1485,12 @@ class QuotationController extends Controller
         $customer = $quotation->customer;
         $customerName = $customer?->name ?: ($quotation->customer_name ?: 'Client');
         $quoteRef = $quotation->quotation_number ?? $quotation->sale_number ?? (string) $quotation->id;
-        $phone = preg_replace('/[^0-9+]/', '', (string) ($customer?->phone ?? ($quotation->lead?->phone ?? '')));
-        $email = trim((string) ($customer?->email ?? ($quotation->lead?->email ?? '')));
+        $linkedLead = $company?->hasModule('leadmanagement') ? $quotation->lead : null;
+        $phone = preg_replace('/[^0-9+]/', '', (string) ($customer?->phone ?? ($linkedLead?->phone ?? '')));
+        $email = trim((string) ($customer?->email ?? ($linkedLead?->email ?? '')));
 
         // Log Activity in Lead if linked
-        $leadId = $quotation->lead_id ?? $quotation->lead?->id;
+        $leadId = $linkedLead?->id;
         if ($leadId) {
             AuditHistory::log($leadId, "Quotation #{$quoteRef} dispatched to {$customerName} via " . strtoupper($channel));
         }

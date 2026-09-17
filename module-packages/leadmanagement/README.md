@@ -1,6 +1,6 @@
-# Lead Management System — Packaged Vertical Module
+# Lead Management System — Optional Extension
 
-A deeply integrated, standalone Lead Management module for the ZoomNearby CRM ecosystem, compatible with the Perfex-style plugin engine (`App\Services\Modular\ModulePackageService`).
+An optional Lead Management extension for the ZoomNearby CRM ecosystem, installed and managed through the existing package engine (`App\Services\Modular\ModulePackageService`). Its module type is `extension`; it adds CRM features to a tenant's existing business operating mode.
 
 ---
 
@@ -87,5 +87,8 @@ README.md                                        Documentation
 ## Installation & Deployment
 
 1. **Super Admin → Modules → Upload** `leadmanagement.zip`.
-2. Click **Activate**. Migrations run automatically and register all tables and schema constraints.
-3. Access tenant workspace: **Lead Management** navigation drawer appears with full permissions and SDUI screens ready.
+2. As **Super Admin**, verify the license and click **Activate**. Migrations run and register its tables and routes. Support administrators and license callbacks cannot activate it.
+3. Open **Super Admin → Tenants → Tenant Detail → Optional Extensions**, enable **Lead Management**, and save. Assignment uses the existing `licensed_modules` field and keeps the tenant's operating mode.
+4. Assigned tenants receive the **Lead Management** drawer and SDUI features, subject to user permissions. Tenants without an explicit assignment receive no access, including tenants with no module whitelist.
+
+Lead Management is never offered during tenant registration or as a primary operating mode. Tenant settings and role permissions cannot activate it. Removing the tenant assignment, deactivating the package, revoking/expiring its license, or uninstalling it immediately blocks its web/API access and removes its features and navigation. Deactivation keeps its data and assignments so Super Admin can reactivate it later.

@@ -110,8 +110,8 @@ class SduiViewApiTest extends TestCase
         $this->assertSame($builder['tree_data'], $builder['sections']);
         $this->assertNotEmpty($builder['nav_config']['items']);
         $this->assertSame('cashier_sales', $builder['tree_data'][0]['key']);
-        $this->assertSame('Point of Sale', $builder['tree_data'][0]['custom_title']);
-        $this->assertSame('Point of Sale', $builder['nav_config']['sections'][0]['custom_title']);
+        $this->assertSame('Retail & Cashier', $builder['tree_data'][0]['custom_title']);
+        $this->assertSame('Retail & Cashier', $builder['nav_config']['sections'][0]['custom_title']);
         $this->assertNotEmpty($builder['tree_data'][0]['items']);
 
         $settings = collect($builder['tree_data'])
@@ -658,17 +658,20 @@ class SduiViewApiTest extends TestCase
             'licensed_modules' => ['laundry'],
         ]);
 
-        $this->withHeader('Authorization', 'Bearer '.$this->token())
+        $res = $this->withHeader('Authorization', 'Bearer '.$this->token())
             ->getJson('/api/app/bootstrap')
             ->assertOk()
             ->assertJsonPath('tenant.active_mode', 'laundry')
-            ->assertJsonPath('modules.laundry.source', 'database')
-            ->assertJsonPath('menu_structure.0.items.0.target_endpoint', '/api/tenant/views/laundry-queue')
-            ->assertJsonFragment([
-                'key' => 'laundry-queue',
-                'endpoint' => '/api/tenant/views/laundry-queue',
-                'permission' => 'pos.view',
-            ]);
+            ->assertJsonPath('modules.laundry.source', 'database');
+
+        $laundrySection = collect($res->json('menu_structure'))->firstWhere('key', 'laundry_operations');
+        $this->assertNotNull($laundrySection);
+        $this->assertSame('/api/tenant/views/laundry-queue', $laundrySection['items'][0]['target_endpoint']);
+        $res->assertJsonFragment([
+            'key' => 'laundry-queue',
+            'endpoint' => '/api/tenant/views/laundry-queue',
+            'permission' => 'pos.view',
+        ]);
     }
 
     public function test_unknown_views_are_not_synthesized_and_invalid_schemas_cannot_be_registered(): void

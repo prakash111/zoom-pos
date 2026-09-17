@@ -90,9 +90,10 @@ class ModuleRegistry
             ],
             'leadmanagement' => [
                 'id' => 'leadmanagement',
+                'type' => SduiModule::TYPE_EXTENSION,
                 'title' => 'Lead Management System',
                 'subtitle' => 'Lead pipeline, follow-ups, attribution, auto-sync CRM',
-                'description' => 'Standalone CRM lead management vertical: lead pipeline, activity tracking, source attribution, and customer conversion.',
+                'description' => 'Optional CRM extension: lead pipeline, activity tracking, source attribution, and customer conversion.',
                 'layout_type' => 'standard_grid',
                 'icon' => 'leaderboard',
                 'features' => [
@@ -142,6 +143,10 @@ class ModuleRegistry
     public static function canonicalKey(string $key): string
     {
         $key = strtolower(trim($key));
+
+        if (in_array($key, ['lead', 'leads', 'lead_management', 'lead-management'], true)) {
+            return 'leadmanagement';
+        }
 
         return self::packageAliases()[$key] ?? $key;
     }
@@ -200,6 +205,14 @@ class ModuleRegistry
             $databaseModules = [];
 
             foreach (SduiModule::query()->where('is_active', true)->orderBy('sort_order')->get() as $module) {
+                if ($module->isExtension() && (
+                    ! $module->isLicensed() || $module->licenseIsExpired()
+                    || $module->source_type !== 'package' || ! $module->package_path
+                    || (! is_file(base_path('modules/'.$module->package_path.'/module.json'))
+                        && ! is_file(base_path('module-packages/'.$module->package_path.'/module.json')))
+                )) {
+                    continue;
+                }
                 $routes = $module->routes ?? [];
 
                 // One entry per physical module, keyed by its canonical
@@ -229,6 +242,7 @@ class ModuleRegistry
                     'id' => $key,
                     'slug' => $module->slug,
                     'source' => 'database',
+                    'type' => $module->isExtension() ? SduiModule::TYPE_EXTENSION : SduiModule::TYPE_CORE,
                 ]);
             }
 
@@ -248,6 +262,37 @@ class ModuleRegistry
         $key = self::canonicalKey($modeId);
 
         return self::allModules()[$key] ?? null;
+    }
+
+    /** Active business operating modes, excluding additive extensions. */
+    public static function operatingModules(): array
+    {
+        return array_filter(self::allModules(), fn ($module) => ($module['type'] ?? SduiModule::TYPE_CORE) !== SduiModule::TYPE_EXTENSION);
+    }
+
+    /** Includes inactive extensions so disabling a package cannot change its type. */
+    public static function extensionKeys(): array
+    {
+        $keys = (array) config('modules.extensions', []);
+        if (Schema::hasTable('sdui_modules') && Schema::hasColumn('sdui_modules', 'type')) {
+            $keys = [...$keys, ...SduiModule::query()->where('type', SduiModule::TYPE_EXTENSION)->pluck('slug')->all()];
+        }
+
+        return array_values(array_unique(array_map([self::class, 'canonicalKey'], $keys)));
+    }
+
+    public static function isExtension(string $key): bool
+    {
+        return in_array(self::canonicalKey($key), self::extensionKeys(), true);
+    }
+
+    /** Tenant bootstrap keeps the existing core catalog and assigned extensions. */
+    public static function modulesFor(Company $company): array
+    {
+        $licensed = $company->licensedModuleKeys();
+
+        return array_filter(self::allModules(), fn ($module, $key) => ($module['type'] ?? SduiModule::TYPE_CORE) !== SduiModule::TYPE_EXTENSION
+            || in_array($key, $licensed, true), ARRAY_FILTER_USE_BOTH);
     }
 
     /**
@@ -271,7 +316,7 @@ class ModuleRegistry
      */
     public static function isInstalled(string $key): bool
     {
-        $key = strtolower(trim($key));
+        $key = self::canonicalKey($key);
 
         if (in_array($key, self::NATIVE, true)) {
             return true;
@@ -306,7 +351,7 @@ class ModuleRegistry
         }
 
         $rawMode = self::canonicalKey($rawMode);
-        $all = self::allModules();
+        $all = self::operatingModules();
         if (isset($all[$rawMode])) {
             return $rawMode;
         }
@@ -321,7 +366,7 @@ class ModuleRegistry
      */
     public static function enabledRegistrationModes(): array
     {
-        $allKeys = array_keys(self::allModules());
+        $allKeys = array_keys(self::operatingModules());
         $raw = PlatformSystem::get('allowed_registration_modes', json_encode($allKeys));
         $databaseDefaults = [];
         if (Schema::hasTable('sdui_modules')) {
@@ -397,7 +442,7 @@ class ModuleRegistry
      */
     public static function availableModes(Company $company): array
     {
-        $all = array_keys(self::allModules());
+        $all = array_keys(self::operatingModules());
         $licensed = $company->licensed_modules;
 
         if (is_array($licensed) && ! empty($licensed)) {
@@ -437,6 +482,7 @@ class ModuleRegistry
         $keys = array_values(array_unique([
             ...self::availableModes($company),
             self::resolveActiveMode($company),
+            ...array_intersect($company->licensedModuleKeys(), self::extensionKeys()),
         ]));
 
         $merged = [];
@@ -455,12 +501,7 @@ class ModuleRegistry
         $merged['consignments'] = true;
         $merged['customers'] = true;
 
-        $hasLead = in_array('leadmanagement', $keys, true)
-            || in_array('lead_management', $keys, true)
-            || in_array('leads', $keys, true)
-            || $company->hasModule('leadmanagement')
-            || $company->hasModule('lead_management')
-            || $company->hasModule('leads');
+        $hasLead = $company->hasModule('leadmanagement');
 
         $merged['leads'] = $hasLead;
         $merged['lead_management'] = $hasLead;

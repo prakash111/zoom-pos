@@ -504,7 +504,7 @@
     {{-- ========================================================================= --}}
     {{-- 4. SUBSCRIPTION TIERS: MONTHLY VS. YEARLY SWITCH & DIRECT CHECKOUT HOOKS --}}
     {{-- ========================================================================= --}}
-    <section id="pricing" class="py-20 sm:py-28 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="pricing" class="landing-dark-section py-20 sm:py-28 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 transition-colors duration-300">
         <div class="text-center mb-12">
             <span class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-black uppercase tracking-wider mb-3">
                 {{ __('Transparent SaaS Investment') }}
