@@ -960,7 +960,9 @@ class RepairApiController extends Controller
                 'action' => [
                     'type' => 'SUBMIT_FORM', 'endpoint' => $dispatchEndpoint, 'method' => 'POST',
                     'data' => ['channel' => 'whatsapp', 'recipient' => $phone],
-                    'feedback' => $whatsappConfigured ? 'Sent via tenant WhatsApp API.' : 'Sent via platform WhatsApp service.',
+                    'feedback' => $whatsappConfigured
+                        ? 'Sending via the configured WhatsApp gateway.'
+                        : 'WhatsApp gateway is not configured for this store.',
                 ],
             ],
             [
@@ -972,7 +974,9 @@ class RepairApiController extends Controller
                 'action' => [
                     'type' => 'SUBMIT_FORM', 'endpoint' => $dispatchEndpoint, 'method' => 'POST',
                     'data' => ['channel' => 'email', 'recipient' => $email],
-                    'feedback' => $emailConfigured ? 'Sent via tenant SMTP.' : 'Sent via system mailer.',
+                    'feedback' => $emailConfigured
+                        ? 'Sending via the configured SMTP gateway.'
+                        : 'Sending via the system mailer.',
                 ],
             ],
         ];
@@ -1012,11 +1016,25 @@ class RepairApiController extends Controller
         $message = "Hello {$customerName}, your repair ticket #{$ticket->ticket_number} for {$device} is ready. Track status: {$trackingUrl}";
 
         if ($channel === 'whatsapp') {
-            $recipient = preg_replace('/[^0-9+]/', '', (string) ($request->input('recipient') ?: $phone));
+            // Always use the contact bound to this ticket. A caller cannot
+            // redirect a repair notification to an arbitrary recipient.
+            $recipient = preg_replace('/[^0-9+]/', '', (string) $phone);
             if ($recipient === '') return response()->json(['success' => false, 'error' => 'Customer phone is not linked.'], 422);
-            $result = $this->documentDispatchService->dispatchWhatsApp($company, $recipient, $message, url("/api/tenant/repair/tickets/{$ticket->id}/intake-sheet"));
+            // Repair sharing is a text notification only. Do not attach the
+            // intake PDF, and do not claim delivery when the dispatcher merely
+            // generated a manual wa.me link because no provider is configured.
+            $result = $this->documentDispatchService->dispatchWhatsApp($company, $recipient, $message, null);
+            if (($result['status'] ?? '') === 'manual_link') {
+                $result = [
+                    'success' => false,
+                    'status' => 'not_configured',
+                    'error' => 'WhatsApp gateway is not configured for this store.',
+                ];
+            }
         } elseif ($channel === 'email') {
-            $recipient = trim((string) ($request->input('recipient') ?: $email));
+            // Email delivery follows the linked customer record (with the
+            // ticket snapshot as the model fallback), just like WhatsApp.
+            $recipient = trim((string) $email);
             if (! filter_var($recipient, FILTER_VALIDATE_EMAIL)) return response()->json(['success' => false, 'error' => 'Customer email is not linked.'], 422);
             $html = '<p>'.e($message).'</p><p>Ticket: <strong>'.e($ticket->ticket_number).'</strong></p>';
             $result = $this->documentDispatchService->dispatchEmail($company, $recipient, "Repair Ticket #{$ticket->ticket_number}", $html);
@@ -1024,9 +1042,11 @@ class RepairApiController extends Controller
             return response()->json(['success' => false, 'error' => 'Unsupported dispatch channel.'], 422);
         }
 
+        $error = $result['error'] ?? $result['message'] ?? 'Dispatch failed.';
+
         return response()->json([
             'success' => (bool) ($result['success'] ?? false),
-            'message' => ($result['success'] ?? false) ? 'Repair ticket sent to the linked customer.' : ($result['error'] ?? 'Dispatch failed.'),
+            'message' => ($result['success'] ?? false) ? 'Repair ticket sent to the linked customer.' : $error,
             'channel' => $result['channel'] ?? $channel,
         ], ($result['success'] ?? false) ? 200 : 422);
     }
