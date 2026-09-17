@@ -60,6 +60,8 @@ class UnifiedDocumentDispatchData {
     this.stylistName,
     this.onPreviewPdf,
     this.onDispatch,
+    this.onChannelsDispatch,
+    this.initialChannels,
   });
 
   final String documentType;
@@ -97,6 +99,8 @@ class UnifiedDocumentDispatchData {
   final String? stylistName;
   final VoidCallback? onPreviewPdf;
   final void Function(bool sendWhatsApp, bool sendEmail)? onDispatch;
+  final void Function(List<String> channels, Map<String, dynamic> payload)? onChannelsDispatch;
+  final List<DispatchChannelItem>? initialChannels;
 
   String get displayTitle => documentNumber.trim();
 
@@ -172,6 +176,200 @@ Future<void> showUnifiedDocumentDispatchSheet(
   );
 }
 
+/// Represents an omnichannel dispatch channel dynamically discovered from tenant integration settings.
+class DispatchChannelItem {
+  DispatchChannelItem({
+    required this.id,
+    required this.channel,
+    required this.title,
+    required this.subtitle,
+    this.channelId,
+    this.target,
+    this.icon = Icons.send_rounded,
+    this.iconColor = const Color(0xFF38BDF8),
+    this.isSelected = false,
+    this.isEnabled = true,
+    this.provider,
+  });
+
+  final String id;
+  final String channel; // 'whatsapp', 'email', 'sms', 'webhook', 'custom'
+  final int? channelId;
+  String title;
+  String subtitle;
+  String? target;
+  IconData icon;
+  Color iconColor;
+  bool isSelected;
+  bool isEnabled;
+  String? provider;
+
+  factory DispatchChannelItem.fromJson(
+    Map<String, dynamic> json, {
+    String? targetPhone,
+    String? targetEmail,
+  }) {
+    final rawChannel = (json['channel'] ?? 'custom').toString().toLowerCase();
+    final channel = rawChannel == 'custom_webhook' ? 'webhook' : rawChannel;
+    final id = (json['id'] ?? 'channel_$channel').toString();
+    final title = (json['title'] ?? _defaultTitle(channel)).toString();
+    var subtitle = (json['subtitle'] ?? '').toString();
+    var target = json['target']?.toString();
+
+    if (channel == 'whatsapp' || channel == 'sms') {
+      if ((targetPhone ?? '').isNotEmpty) {
+        target = targetPhone;
+        subtitle = 'To: $targetPhone';
+      }
+    } else if (channel == 'email') {
+      if ((targetEmail ?? '').isNotEmpty) {
+        target = targetEmail;
+        subtitle = 'To: $targetEmail';
+      }
+    }
+
+    final channelId = json['channel_id'] is int
+        ? json['channel_id'] as int
+        : int.tryParse('${json['channel_id']}');
+
+    final isSelected = json['default'] == true ||
+        json['is_selected'] == true ||
+        (channel == 'whatsapp') ||
+        (channel == 'email' && (targetEmail ?? '').isNotEmpty);
+
+    return DispatchChannelItem(
+      id: id,
+      channel: channel,
+      channelId: channelId,
+      title: title,
+      subtitle: subtitle,
+      target: target,
+      icon: _resolveIcon(json['icon']?.toString() ?? channel),
+      iconColor: _resolveColor(json['color']?.toString() ?? channel),
+      isSelected: isSelected,
+      isEnabled: json['available'] != false && json['is_enabled'] != false,
+      provider: json['provider']?.toString(),
+    );
+  }
+
+  factory DispatchChannelItem.fromSdui(
+    Map<String, dynamic> json, {
+    String? targetPhone,
+    String? targetEmail,
+  }) {
+    final rawChannel = (json['channel'] ?? '').toString().toLowerCase();
+    final id = (json['id'] ?? '').toString();
+    var channel = rawChannel;
+    if (channel.isEmpty) {
+      if (id.startsWith('channel_')) {
+        channel = id.substring('channel_'.length);
+      } else {
+        channel = 'custom';
+      }
+    }
+    if (channel == 'custom_webhook') channel = 'webhook';
+
+    final title = (json['title'] ?? _defaultTitle(channel)).toString();
+    var subtitle = (json['subtitle'] ?? '').toString();
+    var target = (targetPhone ?? targetEmail ?? '');
+
+    if (channel == 'whatsapp' || channel == 'sms') {
+      if ((targetPhone ?? '').isNotEmpty) {
+        target = targetPhone!;
+        subtitle = 'To: $targetPhone';
+      }
+    } else if (channel == 'email') {
+      if ((targetEmail ?? '').isNotEmpty) {
+        target = targetEmail!;
+        subtitle = 'To: $targetEmail';
+      }
+    }
+
+    final leading = json['leading'] is Map ? json['leading'] as Map : null;
+    final iconName = leading?['icon']?.toString() ?? channel;
+    final colorVal = leading?['color']?.toString() ?? channel;
+
+    final isSelected = (channel == 'whatsapp') ||
+        (channel == 'email' && (targetEmail ?? '').isNotEmpty);
+
+    return DispatchChannelItem(
+      id: id.isNotEmpty ? id : 'channel_$channel',
+      channel: channel,
+      channelId: json['channel_id'] is int
+          ? json['channel_id'] as int
+          : int.tryParse('${json['channel_id']}'),
+      title: title,
+      subtitle: subtitle,
+      target: target,
+      icon: _resolveIcon(iconName),
+      iconColor: _resolveColor(colorVal),
+      isSelected: isSelected,
+      isEnabled: true,
+      provider: json['provider']?.toString(),
+    );
+  }
+
+  static String _defaultTitle(String channel) {
+    switch (channel.toLowerCase()) {
+      case 'whatsapp':
+        return 'Send via WhatsApp';
+      case 'sms':
+        return 'Send via SMS (Text Message)';
+      case 'email':
+        return 'Send via Email';
+      case 'webhook':
+      case 'custom_webhook':
+        return 'Trigger External Webhook';
+      default:
+        return 'Send via ${channel.toUpperCase()}';
+    }
+  }
+
+  static IconData _resolveIcon(String iconStr) {
+    switch (iconStr.toLowerCase()) {
+      case 'whatsapp':
+      case 'chat':
+        return Icons.chat_rounded;
+      case 'sms':
+      case 'textsms':
+        return Icons.textsms_outlined;
+      case 'email':
+      case 'mark_email_read':
+        return Icons.email_outlined;
+      case 'webhook':
+      case 'hub':
+        return Icons.hub_outlined;
+      case 'notifications':
+        return Icons.notifications_active_outlined;
+      default:
+        return Icons.send_rounded;
+    }
+  }
+
+  static Color _resolveColor(String colorStr) {
+    if (colorStr.startsWith('#')) {
+      final hex = colorStr.replaceAll('#', '');
+      if (hex.length == 6) {
+        final parsed = int.tryParse('FF$hex', radix: 16);
+        if (parsed != null) return Color(parsed);
+      }
+    }
+    switch (colorStr.toLowerCase()) {
+      case 'whatsapp':
+        return const Color(0xFF25D366);
+      case 'sms':
+        return const Color(0xFF38BDF8);
+      case 'email':
+        return const Color(0xFF818CF8);
+      case 'webhook':
+      case 'custom_webhook':
+        return const Color(0xFFA855F7);
+      default:
+        return const Color(0xFF10B981);
+    }
+  }
+}
+
 /// The unified Document Dispatch Bottom Sheet widget.
 class UnifiedDocumentDispatchSheet extends StatefulWidget {
   const UnifiedDocumentDispatchSheet({
@@ -190,32 +388,174 @@ class UnifiedDocumentDispatchSheet extends StatefulWidget {
 
 class _UnifiedDocumentDispatchSheetState
     extends State<UnifiedDocumentDispatchSheet> {
-  late bool _sendWhatsApp;
-  late bool _sendEmail;
   late String _targetPhone;
   late String _targetEmail;
   bool _isDispatching = false;
+  List<DispatchChannelItem> _channels = [];
 
   @override
   void initState() {
     super.initState();
     _targetPhone = (widget.data.customerPhone ?? '').trim();
     _targetEmail = (widget.data.customerEmail ?? '').trim();
-    _sendWhatsApp = true;
-    _sendEmail = _targetEmail.isNotEmpty;
 
-    if ((widget.data.actionsPathOverride ?? '').isNotEmpty) {
-      _fetchDynamicActions();
+    if (widget.data.initialChannels != null &&
+        widget.data.initialChannels!.isNotEmpty) {
+      _channels = List<DispatchChannelItem>.from(widget.data.initialChannels!);
+    } else {
+      _channels = [
+        DispatchChannelItem(
+          id: 'channel_whatsapp',
+          channel: 'whatsapp',
+          title: 'Send via WhatsApp',
+          subtitle: _targetPhone.isNotEmpty
+              ? 'To: $_targetPhone'
+              : ((widget.data.tableName ?? '').isNotEmpty
+                  ? 'To: Kitchen / Intake Desk'
+                  : 'Tap to enter recipient phone'),
+          target: _targetPhone,
+          icon: Icons.chat_rounded,
+          iconColor: const Color(0xFF25D366),
+          isSelected: true,
+        ),
+        DispatchChannelItem(
+          id: 'channel_email',
+          channel: 'email',
+          title: 'Send via Email',
+          subtitle: _targetEmail.isNotEmpty
+              ? 'To: $_targetEmail'
+              : 'Tap to enter recipient email',
+          target: _targetEmail,
+          icon: Icons.email_outlined,
+          iconColor: const Color(0xFF818CF8),
+          isSelected: _targetEmail.isNotEmpty,
+        ),
+      ];
     }
+
+    _fetchEnabledChannels();
   }
 
-  Future<void> _fetchDynamicActions() async {
-    final endpoint = widget.data.actionsPathOverride;
-    if (endpoint == null || endpoint.isEmpty) return;
+  Future<void> _fetchEnabledChannels() async {
+    final candidateEndpoints = <String>[
+      if ((widget.data.actionsPathOverride ?? '').isNotEmpty)
+        widget.data.actionsPathOverride!,
+      '/api/v1/documents/${widget.data.documentType}/${widget.data.documentId}/dispatch-options',
+      '/api/v1/tenant/dispatch/channels',
+      '/api/v1/documents/channels',
+    ];
+
     try {
       final apiClient = widget.parentContext.read<ApiClient>();
-      await apiClient.requestAbsolute(endpoint, method: 'GET');
+      for (final endpoint in candidateEndpoints) {
+        try {
+          final res = await apiClient.requestAbsolute(endpoint, method: 'GET');
+          if (res.isNotEmpty && mounted) {
+            final parsed = _parseChannels(res);
+            if (parsed.isNotEmpty) {
+              setState(() {
+                _channels = parsed;
+              });
+              return;
+            }
+          }
+        } catch (_) {}
+      }
     } catch (_) {}
+  }
+
+  List<DispatchChannelItem> _parseChannels(Map<String, dynamic> res) {
+    final result = <DispatchChannelItem>[];
+    final seen = <String>{};
+
+    void addChannel(DispatchChannelItem item) {
+      final key = item.channel == 'custom' && item.channelId != null
+          ? 'custom:${item.channelId}'
+          : item.channel;
+      if (!seen.contains(key)) {
+        seen.add(key);
+        result.add(item);
+      }
+    }
+
+    // 1. Check enabled_channels array
+    final rawEnabled = res['enabled_channels'];
+    if (rawEnabled is List) {
+      for (final entry in rawEnabled) {
+        if (entry is Map<String, dynamic>) {
+          addChannel(DispatchChannelItem.fromJson(
+            entry,
+            targetPhone: _targetPhone,
+            targetEmail: _targetEmail,
+          ));
+        }
+      }
+    }
+
+    // 2. Check channels map or list
+    if (result.isEmpty && res['channels'] != null) {
+      final chs = res['channels'];
+      if (chs is List) {
+        for (final entry in chs) {
+          if (entry is Map<String, dynamic>) {
+            addChannel(DispatchChannelItem.fromJson(
+              entry,
+              targetPhone: _targetPhone,
+              targetEmail: _targetEmail,
+            ));
+          }
+        }
+      } else if (chs is Map<String, dynamic>) {
+        chs.forEach((k, v) {
+          if (v is Map<String, dynamic>) {
+            final copy = Map<String, dynamic>.from(v);
+            copy['channel'] ??= k;
+            copy['id'] ??= 'channel_$k';
+            if (copy['available'] != false) {
+              addChannel(DispatchChannelItem.fromJson(
+                copy,
+                targetPhone: _targetPhone,
+                targetEmail: _targetEmail,
+              ));
+            }
+          }
+        });
+      }
+    }
+
+    // 3. Check SDUI components or schema.components
+    if (result.isEmpty) {
+      final components = res['components'] ?? res['schema']?['components'];
+      if (components is List) {
+        for (final comp in components) {
+          if (comp is Map<String, dynamic>) {
+            final id = comp['id']?.toString() ?? '';
+            final channel = comp['channel']?.toString();
+            final actionType = comp['action_type']?.toString();
+            final action = comp['action'] is Map ? comp['action'] as Map : null;
+
+            final isChannelTile = channel != null ||
+                id.startsWith('channel_') ||
+                actionType == 'SUBMIT_FORM' ||
+                action?['type'] == 'SUBMIT_FORM';
+
+            if (isChannelTile) {
+              final rawCh =
+                  channel ?? (id.startsWith('channel_') ? id.substring(8) : '');
+              if (rawCh.isNotEmpty) {
+                addChannel(DispatchChannelItem.fromSdui(
+                  comp,
+                  targetPhone: _targetPhone,
+                  targetEmail: _targetEmail,
+                ));
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return result;
   }
 
   Future<void> _handleEditTarget(String type) async {
@@ -235,10 +575,14 @@ class _UnifiedDocumentDispatchSheetState
           content: TextField(
             controller: controller,
             autofocus: true,
-            keyboardType: isEmail ? TextInputType.emailAddress : TextInputType.phone,
+            keyboardType:
+                isEmail ? TextInputType.emailAddress : TextInputType.phone,
             decoration: InputDecoration(
-              labelText: isEmail ? 'Email Address' : 'Phone Number with Country Code',
-              hintText: isEmail ? 'e.g. user@example.com' : 'e.g. +1 555 123 4567',
+              labelText: isEmail
+                  ? 'Email Address'
+                  : 'Phone Number with Country Code',
+              hintText:
+                  isEmail ? 'e.g. user@example.com' : 'e.g. +1 555 123 4567',
             ),
           ),
           actions: [
@@ -247,7 +591,8 @@ class _UnifiedDocumentDispatchSheetState
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(controller.text.trim()),
               child: const Text('Confirm'),
             ),
           ],
@@ -259,23 +604,30 @@ class _UnifiedDocumentDispatchSheetState
       setState(() {
         if (isEmail) {
           _targetEmail = res;
-          if (_targetEmail.isNotEmpty) _sendEmail = true;
+          for (final ch in _channels) {
+            if (ch.channel == 'email') {
+              ch.target = res;
+              ch.subtitle = 'To: $res';
+              if (res.isNotEmpty) ch.isSelected = true;
+            }
+          }
         } else {
           _targetPhone = res;
-          if (_targetPhone.isNotEmpty) _sendWhatsApp = true;
+          for (final ch in _channels) {
+            if (ch.channel == 'whatsapp' || ch.channel == 'sms') {
+              ch.target = res;
+              ch.subtitle = 'To: $res';
+              if (res.isNotEmpty) ch.isSelected = true;
+            }
+          }
         }
       });
     }
   }
 
   Future<void> _handleDispatch() async {
-    if (widget.data.onDispatch != null) {
-      Navigator.of(context).pop();
-      widget.data.onDispatch!(_sendWhatsApp, _sendEmail);
-      return;
-    }
-
-    if (!_sendWhatsApp && !_sendEmail) {
+    final selected = _channels.where((c) => c.isSelected).toList();
+    if (selected.isEmpty) {
       ScaffoldMessenger.of(widget.parentContext).showSnackBar(
         const SnackBar(
           content: Text('Please select at least one channel to dispatch.'),
@@ -285,12 +637,45 @@ class _UnifiedDocumentDispatchSheetState
       return;
     }
 
-    if (_sendWhatsApp && _targetPhone.isEmpty) {
+    final selectedChannels = selected.map((c) {
+      if (c.channel == 'custom' && c.channelId != null) {
+        return 'custom:${c.channelId}';
+      }
+      return c.channel;
+    }).toList();
+
+    final sendWhatsApp = selectedChannels.contains('whatsapp');
+    final sendEmail = selectedChannels.contains('email');
+    final sendSms = selectedChannels.contains('sms');
+
+    if (widget.data.onChannelsDispatch != null) {
+      Navigator.of(context).pop();
+      widget.data.onChannelsDispatch!(selectedChannels, {
+        'phone': _targetPhone,
+        'email': _targetEmail,
+      });
+      return;
+    }
+
+    if (widget.data.onDispatch != null) {
+      Navigator.of(context).pop();
+      widget.data.onDispatch!(sendWhatsApp, sendEmail);
+      return;
+    }
+
+    final hasDeskOrTable = (widget.data.tableName ?? '').isNotEmpty;
+
+    if (sendWhatsApp && _targetPhone.isEmpty && !hasDeskOrTable) {
       await _handleEditTarget('phone');
       if (_targetPhone.isEmpty) return;
     }
 
-    if (_sendEmail && _targetEmail.isEmpty) {
+    if (sendSms && _targetPhone.isEmpty && !hasDeskOrTable) {
+      await _handleEditTarget('phone');
+      if (_targetPhone.isEmpty) return;
+    }
+
+    if (sendEmail && _targetEmail.isEmpty) {
       await _handleEditTarget('email');
       if (_targetEmail.isEmpty) return;
     }
@@ -298,16 +683,13 @@ class _UnifiedDocumentDispatchSheetState
     setState(() => _isDispatching = true);
     final apiClient = widget.parentContext.read<ApiClient>();
 
-    final selectedChannels = <String>[];
-    if (_sendWhatsApp) selectedChannels.add('whatsapp');
-    if (_sendEmail) selectedChannels.add('email');
-
     final payload = {
       'document_type': widget.data.documentType,
       'document_id': widget.data.documentId,
       'channels': selectedChannels,
-      'send_whatsapp': _sendWhatsApp,
-      'send_email': _sendEmail,
+      'send_whatsapp': sendWhatsApp,
+      'send_email': sendEmail,
+      'send_sms': sendSms,
       'phone': _targetPhone,
       'email': _targetEmail,
     };
@@ -335,12 +717,14 @@ class _UnifiedDocumentDispatchSheetState
     if (!mounted) return;
     setState(() => _isDispatching = false);
 
-    if (response != null && (response['success'] == true || response['success'] == 1)) {
+    if (response != null &&
+        (response['success'] == true || response['success'] == 1)) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(widget.parentContext).showSnackBar(
         SnackBar(
           content: Text(
-            response['message']?.toString() ?? 'Dispatched successfully via selected channels.',
+            response['message']?.toString() ??
+                'Dispatched successfully via selected channels.',
           ),
           backgroundColor: AppTheme.success,
         ),
@@ -521,85 +905,75 @@ class _UnifiedDocumentDispatchSheetState
                 onTap: _handleThermalPrint,
               ),
 
-            // 3. Send via WhatsApp (Interactive Checkbox)
-            CheckboxListTile(
-              value: _sendWhatsApp,
-              activeColor: AppTheme.success,
-              controlAffinity: ListTileControlAffinity.leading,
-              secondary: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 22),
-              title: const Text(
-                'Send via WhatsApp',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-              subtitle: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _targetPhone.isNotEmpty
-                          ? 'To: $_targetPhone'
-                          : ((widget.data.tableName ?? '').isNotEmpty
-                              ? 'To: Kitchen / Intake Desk'
-                              : 'Tap to enter recipient phone'),
-                      style: TextStyle(fontSize: 12, color: secondaryText),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => _handleEditTarget('phone'),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Text(
-                        'Edit',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.activeLink,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              onChanged: (val) => setState(() => _sendWhatsApp = val ?? false),
-            ),
+            // Dynamic channel checkboxes (WhatsApp, SMS, Email, Webhook, Custom channels)
+            ..._channels.map((channel) {
+              final isPhone =
+                  channel.channel == 'whatsapp' || channel.channel == 'sms';
+              final isEmail = channel.channel == 'email';
+              final canEdit = isPhone || isEmail;
 
-            // 4. Send via Email (Interactive Checkbox)
-            CheckboxListTile(
-              value: _sendEmail,
-              activeColor: AppTheme.success,
-              controlAffinity: ListTileControlAffinity.leading,
-              secondary: const Icon(Icons.email_outlined, color: AppTheme.activeLink, size: 22),
-              title: const Text(
-                'Send via Email',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-              subtitle: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _targetEmail.isNotEmpty
-                          ? 'To: $_targetEmail'
-                          : 'Tap to enter recipient email',
-                      style: TextStyle(fontSize: 12, color: secondaryText),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => _handleEditTarget('email'),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              String targetDisplay;
+              if (isPhone) {
+                targetDisplay = _targetPhone.isNotEmpty
+                    ? 'To: $_targetPhone'
+                    : ((widget.data.tableName ?? '').isNotEmpty
+                        ? 'To: Kitchen / Intake Desk'
+                        : 'Tap to enter recipient phone');
+              } else if (isEmail) {
+                targetDisplay = _targetEmail.isNotEmpty
+                    ? 'To: $_targetEmail'
+                    : 'Tap to enter recipient email';
+              } else {
+                targetDisplay = channel.subtitle.isNotEmpty
+                    ? channel.subtitle
+                    : (channel.provider ?? 'Configured in Settings');
+              }
+
+              return CheckboxListTile(
+                key: ValueKey(channel.id),
+                value: channel.isSelected,
+                activeColor: AppTheme.success,
+                controlAffinity: ListTileControlAffinity.leading,
+                secondary:
+                    Icon(channel.icon, color: channel.iconColor, size: 22),
+                title: Text(
+                  channel.title,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Row(
+                  children: [
+                    Expanded(
                       child: Text(
-                        'Edit',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.activeLink,
-                        ),
+                        targetDisplay,
+                        style: TextStyle(fontSize: 12, color: secondaryText),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              onChanged: (val) => setState(() => _sendEmail = val ?? false),
-            ),
+                    if (canEdit)
+                      InkWell(
+                        onTap: () =>
+                            _handleEditTarget(isEmail ? 'email' : 'phone'),
+                        child: const Padding(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          child: Text(
+                            'Edit',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.activeLink,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                onChanged: (val) =>
+                    setState(() => channel.isSelected = val ?? false),
+              );
+            }),
 
             const SizedBox(height: 12),
 
