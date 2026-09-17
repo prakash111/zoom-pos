@@ -1789,6 +1789,10 @@ class TenantNavRegistry
             $normalized['parent'] = null;
             $normalized['parent_id'] = null;
             $normalized['type'] = 'link';
+            // Core commerce actions are never containers. Discard stale
+            // children from previously saved layouts before deriving the
+            // accordion state below.
+            unset($normalized['children']);
         }
 
         if ($parentId !== null) {
@@ -1797,7 +1801,7 @@ class TenantNavRegistry
             $normalized['type'] = $normalized['type'] ?? 'link';
         }
 
-        if (isset($item['children']) && is_array($item['children'])) {
+        if (! in_array($key, $flatCoreItems, true) && isset($item['children']) && is_array($item['children'])) {
             $children = [];
             foreach ($item['children'] as $child) {
                 if (is_array($child)) {
