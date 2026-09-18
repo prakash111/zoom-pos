@@ -95,7 +95,7 @@ void main() {
   });
 
   testWidgets(
-      'repair dispatch keeps document utilities and binds customer data',
+      'repair sharing omits print preview and still dispatches with bound customer data',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     tester.view.devicePixelRatio = 1;
@@ -147,7 +147,7 @@ void main() {
     expect(find.textContaining('Carlos Rivera • Apple iPhone 15 Pro'),
         findsOneWidget);
 
-    expect(find.text('PDF Preview'), findsOneWidget);
+    expect(find.text('PDF Preview'), findsNothing);
     expect(find.text('Thermal Print'), findsOneWidget);
 
     // Verify channels are displayed

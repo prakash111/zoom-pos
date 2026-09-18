@@ -914,22 +914,23 @@ class _UnifiedDocumentDispatchSheetState
             Divider(height: 1, color: borderColor),
             const SizedBox(height: 4),
 
-            // Document utilities remain visible for every document and API configuration.
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf_outlined,
-                  color: AppTheme.activeLink, size: 22),
-              title: const Text(
-                'PDF Preview',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            // Repair sharing omits the preview; other sheets keep it visible.
+            if (widget.data.showPreview)
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf_outlined,
+                    color: AppTheme.activeLink, size: 22),
+                title: const Text(
+                  'PDF Preview',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  'Shared full-screen thermal/A4 preview with Print and Share',
+                  style: TextStyle(fontSize: 12, color: secondaryText),
+                ),
+                trailing: Icon(Icons.chevron_right_rounded,
+                    color: secondaryText, size: 20),
+                onTap: _handlePreview,
               ),
-              subtitle: Text(
-                'Shared full-screen thermal/A4 preview with Print and Share',
-                style: TextStyle(fontSize: 12, color: secondaryText),
-              ),
-              trailing: Icon(Icons.chevron_right_rounded,
-                  color: secondaryText, size: 20),
-              onTap: _handlePreview,
-            ),
 
             // 2. Print on Receipt Printer
             ListTile(
