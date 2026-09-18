@@ -60,9 +60,8 @@ Future<void> showKotTicketSheet(
   VoidCallback? onPreviewPdf,
   void Function(bool sendWhatsApp, bool sendEmail)? onDispatch,
 }) {
-  final docNumber = kot.kotNumber.trim().isEmpty
-      ? '#KOT-${kot.id}'
-      : kot.kotNumber.trim();
+  final docNumber =
+      kot.kotNumber.trim().isEmpty ? '#KOT-${kot.id}' : kot.kotNumber.trim();
 
   final data = UnifiedDocumentDispatchData(
     documentType: 'kot',
@@ -80,9 +79,10 @@ Future<void> showKotTicketSheet(
         lineTotal: 0.0,
       );
     }).toList(),
-    pdfPathOverride: '/api/v1/tenant/documents/kot/${Uri.encodeComponent(kot.id)}/preview-modal',
+    pdfPathOverride:
+        '/api/v1/tenant/documents/kot/${Uri.encodeComponent(kot.id)}/preview-modal',
     onPreviewPdf: onPreviewPdf,
-    onDispatch: onDispatch ?? (_, __) {},
+    onDispatch: onDispatch,
   );
 
   return showUnifiedDocumentDispatchSheet(context, data);
@@ -199,7 +199,8 @@ class _KotUnifiedDispatchSheetState extends State<KotUnifiedDispatchSheet> {
                   style: TextStyle(color: Colors.white, fontSize: 14)),
               subtitle: const Text('Enter phone number or kitchen group',
                   style: TextStyle(color: muted, fontSize: 12)),
-              secondary: const Icon(Icons.chat, color: Color(0xFF25D366), size: 20),
+              secondary:
+                  const Icon(Icons.chat, color: Color(0xFF25D366), size: 20),
             ),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
@@ -266,7 +267,6 @@ class _KotActionTile extends StatelessWidget {
         onTap: onTap,
       );
 }
-
 
 /// Prints [kot] to the saved Bluetooth thermal printer and reports the outcome
 /// through the nearest [ScaffoldMessenger]. Safe to call from any screen that

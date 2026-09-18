@@ -10,7 +10,8 @@ import 'package:zoom_pos_mobile/core/sdui/sdui_action_dispatcher.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('receivable action opens the four-row native POS sale sheet',
+  testWidgets(
+      'receivable action opens a native POS sheet with every standard channel',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     tester.view.devicePixelRatio = 1;
@@ -74,11 +75,11 @@ void main() {
 
     expect(find.text('POS-63776202'), findsOneWidget);
     expect(find.text('GSTIN: 29ABCDE1234F1Z5'), findsOneWidget);
-    expect(find.text('Preview & Print'), findsOneWidget);
-    expect(find.text('Print on receipt printer'), findsOneWidget);
+    expect(find.text('PDF Preview'), findsOneWidget);
+    expect(find.text('Thermal Print'), findsOneWidget);
     expect(find.text('Send via WhatsApp'), findsOneWidget);
     expect(find.text('Send via Email'), findsOneWidget);
-    expect(find.textContaining('SMS'), findsNothing);
+    expect(find.text('Open Messages / SMS'), findsOneWidget);
     expect(api.requestedPaths, [
       '/api/v1/tenant/receivables/42/reminder-sheet?document_type=sale',
     ]);

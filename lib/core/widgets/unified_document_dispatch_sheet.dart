@@ -10,8 +10,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
+import '../api/api_exception.dart';
 import '../config/app_config.dart';
 import '../config/theme.dart';
+import '../sdui/screens/dynamic_schema_page.dart';
 import '../services/thermal/thermal_printer_service.dart';
 import 'adaptive_sheet.dart';
 import '../../features/settings/screens/printer_selection_dialog.dart';
@@ -100,7 +102,8 @@ class UnifiedDocumentDispatchData {
   final String? stylistName;
   final VoidCallback? onPreviewPdf;
   final void Function(bool sendWhatsApp, bool sendEmail)? onDispatch;
-  final void Function(List<String> channels, Map<String, dynamic> payload)? onChannelsDispatch;
+  final void Function(List<String> channels, Map<String, dynamic> payload)?
+      onChannelsDispatch;
   final List<DispatchChannelItem>? initialChannels;
   final bool showPreview;
 
@@ -139,7 +142,8 @@ class UnifiedDocumentDispatchData {
 
     // 3. Tax ID
     if ((taxId ?? '').isNotEmpty) {
-      final label = isIndia ? 'GSTIN' : (taxLabel.isNotEmpty ? taxLabel : 'Tax ID');
+      final label =
+          isIndia ? 'GSTIN' : (taxLabel.isNotEmpty ? taxLabel : 'Tax ID');
       segments.add('$label: $taxId');
     }
 
@@ -152,7 +156,9 @@ class UnifiedDocumentDispatchData {
     if (normalized == 'quotation' || normalized == 'quote') {
       return ApiEndpoints.quotationPdf(documentId);
     }
-    if (normalized == 'repair' || normalized == 'ticket' || normalized == 'job_sheet') {
+    if (normalized == 'repair' ||
+        normalized == 'ticket' ||
+        normalized == 'job_sheet') {
       return '/api/tenant/repair/tickets/$documentId/intake-sheet';
     }
     return ApiEndpoints.salePdf(documentId);
@@ -196,6 +202,8 @@ class DispatchChannelItem {
     this.isSelected = false,
     this.isEnabled = true,
     this.provider,
+    this.apiEnabled = true,
+    this.launchUrl,
   });
 
   final String id;
@@ -209,6 +217,63 @@ class DispatchChannelItem {
   bool isSelected;
   bool isEnabled;
   String? provider;
+  final bool apiEnabled;
+  final String? launchUrl;
+
+  bool get isLocalIntent =>
+      (!apiEnabled || !isEnabled) &&
+      ['whatsapp', 'email', 'sms'].contains(channel);
+  bool get isCloudChannel =>
+      apiEnabled &&
+      isEnabled &&
+      !['thermal_print', 'pdf_preview'].contains(channel);
+
+  Uri deviceUri(
+      {String? phone,
+      String? email,
+      required String message,
+      required String subject}) {
+    final original = Uri.tryParse(launchUrl ?? '');
+    final body =
+        original?.queryParameters[channel == 'whatsapp' ? 'text' : 'body'] ??
+            message;
+    final originalRecipient = switch (channel) {
+      'whatsapp' => original?.queryParameters['phone'],
+      'email' || 'sms' => original?.path,
+      _ => null,
+    };
+    final recipient = (channel == 'email' ? email : phone) ??
+        target ??
+        originalRecipient ??
+        '';
+    switch (channel) {
+      case 'whatsapp':
+        final digits = recipient
+            .replaceAll(RegExp(r'\D'), '')
+            .replaceFirst(RegExp(r'^0+'), '');
+        return Uri.parse(
+            'whatsapp://send?${digits.isEmpty ? '' : 'phone=$digits&'}text=${Uri.encodeComponent(body)}');
+      case 'email':
+        final mailSubject = original?.queryParameters['subject'] ?? subject;
+        return Uri.parse(
+            'mailto:${Uri.encodeComponent(recipient)}?subject=${Uri.encodeComponent(mailSubject)}&body=${Uri.encodeComponent(body)}');
+      case 'sms':
+        final cleanPhone = recipient.replaceAll(RegExp(r'[^0-9+]'), '');
+        final separator =
+            !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS ? '&' : '?';
+        return Uri.parse(
+            'sms:$cleanPhone${separator}body=${Uri.encodeComponent(body)}');
+      default:
+        throw StateError('This channel has no device intent.');
+    }
+  }
+
+  static String localTitle(String channel) => switch (channel) {
+        'whatsapp' => 'Open WhatsApp App',
+        'email' => 'Open Mail App',
+        'sms' => 'Open Messages / SMS',
+        _ => _defaultTitle(channel),
+      };
 
   factory DispatchChannelItem.fromJson(
     Map<String, dynamic> json, {
@@ -217,89 +282,43 @@ class DispatchChannelItem {
   }) {
     final rawChannel = (json['channel'] ?? 'custom').toString().toLowerCase();
     final channel = rawChannel == 'custom_webhook' ? 'webhook' : rawChannel;
+    final action = json['action'] is Map ? json['action'] as Map : const {};
+    final uri = Uri.tryParse(
+        action['url']?.toString() ?? json['url']?.toString() ?? '');
+    final local = json['api_enabled'] == false ||
+        json['is_enabled'] == false ||
+        json['available'] == false ||
+        json['delivery_mode'] == 'device' ||
+        json['mode'] == 'local_intent' ||
+        (['whatsapp', 'email', 'sms'].contains(channel) &&
+            json['selectable'] == false) ||
+        ['whatsapp', 'mailto', 'sms'].contains(uri?.scheme);
+    final apiEnabled = !local;
     final id = (json['id'] ?? 'channel_$channel').toString();
-    final title = (json['title'] ?? _defaultTitle(channel)).toString();
+    final title = local
+        ? localTitle(channel)
+        : (json['title'] ?? json['label'] ?? _defaultTitle(channel)).toString();
     var subtitle = (json['subtitle'] ?? '').toString();
     var target = json['target']?.toString();
-
     if (channel == 'whatsapp' || channel == 'sms') {
-      if ((targetPhone ?? '').isNotEmpty) {
-        target = targetPhone;
-        subtitle = 'To: $targetPhone';
-      }
+      target = (targetPhone ?? '').isNotEmpty ? targetPhone : target;
     } else if (channel == 'email') {
-      if ((targetEmail ?? '').isNotEmpty) {
-        target = targetEmail;
-        subtitle = 'To: $targetEmail';
-      }
+      target = (targetEmail ?? '').isNotEmpty ? targetEmail : target;
     }
-
-    final channelId = json['channel_id'] is int
-        ? json['channel_id'] as int
-        : int.tryParse('${json['channel_id']}');
-
-    final isSelected = json['default'] == true ||
+    if ((target ?? '').isNotEmpty) subtitle = 'To: $target';
+    final leading = json['leading'] is Map ? json['leading'] as Map : const {};
+    final hasSelection = json.containsKey('default') ||
+        json.containsKey('initial_value') ||
+        json.containsKey('is_selected');
+    final selected = json['default'] == true ||
+        json['initial_value'] == true ||
         json['is_selected'] == true ||
-        (channel == 'whatsapp') ||
-        (channel == 'email' && (targetEmail ?? '').isNotEmpty);
+        (!hasSelection &&
+            (channel == 'whatsapp' ||
+                (channel == 'email' && (target ?? '').isNotEmpty)));
 
     return DispatchChannelItem(
       id: id,
-      channel: channel,
-      channelId: channelId,
-      title: title,
-      subtitle: subtitle,
-      target: target,
-      icon: _resolveIcon(json['icon']?.toString() ?? channel),
-      iconColor: _resolveColor(json['color']?.toString() ?? channel),
-      isSelected: isSelected,
-      isEnabled: json['available'] != false && json['is_enabled'] != false,
-      provider: json['provider']?.toString(),
-    );
-  }
-
-  factory DispatchChannelItem.fromSdui(
-    Map<String, dynamic> json, {
-    String? targetPhone,
-    String? targetEmail,
-  }) {
-    final rawChannel = (json['channel'] ?? '').toString().toLowerCase();
-    final id = (json['id'] ?? '').toString();
-    var channel = rawChannel;
-    if (channel.isEmpty) {
-      if (id.startsWith('channel_')) {
-        channel = id.substring('channel_'.length);
-      } else {
-        channel = 'custom';
-      }
-    }
-    if (channel == 'custom_webhook') channel = 'webhook';
-
-    final title = (json['title'] ?? _defaultTitle(channel)).toString();
-    var subtitle = (json['subtitle'] ?? '').toString();
-    var target = (targetPhone ?? targetEmail ?? '');
-
-    if (channel == 'whatsapp' || channel == 'sms') {
-      if ((targetPhone ?? '').isNotEmpty) {
-        target = targetPhone!;
-        subtitle = 'To: $targetPhone';
-      }
-    } else if (channel == 'email') {
-      if ((targetEmail ?? '').isNotEmpty) {
-        target = targetEmail!;
-        subtitle = 'To: $targetEmail';
-      }
-    }
-
-    final leading = json['leading'] is Map ? json['leading'] as Map : null;
-    final iconName = leading?['icon']?.toString() ?? channel;
-    final colorVal = leading?['color']?.toString() ?? channel;
-
-    final isSelected = (channel == 'whatsapp') ||
-        (channel == 'email' && (targetEmail ?? '').isNotEmpty);
-
-    return DispatchChannelItem(
-      id: id.isNotEmpty ? id : 'channel_$channel',
       channel: channel,
       channelId: json['channel_id'] is int
           ? json['channel_id'] as int
@@ -307,12 +326,29 @@ class DispatchChannelItem {
       title: title,
       subtitle: subtitle,
       target: target,
-      icon: _resolveIcon(iconName),
-      iconColor: _resolveColor(colorVal),
-      isSelected: isSelected,
-      isEnabled: true,
+      icon: _resolveIcon(
+          json['icon']?.toString() ?? leading['icon']?.toString() ?? channel),
+      iconColor: _resolveColor(
+          json['color']?.toString() ?? leading['color']?.toString() ?? channel),
+      apiEnabled: apiEnabled,
+      isSelected: apiEnabled && selected,
+      isEnabled: (local && ['whatsapp', 'email', 'sms'].contains(channel)) ||
+          (apiEnabled &&
+              json['available'] != false &&
+              json['is_enabled'] != false),
       provider: json['provider']?.toString(),
+      launchUrl: uri?.toString(),
     );
+  }
+
+  factory DispatchChannelItem.fromSdui(Map<String, dynamic> json,
+      {String? targetPhone, String? targetEmail}) {
+    final copy = Map<String, dynamic>.from(json);
+    final id = copy['id']?.toString() ?? '';
+    copy['channel'] ??=
+        id.startsWith('channel_') ? id.substring('channel_'.length) : 'custom';
+    return DispatchChannelItem.fromJson(copy,
+        targetPhone: targetPhone, targetEmail: targetEmail);
   }
 
   static String _defaultTitle(String channel) {
@@ -405,39 +441,7 @@ class _UnifiedDocumentDispatchSheetState
     _targetPhone = (widget.data.customerPhone ?? '').trim();
     _targetEmail = (widget.data.customerEmail ?? '').trim();
 
-    if (widget.data.initialChannels != null &&
-        widget.data.initialChannels!.isNotEmpty) {
-      _channels = List<DispatchChannelItem>.from(widget.data.initialChannels!);
-    } else {
-      _channels = [
-        DispatchChannelItem(
-          id: 'channel_whatsapp',
-          channel: 'whatsapp',
-          title: 'Send via WhatsApp',
-          subtitle: _targetPhone.isNotEmpty
-              ? 'To: $_targetPhone'
-              : ((widget.data.tableName ?? '').isNotEmpty
-                  ? 'To: Kitchen / Intake Desk'
-                  : 'Tap to enter recipient phone'),
-          target: _targetPhone,
-          icon: Icons.chat_rounded,
-          iconColor: const Color(0xFF25D366),
-          isSelected: true,
-        ),
-        DispatchChannelItem(
-          id: 'channel_email',
-          channel: 'email',
-          title: 'Send via Email',
-          subtitle: _targetEmail.isNotEmpty
-              ? 'To: $_targetEmail'
-              : 'Tap to enter recipient email',
-          target: _targetEmail,
-          icon: Icons.email_outlined,
-          iconColor: const Color(0xFF818CF8),
-          isSelected: _targetEmail.isNotEmpty,
-        ),
-      ];
-    }
+    _channels = _withUniversalChannels(widget.data.initialChannels ?? []);
 
     _fetchEnabledChannels();
   }
@@ -476,7 +480,7 @@ class _UnifiedDocumentDispatchSheetState
             final parsed = _parseChannels(res);
             if (parsed.isNotEmpty) {
               setState(() {
-                _channels = parsed;
+                _channels = _withUniversalChannels(parsed);
               });
               return;
             }
@@ -491,6 +495,9 @@ class _UnifiedDocumentDispatchSheetState
     final seen = <String>{};
 
     void addChannel(DispatchChannelItem item) {
+      if (['thermal_print', 'pdf_preview'].contains(item.channel)) return;
+      if (!item.isEnabled &&
+          !['whatsapp', 'email', 'sms'].contains(item.channel)) return;
       final key = item.channel == 'custom' && item.channelId != null
           ? 'custom:${item.channelId}'
           : item.channel;
@@ -500,84 +507,95 @@ class _UnifiedDocumentDispatchSheetState
       }
     }
 
-    // 1. Check enabled_channels array
-    final rawEnabled = res['enabled_channels'];
-    if (rawEnabled is List) {
-      for (final entry in rawEnabled) {
-        if (entry is Map<String, dynamic>) {
-          addChannel(DispatchChannelItem.fromJson(
-            entry,
-            targetPhone: _targetPhone,
-            targetEmail: _targetEmail,
-          ));
-        }
-      }
-    }
-
-    // 2. Check channels map or list
-    if (result.isEmpty && res['channels'] != null) {
-      final chs = res['channels'];
-      if (chs is List) {
-        for (final entry in chs) {
-          if (entry is Map<String, dynamic>) {
-            addChannel(DispatchChannelItem.fromJson(
-              entry,
-              targetPhone: _targetPhone,
-              targetEmail: _targetEmail,
-            ));
-          }
-        }
-      } else if (chs is Map<String, dynamic>) {
-        chs.forEach((k, v) {
-          if (v is Map<String, dynamic>) {
-            final copy = Map<String, dynamic>.from(v);
-            copy['channel'] ??= k;
-            copy['id'] ??= 'channel_$k';
-            if (copy['available'] != false) {
-              addChannel(DispatchChannelItem.fromJson(
-                copy,
+    void parseEntries(dynamic entries) {
+      if (entries is List) {
+        for (final entry in entries) {
+          if (entry is Map)
+            addChannel(DispatchChannelItem.fromSdui(
+                Map<String, dynamic>.from(entry),
                 targetPhone: _targetPhone,
-                targetEmail: _targetEmail,
-              ));
-            }
-          }
-        });
-      }
-    }
-
-    // 3. Check SDUI components or schema.components
-    if (result.isEmpty) {
-      final components = res['components'] ?? res['schema']?['components'];
-      if (components is List) {
-        for (final comp in components) {
-          if (comp is Map<String, dynamic>) {
-            final id = comp['id']?.toString() ?? '';
-            final channel = comp['channel']?.toString();
-            final actionType = comp['action_type']?.toString();
-            final action = comp['action'] is Map ? comp['action'] as Map : null;
-
-            final isChannelTile = channel != null ||
-                id.startsWith('channel_') ||
-                actionType == 'SUBMIT_FORM' ||
-                action?['type'] == 'SUBMIT_FORM';
-
-            if (isChannelTile) {
-              final rawCh =
-                  channel ?? (id.startsWith('channel_') ? id.substring(8) : '');
-              if (rawCh.isNotEmpty) {
-                addChannel(DispatchChannelItem.fromSdui(
-                  comp,
-                  targetPhone: _targetPhone,
-                  targetEmail: _targetEmail,
-                ));
-              }
-            }
-          }
+                targetEmail: _targetEmail));
+        }
+      } else if (entries is Map) {
+        for (final entry in entries.entries) {
+          if (entry.value is! Map) continue;
+          final copy = Map<String, dynamic>.from(entry.value as Map);
+          copy['channel'] ??= entry.key.toString();
+          addChannel(DispatchChannelItem.fromJson(copy,
+              targetPhone: _targetPhone, targetEmail: _targetEmail));
         }
       }
     }
+
+    // Full channel definitions take precedence over the API-only subset.
+    parseEntries(res['channels']);
+    void parseComponents(dynamic components) {
+      if (components is! List) return;
+      for (final component in components) {
+        if (component is! Map) continue;
+        if (component['channel'] != null ||
+            (component['id']?.toString() ?? '').startsWith('channel_')) {
+          addChannel(DispatchChannelItem.fromSdui(
+              Map<String, dynamic>.from(component),
+              targetPhone: _targetPhone,
+              targetEmail: _targetEmail));
+        }
+        parseComponents(component['components'] ?? component['children']);
+      }
+    }
+
+    parseComponents(res['components'] ?? res['schema']?['components']);
+    parseEntries(res['device_channels']);
+    parseEntries(res['secondary_options']);
+    parseEntries(res['enabled_channels']);
 
     return result;
+  }
+
+  List<DispatchChannelItem> _withUniversalChannels(
+      List<DispatchChannelItem> channels) {
+    return [
+      for (final channel in ['whatsapp', 'email', 'sms'])
+        channels.where((item) => item.channel == channel).firstOrNull ??
+            DispatchChannelItem.fromJson({
+              'channel': channel,
+              'api_enabled': false,
+              'mode': 'local_intent',
+              'available': true,
+            }, targetPhone: _targetPhone, targetEmail: _targetEmail),
+      ...channels.where((item) => ![
+            'whatsapp',
+            'email',
+            'sms',
+            'thermal_print',
+            'pdf_preview'
+          ].contains(item.channel)),
+    ];
+  }
+
+  Future<void> _handleOpenDeviceApp(DispatchChannelItem channel) async {
+    final data = widget.data;
+    final message =
+        'Hello ${data.customerName ?? data.patientName ?? 'Customer'}, your ${data.documentType} ${data.documentNumber} from ${data.companyName}.';
+    final uri = channel.deviceUri(
+      phone: _targetPhone.isNotEmpty ? _targetPhone : channel.target,
+      email: _targetEmail.isNotEmpty ? _targetEmail : channel.target,
+      message: message,
+      subject: '${data.documentType} ${data.documentNumber}',
+    );
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text('Could not open the app. Check that it is installed.')));
+      }
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text('Could not open the app. Check that it is installed.')));
+    }
   }
 
   Future<void> _handleEditTarget(String type) async {
@@ -593,16 +611,16 @@ class _UnifiedDocumentDispatchSheetState
           backgroundColor: Theme.of(context).brightness == Brightness.dark
               ? AppTheme.darkCard
               : AppTheme.lightCard,
-          title: Text(isEmail ? 'Edit Recipient Email' : 'Edit Recipient Phone'),
+          title:
+              Text(isEmail ? 'Edit Recipient Email' : 'Edit Recipient Phone'),
           content: TextField(
             controller: controller,
             autofocus: true,
             keyboardType:
                 isEmail ? TextInputType.emailAddress : TextInputType.phone,
             decoration: InputDecoration(
-              labelText: isEmail
-                  ? 'Email Address'
-                  : 'Phone Number with Country Code',
+              labelText:
+                  isEmail ? 'Email Address' : 'Phone Number with Country Code',
               hintText:
                   isEmail ? 'e.g. user@example.com' : 'e.g. +1 555 123 4567',
             ),
@@ -630,7 +648,7 @@ class _UnifiedDocumentDispatchSheetState
             if (ch.channel == 'email') {
               ch.target = res;
               ch.subtitle = 'To: $res';
-              if (res.isNotEmpty) ch.isSelected = true;
+              if (res.isNotEmpty && ch.isCloudChannel) ch.isSelected = true;
             }
           }
         } else {
@@ -639,7 +657,7 @@ class _UnifiedDocumentDispatchSheetState
             if (ch.channel == 'whatsapp' || ch.channel == 'sms') {
               ch.target = res;
               ch.subtitle = 'To: $res';
-              if (res.isNotEmpty) ch.isSelected = true;
+              if (res.isNotEmpty && ch.isCloudChannel) ch.isSelected = true;
             }
           }
         }
@@ -648,7 +666,8 @@ class _UnifiedDocumentDispatchSheetState
   }
 
   Future<void> _handleDispatch() async {
-    final selected = _channels.where((c) => c.isSelected).toList();
+    final selected =
+        _channels.where((c) => c.isCloudChannel && c.isSelected).toList();
     if (selected.isEmpty) {
       ScaffoldMessenger.of(widget.parentContext).showSnackBar(
         const SnackBar(
@@ -670,21 +689,6 @@ class _UnifiedDocumentDispatchSheetState
     final sendEmail = selectedChannels.contains('email');
     final sendSms = selectedChannels.contains('sms');
 
-    if (widget.data.onChannelsDispatch != null) {
-      Navigator.of(context).pop();
-      widget.data.onChannelsDispatch!(selectedChannels, {
-        'phone': _targetPhone,
-        'email': _targetEmail,
-      });
-      return;
-    }
-
-    if (widget.data.onDispatch != null) {
-      Navigator.of(context).pop();
-      widget.data.onDispatch!(sendWhatsApp, sendEmail);
-      return;
-    }
-
     final hasDeskOrTable = (widget.data.tableName ?? '').isNotEmpty;
 
     if (sendWhatsApp && _targetPhone.isEmpty && !hasDeskOrTable) {
@@ -702,13 +706,11 @@ class _UnifiedDocumentDispatchSheetState
       if (_targetEmail.isEmpty) return;
     }
 
-    setState(() => _isDispatching = true);
-    final apiClient = widget.parentContext.read<ApiClient>();
-
     final payload = {
       'document_type': widget.data.documentType,
       'document_id': widget.data.documentId,
       'channels': selectedChannels,
+      'api_only': true,
       'send_whatsapp': sendWhatsApp,
       'send_email': sendEmail,
       'send_sms': sendSms,
@@ -716,67 +718,68 @@ class _UnifiedDocumentDispatchSheetState
       'email': _targetEmail,
     };
 
-    final endpoints = [
-      widget.data.dispatchEndpoint,
-      '/api/v1/documents/dispatch',
-      '/api/tenant/documents/dispatch',
-      '/api/v1/tenant/documents/dispatch',
-    ];
-
-    Map<String, dynamic>? response;
-
-    for (final endpoint in endpoints) {
-      try {
-        response = await apiClient.requestAbsolute(
-          endpoint,
-          method: 'POST',
-          data: payload,
-        );
-        break;
-      } catch (_) {}
+    if (!mounted) return;
+    if (widget.data.onChannelsDispatch != null) {
+      Navigator.of(context).pop();
+      widget.data.onChannelsDispatch!(selectedChannels, payload);
+      return;
+    }
+    // The legacy callback can represent only WhatsApp and email.
+    if (widget.data.onDispatch != null &&
+        selectedChannels
+            .every((channel) => ['whatsapp', 'email'].contains(channel))) {
+      Navigator.of(context).pop();
+      widget.data.onDispatch!(sendWhatsApp, sendEmail);
+      return;
     }
 
-    if (!mounted) return;
-    setState(() => _isDispatching = false);
-
-    if (response != null &&
-        (response['success'] == true || response['success'] == 1)) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(widget.parentContext).showSnackBar(
-        SnackBar(
-          content: Text(
-            response['message']?.toString() ??
-                'Dispatched successfully via selected channels.',
-          ),
-          backgroundColor: AppTheme.success,
-        ),
-      );
-
-      final returnedUrl =
-          (response['whatsapp_url'] ?? response['url'])?.toString().trim();
-      if (returnedUrl != null && returnedUrl.isNotEmpty) {
-        final uri = Uri.tryParse(returnedUrl);
-        if (uri != null && uri.hasScheme && uri.scheme.isNotEmpty) {
-          try {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          } catch (_) {}
-        }
-      }
-    } else {
-      // Platform fallback guarantees zero errors
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(widget.parentContext).showSnackBar(
-        const SnackBar(
-          content: Text('Dispatched successfully via platform fallback.'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
+    setState(() => _isDispatching = true);
+    try {
+      final apiClient = widget.parentContext.read<ApiClient>();
+      final response = await apiClient.requestAbsolute(
+          widget.data.dispatchEndpoint,
+          method: 'POST',
+          data: payload);
+      if (!mounted) return;
+      final success = response['success'] == true || response['success'] == 1;
+      final partial = response['status'] == 'partial';
+      final failures = response['failed'] is Map
+          ? (response['failed'] as Map)
+              .entries
+              .map((entry) => '${entry.key}: ${entry.value}')
+              .join('; ')
+          : '';
+      final message = [
+        response['message']?.toString() ??
+            (success ? 'Document sent.' : 'Document dispatch failed.'),
+        if (failures.isNotEmpty) failures
+      ].join(' ');
+      if (success && !partial) Navigator.of(context).pop();
+      ScaffoldMessenger.of(widget.parentContext).showSnackBar(SnackBar(
+        content: Text(message),
+        backgroundColor: !success
+            ? AppTheme.danger
+            : partial
+                ? AppTheme.warning
+                : AppTheme.success,
+      ));
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(widget.parentContext).showSnackBar(SnackBar(
+          content: Text(error is ApiException
+              ? error.message
+              : 'Document dispatch failed. Please try again.'),
+          backgroundColor: AppTheme.danger,
+        ));
+    } finally {
+      if (mounted) setState(() => _isDispatching = false);
     }
   }
 
   Future<void> _handleThermalPrint() async {
     Navigator.of(context).pop();
-    final target = await PrinterSelectionDialog.ensureSelected(widget.parentContext);
+    final target =
+        await PrinterSelectionDialog.ensureSelected(widget.parentContext);
     if (target == null || !widget.parentContext.mounted) return;
 
     final messenger = ScaffoldMessenger.of(widget.parentContext);
@@ -785,7 +788,8 @@ class _UnifiedDocumentDispatchSheetState
     final service = ThermalPrinterService();
     final ok = await service.printReceipt(
       companyName: widget.data.companyName,
-      documentLabel: '${widget.data.title ?? widget.data.documentType.toUpperCase()} ${widget.data.displayTitle}',
+      documentLabel:
+          '${widget.data.title ?? widget.data.documentType.toUpperCase()} ${widget.data.displayTitle}',
       lines: widget.data.lines,
       subtotal: widget.data.subtotal,
       discount: widget.data.discount,
@@ -802,7 +806,8 @@ class _UnifiedDocumentDispatchSheetState
     );
 
     messenger.showSnackBar(SnackBar(
-      content: Text(ok ? 'Sent to receipt printer.' : 'Could not reach receipt printer.'),
+      content: Text(
+          ok ? 'Sent to receipt printer.' : 'Could not reach receipt printer.'),
       backgroundColor: ok ? AppTheme.success : AppTheme.danger,
     ));
   }
@@ -815,13 +820,24 @@ class _UnifiedDocumentDispatchSheetState
     }
 
     final apiClient = widget.parentContext.read<ApiClient>();
+    final type = widget.data.documentType.toLowerCase().trim();
+    final usesDocumentSchema =
+        ['repair', 'ticket', 'job_sheet'].contains(type) ||
+            widget.data.pdfPath.contains('/preview-modal');
     Navigator.of(context).pop();
     Navigator.of(widget.parentContext).push(
       MaterialPageRoute(
-        builder: (_) => UnifiedDocumentPreviewScreen(
-          apiClient: apiClient,
-          data: widget.data,
-        ),
+        builder: (_) => usesDocumentSchema
+            ? DynamicSchemaPage(
+                apiClient: apiClient,
+                endpoint:
+                    '/api/v1/tenant/documents/${Uri.encodeComponent(type)}/${Uri.encodeComponent(widget.data.documentId)}/preview-modal?format=a4&preview_document=1',
+                initialTitle: widget.data.documentNumber,
+              )
+            : UnifiedDocumentPreviewScreen(
+                apiClient: apiClient,
+                data: widget.data,
+              ),
       ),
     );
   }
@@ -846,7 +862,9 @@ class _UnifiedDocumentDispatchSheetState
                 height: 4,
                 margin: const EdgeInsets.only(top: 10, bottom: 12),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFCBD5E1),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -896,40 +914,47 @@ class _UnifiedDocumentDispatchSheetState
             Divider(height: 1, color: borderColor),
             const SizedBox(height: 4),
 
-            // 1. Preview & Print (omitted for repair tickets, as tickets do not require a preview document)
-            if (widget.data.showPreview &&
-                widget.data.documentType != 'repair' &&
-                widget.data.documentType != 'ticket' &&
-                widget.data.documentType != 'job_sheet')
-              ListTile(
-                leading: const Icon(Icons.picture_as_pdf_outlined, color: AppTheme.activeLink, size: 22),
-                title: const Text(
-                  'Preview & Print',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  'Shared full-screen thermal/A4 preview with Print and Share',
-                  style: TextStyle(fontSize: 12, color: secondaryText),
-                ),
-                trailing: Icon(Icons.chevron_right_rounded, color: secondaryText, size: 20),
-                onTap: _handlePreview,
+            // Document utilities remain visible for every document and API configuration.
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined,
+                  color: AppTheme.activeLink, size: 22),
+              title: const Text(
+                'PDF Preview',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
+              subtitle: Text(
+                'Shared full-screen thermal/A4 preview with Print and Share',
+                style: TextStyle(fontSize: 12, color: secondaryText),
+              ),
+              trailing: Icon(Icons.chevron_right_rounded,
+                  color: secondaryText, size: 20),
+              onTap: _handlePreview,
+            ),
 
             // 2. Print on Receipt Printer
-            if (_supportsThermalPrint)
-              ListTile(
-                leading: const Icon(Icons.print_outlined, color: AppTheme.success, size: 22),
-                title: const Text(
-                  'Print on receipt printer',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  'Bluetooth / Network ESC/POS thermal printer',
-                  style: TextStyle(fontSize: 12, color: secondaryText),
-                ),
-                trailing: Icon(Icons.arrow_forward_ios_rounded, color: secondaryText, size: 14),
-                onTap: _handleThermalPrint,
+            ListTile(
+              leading: const Icon(Icons.print_outlined,
+                  color: AppTheme.success, size: 22),
+              title: const Text(
+                'Thermal Print',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
+              subtitle: Text(
+                'Bluetooth / Network ESC/POS thermal printer',
+                style: TextStyle(fontSize: 12, color: secondaryText),
+              ),
+              trailing: Icon(Icons.arrow_forward_ios_rounded,
+                  color: secondaryText, size: 14),
+              onTap: () {
+                if (_supportsThermalPrint) {
+                  _handleThermalPrint();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text(
+                          'Thermal printing is available on Android and iOS.')));
+                }
+              },
+            ),
 
             // Dynamic channel checkboxes (WhatsApp, SMS, Email, Webhook, Custom channels)
             ..._channels.map((channel) {
@@ -953,6 +978,33 @@ class _UnifiedDocumentDispatchSheetState
                 targetDisplay = channel.subtitle.isNotEmpty
                     ? channel.subtitle
                     : (channel.provider ?? 'Configured in Settings');
+              }
+
+              if (channel.isLocalIntent) {
+                return ListTile(
+                  key: ValueKey(channel.id),
+                  leading:
+                      Icon(channel.icon, color: channel.iconColor, size: 22),
+                  title: Text(channel.title,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
+                  subtitle: Row(children: [
+                    Expanded(
+                        child: Text(targetDisplay,
+                            style:
+                                TextStyle(fontSize: 12, color: secondaryText))),
+                    if (canEdit)
+                      TextButton(
+                          onPressed: () =>
+                              _handleEditTarget(isEmail ? 'email' : 'phone'),
+                          child: const Text('Edit')),
+                  ]),
+                  trailing: TextButton.icon(
+                      onPressed: () => _handleOpenDeviceApp(channel),
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: const Text('Open')),
+                  onTap: () => _handleOpenDeviceApp(channel),
+                );
               }
 
               return CheckboxListTile(
@@ -996,8 +1048,10 @@ class _UnifiedDocumentDispatchSheetState
                       ),
                   ],
                 ),
-                onChanged: (val) =>
-                    setState(() => channel.isSelected = val ?? false),
+                onChanged: _isDispatching || !channel.isCloudChannel
+                    ? null
+                    : (val) =>
+                        setState(() => channel.isSelected = val ?? false),
               );
             }),
 
@@ -1010,7 +1064,11 @@ class _UnifiedDocumentDispatchSheetState
                 width: double.infinity,
                 height: 48,
                 child: FilledButton.icon(
-                  onPressed: _isDispatching ? null : _handleDispatch,
+                  onPressed: _isDispatching ||
+                          !_channels.any((channel) =>
+                              channel.isCloudChannel && channel.isSelected)
+                      ? null
+                      : _handleDispatch,
                   icon: _isDispatching
                       ? const SizedBox(
                           width: 18,
@@ -1022,7 +1080,9 @@ class _UnifiedDocumentDispatchSheetState
                         )
                       : const Icon(Icons.send_rounded, size: 18),
                   label: Text(
-                    _isDispatching ? 'Dispatching...' : 'Send to Selected Channels',
+                    _isDispatching
+                        ? 'Dispatching...'
+                        : 'Send to Selected Channels',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -1065,21 +1125,24 @@ class UnifiedDocumentPreviewScreen extends StatefulWidget {
 
 class _UnifiedDocumentPreviewScreenState
     extends State<UnifiedDocumentPreviewScreen> {
-  int _selectedFormatIndex = 0; // 0: Thermal 80mm, 1: Standard A4, 2: Thermal 58mm
+  int _selectedFormatIndex =
+      0; // 0: Thermal 80mm, 1: Standard A4, 2: Thermal 58mm
 
   Future<void> _handleShare() async {
     final data = widget.data;
     final summary = [
       '${data.companyName} - ${data.displayTitle}',
       'Date: ${data.formattedTimestamp ?? DateFormat('d MMM yyyy').format(data.dateTime ?? DateTime.now())}',
-      if ((data.customerName ?? '').isNotEmpty) 'Customer: ${data.customerName}',
+      if ((data.customerName ?? '').isNotEmpty)
+        'Customer: ${data.customerName}',
       if ((data.tableName ?? '').isNotEmpty) 'Table: ${data.tableName}',
       if ((data.deviceModel ?? '').isNotEmpty) 'Device: ${data.deviceModel}',
       'Total: ${data.currencySymbol}${data.total.toStringAsFixed(2)}',
       'Status: ${data.status}',
     ].join('\n');
 
-    await Share.share(summary, subject: '${data.companyName} - ${data.displayTitle}');
+    await Share.share(summary,
+        subject: '${data.companyName} - ${data.displayTitle}');
   }
 
   Future<void> _handlePrint() async {
@@ -1104,10 +1167,12 @@ class _UnifiedDocumentPreviewScreenState
       final target = await PrinterSelectionDialog.ensureSelected(context);
       if (target == null || !mounted) return;
 
-      messenger.showSnackBar(const SnackBar(content: Text('Printing to receipt printer…')));
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Printing to receipt printer…')));
       final ok = await ThermalPrinterService().printReceipt(
         companyName: data.companyName,
-        documentLabel: '${data.title ?? data.documentType.toUpperCase()} ${data.displayTitle}',
+        documentLabel:
+            '${data.title ?? data.documentType.toUpperCase()} ${data.displayTitle}',
         lines: data.lines,
         subtotal: data.subtotal,
         discount: data.discount,
@@ -1124,7 +1189,9 @@ class _UnifiedDocumentPreviewScreenState
       );
 
       messenger.showSnackBar(SnackBar(
-        content: Text(ok ? 'Sent to receipt printer.' : 'Could not reach receipt printer.'),
+        content: Text(ok
+            ? 'Sent to receipt printer.'
+            : 'Could not reach receipt printer.'),
         backgroundColor: ok ? AppTheme.success : AppTheme.danger,
       ));
     }
@@ -1169,7 +1236,9 @@ class _UnifiedDocumentPreviewScreenState
               ],
             ),
           ),
-          Divider(height: 1, color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+          Divider(
+              height: 1,
+              color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
 
           // Main preview viewport
           Expanded(
@@ -1197,9 +1266,11 @@ class _UnifiedDocumentPreviewScreenState
                     icon: const Icon(Icons.share_rounded, size: 18),
                     label: const Text('Share'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: isDark ? AppTheme.darkHeading : AppTheme.lightHeading,
+                      foregroundColor:
+                          isDark ? AppTheme.darkHeading : AppTheme.lightHeading,
                       side: BorderSide(
-                        color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                        color:
+                            isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -1347,11 +1418,13 @@ class _UnifiedDocumentPreviewScreenState
                 Text(
                   data.subtitleContext,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF475569)),
+                  style:
+                      const TextStyle(fontSize: 10, color: Color(0xFF475569)),
                 ),
 
                 const SizedBox(height: 12),
-                const Text('--------------------------------------------------'),
+                const Text(
+                    '--------------------------------------------------'),
                 const SizedBox(height: 6),
 
                 // Line items
@@ -1368,7 +1441,8 @@ class _UnifiedDocumentPreviewScreenState
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Text('${data.currencySymbol}${line.lineTotal.toStringAsFixed(2)}'),
+                          Text(
+                              '${data.currencySymbol}${line.lineTotal.toStringAsFixed(2)}'),
                         ],
                       ),
                     ),
@@ -1377,13 +1451,15 @@ class _UnifiedDocumentPreviewScreenState
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(data.title ?? 'Service / Order Payload'),
-                      Text('${data.currencySymbol}${data.total.toStringAsFixed(2)}'),
+                      Text(
+                          '${data.currencySymbol}${data.total.toStringAsFixed(2)}'),
                     ],
                   ),
                 ],
 
                 const SizedBox(height: 6),
-                const Text('--------------------------------------------------'),
+                const Text(
+                    '--------------------------------------------------'),
                 const SizedBox(height: 6),
 
                 // Financial summary
@@ -1392,7 +1468,8 @@ class _UnifiedDocumentPreviewScreenState
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('Subtotal:'),
-                      Text('${data.currencySymbol}${data.subtotal.toStringAsFixed(2)}'),
+                      Text(
+                          '${data.currencySymbol}${data.subtotal.toStringAsFixed(2)}'),
                     ],
                   ),
                 if (data.tax > 0)
@@ -1400,7 +1477,8 @@ class _UnifiedDocumentPreviewScreenState
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('${data.taxLabel} (${data.taxRate}%):'),
-                      Text('${data.currencySymbol}${data.tax.toStringAsFixed(2)}'),
+                      Text(
+                          '${data.currencySymbol}${data.tax.toStringAsFixed(2)}'),
                     ],
                   ),
                 if (data.discount > 0)
@@ -1408,17 +1486,21 @@ class _UnifiedDocumentPreviewScreenState
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('Discount:'),
-                      Text('-${data.currencySymbol}${data.discount.toStringAsFixed(2)}'),
+                      Text(
+                          '-${data.currencySymbol}${data.discount.toStringAsFixed(2)}'),
                     ],
                   ),
                 const SizedBox(height: 4),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('TOTAL:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Text('TOTAL:',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13)),
                     Text(
                       '${data.currencySymbol}${data.total.toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                   ],
                 ),
@@ -1428,17 +1510,24 @@ class _UnifiedDocumentPreviewScreenState
                 // Contrast Badges: subtle tint pills
                 Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isPaid ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+                      color: isPaid
+                          ? const Color(0xFFECFDF5)
+                          : const Color(0xFFFEF2F2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      isPaid ? 'PAID IN FULL' : 'PAYMENT DUE: ${data.currencySymbol}${data.dueAmount.toStringAsFixed(2)}',
+                      isPaid
+                          ? 'PAID IN FULL'
+                          : 'PAYMENT DUE: ${data.currencySymbol}${data.dueAmount.toStringAsFixed(2)}',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: isPaid ? const Color(0xFF065F46) : const Color(0xFF991B1B),
+                        color: isPaid
+                            ? const Color(0xFF065F46)
+                            : const Color(0xFF991B1B),
                       ),
                     ),
                   ),

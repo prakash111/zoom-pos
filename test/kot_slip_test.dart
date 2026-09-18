@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:zoom_pos_mobile/core/api/api_client.dart';
 import 'package:zoom_pos_mobile/core/models/restaurant_models.dart';
 import 'package:zoom_pos_mobile/features/restaurant/widgets/kot_slip.dart';
 
@@ -86,18 +88,85 @@ void main() {
 
     expect(find.text('KOT-DEMO-002'), findsOneWidget);
     expect(find.text('Table: T-04 • Sent at 14:05'), findsOneWidget);
-    expect(find.text('Preview & Print'), findsOneWidget);
-    expect(find.text('Print on receipt printer'), findsOneWidget);
-    expect(find.text('Send via WhatsApp'), findsOneWidget);
-    expect(find.text('Send via Email'), findsOneWidget);
+    expect(find.text('PDF Preview'), findsOneWidget);
+    expect(find.text('Thermal Print'), findsOneWidget);
+    expect(find.text('Open WhatsApp App'), findsOneWidget);
+    expect(find.text('Open Mail App'), findsOneWidget);
+    expect(find.text('Open Messages / SMS'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Send to Selected Channels'),
         findsOneWidget);
 
     // No transient snackbar for the KOT feedback.
     expect(find.byType(SnackBar), findsNothing);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Send to Selected Channels'));
-    await tester.pumpAndSettle();
-    expect(find.text('KOT-DEMO-002'), findsNothing);
+    expect(
+        tester
+            .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Send to Selected Channels'))
+            .onPressed,
+        isNull);
   });
+
+  testWidgets(
+      'KOT dispatch sends all selected cloud channels through the shared API',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(450, 1100);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final api = _KitchenDispatchApi();
+    await tester.pumpWidget(Provider<ApiClient>.value(
+      value: api,
+      child: MaterialApp(
+          home: Scaffold(
+              body: Builder(
+                  builder: (context) => ElevatedButton(
+                        onPressed: () =>
+                            showKotTicketSheet(context, _kot(const {})),
+                        child: const Text('open'),
+                      )))),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Open WhatsApp App'), findsOneWidget);
+    await tester.tap(find.text('Send to Selected Channels'));
+    await tester.pumpAndSettle();
+    expect(api.dispatchEndpoint, '/api/v1/documents/dispatch');
+    expect(api.payload!['document_type'], 'kot');
+    expect(api.payload!['document_id'], 'k1');
+    expect(api.payload!['channels'], ['email', 'sms']);
+    expect(api.payload!['api_only'], true);
+    expect(api.payload!['email'], 'kitchen@example.com');
+    expect(api.payload!['phone'], '+15550001111');
+  });
+}
+
+class _KitchenDispatchApi implements ApiClient {
+  String? dispatchEndpoint;
+  Map<String, dynamic>? payload;
+
+  @override
+  Future<Map<String, dynamic>> requestAbsolute(
+    String path, {
+    String method = 'GET',
+    Map<String, dynamic>? data,
+    Map<String, dynamic>? query,
+  }) async {
+    if (method == 'GET') {
+      return {
+        'customer': {'phone': '+15550001111', 'email': 'kitchen@example.com'},
+        'channels': {
+          'whatsapp': {'api_enabled': false},
+          'email': {'api_enabled': true, 'default': true},
+          'sms': {'api_enabled': true, 'default': true},
+        },
+      };
+    }
+    dispatchEndpoint = path;
+    payload = data;
+    return {'success': true, 'message': 'Kitchen ticket sent.'};
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
