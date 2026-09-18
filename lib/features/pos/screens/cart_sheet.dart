@@ -13,15 +13,22 @@ import '../../../l10n/app_localizations.dart';
 import '../../auth/auth_provider.dart';
 import '../../customers/customers_repository.dart';
 import '../pos_provider.dart';
+import '../../../core/services/thermal/thermal_printer_service.dart';
 import 'customer_picker_sheet.dart';
+import 'invoice_actions_sheet.dart';
 import 'invoice_preview_screen.dart';
 
 /// The modernized POS Cart & Checkout sheet supporting dynamic payment options,
 /// action pills (Hold, Customer, Note, More), and country-wise GST tax breakdown.
 class CartSheet extends StatelessWidget {
-  const CartSheet({super.key, required this.customersRepository});
+  const CartSheet({
+    super.key,
+    required this.customersRepository,
+    this.onCheckoutCompleted,
+  });
 
   final CustomersRepository customersRepository;
+  final ValueChanged<PosCheckoutResult>? onCheckoutCompleted;
 
   Future<void> _pickDueDate(BuildContext context) async {
     final pos = context.read<PosProvider>();
@@ -341,7 +348,59 @@ class CartSheet extends StatelessWidget {
     if (!context.mounted) return;
 
     if (result != null) {
-      Navigator.of(context).pop(result);
+      if (onCheckoutCompleted != null) {
+        onCheckoutCompleted!(result);
+      } else {
+        final modalRoute = ModalRoute.of(context);
+        final isDialogOrSheet = modalRoute is PopupRoute;
+        if (isDialogOrSheet && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(result);
+        } else {
+          if (result.isPendingSync) {
+            messenger.showSnackBar(
+              SnackBar(
+                  content: Text(AppLocalizations.of(context).saleQueuedOffline)),
+            );
+            return;
+          }
+          messenger.showSnackBar(
+              SnackBar(content: Text(AppLocalizations.of(context).saleCompleted)));
+          await showInvoiceActionsSheet(
+            context,
+            InvoiceActionsData(
+              documentType: 'invoice',
+              documentId: result.saleId,
+              documentNumber: result.saleNumber,
+              companyName: company?.tradeName ?? company?.name ?? '',
+              customerName: result.customerName,
+              customerPhone: result.customerPhone,
+              customerEmail: result.customerEmail,
+              currencySymbol: company?.currencySymbol ?? '\$',
+              subtotal: result.subtotal,
+              discount: result.discount,
+              tax: result.tax,
+              total: result.total,
+              taxId: company?.taxId,
+              taxLabel: company?.taxLabel ?? 'Tax',
+              isIndia: company?.isIndia ?? false,
+              taxRate: (result.subtotal - result.discount) > 0
+                  ? result.tax / (result.subtotal - result.discount) * 100
+                  : 0,
+              paidAmount: result.paidAmount,
+              dueAmount: result.dueAmount,
+              batchDispatchEndpoint: '/api/v1/tenant/dispatch/batch-send',
+              lines: result.items
+                  .map((item) => ReceiptLine(
+                        name: item.product.name,
+                        quantity: item.quantity,
+                        unitPrice: item.product.salePrice,
+                        lineTotal: item.lineTotal,
+                      ))
+                  .toList(),
+            ),
+          );
+        }
+      }
     } else if (pos.checkoutError != null) {
       messenger.showSnackBar(SnackBar(content: Text(pos.checkoutError!)));
     }

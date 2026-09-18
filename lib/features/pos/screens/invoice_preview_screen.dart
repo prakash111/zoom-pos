@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../settings/screens/printer_selection_dialog.dart';
 import '../cart_item.dart';
 
@@ -297,11 +298,8 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
   /// The same unified bottom-sheet popup used after a sale is finalized —
   /// print / thermal / share / direct dispatch all live inside it.
   Future<void> _openActionsSheet() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    await showAdaptiveSheet<void>(
+      context,
       builder: (sheetCtx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,

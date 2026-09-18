@@ -15,6 +15,7 @@ import '../config/app_config.dart';
 import '../config/theme.dart';
 import '../sdui/screens/dynamic_schema_page.dart';
 import '../services/thermal/thermal_printer_service.dart';
+import '../utils/responsive.dart';
 import 'adaptive_sheet.dart';
 import '../../features/settings/screens/printer_selection_dialog.dart';
 
@@ -855,19 +856,36 @@ class _UnifiedDocumentDispatchSheetState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Top drag handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(top: 10, bottom: 12),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF334155)
-                      : const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(2),
+            // Top header bar with drag handle and close button
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                if (!isWide(context))
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(top: 10, bottom: 12),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(height: 16),
+                Positioned(
+                  right: 8,
+                  top: 2,
+                  child: IconButton(
+                    tooltip: 'Close',
+                    icon: Icon(Icons.close, size: 20, color: secondaryText),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
                 ),
-              ),
+              ],
             ),
 
             // Centered Document Identifier Header

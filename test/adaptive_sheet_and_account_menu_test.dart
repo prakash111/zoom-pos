@@ -80,5 +80,33 @@ void main() {
       expect(find.text('Mobile Sheet Content'), findsOneWidget);
       expect(find.byType(BottomSheet), findsOneWidget);
     });
+
+    testWidgets('showInvoiceActionsSheet opens cleanly on wide viewport',
+        (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(testHost(
+        Builder(builder: (context) {
+          return ElevatedButton(
+            onPressed: () {
+              showAdaptiveSheet(
+                context,
+                builder: (_) => const Text('Invoice Actions Content'),
+              );
+            },
+            child: const Text('Open Invoice Actions'),
+          );
+        }),
+      ));
+
+      await tester.tap(find.text('Open Invoice Actions'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Dialog), findsOneWidget);
+      expect(find.text('Invoice Actions Content'), findsOneWidget);
+    });
   });
 }

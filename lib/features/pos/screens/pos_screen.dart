@@ -117,20 +117,9 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     }
   }
 
-  Future<void> _openCart(BuildContext context) async {
-    final posProvider = context.read<PosProvider>();
-    final customersRepository = CustomersRepository(context.read<ApiClient>());
+  Future<void> _handleCheckoutResult(
+      BuildContext context, PosCheckoutResult result) async {
     final company = context.read<AuthProvider>().company;
-
-    final result = await showAdaptiveSheet<PosCheckoutResult>(
-      context,
-      builder: (_) => ChangeNotifierProvider.value(
-        value: posProvider,
-        child: CartSheet(customersRepository: customersRepository),
-      ),
-    );
-
-    if (result == null || !context.mounted) return;
 
     if (result.isPendingSync) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -175,6 +164,27 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
             .toList(),
       ),
     );
+  }
+
+  Future<void> _openCart(BuildContext context) async {
+    final posProvider = context.read<PosProvider>();
+    final customersRepository = CustomersRepository(context.read<ApiClient>());
+
+    final result = await showAdaptiveSheet<PosCheckoutResult>(
+      context,
+      builder: (sheetCtx) => ChangeNotifierProvider.value(
+        value: posProvider,
+        child: CartSheet(
+          customersRepository: customersRepository,
+          onCheckoutCompleted: (checkoutResult) {
+            Navigator.of(sheetCtx).pop(checkoutResult);
+          },
+        ),
+      ),
+    );
+
+    if (result == null || !context.mounted) return;
+    await _handleCheckoutResult(context, result);
   }
 
   @override
@@ -360,8 +370,11 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
                 SizedBox(
                   width: 400,
                   child: CartSheet(
-                      customersRepository:
-                          CustomersRepository(context.read<ApiClient>())),
+                    customersRepository:
+                        CustomersRepository(context.read<ApiClient>()),
+                    onCheckoutCompleted: (result) =>
+                        _handleCheckoutResult(context, result),
+                  ),
                 ),
               ],
             )
