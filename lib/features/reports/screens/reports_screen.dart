@@ -1,9 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/report_models.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/file_download/file_download.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
@@ -101,44 +99,25 @@ class _ReportsScreenBodyState extends State<_ReportsScreenBody> with SingleTicke
     reports.setDateRange(picked.start, picked.end);
   }
 
-  /// Saves the report as a `.csv` file via the OS's native save-file dialog,
-  /// instead of the previous clipboard-copy — a desktop user expects a real
-  /// file they can open in a spreadsheet app, not a paste target.
+  /// Saves or downloads the report as a `.csv` file via FileDownloadHelper,
+  /// supporting browser downloads on Web and native save dialogs on Desktop/Mobile.
   Future<void> _exportCsv(BuildContext context) async {
     final reports = context.read<ReportsProvider>();
     final key = _exportKeys[_tabController.index];
     if (key == null) return;
 
-    final isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
-
     try {
       final csv = await reports.exportCsv(key);
       final fileName = 'report_${key}_${DateTime.now().millisecondsSinceEpoch}.csv';
+      final bytes = Uint8List.fromList(utf8.encode(csv));
 
-      String? savedPath;
-      if (isDesktop) {
-        // On desktop, saveFile only opens the picker and returns the chosen
-        // path — the caller writes the file itself.
-        savedPath = await FilePicker.platform.saveFile(
-          dialogTitle: 'Save report',
-          fileName: fileName,
-          type: FileType.custom,
-          allowedExtensions: ['csv'],
-        );
-        if (savedPath == null) return; // user cancelled
-        await File(savedPath).writeAsString(csv);
-      } else {
-        // On Android/iOS/web, the plugin needs the bytes up front and
-        // writes (or hands off) the file itself.
-        savedPath = await FilePicker.platform.saveFile(
-          dialogTitle: 'Save report',
-          fileName: fileName,
-          bytes: Uint8List.fromList(utf8.encode(csv)),
-        );
-        if (savedPath == null) return; // user cancelled
-      }
+      final saved = await FileDownloadHelper.saveOrDownloadFile(
+        fileName: fileName,
+        bytes: bytes,
+        mimeType: 'text/csv',
+      );
 
-      if (!context.mounted) return;
+      if (!saved || !context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Report saved.'),
