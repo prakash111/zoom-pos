@@ -1,0 +1,143 @@
+name: Web Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_href:
+        description: 'Base href for Flutter web (e.g. / or /zoom-pos/)'
+        required: false
+        default: '/'
+        type: string
+      deploy_to_pages:
+        description: 'Deploy to GitHub Pages'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - main
+      - feat/windows-offline-sync
+    tags:
+      - "v*.*.*"
+      - "mobile-v*"
+      - "web-v*"
+  pull_request:
+    branches:
+      - main
+      - feat/windows-offline-sync
+
+permissions:
+  contents: write # needed to attach the web archive to a GitHub Release
+  pages: write    # needed if deploying to GitHub Pages
+  id-token: write # needed for GitHub Pages deployment authentication
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build-web-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter (stable, cached)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Extract app version from pubspec.yaml
+        id: version
+        run: |
+          APP_VERSION=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          BUILD_NUMBER=$(grep -m1 '^version:' pubspec.yaml | sed -nE 's/.*\+([0-9]+).*/\1/p')
+          if [ -z "$APP_VERSION" ]; then
+            echo "Could not determine app version from pubspec.yaml"
+            exit 1
+          fi
+          echo "App version: $APP_VERSION (build: $BUILD_NUMBER)"
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+          echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Ensure Web platform scaffold exists
+        run: |
+          flutter config --enable-web
+          if [ ! -d "web" ]; then
+            echo "web/ directory missing, creating scaffold..."
+            flutter create --platforms=web .
+          else
+            echo "web/ directory is already present."
+          fi
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Run Flutter tests
+        run: flutter test
+
+      - name: Build Flutter Web release
+        run: |
+          BASE_HREF="${{ inputs.base_href || '/' }}"
+          echo "Building Flutter Web release with base-href: $BASE_HREF"
+          flutter build web --release --base-href "$BASE_HREF"
+
+      - name: Prepare release artifacts
+        run: |
+          mkdir -p release-output
+          (cd build/web && zip -r "../../release-output/zoom-pos-web-v${{ env.APP_VERSION }}.zip" .)
+          cp "release-output/zoom-pos-web-v${{ env.APP_VERSION }}.zip" "release-output/zoom-pos-web-release.zip"
+
+      - name: Upload Web build artifact (best-effort)
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZoomPOS-Web-v${{ env.APP_VERSION }}
+          path: |
+            build/web/
+            release-output/zoom-pos-web-v${{ env.APP_VERSION }}.zip
+            release-output/zoom-pos-web-release.zip
+          if-no-files-found: warn
+          retention-days: 5
+
+      # Publish the web zip as GitHub Release assets — Release storage is
+      # separate from (and far larger than) the Actions artifact quota, so
+      # this matches the Android and Windows release distribution path.
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-output/zoom-pos-web-v${{ env.APP_VERSION }}.zip
+            release-output/zoom-pos-web-release.zip
+          fail_on_unmatched_files: true
+          tag_name: >-
+            ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name
+            || format('web-build-{0}', github.run_number) }}
+          name: >-
+            ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name
+            || format('Web Build {0} (build {1})', env.APP_VERSION, github.run_number) }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          make_latest: ${{ startsWith(github.ref, 'refs/tags/') }}
+          generate_release_notes: ${{ startsWith(github.ref, 'refs/tags/') }}
+          body: >-
+            Flutter Web release archive built from
+            `${{ github.ref_name }}` @ ${{ github.sha }}.
+
+      - name: Setup Pages
+        if: ${{ inputs.deploy_to_pages == true }}
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: ${{ inputs.deploy_to_pages == true }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - name: Deploy to GitHub Pages
+        if: ${{ inputs.deploy_to_pages == true }}
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -38,7 +39,7 @@ class ThermalPrinterService {
   /// frame. The print plugin owns the platform request and returns immediately
   /// on iOS, Windows, and already-authorized devices.
   static Future<bool> requestBluetoothPermission() async {
-    if (!Platform.isAndroid) return true;
+    if (kIsWeb || !Platform.isAndroid) return true;
     try {
       return await PrintBluetoothThermal.isPermissionBluetoothGranted
           .timeout(const Duration(seconds: 8), onTimeout: () => false);
@@ -60,6 +61,7 @@ class ThermalPrinterService {
   }
 
   Future<bool> get bluetoothEnabled async {
+    if (kIsWeb || !Platform.isAndroid) return false;
     try {
       return await PrintBluetoothThermal.bluetoothEnabled.timeout(
         const Duration(seconds: 3),
@@ -71,6 +73,7 @@ class ThermalPrinterService {
   }
 
   Future<List<BluetoothInfo>> pairedDevices() async {
+    if (kIsWeb || !Platform.isAndroid) return <BluetoothInfo>[];
     try {
       return await PrintBluetoothThermal.pairedBluetooths.timeout(
         const Duration(seconds: 4),
@@ -98,6 +101,7 @@ class ThermalPrinterService {
   }
 
   Future<bool> connect(String macAddress) async {
+    if (kIsWeb || !Platform.isAndroid) return false;
     try {
       return await PrintBluetoothThermal.connect(macPrinterAddress: macAddress)
           .timeout(
@@ -110,6 +114,7 @@ class ThermalPrinterService {
   }
 
   Future<bool> get isConnected async {
+    if (kIsWeb || !Platform.isAndroid) return false;
     try {
       return await PrintBluetoothThermal.connectionStatus.timeout(
         const Duration(seconds: 3),

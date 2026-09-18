@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io' show Directory, File, Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// One queued offline sale — a row in `outbox_sync`, storing the exact
@@ -179,7 +181,8 @@ class AppDatabase {
 
   static final AppDatabase instance = AppDatabase._();
 
-  static bool get _usesJsonStore => Platform.isWindows || Platform.isLinux;
+  static bool get _usesJsonStore =>
+      kIsWeb || (!kIsWeb && (Platform.isWindows || Platform.isLinux));
 
   /// Bump when the sqflite schema changes (see [_open] onUpgrade). The JSON
   /// store is schemaless so it ignores this.
@@ -278,6 +281,16 @@ class AppDatabase {
   /// Reads [name].json, decoded as JSON, or [fallback] if the file doesn't
   /// exist yet (first run) or is empty.
   Future<dynamic> _readJson(String name, dynamic fallback) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      final text = prefs.getString('offline_db_$name');
+      if (text == null || text.trim().isEmpty) return fallback;
+      try {
+        return jsonDecode(text);
+      } catch (_) {
+        return fallback;
+      }
+    }
     final file = await _jsonFile(name);
     if (!await file.exists()) return fallback;
     final text = await file.readAsString();
@@ -290,6 +303,11 @@ class AppDatabase {
   /// can never leave a half-written (unparseable) file — the previous good
   /// copy stays intact until the rename completes.
   Future<void> _writeJson(String name, dynamic data) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('offline_db_$name', jsonEncode(data));
+      return;
+    }
     final file = await _jsonFile(name);
     final tmp = File('${file.path}.tmp');
     await tmp.writeAsString(jsonEncode(data), flush: true);

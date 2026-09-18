@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,7 +29,7 @@ final GlobalKey<ScaffoldMessengerState> appMessengerKey =
 
 @pragma('vm:entry-point')
 Future<void> firebasePushBackgroundHandler(RemoteMessage message) async {
-  if (!Platform.isAndroid) return;
+  if (kIsWeb || !Platform.isAndroid) return;
   await _initializeFirebaseFromCache();
   await _showLocalMessage(message.data);
 }
@@ -199,7 +200,7 @@ class PushNotificationService {
   /// Immediately prompts the user for notification permissions on app launch (Android 13+)
   /// without waiting for remote configs or backend roundtrips.
   Future<void> promptNotificationPermissionOnLaunch() async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
     try {
       await _ensureLocalInitialized();
       final androidNotifications = _local.resolvePlatformSpecificImplementation<
@@ -223,7 +224,7 @@ class PushNotificationService {
   Future<void> initialize(
       {required ApiClient apiClient,
       required AuthProvider authProvider}) async {
-    if (!Platform.isAndroid || _ready) return;
+    if (kIsWeb || !Platform.isAndroid || _ready) return;
     _apiClient = apiClient;
     _authProvider = authProvider;
     FirebaseMessaging.onBackgroundMessage(firebasePushBackgroundHandler);
@@ -376,7 +377,7 @@ class PushNotificationService {
       await _apiClient?.post(ApiEndpoints.pushDevices, data: {
         'token': token,
         'platform': 'android',
-        'device_name': Platform.localHostname,
+        'device_name': kIsWeb ? 'Web Browser' : Platform.localHostname,
       });
     } catch (error) {
       debugPrint('Push device registration failed: $error');
