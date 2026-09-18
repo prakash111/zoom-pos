@@ -1,8 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/config/platform_branding_provider.dart';
+import '../../../core/widgets/app_network_image.dart';
 import 'auth_illustration.dart';
 import 'auth_widgets.dart';
 
@@ -64,12 +64,12 @@ class AuthScaffold extends StatelessWidget {
   final double maxCardWidth;
 
   Widget _logo(PlatformBrandingProvider branding) => branding.hasLogo
-      ? CachedNetworkImage(
+      ? AppNetworkImage(
           imageUrl: branding.brandLogoUrl!,
           height: 40,
           fit: BoxFit.contain,
           alignment: Alignment.centerLeft,
-          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+          fallbackIcon: Icons.storefront,
         )
       : const SizedBox.shrink();
 

@@ -107,13 +107,23 @@ class PosCatalogItem {
   bool get isLowStock => stock != null && stock! > 0 && stock! <= 5;
 
   static PosCatalogItem fromJson(Map<String, dynamic> json) {
+    final rawImage = json['image_url'] ??
+        json['imageUrl'] ??
+        json['image'] ??
+        json['image_path'] ??
+        json['thumbnail'] ??
+        json['photo'];
+    final imageUrl = (rawImage != null && rawImage.toString().trim().isNotEmpty)
+        ? rawImage.toString().trim()
+        : null;
+
     return PosCatalogItem(
       id: json['id'],
       categoryId: json['category_id'],
       title: json['title']?.toString() ?? '',
       subtitle: json['subtitle']?.toString(),
       price: (json['price'] as num?)?.toDouble() ?? 0,
-      imageUrl: json['image_url']?.toString(),
+      imageUrl: imageUrl,
       stock: (json['stock'] as num?)?.toInt(),
       badge: json['badge'] is Map
           ? PosCatalogBadge.fromJson(

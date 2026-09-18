@@ -1,10 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/product_model.dart';
 import '../../utils/currency_formatter.dart';
-import '../../utils/image_url.dart';
 import '../../utils/responsive.dart';
+import '../app_network_image.dart';
 
 /// Agnostic layout builder for catalog items supporting grid or list presentations.
 class SduiCatalogLayout extends StatelessWidget {
@@ -98,7 +97,6 @@ class SduiProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final resolvedImageUrl = resolveImageUrl(product.imageUrl, baseUrl: baseUrl);
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -115,24 +113,12 @@ class SduiProductCard extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: SizedBox.expand(
-                    child: resolvedImageUrl == null
-                        ? Container(
-                            color: Colors.grey.shade100,
-                            child: Center(
-                              child: Icon(Icons.inventory_2_outlined, size: 36, color: Colors.grey.shade400),
-                            ),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: resolvedImageUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => const Center(
-                              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                            ),
-                            errorWidget: (_, __, ___) => Container(
-                              color: Colors.grey.shade100,
-                              child: Icon(Icons.broken_image_outlined, color: Colors.grey.shade400),
-                            ),
-                          ),
+                    child: AppNetworkImage(
+                      imageUrl: product.imageUrl,
+                      baseUrl: baseUrl,
+                      fit: BoxFit.cover,
+                      fallbackIcon: Icons.inventory_2_outlined,
+                    ),
                   ),
                 ),
               ),
@@ -183,7 +169,6 @@ class SduiProductListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final resolvedImageUrl = resolveImageUrl(product.imageUrl, baseUrl: baseUrl);
 
     return Card(
       child: ListTile(
@@ -192,17 +177,12 @@ class SduiProductListTile extends StatelessWidget {
           child: SizedBox(
             width: 48,
             height: 48,
-            child: resolvedImageUrl == null
-                ? Container(
-                    color: Colors.grey.shade100,
-                    child: Icon(Icons.inventory_2_outlined, color: Colors.grey.shade400),
-                  )
-                : CachedNetworkImage(
-                    imageUrl: resolvedImageUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
-                    errorWidget: (_, __, ___) => Icon(Icons.broken_image_outlined, color: Colors.grey.shade400),
-                  ),
+            child: AppNetworkImage(
+              imageUrl: product.imageUrl,
+              baseUrl: baseUrl,
+              fit: BoxFit.cover,
+              fallbackIcon: Icons.inventory_2_outlined,
+            ),
           ),
         ),
         title: Text(product.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),

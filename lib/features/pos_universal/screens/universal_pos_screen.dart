@@ -64,8 +64,9 @@ class _UniversalPosScreenState extends State<UniversalPosScreen> {
   void initState() {
     super.initState();
     _cart.addListener(_onCartChanged);
+    _baseUrl = context.read<ApiClient>().currentBaseUrlSync;
     context.read<ApiClient>().currentBaseUrl().then((url) {
-      if (mounted) setState(() => _baseUrl = url);
+      if (mounted && _baseUrl != url) setState(() => _baseUrl = url);
     });
     _fetchScreen();
   }

@@ -1,8 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/utils/currency_formatter.dart';
-import '../../../core/utils/image_url.dart';
+import '../../../core/widgets/app_network_image.dart';
 import '../pos_screen_model.dart';
 
 /// Visual counterpart to `SduiProductCard`
@@ -26,7 +25,6 @@ class UniversalCatalogCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final resolvedImageUrl = resolveImageUrl(item.imageUrl, baseUrl: baseUrl);
     final badge = item.badge;
 
     return Card(
@@ -44,29 +42,12 @@ class UniversalCatalogCard extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: SizedBox.expand(
-                    child: resolvedImageUrl == null
-                        ? Container(
-                            color: Colors.grey.shade100,
-                            child: Center(
-                              child: Icon(Icons.inventory_2_outlined,
-                                  size: 36, color: Colors.grey.shade400),
-                            ),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: resolvedImageUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => const Center(
-                              child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2)),
-                            ),
-                            errorWidget: (_, __, ___) => Container(
-                              color: Colors.grey.shade100,
-                              child: Icon(Icons.broken_image_outlined,
-                                  color: Colors.grey.shade400),
-                            ),
-                          ),
+                    child: AppNetworkImage(
+                      imageUrl: item.imageUrl,
+                      baseUrl: baseUrl,
+                      fit: BoxFit.cover,
+                      fallbackIcon: Icons.inventory_2_outlined,
+                    ),
                   ),
                 ),
               ),

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../api/api_exception.dart';
 import '../models/settings_models.dart';
 import '../services/dynamic_string_service.dart';
+import '../widgets/app_network_image.dart';
 import '../widgets/sdui/sdui_controls.dart';
 import 'components/navigation_tree_builder.dart';
 import 'dynamic_schema_context.dart';
@@ -669,23 +669,12 @@ class DynamicSchemaParser {
 
     if (url.isEmpty) return const SizedBox.shrink();
 
-    Widget img = CachedNetworkImage(
+    Widget img = AppNetworkImage(
       imageUrl: url,
       width: width,
       height: height,
       fit: BoxFit.cover,
-      placeholder: (_, __) => Container(
-        width: width,
-        height: height,
-        color: Colors.grey.shade200,
-        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      ),
-      errorWidget: (_, __, ___) => Container(
-        width: width,
-        height: height,
-        color: Colors.grey.shade200,
-        child: const Icon(Icons.broken_image, color: Colors.grey),
-      ),
+      fallbackIcon: Icons.broken_image,
     );
 
     if (borderRadius > 0) {
@@ -3703,11 +3692,11 @@ class _SduiFileUploadFieldState extends State<_SduiFileUploadField> {
           Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
           if (hasFile) ...[
             const SizedBox(height: 8),
-            CachedNetworkImage(
+            AppNetworkImage(
               imageUrl: _url!,
               height: 88,
               fit: BoxFit.contain,
-              errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
+              fallbackIcon: Icons.broken_image,
             ),
           ],
           const SizedBox(height: 8),
@@ -4061,13 +4050,12 @@ class _PreviewCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: isImage
-                ? CachedNetworkImage(
+                ? AppNetworkImage(
                     imageUrl: url,
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) =>
-                        const Icon(Icons.broken_image_outlined),
+                    fallbackIcon: Icons.broken_image_outlined,
                   )
                 : Container(
                     width: 56,

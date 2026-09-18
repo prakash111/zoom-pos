@@ -10,11 +10,19 @@ import '../config/app_config.dart';
 String? resolveImageUrl(String? rawUrl, {String? baseUrl}) {
   if (rawUrl == null || rawUrl.trim().isEmpty) return null;
   final value = rawUrl.trim();
-  if (value.startsWith('http://') || value.startsWith('https://')) {
+  if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('data:image/')) {
     return value;
   }
-  final host = (baseUrl == null || baseUrl.trim().isEmpty) ? AppConfig.defaultBaseUrl : baseUrl.trim();
-  final normalizedHost = host.endsWith('/') ? host.substring(0, host.length - 1) : host;
+  if (value.startsWith('//')) {
+    return 'https:$value';
+  }
+
+  var host = (baseUrl == null || baseUrl.trim().isEmpty) ? AppConfig.defaultBaseUrl : baseUrl.trim();
+  host = host.replaceAll(RegExp(r'/+$'), '');
+  host = host.replaceFirst(RegExp(r'/api/v1/pos$', caseSensitive: false), '');
+  host = host.replaceFirst(RegExp(r'/api/v1$', caseSensitive: false), '');
+  host = host.replaceFirst(RegExp(r'/api$', caseSensitive: false), '');
+
   final normalizedPath = value.startsWith('/') ? value : '/$value';
-  return '$normalizedHost$normalizedPath';
+  return '$host$normalizedPath';
 }

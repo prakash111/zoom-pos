@@ -78,8 +78,9 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
   @override
   void initState() {
     super.initState();
+    _baseUrl = context.read<ApiClient>().currentBaseUrlSync;
     context.read<ApiClient>().currentBaseUrl().then((url) {
-      if (mounted) setState(() => _baseUrl = url);
+      if (mounted && _baseUrl != url) setState(() => _baseUrl = url);
     });
   }
 

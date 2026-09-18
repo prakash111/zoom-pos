@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +10,7 @@ import '../../../core/config/theme.dart';
 import '../../../core/config/theme_provider.dart';
 import '../../../core/models/settings_models.dart';
 import '../../../core/utils/color_utils.dart';
+import '../../../core/widgets/app_network_image.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../../l10n/app_localizations.dart';
@@ -779,11 +779,13 @@ class _BrandImagePicker extends StatelessWidget {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2))
                 : (imageUrl ?? '').isNotEmpty
-                    ? CachedNetworkImage(
+                    ? AppNetworkImage(
                         imageUrl: imageUrl!,
                         fit: BoxFit.cover,
                         width: 72,
-                        height: 72)
+                        height: 72,
+                        fallbackIcon: Icons.image_outlined,
+                      )
                     : Icon(Icons.image_outlined,
                         size: 28, color: Colors.grey.shade400),
           ),

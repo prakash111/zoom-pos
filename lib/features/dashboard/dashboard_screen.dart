@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../core/widgets/app_network_image.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/config/bootstrap_cache.dart';
@@ -757,7 +760,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: primaryColor,
               image: hasCover
                   ? DecorationImage(
-                      image: CachedNetworkImageProvider(coverUrl),
+                      image: kIsWeb
+                          ? NetworkImage(coverUrl, webHtmlElementStrategy: WebHtmlElementStrategy.prefer)
+                          : CachedNetworkImageProvider(coverUrl) as ImageProvider,
                       fit: BoxFit.cover,
                     )
                   : null,
@@ -795,15 +800,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     padding: const EdgeInsets.all(4),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(6),
-                      child: CachedNetworkImage(
+                      child: AppNetworkImage(
                         imageUrl: logoUrl,
                         fit: BoxFit.contain,
-                        placeholder: (_, __) => const SizedBox.shrink(),
-                        errorWidget: (_, __, ___) => const Icon(
-                          Icons.storefront,
-                          color: Colors.grey,
-                          size: 26,
-                        ),
+                        fallbackIcon: Icons.storefront,
                       ),
                     ),
                   ),

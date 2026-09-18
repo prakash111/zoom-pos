@@ -1,11 +1,10 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/models/product_model.dart';
-import '../../../core/utils/image_url.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/widgets/app_network_image.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../inventory/inventory_repository.dart';
@@ -41,8 +40,9 @@ class _ProductPickerSheetState extends State<ProductPickerSheet> {
   void initState() {
     super.initState();
     _future = widget.inventoryRepository.fetchCatalog();
+    _baseUrl = context.read<ApiClient>().currentBaseUrlSync;
     context.read<ApiClient>().currentBaseUrl().then((url) {
-      if (mounted) setState(() => _baseUrl = url);
+      if (mounted && _baseUrl != url) setState(() => _baseUrl = url);
     });
   }
 
@@ -204,30 +204,17 @@ class _ProductPickerSheetState extends State<ProductPickerSheet> {
                                 itemCount: products.length,
                                 itemBuilder: (context, index) {
                                   final product = products[index];
-                                  final resolvedImageUrl = resolveImageUrl(product.imageUrl, baseUrl: _baseUrl);
                                   return ListTile(
                                     leading: ClipOval(
                                       child: SizedBox(
                                         width: 40,
                                         height: 40,
-                                        child: resolvedImageUrl == null
-                                            ? CircleAvatar(
-                                                child: Icon(widget.partsOnly ? Icons.build_outlined : Icons.inventory_2_outlined),
-                                              )
-                                            : CachedNetworkImage(
-                                                imageUrl: resolvedImageUrl,
-                                                fit: BoxFit.cover,
-                                                placeholder: (context, url) => const Center(
-                                                  child: SizedBox(
-                                                    width: 14,
-                                                    height: 14,
-                                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                                  ),
-                                                ),
-                                                errorWidget: (context, url, error) => CircleAvatar(
-                                                  child: Icon(widget.partsOnly ? Icons.build_outlined : Icons.inventory_2_outlined),
-                                                ),
-                                              ),
+                                        child: AppNetworkImage(
+                                          imageUrl: product.imageUrl,
+                                          baseUrl: _baseUrl,
+                                          fit: BoxFit.cover,
+                                          fallbackIcon: widget.partsOnly ? Icons.build_outlined : Icons.inventory_2_outlined,
+                                        ),
                                       ),
                                     ),
                                     title: Text(product.name),

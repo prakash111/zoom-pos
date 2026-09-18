@@ -44,9 +44,20 @@ class ApiClient {
   /// so the app can drop back to the login screen. Set by AuthProvider.
   void Function()? onUnauthenticated;
 
+  String _cachedBaseUrl = AppConfig.defaultBaseUrl;
+
+  /// Synchronous cached server base URL (defaults to [AppConfig.defaultBaseUrl]
+  /// until loaded). Allows UI components to render resolved image URLs on the
+  /// very first frame without waiting for an async future.
+  String get currentBaseUrlSync => _cachedBaseUrl;
+
   /// The configured server host (no `/api/v1/pos` suffix), for building
   /// asset URLs (product images) or opening public web pages from the app.
-  Future<String> currentBaseUrl() => _preferences.readBaseUrl();
+  Future<String> currentBaseUrl() async {
+    final url = await _preferences.readBaseUrl();
+    _cachedBaseUrl = url;
+    return url;
+  }
 
   /// Runs once before every request. Each read is bounded by
   /// [AppConfig.localReadTimeout]: these are platform-channel calls (OS
@@ -59,6 +70,7 @@ class ApiClient {
     final baseUrl = await _preferences.readBaseUrl().timeout(
         AppConfig.localReadTimeout,
         onTimeout: () => AppConfig.defaultBaseUrl);
+    _cachedBaseUrl = baseUrl;
     _dio.options.baseUrl = '$baseUrl${AppConfig.apiPrefix}';
 
     // On timeout, keep whatever Authorization header a previous successful

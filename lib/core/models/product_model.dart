@@ -24,6 +24,16 @@ class ProductModel {
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
+    final rawImage = json['image_url'] ??
+        json['imageUrl'] ??
+        json['image'] ??
+        json['image_path'] ??
+        json['thumbnail'] ??
+        json['photo'];
+    final imageUrl = (rawImage != null && rawImage.toString().trim().isNotEmpty)
+        ? rawImage.toString().trim()
+        : null;
+
     return ProductModel(
       id: json['id'].toString(),
       name: json['name'] as String? ?? '',
@@ -37,7 +47,7 @@ class ProductModel {
       categoryId: json['category_id']?.toString(),
       categoryName: json['category_name'] as String? ?? 'General',
       brandName: json['brand_name'] as String? ?? '',
-      imageUrl: json['image_url'] as String?,
+      imageUrl: imageUrl,
       taxRate: (json['tax_rate'] as num?)?.toDouble() ?? 0,
       active: json['active'] as bool? ?? true,
       isLowStock: json['is_low_stock'] as bool? ?? false,
@@ -111,6 +121,7 @@ class ProductModel {
       'duration_minutes': durationMinutes,
       'brand_name': brandName,
       'image_url': imageUrl,
+      'image': imageUrl,
       'tax_rate': taxRate,
       'active': active,
       'is_low_stock': isLowStock,

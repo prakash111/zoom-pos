@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:math';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -13,6 +12,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/models/tax_rule_model.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/widgets/app_network_image.dart';
 import '../../../core/widgets/barcode_scanner_screen.dart';
 import '../../taxes/taxes_repository.dart';
 import '../inventory_provider.dart';
@@ -304,11 +304,11 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
                                 ? (kIsWeb
                                     ? Image.network(_pickedImage!.path, fit: BoxFit.cover)
                                     : Image.file(File(_pickedImage!.path), fit: BoxFit.cover))
-                                : (_aiImageUrl ?? '').isNotEmpty
-                                    ? CachedNetworkImage(imageUrl: _aiImageUrl!, fit: BoxFit.cover)
-                                    : (widget.product?.imageUrl ?? '').isNotEmpty
-                                        ? CachedNetworkImage(imageUrl: widget.product!.imageUrl!, fit: BoxFit.cover)
-                                        : Icon(Icons.inventory_2_outlined, size: 36, color: Colors.grey.shade400),
+                                 : (_aiImageUrl ?? '').isNotEmpty
+                                     ? AppNetworkImage(imageUrl: _aiImageUrl!, fit: BoxFit.cover)
+                                     : (widget.product?.imageUrl ?? '').isNotEmpty
+                                         ? AppNetworkImage(imageUrl: widget.product!.imageUrl!, fit: BoxFit.cover)
+                                         : Icon(Icons.inventory_2_outlined, size: 36, color: Colors.grey.shade400),
                           ),
                         ),
                         if (_isGeneratingAi)
