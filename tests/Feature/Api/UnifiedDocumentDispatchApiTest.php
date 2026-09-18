@@ -283,8 +283,8 @@ class UnifiedDocumentDispatchApiTest extends TestCase
             'ends_at' => now()->addDay()->addHour(),
         ]);
 
+        // Prescription and appointment vertical preview modals return preview card
         foreach ([
-            ['repair', $repair->id, '#REP-9902'],
             ['prescription', $rx->id, '#RX-4002'],
             ['appointment', $apt->id, '#APT-7702'],
         ] as [$type, $docId, $expectedCode]) {
@@ -297,6 +297,26 @@ class UnifiedDocumentDispatchApiTest extends TestCase
                 ->assertJsonPath('schema.components.0.active_value', 'thermal_80mm')
                 ->assertJsonPath('schema.components.1.type', 'document_preview_card');
         }
+
+        // Repair ticket returns unified dispatch with pre-bound customer data and NO document_preview_card
+        $repairModal = $this->withToken($this->token)
+            ->getJson("/api/v1/tenant/documents/repair/{$repair->id}/preview-modal")
+            ->assertOk()
+            ->assertJsonPath('schema.type', 'bottom_sheet')
+            ->assertJsonPath('schema.background_color', '#0B1120')
+            ->assertJsonPath('schema.header.title', '#REP-9902');
+
+        $componentTypes = collect($repairModal->json('schema.components'))->pluck('type')->all();
+        $this->assertNotContains('document_preview_card', $componentTypes, 'Repair tickets must omit document_preview_card.');
+        $this->assertNotContains('segmented_tabs', $componentTypes, 'Repair tickets do not require format segmented_tabs.');
+        $this->assertContains('section_header', $componentTypes);
+        $this->assertContains('list_tile', $componentTypes);
+
+        // Verify customer user data is pre-bound to channel actions
+        $whatsappTile = collect($repairModal->json('schema.components'))->firstWhere('title', 'Send via WhatsApp');
+        $this->assertNotNull($whatsappTile);
+        $this->assertSame('+91 98765 66666', $whatsappTile['action']['payload']['phone']);
+        $this->assertSame('Alice Martin', $whatsappTile['action']['payload']['customer_name']);
     }
 
     public function test_dispatch_options_automatically_fetches_enabled_channels_from_settings(): void
@@ -381,5 +401,72 @@ class UnifiedDocumentDispatchApiTest extends TestCase
         $this->assertTrue($dispatchResponse->json('results.sms.success'));
         $this->assertTrue($dispatchResponse->json('results.email.success'));
         $this->assertTrue($dispatchResponse->json('results.webhook.success'));
+    }
+
+    public function test_repair_ticket_unified_dispatch_binds_customer_user_data_automatically(): void
+    {
+        // 1. Create a customer with phone and email
+        $customer = \App\Models\Customer::create([
+            'company_id' => $this->company->id,
+            'tenant_id' => $this->company->id,
+            'name' => 'Diana Prince',
+            'phone' => '+91 98765 99999',
+            'email' => 'diana@example.test',
+            'is_demo' => false,
+        ]);
+
+        // 2. Create a repair ticket for this customer
+        $ticket = RepairTicket::create([
+            'company_id' => $this->company->id,
+            'tenant_id' => $this->company->id,
+            'customer_id' => $customer->id,
+            'customer_name' => $customer->name,
+            'customer_phone' => $customer->phone,
+            'ticket_number' => 'REP-2026-DIANA',
+            'brand' => 'Apple',
+            'model' => 'MacBook Pro M3',
+            'problem_reported' => 'Battery replacement required',
+            'status' => RepairTicket::STATUS_DIAGNOSING,
+            'total_amount' => 4500.00,
+        ]);
+
+        // 3. Verify dispatch-options endpoint pre-binds customer data and targets
+        $optionsResponse = $this->withToken($this->token)
+            ->getJson("/api/v1/documents/repair/{$ticket->id}/dispatch-options")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('customer.name', 'Diana Prince')
+            ->assertJsonPath('customer.phone', '+91 98765 99999')
+            ->assertJsonPath('customer.email', 'diana@example.test');
+
+        $channels = $optionsResponse->json('channels');
+        $this->assertSame('+91 98765 99999', $channels['whatsapp']['target']);
+        $this->assertSame('diana@example.test', $channels['email']['target']);
+
+        // 4. Verify share-sheet SDUI endpoint returns unified dispatch without document_preview_card
+        $shareSheetResponse = $this->withToken($this->token)
+            ->getJson("/api/tenant/repair/tickets/{$ticket->id}/share-sheet")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('header.title', '#REP-2026-DIANA');
+
+        $components = $shareSheetResponse->json('components');
+        $types = collect($components)->pluck('type')->all();
+        $this->assertNotContains('document_preview_card', $types, 'Ticket dispatch sheet must not contain document_preview_card.');
+        $this->assertNotContains('segmented_tabs', $types, 'Ticket dispatch sheet must not contain format segmented_tabs.');
+
+        // 5. Dispatch via server-bound customer data without explicitly passing phone/email in request
+        $dispatchRes = $this->withToken($this->token)
+            ->postJson('/api/v1/documents/dispatch', [
+                'document_type' => 'repair',
+                'document_id' => $ticket->id,
+                'channels' => ['whatsapp', 'email', 'sms'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertTrue($dispatchRes->json('results.whatsapp.success'));
+        $this->assertTrue($dispatchRes->json('results.email.success'));
+        $this->assertTrue($dispatchRes->json('results.sms.success'));
     }
 }

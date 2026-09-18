@@ -372,41 +372,84 @@ class DocumentPreviewController extends Controller
             ->firstOrFail();
 
         $company = $ticket->company;
-        $customerName = $ticket->customer_name ?: ($ticket->customer?->name ?? 'Customer');
-        $phone = $ticket->customer_phone ?: ($ticket->customer?->phone ?? null);
-        $email = $ticket->customer?->email ?? null;
+        $customer = $ticket->customer;
+        $customerName = $ticket->customer_name ?: ($customer?->name ?? 'Customer');
+        $phone = $ticket->customer_phone ?: ($customer?->phone ?? '');
+        $email = $customer?->email ?? ($ticket->customer_email ?? '');
         $device = trim(($ticket->brand ?? '') . ' ' . ($ticket->model ?? ''));
         $reference = (string) $ticket->ticket_number;
-        $total = (float) $ticket->total_amount;
-        $renderUrl = url("/tenant/repair/tickets/{$ticket->id}/intake-sheet");
+        $statusLabel = ucfirst(str_replace('_', ' ', $ticket->status ?? 'received'));
+        $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
+        $endpointPrefix = $request->is('api/*') ? '/api/v1/tenant' : '/tenant';
 
-        $items = [
-            [
-                'name' => "Repair Service: {$device}",
-                'quantity' => 1,
-                'unit_price' => (float) ($ticket->estimated_cost ?: $total),
-                'line_total' => (float) ($ticket->estimated_cost ?: $total),
-            ],
-        ];
-        if ((float) $ticket->diagnostic_fee > 0) {
-            $items[] = [
-                'name' => 'Diagnostic Fee',
-                'quantity' => 1,
-                'unit_price' => (float) $ticket->diagnostic_fee,
-                'line_total' => (float) $ticket->diagnostic_fee,
+        $dynamicChannels = \App\Services\OmnichannelRegistryService::resolveChannels($tenantId, [
+            'type' => 'repair',
+            'id' => $ticket->id,
+            'phone' => $phone,
+            'email' => $email,
+        ]);
+
+        $channelComponents = [];
+        foreach ($dynamicChannels as $chItem) {
+            $ch = $chItem['channel'] ?? 'custom';
+            $target = match ($ch) {
+                'whatsapp', 'sms' => $phone,
+                'email' => $email,
+                default => $chItem['subtitle'] ?? '',
+            };
+
+            $channelComponents[] = [
+                'type' => 'list_tile',
+                'title' => $chItem['title'] ?? ('Send via ' . ucfirst($ch)),
+                'subtitle' => $target ? "To: {$target}" : ($chItem['subtitle'] ?? 'Target configured in Settings'),
+                'leading' => $chItem['leading'] ?? ['icon' => 'send'],
+                'action' => [
+                    'type' => 'SUBMIT_FORM',
+                    'endpoint' => '/api/v1/documents/dispatch',
+                    'method' => 'POST',
+                    'payload' => [
+                        'document_type' => 'repair',
+                        'document_id' => $ticket->id,
+                        'channels' => [$ch],
+                        'phone' => $phone,
+                        'email' => $email,
+                        'customer_name' => $customerName,
+                    ],
+                ],
             ];
         }
 
-        $endpointPrefix = $request->is('api/*') ? '/api/v1/tenant' : '/tenant';
-        $reloadEndpoint = "{$endpointPrefix}/documents/repair/{$ticket->id}/preview-modal";
+        // Print thermal token / slip (direct printer output for repair tickets)
+        $printComponent = [
+            'type' => 'list_tile',
+            'title' => 'Print Thermal Slip / Token',
+            'subtitle' => 'Bluetooth / ESC/POS thermal receipt printer',
+            'leading' => ['icon' => 'receipt_long', 'color' => '#10B981'],
+            'action' => [
+                'type' => 'OPEN_URL',
+                'url' => url("{$endpointPrefix}/repair/tickets/{$ticket->id}/intake-sheet?format=slip"),
+            ],
+        ];
+
+        // System share / tracking link
+        $shareComponent = [
+            'type' => 'list_tile',
+            'title' => 'Share Tracking Link',
+            'subtitle' => "Track: {$trackingUrl}",
+            'leading' => ['icon' => 'send', 'color' => '#38BDF8'],
+            'action' => [
+                'type' => 'SHARE',
+                'text' => "Hello {$customerName}, your repair ticket #{$reference}" . ($device !== '' ? " for {$device}" : '') . " is {$statusLabel}. Track status: {$trackingUrl}",
+            ],
+        ];
 
         $schema = [
             'type' => 'bottom_sheet',
             'schema_version' => 1,
-            'title' => "Preview & Dispatch #{$reference}",
+            'title' => "Dispatch Ticket #{$reference}",
             'header' => [
-                'title' => $reference,
-                'subtitle' => "Device: {$device} • Status: " . ucfirst($ticket->status ?? 'Intake'),
+                'title' => "#{$reference}",
+                'subtitle' => "Customer: {$customerName} • Device: {$device} • Status: {$statusLabel}",
             ],
             'theme' => [
                 'surface' => 'theme.surface',
@@ -417,80 +460,25 @@ class DocumentPreviewController extends Controller
             'background_color' => '#0B1120',
             'loading_background_color' => '#0B1120',
             'empty_background_color' => '#0F172A',
-            'components' => [
+            'components' => array_merge(
                 [
-                    'type' => 'segmented_tabs',
-                    'param_name' => 'format',
-                    'active_value' => $format,
-                    'options' => [
-                        ['label' => 'Standard A4', 'value' => 'a4'],
-                        ['label' => '80mm POS', 'value' => 'thermal_80mm'],
-                        ['label' => '58mm Receipt', 'value' => 'thermal_58mm'],
-                        ['label' => 'Mobile Slip', 'value' => 'slip'],
-                    ],
-                    'action' => [
-                        'type' => 'RELOAD_COMPONENT',
-                        'endpoint' => $reloadEndpoint,
-                        'refresh_in_place' => true,
-                    ],
-                    'active_background_color' => '#10B981',
-                    'active_text_color' => '#0B1120',
-                    'inactive_background_color' => '#1E293B',
-                    'inactive_text_color' => '#94A3B8',
-                ],
-                [
-                    'type' => 'document_preview_card',
-                    'format' => $format,
-                    'background_color' => '#0F172A',
-                    'border_color' => '#334155',
-                    'summary' => [
-                        'client_name' => $customerName,
-                        'client_phone' => $phone,
-                        'total_amount' => '₹' . number_format($total, 2),
-                        'item_count' => count($items),
-                    ],
-                    'render_url' => $renderUrl,
-                ],
-                [
-                    'type' => 'section_header',
-                    'title' => 'Dispatch Channels',
-                    'subtitle' => 'Share repair intake token or invoice with customer',
-                ],
-                [
-                    'type' => 'list_tile',
-                    'title' => 'Send via WhatsApp',
-                    'subtitle' => $phone ? "Send to {$phone}" : 'Customer WhatsApp',
-                    'leading' => ['icon' => 'chat'],
-                    'action' => [
-                        'type' => 'SUBMIT_FORM',
-                        'endpoint' => '/api/v1/documents/dispatch',
-                        'method' => 'POST',
-                        'payload' => [
-                            'document_type' => 'repair',
-                            'document_id' => $ticket->id,
-                            'channels' => ['whatsapp'],
-                            'phone' => $phone,
-                        ],
+                    [
+                        'type' => 'section_header',
+                        'title' => 'Dispatch Channels',
+                        'subtitle' => "Notify {$customerName} via enabled channels (automatically bound from ticket customer profile)",
                     ],
                 ],
+                $channelComponents,
                 [
-                    'type' => 'list_tile',
-                    'title' => 'Send via Email',
-                    'subtitle' => $email ? "Send to {$email}" : 'Customer Email',
-                    'leading' => ['icon' => 'email'],
-                    'action' => [
-                        'type' => 'SUBMIT_FORM',
-                        'endpoint' => '/api/v1/documents/dispatch',
-                        'method' => 'POST',
-                        'payload' => [
-                            'document_type' => 'repair',
-                            'document_id' => $ticket->id,
-                            'channels' => ['email'],
-                            'email' => $email,
-                        ],
+                    [
+                        'type' => 'section_header',
+                        'title' => 'Printer & Share',
+                        'subtitle' => 'Print token slip or share tracking portal link',
                     ],
-                ],
-            ],
+                    $printComponent,
+                    $shareComponent,
+                ]
+            ),
         ];
 
         return response()->json(['success' => true, 'schema' => $schema] + $schema);

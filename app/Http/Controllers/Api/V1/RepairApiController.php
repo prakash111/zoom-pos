@@ -512,6 +512,7 @@ class RepairApiController extends Controller
         $customerId = $request->input('customer_id');
         $customerName = trim((string) $request->input('customer_name'));
         $customerPhone = trim((string) $request->input('customer_phone'));
+        $customerEmail = trim((string) ($request->input('customer_email') ?: $request->input('email') ?: ''));
 
         if ($customerId) {
             $existingCustomer = Customer::where('company_id', $company->id)
@@ -524,6 +525,11 @@ class RepairApiController extends Controller
                 }
                 if ($customerPhone === '') {
                     $customerPhone = (string) ($existingCustomer->phone ?? '');
+                }
+                if ($customerEmail === '') {
+                    $customerEmail = (string) ($existingCustomer->email ?? '');
+                } elseif (empty($existingCustomer->email)) {
+                    $existingCustomer->update(['email' => $customerEmail]);
                 }
             }
         } elseif ($customerName !== '') {
@@ -538,12 +544,18 @@ class RepairApiController extends Controller
 
             if ($existingCustomer) {
                 $customerId = $existingCustomer->id;
+                if ($customerEmail === '') {
+                    $customerEmail = (string) ($existingCustomer->email ?? '');
+                } elseif (empty($existingCustomer->email)) {
+                    $existingCustomer->update(['email' => $customerEmail]);
+                }
             } else {
                 $createdCust = Customer::create([
                     'company_id' => $company->id,
                     'tenant_id' => $company->id,
                     'name' => $customerName,
                     'phone' => $customerPhone ?: null,
+                    'email' => $customerEmail ?: null,
                     'is_demo' => false,
                 ]);
                 $customerId = $createdCust->id;
@@ -559,7 +571,7 @@ class RepairApiController extends Controller
         $ticketNumber = app(DocumentNumberService::class)->next($company, 'repair');
 
         return DB::transaction(function () use (
-            $company, $user, $request, $ticketNumber, $customerId, $customerName, $customerPhone,
+            $company, $user, $request, $ticketNumber, $customerId, $customerName, $customerPhone, $customerEmail,
             $categoryId, $technicianId, $serial, $passcode, $problem, $advanceDeposit, $advanceMethod
         ) {
             $checklist = $request->input('inspection_checklist');
@@ -773,6 +785,7 @@ class RepairApiController extends Controller
                     'ticket_id' => $ticket->id,
                     'customer_name' => $ticket->customer_name,
                     'customer_phone' => $ticket->customer_phone,
+                    'customer_email' => $customerEmail ?: ($ticket->customer?->email ?? ''),
                     'device' => $deviceLabel,
                     'status' => $ticket->status,
                     'defect' => $ticket->issue_description ?: $ticket->reported_defect,
@@ -832,8 +845,10 @@ class RepairApiController extends Controller
             return response()->json(['success' => false, 'error' => 'Repair ticket not found.'], 404);
         }
 
-        $customerName = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Walk-in Customer');
-        $phone = $ticket->customer?->phone ?: ($ticket->customer_phone ?: '');
+        $customer = $ticket->customer;
+        $customerName = $customer?->name ?: ($ticket->customer_name ?: 'Walk-in Customer');
+        $phone = $customer?->phone ?: ($ticket->customer_phone ?: '');
+        $email = $customer?->email ?: ($ticket->customer_email ?: '');
         $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'Device';
 
         // Build the customer-facing links inline (no notifyTicketCreated — that
@@ -854,6 +869,7 @@ class RepairApiController extends Controller
                 'ticket_id' => $ticket->id,
                 'customer_name' => $customerName,
                 'customer_phone' => $phone,
+                'customer_email' => $email,
                 'device' => $device,
                 'status' => $ticket->status,
                 'defect' => $ticket->issue_description ?: $ticket->reported_defect,
@@ -867,10 +883,9 @@ class RepairApiController extends Controller
 
     /**
      * Unified document dispatch sheet for an existing repair ticket.
-     * The response follows the same SDUI contract as invoice/quotation
-     * preview sheets, so both web and mobile can render it without a client
-     * release. Customer contact fields are resolved from the linked customer
-     * first, with the ticket snapshot as a fallback.
+     * The response follows the omnichannel SDUI contract without requiring
+     * an unnecessary document preview iframe. Customer contact fields are
+     * pre-bound so operators never need to enter phone/email manually.
      * GET /api/tenant/repair/tickets/{id}/share-sheet
      */
     public function ticketsShareDispatchSheet(Request $request, string $id): JsonResponse
@@ -892,105 +907,102 @@ class RepairApiController extends Controller
         $email = $customer?->email ?: ($ticket->customer_email ?: '');
         $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'Device';
         $reference = (string) $ticket->ticket_number;
+        $statusLabel = ucfirst(str_replace('_', ' ', $ticket->status ?? 'received'));
         $trackingUrl = route('repair.portal.track', $reference);
-        $message = "Hello {$customerName}, your repair ticket #{$reference} for {$device} is ready. Track status: {$trackingUrl}";
-        $formats = [
-            ['label' => 'Standard A4', 'value' => 'a4'],
-            ['label' => '80mm POS', 'value' => 'thermal_80mm'],
-            ['label' => '58mm Receipt', 'value' => 'thermal_58mm'],
-            ['label' => 'Mobile Slip', 'value' => 'slip'],
-        ];
-        $format = strtolower((string) $request->input('format', 'a4'));
-        if (! in_array($format, array_column($formats, 'value'), true)) {
-            $format = 'a4';
-        }
-        $endpointPrefix = $request->is('api/*') ? '/api/tenant' : '/tenant';
-        $sheetEndpoint = "{$endpointPrefix}/repair/tickets/{$ticket->id}/share-sheet";
-        $renderUrl = "{$endpointPrefix}/repair/tickets/{$ticket->id}/intake-sheet?format={$format}";
-        $formatLabel = data_get(collect($formats)->firstWhere('value', $format), 'label', 'Standard A4');
-        $dispatchEndpoint = "{$endpointPrefix}/repair/tickets/{$ticket->id}/dispatch";
-        $settings = (array) ($company->api_settings ?? []);
-        $whatsappConfigured = filter_var($settings['whatsapp_api_enabled'] ?? false, FILTER_VALIDATE_BOOL)
-            && filled($settings['whatsapp_api_url'] ?? null)
-            && filled($settings['whatsapp_api_token'] ?? null);
-        $emailConfigured = filter_var($settings['smtp_enabled'] ?? false, FILTER_VALIDATE_BOOL)
-            && filled($settings['smtp_host'] ?? null)
-            && filled($settings['smtp_username'] ?? null)
-            && filled($settings['smtp_password'] ?? null);
+        $shareText = "Hello {$customerName}, your repair ticket #{$reference} for {$device} is ready. Track status: {$trackingUrl}";
+        $endpointPrefix = $request->is('api/*') ? '/api/v1/tenant' : '/tenant';
 
-        $components = [
-            [
-                'type' => 'segmented_tabs',
-                'param_name' => 'format',
-                'active_value' => $format,
-                'options' => $formats,
-                'action' => ['type' => 'RELOAD_COMPONENT', 'endpoint' => $sheetEndpoint, 'refresh_in_place' => true],
-                'active_background_color' => '#10B981',
-                'active_text_color' => '#0B1120',
-                'inactive_background_color' => '#1E293B',
-                'inactive_text_color' => '#94A3B8',
-                'border_color' => '#334155',
-            ],
-            [
-                'type' => 'document_preview_card',
-                'format' => $format,
-                'paper' => ['label' => $formatLabel],
-                'render_url' => url($renderUrl),
-                'document' => [
-                    'company_name' => $company->display_name ?? ($company->name ?? 'Store'),
-                    'document_label' => 'REPAIR INTAKE TICKET',
-                    'reference' => $reference,
-                    'customer_name' => $customerName,
-                    'customer_phone' => $phone,
-                    'device' => $device,
-                    'notes' => $ticket->issue_description ?: $ticket->reported_defect,
-                ],
-                'summary' => [
-                    'client_name' => $customerName,
-                    'client_phone' => $phone,
-                    'item_count' => $ticket->items?->count() ?? 0,
-                ],
-            ],
-            [
-                'type' => 'list_tile', 'title' => 'Send via WhatsApp',
-                'subtitle' => $phone !== ''
-                    ? 'to '.$phone.' · '.($whatsappConfigured ? 'Tenant API' : 'Platform service')
-                    : 'Customer phone is not linked',
-                'leading' => ['type' => 'icon', 'icon' => 'chat', 'color' => '#25D366'],
+        $dynamicChannels = \App\Services\OmnichannelRegistryService::resolveChannels($company->id, [
+            'type' => 'repair',
+            'id' => $ticket->id,
+            'phone' => $phone,
+            'email' => $email,
+        ]);
+
+        $channelComponents = [];
+        foreach ($dynamicChannels as $chItem) {
+            $ch = $chItem['channel'] ?? 'custom';
+            $target = match ($ch) {
+                'whatsapp', 'sms' => $phone,
+                'email' => $email,
+                default => $chItem['subtitle'] ?? '',
+            };
+
+            $channelComponents[] = [
+                'type' => 'list_tile',
+                'title' => $chItem['title'] ?? ('Send via ' . ucfirst($ch)),
+                'subtitle' => $target ? "To: {$target}" : ($chItem['subtitle'] ?? 'Target configured in Settings'),
+                'leading' => $chItem['leading'] ?? ['icon' => 'send'],
                 'action' => [
-                    'type' => 'SUBMIT_FORM', 'endpoint' => $dispatchEndpoint, 'method' => 'POST',
-                    'data' => ['channel' => 'whatsapp', 'recipient' => $phone],
-                    'feedback' => $whatsappConfigured
-                        ? 'Sending via the configured WhatsApp gateway.'
-                        : 'WhatsApp gateway is not configured for this store.',
+                    'type' => 'SUBMIT_FORM',
+                    'endpoint' => '/api/v1/documents/dispatch',
+                    'method' => 'POST',
+                    'payload' => [
+                        'document_type' => 'repair',
+                        'document_id' => $ticket->id,
+                        'channels' => [$ch],
+                        'phone' => $phone,
+                        'email' => $email,
+                        'customer_name' => $customerName,
+                    ],
                 ],
-            ],
-            [
-                'type' => 'list_tile', 'title' => 'Send via Email',
-                'subtitle' => $email !== ''
-                    ? 'to '.$email.' · '.($emailConfigured ? 'Tenant SMTP' : 'System mailer')
-                    : 'Customer email is not linked',
-                'leading' => ['type' => 'icon', 'icon' => 'mark_email_read', 'color' => '#818CF8'],
-                'action' => [
-                    'type' => 'SUBMIT_FORM', 'endpoint' => $dispatchEndpoint, 'method' => 'POST',
-                    'data' => ['channel' => 'email', 'recipient' => $email],
-                    'feedback' => $emailConfigured
-                        ? 'Sending via the configured SMTP gateway.'
-                        : 'Sending via the system mailer.',
-                ],
+            ];
+        }
+
+        // Direct thermal slip/token printing
+        $printComponent = [
+            'type' => 'list_tile',
+            'title' => 'Print Thermal Slip / Token',
+            'subtitle' => 'Bluetooth / ESC/POS thermal receipt printer',
+            'leading' => ['type' => 'icon', 'icon' => 'receipt_long', 'color' => '#10B981'],
+            'action' => [
+                'type' => 'OPEN_URL',
+                'url' => url("{$endpointPrefix}/repair/tickets/{$ticket->id}/intake-sheet?format=slip"),
             ],
         ];
+
+        // System share / tracking link
+        $shareComponent = [
+            'type' => 'list_tile',
+            'title' => 'Share Tracking Link',
+            'subtitle' => "Track: {$trackingUrl}",
+            'leading' => ['type' => 'icon', 'icon' => 'send', 'color' => '#38BDF8'],
+            'action' => [
+                'type' => 'SHARE',
+                'text' => $shareText,
+            ],
+        ];
+
+        $components = array_merge(
+            [
+                [
+                    'type' => 'section_header',
+                    'title' => 'Dispatch Channels',
+                    'subtitle' => "Notify {$customerName} via enabled channels (automatically bound from ticket customer profile)",
+                ],
+            ],
+            $channelComponents,
+            [
+                [
+                    'type' => 'section_header',
+                    'title' => 'Printer & Share',
+                    'subtitle' => 'Print token slip or share tracking portal link',
+                ],
+                $printComponent,
+                $shareComponent,
+            ]
+        );
 
         return response()->json([
             'success' => true,
             'type' => 'bottom_sheet',
             'title' => "Repair Ticket #{$reference}",
-            'header' => ['title' => $reference, 'subtitle' => "{$device} • {$customerName}"],
+            'header' => ['title' => "#{$reference}", 'subtitle' => "{$device} • {$customerName} • {$statusLabel}"],
             'components' => $components,
             'schema' => [
                 'type' => 'bottom_sheet',
                 'title' => "Repair Ticket #{$reference}",
-                'header' => ['title' => $reference, 'subtitle' => "{$device} • {$customerName}"],
+                'header' => ['title' => "#{$reference}", 'subtitle' => "{$device} • {$customerName} • {$statusLabel}"],
                 'components' => $components,
             ],
         ]);

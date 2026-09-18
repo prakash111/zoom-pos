@@ -413,6 +413,42 @@ class DocumentDispatchController extends Controller
             }
         }
 
+        // 5. Repair Tickets / Job Sheets / Work Orders
+        if (in_array($normalizedType, ['repair', 'ticket', 'job_sheet', 'repair_ticket', 'work_order'], true)) {
+            $ticket = \App\Models\RepairTicket::withoutGlobalScope('company')
+                ->with(['customer', 'company'])
+                ->where('company_id', $tenant->id)
+                ->where(function ($query) use ($id) {
+                    $query->where('id', $id)
+                        ->orWhere('ticket_number', (string) $id);
+                })
+                ->first();
+
+            if ($ticket) {
+                $rawCode = (string) $ticket->ticket_number ?: (string) $ticket->id;
+                $code = $this->formatDocumentCode($rawCode, 'REP');
+                $customer = $ticket->customer;
+                $customerName = $ticket->customer_name ?: ($customer?->name ?? 'Customer');
+                $customerPhone = $ticket->customer_phone ?: ($customer?->phone ?? null);
+                $customerEmail = $customer?->email ?? ($ticket->customer_email ?? null);
+                $device = trim(($ticket->brand ?? '') . ' ' . ($ticket->model ?? ''));
+                $statusLabel = ucfirst(str_replace('_', ' ', $ticket->status ?? 'received'));
+                $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
+                $context = implode(' • ', array_filter([
+                    $customerName,
+                    $device ?: null,
+                    $statusLabel,
+                    $taxId ? "Tax ID: {$taxId}" : null,
+                ]));
+                $message = "Hello {$customerName}! Your repair ticket #{$ticket->ticket_number}"
+                    . ($device !== '' ? " for {$device}" : '')
+                    . " from {$tenant->name} is {$statusLabel}."
+                    . " Track status: {$trackingUrl}";
+
+                return compact('code', 'customerName', 'customerPhone', 'customerEmail', 'context', 'message', 'sale', 'timestamp', 'taxId');
+            }
+        }
+
         // 5. General Sale / Quotation / Due Invoice / POS Receipt
         $sale = Sale::withoutGlobalScope('company')
             ->with(['customer', 'company'])
