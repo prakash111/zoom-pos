@@ -2,6 +2,9 @@
 
 namespace Tests\Feature\Tenant;
 
+use App\Models\Configuration;
+use App\Livewire\Tenant\Sales\Show as SalesShow;
+
 use App\Livewire\Tenant\Quotes\Create as QuotesCreate;
 use App\Livewire\Tenant\Quotes\Edit as QuotesEdit;
 use App\Livewire\Tenant\Quotes\Index as QuotesIndex;
@@ -241,6 +244,7 @@ class QuotesAndDocumentsTest extends TestCase
     {
         [$company, $user] = $this->actingAsTenantAdmin();
         Mail::fake();
+        Configuration::withoutGlobalScopes()->create(['company_id' => $company->id, 'key' => 'smtp_host', 'value' => 'smtp.example.test']);
 
         $quote = Sale::create([
             'company_id' => $company->id,
@@ -305,6 +309,7 @@ class QuotesAndDocumentsTest extends TestCase
     {
         [$company, $user] = $this->actingAsTenantAdmin();
         Mail::fake();
+        Configuration::withoutGlobalScopes()->create(['company_id' => $company->id, 'key' => 'smtp_host', 'value' => 'smtp.example.test']);
 
         $sale = Sale::create([
             'company_id' => $company->id,
@@ -443,6 +448,7 @@ class QuotesAndDocumentsTest extends TestCase
     {
         [$company, $user] = $this->actingAsTenantAdmin();
         Mail::fake();
+        Configuration::withoutGlobalScopes()->create(['company_id' => $company->id, 'key' => 'smtp_host', 'value' => 'smtp.example.test']);
 
         $quote = Sale::create([
             'company_id' => $company->id,
@@ -653,4 +659,28 @@ class QuotesAndDocumentsTest extends TestCase
             ->call('save')
             ->assertRedirect(route('tenant.quotes.show', $quote));
     }
+    public function test_device_sending_in_sales_and_quotes_does_not_send_or_queue_email(): void
+    {
+        [$company, $user] = $this->actingAsTenantAdmin();
+        config(['mail.mailers.smtp.host' => null]);
+        Mail::fake();
+        foreach ([SalesShow::class => 'sale', QuotesShow::class => 'quote'] as $component => $key) {
+            $sale = Sale::create([
+                'company_id' => $company->id, 'sale_number' => $key === 'sale' ? 'INV-WEB-DEVICE' : 'QUO-WEB-DEVICE',
+                'operation_type' => $key === 'sale' ? 'sale' : 'quotation', 'status' => 'draft', 'customer_name' => 'Prakash', 'total' => 60,
+            ]);
+            $test = Livewire::test($component, [$key => $sale])->call('openSendModal', 'email')
+                ->set('recipientEmail', 'prakash@example.test')->set('customMessage', 'Hello {customer_name}, document #{document_number}.');
+            $test->assertSee('Open Email &amp; Send', false)->call('sendEmail')->assertDispatched('open-external-url', function ($event, $parameters) use ($sale) {
+                $url = rawurldecode($parameters['url']);
+                return str_starts_with($url, 'mailto:prakash@example.test') && str_contains($url, 'Hello Prakash, document #'.$sale->sale_number);
+            });
+            $test->call('openSendModal', 'sms')->set('recipientPhone', '+919876511111')
+                ->assertSee('Open SMS &amp; Send', false)->call('sendSms')->assertDispatched('open-external-url');
+            $this->assertSame('draft', $sale->fresh()->status);
+        }
+        Mail::assertNothingSent();
+        $this->assertDatabaseCount('message_queue', 0);
+    }
+
 }

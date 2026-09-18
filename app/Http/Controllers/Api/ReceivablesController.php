@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Services\Documents\TenantDocumentResolver;
+use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\OmnichannelRegistryService;
 use App\Services\Sdui\SchemaResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -51,7 +53,6 @@ class ReceivablesController extends Controller
         $documentNumber = $document->sale_number
             ?: (($documentType === 'sale' ? 'POS-' : 'INV-').str_pad((string) $document->id, 4, '0', STR_PAD_LEFT));
         $gstin = $document->company?->gstin ?: 'N/A';
-        $previewEndpoint = "/api/v1/tenant/documents/{$documentType}/{$document->id}/preview-modal";
         $nativeData = SchemaResponse::postSaleActionData($document);
         $nativeData['actions_endpoint'] = "/api/v1/tenant/documents/{$documentType}/{$document->id}/actions-sheet";
         $nativeAction = [
@@ -60,79 +61,19 @@ class ReceivablesController extends Controller
             'data' => $nativeData,
         ];
 
-        // Four-row compatibility schema for older SDUI/web clients. Current
-        // Flutter clients use native_action/post_sale_sheet below and render
-        // the same canonical POS sale bottom sheet directly.
-        $components = [
-            [
-                'type' => 'list_tile',
-                'title' => 'Preview & Print',
-                'subtitle' => 'View the PDF, print, or share the file',
-                'icon' => 'picture_as_pdf',
-                'leading' => ['type' => 'icon', 'icon' => 'picture_as_pdf', 'size' => 24, 'color' => '#CBD5E1'],
-                'action_type' => 'OPEN_RECEIPT_PREVIEW',
-                'endpoint' => $previewEndpoint,
-                'action' => [
-                    'type' => 'OPEN_RECEIPT_PREVIEW',
-                    'endpoint' => $previewEndpoint,
-                    'pdf_endpoint' => $nativeData['pdf_endpoint'],
-                    'document_id' => $document->id,
-                    'document_type' => $documentType,
-                ],
-            ],
-            [
-                'type' => 'list_tile',
-                'title' => 'Print on receipt printer',
-                'subtitle' => 'Bluetooth thermal printer',
-                'icon' => 'print',
-                'leading' => ['type' => 'icon', 'icon' => 'print', 'size' => 24, 'color' => '#CBD5E1'],
-                'action_type' => 'TRIGGER_THERMAL_PRINT',
-                'data' => ['document_id' => $document->id, 'document_type' => $documentType],
-                'action' => [
-                    'type' => 'TRIGGER_THERMAL_PRINT',
-                    'document_id' => $document->id,
-                    'sale_id' => $document->id,
-                    'invoice_id' => $document->id,
-                    'document_type' => $documentType,
-                ],
-            ],
-            [
-                'type' => 'list_tile',
-                'title' => 'Send via WhatsApp',
-                'subtitle' => $phone ?: 'Enter phone number',
-                'channel' => 'whatsapp',
-                'icon' => 'chat',
-                'leading' => ['type' => 'icon', 'icon' => 'chat', 'size' => 24, 'color' => '#22C55E'],
-                'trailing' => ['type' => 'icon', 'icon' => 'send', 'size' => 16, 'color' => '#94A3B8'],
-                'action_type' => 'SUBMIT_FORM',
-                'endpoint' => '/api/v1/tenant/dispatch/send',
-                'data' => ['channel' => 'whatsapp', 'type' => $documentType, 'id' => $document->id, 'recipient' => $phone],
-                'action' => [
-                    'type' => 'SUBMIT_FORM',
-                    'endpoint' => '/api/v1/tenant/dispatch/send',
-                    'method' => 'POST',
-                    'data' => ['channel' => 'whatsapp', 'type' => $documentType, 'id' => $document->id, 'recipient' => $phone],
-                ],
-            ],
-            [
-                'type' => 'list_tile',
-                'title' => 'Send via Email',
-                'subtitle' => $email ?: 'Enter email address',
-                'channel' => 'email',
-                'icon' => 'email',
-                'leading' => ['type' => 'icon', 'icon' => 'email', 'size' => 24, 'color' => '#818CF8'],
-                'trailing' => ['type' => 'icon', 'icon' => 'send', 'size' => 16, 'color' => '#94A3B8'],
-                'action_type' => 'SUBMIT_FORM',
-                'endpoint' => '/api/v1/tenant/dispatch/send',
-                'data' => ['channel' => 'email', 'type' => $documentType, 'id' => $document->id, 'recipient' => $email],
-                'action' => [
-                    'type' => 'SUBMIT_FORM',
-                    'endpoint' => '/api/v1/tenant/dispatch/send',
-                    'method' => 'POST',
-                    'data' => ['channel' => 'email', 'type' => $documentType, 'id' => $document->id, 'recipient' => $email],
-                ],
-            ],
-        ];
+        $message = app(InvoiceDeliveryService::class)->buildDueReminderMessage($document);
+        $channels = OmnichannelRegistryService::resolveChannels($tenantId, [
+            'type' => $documentType,
+            'id' => $document->id,
+            'reference' => $documentNumber,
+            'phone' => $phone,
+            'email' => $email,
+            'message' => $message,
+            'subject' => 'Payment Reminder #'.$documentNumber,
+        ]);
+        $components = \App\Services\DispatchChannelService::groupedComponents($channels, [
+            'type' => $documentType, 'id' => $document->id, 'phone' => $phone, 'email' => $email,
+        ]);
 
         $responsePayload = [
             'type' => 'bottom_sheet',

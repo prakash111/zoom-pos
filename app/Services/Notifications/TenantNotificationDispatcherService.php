@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\MessageQueue;
 use App\Models\Sale;
 use App\Models\TenantNotificationGateway;
+use App\Services\DispatchChannelService;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\WhatsApp\WhatsAppCloudApiClient;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -52,33 +53,12 @@ class TenantNotificationDispatcherService
             ];
         }
 
-        $gateways = TenantNotificationGateway::withoutGlobalScope('company')
-            ->where('company_id', $resolved->id)
-            ->where('is_enabled', true)
-            ->get();
-
         $channels = [
-            'whatsapp' => false,
-            'sms' => false,
-            'email' => false,
-            'custom_webhook' => false,
+            'whatsapp' => DispatchChannelService::isWhatsAppConfigured($resolved->id),
+            'sms' => DispatchChannelService::isSmsConfigured($resolved->id),
+            'email' => DispatchChannelService::isEmailConfigured($resolved->id),
+            'custom_webhook' => $this->getGateway($resolved, 'custom_webhook')?->isConfigured() ?? false,
         ];
-
-        foreach ($gateways as $gw) {
-            if ($gw->isConfigured()) {
-                $channels[$gw->channel] = true;
-            }
-        }
-
-        // Fallback to legacy configured channels if not explicitly disabled in new gateways
-        if (! $channels['whatsapp'] && $this->whatsAppCloudApiClient->isConfigured($resolved)) {
-            $channels['whatsapp'] = true;
-        }
-
-        $smtp = $this->invoiceDeliveryService->getSmtpConfig($resolved);
-        if (! $channels['email'] && ! empty($smtp['host'])) {
-            $channels['email'] = true;
-        }
 
         return $channels;
     }
@@ -124,7 +104,17 @@ class TenantNotificationDispatcherService
             return ['success' => false, 'status' => 'error', 'message' => 'Invalid phone number.'];
         }
 
+        if (! DispatchChannelService::isWhatsAppConfigured($company->id)) {
+            return DeviceMessageService::prepare('whatsapp', $toPhone, $message);
+        }
+
         $gateway = $this->getGateway($company, TenantNotificationGateway::CHANNEL_WHATSAPP);
+        if (! $gateway) {
+            $settings = DispatchChannelService::apiSettings($company->id);
+            if (! empty($settings['whatsapp_api_url']) && ! empty($settings['whatsapp_api_token'])) {
+                return $this->dispatchHttpMessage($company, 'whatsapp', $toPhone, $message, $settings['whatsapp_api_url'], $settings['whatsapp_api_token'], $documentUrl);
+            }
+        }
 
         // Unofficial/self-hosted WhatsApp HTTP providers (for example WAPI,
         // Baileys or a tenant's private bridge). Keep this opt-in and fall
@@ -229,16 +219,7 @@ class TenantNotificationDispatcherService
                 }
             }
 
-            // Fallback: Generate manual WhatsApp chat link
-            $waUrl = 'https://wa.me/'.$sanitizedPhone.'?text='.urlencode($message);
-
-            return [
-                'success' => true,
-                'status' => 'manual_link',
-                'url' => $waUrl,
-                'whatsapp_url' => $waUrl,
-                'message' => "WhatsApp link generated for +{$sanitizedPhone}.",
-            ];
+            return DeviceMessageService::prepare('whatsapp', $toPhone, $message);
         }
 
         try {
@@ -289,8 +270,18 @@ class TenantNotificationDispatcherService
         }
 
         $gateway = $this->getGateway($company, TenantNotificationGateway::CHANNEL_SMS);
-        if (! $gateway || ! $gateway->is_enabled) {
-            return ['success' => false, 'status' => 'not_configured', 'message' => 'SMS Gateway is not enabled.'];
+        if (! DispatchChannelService::isSmsConfigured($company->id)) {
+            return DeviceMessageService::prepare('sms', $toPhone, $message);
+        }
+        if (! $gateway) {
+            $settings = DispatchChannelService::apiSettings($company->id);
+            if (! empty($settings['sms_api_url'] ?? $settings['generic_sms_url'] ?? null)) {
+                return $this->dispatchHttpMessage($company, 'sms', $toPhone, $message,
+                    $settings['sms_api_url'] ?? $settings['generic_sms_url'],
+                    $settings['sms_api_token'] ?? $settings['generic_sms_api_key'] ?? '');
+            }
+            $result = \App\Services\SmsGatewayService::send($sanitizedPhone, $message, $company->id);
+            return ['success' => $result['success'], 'status' => $result['success'] ? 'sent' : 'failed', 'message' => $result['success'] ? 'SMS sent.' : 'SMS dispatch failed.', 'details' => $result];
         }
 
         $creds = (array) $gateway->credentials;
@@ -457,29 +448,10 @@ class TenantNotificationDispatcherService
             return ['success' => false, 'status' => 'error', 'message' => 'Invalid email address.'];
         }
 
-        $gateway = $this->getGateway($company, TenantNotificationGateway::CHANNEL_EMAIL);
-        $smtp = [];
-
-        if ($gateway && $gateway->is_enabled && ! empty($gateway->credentials)) {
-            $creds = (array) $gateway->credentials;
-            $smtp = [
-                'host' => $creds['host'] ?? null,
-                'port' => ! empty($creds['port']) ? (int) $creds['port'] : 587,
-                'username' => $creds['username'] ?? null,
-                'password' => $creds['password'] ?? null,
-                'encryption' => $creds['encryption'] ?? 'tls',
-                'from_address' => $creds['from_address'] ?? ($company->email ?: 'no-reply@zoomnearby.com'),
-                'from_name' => $creds['from_name'] ?? ($company->name ?: 'ZoomNearby Store'),
-            ];
+        if (! DispatchChannelService::isEmailConfigured($company->id)) {
+            return DeviceMessageService::prepare('email', $recipientEmail, DeviceMessageService::plainText($htmlContent), $subject);
         }
-
-        if (empty($smtp['host'])) {
-            $smtp = $this->invoiceDeliveryService->getSmtpConfig($company);
-        }
-
-        if (empty($smtp['host'])) {
-            return ['success' => false, 'status' => 'not_configured', 'message' => 'SMTP is not configured for this store.'];
-        }
+        $smtp = $this->invoiceDeliveryService->getSmtpConfig($company);
 
         Config::set('mail.mailers.tenant_dynamic', [
             'transport' => 'smtp',
@@ -490,6 +462,7 @@ class TenantNotificationDispatcherService
             'password' => $smtp['password'],
             'timeout' => 15,
         ]);
+        Mail::purge('tenant_dynamic');
 
         try {
             Mail::mailer('tenant_dynamic')->send([], [], function ($msg) use ($cleanEmail, $smtp, $subject, $htmlContent, $attachmentPdf, $attachmentName) {
@@ -521,7 +494,7 @@ class TenantNotificationDispatcherService
     /**
      * Dispatch webhook with HMAC signature.
      */
-    public function dispatchWebhook(Company $company, string $eventType, array $payload): array
+    public function dispatchWebhook(Company $company, string $eventType, array $payload, bool $ignoreEventSubscription = false): array
     {
         $gateway = $this->getGateway($company, TenantNotificationGateway::CHANNEL_WEBHOOK);
         if (! $gateway || ! $gateway->is_enabled) {
@@ -540,7 +513,7 @@ class TenantNotificationDispatcherService
         }
 
         // Check if event type is subscribed
-        if (! empty($triggers) && ! in_array($eventType, $triggers, true) && ! in_array('*', $triggers, true)) {
+        if (! $ignoreEventSubscription && ! empty($triggers) && ! in_array($eventType, $triggers, true) && ! in_array('*', $triggers, true)) {
             return ['success' => false, 'status' => 'skipped', 'message' => "Event '{$eventType}' not subscribed."];
         }
 
@@ -631,7 +604,7 @@ class TenantNotificationDispatcherService
         if (in_array('email', $channels, true) && ! empty($email)) {
             $pdfData = null;
             try {
-                $pdfData = $this->invoiceDeliveryService->generateInvoicePdf($sale);
+                $pdfData = DispatchChannelService::isEmailConfigured($company->id) ? $this->invoiceDeliveryService->generateInvoicePdf($sale) : null;
             } catch (\Throwable $e) {
                 Log::warning("Could not generate PDF for email: ".$e->getMessage());
             }
@@ -724,7 +697,7 @@ class TenantNotificationDispatcherService
         if (in_array('email', $channels, true) && ! empty($email)) {
             $pdfData = null;
             try {
-                $pdfData = $this->invoiceDeliveryService->generateQuotationPdf($quote);
+                $pdfData = DispatchChannelService::isEmailConfigured($company->id) ? $this->invoiceDeliveryService->generateQuotationPdf($quote) : null;
             } catch (\Throwable $e) {
                 Log::warning("Could not generate Quotation PDF: ".$e->getMessage());
             }
@@ -870,6 +843,26 @@ class TenantNotificationDispatcherService
 
             default:
                 return ['success' => false, 'message' => "Unknown channel '{$channel}'."];
+        }
+    }
+
+    protected function dispatchHttpMessage(Company $company, string $channel, string $recipient, string $message, string $url, string $token, ?string $documentUrl = null): array
+    {
+        try {
+            $endpoint = str_replace(['{phone}', '{to}', '{message}'], [rawurlencode($recipient), rawurlencode($recipient), rawurlencode($message)], $url);
+            $client = Http::timeout(15)->acceptJson();
+            if ($token !== '') {
+                $client = $client->withToken($token);
+            }
+            $response = $channel === 'sms'
+                ? $client->get($endpoint)
+                : $client->post($endpoint, ['recipient' => $recipient, 'message' => $message, 'media_url' => $documentUrl]);
+            $success = $response->successful();
+            $this->logMessageQueue($company->id, $channel, $recipient, $message, $success ? 'sent' : 'failed', $success ? null : $response->body());
+
+            return ['success' => $success, 'status' => $success ? 'sent' : 'failed', 'message' => $success ? 'Message sent via configured gateway.' : 'Configured gateway rejected the message.'];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'status' => 'failed', 'error' => $e->getMessage()];
         }
     }
 

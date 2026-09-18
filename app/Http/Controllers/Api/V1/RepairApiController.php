@@ -764,7 +764,7 @@ class RepairApiController extends Controller
 
             $deviceLabel = trim(trim((string) $ticket->brand).' '.trim((string) $ticket->model)) ?: 'Device';
             $trackingUrl = $dispatchResults['tracking_url'] ?? url('/track/'.$ticket->ticket_number);
-            $shareText = "Hello {$ticket->customer_name}, your repair ticket #{$ticket->ticket_number} for {$deviceLabel} has been booked. Track status: {$trackingUrl}";
+            $shareText = $dispatchResults['sms_text'];
 
             // `action: show_ticket_share_sheet` tells the client to pop a native
             // bottom sheet (WhatsApp / Print Token / System Share / Done)
@@ -855,8 +855,7 @@ class RepairApiController extends Controller
         // dispatches webhooks and audit rows; sharing an existing ticket must
         // stay a read-only, idempotent action).
         $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
-        $shareText = "Hello {$customerName}, your repair ticket #{$ticket->ticket_number} for {$device} is with "
-            .($company->name ?: 'our service center').". Track status: {$trackingUrl}";
+        $shareText = $this->notificationService->buildCustomerMessage($ticket);
         $whatsappUrl = RepairNotificationService::whatsAppUrl($shareText, $phone);
         $printUrl = url("/api/tenant/repair/tickets/{$ticket->id}/intake-sheet");
 
@@ -909,7 +908,7 @@ class RepairApiController extends Controller
         $reference = (string) $ticket->ticket_number;
         $statusLabel = ucfirst(str_replace('_', ' ', $ticket->status ?? 'received'));
         $trackingUrl = route('repair.portal.track', $reference);
-        $shareText = "Hello {$customerName}, your repair ticket #{$reference} for {$device} is ready. Track status: {$trackingUrl}";
+        $shareText = $this->notificationService->buildCustomerMessage($ticket);
         $endpointPrefix = $request->is('api/*') ? '/api/v1/tenant' : '/tenant';
 
         $dynamicChannels = \App\Services\OmnichannelRegistryService::resolveChannels($company->id, [
@@ -917,49 +916,11 @@ class RepairApiController extends Controller
             'id' => $ticket->id,
             'phone' => $phone,
             'email' => $email,
+            'reference' => $reference,
+            'message' => $shareText,
         ]);
 
-        $channelComponents = [];
-        foreach ($dynamicChannels as $chItem) {
-            $ch = $chItem['channel'] ?? 'custom';
-            $target = match ($ch) {
-                'whatsapp', 'sms' => $phone,
-                'email' => $email,
-                default => $chItem['subtitle'] ?? '',
-            };
-
-            $channelComponents[] = [
-                'type' => 'list_tile',
-                'title' => $chItem['title'] ?? ('Send via ' . ucfirst($ch)),
-                'subtitle' => $target ? "To: {$target}" : ($chItem['subtitle'] ?? 'Target configured in Settings'),
-                'leading' => $chItem['leading'] ?? ['icon' => 'send'],
-                'action' => [
-                    'type' => 'SUBMIT_FORM',
-                    'endpoint' => '/api/v1/documents/dispatch',
-                    'method' => 'POST',
-                    'payload' => [
-                        'document_type' => 'repair',
-                        'document_id' => $ticket->id,
-                        'channels' => [$ch],
-                        'phone' => $phone,
-                        'email' => $email,
-                        'customer_name' => $customerName,
-                    ],
-                ],
-            ];
-        }
-
-        // Direct thermal slip/token printing
-        $printComponent = [
-            'type' => 'list_tile',
-            'title' => 'Print Thermal Slip / Token',
-            'subtitle' => 'Bluetooth / ESC/POS thermal receipt printer',
-            'leading' => ['type' => 'icon', 'icon' => 'receipt_long', 'color' => '#10B981'],
-            'action' => [
-                'type' => 'OPEN_URL',
-                'url' => url("{$endpointPrefix}/repair/tickets/{$ticket->id}/intake-sheet?format=slip"),
-            ],
-        ];
+        $channelComponents = \App\Services\DispatchChannelService::groupedComponents($dynamicChannels, ['type' => 'repair', 'id' => $ticket->id, 'phone' => $phone, 'email' => $email]);
 
         // System share / tracking link
         $shareComponent = [
@@ -978,7 +939,7 @@ class RepairApiController extends Controller
                 [
                     'type' => 'section_header',
                     'title' => 'Dispatch Channels',
-                    'subtitle' => "Notify {$customerName} via enabled channels (automatically bound from ticket customer profile)",
+                    'subtitle' => "Notify {$customerName} using a configured gateway or your device app",
                 ],
             ],
             $channelComponents,
@@ -988,7 +949,6 @@ class RepairApiController extends Controller
                     'title' => 'Printer & Share',
                     'subtitle' => 'Print token slip or share tracking portal link',
                 ],
-                $printComponent,
                 $shareComponent,
             ]
         );
@@ -1005,7 +965,7 @@ class RepairApiController extends Controller
                 'header' => ['title' => "#{$reference}", 'subtitle' => "{$device} • {$customerName} • {$statusLabel}"],
                 'components' => $components,
             ],
-        ]);
+        ], 200, ['Cache-Control' => 'no-store, private']);
     }
 
     /** Dispatch a repair ticket directly to its linked customer contact. */
@@ -1025,7 +985,7 @@ class RepairApiController extends Controller
         $email = $ticket->customer?->email ?: ($ticket->customer_email ?: '');
         $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'Device';
         $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
-        $message = "Hello {$customerName}, your repair ticket #{$ticket->ticket_number} for {$device} is ready. Track status: {$trackingUrl}";
+        $message = $this->notificationService->buildCustomerMessage($ticket);
 
         if ($channel === 'whatsapp') {
             // Always use the contact bound to this ticket. A caller cannot
@@ -1036,13 +996,6 @@ class RepairApiController extends Controller
             // intake PDF, and do not claim delivery when the dispatcher merely
             // generated a manual wa.me link because no provider is configured.
             $result = $this->documentDispatchService->dispatchWhatsApp($company, $recipient, $message, null);
-            if (($result['status'] ?? '') === 'manual_link') {
-                $result = [
-                    'success' => false,
-                    'status' => 'not_configured',
-                    'error' => 'WhatsApp gateway is not configured for this store.',
-                ];
-            }
         } elseif ($channel === 'email') {
             // Email delivery follows the linked customer record (with the
             // ticket snapshot as the model fallback), just like WhatsApp.
@@ -1050,6 +1003,9 @@ class RepairApiController extends Controller
             if (! filter_var($recipient, FILTER_VALIDATE_EMAIL)) return response()->json(['success' => false, 'error' => 'Customer email is not linked.'], 422);
             $html = '<p>'.e($message).'</p><p>Ticket: <strong>'.e($ticket->ticket_number).'</strong></p>';
             $result = $this->documentDispatchService->dispatchEmail($company, $recipient, "Repair Ticket #{$ticket->ticket_number}", $html);
+        } elseif ($channel === 'sms') {
+            if (! preg_match('/[0-9]/', $phone)) return response()->json(['success' => false, 'error' => 'Customer phone is not linked.'], 422);
+            $result = $this->documentDispatchService->dispatchSms($company, $phone, $message);
         } else {
             return response()->json(['success' => false, 'error' => 'Unsupported dispatch channel.'], 422);
         }
@@ -1058,8 +1014,14 @@ class RepairApiController extends Controller
 
         return response()->json([
             'success' => (bool) ($result['success'] ?? false),
-            'message' => ($result['success'] ?? false) ? 'Repair ticket sent to the linked customer.' : $error,
-            'channel' => $result['channel'] ?? $channel,
+            'message' => $result['message'] ?? (($result['success'] ?? false) ? 'Repair ticket sent to the linked customer.' : $error),
+            'status' => $result['status'] ?? 'failed',
+            'channel' => $channel,
+            'url' => $result['url'] ?? null,
+            'action' => $result['action'] ?? null,
+            'whatsapp_url' => $result['whatsapp_url'] ?? null,
+            'email_url' => $result['email_url'] ?? null,
+            'sms_url' => $result['sms_url'] ?? null,
         ], ($result['success'] ?? false) ? 200 : 422);
     }
 

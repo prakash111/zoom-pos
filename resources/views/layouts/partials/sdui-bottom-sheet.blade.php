@@ -10,6 +10,8 @@
         previewLoading: true,
         dispatching: false,
         error: '',
+        deviceActions: [],
+        selectedChannels: [],
         schema: { title: '', components: [] },
         history: [],
 
@@ -25,10 +27,12 @@
             this.loading = true;
             this.previewLoading = true;
             this.error = '';
+            this.deviceActions = [];
             document.documentElement.classList.add('overflow-hidden');
 
             try {
                 const response = await fetch(endpoint, {
+                    cache: 'no-store',
                     credentials: 'same-origin',
                     headers: {
                         'Accept': 'application/json',
@@ -38,6 +42,7 @@
                 const payload = await response.json();
                 if (!response.ok) throw new Error(payload.message || payload.error || 'Unable to load this panel.');
                 this.schema = payload.schema || payload;
+                this.resetSelection();
                 if (typeof payload.unread_count !== 'undefined') {
                     window.dispatchEvent(new CustomEvent('sdui-unread-count', { detail: { count: payload.unread_count } }));
                 }
@@ -56,7 +61,20 @@
 
         back() {
             const previous = this.history.pop();
-            if (previous) this.schema = previous;
+            if (previous) { this.schema = previous; this.resetSelection(); }
+        },
+
+        channelOptions() {
+            return (this.schema.components || []).filter(item => item.type === 'checkbox' && item.name === 'channels[]'
+                && item.selectable !== false && item.api_enabled !== false && item.delivery_mode !== 'device');
+        },
+
+        channelValue(component) {
+            return component.selection_value || component.option_value || component.value || component.channel;
+        },
+
+        resetSelection() {
+            this.selectedChannels = this.channelOptions().filter(item => item.initial_value === true).map(item => this.channelValue(item));
         },
 
         async selectFormat(component, option) {
@@ -72,7 +90,8 @@
                 receipt_long: '🧾', person_pin: '📌', request_quote: '📑',
                 point_of_sale: '🛍️', notifications_active: '🔔',
                 notifications_none: '🔔', sms: '💬', chat: '🟢',
-                email: '✉️', mark_email_read: '✉️', webhook: '🔗', send: '📤'
+                email: '✉️', mark_email_read: '✉️', webhook: '🔗', send: '📤',
+                print: '🖨️', picture_as_pdf: '📄', textsms: '💬'
             }[name] || '•';
         },
 
@@ -92,6 +111,7 @@
                 .replace(/^\/api\/tenant\/dispatch(?=\/|$)/, '/tenant/dispatch')
                 .replace(/^\/api\/v1\/tenant\/documents\//, '/tenant/documents/')
                 .replace(/^\/api\/tenant\/documents\//, '/tenant/documents/')
+                .replace(/^\/api\/(?:v1\/)?documents\/dispatch$/, '/tenant/documents/dispatch')
                 .replace(/^\/api\/v1\/tenant\/repair\//, '/tenant/repair/')
                 .replace(/^\/api\/tenant\/repair\//, '/tenant/repair/')
                 .replace(/^\/api\/v1\/tenant\/views\/leads\/(.+)$/, '/tenant/leads/$1')
@@ -103,7 +123,9 @@
             const type = String(action.type || component?.action_type || '').toUpperCase();
 
             if (type === 'OPEN_URL') {
-                window.open(action.url || component.url, '_blank', 'noopener,noreferrer');
+                const url = action.url || component.url;
+                if (/^(whatsapp:|mailto:|sms:)/i.test(url)) window.location.href = url;
+                else window.open(url, '_blank', 'noopener,noreferrer');
                 return;
             }
             if (type === 'OPEN_RECEIPT_PREVIEW') {
@@ -144,10 +166,38 @@
                 if (target) await this.show(target, true);
                 return;
             }
-            if (type !== 'SUBMIT_FORM') return;
+            if (!['SUBMIT_FORM', 'FORM_SUBMIT'].includes(type) || this.dispatching) return;
+
+            const data = { ...(action.data || action.payload || component.data || {}) };
+            if (type === 'FORM_SUBMIT' || action.collect_form) {
+                const enabled = this.channelOptions().map(item => this.channelValue(item));
+                data.channels = this.selectedChannels.filter(value => enabled.includes(value));
+                if (!data.channels.length) { this.error = 'Select a delivery channel.'; return; }
+                data.api_only = true;
+            }
+            if (data.document_type) {
+                const channels = data.channels || [data.channel || component.channel];
+                if (channels.some(value => ['whatsapp', 'sms'].includes(value)) && !(data.phone || data.recipient_phone)) {
+                    const phone = window.prompt('Recipient phone number with country code');
+                    if (!phone?.trim()) return;
+                    data.phone = phone.trim();
+                }
+                if (channels.includes('email') && !(data.email || data.recipient_email)) {
+                    const email = window.prompt('Recipient email address');
+                    if (!email?.trim()) return;
+                    data.email = email.trim();
+                }
+            }
+            const channel = data.channel || component.channel;
+            if (data.type === 'kot' && ['whatsapp', 'sms', 'email'].includes(channel) && !data.recipient) {
+                const recipient = window.prompt(channel === 'email' ? 'Recipient email address' : 'Recipient phone number with country code');
+                if (!recipient?.trim()) return;
+                data.recipient = recipient.trim();
+            }
 
             this.dispatching = true;
             this.error = '';
+            this.deviceActions = [];
             try {
                 const response = await fetch(this.browserEndpoint(action.endpoint || component.endpoint), {
                     method: action.method || component.method || 'POST',
@@ -158,16 +208,22 @@
                         'X-Requested-With': 'XMLHttpRequest',
                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || ''
                     },
-                    body: JSON.stringify(action.data || action.payload || component.data || {})
+                    body: JSON.stringify(data)
                 });
                 const payload = await response.json();
                 if (!response.ok || payload.success === false) {
-                    throw new Error(payload.error || payload.message || 'Dispatch failed.');
+                    const reasons = Object.entries(payload.failed || {}).map(([channel, reason]) => channel + ': ' + reason).join('; ');
+                    throw new Error(reasons || payload.error || payload.message || 'Dispatch failed.');
                 }
                 window.dispatchEvent(new CustomEvent('toast', {
-                    detail: { type: 'success', message: payload.message || action.feedback || 'Document dispatched.' }
+                    detail: { type: payload.status === 'partial' ? 'warning' : 'success', message: payload.message || action.feedback || 'Document dispatched.' }
                 }));
-                if (payload.url || payload.whatsapp_url) {
+                if (payload.failed && Object.keys(payload.failed).length) {
+                    this.error = Object.entries(payload.failed).map(([channel, reason]) => channel + ': ' + reason).join('; ');
+                }
+                if (payload.device_actions?.length || payload.status === 'manual_link') {
+                    this.deviceActions = payload.device_actions?.length ? payload.device_actions : [payload];
+                } else if (payload.url || payload.whatsapp_url) {
                     window.open(payload.url || payload.whatsapp_url, '_blank', 'noopener,noreferrer');
                 }
             } catch (exception) {
@@ -184,6 +240,17 @@
     x-on:keydown.escape.window="if (visible) close()"
     x-cloak
 >
+    <div x-show="visible && deviceActions.length" class="fixed inset-x-4 bottom-4 z-[100002] mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+        <p class="mb-3 text-sm text-slate-600 dark:text-slate-300">{{ __('Complete sending in your device app:') }}</p>
+        <div class="flex flex-wrap gap-2">
+            <template x-for="(item, index) in deviceActions" :key="index">
+                <a :href="item.url" target="_self" rel="noopener noreferrer"
+                   class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
+                   x-text="'Open ' + (item.channel || 'app') + ' & Send'"></a>
+            </template>
+            <button type="button" @click="deviceActions = []" class="px-3 py-2 text-sm text-slate-500">{{ __('Close') }}</button>
+        </div>
+    </div>
     <div
         x-show="visible"
         x-transition.opacity
@@ -286,6 +353,17 @@
                             </div>
                         </template>
 
+                        <template x-if="component.type === 'checkbox' &amp;&amp; component.name === 'channels[]'">
+                            <label class="flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 p-3.5 dark:border-slate-700">
+                                <input type="checkbox" x-model="selectedChannels" :value="channelValue(component)" :disabled="dispatching || component.selectable === false" class="h-5 w-5 rounded border-slate-300 text-blue-600">
+                                <span class="min-w-0 flex-1"><strong class="block text-sm text-slate-900 dark:text-slate-100" x-text="component.label || component.title"></strong><span class="block text-xs text-slate-500 dark:text-slate-400" x-text="component.subtitle"></span></span>
+                            </label>
+                        </template>
+
+                        <template x-if="component.type === 'button_primary'">
+                            <button type="button" @click="execute(component)" :disabled="dispatching || (component.id === 'dispatch_selected_channels' &amp;&amp; !selectedChannels.length)" class="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50" x-text="dispatching ? 'Sending…' : component.label"></button>
+                        </template>
+
                         <template x-if="component.type === 'list_tile' || component.type === 'notification_item'">
                             <button
                                 type="button"
@@ -301,7 +379,7 @@
                                     <span class="mt-0.5 block text-xs text-slate-500 dark:text-slate-400" x-text="component.subtitle"></span>
                                     <span x-show="component.timestamp" class="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400" x-text="formatTimestamp(component.timestamp)"></span>
                                 </span>
-                                <span class="shrink-0 text-slate-400">›</span>
+                                <span class="shrink-0 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300" x-text="component.launch_label || 'Open'"></span>
                             </button>
                         </template>
 

@@ -23,7 +23,7 @@ class DispatchController extends Controller
     public function dispatchSms(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'type' => ['required', 'string', 'in:invoice,sale,quotation'],
+            'type' => ['required', 'string', 'in:invoice,sale,quotation,kot,kitchen_order_ticket,kitchen-ticket'],
             'id' => ['required'],
             'phone' => ['required', 'string'],
             'message' => ['nullable', 'string'],
@@ -41,7 +41,7 @@ class DispatchController extends Controller
     public function dispatchEmail(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'type' => ['required', 'string', 'in:invoice,sale,quotation'],
+            'type' => ['required', 'string', 'in:invoice,sale,quotation,kot,kitchen_order_ticket,kitchen-ticket'],
             'id' => ['required'],
             'email' => ['required', 'email'],
         ]);
@@ -65,6 +65,10 @@ class DispatchController extends Controller
      */
     public function dispatchDocument(Request $request, string $type, string $id): JsonResponse
     {
+        if (in_array(strtolower($type), ['kot', 'kitchen_order_ticket', 'kitchen-ticket'], true)) {
+            return app(DocumentDispatchController::class)->dispatchKot($request, $id);
+        }
+
         $company = $this->resolveCompany($request);
         $companyId = $company->id;
 
@@ -240,6 +244,10 @@ class DispatchController extends Controller
                 ], 422);
             }
 
+            if (($res['status'] ?? '') === 'manual_link') {
+                return response()->json($res + ['document_number' => $docNumber]);
+            }
+
             $markQuotationSent();
 
             AuditLog::record('document.dispatched', $companyId, $this->resolveUser($request, $company)?->id, [
@@ -292,27 +300,18 @@ class DispatchController extends Controller
                 $msg = "Thank you for your business! Your receipt for {$docNumber} ({$currency}{$totalVal}): {$publicLink}";
             }
 
-            $whatsappUrl = "https://wa.me/{$cleanPhone}?text=".urlencode($msg);
-
-            $markQuotationSent();
-
+            if ($isQuote && ! $customMsg) {
+                $msg .= "\nReview online: ".route('quotes.public', $docNumber);
+            }
+            $result = app(TenantNotificationDispatcherService::class)->dispatchWhatsApp($company, $recipient, $msg);
+            if (($result['status'] ?? '') === 'sent') {
+                $markQuotationSent();
+            }
             AuditLog::record('document.dispatched', $companyId, $this->resolveUser($request, $company)?->id, [
-                'type' => 'whatsapp',
-                'document_type' => $type,
-                'recipient' => $cleanPhone,
-                'document_number' => $docNumber,
-                'status' => 'sent',
+                'type' => 'whatsapp', 'document_type' => $type, 'recipient' => $cleanPhone,
+                'document_number' => $docNumber, 'status' => $result['status'] ?? 'failed',
             ]);
-
-            return response()->json([
-                'success' => true,
-                'status' => 'sent',
-                'channel' => 'whatsapp',
-                'message' => 'WhatsApp link prepared.',
-                'whatsapp_url' => $whatsappUrl,
-                'url' => $whatsappUrl,
-                'document_number' => $docNumber,
-            ]);
+            return response()->json($result + ['channel' => 'whatsapp', 'document_number' => $docNumber], ($result['success'] ?? false) ? 200 : 422);
         }
 
         // 3. Email Dispatch
@@ -339,6 +338,9 @@ class DispatchController extends Controller
                     'message' => 'Email dispatch failed.',
                     'details' => $emailRes,
                 ], 422);
+            }
+            if (($emailRes['status'] ?? '') === 'manual_link') {
+                return response()->json($emailRes + ['document_number' => $docNumber]);
             }
             $emailMessage = $emailRes['message'] ?? "Email dispatched successfully to {$recipient}.";
 

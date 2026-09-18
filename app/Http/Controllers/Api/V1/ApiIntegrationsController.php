@@ -442,6 +442,10 @@ class ApiIntegrationsController extends Controller
      */
     public function dispatchDocument(Request $request): JsonResponse
     {
+        if ($request->boolean('api_only') || in_array($request->input('document_type'), ['kot', 'kitchen_order_ticket', 'kitchen-ticket', 'repair', 'prescription', 'appointment'], true)) {
+            return app(\App\Http\Controllers\Api\DocumentDispatchController::class)->dispatchDocument($request, app(\App\Services\Dispatch\DocumentDispatchService::class));
+        }
+
         $company = $this->resolveCompany($request);
 
         $validator = Validator::make($request->all(), [
@@ -483,6 +487,9 @@ class ApiIntegrationsController extends Controller
                 'success' => true,
                 'document_type' => 'due_reminder',
                 'results' => $results,
+            'device_actions' => array_values(array_filter($results, fn ($result) => ($result['status'] ?? '') === 'manual_link')),
+                'url' => count($results) === 1 ? (reset($results)['url'] ?? null) : null,
+                'status' => count($results) === 1 ? (reset($results)['status'] ?? null) : null,
                 'message' => 'Due reminder notifications dispatched.',
             ]);
         }
@@ -511,7 +518,10 @@ class ApiIntegrationsController extends Controller
             'document_type' => $docType,
             'document_number' => $sale->sale_number,
             'results' => $results,
-            'message' => 'Document dispatched across configured channels.',
+            'device_actions' => array_values(array_filter($results, fn ($result) => ($result['status'] ?? '') === 'manual_link')),
+            'url' => count($results) === 1 ? (reset($results)['url'] ?? null) : null,
+            'status' => count($results) === 1 ? (reset($results)['status'] ?? null) : null,
+            'message' => collect($results)->contains(fn ($result) => ($result['status'] ?? '') === 'manual_link') ? 'Messages prepared. Complete sending in your device app.' : 'Document dispatched across configured channels.',
         ]);
     }
 

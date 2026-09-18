@@ -95,6 +95,16 @@ class SmsGatewayService
                 }
                 $response = $client->post($resolvedUrl, $postData);
             } else {
+                $params = [];
+                if (! str_contains($endpoint, '{phone}') && ! str_contains($endpoint, '{to}')) {
+                    $params['phone'] = $cleanPhone;
+                }
+                if (! str_contains($endpoint, '{message}')) {
+                    $params['message'] = $message;
+                }
+                if ($params) {
+                    $resolvedUrl .= (str_contains($resolvedUrl, '?') ? '&' : '?').http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+                }
                 $response = $client->get($resolvedUrl);
             }
 

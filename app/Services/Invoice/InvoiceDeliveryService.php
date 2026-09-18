@@ -10,12 +10,14 @@ use App\Models\Company;
 use App\Models\Configuration;
 use App\Models\PlatformBranding;
 use App\Models\Sale;
+use App\Models\TenantNotificationGateway;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class InvoiceDeliveryService
@@ -65,9 +67,28 @@ class InvoiceDeliveryService
         if ($companyId) {
             $tenantConfigs = Configuration::withoutGlobalScopes()
                 ->where('company_id', $companyId)
-                ->where('key', 'like', 'smtp_%')
+                ->where(fn ($query) => $query->where('key', 'like', 'smtp_%')->orWhere('key', 'enable_smtp'))
                 ->pluck('value', 'key')
                 ->all();
+        }
+
+        $company ??= $companyId ? Company::withoutGlobalScopes()->find($companyId) : null;
+        $tenantConfigs = array_merge((array) ($company?->api_settings ?? []), $tenantConfigs);
+        $disabled = false;
+        foreach (['smtp_enabled', 'enable_smtp'] as $flag) {
+            if (array_key_exists($flag, $tenantConfigs) && ! filter_var($tenantConfigs[$flag], FILTER_VALIDATE_BOOL)) {
+                $disabled = true;
+            }
+        }
+
+        $gateway = $companyId && Schema::hasTable('tenant_notification_gateways')
+            ? TenantNotificationGateway::withoutGlobalScopes()->where('company_id', $companyId)->where('channel', 'email')->first()
+            : null;
+        if ($gateway) {
+            $disabled = ! $gateway->isConfigured();
+            foreach ((array) $gateway->credentials as $key => $value) {
+                $tenantConfigs['smtp_'.$key] = $value;
+            }
         }
 
         $host = $tenantConfigs['smtp_host'] ?? null;
@@ -79,7 +100,7 @@ class InvoiceDeliveryService
         $fromName = $tenantConfigs['smtp_from_name'] ?? ($company?->name ?? 'Store');
 
         // Fallback to platform settings if tenant has no host configured
-        if (empty($host)) {
+        if (! $disabled && empty($host)) {
             $branding = PlatformBranding::current();
             $host = $branding?->smtp_host;
             $port = $branding?->smtp_port ?? 587;
@@ -91,7 +112,7 @@ class InvoiceDeliveryService
         }
 
         // Fallback to default config
-        if (empty($host)) {
+        if (! $disabled && empty($host)) {
             $host = config('mail.mailers.smtp.host');
             $port = config('mail.mailers.smtp.port') ?: 587;
             $username = config('mail.mailers.smtp.username');
@@ -99,6 +120,13 @@ class InvoiceDeliveryService
             $encryption = config('mail.mailers.smtp.encryption') ?: 'tls';
             $fromAddress = $fromAddress ?: config('mail.from.address');
             $fromName = $fromName ?: config('mail.from.name');
+            if (in_array($host, ['localhost', '127.0.0.1', '::1'], true) && empty($username) && empty($password)) {
+                $host = null;
+            }
+        }
+
+        if ($disabled) {
+            $host = null;
         }
 
         return [

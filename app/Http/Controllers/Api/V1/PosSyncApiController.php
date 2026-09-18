@@ -3914,7 +3914,7 @@ class PosSyncApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'type' => ['required', 'string', 'in:email,whatsapp,sms,custom'],
-            'document_type' => ['required', 'string', 'in:invoice,quotation'],
+            'document_type' => ['required', 'string', 'in:invoice,quotation,kot,kitchen_order_ticket,kitchen-ticket'],
             'recipient' => ['required_unless:type,custom', 'nullable', 'string'],
             'channel_id' => ['required_if:type,custom', 'nullable', 'integer'],
             'document_id' => ['nullable', 'string'],
@@ -3932,6 +3932,11 @@ class PosSyncApiController extends Controller
 
         $type = $request->input('type');
         $docType = $request->input('document_type');
+        if (in_array($docType, ['kot', 'kitchen_order_ticket', 'kitchen-ticket'], true)) {
+            $request->validate(['document_id' => ['required']]);
+
+            return app(\App\Http\Controllers\Api\DocumentDispatchController::class)->dispatchKot($request, $request->input('document_id'), $type);
+        }
         $recipient = trim((string) $request->input('recipient'));
         $docId = $request->input('document_id');
         $customMessage = $request->input('custom_message');
@@ -4032,13 +4037,8 @@ class PosSyncApiController extends Controller
                     'document_number' => $sale->sale_number,
                 ]);
 
-                return response()->json([
-                    'success' => true,
-                    'status' => 'sent',
-                    'message' => $smsResult['sms']['message'] ?? "SMS sent successfully to {$recipient}.",
-                    'document_number' => $sale->sale_number,
-                    'sent_at' => now()->toIso8601String(),
-                ]);
+                $result = $smsResult['sms'] ?? ['success' => false, 'status' => 'failed', 'message' => 'SMS dispatch failed.'];
+                return response()->json($result + ['document_number' => $sale->sale_number], ($result['success'] ?? false) ? 200 : 422);
             }
 
             if ($type === 'email') {
@@ -4047,6 +4047,9 @@ class PosSyncApiController extends Controller
                     : $dispatcher->dispatchReceipt($company, $sale, ['email'], null, $recipient);
 
                 $emailRes = $dispatchResult['email'] ?? [];
+                if (($emailRes['status'] ?? '') === 'manual_link') {
+                    return response()->json($emailRes + ['document_number' => $sale->sale_number]);
+                }
                 if (! empty($emailRes['success'])) {
                     AuditLog::record('pos.delivery_dispatched', $company->id, $user?->id, [
                         'type' => 'email',
@@ -4620,7 +4623,7 @@ class PosSyncApiController extends Controller
             }
 
             $smsBody = $delivery->buildDueReminderMessage($saleModel);
-            $res = SmsGatewayService::send($phone, $smsBody, $company->id);
+            $res = app(TenantNotificationDispatcherService::class)->dispatchSms($company, $phone, $smsBody);
 
             AuditLog::record('pos.delivery_dispatched', $company->id, $this->resolveUser($request, $company)?->id, [
                 'type' => 'sms',
@@ -4636,6 +4639,10 @@ class PosSyncApiController extends Controller
                     'error' => $res['error'] ?? 'Failed to send SMS reminder.',
                     'details' => $res['body'] ?? null,
                 ], 422);
+            }
+
+            if (($res['status'] ?? '') === 'manual_link') {
+                return response()->json($res + ['document_number' => $saleModel->sale_number]);
             }
 
             return response()->json([

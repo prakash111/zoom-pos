@@ -892,80 +892,7 @@ class QuotationController extends Controller
             'customer_name'   => $customerName,
         ]);
 
-        $channelButtons = [];
-        foreach ($availableChannels as $idx => $chan) {
-            $chKey = $chan['channel'];
-            $isPrimary = $idx === 0;
-            $btnType = $isPrimary ? 'button_primary' : 'button_outlined';
-            $btnVariant = $isPrimary ? 'primary' : 'outline';
-            $recipientText = ! empty($chan['recipient']) ? ' (' . $chan['recipient'] . ')' : '';
-            $btnLabel = $chan['title'] . $recipientText;
-            $btnColor = $chan['color'] ?? '#166534';
-
-            $btn = [
-                'type'             => $btnType,
-                'component_type'   => 'button',
-                'button_type'      => $isPrimary ? 'primary' : 'outlined',
-                'label'            => $btnLabel,
-                'text'             => $btnLabel,
-                'variant'          => $btnVariant,
-                'style'            => ['marginTop' => $idx === 0 ? 8 : 12],
-                'full_width'       => true,
-                'action_type'      => 'SUBMIT_FORM',
-                'action_name'      => 'SUBMIT_FORM',
-                'endpoint'         => '/api/v1/tenant/quotations/' . $quotation->id . '/dispatch',
-                'method'           => 'POST',
-                'data'             => ['channel' => $chKey],
-                'payload'          => ['channel' => $chKey],
-                'action'           => [
-                    'type'          => 'SUBMIT_FORM',
-                    'action_type'   => 'SUBMIT_FORM',
-                    'action'        => 'SUBMIT_FORM',
-                    'endpoint'      => '/api/v1/tenant/quotations/' . $quotation->id . '/dispatch',
-                    'method'        => 'POST',
-                    'data'          => ['channel' => $chKey],
-                    'payload'       => ['channel' => $chKey],
-                    'feedback'      => "Quotation dispatched via {$chan['title']} successfully.",
-                    'success_toast' => "Quotation dispatched via {$chan['title']} successfully.",
-                ],
-                'on_tap'           => [
-                    'type'        => 'SUBMIT_FORM',
-                    'action_type' => 'SUBMIT_FORM',
-                    'endpoint'    => '/api/v1/tenant/quotations/' . $quotation->id . '/dispatch',
-                    'method'      => 'POST',
-                    'payload'     => ['channel' => $chKey],
-                ],
-            ];
-
-            if ($isPrimary) {
-                $btn['background_color'] = $btnColor;
-                $btn['foreground_color'] = '#ffffff';
-            } else {
-                $btn['color'] = $btnColor;
-            }
-
-            $channelButtons[] = $btn;
-        }
-
-        $components = [
-            [
-                'type' => 'card',
-                'title' => 'Dispatch Channels',
-                'style' => [
-                    'backgroundColor' => 'theme.surface',
-                    'borderColor'     => 'theme.divider',
-                    'borderRadius'    => 12,
-                    'padding'         => 16,
-                ],
-                'components' => array_merge([
-                    [
-                        'type'  => 'text',
-                        'text'  => 'Select a channel to deliver Quotation #' . $quoteRef . ' to ' . $customerName . ':',
-                        'style' => ['fontSize' => 14, 'color' => '#94A3B8', 'marginBottom' => 16],
-                    ],
-                ], $channelButtons),
-            ],
-        ];
+        $components = \App\Services\DispatchChannelService::groupedComponents($availableChannels, ['type' => 'quotation', 'id' => $quotation->id, 'phone' => $phone, 'email' => $email]);
 
         $schema = [
             'type' => 'screen',
@@ -1377,22 +1304,8 @@ class QuotationController extends Controller
 
         $channelComponents = \App\Services\OmnichannelRegistryService::resolveChannels($tenantId, $context);
 
-        // Keep the top 3 document utilities:
+        // Preserve PDF file sharing alongside the universal dispatch controls.
         $baseActions = [
-            [
-                'type'     => 'list_tile',
-                'title'    => 'Preview & Print',
-                'subtitle' => 'View the PDF, print, or share the file',
-                'leading'  => ['type' => 'icon', 'icon' => 'picture_as_pdf', 'size' => 22],
-                'action'   => ['type' => 'OPEN_URL', 'url' => "/tenant/documents/quotation/{$quotation->id}/pdf"],
-            ],
-            [
-                'type'     => 'list_tile',
-                'title'    => 'Print on receipt printer',
-                'subtitle' => 'Bluetooth thermal printer',
-                'leading'  => ['type' => 'icon', 'icon' => 'print', 'size' => 22],
-                'action'   => ['type' => 'THERMAL_PRINT', 'document_id' => $quotation->id, 'quotation_id' => $quotation->id],
-            ],
             [
                 'type'     => 'list_tile',
                 'title'    => 'Share as PDF file',
@@ -1414,7 +1327,7 @@ class QuotationController extends Controller
             ]
         );
 
-        $allComponents = array_merge($baseActions, $dynamicChannels);
+        $allComponents = array_merge(\App\Services\DispatchChannelService::groupedComponents($dynamicChannels, $context), $baseActions);
         $gstin = auth()->user()?->tenant?->gstin ?? (auth()->user()?->company?->tax_id ?? 'N/A');
 
         return response()->json([
@@ -1425,7 +1338,10 @@ class QuotationController extends Controller
                 'subtitle' => 'GSTIN: ' . $gstin,
             ],
             'components' => $allComponents,
-            'channels'   => $dynamicChannels,
+            'channels' => \App\Services\DispatchChannelService::visibleChannels($allComponents),
+            'enabled_channels' => \App\Services\DispatchChannelService::splitChannels(\App\Services\DispatchChannelService::visibleChannels($allComponents))['api'],
+            'device_channels' => \App\Services\DispatchChannelService::splitChannels($dynamicChannels)['device'],
+            'multi_select' => true,
             'schema'     => [
                 'type'       => 'bottom_sheet',
                 'title'      => 'Invoice Preview',
@@ -1468,72 +1384,22 @@ class QuotationController extends Controller
         $quotation = $this->findQuotation($id, $companyId);
         $channel = strtolower($request->input('channel', 'whatsapp'));
 
-        // Direct DB update to prevent any caching or $fillable issues
-        \Illuminate\Support\Facades\DB::table('sales')
-            ->where('id', $quotation->id)
-            ->update(['status' => 'sent', 'updated_at' => now()]);
-
-        if (\Illuminate\Support\Facades\Schema::hasTable('quotations')) {
-            \Illuminate\Support\Facades\DB::table('quotations')
-                ->where('id', $quotation->id)
-                ->update(['status' => 'sent', 'updated_at' => now()]);
+        if (! in_array($channel, ['whatsapp', 'sms', 'email'], true)) {
+            return response()->json(['success' => false, 'error' => 'Unsupported dispatch channel.'], 422);
         }
-
-        $quotation->status = 'sent';
-        $quotation->save();
-
         $customer = $quotation->customer;
-        $customerName = $customer?->name ?: ($quotation->customer_name ?: 'Client');
-        $quoteRef = $quotation->quotation_number ?? $quotation->sale_number ?? (string) $quotation->id;
-        $linkedLead = $company?->hasModule('leadmanagement') ? $quotation->lead : null;
-        $phone = preg_replace('/[^0-9+]/', '', (string) ($customer?->phone ?? ($linkedLead?->phone ?? '')));
-        $email = trim((string) ($customer?->email ?? ($linkedLead?->email ?? '')));
-
-        // Log Activity in Lead if linked
-        $leadId = $linkedLead?->id;
-        if ($leadId) {
-            AuditHistory::log($leadId, "Quotation #{$quoteRef} dispatched to {$customerName} via " . strtoupper($channel));
+        $lead = $company?->hasModule('leadmanagement') ? $quotation->lead : null;
+        $phone = $customer?->phone ?: ($lead?->phone ?: $quotation->customer_phone);
+        $email = $customer?->email ?: ($lead?->email ?: $quotation->customer_email);
+        $results = app(\App\Services\Notifications\TenantNotificationDispatcherService::class)
+            ->dispatchQuotation($company, $quotation, [$channel], $phone, $email);
+        $result = $results[$channel] ?? ['success' => false, 'status' => 'failed', 'message' => 'A recipient is required for this channel.'];
+        if (($result['status'] ?? '') === 'sent' && $quotation->status === 'draft') {
+            $quotation->update(['status' => 'sent']);
         }
-
-        $currency = $company?->currency_symbol ?: ($company?->currency ?: '₹');
-        $totalValuation = (float) ($quotation->total_amount ?? $quotation->total ?? 0);
-        $formattedTotal = $currency . number_format($totalValuation, 2);
-        $storeName = $company?->trade_name ?: ($company?->name ?: 'Store');
-
-        $whatsappUrl = null;
-        if ($channel === 'whatsapp' && $phone) {
-            $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
-            $messageText = "Hello {$customerName},\n\nPlease find your Quotation #{$quoteRef} for {$formattedTotal} from {$storeName}.\n\nThank you for choosing us!";
-            $whatsappUrl = "https://wa.me/{$cleanPhone}?text=" . urlencode($messageText);
+        if ($lead && ($result['success'] ?? false)) {
+            AuditHistory::log($lead->id, "Quotation #{$quotation->sale_number} ".($result['status'] ?? 'prepared')." via ".strtoupper($channel));
         }
-
-        $smsResult = null;
-        if ($channel === 'sms') {
-            if (empty($phone)) {
-                return response()->json(['success' => false, 'error' => 'This customer has no phone number on file.'], 422);
-            }
-            $smsText = "Hello {$customerName},\nYour Quotation #{$quoteRef} for {$formattedTotal} is ready from {$storeName}.\nThank you for choosing us!";
-            $smsResult = \App\Services\SmsGatewayService::send($phone, $smsText, $companyId);
-        }
-
-        if ($channel === 'email' && ! empty($email)) {
-            try {
-                $dispatcher = app(\App\Services\Notifications\TenantNotificationDispatcherService::class);
-                if ($company && method_exists($dispatcher, 'dispatchQuotation')) {
-                    $dispatcher->dispatchQuotation($company, $quotation, ['email'], null, $email);
-                }
-            } catch (\Throwable) {
-                // Email fallback logged gracefully
-            }
-        }
-
-        return response()->json([
-            'success'      => true,
-            'message'      => "Quotation successfully dispatched via " . strtoupper($channel),
-            'channel'      => $channel,
-            'status'       => 'sent',
-            'whatsapp_url' => $whatsappUrl,
-            'sms_result'   => $smsResult,
-        ]);
+        return response()->json($result + ['channel' => $channel], ($result['success'] ?? false) ? 200 : 422);
     }
 }

@@ -310,6 +310,16 @@ class RestaurantApiController extends Controller
             'driver_phone' => ['nullable', 'string', 'max:50'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'channels' => ['nullable', 'array'],
+            'channels.*' => ['string'],
+            'channel' => ['nullable', 'string'],
+            'channel_id' => ['nullable', 'integer'],
+            'recipient_phone' => ['nullable', 'string', 'max:50'],
+            'recipient_email' => ['nullable', 'email'],
+            'customer_email' => ['nullable', 'email'],
+            'send_whatsapp' => ['sometimes', 'boolean'],
+            'send_email' => ['sometimes', 'boolean'],
+            'send_sms' => ['sometimes', 'boolean'],
             'prep_minutes' => ['nullable', 'integer', 'min:1', 'max:240'],
             // Any custom alert lead time is accepted (was previously capped to
             // the 0/2/5 quick-chip presets); it's clamped to <= prep_minutes
@@ -412,6 +422,10 @@ class RestaurantApiController extends Controller
                     'kot_status' => 'pending',
                     'items' => $items,
                     'notes' => $data['notes'] ?? null,
+                    'gst_invoice' => array_filter([
+                        'customer_phone' => $data['customer_phone'] ?? null,
+                        'customer_email' => $data['customer_email'] ?? null,
+                    ]),
                 ]);
             }
 
@@ -431,6 +445,7 @@ class RestaurantApiController extends Controller
                 'server_name' => $user?->name ?? 'POS Staff',
                 'items' => $items,
                 'sent_to_kitchen_at' => $sentAt,
+                'kitchen_notes' => $data['notes'] ?? null,
                 'prep_minutes' => $prepMinutes,
                 'intimation_minutes' => $intimationMinutes,
                 'target_completion_at' => $targetAt,
@@ -457,10 +472,24 @@ class RestaurantApiController extends Controller
         $freshKot = $kot->fresh('table');
         $thermalText = SchemaResponse::formatKotThermalText($freshKot, $company);
         $printModalSheet = SchemaResponse::kotPrintModalSheet($freshKot, $company, $thermalText);
+        $delivery = null;
+        if (! empty($data['channels']) || ! empty($data['channel']) || $request->boolean('send_whatsapp') || $request->boolean('send_email') || $request->boolean('send_sms')) {
+            $dispatchRequest = clone $request;
+            $dispatchRequest->merge([
+                'phone' => $data['recipient_phone'] ?? $data['customer_phone'] ?? null,
+                'email' => $data['recipient_email'] ?? $data['customer_email'] ?? null,
+            ]);
+            $delivery = app(\App\Http\Controllers\Api\DocumentDispatchController::class)
+                ->dispatchKot($dispatchRequest, $kot->id)->getData(true);
+        }
 
         return response()->json([
             'success' => true,
-            'message' => "{$kot->kot_number} dispatched to kitchen for {$tableName}.",
+            'message' => "{$kot->kot_number} dispatched to kitchen for {$tableName}.".($delivery ? ' '.$delivery['message'] : ''),
+            'delivery_success' => $delivery['success'] ?? null,
+            'results' => $delivery['results'] ?? [],
+            'device_actions' => $delivery['device_actions'] ?? [],
+            'delivery_status' => $delivery['status'] ?? null,
             'action' => 'OPEN_MODAL_BOTTOM_SHEET',
             'type' => 'OPEN_MODAL_BOTTOM_SHEET',
             'sheet' => $printModalSheet,

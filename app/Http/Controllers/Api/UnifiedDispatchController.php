@@ -8,8 +8,6 @@ use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\Quotation;
 use App\Models\Sale;
-use App\Models\CustomNotificationChannel;
-use App\Services\Notifications\CustomChannelDispatcherService;
 use App\Services\Notifications\TenantNotificationDispatcherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,11 +20,16 @@ class UnifiedDispatchController extends Controller
     public function dispatch(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'channel' => ['required', 'string', 'in:sms,whatsapp,email,webhook,custom_webhook'],
-            'type' => ['required', 'string', 'in:invoice,invoice_reminder,sale,receipt,quotation,quote'],
+            'channel' => ['required', 'string', 'in:sms,whatsapp,email,webhook,custom_webhook,custom'],
+            'channel_id' => ['nullable', 'integer'],
+            'type' => ['required', 'string', 'in:invoice,invoice_reminder,sale,receipt,quotation,quote,kot,kitchen_order_ticket,kitchen-ticket'],
             'id' => ['required'],
             'recipient' => ['nullable', 'string'],
         ]);
+
+        if (in_array($validated['type'], ['kot', 'kitchen_order_ticket', 'kitchen-ticket'], true)) {
+            return app(DocumentDispatchController::class)->dispatchKot($request, $validated['id'], $validated['channel']);
+        }
 
         $company = $this->resolveCompany($request);
         $requestedType = match ($validated['type']) {
@@ -67,7 +70,7 @@ class UnifiedDispatchController extends Controller
         // A successful manual dispatch advances quotations out of Draft. Do
         // not change invoice/sale lifecycle statuses here: those statuses are
         // governed by payment/completion workflows, not notification delivery.
-        if ($success && $resolvedType === 'quotation' && in_array(strtolower((string) $document->status), ['', 'draft'], true)) {
+        if ($success && ($result['status'] ?? '') === 'sent' && $resolvedType === 'quotation' && in_array(strtolower((string) $document->status), ['', 'draft'], true)) {
             $document->forceFill(['status' => 'sent'])->save();
         }
 
@@ -90,121 +93,29 @@ class UnifiedDispatchController extends Controller
                 : 'Document dispatch failed.'),
         ];
 
-        if ($channel === 'whatsapp') {
-            $waUrl = $result['whatsapp_url'] ?? $result['url'] ?? null;
-            if (! empty($waUrl)) {
-                $responsePayload['whatsapp_url'] = $waUrl;
-                $responsePayload['url'] = $waUrl;
-            }
-        } else {
-            // For email, sms, webhooks: explicitly ensure no client intent / url is returned
-            $responsePayload['action'] = null;
-            $responsePayload['intent'] = null;
-            $responsePayload['url'] = null;
-            $responsePayload['whatsapp_url'] = null;
-            $responsePayload['redirect_url'] = null;
+        $responsePayload['status'] = $result['status'] ?? ($success ? 'sent' : 'failed');
+        foreach (['action', 'url', 'whatsapp_url', 'email_url', 'sms_url', 'provider'] as $key) {
+            $responsePayload[$key] = $result[$key] ?? null;
         }
 
         return response()->json($responsePayload, $success ? 200 : 422);
     }
 
     /**
-     * Dispatch one sale/invoice through several enabled channels in one
+     * Dispatch one document through several enabled channels in one
      * request. The client uses this for the checkbox-based POS action sheet.
      */
     public function batchDispatch(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'document_id' => ['required'],
-            'document_type' => ['nullable', 'string', 'in:invoice,invoice_reminder,sale,receipt'],
-            'channels' => ['required', 'array', 'min:1'],
-            'channels.*' => ['string', 'max:120'],
-            'phone' => ['nullable', 'string'],
-            'email' => ['nullable', 'email'],
+        $request->validate([
+            'document_id' => ['required'], 'document_type' => ['nullable', 'string'],
+            'channels' => ['required', 'array', 'min:1'], 'channels.*' => ['string', 'max:120'],
+            'phone' => ['nullable', 'string'], 'email' => ['nullable', 'email'],
         ]);
+        $forwarded = clone $request;
+        $forwarded->merge(['document_type' => $request->input('document_type') ?: 'invoice', 'api_only' => true]);
 
-        $company = $this->resolveCompany($request);
-        $requestedType = match ($validated['document_type'] ?? 'invoice') {
-            'sale', 'receipt' => 'sale',
-            default => 'invoice',
-        };
-        [$document, $resolvedType] = $this->resolveDocument(
-            $company,
-            $requestedType,
-            $validated['document_id']
-        );
-
-        $phone = trim((string) ($validated['phone'] ?? '')) ?: ($document->customer?->phone ?? $document->customer_phone ?? null);
-        $email = trim((string) ($validated['email'] ?? '')) ?: ($document->customer?->email ?? $document->customer_email ?? null);
-        $channels = array_values(array_unique(array_map('strtolower', $validated['channels'])));
-        $builtInChannels = ['sms', 'whatsapp', 'email', 'webhook', 'custom_webhook'];
-        foreach ($channels as $channel) {
-            if (in_array($channel, $builtInChannels, true)) {
-                continue;
-            }
-            if (! preg_match('/^custom:(\d+)$/', $channel, $matches)) {
-                return response()->json(['success' => false, 'message' => "Unsupported channel '{$channel}' ."], 422);
-            }
-            $custom = CustomNotificationChannel::withoutGlobalScope('company')
-                ->where('company_id', $company->id)
-                ->where('is_active', true)
-                ->find((int) $matches[1]);
-            if (! $custom) {
-                return response()->json(['success' => false, 'message' => 'One or more custom channels are inactive or unavailable.'], 422);
-            }
-        }
-
-        $dispatcher = app(TenantNotificationDispatcherService::class);
-        $standardChannels = array_values(array_intersect($channels, $builtInChannels));
-        $results = $standardChannels === []
-            ? []
-            : $dispatcher->dispatchReceipt($company, $document, $standardChannels, $phone, $email);
-        $customDispatcher = app(CustomChannelDispatcherService::class);
-        foreach ($channels as $channel) {
-            if (! str_starts_with($channel, 'custom:')) {
-                continue;
-            }
-            $custom = CustomNotificationChannel::withoutGlobalScope('company')
-                ->where('company_id', $company->id)
-                ->where('is_active', true)
-                ->find((int) substr($channel, 7));
-            $customResult = $customDispatcher->dispatch($custom, [
-                'customer_name' => $document->customer?->name ?? $document->customer_name ?? 'Valued Customer',
-                'customer_phone' => $phone,
-                'customer_email' => $email,
-                'document_id' => (string) $document->id,
-                'document_number' => $document->sale_number,
-                'document_type' => $resolvedType,
-                'amount' => (float) ($document->total ?? 0),
-                'due_amount' => (float) ($document->due_amount ?? 0),
-            ]);
-            $results[$channel] = $customResult + ['name' => $custom->name];
-        }
-        $successful = [];
-        $failed = [];
-        foreach ($channels as $channel) {
-            $key = $channel === 'custom_webhook' ? 'webhook' : $channel;
-            $result = $results[$key] ?? null;
-            if (($result['success'] ?? false) === true) {
-                $successful[] = ucfirst($key);
-            } else {
-                $failed[$key] = $result['message'] ?? $result['error'] ?? 'No recipient or configured gateway.';
-            }
-        }
-
-        $message = $successful
-            ? 'Dispatched via: '.implode(', ', $successful)
-            : 'No selected channel could be dispatched.';
-
-        return response()->json([
-            'success' => $successful !== [],
-            'message' => $message,
-            'document_id' => (string) $document->id,
-            'document_type' => $resolvedType,
-            'channels' => $channels,
-            'results' => $results,
-            'failed' => $failed,
-        ], $successful !== [] ? 200 : 422);
+        return app(DocumentDispatchController::class)->dispatchDocument($forwarded, app(\App\Services\Dispatch\DocumentDispatchService::class));
     }
 
     /**

@@ -4,9 +4,9 @@ namespace App\Services;
 
 use App\Models\Company;
 use App\Models\Configuration;
-use App\Models\CustomNotificationChannel;
 use App\Models\TenantNotificationGateway;
 use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\WhatsApp\WhatsAppCloudApiClient;
 use Illuminate\Support\Facades\Schema;
 
 class DispatchChannelService
@@ -23,12 +23,18 @@ class DispatchChannelService
             return $gateway->isConfigured();
         }
 
+        $settings = self::apiSettings($companyId);
+        if (array_key_exists('sms_api_enabled', $settings)) {
+            return self::isEnabledValue($settings['sms_api_enabled'])
+                && filled($settings['sms_api_url'] ?? $settings['generic_sms_url'] ?? null);
+        }
+
         $legacy = self::configuration($companyId, 'sms_gateway');
         $legacy = is_string($legacy) ? (json_decode($legacy, true) ?: []) : $legacy;
 
         return is_array($legacy)
             && ! empty($legacy['gateway_url'] ?? $legacy['url'] ?? null)
-            && self::isEnabledValue($legacy['is_enabled'] ?? true);
+            && self::isEnabledValue($legacy['is_enabled'] ?? $legacy['enabled'] ?? true);
     }
 
     /**
@@ -36,12 +42,25 @@ class DispatchChannelService
      */
     public static function isWhatsAppConfigured(mixed $tenantId): bool
     {
-        $gateway = self::activeGateway(
-            self::resolveCompanyId($tenantId),
-            TenantNotificationGateway::CHANNEL_WHATSAPP
-        );
+        $companyId = self::resolveCompanyId($tenantId);
+        $gateway = self::gateway($companyId, TenantNotificationGateway::CHANNEL_WHATSAPP);
+        if ($gateway !== null) {
+            return $gateway->isConfigured();
+        }
 
-        return $gateway?->isConfigured() ?? false;
+        $company = Company::withoutGlobalScopes()->find($companyId);
+
+        $settings = self::apiSettings($companyId);
+        if (array_key_exists('whatsapp_api_enabled', $settings)) {
+            if (! self::isEnabledValue($settings['whatsapp_api_enabled'])) {
+                return false;
+            }
+            if (filled($settings['whatsapp_api_url'] ?? null) && filled($settings['whatsapp_api_token'] ?? null)) {
+                return true;
+            }
+        }
+
+        return $company && app(WhatsAppCloudApiClient::class)->isConfigured($company);
     }
 
     /**
@@ -53,10 +72,6 @@ class DispatchChannelService
         $gateway = self::gateway($companyId, TenantNotificationGateway::CHANNEL_EMAIL);
         if ($gateway !== null) {
             return $gateway->isConfigured();
-        }
-
-        if (filled(self::configuration($companyId, 'smtp_host'))) {
-            return true;
         }
 
         $smtp = app(InvoiceDeliveryService::class)->getSmtpConfig(
@@ -76,6 +91,101 @@ class DispatchChannelService
         return OmnichannelRegistryService::resolveChannels($companyId, $context);
     }
 
+    public static function splitChannels(array $channels): array
+    {
+        return [
+            'api' => array_values(array_filter($channels, fn ($channel) => ($channel['delivery_mode'] ?? 'api') !== 'utility' && ($channel['api_enabled'] ?? true)
+                && ($channel['delivery_mode'] ?? 'api') !== 'device')),
+            'device' => array_values(array_filter($channels, fn ($channel) => ($channel['delivery_mode'] ?? 'api') !== 'utility'
+                && (! ($channel['api_enabled'] ?? true) || ($channel['delivery_mode'] ?? 'api') === 'device'))),
+        ];
+    }
+
+    /** Render every channel together; only configured APIs participate in the form. */
+    public static function groupedComponents(array $channels, array $context): array
+    {
+        $type = $context['type'] ?? $context['document_type'] ?? 'document';
+        $id = $context['id'] ?? $context['document_id'] ?? null;
+        $phone = $context['phone'] ?? $context['recipient_phone'] ?? '';
+        $email = $context['email'] ?? $context['recipient_email'] ?? '';
+        $payload = ['document_type' => $type, 'document_id' => $id, 'phone' => $phone, 'email' => $email, 'api_only' => true];
+        $utilities = self::documentUtilities($context);
+        $components = [$utilities[0]];
+        $apiChannels = [];
+
+        $order = ['whatsapp' => 0, 'email' => 1, 'sms' => 2];
+        usort($channels, fn ($a, $b) => ($order[$a['channel']] ?? 3) <=> ($order[$b['channel']] ?? 3));
+        foreach ($channels as $channel) {
+            $key = $channel['channel'] === 'custom' ? 'custom:'.$channel['channel_id'] : $channel['channel'];
+            $device = ! ($channel['api_enabled'] ?? true) || ($channel['delivery_mode'] ?? 'api') === 'device';
+            if ($device) {
+                $components[] = array_merge($channel, [
+                    'type' => 'list_tile', 'available' => true, 'visible' => true,
+                    'selectable' => false, 'default' => false, 'mode' => 'local_intent', 'launch_label' => 'Open',
+                ]);
+                continue;
+            }
+
+            $apiChannels[] = $key;
+            $recipient = $channel['channel'] === 'email' ? $email : $phone;
+            $component = array_merge($channel, [
+                'type' => 'checkbox', 'name' => 'channels[]', 'label' => $channel['title'],
+                'value' => $key, 'option_value' => $key, 'selection_value' => $key,
+                'available' => true, 'visible' => true, 'selectable' => true, 'mode' => 'cloud_api',
+                'initial_value' => in_array($key, ['whatsapp', 'sms', 'email'], true) && filled($recipient),
+            ]);
+            unset($component['action'], $component['action_type'], $component['on_tap'], $component['endpoint']);
+            $components[] = $component;
+        }
+        $components[] = $utilities[1];
+        if ($apiChannels && $id !== null) {
+            $components[] = [
+                'type' => 'button_primary', 'id' => 'dispatch_selected_channels', 'label' => 'Send to Selected Channels',
+                'action' => ['type' => 'form_submit', 'endpoint' => '/api/v1/documents/dispatch', 'method' => 'POST',
+                    'collect_form' => true, 'data' => $payload, 'payload' => $payload],
+            ];
+        }
+
+        return $components;
+    }
+
+    public static function documentUtilities(array $context): array
+    {
+        $type = $context['type'] ?? $context['document_type'] ?? 'document';
+        $id = $context['id'] ?? $context['document_id'] ?? null;
+        $pathType = rawurlencode((string) $type);
+        $pathId = rawurlencode((string) $id);
+        $endpoint = "/api/v1/tenant/documents/{$pathType}/{$pathId}/preview-modal?format=a4&preview_document=1";
+        $document = ['document_type' => $type, 'document_id' => $id];
+        $metadata = ['type' => 'list_tile', 'available' => true, 'visible' => true, 'api_enabled' => false,
+            'selectable' => false, 'default' => false, 'mode' => 'document_action', 'delivery_mode' => 'utility'];
+        $pdfAction = ['type' => 'OPEN_BOTTOM_SHEET', 'endpoint' => $endpoint] + $document;
+        if (in_array($type, ['invoice', 'invoice_reminder', 'sale', 'receipt', 'quotation', 'quote'], true)) {
+            $pdfAction = ['type' => 'OPEN_RECEIPT_PREVIEW', 'endpoint' => $endpoint,
+                'pdf_endpoint' => "/api/tenant/invoices/{$pathId}/pdf-stream"] + $document;
+        }
+
+        return [
+            $metadata + [
+                'id' => 'channel_thermal_print', 'channel' => 'thermal_print', 'title' => 'Thermal Print',
+                'subtitle' => 'Print on a Bluetooth or network receipt printer', 'launch_label' => 'Print',
+                'leading' => ['type' => 'icon', 'icon' => 'print', 'color' => '#10B981', 'size' => 22],
+                'action_type' => 'THERMAL_PRINT', 'action' => ['type' => 'THERMAL_PRINT', 'data' => $document] + $document,
+            ],
+            $metadata + [
+                'id' => 'channel_pdf_preview', 'channel' => 'pdf_preview', 'title' => 'PDF Preview',
+                'subtitle' => 'Preview and print the document', 'launch_label' => 'Preview',
+                'leading' => ['type' => 'icon', 'icon' => 'picture_as_pdf', 'color' => '#818CF8', 'size' => 22],
+                'action_type' => $pdfAction['type'], 'action' => $pdfAction,
+            ],
+        ];
+    }
+
+    public static function visibleChannels(array $components): array
+    {
+        return array_values(array_filter($components, fn ($component) => isset($component['channel'])));
+    }
+
     private static function resolveCompanyId(mixed $tenantId): mixed
     {
         $companyId = is_object($tenantId) ? ($tenantId->id ?? null) : $tenantId;
@@ -88,11 +198,17 @@ class DispatchChannelService
             ?: auth()->user()?->tenant_id;
     }
 
-    private static function activeGateway(mixed $companyId, string $channel): ?TenantNotificationGateway
+    public static function apiSettings(mixed $companyId): array
     {
-        $gateway = self::gateway($companyId, $channel);
+        $settings = (array) (Company::withoutGlobalScopes()->find($companyId)?->api_settings ?? []);
+        if ($companyId && Schema::hasTable('configurations')) {
+            $settings = array_merge($settings, Configuration::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->whereIn('key', ['whatsapp_api_enabled', 'whatsapp_api_url', 'whatsapp_api_token', 'sms_api_enabled', 'sms_api_url', 'sms_api_token', 'generic_sms_url', 'generic_sms_api_key'])
+                ->pluck('value', 'key')->all());
+        }
 
-        return $gateway?->is_enabled ? $gateway : null;
+        return $settings;
     }
 
     private static function gateway(mixed $companyId, string $channel): ?TenantNotificationGateway
@@ -125,7 +241,7 @@ class DispatchChannelService
     }
 
     /**
-     * Build standard SDUI Bottom Sheet Schema containing dynamic action cards and options.
+     * Build the universal dispatch sheet with cloud selections and device intents.
      *
      * @param  array<int, array<string, mixed>>  $channels
      * @param  array<string, mixed>  $extraPayload
@@ -139,132 +255,18 @@ class DispatchChannelService
         array $extraPayload = [],
         array $headerInfo = []
     ): array {
-        $components = [];
+        $context = array_merge($headerInfo, $extraPayload);
+        $components = self::groupedComponents($channels, $context);
+        $groups = self::splitChannels(self::visibleChannels($components));
+        $options = array_map(fn ($channel) => [
+            'label' => $channel['title'], 'icon' => $channel['leading']['icon'] ?? 'send',
+            'action' => $channel['action'] ?? ['type' => 'OPEN_BOTTOM_SHEET',
+                'endpoint' => '/api/v1/tenant/documents/'.rawurlencode((string) ($context['document_type'] ?? $context['type'] ?? 'document')).'/'.rawurlencode((string) ($context['document_id'] ?? $context['id'] ?? '')).'/dispatch-options'],
+        ], self::visibleChannels($components));
+        $schema = ['type' => 'bottom_sheet', 'title' => $title, 'header' => $headerInfo, 'components' => $components];
 
-        // 1. Optional Header Component
-        if (! empty($headerInfo['subtitle'])) {
-            $components[] = [
-                'type' => 'text',
-                'text' => $headerInfo['subtitle'],
-                'style' => [
-                    'fontSize' => 14,
-                    'color' => '#94A3B8',
-                    'marginBottom' => 12,
-                ],
-            ];
-        }
-
-        // 2. Action Options for action_sheet_trigger
-        $actionSheetOptions = [];
-
-        // 3. Render Card components for each channel (compatible with SDUI modal sheets)
-        foreach ($channels as $chan) {
-            $channelKey = $chan['channel'] ?? $chan['id'] ?? 'sms';
-            $channelTitle = $chan['title'] ?? $chan['name'] ?? ucfirst($channelKey);
-            $channelSubtitle = $chan['subtitle'] ?? '';
-            $channelIcon = $chan['leading']['icon'] ?? $chan['icon'] ?? 'message';
-            $channelColor = $chan['leading']['color'] ?? $chan['color'] ?? '#38BDF8';
-
-            $payload = array_merge(['channel' => $channelKey], $extraPayload);
-            if (! empty($chan['channel_id'])) {
-                $payload['channel_id'] = $chan['channel_id'];
-            }
-            if (! empty($chan['recipient'])) {
-                $payload['phone'] = $chan['recipient'];
-                $payload['email'] = $chan['recipient'];
-                $payload['recipient'] = $chan['recipient'];
-            }
-
-            $successMsg = "Dispatched via {$channelTitle} successfully.";
-
-            $actionDescriptor = $chan['action'] ?? [
-                'type' => 'SUBMIT_FORM',
-                'action_type' => 'SUBMIT_FORM',
-                'action' => 'SUBMIT_FORM',
-                'action_name' => 'SUBMIT_FORM',
-                'endpoint' => $dispatchEndpoint,
-                'method' => 'POST',
-                'data' => $payload,
-                'payload' => $payload,
-                'feedback' => $successMsg,
-                'success_toast' => $successMsg,
-                'navigate_back' => true,
-            ];
-
-            $actionSheetOptions[] = [
-                'label' => $channelTitle.($channelSubtitle ? " ({$channelSubtitle})" : ''),
-                'icon' => $channelIcon,
-                'action' => $actionDescriptor,
-            ];
-
-            $components[] = [
-                'type' => 'card',
-                'style' => [
-                    'backgroundColor' => 'theme.surface',
-                    'borderColor' => 'theme.divider',
-                    'padding' => 14,
-                    'marginBottom' => 10,
-                    'borderRadius' => 12,
-                ],
-                'action_type' => $chan['action_type'] ?? 'SUBMIT_FORM',
-                'action_name' => $chan['action_type'] ?? 'SUBMIT_FORM',
-                'endpoint' => $dispatchEndpoint,
-                'method' => 'POST',
-                'action' => $actionDescriptor,
-                'on_tap' => $actionDescriptor,
-                'components' => [
-                    [
-                        'type' => 'row',
-                        'components' => [
-                            [
-                                'type' => 'icon',
-                                'icon' => $channelIcon,
-                                'color' => $channelColor,
-                                'size' => 24,
-                            ],
-                            [
-                                'type' => 'column',
-                                'style' => ['marginLeft' => 14],
-                                'components' => [
-                                    [
-                                        'type' => 'text',
-                                        'text' => $channelTitle,
-                                        'style' => [
-                                            'fontWeight' => 'bold',
-                                            'fontSize' => 15,
-                                            'color' => '#F8FAFC',
-                                        ],
-                                    ],
-                                    [
-                                        'type' => 'text',
-                                        'text' => $channelSubtitle ?: 'Click to send',
-                                        'style' => [
-                                            'fontSize' => 12,
-                                            'color' => '#94A3B8',
-                                            'marginTop' => 2,
-                                        ],
-                                    ],
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ];
-        }
-
-        return [
-            'type' => 'bottom_sheet',
-            'title' => $title,
-            'header' => $headerInfo,
-            'channels' => $channels,
-            'components' => $components,
-            'options' => $actionSheetOptions,
-            'schema' => [
-                'type' => 'bottom_sheet',
-                'title' => $title,
-                'components' => $components,
-                'options' => $actionSheetOptions,
-            ],
-        ];
+        return $schema + ['channels' => self::visibleChannels($components), 'enabled_channels' => $groups['api'],
+            'device_channels' => $groups['device'], 'secondary_options' => $groups['device'],
+            'multi_select' => true, 'options' => $options, 'schema' => $schema];
     }
 }

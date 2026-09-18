@@ -5,6 +5,9 @@ namespace App\Services\Delivery;
 use App\Models\Company;
 use App\Models\MessageQueue;
 use App\Models\Sale;
+use App\Services\DispatchChannelService;
+use App\Services\Notifications\DeviceMessageService;
+use App\Services\Notifications\TenantNotificationDispatcherService;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\WhatsApp\WhatsAppCloudApiClient;
 use Illuminate\Support\Facades\Log;
@@ -26,10 +29,25 @@ class MessageQueueService
     }
 
     /**
-     * @return array{status: 'sent'|'queued', id?: int, error?: string}
+     * @return array{status: 'sent'|'queued'|'manual_link', id?: int, error?: string, url?: string}
      */
     public function sendOrQueueEmail(Sale $sale, string $recipient, ?string $customMessage = null, bool $attachPdf = true): array
     {
+        if (! filter_var(trim($recipient), FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('A valid recipient email address is required.');
+        }
+        if (! DispatchChannelService::isEmailConfigured($sale->company_id)) {
+            $quote = $sale->operation_type === 'quotation';
+            $message = $quote
+                ? $this->delivery->buildQuotationWhatsAppMessage($sale, $customMessage)
+                : $this->delivery->buildInvoiceWhatsAppMessage($sale, $customMessage);
+            $link = route($quote ? 'quotes.public' : 'sales.public', $sale->sale_number);
+            if (! str_contains($message, $link)) {
+                $message .= "\nView online: {$link}";
+            }
+            return DeviceMessageService::prepare('email', $recipient, $message, ($quote ? 'Quotation #' : 'Invoice #').$sale->sale_number);
+        }
+
         try {
             $this->deliverEmail($sale, $recipient, $customMessage, $attachPdf);
 
@@ -51,11 +69,17 @@ class MessageQueueService
     {
         $company = $sale->company ?? Company::find($sale->company_id);
 
-        if (! $this->whatsapp->isConfigured($company)) {
-            return [
-                'status' => 'manual_link',
-                'url' => $this->delivery->generateWhatsAppUrl($sale, $recipientPhone, $customMessage),
-            ];
+        if (! DispatchChannelService::isWhatsAppConfigured($company->id)) {
+            $quote = $sale->operation_type === 'quotation';
+            $message = $quote
+                ? $this->delivery->buildQuotationWhatsAppMessage($sale, $customMessage)
+                : $this->delivery->buildInvoiceWhatsAppMessage($sale, $customMessage);
+            $link = route($quote ? 'quotes.public' : 'sales.public', $sale->sale_number);
+            if (! str_contains($message, $link)) {
+                $message .= "\nView online: {$link}";
+            }
+
+            return DeviceMessageService::prepare('whatsapp', $recipientPhone, $message);
         }
 
         try {
@@ -160,6 +184,14 @@ class MessageQueueService
         $text = $isQuotation
             ? $this->delivery->buildQuotationWhatsAppMessage($sale, $customMessage)
             : $this->delivery->buildInvoiceWhatsAppMessage($sale, $customMessage);
+
+        if (! $this->whatsapp->isConfigured($company)) {
+            $result = app(TenantNotificationDispatcherService::class)->dispatchWhatsApp($company, $recipientPhone, $text);
+            if (($result['status'] ?? '') !== 'sent') {
+                throw new \RuntimeException($result['error'] ?? $result['message'] ?? 'WhatsApp delivery failed.');
+            }
+            return;
+        }
 
         // Deliver the real receipt/quotation PDF as a WhatsApp document with the
         // formatted summary as its caption. If PDF generation fails for any

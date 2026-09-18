@@ -177,26 +177,34 @@
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.275.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.158.57 4.184 1.564 5.941l-1.657 6.059 6.223-1.632c1.705.932 3.654 1.465 5.73 1.465 6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
                     <span>{{ __("WhatsApp Web / Mobile") }}</span>
                 </button>
+                    <button type="button" wire:click="$set('activeChannel', 'sms')"
+                            class="flex-1 py-2 rounded-xl text-xs font-black transition {{ $activeChannel === 'sms' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-500' }}">
+                        {{ __('SMS') }}
+                    </button>
             </div>
 
-            <!-- Recipient Inputs -->
+            @if (($activeChannel === 'email' && ! $this->emailApiConfigured) || ($activeChannel === 'sms' && ! $this->smsApiConfigured) || ($activeChannel === 'whatsapp' && ! $this->whatsAppApiConfigured))
+                    <p class="text-xs text-slate-500">{{ __('Your device app opens with the message and document link. Complete sending there.') }}</p>
+                @endif
+
+                <!-- Recipient Inputs -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 @if ($activeChannel === 'email')
                     <div class="space-y-1.5 col-span-2">
                         <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Recipient Email Address") }} <span class="text-rose-500">*</span></label>
-                        <input type="email" wire:model="recipientEmail" placeholder="client@example.com" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
+                        <input type="email" wire:model.live="recipientEmail" placeholder="client@example.com" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500">
                         @error('recipientEmail') <p class="text-rose-600 text-xs">{{ $message }}</p> @enderror
                     </div>
                 @else
                     <div class="space-y-1.5 col-span-2">
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Recipient WhatsApp Phone Number (with Country Code)") }}</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ $activeChannel === 'sms' ? __('Recipient SMS Phone Number (with Country Code)') : __('Recipient WhatsApp Phone Number (with Country Code)') }}</label>
                         <input type="text" wire:model.live="recipientPhone" placeholder="+1234567890" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-emerald-500">
                     </div>
                 @endif
             </div>
 
             <!-- Custom Toggle Switch without Input Clipping Artefacts -->
-            @if ($activeChannel === 'email')
+            @if ($activeChannel === 'email' && $this->emailApiConfigured)
                 <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-4">
                     <div class="space-y-0.5">
                         <div class="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
@@ -263,7 +271,24 @@
                     Cancel
                 </button>
 
-                @if ($activeChannel === 'email')
+                @if ($activeChannel === 'email' && ! $this->emailApiConfigured)
+                    <a href="{{ $this->emailUrl }}" @click="$wire.set('showSendModal', false)"
+                       class="px-6 py-2.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white">
+                        {{ __('Open Email & Send') }}
+                    </a>
+                @elseif ($activeChannel === 'sms')
+                    @if ($this->smsApiConfigured)
+                        <button type="button" wire:click="sendSms" wire:loading.attr="disabled"
+                                class="px-6 py-2.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white">
+                            {{ __('Send via SMS') }}
+                        </button>
+                    @else
+                        <a href="{{ $this->smsUrl }}" @click="$wire.set('showSendModal', false)"
+                           class="px-6 py-2.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white">
+                            {{ __('Open SMS & Send') }}
+                        </a>
+                    @endif
+                @elseif ($activeChannel === 'email')
                     <button type="button"
                             wire:click="sendEmail"
                             wire:loading.attr="disabled"
@@ -281,7 +306,7 @@
                     </button>
                 @else
                     <a href="{{ $this->whatsAppUrl }}"
-                       target="_blank"
+                       target="_self"
                        wire:click="trackWhatsAppSent"
                        class="px-6 py-2.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.275.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.158.57 4.184 1.564 5.941l-1.657 6.059 6.223-1.632c1.705.932 3.654 1.465 5.73 1.465 6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>

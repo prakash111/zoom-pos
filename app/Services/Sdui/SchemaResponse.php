@@ -818,6 +818,15 @@ class SchemaResponse
             // route helper unavailable in some contexts — omit the link
         }
 
+        $dispatchContext = [
+            'type' => $documentType, 'id' => $sale->id, 'reference' => $sale->sale_number,
+            'phone' => $sale->customer?->phone ?: $sale->customer_phone,
+            'email' => $sale->customer?->email ?: $sale->customer_email,
+        ];
+        $channels = \App\Services\OmnichannelRegistryService::resolveChannels($sale->company_id, $dispatchContext);
+        $dispatchComponents = \App\Services\DispatchChannelService::groupedComponents($channels, $dispatchContext);
+        $channelGroups = \App\Services\DispatchChannelService::splitChannels(\App\Services\DispatchChannelService::visibleChannels($dispatchComponents));
+
         return [
             'document_id' => $sale->id,
             'document_type' => $documentType,
@@ -839,9 +848,14 @@ class SchemaResponse
             'paid_amount' => $paid,
             'due_amount' => $due,
             'pdf_endpoint' => "/api/tenant/invoices/{$sale->id}/pdf-stream",
-            'batch_dispatch_endpoint' => $documentType === 'quotation'
-                ? null
-                : '/api/v1/tenant/dispatch/batch-send',
+            'dispatch_options_endpoint' => "/api/v1/documents/{$documentType}/{$sale->id}/dispatch-options",
+            'channels' => \App\Services\DispatchChannelService::visibleChannels($dispatchComponents),
+            'components' => $dispatchComponents,
+            'enabled_channels' => $channelGroups['api'],
+            'device_channels' => $channelGroups['device'],
+            'multi_select' => true,
+            'batch_dispatch_endpoint' => '/api/v1/documents/dispatch',
+            'api_only' => true,
             'share_text' => trim(sprintf(
                 'Thank you for your business! Your receipt for %s%s%s',
                 $sale->sale_number,
@@ -1944,6 +1958,9 @@ class SchemaResponse
                     'border_radius' => 12,
                 ]),
             ]),
+            self::buttonOutlined('Send Kitchen Ticket', self::openRemoteSheetAction(
+                "/api/v1/tenant/documents/kot/{$kot->id}/preview-modal", 'Send Kitchen Ticket'
+            ), 'send'),
             self::buttonOutlined('Dismiss / Back to POS', self::popAction(), 'check', [
                 'border_radius' => 12,
             ]),
@@ -4308,46 +4325,18 @@ class SchemaResponse
                         reload: false
                     ), 'print'),
                     self::buttonOutlined('Share Quote', self::openModalAction("Share Quotation #{$q->sale_number}", (function () use ($company, $q, $currency) {
-                        $enabled = [];
-                        try {
-                            $enabled = app(TenantNotificationDispatcherService::class)->getEnabledChannels($company);
-                        } catch (\Throwable) {
-                        }
-
-                        $channelCheckboxes = [];
-                        if (! empty($enabled['whatsapp'])) {
-                            $channelCheckboxes[] = self::checkbox('channels[]', 'Send via WhatsApp', true);
-                        }
-                        if (! empty($enabled['sms'])) {
-                            $channelCheckboxes[] = self::checkbox('channels[]', 'Send via SMS', true);
-                        }
-                        if (! empty($enabled['email'])) {
-                            $channelCheckboxes[] = self::checkbox('channels[]', 'Send via Email (PDF Attached)', true);
-                        }
-
-                        $modal = [
+                        $context = [
+                            'type' => 'quotation', 'id' => $q->id, 'reference' => $q->sale_number,
+                            'phone' => $q->customer?->phone ?: ($q->customer_phone ?: ''),
+                            'email' => $q->customer?->email ?: ($q->customer_email ?: ''),
+                        ];
+                        $channels = \App\Services\OmnichannelRegistryService::resolveChannels($company->id, $context);
+                        $modal = array_merge([
                             self::text("Dispatch Quotation #{$q->sale_number}", 'title_medium', ['bold' => true]),
                             self::text("Total Amount: {$currency}".number_format((float) $q->total, 2), 'body_small', ['color' => '#64748b']),
-                            self::divider(),
-                        ];
-
-                        if (! empty($channelCheckboxes)) {
-                            $modal[] = self::text('Active Delivery Channels', 'label_medium', ['bold' => true]);
-                            $modal = array_merge($modal, $channelCheckboxes);
-                            $modal[] = self::divider();
-                        }
-
-                        $modal[] = self::textInput('recipient_phone', 'Recipient Mobile Number', (string) ($q->customer?->phone ?? ''), ['placeholder' => 'e.g. 919876543210', 'keyboard_type' => 'phone']);
-                        $modal[] = self::textInput('recipient_email', 'Recipient Email Address', (string) ($q->customer?->email ?? ''), ['placeholder' => 'client@example.com', 'keyboard_type' => 'email']);
-                        $modal[] = self::buttonPrimary('Dispatch Quotation', self::formSubmitAction(
-                            '/api/v1/tenant/notifications/dispatch',
-                            'POST',
-                            'Quotation proposal dispatched across configured channels!',
-                            payload: [
-                                'document_type' => 'quotation',
-                                'document_id' => (string) $q->id,
-                            ]
-                        ), 'send');
+                            self::textInput('phone', 'Recipient Mobile Number', (string) $context['phone'], ['keyboard_type' => 'phone']),
+                            self::textInput('email', 'Recipient Email Address', (string) $context['email'], ['keyboard_type' => 'email']),
+                        ], \App\Services\DispatchChannelService::groupedComponents($channels, $context));
 
                         return $modal;
                     })()), 'share'),

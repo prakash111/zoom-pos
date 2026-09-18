@@ -5,20 +5,17 @@ namespace App\Services\Dispatch;
 use App\Models\Company;
 use App\Models\CustomNotificationChannel;
 use App\Models\Tenant;
+use App\Services\DispatchChannelService;
+use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\Notifications\DeviceMessageService;
 use App\Services\Notifications\CustomChannelDispatcherService;
 use App\Services\Notifications\TenantNotificationDispatcherService;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
-/**
- * Routes document delivery through a tenant gateway when it is complete and
- * falls back to the platform provider when it is not. A provider failure is
- * also treated as a reason to try the shared provider, so a bad tenant
- * credential never disables the document action sheet.
- */
+/** Routes delivery through configured gateways or prepares a device composer. */
 class DocumentDispatchService
 {
     public function __construct(
@@ -32,33 +29,7 @@ class DocumentDispatchService
         string $message,
         ?string $pdfUrl = null,
     ): array {
-        $settings = $this->settings($tenant);
-        $customUrl = trim((string) ($settings['whatsapp_api_url'] ?? ''));
-        $customToken = trim((string) ($settings['whatsapp_api_token'] ?? ''));
-
-        if ($this->enabled($settings, 'whatsapp_api_enabled') && $customUrl !== '' && $customToken !== '') {
-            try {
-                $response = Http::withToken($customToken)->timeout(10)->post($customUrl, [
-                    'recipient' => $phoneNumber,
-                    'message' => $message,
-                    'media_url' => $pdfUrl,
-                ]);
-                if ($response->successful()) {
-                    return ['success' => true, 'status' => 'sent', 'channel' => 'tenant_api'];
-                }
-                Log::warning('Tenant WhatsApp gateway failed; using platform fallback.', [
-                    'tenant_id' => $tenant->id,
-                    'status' => $response->status(),
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning('Tenant WhatsApp gateway exception; using platform fallback.', [
-                    'tenant_id' => $tenant->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        return $this->platformWhatsApp($tenant, $phoneNumber, $message, $pdfUrl);
+        return $this->platformDispatcher->dispatchWhatsApp($tenant, $phoneNumber, $message, $pdfUrl);
     }
 
     public function dispatchEmail(
@@ -67,61 +38,25 @@ class DocumentDispatchService
         string $subject,
         Mailable|string $mailable,
     ): array {
-        $settings = $this->settings($tenant);
-        $host = trim((string) ($settings['smtp_host'] ?? ''));
-        $username = trim((string) ($settings['smtp_username'] ?? ''));
-        $password = (string) ($settings['smtp_password'] ?? '');
-
-        if ($this->enabled($settings, 'smtp_enabled') && $host !== '' && $username !== '' && $password !== '') {
-            try {
-                Config::set('mail.mailers.tenant_dispatch', [
-                    'transport' => 'smtp',
-                    'host' => $host,
-                    'port' => (int) ($settings['smtp_port'] ?? 587),
-                    'encryption' => $settings['smtp_encryption'] ?? 'tls',
-                    'username' => $username,
-                    'password' => $password,
-                    'timeout' => 15,
-                ]);
-                $mailer = Mail::mailer('tenant_dispatch');
-                if (is_string($mailable)) {
-                    $mailer->html($mailable, fn ($message) => $message
-                        ->to($recipientEmail)
-                        ->subject($subject));
-                } else {
-                    $mailer->to($recipientEmail)->send($mailable);
-                }
-
-                return ['success' => true, 'status' => 'sent', 'channel' => 'tenant_smtp'];
-            } catch (\Throwable $e) {
-                Log::warning('Tenant SMTP failed; using platform mailer.', [
-                    'tenant_id' => $tenant->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        if (! filter_var(trim($recipientEmail), FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'status' => 'error', 'message' => 'A valid recipient email address is required.'];
+        }
+        $html = is_string($mailable) ? $mailable : $mailable->render();
+        if (! DispatchChannelService::isEmailConfigured($tenant->id)) {
+            return DeviceMessageService::prepare('email', $recipientEmail, DeviceMessageService::plainText($html), $subject);
+        }
+        if (is_string($mailable)) {
+            return $this->platformDispatcher->dispatchEmail($tenant, $recipientEmail, $subject, $html);
         }
 
+        $smtp = app(InvoiceDeliveryService::class)->getSmtpConfig($tenant);
+        Config::set('mail.mailers.tenant_dispatch', array_merge($smtp, ['transport' => 'smtp', 'timeout' => 15]));
+        Mail::purge('tenant_dispatch');
         try {
-            $defaultMailer = config('mail.default') ?: 'smtp';
-            $mailer = Mail::mailer($defaultMailer);
-            if (is_string($mailable)) {
-                $mailer->html($mailable, fn ($message) => $message
-                    ->to($recipientEmail)
-                    ->subject($subject));
-            } else {
-                $mailer->to($recipientEmail)->send($mailable);
-            }
-
-            return ['success' => true, 'status' => 'sent', 'channel' => 'system_email'];
+            Mail::mailer('tenant_dispatch')->to($recipientEmail)->send($mailable);
+            return ['success' => true, 'status' => 'sent', 'channel' => 'email'];
         } catch (\Throwable $e) {
-            Log::info('Platform email fallback recorded.', [
-                'tenant_id' => $tenant->id,
-                'recipient' => $recipientEmail,
-                'subject' => $subject,
-                'error' => $e->getMessage(),
-            ]);
-
-            return ['success' => true, 'status' => 'sent', 'channel' => 'platform_fallback', 'message' => 'Email dispatched via platform fallback.'];
+            return ['success' => false, 'status' => 'failed', 'error' => $e->getMessage()];
         }
     }
 
@@ -130,51 +65,7 @@ class DocumentDispatchService
         string $phoneNumber,
         string $message,
     ): array {
-        $settings = $this->settings($tenant);
-        $customUrl = trim((string) ($settings['sms_api_url'] ?? ($settings['generic_sms_url'] ?? '')));
-        $customToken = trim((string) ($settings['sms_api_token'] ?? ($settings['generic_sms_api_key'] ?? '')));
-
-        if ($this->enabled($settings, 'sms_api_enabled') && $customUrl !== '') {
-            try {
-                $url = str_replace(
-                    ['{phone}', '{message}'],
-                    [rawurlencode($phoneNumber), rawurlencode($message)],
-                    $customUrl
-                );
-                $req = Http::timeout(10);
-                if ($customToken !== '') {
-                    $req = $req->withToken($customToken);
-                }
-                $response = $req->get($url);
-                if ($response->successful()) {
-                    return ['success' => true, 'status' => 'sent', 'channel' => 'tenant_sms_api'];
-                }
-            } catch (\Throwable $e) {
-                Log::warning('Tenant SMS gateway exception; using platform fallback.', [
-                    'tenant_id' => $tenant->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        try {
-            $company = $tenant instanceof Company ? $tenant : Company::find($tenant->id);
-            if ($company) {
-                $res = $this->platformDispatcher->dispatchSms($company, $phoneNumber, $message);
-                if (! empty($res['success'])) {
-                    return $res;
-                }
-            }
-        } catch (\Throwable $e) {
-            Log::info('Platform SMS dispatcher exception; using fallback.', ['error' => $e->getMessage()]);
-        }
-
-        return [
-            'success' => true,
-            'status' => 'sent',
-            'channel' => 'platform_fallback',
-            'message' => "SMS dispatched to {$phoneNumber}.",
-        ];
+        return $this->platformDispatcher->dispatchSms($tenant, $phoneNumber, $message);
     }
 
     public function dispatchWebhook(
@@ -185,20 +76,18 @@ class DocumentDispatchService
         try {
             $company = $tenant instanceof Company ? $tenant : Company::find($tenant->id);
             if ($company) {
-                $res = $this->platformDispatcher->dispatchWebhook($company, $eventType, $payload);
-                if (! empty($res['success'])) {
-                    return $res;
-                }
+                return $this->platformDispatcher->dispatchWebhook($company, $eventType, $payload, ignoreEventSubscription: true);
             }
         } catch (\Throwable $e) {
-            Log::info('Platform Webhook dispatcher exception; using fallback.', ['error' => $e->getMessage()]);
+            Log::warning('Webhook dispatch failed.', ['error' => $e->getMessage()]);
+            return ['success' => false, 'status' => 'failed', 'error' => $e->getMessage()];
         }
 
         return [
-            'success' => true,
-            'status' => 'sent',
-            'channel' => 'platform_fallback',
-            'message' => 'Webhook dispatched successfully.',
+            'success' => false,
+            'status' => 'not_configured',
+            'channel' => 'webhook',
+            'message' => 'Webhook is not configured.',
         ];
     }
 
@@ -216,97 +105,20 @@ class DocumentDispatchService
 
             if ($custom) {
                 $customDispatcher = app(CustomChannelDispatcherService::class);
-                return $customDispatcher->dispatch($custom, $payload);
+                $result = $customDispatcher->dispatch($custom, $payload);
+
+                return $result + ['status' => $result['success'] ? 'sent' : 'failed', 'channel' => 'custom', 'channel_id' => $custom->id];
             }
         } catch (\Throwable $e) {
-            Log::info('Custom channel exception; using fallback.', ['error' => $e->getMessage()]);
+            Log::warning('Custom channel dispatch failed.', ['error' => $e->getMessage()]);
+            return ['success' => false, 'status' => 'failed', 'error' => $e->getMessage()];
         }
 
         return [
-            'success' => true,
-            'status' => 'sent',
-            'channel' => 'platform_fallback',
-            'message' => 'Custom channel notification dispatched.',
+            'success' => false,
+            'status' => 'not_configured',
+            'channel' => 'custom',
+            'message' => 'The selected custom channel is unavailable or inactive.',
         ];
-    }
-
-    protected function platformWhatsApp(
-        Tenant|Company $tenant,
-        string $phoneNumber,
-        string $message,
-        ?string $pdfUrl,
-    ): array {
-        $url = trim((string) config('services.platform_whatsapp.url'));
-        $token = trim((string) config('services.platform_whatsapp.token'));
-
-        if ($url !== '' && $token !== '') {
-            try {
-                $response = Http::withToken($token)->timeout(10)->post($url, [
-                    'to' => $phoneNumber,
-                    'body' => $message,
-                    'pdf_url' => $pdfUrl,
-                ]);
-                if ($response->successful()) {
-                    return ['success' => true, 'status' => 'sent', 'channel' => 'system_whatsapp'];
-                }
-            } catch (\Throwable $e) {
-                Log::warning('Platform WhatsApp gateway failed.', ['error' => $e->getMessage()]);
-            }
-        }
-
-        try {
-            // Keep the existing platform dispatcher as the final compatibility
-            // path (Meta/Twilio/manual link) rather than blocking the action.
-            $res = $this->platformDispatcher->dispatchWhatsApp(
-                $tenant,
-                $phoneNumber,
-                $message,
-                $pdfUrl,
-            );
-            if (! empty($res['success'])) {
-                return $res;
-            }
-        } catch (\Throwable $e) {
-            Log::info('Platform dispatcher caught exception, using manual link fallback.', ['error' => $e->getMessage()]);
-        }
-
-        $cleanPhone = preg_replace('/[^0-9]/', '', $phoneNumber);
-        $waUrl = 'https://wa.me/'.$cleanPhone.'?text='.urlencode($message);
-
-        return [
-            'success' => true,
-            'status' => 'manual_link',
-            'url' => $waUrl,
-            'whatsapp_url' => $waUrl,
-            'channel' => 'platform_fallback',
-            'message' => "WhatsApp link generated for +{$cleanPhone}.",
-        ];
-    }
-
-    protected function settings(Tenant|Company $tenant): array
-    {
-        $settings = $tenant->api_settings ?? [];
-        if (is_string($settings)) {
-            $settings = json_decode($settings, true) ?: [];
-        }
-
-        foreach (['whatsapp_api_enabled', 'whatsapp_api_url', 'whatsapp_api_token', 'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password', 'sms_api_enabled', 'sms_api_url', 'sms_api_token', 'generic_sms_url', 'generic_sms_api_key'] as $key) {
-            if (array_key_exists($key, $settings)) {
-                continue;
-            }
-            if (function_exists('tenant_setting')) {
-                $value = tenant_setting($tenant->id, $key, null);
-                if ($value !== null) {
-                    $settings[$key] = $value;
-                }
-            }
-        }
-
-        return is_array($settings) ? $settings : [];
-    }
-
-    protected function enabled(array $settings, string $key): bool
-    {
-        return filter_var($settings[$key] ?? false, FILTER_VALIDATE_BOOL);
     }
 }

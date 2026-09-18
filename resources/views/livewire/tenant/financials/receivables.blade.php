@@ -477,5 +477,5 @@
         </div>
     @endif
 
-    <div x-data x-on:open-external-url.window="window.open($event.detail.url, '_blank')"></div>
+
 </div>

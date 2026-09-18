@@ -399,22 +399,8 @@ class InvoiceController extends Controller
 
         $docType = $sale->operation_type === 'quotation' ? 'quotation' : 'invoice';
 
-        // Keep the top 3 document utilities:
+        // Preserve PDF file sharing alongside the universal dispatch controls.
         $baseActions = [
-            [
-                'type'     => 'list_tile',
-                'title'    => 'Preview & Print',
-                'subtitle' => 'View the PDF, print, or share the file',
-                'leading'  => ['type' => 'icon', 'icon' => 'picture_as_pdf', 'size' => 22],
-                'action'   => ['type' => 'OPEN_URL', 'url' => "/tenant/documents/{$docType}/{$sale->id}/pdf"],
-            ],
-            [
-                'type'     => 'list_tile',
-                'title'    => 'Print on receipt printer',
-                'subtitle' => 'Bluetooth thermal printer',
-                'leading'  => ['type' => 'icon', 'icon' => 'print', 'size' => 22],
-                'action'   => ['type' => 'THERMAL_PRINT', 'document_id' => $sale->id, 'sale_id' => $sale->id, 'invoice_id' => $sale->id],
-            ],
             [
                 'type'     => 'list_tile',
                 'title'    => 'Share as PDF file',
@@ -436,7 +422,7 @@ class InvoiceController extends Controller
             ]
         );
 
-        $allComponents = array_merge($baseActions, $dynamicChannels);
+        $allComponents = array_merge(\App\Services\DispatchChannelService::groupedComponents($dynamicChannels, ['type' => $docType, 'id' => $sale->id, 'phone' => $phone, 'email' => $email]), $baseActions);
         $gstin = $sale->company?->tax_id ?? ($sale->company?->document ?? (auth()->user()?->tenant?->gstin ?? 'N/A'));
 
         return response()->json([
@@ -447,7 +433,10 @@ class InvoiceController extends Controller
                 'subtitle' => 'GSTIN: ' . $gstin,
             ],
             'components' => $allComponents,
-            'channels'   => $dynamicChannels,
+            'channels' => \App\Services\DispatchChannelService::visibleChannels($allComponents),
+            'enabled_channels' => \App\Services\DispatchChannelService::splitChannels(\App\Services\DispatchChannelService::visibleChannels($allComponents))['api'],
+            'device_channels' => \App\Services\DispatchChannelService::splitChannels($dynamicChannels)['device'],
+            'multi_select' => true,
             'schema'     => [
                 'type'       => 'bottom_sheet',
                 'title'      => 'Invoice Preview',

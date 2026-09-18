@@ -3,13 +3,19 @@
 namespace App\Services;
 
 use App\Models\CustomNotificationChannel;
+use App\Models\RepairTicket;
+use App\Models\Sale;
 use App\Models\TenantNotificationGateway;
+use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\Notifications\DeviceMessageService;
+use App\Services\Repair\RepairNotificationService;
+use App\Services\Restaurant\KotDeliveryService;
 use Illuminate\Support\Facades\Schema;
 
 class OmnichannelRegistryService
 {
     /**
-     * Get all active, configured dispatch channels formatted for SDUI bottom sheets.
+     * Get gateway and device dispatch options formatted for SDUI bottom sheets.
      */
     public static function resolveChannels(mixed $tenantId, array $context): array
     {
@@ -21,171 +27,54 @@ class OmnichannelRegistryService
         $cleanPhone  = preg_replace('/[^0-9+]/', '', (string) ($phone ?? ''));
 
         $channelItems = [];
+        $deviceMessage = null;
 
-        // -------------------------------------------------------------
-        // 1. WHATSAPP (Cloud API or Direct Fallback)
-        // -------------------------------------------------------------
-        $waSettings = function_exists('tenant_setting') ? tenant_setting($tenantId, 'whatsapp_gateway', []) : [];
-        if (is_string($waSettings)) {
-            $waSettings = json_decode($waSettings, true) ?: [];
-        }
-        if (class_exists(TenantNotificationGateway::class)) {
-            $gw = TenantNotificationGateway::withoutGlobalScope('company')
-                ->where(function ($q) use ($tenantId) {
-                    $q->where('company_id', $tenantId)->orWhere('tenant_id', $tenantId);
-                })
-                ->where('channel', TenantNotificationGateway::CHANNEL_WHATSAPP)
-                ->first();
-            if ($gw) {
-                $waSettings['enabled'] = (bool) $gw->is_enabled;
-                $waSettings['is_enabled'] = (bool) $gw->is_enabled;
-                $waSettings['provider'] = $gw->provider;
-                $waSettings['access_token'] = $gw->credentials['access_token'] ?? ($waSettings['access_token'] ?? null);
-            }
-        }
-        $waExplicitlyDisabled = (isset($waSettings['is_enabled']) && ! $waSettings['is_enabled'])
-            || (isset($waSettings['enabled']) && ! $waSettings['enabled']);
-        // Keep the action available even when a tenant gateway is disabled or
-        // incomplete. The dispatch service will route through the platform
-        // WhatsApp provider (or its final compatibility fallback).
-        $waEnabled = true;
-
-        if ($waEnabled) {
-            $isMetaApi = ($waSettings['provider'] ?? '') === 'meta_cloud_api' && ! empty($waSettings['access_token']);
-            $channelItems[] = [
-                'type'        => 'list_tile',
-                'id'          => 'channel_whatsapp',
-                'channel'     => 'whatsapp',
-                'title'       => $isMetaApi ? 'Send via WhatsApp Business API' : 'Send via WhatsApp',
-                'subtitle'    => ! empty($cleanPhone) ? "to {$cleanPhone}" : 'Enter phone number',
-                'leading'     => ['type' => 'icon', 'icon' => 'chat', 'color' => '#25D366', 'size' => 22],
-                'trailing'    => ['type' => 'icon', 'icon' => 'send', 'size' => 18, 'color' => 'theme.textSecondary'],
-                'action_type' => 'SUBMIT_FORM',
-                'action'      => [
-                    'type'     => 'SUBMIT_FORM',
+        foreach ([
+            'whatsapp' => ['WhatsApp', 'chat', '#25D366', $cleanPhone],
+            'sms' => ['SMS', 'textsms', '#38BDF8', $cleanPhone],
+            'email' => ['Email', 'mark_email_read', '#818CF8', $email],
+        ] as $channel => [$label, $icon, $color, $recipient]) {
+            $configured = match ($channel) {
+                'whatsapp' => DispatchChannelService::isWhatsAppConfigured($tenantId),
+                'sms' => DispatchChannelService::isSmsConfigured($tenantId),
+                'email' => DispatchChannelService::isEmailConfigured($tenantId),
+            };
+            if ($configured) {
+                $action = [
+                    'type' => 'SUBMIT_FORM',
                     'endpoint' => '/api/v1/tenant/dispatch/send',
-                    'method'   => 'POST',
-                    'data'     => ['channel' => 'whatsapp', 'type' => $docType, 'id' => $documentId, 'recipient' => $cleanPhone ?: ''],
-                    'feedback' => ! empty($cleanPhone) ? "Dispatched via WhatsApp to {$cleanPhone}" : 'Dispatched via WhatsApp',
-                ],
-                'background_color' => 'theme.surface',
-                'divider_color'    => 'theme.divider',
-                'text_color'       => 'theme.textPrimary',
-            ];
-        }
-
-        // -------------------------------------------------------------
-        // 2. SMS GATEWAYS (Generic HTTP, Android Gateway, Twilio, MSG91)
-        // -------------------------------------------------------------
-        $smsSettings = function_exists('tenant_setting') ? tenant_setting($tenantId, 'sms_gateway', []) : [];
-        if (is_string($smsSettings)) {
-            $smsSettings = json_decode($smsSettings, true) ?: [];
-        }
-        if (class_exists(TenantNotificationGateway::class)) {
-            $gw = TenantNotificationGateway::withoutGlobalScope('company')
-                ->where(function ($q) use ($tenantId) {
-                    $q->where('company_id', $tenantId)->orWhere('tenant_id', $tenantId);
-                })
-                ->where('channel', TenantNotificationGateway::CHANNEL_SMS)
-                ->first();
-            if ($gw) {
-                $smsSettings['enabled'] = (bool) $gw->is_enabled;
-                $smsSettings['is_enabled'] = (bool) $gw->is_enabled;
-                $smsSettings['provider'] = $gw->provider;
-                $smsSettings['gateway_url'] = $gw->credentials['url'] ?? ($gw->credentials['gateway_url'] ?? ($smsSettings['gateway_url'] ?? null));
+                    'method' => 'POST',
+                    'data' => ['channel' => $channel, 'type' => $docType, 'id' => $documentId, 'recipient' => $recipient ?: ''],
+                ];
+            } else {
+                $deviceMessage ??= self::deviceMessage($tenantId, $docType, $documentId, $reference, $context);
+                $subject = $context['subject'] ?? ucfirst($docType).' #'.ltrim((string) $reference, '#');
+                $action = [
+                    'type' => 'OPEN_URL',
+                    'url' => DeviceMessageService::appUrl($channel, (string) $recipient, $deviceMessage, $subject),
+                    'fallback_url' => DeviceMessageService::url($channel, (string) $recipient, $deviceMessage, $subject),
+                ];
             }
-        }
-        $smsExplicitlyDisabled = (isset($smsSettings['is_enabled']) && ! $smsSettings['is_enabled'])
-            || (isset($smsSettings['enabled']) && ! $smsSettings['enabled']);
-        $smsGlobalEnabled = ! $smsExplicitlyDisabled
-            && ((function_exists('tenant_setting') && tenant_setting($tenantId, 'enable_sms', false)) || ! empty($smsSettings['enabled']) || ! empty($smsSettings['is_enabled']));
-        $hasSmsUrl = ! $smsExplicitlyDisabled
-            && (! empty($smsSettings['gateway_url']) || ! empty($smsSettings['url']) || (function_exists('tenant_setting') && ! empty(tenant_setting($tenantId, 'generic_sms_gateway'))));
-
-        if ($smsGlobalEnabled || $hasSmsUrl) {
-            $providerName = ucwords(str_replace('_', ' ', $smsSettings['provider'] ?? 'Android Gateway'));
-
             $channelItems[] = [
-                'type'        => 'list_tile',
-                'id'          => 'channel_sms',
-                'channel'     => 'sms',
-                'title'       => 'Send via SMS (Text Message)',
-                'subtitle'    => ! empty($cleanPhone) ? "via {$providerName} to {$cleanPhone}" : "via {$providerName} — enter phone number",
-                'leading'     => ['type' => 'icon', 'icon' => 'textsms', 'color' => '#38BDF8', 'size' => 22],
-                'trailing'    => ['type' => 'icon', 'icon' => 'send', 'size' => 18, 'color' => 'theme.textSecondary'],
-                'action_type' => 'SUBMIT_FORM',
-                'action'      => [
-                    'type'     => 'SUBMIT_FORM',
-                    'endpoint' => '/api/v1/tenant/dispatch/send',
-                    'method'   => 'POST',
-                    'data'     => [
-                        'channel'   => 'sms',
-                        'type'      => $docType,
-                        'id'        => $documentId,
-                        'recipient' => $cleanPhone ?: '',
-                    ],
-                    'feedback' => ! empty($cleanPhone) ? "SMS sent via HTTP Gateway to {$cleanPhone}." : "SMS queued via {$providerName}.",
-                ],
+                'type' => 'list_tile',
+                'id' => 'channel_'.$channel,
+                'channel' => $channel,
+                'title' => $configured ? 'Send via '.$label.' [Cloud API]' : match ($channel) {
+                    'whatsapp' => 'Open WhatsApp App', 'email' => 'Open Mail App', 'sms' => 'Open Messages / SMS',
+                },
+                'subtitle' => ($recipient ? 'to '.$recipient.' — ' : '').($configured ? 'Configured gateway' : 'Complete sending in your device app'),
+                'api_enabled' => $configured,
+                'selectable' => $configured, 'default' => $configured && filled($recipient),
+                'available' => true, 'visible' => true, 'mode' => $configured ? 'cloud_api' : 'local_intent',
+                ...($configured ? [] : ['launch_label' => 'Open']),
+                'delivery_mode' => $configured ? 'api' : 'device',
+                'leading' => ['type' => 'icon', 'icon' => $icon, 'color' => $color, 'size' => 22],
+                'trailing' => ['type' => 'icon', 'icon' => 'send', 'size' => 18, 'color' => 'theme.textSecondary'],
+                'action_type' => $action['type'],
+                'action' => $action,
                 'background_color' => 'theme.surface',
-                'divider_color'    => 'theme.divider',
-                'text_color'       => 'theme.textPrimary',
-            ];
-        }
-
-        // -------------------------------------------------------------
-        // 3. EMAIL (Custom SMTP / System Mailer)
-        // -------------------------------------------------------------
-        $smtpSettings = function_exists('tenant_setting') ? tenant_setting($tenantId, 'custom_smtp', []) : [];
-        if (is_string($smtpSettings)) {
-            $smtpSettings = json_decode($smtpSettings, true) ?: [];
-        }
-        if (class_exists(TenantNotificationGateway::class)) {
-            $gw = TenantNotificationGateway::withoutGlobalScope('company')
-                ->where(function ($q) use ($tenantId) {
-                    $q->where('company_id', $tenantId)->orWhere('tenant_id', $tenantId);
-                })
-                ->where('channel', TenantNotificationGateway::CHANNEL_EMAIL)
-                ->first();
-            if ($gw) {
-                $smtpSettings['enabled'] = (bool) $gw->is_enabled;
-                $smtpSettings['is_enabled'] = (bool) $gw->is_enabled;
-                $smtpSettings['host'] = $gw->credentials['host'] ?? ($smtpSettings['host'] ?? null);
-            }
-        }
-        $smtpExplicitlyDisabled = (isset($smtpSettings['is_enabled']) && ! $smtpSettings['is_enabled'])
-            || (isset($smtpSettings['enabled']) && ! $smtpSettings['enabled']);
-        $smtpEnabled = ! $smtpExplicitlyDisabled
-            && (! empty($smtpSettings['enabled']) || ! empty($smtpSettings['is_enabled']) || (function_exists('tenant_setting') && tenant_setting($tenantId, 'enable_smtp', false)));
-        $hasSmtpHost = ! empty($smtpSettings['host']);
-
-        // System mail remains a valid fallback when custom SMTP is disabled.
-        if ($smtpEnabled || $hasSmtpHost || config('mail.default')) {
-            $hostLabel = ! empty($smtpSettings['host']) ? " ({$smtpSettings['host']})" : '';
-
-            $channelItems[] = [
-                'type'        => 'list_tile',
-                'id'          => 'channel_email',
-                'channel'     => 'email',
-                'title'       => "Send via Email{$hostLabel}",
-                'subtitle'    => ! empty($email) ? "to {$email}" : 'Enter email address',
-                'leading'     => ['type' => 'icon', 'icon' => 'mark_email_read', 'color' => '#818CF8', 'size' => 22],
-                'trailing'    => ['type' => 'icon', 'icon' => 'send', 'size' => 18, 'color' => 'theme.textSecondary'],
-                'action_type' => 'SUBMIT_FORM',
-                'action'      => [
-                    'type'     => 'SUBMIT_FORM',
-                    'endpoint' => '/api/v1/tenant/dispatch/send',
-                    'method'   => 'POST',
-                    'data'     => [
-                        'channel'   => 'email',
-                        'type'      => $docType,
-                        'id'        => $documentId,
-                        'recipient' => $email ?: '',
-                    ],
-                    'feedback' => ! empty($email) ? "Email sent successfully to {$email}." : 'Official document emailed.',
-                ],
-                'background_color' => 'theme.surface',
-                'divider_color'    => 'theme.divider',
-                'text_color'       => 'theme.textPrimary',
+                'divider_color' => 'theme.divider',
+                'text_color' => 'theme.textPrimary',
             ];
         }
 
@@ -249,7 +138,8 @@ class OmnichannelRegistryService
                 ->where('company_id', $tenantId)
                 ->where('is_active', true)
                 ->get()
-                ->filter(fn (CustomNotificationChannel $channel) => $channel->handlesEvent($eventType));
+                ->filter(fn (CustomNotificationChannel $channel) => $docType === 'document' || $channel->handlesEvent($eventType)
+                    || ($docType === 'kot' && ($channel->handlesEvent('kot') || $channel->handlesEvent('kot_created'))));
 
             foreach ($customChannels as $customChannel) {
                 $channelItems[] = [
@@ -293,5 +183,48 @@ class OmnichannelRegistryService
         // 6. EXTENSIBILITY HOOK FOR FUTURE CHANNELS
         // -------------------------------------------------------------
         return function_exists('apply_filters') ? apply_filters('tenant_dispatch_channels', $channelItems, $tenantId, $context) : $channelItems;
+    }
+
+    private static function deviceMessage(mixed $tenantId, string $type, mixed $id, string $reference, array $context): string
+    {
+        if (isset($context['message'])) {
+            return (string) $context['message'];
+        }
+
+        if ($id && $type === 'kot') {
+            $delivery = app(KotDeliveryService::class);
+
+            return $delivery->message($delivery->find($tenantId, $id));
+        }
+
+        if ($id && $type === 'repair') {
+            $ticket = RepairTicket::withoutGlobalScope('company')
+                ->where('company_id', $tenantId)
+                ->where(fn ($query) => $query->where('id', $id)->orWhere('ticket_number', $id))
+                ->with(['company', 'customer'])
+                ->first();
+            if ($ticket) {
+                return app(RepairNotificationService::class)->buildCustomerMessage($ticket);
+            }
+        }
+
+        if ($id && in_array($type, ['invoice', 'sale', 'receipt', 'quotation', 'quote', 'due_invoice', 'due_reminder'], true)) {
+            $sale = Sale::withoutGlobalScope('company')
+                ->where('company_id', $tenantId)
+                ->where(fn ($query) => $query->where('id', $id)->orWhere('sale_number', $id))
+                ->with(['company', 'customer'])
+                ->first();
+            if ($sale) {
+                $delivery = app(InvoiceDeliveryService::class);
+
+                return match (true) {
+                    in_array($type, ['due_invoice', 'due_reminder'], true) => $delivery->buildDueReminderMessage($sale),
+                    $sale->operation_type === 'quotation' => $delivery->buildQuotationWhatsAppMessage($sale),
+                    default => $delivery->buildInvoiceWhatsAppMessage($sale),
+                };
+            }
+        }
+
+        return (string) ($context['default_message'] ?? 'Please review your '.str_replace('_', ' ', $type).' #'.$reference.'.');
     }
 }

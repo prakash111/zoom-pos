@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\RepairTicket;
 use App\Models\User;
 use App\Services\Notifications\CustomChannelDispatcherService;
+use App\Services\Notifications\DeviceMessageService;
 use App\Services\Push\FirebasePushService;
 use Illuminate\Support\Facades\Log;
 
@@ -18,9 +19,8 @@ class RepairNotificationService
     ) {}
 
     /**
-     * Build a WhatsApp deep link the same way the rest of the platform does
-     * (InvoiceDeliveryService / CashRegisterReportService): only address a
-     * specific recipient when the phone looks like a real, dialable
+     * Open the installed WhatsApp app, only addressing a specific recipient
+     * when the phone looks like a real, dialable
      * international number, otherwise open the WhatsApp composer with the
      * message pre-filled so the user can pick the contact. This prevents the
      * client from launching `https://wa.me/?text=` or `wa.me/<too-short>` and
@@ -28,16 +28,30 @@ class RepairNotificationService
      */
     public static function whatsAppUrl(string $message, ?string $phone): string
     {
-        $digits = preg_replace('/\D+/', '', (string) $phone);
+        return DeviceMessageService::appUrl('whatsapp', (string) $phone, $message);
+    }
 
-        // Drop a leading 0 (trunk prefix) which is never part of an E.164 number.
-        $digits = ltrim($digits, '0');
+    public function buildCustomerMessage(RepairTicket $ticket, ?string $status = null): string
+    {
+        $company = $ticket->company ?? Company::find($ticket->company_id);
+        $customer = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Valued Customer');
+        $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'Device';
+        $store = $company?->name ?: 'our service center';
+        $currency = $company?->currency_symbol ?: '$';
+        $advance = $currency.number_format((float) $ticket->advance_deposit, 2);
+        $balance = $currency.number_format((float) $ticket->balance_due, 2);
+        $stage = match ($status ?? $ticket->status) {
+            RepairTicket::STATUS_RECEIVED => "has been received at {$store}. Advance Paid: {$advance}.",
+            RepairTicket::STATUS_DIAGNOSING => "is being diagnosed at {$store}. We are checking the reported issue.",
+            RepairTicket::STATUS_WAITING_PARTS => "is waiting for parts at {$store}. We will continue the repair once the required parts arrive.",
+            RepairTicket::STATUS_IN_PROGRESS => "is being repaired at {$store}. Work is in progress.",
+            RepairTicket::STATUS_READY => "has been repaired and is ready for pickup at {$store}. Balance Due: {$balance}.",
+            RepairTicket::STATUS_DELIVERED => "has been delivered and closed at {$store}. Thank you for choosing us!",
+            RepairTicket::STATUS_CANCELLED => "has been cancelled at {$store}. Please contact us for any questions.",
+            default => 'is now '.(RepairTicket::STATUSES[$status ?? $ticket->status] ?? ucwords(str_replace('_', ' ', $status ?? $ticket->status)))." at {$store}.",
+        };
 
-        if (strlen($digits) >= 10) {
-            return 'https://wa.me/'.$digits.'?text='.rawurlencode($message);
-        }
-
-        return 'https://api.whatsapp.com/send?text='.rawurlencode($message);
+        return "Hello {$customer}, repair ticket #{$ticket->ticket_number} for your {$device} {$stage} Track progress: ".route('repair.portal.track', $ticket->ticket_number);
     }
 
     /**
@@ -55,12 +69,11 @@ class RepairNotificationService
             );
         }
 
-        $company = $ticket->company ?? Company::find($ticket->company_id);
         $customerName = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Valued Customer');
         $phone = $ticket->customer?->phone ?: $ticket->customer_phone;
         $statusLabel = RepairTicket::STATUSES[$newStatus] ?? ucwords(str_replace('_', ' ', $newStatus));
         $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'device';
-        $smsText = "Hello {$customerName}, your {$device} repair (Ticket #{$ticket->ticket_number}) is now: {$statusLabel}.";
+        $smsText = $this->buildCustomerMessage($ticket, $newStatus);
         $whatsappUrl = self::whatsAppUrl($smsText, $phone);
 
         $dispatched = 0;
@@ -97,11 +110,9 @@ class RepairNotificationService
      */
     public function notifyTicketCreated(RepairTicket $ticket): array
     {
-        $company = $ticket->company ?? Company::find($ticket->company_id);
         $customerName = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Valued Customer');
         $phone = $ticket->customer?->phone ?: $ticket->customer_phone;
 
-        $currency = $company?->currency_symbol ?: '$';
         $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
         $intakeSheetUrl = url("/api/tenant/repair/tickets/{$ticket->id}/intake-sheet");
 
@@ -110,10 +121,7 @@ class RepairNotificationService
             $device = 'Device';
         }
 
-        $depositFormatted = $currency.number_format((float) $ticket->advance_deposit, 2);
-        $estimatedFormatted = $currency.number_format((float) $ticket->estimated_cost, 2);
-
-        $smsText = "Hello {$customerName}, repair ticket #{$ticket->ticket_number} for your {$device} has been received at ".($company?->name ?? 'our service center').". Advance Paid: {$depositFormatted}. Track progress: {$trackingUrl}";
+        $smsText = $this->buildCustomerMessage($ticket, RepairTicket::STATUS_RECEIVED);
         $whatsappUrl = self::whatsAppUrl($smsText, $phone);
 
         // 1. Dispatch through registered webhooks / custom channels (SMS, WhatsApp API gateways)
@@ -178,7 +186,7 @@ class RepairNotificationService
             $device = 'Device';
         }
 
-        $smsText = "Good news {$customerName}! Your {$device} (Ticket #{$ticket->ticket_number}) is REPAIRED & READY for pickup at ".($company?->name ?? 'our service center').". Balance Due: {$balanceFormatted}. Thank you!";
+        $smsText = $this->buildCustomerMessage($ticket, RepairTicket::STATUS_READY);
         $whatsappUrl = self::whatsAppUrl($smsText, $phone);
 
         // 1. Dispatch Push Notification to all active store devices & customer apps

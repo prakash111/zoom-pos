@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Mail\InvoiceMailable;
-use App\Models\KitchenTicket;
+use App\Mail\QuotationMailable;
 use App\Models\PharmacyPrescription;
 use App\Models\RepairTicket;
 use App\Models\Sale;
@@ -13,7 +13,10 @@ use App\Models\SalonAppointment;
 use App\Models\Tenant;
 use App\Models\TenantNotificationGateway;
 use App\Services\Dispatch\DocumentDispatchService;
+use App\Services\Repair\RepairNotificationService;
 use App\Services\OmnichannelRegistryService;
+use App\Services\DispatchChannelService;
+use App\Services\Restaurant\KotDeliveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -25,169 +28,61 @@ class DocumentDispatchController extends Controller
     {
         $tenant = Tenant::findOrFail($this->resolveCompany($request)->id);
         $doc = $this->resolveDocumentInfo($tenant, $type, $id);
-        $settings = (array) ($tenant->api_settings ?? []);
+        $context = [
+            'id' => $id, 'type' => $type, 'phone' => $doc['customerPhone'],
+            'email' => $doc['customerEmail'], 'reference' => $doc['code'], 'message' => $doc['message'],
+        ];
 
-        $dynamicChannels = OmnichannelRegistryService::resolveChannels($tenant->id, [
-            'id' => $id,
-            'type' => $type,
-            'phone' => $doc['customerPhone'],
-            'email' => $doc['customerEmail'],
-            'reference' => $doc['code'],
-        ]);
-
-        $channels = [];
-        $enabledChannelsList = [];
-
-        foreach ($dynamicChannels as $item) {
-            $ch = $item['channel'] ?? 'custom';
-            $chId = $item['id'] ?? ('channel_' . $ch);
-            $target = match ($ch) {
-                'whatsapp', 'sms' => $doc['customerPhone'] ?: '',
-                'email' => $doc['customerEmail'] ?: '',
-                default => $item['subtitle'] ?? '',
-            };
-
-            $entry = [
-                'id' => $chId,
-                'channel' => $ch,
-                'channel_id' => $item['channel_id'] ?? null,
-                'available' => true,
-                'default' => match ($ch) {
-                    'whatsapp' => true,
-                    'email' => ! empty($doc['customerEmail']),
-                    'sms' => ! empty($doc['customerPhone']),
-                    default => false,
-                },
-                'title' => $item['title'] ?? ucfirst($ch),
-                'subtitle' => $item['subtitle'] ?? '',
-                'provider' => $this->resolveProviderLabel($tenant, $ch),
-                'target' => $target,
-                'icon' => $item['leading']['icon'] ?? 'send',
-                'color' => $item['leading']['color'] ?? '#38BDF8',
-            ];
-
-            $channels[$ch] = $entry;
-            $enabledChannelsList[] = $entry;
-        }
-
-        if (! isset($channels['whatsapp'])) {
-            $entry = [
-                'id' => 'channel_whatsapp',
-                'channel' => 'whatsapp',
-                'available' => true,
-                'default' => true,
-                'title' => 'Send via WhatsApp',
-                'subtitle' => $doc['customerPhone'] ?: 'Customer Phone / Kitchen Desk',
-                'provider' => $this->enabled($settings, 'whatsapp_api_enabled') ? 'Custom Gateway' : 'System Service',
-                'target' => $doc['customerPhone'] ?: 'Customer Phone / Kitchen Desk',
-                'icon' => 'chat',
-                'color' => '#25D366',
-            ];
-            $channels['whatsapp'] = $entry;
-            $enabledChannelsList[] = $entry;
-        }
-
-        if (! isset($channels['email'])) {
-            $entry = [
-                'id' => 'channel_email',
-                'channel' => 'email',
-                'available' => true,
-                'default' => ! empty($doc['customerEmail']),
-                'title' => 'Send via Email',
-                'subtitle' => $doc['customerEmail'] ?: 'Enter email address',
-                'provider' => $this->enabled($settings, 'smtp_enabled') ? 'Custom SMTP' : 'System Mailer',
-                'target' => $doc['customerEmail'] ?: 'Enter email address',
-                'icon' => 'email',
-                'color' => '#818CF8',
-            ];
-            $channels['email'] = $entry;
-            $enabledChannelsList[] = $entry;
-        }
-
-        return response()->json([
-            'success' => true,
-            'document_code' => $doc['code'],
-            'customer' => [
-                'name' => $doc['customerName'],
-                'phone' => $doc['customerPhone'],
-                'email' => $doc['customerEmail'],
-            ],
+        return response()->json(array_merge([
+            'success' => true, 'document_code' => $doc['code'],
+            'customer' => ['name' => $doc['customerName'], 'phone' => $doc['customerPhone'], 'email' => $doc['customerEmail']],
             'context' => $doc['context'],
-            'channels' => $channels,
-            'enabled_channels' => $enabledChannelsList,
-            'components' => $dynamicChannels,
-        ]);
+        ], $this->channelOptions($tenant, $context)), 200, ['Cache-Control' => 'no-store, private']);
     }
 
     public function getEnabledChannels(Request $request): JsonResponse
     {
         $tenant = Tenant::findOrFail($this->resolveCompany($request)->id);
-        $settings = (array) ($tenant->api_settings ?? []);
 
-        $dynamicChannels = OmnichannelRegistryService::resolveChannels($tenant->id, [
-            'type' => 'document',
-            'id' => null,
-            'phone' => null,
-            'email' => null,
-        ]);
+        return response()->json(['success' => true] + $this->channelOptions($tenant, ['type' => 'document']),
+            200, ['Cache-Control' => 'no-store, private']);
+    }
 
-        $channels = [];
-        $enabledChannelsList = [];
+    private function channelOptions(Tenant $tenant, array $context): array
+    {
+        $items = OmnichannelRegistryService::resolveChannels($tenant->id, $context);
+        $entries = [];
+        foreach ($items as $item) {
+            $channel = $item['channel'];
+            $device = ($item['delivery_mode'] ?? 'api') === 'device' || ! ($item['api_enabled'] ?? true);
+            $target = $channel === 'email' ? ($context['email'] ?? '') : ($context['phone'] ?? '');
+            $entry = array_merge($item, [
+                'available' => true, 'selectable' => ! $device,
+                'default' => ! $device && in_array($channel, ['whatsapp', 'sms', 'email'], true) && filled($target),
+                'provider' => $device ? 'Device app' : $this->resolveProviderLabel($tenant, $channel),
+                'target' => $target, 'icon' => $item['leading']['icon'] ?? 'send', 'color' => $item['leading']['color'] ?? '#38BDF8',
+            ]);
+            $entries[] = $entry;
+        }
+        $components = DispatchChannelService::groupedComponents($entries, $context);
+        $batchButton = collect($components)->firstWhere('id', 'dispatch_selected_channels');
 
-        foreach ($dynamicChannels as $item) {
-            $ch = $item['channel'] ?? 'custom';
-            $chId = $item['id'] ?? ('channel_' . $ch);
-            $entry = [
-                'id' => $chId,
-                'channel' => $ch,
-                'channel_id' => $item['channel_id'] ?? null,
-                'available' => true,
-                'title' => $item['title'] ?? ucfirst($ch),
-                'subtitle' => $item['subtitle'] ?? '',
-                'provider' => $this->resolveProviderLabel($tenant, $ch),
-                'icon' => $item['leading']['icon'] ?? 'send',
-                'color' => $item['leading']['color'] ?? '#38BDF8',
-            ];
-            $channels[$ch] = $entry;
-            $enabledChannelsList[] = $entry;
+        $visibleChannels = [];
+        foreach (DispatchChannelService::visibleChannels($components) as $component) {
+            $key = $component['channel'] === 'custom' ? 'custom:'.$component['channel_id'] : $component['channel'];
+            $visibleChannels[$key] = $component;
         }
 
-        if (! isset($channels['whatsapp'])) {
-            $entry = [
-                'id' => 'channel_whatsapp',
-                'channel' => 'whatsapp',
-                'available' => true,
-                'title' => 'Send via WhatsApp',
-                'subtitle' => 'Customer Phone',
-                'provider' => $this->enabled($settings, 'whatsapp_api_enabled') ? 'Custom Gateway' : 'System Service',
-                'icon' => 'chat',
-                'color' => '#25D366',
-            ];
-            $channels['whatsapp'] = $entry;
-            $enabledChannelsList[] = $entry;
-        }
+        $groups = DispatchChannelService::splitChannels($visibleChannels);
+        $deviceChannels = array_filter($visibleChannels, fn ($channel) => ($channel['delivery_mode'] ?? '') === 'device');
 
-        if (! isset($channels['email'])) {
-            $entry = [
-                'id' => 'channel_email',
-                'channel' => 'email',
-                'available' => true,
-                'title' => 'Send via Email',
-                'subtitle' => 'Customer Email',
-                'provider' => $this->enabled($settings, 'smtp_enabled') ? 'Custom SMTP' : 'System Mailer',
-                'icon' => 'email',
-                'color' => '#818CF8',
-            ];
-            $channels['email'] = $entry;
-            $enabledChannelsList[] = $entry;
-        }
-
-        return response()->json([
-            'success' => true,
-            'channels' => $channels,
-            'enabled_channels' => $enabledChannelsList,
-            'components' => $dynamicChannels,
-        ]);
+        return [
+            'channels' => (object) $visibleChannels, 'enabled_channels' => $groups['api'],
+            'device_channels' => (object) $deviceChannels, 'secondary_options' => $groups['device'],
+            'multi_select' => true, 'batch_action' => $batchButton['action'] ?? null,
+            'components' => $components,
+            'schema' => ['type' => 'bottom_sheet', 'title' => 'Unified Dispatch', 'components' => $components],
+        ];
     }
 
     public function dispatchDocument(Request $request, DocumentDispatchService $dispatchService): JsonResponse
@@ -198,19 +93,46 @@ class DocumentDispatchController extends Controller
             'send_whatsapp' => ['sometimes', 'boolean'],
             'send_email' => ['sometimes', 'boolean'],
             'send_sms' => ['sometimes', 'boolean'],
+            'api_only' => ['sometimes', 'boolean'],
             'channels' => ['sometimes', 'array'],
             'channels.*' => ['string'],
+            'channel' => ['nullable', 'string'],
+            'channel_id' => ['nullable', 'integer'],
             'phone' => ['nullable', 'string'],
             'email' => ['nullable', 'string'],
+            'recipient_phone' => ['nullable', 'string'],
+            'recipient_email' => ['nullable', 'string'],
         ]);
 
         $channels = (array) ($validated['channels'] ?? []);
+        if (empty($channels) && ! empty($validated['channel'])) {
+            $channels = [$validated['channel']];
+        }
+        $channels = array_values(array_unique(array_map(function ($channel) use ($validated) {
+            $channel = strtolower(trim($channel));
+            if ($channel === 'custom' && ! empty($validated['channel_id'])) {
+                return 'custom:'.$validated['channel_id'];
+            }
+            if (preg_match('/^(?:channel_)?custom[:_]?(\d+)$/', $channel, $match)) {
+                return 'custom:'.$match[1];
+            }
+
+            return $channel;
+        }, $channels)));
+        foreach ($channels as $channel) {
+            if (! in_array($channel, ['whatsapp', 'email', 'sms', 'webhook', 'custom_webhook'], true) && ! preg_match('/^custom:\d+$/', $channel)) {
+                return response()->json(['success' => false, 'message' => 'A valid delivery channel is required.'], 422);
+            }
+        }
         $sendWhatsApp = $request->boolean('send_whatsapp') || in_array('whatsapp', $channels, true);
         $sendEmail = $request->boolean('send_email') || in_array('email', $channels, true);
         $sendSms = $request->boolean('send_sms') || in_array('sms', $channels, true);
         $sendWebhook = in_array('webhook', $channels, true) || in_array('custom_webhook', $channels, true);
 
         if (! $sendWhatsApp && ! $sendEmail && ! $sendSms && ! $sendWebhook && empty($channels)) {
+            if ($request->hasAny(['channels', 'channel', 'send_whatsapp', 'send_email', 'send_sms'])) {
+                return response()->json(['success' => false, 'message' => 'Select a delivery channel.'], 422);
+            }
             $sendWhatsApp = true;
             $sendEmail = ! empty($validated['email']);
         }
@@ -218,49 +140,80 @@ class DocumentDispatchController extends Controller
         $tenant = Tenant::findOrFail($this->resolveCompany($request)->id);
         $doc = $this->resolveDocumentInfo($tenant, $validated['document_type'], $validated['document_id']);
 
-        $targetPhone = ! empty($validated['phone']) ? $validated['phone'] : $doc['customerPhone'];
-        $targetEmail = ! empty($validated['email']) ? $validated['email'] : $doc['customerEmail'];
+        $targetPhone = ($validated['phone'] ?? null) ?: ($validated['recipient_phone'] ?? null);
+        $targetPhone = $targetPhone ?: $doc['customerPhone'];
+        $targetEmail = ($validated['email'] ?? null) ?: ($validated['recipient_email'] ?? null);
+        $targetEmail = $targetEmail ?: $doc['customerEmail'];
+        $variables = array_merge($doc['deliveryVariables'] ?? [], [
+            'document_type' => $validated['document_type'],
+            'document_id' => $validated['document_id'],
+            'document_code' => $doc['code'],
+            'document_number' => ltrim($doc['code'], '#'),
+            'customer_name' => $doc['customerName'],
+            'customer_phone' => $targetPhone,
+            'customer_email' => $targetEmail,
+            'phone' => $targetPhone,
+            'email' => $targetEmail,
+            'message' => $doc['message'],
+            'total' => $doc['sale']?->total ?? $doc['deliveryVariables']['total'] ?? null,
+        ]);
 
         $results = [];
+        $attempt = function (string $channel, callable $send) use ($tenant, $request): array {
+            if ($request->boolean('api_only')) {
+                $configured = match ($channel) {
+                    'whatsapp' => DispatchChannelService::isWhatsAppConfigured($tenant->id),
+                    'email' => DispatchChannelService::isEmailConfigured($tenant->id),
+                    'sms' => DispatchChannelService::isSmsConfigured($tenant->id),
+                    default => true,
+                };
+                if (! $configured) {
+                    return ['success' => false, 'status' => 'not_configured', 'channel' => $channel,
+                        'message' => ucfirst($channel).' API is disabled or incomplete. Use the device app option.'];
+                }
+            }
+            try {
+                return $send();
+            } catch (\Throwable $exception) {
+                report($exception);
+                return ['success' => false, 'status' => 'failed', 'channel' => $channel, 'message' => 'Delivery failed. Please try again.'];
+            }
+        };
 
         if ($sendWhatsApp) {
-            $phoneToUse = $targetPhone ?: '0000000000';
-            $results['whatsapp'] = $dispatchService->dispatchWhatsApp(
+            $phoneToUse = $targetPhone ?: '';
+            $results['whatsapp'] = $attempt('whatsapp', fn () => $dispatchService->dispatchWhatsApp(
                 $tenant,
                 $phoneToUse,
                 $doc['message'],
                 null,
-            );
+            ));
         }
 
         if ($sendEmail) {
-            $emailToUse = $targetEmail ?: "customer@{$tenant->domain}";
-            $mailable = $doc['sale'] instanceof Sale
-                ? new InvoiceMailable($doc['sale'], $tenant)
-                : "<div style='font-family:sans-serif;padding:20px;background:#f8fafc;color:#0f172a;'><h2 style='color:#10b981;'>{$doc['code']}</h2><p>{$doc['message']}</p></div>";
+            $results['email'] = $attempt('email', function () use ($targetEmail, $doc, $tenant, $dispatchService) {
+                $mailable = $doc['sale'] instanceof Sale
+                    ? ($doc['sale']->operation_type === 'quotation' ? new QuotationMailable($doc['sale'], $tenant) : new InvoiceMailable($doc['sale'], $tenant))
+                    : '<div style="font-family:sans-serif;padding:20px"><h2>'.e($doc['code']).'</h2><p>'.nl2br(e($doc['message'])).'</p></div>';
 
-            $results['email'] = $dispatchService->dispatchEmail(
-                $tenant,
-                $emailToUse,
-                "Document {$doc['code']} from {$tenant->name}",
-                $mailable,
-            );
+                return $dispatchService->dispatchEmail($tenant, $targetEmail ?: '', "Document {$doc['code']} from {$tenant->name}", $mailable);
+            });
         }
 
         if ($sendSms) {
-            $phoneToUse = $targetPhone ?: '0000000000';
-            $results['sms'] = $dispatchService->dispatchSms(
+            $phoneToUse = $targetPhone ?: '';
+            $results['sms'] = $attempt('sms', fn () => $dispatchService->dispatchSms(
                 $tenant,
                 $phoneToUse,
                 $doc['message'],
-            );
+            ));
         }
 
         if ($sendWebhook) {
-            $results['webhook'] = $dispatchService->dispatchWebhook(
+            $results['webhook'] = $attempt('webhook', fn () => $dispatchService->dispatchWebhook(
                 $tenant,
-                'document.dispatched',
-                [
+                isset($doc['deliveryVariables']['kot_id']) ? 'kot_created' : 'document.dispatched',
+                array_merge($variables, [
                     'document_type' => $validated['document_type'],
                     'document_id' => $validated['document_id'],
                     'document_code' => $doc['code'],
@@ -271,43 +224,71 @@ class DocumentDispatchController extends Controller
                     ],
                     'message' => $doc['message'],
                     'total' => $doc['sale']?->total,
-                ]
-            );
+                ])
+            ));
         }
 
         foreach ($channels as $channel) {
-            if (preg_match('/^(?:channel_)?custom:?(\d+)$/', $channel, $m)) {
+            if (preg_match('/^custom:(\d+)$/', $channel, $m)) {
                 $customId = (int) $m[1];
-                $results['custom_' . $customId] = $dispatchService->dispatchCustom(
+                $results['custom_' . $customId] = $attempt($channel, fn () => $dispatchService->dispatchCustom(
                     $tenant,
                     $customId,
-                    [
-                        'document_type' => $validated['document_type'],
-                        'document_id' => $validated['document_id'],
-                        'document_code' => $doc['code'],
-                        'customer_name' => $doc['customerName'],
-                        'customer_phone' => $targetPhone,
-                        'customer_email' => $targetEmail,
-                        'total' => $doc['sale']?->total,
-                    ]
-                );
+                    $variables
+                ));
             }
         }
 
+        $success = collect($results)->contains(fn ($result) => ($result['success'] ?? false) === true);
+        $failed = collect($results)->filter(fn ($result) => ! ($result['success'] ?? false))
+            ->map(fn ($result) => $result['message'] ?? $result['error'] ?? 'Delivery failed.')->all();
+        $successfulChannels = array_keys(array_filter($results, fn ($result) => ($result['success'] ?? false) && ($result['status'] ?? '') !== 'manual_link'));
+        $skippedChannels = array_keys(array_filter($results, fn ($result) => ($result['status'] ?? '') === 'not_configured'));
+        $partial = $success && count($failed) > 0;
+        $deviceActions = array_values(array_filter($results, fn ($result) => ($result['status'] ?? '') === 'manual_link'));
+        $single = count($results) === 1 ? reset($results) : [];
         $whatsappUrl = $results['whatsapp']['whatsapp_url'] ?? $results['whatsapp']['url'] ?? null;
 
         return response()->json([
-            'success' => true,
-            'message' => 'Dispatched successfully via selected channels.',
+            'success' => $success,
+            'message' => $deviceActions ? 'Messages prepared. Complete sending in your device app.' : ($success ? ($partial ? 'Some selected channels could not be sent.' : 'Dispatched successfully via selected channels.') : ($single['message'] ?? $single['error'] ?? 'Document dispatch failed.')),
+            'status' => $partial ? 'partial' : ($single['status'] ?? ($deviceActions ? 'manual_link' : ($success ? 'sent' : 'failed'))),
+            'url' => $single['url'] ?? null,
+            'action' => $single['action'] ?? null,
+            'email_url' => $results['email']['url'] ?? null,
+            'sms_url' => $results['sms']['url'] ?? null,
+            'device_actions' => $deviceActions,
             'document_code' => $doc['code'],
+            'document_id' => (string) $validated['document_id'],
+            'document_type' => $doc['deliveryVariables']['document_type'] ?? $validated['document_type'],
+            'channel' => count($results) === 1 ? array_key_first($results) : null,
             'customer' => [
                 'name' => $doc['customerName'],
                 'phone' => $targetPhone,
                 'email' => $targetEmail,
             ],
+            'channels' => $channels,
             'results' => $results,
+            'successful_channels' => $successfulChannels, 'failed' => (object) $failed, 'skipped_channels' => $skippedChannels,
             'whatsapp_url' => $whatsappUrl,
-        ], 200);
+        ], $success ? 200 : 422);
+    }
+
+    /** Adapt legacy single-channel and notification requests to KOT delivery. */
+    public function dispatchKot(Request $request, mixed $id, ?string $channel = null): JsonResponse
+    {
+        $forwarded = clone $request;
+        $channel ??= $request->input('channel');
+        $recipient = $request->input('recipient');
+        $forwarded->merge([
+            'document_type' => 'kot',
+            'document_id' => $id,
+            'channel' => $channel,
+            'phone' => $request->input('phone') ?: ($request->input('recipient_phone') ?: (in_array($channel, ['whatsapp', 'sms'], true) ? $recipient : null)),
+            'email' => $request->input('email') ?: ($request->input('recipient_email') ?: ($channel === 'email' ? $recipient : null)),
+        ]);
+
+        return $this->dispatchDocument($forwarded, app(DocumentDispatchService::class));
     }
 
     protected function resolveDocumentInfo(Tenant $tenant, string $type, string|int $id): array
@@ -323,7 +304,7 @@ class DocumentDispatchController extends Controller
         $taxId = $tenant->tax_id ?? $tenant->tax_number ?? $tenant->gst_number ?? null;
 
         // 1. Repair / Service Tickets
-        if (in_array($normalizedType, ['repair', 'ticket', 'job_sheet', 'intake', 'diagnostic_report', 'repair_invoice', 'intake_job_sheet'], true)) {
+        if (in_array($normalizedType, ['repair', 'ticket', 'job_sheet', 'intake', 'diagnostic_report', 'repair_invoice', 'intake_job_sheet', 'repair_ticket', 'work_order'], true)) {
             $ticket = RepairTicket::withoutGlobalScope('company')
                 ->where('company_id', $tenant->id)
                 ->where(function ($query) use ($id) {
@@ -335,35 +316,30 @@ class DocumentDispatchController extends Controller
             if ($ticket) {
                 $raw = $ticket->ticket_number ?: (string) $ticket->id;
                 $code = $this->formatDocumentCode($raw, 'REP');
-                $customerName = $ticket->customer_name ?: ($ticket->customer?->name ?? 'Valued Customer');
-                $customerPhone = $ticket->customer_phone ?: ($ticket->customer?->phone ?? null);
-                $customerEmail = $ticket->customer_email ?: ($ticket->customer?->email ?? null);
+                $customerName = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Valued Customer');
+                $customerPhone = $ticket->customer?->phone ?: ($ticket->customer_phone ?: null);
+                $customerEmail = $ticket->customer?->email ?: ($ticket->customer_email ?: null);
                 $deviceDesc = trim(($ticket->brand ?? '') . ' ' . ($ticket->model ?? ''));
                 $context = implode(' • ', array_filter([$customerName, $deviceDesc, $ticket->created_at?->format('d M Y, h:i A'), $taxId ? "Tax ID: {$taxId}" : null]));
-                $message = "Hello {$customerName}! Your repair service sheet {$code} for {$deviceDesc} at {$tenant->name} is ready. Status: " . ucfirst($ticket->status ?? 'Intake');
+                $message = app(RepairNotificationService::class)->buildCustomerMessage($ticket);
                 return compact('code', 'customerName', 'customerPhone', 'customerEmail', 'context', 'message', 'sale', 'timestamp', 'taxId');
             }
         }
 
         // 2. Kitchen / Restaurant Tickets
-        if (in_array($normalizedType, ['kot', 'kitchen', 'restaurant', 'split_bill', 'dine_in_invoice'], true)) {
-            $kot = KitchenTicket::withoutGlobalScope('company')
-                ->where('company_id', $tenant->id)
-                ->where(function ($query) use ($id) {
-                    $query->where('id', $id)
-                        ->orWhere('kot_number', (string) $id);
-                })
-                ->first();
-
-            if ($kot) {
-                $raw = $kot->kot_number ?: (string) $kot->id;
-                $code = $this->formatDocumentCode($raw, 'KOT');
-                $tableDesc = $kot->table_name ? "Table {$kot->table_name}" : 'Dine-In';
-                $customerName = $tableDesc;
-                $context = implode(' • ', array_filter([$tableDesc, $kot->created_at?->format('d M Y, h:i A')]));
-                $message = "KOT Order {$code} for {$tableDesc} at {$tenant->name} has been intimating kitchen.";
-                return compact('code', 'customerName', 'customerPhone', 'customerEmail', 'context', 'message', 'sale', 'timestamp', 'taxId');
-            }
+        if (in_array($normalizedType, ['kot', 'kitchen_order_ticket', 'kitchen-ticket', 'kitchen', 'restaurant', 'split_bill', 'dine_in_invoice'], true)) {
+            $delivery = app(KotDeliveryService::class);
+            $kot = $delivery->find($tenant->id, $id);
+            $raw = $kot->kot_number ?: (string) $kot->id;
+            $code = $this->formatDocumentCode($raw, 'KOT');
+            $tableDesc = $kot->table_name ? "Table {$kot->table_name}" : 'Dine-In';
+            $deliveryVariables = $delivery->variables($kot);
+            $customerName = $deliveryVariables['customer_name'] ?: $tableDesc;
+            $customerPhone = $deliveryVariables['phone'];
+            $customerEmail = $deliveryVariables['email'];
+            $context = implode(' • ', array_filter([$tableDesc, $kot->created_at?->format('d M Y, h:i A')]));
+            $message = $deliveryVariables['message'];
+            return compact('code', 'customerName', 'customerPhone', 'customerEmail', 'context', 'message', 'sale', 'timestamp', 'taxId', 'deliveryVariables');
         }
 
         // 3. Pharmacy / Prescriptions
@@ -413,42 +389,6 @@ class DocumentDispatchController extends Controller
             }
         }
 
-        // 5. Repair Tickets / Job Sheets / Work Orders
-        if (in_array($normalizedType, ['repair', 'ticket', 'job_sheet', 'repair_ticket', 'work_order'], true)) {
-            $ticket = \App\Models\RepairTicket::withoutGlobalScope('company')
-                ->with(['customer', 'company'])
-                ->where('company_id', $tenant->id)
-                ->where(function ($query) use ($id) {
-                    $query->where('id', $id)
-                        ->orWhere('ticket_number', (string) $id);
-                })
-                ->first();
-
-            if ($ticket) {
-                $rawCode = (string) $ticket->ticket_number ?: (string) $ticket->id;
-                $code = $this->formatDocumentCode($rawCode, 'REP');
-                $customer = $ticket->customer;
-                $customerName = $ticket->customer_name ?: ($customer?->name ?? 'Customer');
-                $customerPhone = $ticket->customer_phone ?: ($customer?->phone ?? null);
-                $customerEmail = $customer?->email ?? ($ticket->customer_email ?? null);
-                $device = trim(($ticket->brand ?? '') . ' ' . ($ticket->model ?? ''));
-                $statusLabel = ucfirst(str_replace('_', ' ', $ticket->status ?? 'received'));
-                $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
-                $context = implode(' • ', array_filter([
-                    $customerName,
-                    $device ?: null,
-                    $statusLabel,
-                    $taxId ? "Tax ID: {$taxId}" : null,
-                ]));
-                $message = "Hello {$customerName}! Your repair ticket #{$ticket->ticket_number}"
-                    . ($device !== '' ? " for {$device}" : '')
-                    . " from {$tenant->name} is {$statusLabel}."
-                    . " Track status: {$trackingUrl}";
-
-                return compact('code', 'customerName', 'customerPhone', 'customerEmail', 'context', 'message', 'sale', 'timestamp', 'taxId');
-            }
-        }
-
         // 5. General Sale / Quotation / Due Invoice / POS Receipt
         $sale = Sale::withoutGlobalScope('company')
             ->with(['customer', 'company'])
@@ -469,7 +409,8 @@ class DocumentDispatchController extends Controller
             $customerEmail = $sale->customer?->email ?: ($sale->customer_email ?? null);
             $taxId = $sale->tax_id ?: $taxId;
             $context = implode(' • ', array_filter([$customerName, $sale->created_at?->format('d M Y, h:i A'), $taxId ? "Tax ID: {$taxId}" : null]));
-            $message = "Hello {$customerName}! Your document {$code} from {$tenant->name} is ready. Total: {$tenant->currency_symbol}{$sale->total}.";
+            $message = "Hello {$customerName}! Your document {$code} from {$tenant->name} is ready. Total: {$tenant->currency_symbol}{$sale->total}."
+                ." View online: ".route($sale->operation_type === 'quotation' ? 'quotes.public' : 'sales.public', $sale->sale_number);
             return compact('code', 'customerName', 'customerPhone', 'customerEmail', 'context', 'message', 'sale', 'timestamp', 'taxId');
         }
 

@@ -1429,6 +1429,13 @@
 
     <!-- Shared Server-Driven UI renderer for notifications and document dispatch. -->
     @include('layouts.partials.sdui-bottom-sheet')
+    @if (session('device_message_url'))
+        <div class="fixed bottom-6 right-6 z-[100003] rounded-2xl bg-white p-4 shadow-xl dark:bg-slate-900">
+            <a href="{{ session('device_message_url') }}" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white">{{ __('Open Email & Send') }}</a>
+        </div>
+    @endif
+
+    <div x-data x-on:open-external-url.window="if (/^(whatsapp:|mailto:|sms:)/i.test($event.detail.url)) { window.location.href = $event.detail.url } else { window.open($event.detail.url, '_blank', 'noopener,noreferrer') }"></div>
 
     <!-- Resume Fullscreen Nudge -->
     <div x-data

@@ -114,6 +114,9 @@ class SaleApiController extends Controller
                     'channel' => 'email',
                     'status' => $emailResult['status'] ?? 'sent',
                     'message' => $emailResult['message'] ?? "Invoice #{$sale->sale_number} sent to {$email}.",
+                    'url' => $emailResult['url'] ?? null,
+                    'email_url' => $emailResult['email_url'] ?? null,
+                    'action' => $emailResult['action'] ?? null,
                 ]);
             } catch (\Throwable $e) {
                 return response()->json([
@@ -157,11 +160,8 @@ class SaleApiController extends Controller
                 'recipient' => $phone,
             ]);
 
-            return response()->json([
-                'success' => true,
-                'channel' => 'sms',
-                'message' => $smsResult['sms']['message'] ?? "SMS receipt notification dispatched to {$phone}.",
-            ]);
+            $result = $smsResult['sms'] ?? ['success' => false, 'status' => 'failed', 'message' => 'SMS dispatch failed.'];
+            return response()->json($result + ['channel' => 'sms'], ($result['success'] ?? false) ? 200 : 422);
         }
 
         // WhatsApp (default)
@@ -169,7 +169,10 @@ class SaleApiController extends Controller
         $whatsappResult = $dispatcher->dispatchReceipt($company, $sale, ['whatsapp'], $phone);
         $wa = $whatsappResult['whatsapp'] ?? [];
         $status = $wa['status'] ?? 'manual_link';
-        $url = $wa['url'] ?? $wa['whatsapp_url'] ?? $deliveryService->generateInvoiceWhatsAppUrl($sale, $phone ?: null, $customMessage);
+        if ($wa && ! ($wa['success'] ?? false)) {
+            return response()->json($wa, 422);
+        }
+        $url = $status === 'sent' ? null : ($wa['url'] ?? $wa['whatsapp_url'] ?? $deliveryService->generateInvoiceWhatsAppUrl($sale, $phone ?: null, $customMessage));
 
         AuditLog::record('invoice.dispatched', $company->id, $user?->id, [
             'sale_id' => $sale->id,

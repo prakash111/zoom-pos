@@ -359,14 +359,9 @@
                 <span>{{ __("Print") }}</span>
             </button>
 
-            @if (!empty($whatsAppUrl))
-                <a href="{{ $whatsAppUrl }}" target="_blank" class="btn btn-whatsapp">
-                    <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.275.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.158.57 4.184 1.564 5.941l-1.657 6.059 6.223-1.632c1.705.932 3.654 1.465 5.73 1.465 6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
-                </a>
-            @endif
+            @include('documents.partials.dispatch-actions')
 
             @if (auth('web')->check() && !$isQuotation)
-                <button type="button" onclick="posDispatchEmail()" class="btn btn-secondary" title="{{ __('Email') }}">✉️</button>
 
                 @foreach ($dispatchChannels ?? [] as $dc)
                     <button type="button" onclick="posDispatchCustom({{ $dc->id }}, {{ Js::from($dc->name) }})" class="btn btn-secondary" title="{{ $dc->name }}">
@@ -393,17 +388,6 @@
         function posCsrfToken() {
             const meta = document.querySelector('meta[name="csrf-token"]');
             return meta ? meta.content : '{{ csrf_token() }}';
-        }
-
-        function posDispatchEmail() {
-            const email = prompt('{{ __('Send invoice to which email address?') }}', {{ Js::from($customerEmail ?? '') }});
-            if (!email) return;
-            fetch({{ Js::from(route('tenant.sales.send', $sale)) }}, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': posCsrfToken() },
-                body: JSON.stringify({ recipient_email: email }),
-            }).then(r => r.json()).then(data => alert(data.message || (data.success ? 'Sent.' : 'Failed to send.')))
-              .catch(() => alert('Failed to send invoice.'));
         }
 
         function posDispatchCustom(channelId, channelName) {

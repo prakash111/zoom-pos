@@ -72,24 +72,30 @@ class MessageQueueServiceTest extends TestCase
         $this->assertSame(0, MessageQueue::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
     }
 
-    public function test_email_send_falls_back_to_queue_when_smtp_is_not_configured(): void
+    public function test_email_without_smtp_opens_device_composer_without_queueing(): void
     {
-        // Leave both of InvoiceDeliveryService's "always succeed" testing
-        // shortcuts (env === testing, mail.default === array) so it actually
-        // takes the real SMTP-host-required path and throws.
-        app()->detectEnvironment(fn () => 'production');
-        config(['mail.default' => 'smtp']);
-
+        Mail::fake();
+        config(['mail.mailers.smtp.host' => null]);
         $result = app(MessageQueueService::class)->sendOrQueueEmail($this->sale, 'customer@example.com');
 
-        $this->assertSame('queued', $result['status']);
-        $row = MessageQueue::withoutGlobalScopes()->where('company_id', $this->company->id)->first();
-        $this->assertNotNull($row);
-        $this->assertSame(MessageQueue::STATUS_QUEUED, $row->status);
-        $this->assertSame('email', $row->type);
-        $this->assertSame('customer@example.com', $row->recipient);
+        $this->assertSame('manual_link', $result['status']);
+        $this->assertStringStartsWith('mailto:', $result['url']);
+        $this->assertStringContainsString(route('sales.public', $this->sale->sale_number), rawurldecode($result['url']));
+        $this->assertSame(0, MessageQueue::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
+        Mail::assertNothingSent();
+    }
 
-        app()->detectEnvironment(fn () => 'testing');
+    public function test_email_provider_failure_is_still_queued_for_retry(): void
+    {
+        Configuration::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'key' => 'smtp_host', 'value' => 'smtp.example.test',
+        ]);
+        $service = \Mockery::mock(MessageQueueService::class, [app(\App\Services\Invoice\InvoiceDeliveryService::class), app(\App\Services\WhatsApp\WhatsAppCloudApiClient::class)])
+            ->makePartial()->shouldAllowMockingProtectedMethods();
+        $service->shouldReceive('deliverEmail')->once()->andThrow(new \RuntimeException('Connection unavailable.'));
+        $result = $service->sendOrQueueEmail($this->sale, 'customer@example.com');
+        $this->assertSame('queued', $result['status']);
+        $this->assertDatabaseHas('message_queue', ['sale_id' => $this->sale->id, 'status' => 'queued']);
     }
 
     public function test_invalid_email_throws_immediately_without_queueing(): void
@@ -108,7 +114,7 @@ class MessageQueueServiceTest extends TestCase
         $result = app(MessageQueueService::class)->sendOrQueueWhatsApp($this->sale, '+15551234567');
 
         $this->assertSame('manual_link', $result['status']);
-        $this->assertStringContainsString('wa.me', $result['url']);
+        $this->assertStringStartsWith('whatsapp://send?', $result['url']);
         $this->assertSame(0, MessageQueue::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
     }
 

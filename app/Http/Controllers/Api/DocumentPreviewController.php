@@ -154,21 +154,6 @@ class DocumentPreviewController extends Controller
                 ],
             ],
 
-            // 3. Shared document actions (the same contract used by POS).
-            [
-                'type' => 'list_tile',
-                'title' => 'Preview & Print',
-                'subtitle' => 'View the document, print, or share the file',
-                'leading' => ['type' => 'icon', 'icon' => 'picture_as_pdf', 'size' => 22],
-                'action' => ['type' => 'OPEN_URL', 'url' => "/tenant/documents/{$normalizedType}/{$document->id}/pdf"],
-            ],
-            [
-                'type' => 'list_tile',
-                'title' => 'Print on receipt printer',
-                'subtitle' => 'Bluetooth or network thermal printer',
-                'leading' => ['type' => 'icon', 'icon' => 'print', 'size' => 22],
-                'action' => ['type' => 'THERMAL_PRINT', 'document_id' => $document->id],
-            ],
             [
                 'type' => 'list_tile',
                 'title' => 'Share as PDF file',
@@ -181,11 +166,11 @@ class DocumentPreviewController extends Controller
             [
                 'type' => 'section_header',
                 'title' => 'Dispatch Document',
-                'subtitle' => 'Send through configured gateway channels',
+                'subtitle' => 'Send using a configured gateway or your device app',
                 'text_color' => 'theme.textPrimary',
                 'divider_color' => 'theme.divider',
             ],
-            ...$availableChannels,
+            ...\App\Services\DispatchChannelService::groupedComponents($availableChannels, $context),
         ];
 
         // Preserve the legacy invoice route's visible title while using the
@@ -220,7 +205,7 @@ class DocumentPreviewController extends Controller
         return response()->json(array_merge([
             'success' => true,
             'schema' => $schema,
-        ], $schema));
+        ], $schema), 200, ['Cache-Control' => 'no-store, private']);
     }
 
     public function renderHtml(Request $request, string $type, int|string $id): View
@@ -239,6 +224,12 @@ class DocumentPreviewController extends Controller
         }
 
         $normalizedType = $this->normalizeType($type);
+        if ($normalizedType === 'repair') {
+            $ticket = RepairTicket::withoutGlobalScope('company')->where('company_id', $tenantId)
+                ->with(['company', 'items.product', 'customer', 'category', 'technician'])->findOrFail($id);
+
+            return view('pdf.repair_intake_sheet', ['company' => $ticket->company, 'ticket' => $ticket]);
+        }
         $document = $this->findDocument($tenantId, $normalizedType, $id);
 
         $company = $document->tenant ?? $document->company;
@@ -315,6 +306,12 @@ class DocumentPreviewController extends Controller
         $sentAt = optional($kot->sent_to_kitchen_at ?? $kot->created_at)->format('H:i');
         $company = $kot->company;
         $renderUrl = url("/tenant/restaurant/kot/{$kot->id}/print");
+        $delivery = app(\App\Services\Restaurant\KotDeliveryService::class);
+        $variables = $delivery->variables($kot);
+        $channels = OmnichannelRegistryService::resolveChannels($tenantId, [
+            'type' => 'kot', 'id' => $kot->id, 'reference' => $reference,
+            'phone' => $variables['phone'], 'email' => $variables['email'], 'message' => $variables['message'],
+        ]);
 
         $schema = [
             'type' => 'bottom_sheet',
@@ -354,10 +351,12 @@ class DocumentPreviewController extends Controller
                     ],
                     'render_url' => $renderUrl,
                 ],
+                ['type' => 'section_header', 'title' => 'Send Kitchen Ticket', 'subtitle' => 'Choose where to send this KOT'],
+                ...\App\Services\DispatchChannelService::groupedComponents($channels, ['type' => 'kot', 'id' => $kot->id, 'phone' => $variables['phone'], 'email' => $variables['email']]),
             ],
         ];
 
-        return response()->json(['success' => true, 'schema' => $schema] + $schema);
+        return response()->json(['success' => true, 'schema' => $schema] + $schema, 200, ['Cache-Control' => 'no-store, private']);
     }
 
     private function repairPreviewModal(Request $request, mixed $tenantId, int|string $id, string $format): JsonResponse
@@ -373,13 +372,14 @@ class DocumentPreviewController extends Controller
 
         $company = $ticket->company;
         $customer = $ticket->customer;
-        $customerName = $ticket->customer_name ?: ($customer?->name ?? 'Customer');
-        $phone = $ticket->customer_phone ?: ($customer?->phone ?? '');
+        $customerName = $customer?->name ?: ($ticket->customer_name ?: 'Customer');
+        $phone = $customer?->phone ?: ($ticket->customer_phone ?: '');
         $email = $customer?->email ?? ($ticket->customer_email ?? '');
         $device = trim(($ticket->brand ?? '') . ' ' . ($ticket->model ?? ''));
         $reference = (string) $ticket->ticket_number;
         $statusLabel = ucfirst(str_replace('_', ' ', $ticket->status ?? 'received'));
         $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
+        $shareText = app(\App\Services\Repair\RepairNotificationService::class)->buildCustomerMessage($ticket);
         $endpointPrefix = $request->is('api/*') ? '/api/v1/tenant' : '/tenant';
 
         $dynamicChannels = \App\Services\OmnichannelRegistryService::resolveChannels($tenantId, [
@@ -387,49 +387,11 @@ class DocumentPreviewController extends Controller
             'id' => $ticket->id,
             'phone' => $phone,
             'email' => $email,
+            'reference' => $reference,
+            'message' => $shareText,
         ]);
 
-        $channelComponents = [];
-        foreach ($dynamicChannels as $chItem) {
-            $ch = $chItem['channel'] ?? 'custom';
-            $target = match ($ch) {
-                'whatsapp', 'sms' => $phone,
-                'email' => $email,
-                default => $chItem['subtitle'] ?? '',
-            };
-
-            $channelComponents[] = [
-                'type' => 'list_tile',
-                'title' => $chItem['title'] ?? ('Send via ' . ucfirst($ch)),
-                'subtitle' => $target ? "To: {$target}" : ($chItem['subtitle'] ?? 'Target configured in Settings'),
-                'leading' => $chItem['leading'] ?? ['icon' => 'send'],
-                'action' => [
-                    'type' => 'SUBMIT_FORM',
-                    'endpoint' => '/api/v1/documents/dispatch',
-                    'method' => 'POST',
-                    'payload' => [
-                        'document_type' => 'repair',
-                        'document_id' => $ticket->id,
-                        'channels' => [$ch],
-                        'phone' => $phone,
-                        'email' => $email,
-                        'customer_name' => $customerName,
-                    ],
-                ],
-            ];
-        }
-
-        // Print thermal token / slip (direct printer output for repair tickets)
-        $printComponent = [
-            'type' => 'list_tile',
-            'title' => 'Print Thermal Slip / Token',
-            'subtitle' => 'Bluetooth / ESC/POS thermal receipt printer',
-            'leading' => ['icon' => 'receipt_long', 'color' => '#10B981'],
-            'action' => [
-                'type' => 'OPEN_URL',
-                'url' => url("{$endpointPrefix}/repair/tickets/{$ticket->id}/intake-sheet?format=slip"),
-            ],
-        ];
+        $channelComponents = \App\Services\DispatchChannelService::groupedComponents($dynamicChannels, ['type' => 'repair', 'id' => $ticket->id, 'phone' => $phone, 'email' => $email]);
 
         // System share / tracking link
         $shareComponent = [
@@ -439,7 +401,7 @@ class DocumentPreviewController extends Controller
             'leading' => ['icon' => 'send', 'color' => '#38BDF8'],
             'action' => [
                 'type' => 'SHARE',
-                'text' => "Hello {$customerName}, your repair ticket #{$reference}" . ($device !== '' ? " for {$device}" : '') . " is {$statusLabel}. Track status: {$trackingUrl}",
+                'text' => $shareText,
             ],
         ];
 
@@ -465,7 +427,7 @@ class DocumentPreviewController extends Controller
                     [
                         'type' => 'section_header',
                         'title' => 'Dispatch Channels',
-                        'subtitle' => "Notify {$customerName} via enabled channels (automatically bound from ticket customer profile)",
+                        'subtitle' => "Notify {$customerName} using a configured gateway or your device app",
                     ],
                 ],
                 $channelComponents,
@@ -475,13 +437,20 @@ class DocumentPreviewController extends Controller
                         'title' => 'Printer & Share',
                         'subtitle' => 'Print token slip or share tracking portal link',
                     ],
-                    $printComponent,
                     $shareComponent,
                 ]
             ),
         ];
 
-        return response()->json(['success' => true, 'schema' => $schema] + $schema);
+        if ($request->boolean('preview_document')) {
+            array_unshift($schema['components'], [
+                'type' => 'document_preview_card', 'format' => 'a4',
+                'render_url' => url("{$endpointPrefix}/documents/repair/{$ticket->id}/render-html?format=a4"),
+                'summary' => ['client_name' => $customerName, 'client_phone' => $phone, 'notes' => $device],
+            ]);
+        }
+
+        return response()->json(['success' => true, 'schema' => $schema] + $schema, 200, ['Cache-Control' => 'no-store, private']);
     }
 
     private function prescriptionPreviewModal(Request $request, mixed $tenantId, int|string $id, string $format): JsonResponse
@@ -506,6 +475,10 @@ class DocumentPreviewController extends Controller
 
         $endpointPrefix = $request->is('api/*') ? '/api/v1/tenant' : '/tenant';
         $reloadEndpoint = "{$endpointPrefix}/documents/prescription/{$rx->id}/preview-modal";
+
+        $dispatchContext = ['type' => 'prescription', 'id' => $rx->id, 'phone' => $phone, 'email' => $rx->patient_email ?? '',
+            'message' => "Hello {$patientName}! Your prescription record #{$reference} from {$company?->name} is ready."];
+        $channels = OmnichannelRegistryService::resolveChannels($tenantId, $dispatchContext);
 
         $schema = [
             'type' => 'bottom_sheet',
@@ -562,27 +535,11 @@ class DocumentPreviewController extends Controller
                     'title' => 'Dispatch Channels',
                     'subtitle' => 'Share prescription slip & dosage chart',
                 ],
-                [
-                    'type' => 'list_tile',
-                    'title' => 'Send via WhatsApp',
-                    'subtitle' => $phone ? "Send to {$phone}" : 'Patient WhatsApp',
-                    'leading' => ['icon' => 'chat'],
-                    'action' => [
-                        'type' => 'SUBMIT_FORM',
-                        'endpoint' => '/api/v1/documents/dispatch',
-                        'method' => 'POST',
-                        'payload' => [
-                            'document_type' => 'prescription',
-                            'document_id' => $rx->id,
-                            'channels' => ['whatsapp'],
-                            'phone' => $phone,
-                        ],
-                    ],
-                ],
+                ...\App\Services\DispatchChannelService::groupedComponents($channels, $dispatchContext),
             ],
         ];
 
-        return response()->json(['success' => true, 'schema' => $schema] + $schema);
+        return response()->json(['success' => true, 'schema' => $schema] + $schema, 200, ['Cache-Control' => 'no-store, private']);
     }
 
     private function appointmentPreviewModal(Request $request, mixed $tenantId, int|string $id, string $format): JsonResponse
@@ -605,6 +562,10 @@ class DocumentPreviewController extends Controller
 
         $endpointPrefix = $request->is('api/*') ? '/api/v1/tenant' : '/tenant';
         $reloadEndpoint = "{$endpointPrefix}/documents/appointment/{$apt->id}/preview-modal";
+
+        $dispatchContext = ['type' => 'appointment', 'id' => $apt->id, 'phone' => $phone, 'email' => $apt->customer_email ?? '',
+            'message' => "Hello {$customerName}! Your appointment confirmation #{$reference} from {$company?->name} is booked."];
+        $channels = OmnichannelRegistryService::resolveChannels($tenantId, $dispatchContext);
 
         $schema = [
             'type' => 'bottom_sheet',
@@ -661,27 +622,11 @@ class DocumentPreviewController extends Controller
                     'title' => 'Dispatch Channels',
                     'subtitle' => 'Send appointment confirmation & reminders',
                 ],
-                [
-                    'type' => 'list_tile',
-                    'title' => 'Send via WhatsApp',
-                    'subtitle' => $phone ? "Send to {$phone}" : 'Client WhatsApp',
-                    'leading' => ['icon' => 'chat'],
-                    'action' => [
-                        'type' => 'SUBMIT_FORM',
-                        'endpoint' => '/api/v1/documents/dispatch',
-                        'method' => 'POST',
-                        'payload' => [
-                            'document_type' => 'appointment',
-                            'document_id' => $apt->id,
-                            'channels' => ['whatsapp'],
-                            'phone' => $phone,
-                        ],
-                    ],
-                ],
+                ...\App\Services\DispatchChannelService::groupedComponents($channels, $dispatchContext),
             ],
         ];
 
-        return response()->json(['success' => true, 'schema' => $schema] + $schema);
+        return response()->json(['success' => true, 'schema' => $schema] + $schema, 200, ['Cache-Control' => 'no-store, private']);
     }
 
     private function findDocument(mixed $tenantId, string $type, int|string $id): Sale

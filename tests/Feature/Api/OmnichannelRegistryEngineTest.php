@@ -168,17 +168,19 @@ class OmnichannelRegistryEngineTest extends TestCase
 
         // Check specific SDUI contracts
         $wa = collect($channels)->firstWhere('channel', 'whatsapp');
-        $this->assertSame('Send via WhatsApp Business API', $wa['title']);
+        $this->assertSame('Send via WhatsApp [Cloud API]', $wa['title']);
+        $this->assertTrue($wa['api_enabled']);
         $this->assertSame('SUBMIT_FORM', $wa['action_type']);
         $this->assertSame('/api/v1/tenant/dispatch/send', $wa['action']['endpoint']);
         $this->assertSame('POST', $wa['action']['method']);
 
         $sms = collect($channels)->firstWhere('channel', 'sms');
-        $this->assertSame('Send via SMS (Text Message)', $sms['title']);
+        $this->assertSame('Send via SMS [Cloud API]', $sms['title']);
+        $this->assertSame('api', $sms['delivery_mode']);
         $this->assertSame('/api/v1/tenant/dispatch/send', $sms['action']['endpoint']);
 
         $email = collect($channels)->firstWhere('channel', 'email');
-        $this->assertStringContainsString('smtp.gmail.com', $email['title']);
+        $this->assertTrue($email['api_enabled']);
         $this->assertSame('/api/v1/tenant/dispatch/send', $email['action']['endpoint']);
 
         $webhook = collect($channels)->firstWhere('channel', 'webhook');
@@ -191,7 +193,7 @@ class OmnichannelRegistryEngineTest extends TestCase
         $this->assertSame('/api/v1/tenant/dispatch/invoice/999', $custom['action']['endpoint']);
     }
 
-    public function test_registry_omits_disabled_channels_dynamically(): void
+    public function test_registry_offers_device_sending_for_disabled_and_incomplete_channels(): void
     {
         // WhatsApp enabled, SMS disabled, Email disabled, Webhook disabled
         TenantNotificationGateway::create([
@@ -241,7 +243,18 @@ class OmnichannelRegistryEngineTest extends TestCase
         $channelNames = collect($channels)->pluck('channel')->all();
 
         $this->assertContains('whatsapp', $channelNames);
-        $this->assertNotContains('sms', $channelNames);
+        $this->assertContains('sms', $channelNames);
+        foreach (['whatsapp', 'sms', 'email'] as $channel) {
+            $item = collect($channels)->firstWhere('channel', $channel);
+            $this->assertFalse($item['api_enabled']);
+            $this->assertSame('device', $item['delivery_mode']);
+            $this->assertSame('OPEN_URL', $item['action_type']);
+            $this->assertSame('OPEN_URL', $item['action']['type']);
+            $this->assertArrayNotHasKey('endpoint', $item['action']);
+            $this->assertStringStartsWith(match ($channel) {
+                'whatsapp' => 'whatsapp://send?', 'sms' => 'sms:', 'email' => 'mailto:',
+            }, $item['action']['url']);
+        }
         $this->assertNotContains('webhook', $channelNames);
     }
 
@@ -406,7 +419,7 @@ class OmnichannelRegistryEngineTest extends TestCase
             ->assertJsonPath('title', 'Invoice Preview');
 
         $components = collect($docActionSheet->json('components'));
-        $this->assertTrue($components->contains(fn ($c) => ($c['title'] ?? null) === 'Preview & Print'));
+        $this->assertTrue($components->contains(fn ($c) => ($c['title'] ?? null) === 'PDF Preview'));
         $this->assertTrue($components->contains(fn ($c) => ($c['channel'] ?? null) === 'sms'));
         $this->assertEmpty(app(SchemaValidator::class)->validate($docActionSheet->json('schema')));
 
@@ -435,15 +448,16 @@ class OmnichannelRegistryEngineTest extends TestCase
             ->assertJsonPath('post_sale_sheet.data.pdf_endpoint', "/api/tenant/invoices/{$sale->id}/pdf-stream");
 
         $reminderComponents = collect($reminderSheet->json('components'));
-        $this->assertSame([
-            'Preview & Print',
-            'Print on receipt printer',
-            'Send via WhatsApp',
-            'Send via Email',
-        ], $reminderComponents->pluck('title')->all());
-        $this->assertSame('OPEN_RECEIPT_PREVIEW', $reminderComponents[0]['action_type']);
-        $this->assertSame('TRIGGER_THERMAL_PRINT', $reminderComponents[1]['action_type']);
-        $this->assertStringNotContainsString('OPEN_URL', json_encode($reminderSheet->json(), JSON_UNESCAPED_SLASHES));
+        $this->assertSame(['Thermal Print', 'Open WhatsApp App', 'Open Mail App', 'Send via SMS [Cloud API]', 'PDF Preview'], $reminderComponents->filter(fn ($item) => isset($item['channel']))->pluck('title')->all());
+        $this->assertSame('THERMAL_PRINT', $reminderComponents[0]['action_type']);
+        $this->assertSame('OPEN_RECEIPT_PREVIEW', $reminderComponents[4]['action_type']);
+        foreach (['whatsapp' => 'whatsapp://send?', 'email' => 'mailto:'] as $channel => $scheme) {
+            $item = $reminderComponents->firstWhere('channel', $channel);
+            $this->assertSame('OPEN_URL', $item['action_type']);
+            $this->assertStringStartsWith($scheme, $item['action']['url']);
+            $this->assertStringContainsString('50.00', rawurldecode($item['action']['url']));
+        }
+
         $this->assertEmpty(app(SchemaValidator::class)->validate($reminderSheet->json('schema')));
 
         $posSale = Sale::create([
@@ -496,11 +510,11 @@ class OmnichannelRegistryEngineTest extends TestCase
             ->assertJsonPath('title', 'Invoice Preview');
 
         $components1 = collect($resWithoutId->json('components'));
-        $this->assertTrue($components1->contains(fn ($c) => ($c['title'] ?? null) === 'Preview & Print'));
-        $this->assertTrue($components1->contains(fn ($c) => ($c['title'] ?? null) === 'Print on receipt printer'));
+        $this->assertTrue($components1->contains(fn ($c) => ($c['title'] ?? null) === 'PDF Preview'));
+        $this->assertTrue($components1->contains(fn ($c) => ($c['title'] ?? null) === 'Thermal Print'));
         $this->assertTrue($components1->contains(fn ($c) => ($c['title'] ?? null) === 'Share as PDF file'));
         $this->assertTrue($components1->contains(fn ($c) => ($c['channel'] ?? null) === 'sms'));
-        $this->assertStringContainsString('Send via SMS', json_encode($resWithoutId->json()));
+        $this->assertStringContainsString('Send via SMS [Cloud API]', json_encode($resWithoutId->json()));
         $this->assertStringContainsString('channel_sms', json_encode($resWithoutId->json()));
 
         // 2. Direct preview-sheet with ID

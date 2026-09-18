@@ -117,22 +117,8 @@ class DocumentActionController extends Controller
         $tenant = $document->tenant ?? Company::find($tenantId);
         $sheetTitle = in_array($normalizedType, ['quotation', 'quote']) ? 'Quotation Preview' : 'Invoice Preview';
 
-        // Keep the top 3 document utilities:
+        // Preserve PDF file sharing alongside the universal dispatch controls.
         $baseActions = [
-            [
-                'type'     => 'list_tile',
-                'title'    => 'Preview & Print',
-                'subtitle' => 'View the PDF, print, or share the file',
-                'leading'  => ['type' => 'icon', 'icon' => 'picture_as_pdf', 'size' => 22],
-                'action'   => ['type' => 'OPEN_URL', 'url' => "/tenant/documents/{$docType}/{$document->id}/pdf"],
-            ],
-            [
-                'type'     => 'list_tile',
-                'title'    => 'Print on receipt printer',
-                'subtitle' => 'Bluetooth thermal printer',
-                'leading'  => ['type' => 'icon', 'icon' => 'print', 'size' => 22],
-                'action'   => ['type' => 'THERMAL_PRINT', 'document_id' => $document->id],
-            ],
             [
                 'type'     => 'list_tile',
                 'title'    => 'Share as PDF file',
@@ -151,7 +137,7 @@ class DocumentActionController extends Controller
             'email'     => $document->customer?->email,
         ]);
 
-        $components = array_merge($baseActions, $dynamicChannels);
+        $components = array_merge(\App\Services\DispatchChannelService::groupedComponents($dynamicChannels, ['type' => $docType, 'id' => $document->id, 'phone' => $document->customer?->phone ?: $document->customer_phone, 'email' => $document->customer?->email ?: $document->customer_email]), $baseActions);
 
         return response()->json([
             'type'       => 'bottom_sheet',
@@ -161,7 +147,10 @@ class DocumentActionController extends Controller
                 'subtitle' => 'GSTIN: ' . ($tenant?->gstin ?? ($tenant?->tax_id ?? 'N/A')),
             ],
             'components' => $components,
-            'channels'   => $dynamicChannels,
+            'channels' => \App\Services\DispatchChannelService::visibleChannels($components),
+            'enabled_channels' => \App\Services\DispatchChannelService::splitChannels(\App\Services\DispatchChannelService::visibleChannels($components))['api'],
+            'device_channels' => \App\Services\DispatchChannelService::splitChannels($dynamicChannels)['device'],
+            'multi_select' => true,
             'schema'     => [
                 'type'       => 'bottom_sheet',
                 'title'      => $sheetTitle,
@@ -171,6 +160,6 @@ class DocumentActionController extends Controller
                 ],
                 'components' => $components,
             ],
-        ]);
+        ], 200, ['Cache-Control' => 'no-store, private']);
     }
 }

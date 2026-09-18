@@ -1721,7 +1721,7 @@ class PharmacyAndRepairPosTest extends TestCase
         $this->assertSame($res->json('ticket.ticket_number'), $share['id']);
         $this->assertSame('Lenovo ThinkPad X1', $share['device']);
         $this->assertStringContainsString('repair ticket #'.$share['id'], $share['share_text']);
-        $this->assertStringContainsString('wa.me', (string) $share['whatsapp_url']);
+        $this->assertStringStartsWith('whatsapp://send?', (string) $share['whatsapp_url']);
 
         // Legacy contract preserved (existing clients / tests).
         $this->assertNotNull($res->json('ticket.id'));
@@ -1754,4 +1754,3 @@ class PharmacyAndRepairPosTest extends TestCase
         return null;
     }
 }
-

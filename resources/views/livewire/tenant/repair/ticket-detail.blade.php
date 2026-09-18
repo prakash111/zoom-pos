@@ -14,6 +14,8 @@
             </p>
         </div>
         <div class="text-right">
+            <button type="button" x-data @click="$dispatch('open-sdui-sheet', { endpoint: '{{ route('tenant.repair.ticket.share-sheet', $ticket->id) }}' })"
+                    class="mb-2 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700">{{ __('Share Ticket') }}</button>
             <div class="text-[11px] uppercase font-bold text-slate-400">{{ __('Ticket total') }}</div>
             <div class="text-xl font-black text-slate-900 dark:text-white">{{ number_format((float) $ticket->total_amount, 2) }}</div>
             <div class="text-[11px] text-slate-400">{{ __('Balance due') }} {{ number_format((float) $ticket->balance_due, 2) }}</div>
