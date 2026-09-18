@@ -137,7 +137,10 @@ class DispatchChannelService
             unset($component['action'], $component['action_type'], $component['on_tap'], $component['endpoint']);
             $components[] = $component;
         }
-        $components[] = $utilities[1];
+        $showPreview = $context['show_preview'] ?? ! in_array($type, ['repair', 'ticket', 'job_sheet'], true);
+        if ($showPreview) {
+            $components[] = $utilities[1];
+        }
         if ($apiChannels && $id !== null) {
             $components[] = [
                 'type' => 'button_primary', 'id' => 'dispatch_selected_channels', 'label' => 'Send to Selected Channels',

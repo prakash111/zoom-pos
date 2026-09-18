@@ -884,13 +884,24 @@ class UnifiedDocumentDispatchApiTest extends TestCase
         }
     }
 
-    public function test_repair_pdf_preview_opens_the_bound_intake_document(): void
+    public function test_repair_share_sheets_omit_print_preview_and_preserve_sharing_channels(): void
     {
         $ticket = RepairTicket::create(['company_id' => $this->company->id, 'tenant_id' => $this->company->id,
             'ticket_number' => 'REP-2026-PREVIEW', 'customer_id' => $this->customer->id, 'customer_name' => $this->customer->name,
             'customer_phone' => $this->customer->phone, 'brand' => 'Samsung', 'model' => 'ZX10R', 'status' => RepairTicket::STATUS_RECEIVED]);
-        $options = $this->withToken($this->token)->getJson("/api/v1/documents/repair/{$ticket->id}/dispatch-options")->assertOk();
-        $preview = $this->withToken($this->token)->getJson($options->json('channels.pdf_preview.action.endpoint'))->assertOk();
+        foreach ([
+            "/api/v1/documents/repair/{$ticket->id}/dispatch-options",
+            "/api/tenant/repair/tickets/{$ticket->id}/share-sheet",
+            "/api/v1/tenant/documents/repair/{$ticket->id}/preview-modal",
+        ] as $endpoint) {
+            $share = $this->withToken($this->token)->getJson($endpoint)->assertOk();
+            $channels = collect($share->json('components') ?? $share->json('schema.components'))->pluck('channel')->filter()->values()->all();
+            $this->assertSame(['thermal_print', 'whatsapp', 'email', 'sms'], $channels);
+            $this->assertNotContains('document_preview_card', collect($share->json('components') ?? $share->json('schema.components'))->pluck('type')->all());
+        }
+
+        // The standalone intake preview remains accessible outside Share Ticket.
+        $preview = $this->withToken($this->token)->getJson("/api/v1/tenant/documents/repair/{$ticket->id}/preview-modal?format=a4&preview_document=1")->assertOk();
         $card = collect($preview->json('schema.components'))->firstWhere('type', 'document_preview_card');
         $this->assertNotNull($card);
         $this->withToken($this->token)->get($card['render_url'])->assertOk()->assertSee('REP-2026-PREVIEW')->assertSee('ZX10R');
