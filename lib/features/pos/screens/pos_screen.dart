@@ -6,6 +6,7 @@ import '../../../core/config/bootstrap_cache.dart';
 import '../../../core/services/sync/sync_engine.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../../core/widgets/barcode_scanner_screen.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
@@ -121,12 +122,8 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
     final customersRepository = CustomersRepository(context.read<ApiClient>());
     final company = context.read<AuthProvider>().company;
 
-    final result = await showModalBottomSheet<PosCheckoutResult>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    final result = await showAdaptiveSheet<PosCheckoutResult>(
+      context,
       builder: (_) => ChangeNotifierProvider.value(
         value: posProvider,
         child: CartSheet(customersRepository: customersRepository),

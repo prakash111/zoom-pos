@@ -6,6 +6,7 @@ import '../../../core/models/customer_model.dart';
 import '../../../core/models/ledger_entry_model.dart';
 import '../../../core/services/tenant_time_service.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../auth/auth_provider.dart';
@@ -44,11 +45,8 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
 
   Future<void> _recordPayment(
       CustomerModel customer, CurrencyFormatter formatter) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    final saved = await showAdaptiveSheet<bool>(
+      context,
       builder: (_) => RecordPaymentSheet(
         repository: widget.repository,
         customerId: customer.id,

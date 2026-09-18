@@ -6,6 +6,7 @@ import '../../../core/models/customer_model.dart';
 import '../../../core/models/quotation_model.dart';
 import '../../../core/models/tax_rule_model.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/responsive.dart';
 import '../../customers/customers_repository.dart';
 import '../../inventory/inventory_repository.dart';
 import '../../pos/screens/customer_picker_sheet.dart';
@@ -289,25 +290,18 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
     final tax = _taxTotal;
     final total = (_subtotal - discount + tax).clamp(0, double.infinity);
     final customerName = _selectedCustomer?.name ?? _fallbackCustomerName;
+    final wide = isWide(context);
 
-    return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) {
-          return SingleChildScrollView(
-            controller: scrollController,
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(_isEditing ? 'Edit quotation' : 'New quotation',
-                    style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 16),
+    Widget formBody(ScrollController? scrollController) {
+      return SingleChildScrollView(
+        controller: scrollController,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(_isEditing ? 'Edit quotation' : 'New quotation',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
                 InkWell(
                   borderRadius: BorderRadius.circular(8),
                   onTap: _pickCustomer,
@@ -509,7 +503,25 @@ class _QuotationFormSheetState extends State<QuotationFormSheet> {
               ],
             ),
           );
-        },
+    }
+
+    if (wide) {
+      return Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: formBody(null),
+      );
+    }
+
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => formBody(scrollController),
       ),
     );
   }

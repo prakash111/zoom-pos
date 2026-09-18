@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/customer_model.dart';
+import '../../../core/utils/responsive.dart';
 import '../customers_provider.dart';
 
 /// Bottom sheet for POST /customers, used for both creating a new customer
@@ -102,25 +103,19 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
   @override
   Widget build(BuildContext context) {
     final customers = context.watch<CustomersProvider>();
+    final wide = isWide(context);
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.8,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) {
-          return SingleChildScrollView(
-            controller: scrollController,
-            padding: const EdgeInsets.all(20),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(_isEditing ? 'Edit customer' : 'New customer', style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 16),
+    Widget formBody(ScrollController? scrollController) {
+      return SingleChildScrollView(
+        controller: scrollController,
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(_isEditing ? 'Edit customer' : 'New customer', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 16),
                   TextFormField(
                     controller: _nameController,
                     decoration: const InputDecoration(labelText: 'Name'),
@@ -267,7 +262,25 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
               ),
             ),
           );
-        },
+    }
+
+    if (wide) {
+      return Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: formBody(null),
+      );
+    }
+
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => formBody(scrollController),
       ),
     );
   }

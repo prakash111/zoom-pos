@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/models/customer_model.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/responsive/desktop_content_area.dart';
@@ -52,11 +53,8 @@ class _CustomersScreenBodyState extends State<_CustomersScreenBody> {
   void _openCustomerForm(BuildContext context, {CustomerModel? customer}) {
     final customers = context.read<CustomersProvider>();
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    showAdaptiveSheet(
+      context,
       builder: (_) => ChangeNotifierProvider.value(
         value: customers,
         child: CustomerFormSheet(customer: customer),

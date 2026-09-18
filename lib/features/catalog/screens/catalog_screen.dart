@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/published_catalog_model.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../catalog_repository.dart';
@@ -33,10 +34,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
   void _reload() => setState(() => _future = _repository.fetchCatalogs());
 
   Future<void> _openPublish(List<CatalogProductOption> products) async {
-    final published = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    final published = await showAdaptiveSheet<bool>(
+      context,
       builder: (_) => PublishCatalogSheet(repository: _repository, products: products),
     );
     if (published == true) _reload();

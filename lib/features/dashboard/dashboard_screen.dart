@@ -1280,6 +1280,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onDestinationSelected: (index) =>
                     _onDockItemSelected(context, index),
                 labelType: NavigationRailLabelType.all,
+                trailing: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: IconButton(
+                    tooltip: 'Log Out',
+                    icon: const Icon(Icons.logout, color: Color(0xFFEF4444)),
+                    onPressed: () => _confirmLogout(context),
+                  ),
+                ),
                 destinations: [
                   for (final destination in _dockDestinationsFor(
                       AppLocalizations.of(context),
@@ -1458,14 +1466,266 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
+    final user = auth.user;
+    final colorScheme = Theme.of(context).colorScheme;
+
     // Width is owned by the enclosing [DockRailSlot] (viewport-clamped);
     // this just fills it.
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: rows,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: rows,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (user != null) ...[
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor:
+                          colorScheme.primary.withValues(alpha: 0.12),
+                      child: Text(
+                        (user.name)
+                            .trim()
+                            .split(RegExp(r'\s+'))
+                            .where((part) => part.isNotEmpty)
+                            .take(2)
+                            .map((part) => part[0])
+                            .join()
+                            .toUpperCase(),
+                        style: TextStyle(
+                          color: colorScheme.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            user.email,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+              ],
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.logout,
+                    color: Color(0xFFEF4444), size: 20),
+                title: const Text(
+                  'Log Out',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                onTap: () => _confirmLogout(context),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUserAccountMenu(BuildContext context, UserModel? user) {
+    final initials = (user?.name ?? '')
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .map((part) => part[0])
+        .join()
+        .toUpperCase();
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
+
+    return PopupMenuButton<String>(
+      tooltip: 'Account & Settings',
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      icon: CircleAvatar(
+        radius: 16,
+        backgroundColor: colorScheme.primaryContainer,
+        child: Text(
+          initials.isNotEmpty ? initials : 'U',
+          style: TextStyle(
+            color: colorScheme.onPrimaryContainer,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
+      onSelected: (value) {
+        switch (value) {
+          case 'preferences':
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AppPreferencesScreen()),
+            );
+            break;
+          case 'change_password':
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+            );
+            break;
+          case 'server':
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ServerSettingsScreen(
+                  preferences: context.read<AppPreferences>(),
+                ),
+              ),
+            );
+            break;
+          case 'logout':
+            _confirmLogout(context);
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (user != null) ...[
+          PopupMenuItem<String>(
+            enabled: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  user.name,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  user.email,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (user.role.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        user.role.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+        ],
+        const PopupMenuItem<String>(
+          value: 'preferences',
+          child: Row(
+            children: [
+              Icon(Icons.tune, size: 20),
+              SizedBox(width: 12),
+              Text('Preferences'),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'change_password',
+          child: Row(
+            children: [
+              Icon(Icons.lock_outline, size: 20),
+              SizedBox(width: 12),
+              Text('Change Password'),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'server',
+          child: Row(
+            children: [
+              const Icon(Icons.dns_outlined, size: 20),
+              const SizedBox(width: 12),
+              Text(l10n.serverAddress),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'logout',
+          child: Row(
+            children: [
+              Icon(Icons.logout, color: Color(0xFFEF4444), size: 20),
+              SizedBox(width: 12),
+              Text(
+                'Log Out',
+                style: TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1644,6 +1904,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
             ],
           ),
+          const SizedBox(width: 4),
+          _buildUserAccountMenu(context, auth.user),
           const SizedBox(width: 4),
           // endDrawer has no automatic AppBar affordance the way `drawer`
           // does, so add one explicitly when the dock is docked right.

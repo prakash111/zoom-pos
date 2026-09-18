@@ -6,6 +6,8 @@ import '../../../core/models/customer_model.dart';
 import '../../../core/models/settings_models.dart';
 import '../../../core/sdui/sdui_icon_registry.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/responsive.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../../core/widgets/sdui/sdui_controls.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/auth_provider.dart';
@@ -51,12 +53,8 @@ class CartSheet extends StatelessWidget {
 
   Future<void> _pickCustomer(BuildContext context) async {
     final pos = context.read<PosProvider>();
-    final customer = await showModalBottomSheet<CustomerModel>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    final customer = await showAdaptiveSheet<CustomerModel>(
+      context,
       builder: (_) =>
           CustomerPickerSheet(customersRepository: customersRepository),
     );
@@ -221,10 +219,8 @@ class CartSheet extends StatelessWidget {
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
     final l10n = AppLocalizations.of(context);
 
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    showAdaptiveSheet(
+      context,
       builder: (sheetCtx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -684,19 +680,17 @@ class CartSheet extends StatelessWidget {
                 orderIndex: 4),
           ];
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.85,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollController) {
-        return Padding(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom + 20),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              children: [
+    final wide = isWide(context);
+
+    Widget buildCartBody(ScrollController? scrollController) {
+      return Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              if (!wide) ...[
                 const SizedBox(height: 12),
                 Container(
                   width: 44,
@@ -707,6 +701,7 @@ class CartSheet extends StatelessWidget {
                           : Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(3)),
                 ),
+              ],
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1412,7 +1407,18 @@ class CartSheet extends StatelessWidget {
             ),
           ),
         );
-      },
+    }
+
+    if (wide) {
+      return buildCartBody(null);
+    }
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => buildCartBody(scrollController),
     );
   }
 }

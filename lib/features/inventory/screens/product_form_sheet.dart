@@ -12,6 +12,7 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/models/tax_rule_model.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/barcode_scanner_screen.dart';
 import '../../taxes/taxes_repository.dart';
 import '../inventory_provider.dart';
@@ -277,21 +278,15 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
   @override
   Widget build(BuildContext context) {
     final inventory = context.watch<InventoryProvider>();
+    final wide = isWide(context);
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) {
-          return SingleChildScrollView(
-            controller: scrollController,
-            padding: const EdgeInsets.all(20),
-            child: Form(
-              key: _formKey,
-              child: Column(
+    Widget formBody(ScrollController? scrollController) {
+      return SingleChildScrollView(
+        controller: scrollController,
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(_isEditing ? 'Edit product' : 'New product', style: Theme.of(context).textTheme.titleLarge),
@@ -543,7 +538,25 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
               ),
             ),
           );
-        },
+    }
+
+    if (wide) {
+      return Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: formBody(null),
+      );
+    }
+
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => formBody(scrollController),
       ),
     );
   }

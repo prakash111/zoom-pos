@@ -764,11 +764,8 @@ class SduiActionDispatcher {
           sheetSchema['terms']?.toString() ??
           action['terms']?.toString();
 
-      await showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      await showAdaptiveSheet(
+        context,
         builder: (_) {
           final sheet = QuotationFormSheet(
             formatter: formatter,

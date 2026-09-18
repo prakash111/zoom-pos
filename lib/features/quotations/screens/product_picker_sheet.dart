@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/utils/image_url.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../inventory/inventory_repository.dart';
@@ -47,24 +48,24 @@ class _ProductPickerSheetState extends State<ProductPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final wide = isWide(context);
     final sheetTitle = widget.title ?? (widget.partsOnly ? 'Select Spare Part' : 'Select Product');
     final searchHint = widget.partsOnly ? 'Search spare parts, SKU, or barcode' : 'Search products, SKU, or barcode';
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.4,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollController) {
-        return Column(
-          children: [
+    Widget buildContent(ScrollController? scrollController) {
+      return Column(
+        children: [
+          if (!wide) ...[
             const SizedBox(height: 12),
             Container(
               width: 40,
               height: 4,
               decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
             ),
-            Padding(
+          ] else ...[
+            const SizedBox(height: 16),
+          ],
+          Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(
                 children: [
@@ -245,7 +246,18 @@ class _ProductPickerSheetState extends State<ProductPickerSheet> {
             ),
           ],
         );
-      },
+    }
+
+    if (wide) {
+      return buildContent(null);
+    }
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => buildContent(scrollController),
     );
   }
 }

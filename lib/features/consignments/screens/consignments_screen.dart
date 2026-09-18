@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/consignment_model.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../auth/auth_provider.dart';
@@ -37,10 +38,8 @@ class _ConsignmentsScreenState extends State<ConsignmentsScreen> {
   void _reload() => setState(() => _future = _repository.fetchConsignments(status: _statusFilter));
 
   Future<void> _openForm(CurrencyFormatter formatter) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    final saved = await showAdaptiveSheet<bool>(
+      context,
       builder: (_) => ConsignmentFormSheet(repository: _repository, formatter: formatter),
     );
     if (saved == true) _reload();

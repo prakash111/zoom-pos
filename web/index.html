@@ -1,27 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path has to start and end with a slash "/" in order for web routing to work.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="description" content="Sales and Inventory client — Zoom POS platform.">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Zoom POS">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -30,8 +19,210 @@
 
   <title>Zoom POS - Sales & Inventory</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-track: rgba(59, 130, 246, 0.18);
+      --primary-shadow: rgba(59, 130, 246, 0.35);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg-color: #f8fafc;
+        --card-bg: #ffffff;
+        --card-border: #e2e8f0;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        --primary: #2563eb;
+        --primary-track: rgba(37, 99, 235, 0.14);
+        --primary-shadow: rgba(37, 99, 235, 0.25);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-color);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    #app-loading-screen {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--bg-color);
+      z-index: 999999;
+      opacity: 1;
+      transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .loading-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 36px 32px;
+      border-radius: 20px;
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+      max-width: 340px;
+      width: 86%;
+      text-align: center;
+      animation: fadeInPanel 0.35s ease-out;
+    }
+
+    @keyframes fadeInPanel {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .brand-icon {
+      width: 68px;
+      height: 68px;
+      margin-bottom: 18px;
+      border-radius: 16px;
+      box-shadow: 0 6px 16px var(--primary-shadow);
+      display: block;
+      object-fit: contain;
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 4px;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-subtitle {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    .progress-bar-track {
+      width: 100%;
+      height: 4px;
+      background: var(--primary-track);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar-indicator {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 40%;
+      background: var(--primary);
+      border-radius: 999px;
+      animation: indeterminate 1.5s infinite cubic-bezier(0.65, 0.815, 0.735, 0.395);
+    }
+
+    @keyframes indeterminate {
+      0% {
+        left: -40%;
+        width: 40%;
+      }
+      50% {
+        left: 20%;
+        width: 60%;
+      }
+      100% {
+        left: 100%;
+        width: 40%;
+      }
+    }
+
+    .status-text {
+      margin-top: 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+  </style>
 </head>
 <body>
+  <div id="app-loading-screen" role="status" aria-live="polite" aria-label="Loading Zoom POS">
+    <div class="loading-panel">
+      <img
+        class="brand-icon"
+        src="icons/Icon-192.png"
+        alt="Zoom POS Logo"
+        onerror="this.onerror=null; this.src='favicon.png';"
+      />
+      <h1 class="brand-title">Zoom POS</h1>
+      <p class="brand-subtitle">Sales &amp; Inventory Management</p>
+      <div class="progress-bar-track">
+        <div class="progress-bar-indicator"></div>
+      </div>
+      <div class="status-text">Loading application...</div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var dismissed = false;
+      function dismissLoadingScreen() {
+        if (dismissed) return;
+        dismissed = true;
+        var screen = document.getElementById('app-loading-screen');
+        if (!screen) return;
+        screen.style.opacity = '0';
+        screen.style.pointerEvents = 'none';
+        setTimeout(function () {
+          if (screen && screen.parentNode) {
+            screen.parentNode.removeChild(screen);
+          }
+        }, 450);
+      }
+
+      // Event 1: Flutter paints its first frame
+      window.addEventListener('flutter-first-frame', dismissLoadingScreen);
+
+      // Event 2: MutationObserver watches for Flutter canvas or view elements
+      var observer = new MutationObserver(function (mutations, obs) {
+        if (
+          document.querySelector('flutter-view') ||
+          document.querySelector('flt-glass-pane') ||
+          document.querySelector('flt-scene-host')
+        ) {
+          obs.disconnect();
+          setTimeout(dismissLoadingScreen, 120);
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+
+      // Fallback: dismiss after 25s in case engine renders silently
+      setTimeout(dismissLoadingScreen, 25000);
+    })();
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

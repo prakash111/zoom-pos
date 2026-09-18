@@ -4,6 +4,7 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/models/service_order_model.dart';
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../pos/screens/invoice_actions_sheet.dart';
@@ -60,11 +61,8 @@ class _ServiceOrderDetailsScreenState extends State<ServiceOrderDetailsScreen> {
   }
 
   Future<void> _edit() async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    final saved = await showAdaptiveSheet<bool>(
+      context,
       builder: (_) => ServiceOrderFormSheet(
           repository: widget.repository,
           formatter: widget.formatter,

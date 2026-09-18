@@ -349,6 +349,9 @@ class AppTheme {
         backgroundColor: cardColor,
         surfaceTintColor: Colors.transparent,
         showDragHandle: true,
+        modalBarrierColor: Colors.black54,
+        constraints: const BoxConstraints(maxWidth: 680),
+        clipBehavior: Clip.antiAlias,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/staff_user_model.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../auth/auth_provider.dart';
 import '../staff_repository.dart';
 import 'invite_user_sheet.dart';
@@ -34,10 +35,8 @@ class _StaffScreenState extends State<StaffScreen> {
   void _reload() => setState(() => _future = _repository.fetchUsers());
 
   Future<void> _invite(Map<String, String> roles) async {
-    final invited = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    final invited = await showAdaptiveSheet<bool>(
+      context,
       builder: (_) => InviteUserSheet(repository: _repository, roles: roles),
     );
     if (invited == true) _reload();

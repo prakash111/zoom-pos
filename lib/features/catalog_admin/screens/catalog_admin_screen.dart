@@ -7,6 +7,7 @@ import '../../../core/models/brand_model.dart';
 import '../../../core/models/category_model.dart';
 import '../../../core/models/supplier_model.dart';
 import '../../../core/models/unit_model.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../brands_repository.dart';
@@ -45,10 +46,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   void _reload() => setState(() => _future = repository.fetchCategories());
 
   Future<void> _openForm({CategoryModel? category}) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    final saved = await showAdaptiveSheet<bool>(
+      context,
       builder: (_) => CategoryFormSheet(repository: repository, category: category),
     );
     if (saved == true) _reload();
@@ -293,10 +292,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   void _reload() => setState(() => _future = repository.fetchSuppliers());
 
   Future<void> _openForm({SupplierModel? supplier}) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    final saved = await showAdaptiveSheet<bool>(
+      context,
       builder: (_) => SupplierFormSheet(repository: repository, supplier: supplier),
     );
     if (saved == true) _reload();

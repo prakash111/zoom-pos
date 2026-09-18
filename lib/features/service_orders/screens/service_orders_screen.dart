@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/service_order_model.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/config/bootstrap_cache.dart';
@@ -38,10 +39,8 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
   void _reload() => setState(() => _future = _repository.fetchOrders(status: _statusFilter));
 
   Future<void> _openForm(CurrencyFormatter formatter, {ServiceOrderModel? order}) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    final saved = await showAdaptiveSheet<bool>(
+      context,
       builder: (_) => ServiceOrderFormSheet(repository: _repository, formatter: formatter, order: order),
     );
     if (saved == true) _reload();

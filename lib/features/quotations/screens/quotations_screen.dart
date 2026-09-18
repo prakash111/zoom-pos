@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/models/quotation_model.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/responsive/desktop_content_area.dart';
@@ -63,11 +64,8 @@ class _QuotationsScreenBodyState extends State<_QuotationsScreenBody> {
     final company = context.read<AuthProvider>().company;
     final formatter = CurrencyFormatter(company?.currencySymbol ?? '\$');
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    showAdaptiveSheet(
+      context,
       builder: (_) => ChangeNotifierProvider.value(
         value: quotations,
         child: QuotationFormSheet(formatter: formatter),

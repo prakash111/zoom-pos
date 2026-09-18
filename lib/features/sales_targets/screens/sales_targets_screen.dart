@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/sales_target_model.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/adaptive_sheet.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../auth/auth_provider.dart';
@@ -61,10 +62,8 @@ class _SalesTargetsScreenState extends State<SalesTargetsScreen> {
   }
 
   Future<void> _openEdit(SalesTargetsBundle bundle, CurrencyFormatter formatter) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    final saved = await showAdaptiveSheet<bool>(
+      context,
       builder: (_) => _EditTargetsSheet(repository: _repository, bundle: bundle, formatter: formatter),
     );
     if (saved == true) _reload();
