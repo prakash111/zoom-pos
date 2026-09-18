@@ -446,6 +446,7 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
               key: ValueKey(_format),
               build: _build,
               initialPageFormat: _format.pdfFormat,
+              pageFormats: {_format.label: _format.pdfFormat},
               canChangePageFormat: false,
               canChangeOrientation: false,
               canDebug: false,

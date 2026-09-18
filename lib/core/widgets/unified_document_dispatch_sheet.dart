@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -167,6 +169,17 @@ class UnifiedDocumentDispatchData {
 
   bool get isPdfPathAbsolute =>
       pdfPath.startsWith('/api/') || pdfPath.startsWith('http');
+
+  String pdfPathForFormat(String format) {
+    final base = pdfPath;
+    final uri = Uri.parse(base);
+    final query = Map<String, String>.from(uri.queryParameters);
+    query['format'] = format;
+    return uri.replace(queryParameters: query).toString();
+  }
+
+  bool isPdfPathAbsoluteFor(String path) =>
+      path.startsWith('/api/') || path.startsWith('http');
 }
 
 /// Universal entry point for opening the enterprise-grade omnichannel
@@ -1132,10 +1145,12 @@ class UnifiedDocumentPreviewScreen extends StatefulWidget {
     super.key,
     required this.apiClient,
     required this.data,
+    this.initialFormatIndex = 0,
   });
 
   final ApiClient apiClient;
   final UnifiedDocumentDispatchData data;
+  final int initialFormatIndex;
 
   @override
   State<UnifiedDocumentPreviewScreen> createState() =>
@@ -1144,8 +1159,21 @@ class UnifiedDocumentPreviewScreen extends StatefulWidget {
 
 class _UnifiedDocumentPreviewScreenState
     extends State<UnifiedDocumentPreviewScreen> {
-  int _selectedFormatIndex =
-      0; // 0: Thermal 80mm, 1: Standard A4, 2: Thermal 58mm
+  late int _selectedFormatIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedFormatIndex = widget.initialFormatIndex;
+  }
+
+  String _formatParamFor(int index) {
+    return switch (index) {
+      1 => 'a4',
+      2 => '58mm',
+      _ => '80mm',
+    };
+  }
 
   Future<void> _handleShare() async {
     final data = widget.data;
@@ -1167,22 +1195,63 @@ class _UnifiedDocumentPreviewScreenState
   Future<void> _handlePrint() async {
     final messenger = ScaffoldMessenger.of(context);
     final data = widget.data;
+    final formatParam = _formatParamFor(_selectedFormatIndex);
 
     if (_selectedFormatIndex == 1) {
       // Standard A4 PDF Print
       try {
-        final bytes = widget.data.isPdfPathAbsolute
-            ? await widget.apiClient.getBytesAbsolute(widget.data.pdfPath)
-            : await widget.apiClient.getBytes(widget.data.pdfPath);
+        final path = widget.data.pdfPathForFormat('a4');
+        final bytes = widget.data.isPdfPathAbsoluteFor(path)
+            ? await widget.apiClient.getBytesAbsolute(path)
+            : await widget.apiClient.getBytes(path);
         await Printing.layoutPdf(
           onLayout: (format) async => Uint8List.fromList(bytes),
           name: '${data.displayTitle}.pdf',
+          format: PdfPageFormat.a4,
         );
       } catch (e) {
-        messenger.showSnackBar(SnackBar(content: Text('Print error: $e')));
+        try {
+          final localBytes = await _buildLocalDocumentPdf(widget.data, 'a4');
+          await Printing.layoutPdf(
+            onLayout: (format) async => localBytes,
+            name: '${data.displayTitle}.pdf',
+            format: PdfPageFormat.a4,
+          );
+        } catch (localError) {
+          messenger.showSnackBar(SnackBar(content: Text('Print error: $localError')));
+        }
       }
     } else {
       // Thermal Print
+      if (!_supportsThermalPrint) {
+        // Web / Windows / Desktop: print using system layoutPdf with roll paper dimensions
+        try {
+          final path = widget.data.pdfPathForFormat(formatParam);
+          final bytes = widget.data.isPdfPathAbsoluteFor(path)
+              ? await widget.apiClient.getBytesAbsolute(path)
+              : await widget.apiClient.getBytes(path);
+          final rollFormat = _selectedFormatIndex == 2
+              ? PdfPageFormat(58 * PdfPageFormat.mm, double.infinity,
+                  marginAll: 4 * PdfPageFormat.mm)
+              : PdfPageFormat(80 * PdfPageFormat.mm, double.infinity,
+                  marginAll: 4 * PdfPageFormat.mm);
+          await Printing.layoutPdf(
+            onLayout: (format) async => Uint8List.fromList(bytes),
+            name: '${data.displayTitle}.pdf',
+            format: rollFormat,
+          );
+          return;
+        } catch (_) {
+          final localBytes =
+              await _buildLocalDocumentPdf(widget.data, formatParam);
+          await Printing.layoutPdf(
+            onLayout: (format) async => localBytes,
+            name: '${data.displayTitle}.pdf',
+          );
+          return;
+        }
+      }
+
       final target = await PrinterSelectionDialog.ensureSelected(context);
       if (target == null || !mounted) return;
 
@@ -1261,9 +1330,7 @@ class _UnifiedDocumentPreviewScreenState
 
           // Main preview viewport
           Expanded(
-            child: _selectedFormatIndex == 1
-                ? _buildA4PdfPreview()
-                : _buildThermalMonospaceCard(_selectedFormatIndex == 2),
+            child: _buildPdfPreview(_selectedFormatIndex),
           ),
 
           // Bottom Action Dock
@@ -1353,23 +1420,51 @@ class _UnifiedDocumentPreviewScreenState
     );
   }
 
-  Widget _buildA4PdfPreview() {
+  Widget _buildPdfPreview(int index) {
+    final formatParam = _formatParamFor(index);
+    final isA4 = formatParam == 'a4';
+    final is58mm = formatParam == '58mm';
+
+    final targetPageFormat = isA4
+        ? PdfPageFormat.a4
+        : (is58mm
+            ? PdfPageFormat(58 * PdfPageFormat.mm, double.infinity,
+                marginAll: 4 * PdfPageFormat.mm)
+            : PdfPageFormat(80 * PdfPageFormat.mm, double.infinity,
+                marginAll: 4 * PdfPageFormat.mm));
+
+    final maxPageWidth = isA4 ? 794.0 : (is58mm ? 320.0 : 400.0);
+
     return PdfPreview(
-      build: (format) async => Uint8List.fromList(
-        widget.data.isPdfPathAbsolute
-            ? await widget.apiClient.getBytesAbsolute(widget.data.pdfPath)
-            : await widget.apiClient.getBytes(widget.data.pdfPath),
-      ),
+      key: ValueKey('preview_${widget.data.documentId}_$formatParam'),
+      build: (pageFormat) async {
+        try {
+          final path = widget.data.pdfPathForFormat(formatParam);
+          final bytes = widget.data.isPdfPathAbsoluteFor(path)
+              ? await widget.apiClient.getBytesAbsolute(path)
+              : await widget.apiClient.getBytes(path);
+          if (bytes.isNotEmpty) {
+            return Uint8List.fromList(bytes);
+          }
+        } catch (_) {}
+        return _buildLocalDocumentPdf(widget.data, formatParam);
+      },
       allowPrinting: false,
       allowSharing: false,
       canChangeOrientation: false,
       canChangePageFormat: false,
-      maxPageWidth: 700,
+      initialPageFormat: targetPageFormat,
+      pageFormats: {
+        isA4 ? 'A4' : (is58mm ? '58mm' : '80mm'): targetPageFormat,
+      },
+      maxPageWidth: maxPageWidth,
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       loadingWidget: const Center(
         child: CircularProgressIndicator(color: AppTheme.success),
       ),
-      onError: (context, error) => _buildThermalMonospaceCard(false),
+      onError: (context, error) => isA4
+          ? _buildLocalA4CardFallback()
+          : _buildThermalMonospaceCard(is58mm),
     );
   }
 
@@ -1566,4 +1661,720 @@ class _UnifiedDocumentPreviewScreenState
       ),
     );
   }
+
+  Widget _buildLocalA4CardFallback() {
+    final data = widget.data;
+    final isPaid = data.dueAmount <= 0.001;
+
+    Widget tableHeader(String title, {TextAlign align = TextAlign.left}) =>
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          child: Text(
+            title,
+            textAlign: align,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: Color(0xFF334155),
+            ),
+          ),
+        );
+
+    Widget tableCell(String text,
+            {TextAlign align = TextAlign.left, bool isBold = false}) =>
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          child: Text(
+            text,
+            textAlign: align,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+        );
+
+    Widget summaryLine(String label, String value,
+            {bool isBold = false, Color? color}) =>
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: isBold ? 14 : 12,
+                  fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+                  color: color ?? const Color(0xFF334155),
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: isBold ? 14 : 12,
+                  fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+                  color: color ?? const Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      child: Center(
+        child: Container(
+          width: 620.0,
+          constraints: const BoxConstraints(minHeight: 840.0),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          data.companyName,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        if ((data.taxId ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '${data.isIndia ? 'GSTIN' : data.taxLabel}: ${data.taxId}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        (data.title ?? '${data.documentType.toUpperCase()} INVOICE').toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '#${data.displayTitle}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                      Text(
+                        data.formattedTimestamp ??
+                            DateFormat('d MMM yyyy, h:mm a')
+                                .format(data.dateTime ?? DateTime.now()),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Bill To: ${data.customerName ?? 'Walk-in Customer'}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    Text(
+                      data.subtitleContext,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Items Table
+              Table(
+                columnWidths: const {
+                  0: FlexColumnWidth(4),
+                  1: FlexColumnWidth(1.2),
+                  2: FlexColumnWidth(1.5),
+                  3: FlexColumnWidth(1.5),
+                },
+                children: [
+                  TableRow(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                    ),
+                    children: [
+                      tableHeader('Item'),
+                      tableHeader('Qty', align: TextAlign.right),
+                      tableHeader('Unit Price', align: TextAlign.right),
+                      tableHeader('Total', align: TextAlign.right),
+                    ],
+                  ),
+                  if (data.lines.isNotEmpty)
+                    for (final line in data.lines)
+                      TableRow(
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Color(0xFFE2E8F0),
+                              width: 0.8,
+                            ),
+                          ),
+                        ),
+                        children: [
+                          tableCell(line.name),
+                          tableCell(
+                            line.quantity.toStringAsFixed(
+                              line.quantity.truncateToDouble() == line.quantity
+                                  ? 0
+                                  : 2,
+                            ),
+                            align: TextAlign.right,
+                          ),
+                          tableCell(
+                            '${data.currencySymbol}${line.unitPrice.toStringAsFixed(2)}',
+                            align: TextAlign.right,
+                          ),
+                          tableCell(
+                            '${data.currencySymbol}${line.lineTotal.toStringAsFixed(2)}',
+                            align: TextAlign.right,
+                            isBold: true,
+                          ),
+                        ],
+                      )
+                  else
+                    TableRow(
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Color(0xFFE2E8F0),
+                            width: 0.8,
+                          ),
+                        ),
+                      ),
+                      children: [
+                        tableCell(data.title ?? 'Service / Order Details'),
+                        tableCell('1', align: TextAlign.right),
+                        tableCell(
+                          '${data.currencySymbol}${data.total.toStringAsFixed(2)}',
+                          align: TextAlign.right,
+                        ),
+                        tableCell(
+                          '${data.currencySymbol}${data.total.toStringAsFixed(2)}',
+                          align: TextAlign.right,
+                          isBold: true,
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // Totals
+              Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 280,
+                  child: Column(
+                    children: [
+                      if (data.subtotal > 0 && data.subtotal != data.total)
+                        summaryLine('Subtotal',
+                            '${data.currencySymbol}${data.subtotal.toStringAsFixed(2)}'),
+                      if (data.discount > 0)
+                        summaryLine('Discount',
+                            '-${data.currencySymbol}${data.discount.toStringAsFixed(2)}',
+                            color: const Color(0xFF16A34A)),
+                      if (data.tax > 0)
+                        summaryLine(data.taxLabel,
+                            '+${data.currencySymbol}${data.tax.toStringAsFixed(2)}'),
+                      const Divider(height: 16),
+                      summaryLine('Total Amount',
+                          '${data.currencySymbol}${data.total.toStringAsFixed(2)}',
+                          isBold: true),
+                      if (data.paidAmount != null)
+                        summaryLine('Paid',
+                            '${data.currencySymbol}${data.paidAmount!.toStringAsFixed(2)}'),
+                      if (data.dueAmount > 0.001)
+                        summaryLine('Due Amount',
+                            '${data.currencySymbol}${data.dueAmount.toStringAsFixed(2)}',
+                            isBold: true, color: const Color(0xFFDC2626)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Center(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: isPaid
+                        ? const Color(0xFFECFDF5)
+                        : const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    isPaid
+                        ? 'PAID IN FULL'
+                        : 'PAYMENT DUE: ${data.currencySymbol}${data.dueAmount.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isPaid
+                          ? const Color(0xFF065F46)
+                          : const Color(0xFF991B1B),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<Uint8List> _buildLocalDocumentPdf(
+    UnifiedDocumentDispatchData data, String formatParam) async {
+  final doc = pw.Document();
+  final isA4 = formatParam == 'a4';
+  final is58mm = formatParam == '58mm';
+  final pageFormat = isA4
+      ? PdfPageFormat.a4
+      : (is58mm
+          ? PdfPageFormat(58 * PdfPageFormat.mm, double.infinity,
+              marginAll: 4 * PdfPageFormat.mm)
+          : PdfPageFormat(80 * PdfPageFormat.mm, double.infinity,
+              marginAll: 4 * PdfPageFormat.mm));
+
+  pw.Font? regularFont;
+  pw.Font? boldFont;
+  try {
+    regularFont = await PdfGoogleFonts.notoSansRegular();
+    boldFont = await PdfGoogleFonts.notoSansBold();
+  } catch (_) {
+    regularFont = null;
+    boldFont = null;
+  }
+
+  final theme = regularFont != null
+      ? pw.ThemeData.withFont(base: regularFont, bold: boldFont)
+      : null;
+
+  doc.addPage(
+    pw.Page(
+      pageFormat: pageFormat,
+      theme: theme,
+      build: (context) => isA4
+          ? _buildLocalA4Layout(data)
+          : _buildLocalThermalLayout(data, is58mm: is58mm),
+    ),
+  );
+
+  return doc.save();
+}
+
+pw.Widget _buildLocalA4Layout(UnifiedDocumentDispatchData data) {
+  final currency = data.currencySymbol;
+  String fmtPrice(double amount) => '$currency${amount.toStringAsFixed(2)}';
+
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                data.companyName,
+                style:
+                    pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+              ),
+              if ((data.taxId ?? '').isNotEmpty) ...[
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  '${data.isIndia ? 'GSTIN' : data.taxLabel}: ${data.taxId}',
+                  style:
+                      const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                ),
+              ],
+            ],
+          ),
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: [
+              pw.Text(
+                (data.title ?? '${data.documentType.toUpperCase()} INVOICE')
+                    .toUpperCase(),
+                style:
+                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                '#${data.displayTitle}',
+                style:
+                    const pw.TextStyle(fontSize: 11, color: PdfColors.grey700),
+              ),
+              pw.Text(
+                data.formattedTimestamp ??
+                    DateFormat('d MMM yyyy, h:mm a')
+                        .format(data.dateTime ?? DateTime.now()),
+                style:
+                    const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+              ),
+            ],
+          ),
+        ],
+      ),
+      pw.SizedBox(height: 16),
+      if ((data.customerName ?? '').isNotEmpty ||
+          (data.tableName ?? '').isNotEmpty ||
+          (data.deviceModel ?? '').isNotEmpty)
+        pw.Container(
+          padding: const pw.EdgeInsets.all(8),
+          decoration: const pw.BoxDecoration(
+            color: PdfColors.grey100,
+            borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
+          ),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              if ((data.customerName ?? '').isNotEmpty)
+                pw.Text('Bill To: ${data.customerName}',
+                    style: pw.TextStyle(
+                        fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              pw.Text(data.subtitleContext,
+                  style: const pw.TextStyle(
+                      fontSize: 9, color: PdfColors.grey700)),
+            ],
+          ),
+        ),
+      pw.SizedBox(height: 16),
+      pw.Table(
+        border: const pw.TableBorder(
+          top: pw.BorderSide(width: 0.5, color: PdfColors.grey400),
+          bottom: pw.BorderSide(width: 0.5, color: PdfColors.grey400),
+          horizontalInside:
+              pw.BorderSide(width: 0.3, color: PdfColors.grey300),
+        ),
+        columnWidths: const {
+          0: pw.FlexColumnWidth(4),
+          1: pw.FlexColumnWidth(1.2),
+          2: pw.FlexColumnWidth(1.5),
+          3: pw.FlexColumnWidth(1.5),
+        },
+        children: [
+          pw.TableRow(
+            decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+            children: [
+              _pdfCell('Item', bold: true),
+              _pdfCell('Qty', bold: true, align: pw.TextAlign.right),
+              _pdfCell('Unit Price', bold: true, align: pw.TextAlign.right),
+              _pdfCell('Amount', bold: true, align: pw.TextAlign.right),
+            ],
+          ),
+          if (data.lines.isNotEmpty)
+            for (final line in data.lines)
+              pw.TableRow(
+                children: [
+                  _pdfCell(line.name),
+                  _pdfCell(
+                    line.quantity.toStringAsFixed(
+                        line.quantity.truncateToDouble() == line.quantity
+                            ? 0
+                            : 2),
+                    align: pw.TextAlign.right,
+                  ),
+                  _pdfCell(fmtPrice(line.unitPrice),
+                      align: pw.TextAlign.right),
+                  _pdfCell(fmtPrice(line.lineTotal),
+                      align: pw.TextAlign.right),
+                ],
+              )
+          else
+            pw.TableRow(
+              children: [
+                _pdfCell(data.title ?? 'Service / Order Details'),
+                _pdfCell('1', align: pw.TextAlign.right),
+                _pdfCell(fmtPrice(data.total), align: pw.TextAlign.right),
+                _pdfCell(fmtPrice(data.total), align: pw.TextAlign.right),
+              ],
+            ),
+        ],
+      ),
+      pw.SizedBox(height: 16),
+      pw.Align(
+        alignment: pw.Alignment.centerRight,
+        child: pw.SizedBox(
+          width: 220,
+          child: pw.Column(
+            children: [
+              if (data.subtotal > 0 && data.subtotal != data.total)
+                _pdfTotalRow('Subtotal', fmtPrice(data.subtotal)),
+              if (data.discount > 0)
+                _pdfTotalRow('Discount', '-${fmtPrice(data.discount)}'),
+              if (data.tax > 0)
+                if (data.isIndia) ...[
+                  _pdfTotalRow('CGST', '+${fmtPrice(data.tax / 2)}'),
+                  _pdfTotalRow('SGST', '+${fmtPrice(data.tax / 2)}'),
+                ] else
+                  _pdfTotalRow(data.taxLabel, '+${fmtPrice(data.tax)}'),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              _pdfTotalRow('Total', fmtPrice(data.total), isBold: true),
+              if (data.paidAmount != null)
+                _pdfTotalRow('Paid', fmtPrice(data.paidAmount!)),
+              if (data.dueAmount > 0.001)
+                _pdfTotalRow('Due', fmtPrice(data.dueAmount), isBold: true),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+pw.Widget _buildLocalThermalLayout(UnifiedDocumentDispatchData data,
+    {required bool is58mm}) {
+  final currency = data.currencySymbol;
+  String fmtPrice(double amount) => '$currency${amount.toStringAsFixed(2)}';
+  final fontSize = is58mm ? 7.0 : 8.5;
+
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+    children: [
+      pw.Center(
+        child: pw.Text(
+          data.companyName.toUpperCase(),
+          style: pw.TextStyle(
+            fontSize: fontSize + 3,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+      ),
+      if ((data.taxId ?? '').isNotEmpty)
+        pw.Center(
+          child: pw.Text(
+            '${data.isIndia ? 'GSTIN' : data.taxLabel}: ${data.taxId}',
+            style: pw.TextStyle(fontSize: fontSize - 1),
+          ),
+        ),
+      pw.SizedBox(height: 3),
+      pw.Center(
+        child: pw.Text(
+          '*** ${(data.title ?? 'TAX INVOICE / RECEIPT').toUpperCase()} ***',
+          style: pw.TextStyle(
+            fontSize: fontSize,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+      ),
+      pw.Center(
+        child: pw.Text(
+          '------------------------------------------------',
+          style: pw.TextStyle(fontSize: fontSize - 1),
+        ),
+      ),
+      pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text('Receipt #: ${data.displayTitle}',
+              style: pw.TextStyle(fontSize: fontSize - 1)),
+          pw.Text(
+            data.formattedTimestamp ??
+                DateFormat('dd/MM/yyyy HH:mm')
+                    .format(data.dateTime ?? DateTime.now()),
+            style: pw.TextStyle(fontSize: fontSize - 1),
+          ),
+        ],
+      ),
+      if ((data.customerName ?? '').isNotEmpty)
+        pw.Text('Customer: ${data.customerName}',
+            style: pw.TextStyle(fontSize: fontSize - 1)),
+      pw.Center(
+        child: pw.Text(
+          '------------------------------------------------',
+          style: pw.TextStyle(fontSize: fontSize - 1),
+        ),
+      ),
+      for (final line in data.lines)
+        pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Expanded(
+                child: pw.Text(
+                  '${line.quantity.toStringAsFixed(line.quantity.truncateToDouble() == line.quantity ? 0 : 2)}x ${line.name}',
+                  style: pw.TextStyle(fontSize: fontSize),
+                ),
+              ),
+              pw.Text(fmtPrice(line.lineTotal),
+                  style: pw.TextStyle(fontSize: fontSize)),
+            ],
+          ),
+        ),
+      pw.Center(
+        child: pw.Text(
+          '------------------------------------------------',
+          style: pw.TextStyle(fontSize: fontSize - 1),
+        ),
+      ),
+      if (data.subtotal > 0 && data.subtotal != data.total)
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text('Subtotal:', style: pw.TextStyle(fontSize: fontSize)),
+            pw.Text(fmtPrice(data.subtotal),
+                style: pw.TextStyle(fontSize: fontSize)),
+          ],
+        ),
+      if (data.discount > 0)
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text('Discount:', style: pw.TextStyle(fontSize: fontSize)),
+            pw.Text('-${fmtPrice(data.discount)}',
+                style: pw.TextStyle(fontSize: fontSize)),
+          ],
+        ),
+      if (data.tax > 0)
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text('${data.taxLabel}:',
+                style: pw.TextStyle(fontSize: fontSize)),
+            pw.Text('+${fmtPrice(data.tax)}',
+                style: pw.TextStyle(fontSize: fontSize)),
+          ],
+        ),
+      pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text('TOTAL:',
+              style: pw.TextStyle(
+                  fontSize: fontSize + 1, fontWeight: pw.FontWeight.bold)),
+          pw.Text(fmtPrice(data.total),
+              style: pw.TextStyle(
+                  fontSize: fontSize + 1, fontWeight: pw.FontWeight.bold)),
+        ],
+      ),
+      if (data.paidAmount != null)
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text('Paid:', style: pw.TextStyle(fontSize: fontSize)),
+            pw.Text(fmtPrice(data.paidAmount!),
+                style: pw.TextStyle(fontSize: fontSize)),
+          ],
+        ),
+      if (data.dueAmount > 0.001)
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text('Due:',
+                style: pw.TextStyle(
+                    fontSize: fontSize, fontWeight: pw.FontWeight.bold)),
+            pw.Text(fmtPrice(data.dueAmount),
+                style: pw.TextStyle(
+                    fontSize: fontSize, fontWeight: pw.FontWeight.bold)),
+          ],
+        ),
+      pw.SizedBox(height: 6),
+      pw.Center(
+        child: pw.Text(
+          '*** THANK YOU ***',
+          style: pw.TextStyle(
+              fontSize: fontSize, fontWeight: pw.FontWeight.bold),
+        ),
+      ),
+    ],
+  );
+}
+
+pw.Widget _pdfCell(String text,
+    {bool bold = false, pw.TextAlign align = pw.TextAlign.left}) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+    child: pw.Text(
+      text,
+      textAlign: align,
+      style: pw.TextStyle(
+        fontSize: 9,
+        fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+      ),
+    ),
+  );
+}
+
+pw.Widget _pdfTotalRow(String label, String value, {bool isBold = false}) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 2),
+    child: pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Text(
+          label,
+          style: pw.TextStyle(
+            fontSize: 9.5,
+            fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+          ),
+        ),
+        pw.Text(
+          value,
+          style: pw.TextStyle(
+            fontSize: 9.5,
+            fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+          ),
+        ),
+      ],
+    ),
+  );
 }

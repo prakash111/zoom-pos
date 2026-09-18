@@ -353,6 +353,59 @@ void main() {
         '/api/v1/tenant/documents/repair/101/preview-modal?format=a4&preview_document=1');
     expect(api.postCount, 0);
   });
+
+  test(
+      'UnifiedDocumentDispatchData.pdfPathForFormat injects format parameter correctly',
+      () {
+    final data = UnifiedDocumentDispatchData(
+      documentType: 'sale',
+      documentId: 'POS-78C8C0CB',
+      documentNumber: 'POS-78C8C0CB',
+      companyName: 'Zoom Store',
+    );
+
+    expect(data.pdfPathForFormat('a4'), '/sales/POS-78C8C0CB/pdf?format=a4');
+    expect(
+        data.pdfPathForFormat('80mm'), '/sales/POS-78C8C0CB/pdf?format=80mm');
+    expect(
+        data.pdfPathForFormat('58mm'), '/sales/POS-78C8C0CB/pdf?format=58mm');
+  });
+
+  testWidgets(
+      'UnifiedDocumentPreviewScreen requests format=a4 when Standard A4 is selected',
+      (tester) async {
+    final api = _DispatchMockApiClient();
+    final data = UnifiedDocumentDispatchData(
+      documentType: 'sale',
+      documentId: 'POS-78C8C0CB',
+      documentNumber: 'POS-78C8C0CB',
+      companyName: 'Zoom Store',
+      total: 100,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: UnifiedDocumentPreviewScreen(
+          apiClient: api,
+          data: data,
+          initialFormatIndex: 1, // Standard A4
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Standard A4'), findsOneWidget);
+    expect(find.text('Thermal 80mm'), findsOneWidget);
+    expect(find.text('Thermal 58mm'), findsOneWidget);
+    expect(api.requestedPaths, contains('/sales/POS-78C8C0CB/pdf?format=a4'));
+
+    // Tap Thermal 58mm
+    await tester.tap(find.text('Thermal 58mm'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(api.requestedPaths, contains('/sales/POS-78C8C0CB/pdf?format=58mm'));
+  });
 }
 
 Future<void> _openSheet(WidgetTester tester, _DispatchMockApiClient api,
@@ -472,6 +525,19 @@ class _DispatchMockApiClient implements ApiClient {
     }
 
     return {'success': true};
+  }
+
+  @override
+  Future<List<int>> getBytes(String path, {Map<String, dynamic>? query}) async {
+    requestedPaths.add(path);
+    return const [1, 2, 3];
+  }
+
+  @override
+  Future<List<int>> getBytesAbsolute(String path,
+      {Map<String, dynamic>? query}) async {
+    requestedPaths.add(path);
+    return const [1, 2, 3];
   }
 
   @override
