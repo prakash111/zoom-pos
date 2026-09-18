@@ -220,14 +220,22 @@ class SduiActionDispatcher {
                       ? (res['ticket']['id']?.toString() ?? '')
                       : '');
               if (ticketId.isNotEmpty) {
-                await _openRemoteSheet(context, {
-                  'type': 'open_remote_sheet',
-                  'endpoint': '/api/tenant/repair/tickets/$ticketId/share-sheet',
-                  'title': 'Share Repair Ticket',
-                }, client);
+                final ticketMap = <String, dynamic>{
+                  ...share,
+                  if (res['ticket'] is Map)
+                    ...Map<String, dynamic>.from(res['ticket'] as Map),
+                };
+                ticketMap['ticket_id'] ??= ticketId;
+                if (res['ticket'] is Map && res['ticket']['customer'] is Map) {
+                  final cust =
+                      Map<String, dynamic>.from(res['ticket']['customer'] as Map);
+                  ticketMap['customer_name'] ??= cust['name'];
+                  ticketMap['customer_phone'] ??= cust['phone'];
+                  ticketMap['customer_email'] ??= cust['email'];
+                }
+                await showRepairUnifiedDispatchSheet(context, ticketMap);
               } else {
-                // Older servers may not include ticket_id yet; retain the
-                // compatibility sheet until that response is upgraded.
+                // Older servers or mocks without ticket_id
                 await showTicketShareSheet(context, share);
               }
             }
@@ -706,6 +714,14 @@ class SduiActionDispatcher {
     }
 
     if (!context.mounted) return;
+
+    // Intercept repair ticket share/dispatch to show the unified dispatch sheet
+    if (sheetEndpoint.contains('/repair/tickets/') &&
+        (sheetEndpoint.contains('/share-sheet') ||
+            sheetEndpoint.contains('/dispatch'))) {
+      await showRepairUnifiedDispatchSheet(context, sheetSchema);
+      return;
+    }
 
     // Intercept native quotation creation modal (prefilled with Lead and Customer)
     if (sheetEndpoint.contains('quotations/create-modal') ||

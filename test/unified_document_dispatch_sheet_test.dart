@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:zoom_pos_mobile/core/api/api_client.dart';
-import 'package:zoom_pos_mobile/core/widgets/unified_document_dispatch_sheet.dart';
+import 'package:zoom_pos_mobile/features/repair/ticket_share_sheet.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -85,6 +85,87 @@ void main() {
     expect(channels, contains('email'));
     expect(api.lastDispatchPayload!['phone'], '+919876500000');
     expect(api.lastDispatchPayload!['email'], 'aarav@example.com');
+
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets(
+      'showRepairUnifiedDispatchSheet omits preview and automatically binds customer data',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(450, 900);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final api = _DispatchMockApiClient();
+
+    final ticket = {
+      'id': '99',
+      'ticket_number': 'REP-99',
+      'company_name': 'Zoom Fixers',
+      'brand': 'Apple',
+      'model': 'iPhone 15 Pro',
+      'status': 'In Progress',
+      'customer': {
+        'name': 'Carlos Rivera',
+        'phone': '+1555888999',
+        'email': 'carlos@example.com',
+      },
+    };
+
+    await tester.pumpWidget(
+      Provider<ApiClient>.value(
+        value: api,
+        child: MaterialApp(
+          themeMode: ThemeMode.dark,
+          darkTheme: ThemeData.dark(),
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => ElevatedButton(
+                onPressed: () => showRepairUnifiedDispatchSheet(ctx, ticket),
+                child: const Text('Open Repair Dispatch'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open Repair Dispatch'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump();
+
+    // Verify repair ticket header & context
+    expect(find.text('#REP-99'), findsOneWidget);
+    expect(find.textContaining('Carlos Rivera • Apple iPhone 15 Pro'), findsOneWidget);
+
+    // CRITICAL: Verify Preview & Print is omitted for repair tickets
+    expect(find.text('Preview & Print'), findsNothing);
+
+    // Verify channels are displayed
+    expect(find.text('Send via WhatsApp Business API'), findsOneWidget);
+    expect(find.text('Send via Email'), findsOneWidget);
+
+    // Ensure button is visible and tap
+    await tester.scrollUntilVisible(
+      find.text('Send to Selected Channels'),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Send to Selected Channels'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Verify customer contact was bound and dispatched without manual entry
+    expect(api.lastDispatchPayload, isNotNull);
+    expect(api.lastDispatchPayload!['phone'], '+1555888999');
+    expect(api.lastDispatchPayload!['email'], 'carlos@example.com');
+    expect(api.lastDispatchPayload!['document_type'], 'repair');
+    expect(api.lastDispatchPayload!['document_id'], '99');
 
     debugDefaultTargetPlatformOverride = null;
   });

@@ -21,17 +21,31 @@ Future<void> showRepairUnifiedDispatchSheet(
   Map<String, dynamic> ticket,
 ) {
   final id = ticket['id']?.toString() ?? ticket['ticket_id']?.toString() ?? '';
-  final device = ticket['device']?.toString() ?? '';
+  final device = ticket['device']?.toString() ??
+      (ticket['brand'] != null || ticket['model'] != null
+          ? '${ticket['brand'] ?? ''} ${ticket['model'] ?? ''}'.trim()
+          : '');
   final status = ticket['status']?.toString() ?? 'Intake';
-  final customerName = ticket['customer_name']?.toString();
-  final customerPhone = ticket['customer_phone']?.toString();
-  final customerEmail = ticket['customer_email']?.toString();
-  final defect = ticket['defect']?.toString();
+  final customerName = ticket['customer_name']?.toString() ??
+      (ticket['customer'] is Map ? ticket['customer']['name']?.toString() : null);
+  final customerPhone = ticket['customer_phone']?.toString() ??
+      (ticket['customer'] is Map ? ticket['customer']['phone']?.toString() : null);
+  final customerEmail = ticket['customer_email']?.toString() ??
+      (ticket['customer'] is Map ? ticket['customer']['email']?.toString() : null);
+  final defect = ticket['defect']?.toString() ??
+      ticket['problem_reported']?.toString() ??
+      ticket['issue_description']?.toString();
 
-  final docNumber = id.isEmpty ? 'TICKET' : (id.startsWith('#') ? id : '#REP-$id');
+  final docNumber = id.isEmpty
+      ? 'TICKET'
+      : (id.startsWith('#')
+          ? id
+          : (ticket['ticket_number'] != null
+              ? '#${ticket['ticket_number']}'
+              : '#REP-$id'));
 
   final data = UnifiedDocumentDispatchData(
-    documentType: 'job_sheet',
+    documentType: 'repair',
     documentId: id,
     documentNumber: docNumber,
     companyName: ticket['company_name']?.toString() ?? 'Service & Repairs',
@@ -41,6 +55,8 @@ Future<void> showRepairUnifiedDispatchSheet(
     deviceModel: device,
     defect: defect,
     status: status,
+    showPreview: false,
+    actionsPathOverride: '/api/v1/documents/repair/$id/dispatch-options',
     pdfPathOverride: '/api/tenant/repair/tickets/$id/intake-sheet',
   );
 

@@ -62,6 +62,7 @@ class UnifiedDocumentDispatchData {
     this.onDispatch,
     this.onChannelsDispatch,
     this.initialChannels,
+    this.showPreview = true,
   });
 
   final String documentType;
@@ -101,6 +102,7 @@ class UnifiedDocumentDispatchData {
   final void Function(bool sendWhatsApp, bool sendEmail)? onDispatch;
   final void Function(List<String> channels, Map<String, dynamic> payload)? onChannelsDispatch;
   final List<DispatchChannelItem>? initialChannels;
+  final bool showPreview;
 
   String get displayTitle => documentNumber.trim();
 
@@ -115,12 +117,16 @@ class UnifiedDocumentDispatchData {
       segments.add('Table $tableName');
     } else if ((patientName ?? '').isNotEmpty) {
       segments.add(patientName!);
-    } else if ((customerName ?? '').isNotEmpty) {
-      segments.add(customerName!);
-    } else if ((deviceModel ?? '').isNotEmpty) {
-      segments.add(deviceModel!);
     } else {
-      segments.add('Customer');
+      if ((customerName ?? '').isNotEmpty) {
+        segments.add(customerName!);
+      }
+      if ((deviceModel ?? '').isNotEmpty) {
+        segments.add(deviceModel!);
+      }
+      if (segments.isEmpty) {
+        segments.add('Customer');
+      }
     }
 
     // 2. Timestamp
@@ -451,6 +457,22 @@ class _UnifiedDocumentDispatchSheetState
         try {
           final res = await apiClient.requestAbsolute(endpoint, method: 'GET');
           if (res.isNotEmpty && mounted) {
+            if (_targetPhone.isEmpty) {
+              final p = res['customer']?['phone'] ??
+                  res['customer_phone'] ??
+                  res['phone'];
+              if (p != null && p.toString().trim().isNotEmpty) {
+                _targetPhone = p.toString().trim();
+              }
+            }
+            if (_targetEmail.isEmpty) {
+              final e = res['customer']?['email'] ??
+                  res['customer_email'] ??
+                  res['email'];
+              if (e != null && e.toString().trim().isNotEmpty) {
+                _targetEmail = e.toString().trim();
+              }
+            }
             final parsed = _parseChannels(res);
             if (parsed.isNotEmpty) {
               setState(() {
@@ -874,20 +896,24 @@ class _UnifiedDocumentDispatchSheetState
             Divider(height: 1, color: borderColor),
             const SizedBox(height: 4),
 
-            // 1. Preview & Print
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf_outlined, color: AppTheme.activeLink, size: 22),
-              title: const Text(
-                'Preview & Print',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            // 1. Preview & Print (omitted for repair tickets, as tickets do not require a preview document)
+            if (widget.data.showPreview &&
+                widget.data.documentType != 'repair' &&
+                widget.data.documentType != 'ticket' &&
+                widget.data.documentType != 'job_sheet')
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf_outlined, color: AppTheme.activeLink, size: 22),
+                title: const Text(
+                  'Preview & Print',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  'Shared full-screen thermal/A4 preview with Print and Share',
+                  style: TextStyle(fontSize: 12, color: secondaryText),
+                ),
+                trailing: Icon(Icons.chevron_right_rounded, color: secondaryText, size: 20),
+                onTap: _handlePreview,
               ),
-              subtitle: Text(
-                'Shared full-screen thermal/A4 preview with Print and Share',
-                style: TextStyle(fontSize: 12, color: secondaryText),
-              ),
-              trailing: Icon(Icons.chevron_right_rounded, color: secondaryText, size: 20),
-              onTap: _handlePreview,
-            ),
 
             // 2. Print on Receipt Printer
             if (_supportsThermalPrint)
