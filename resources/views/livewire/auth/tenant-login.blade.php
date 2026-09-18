@@ -62,46 +62,20 @@
                                 {{ __($label) }}
                             </a>
                         @endforeach
-                        <a href="https://web.zoomnearby.com"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           class="px-2.5 py-1 rounded-lg border border-sky-500/40 bg-sky-500/20 text-sky-950 dark:text-sky-100 text-xs font-bold hover:bg-sky-500 hover:text-white hover:border-sky-500 transition flex items-center gap-1">
-                            <span>🚀</span> {{ __('Flutter Web Demo') }} &nearr;
-                        </a>
                     </div>
                 </div>
             @endif
 
-            <!-- Try Flutter Web Version Tenant Demo Banner / Button -->
-            <a href="https://web.zoomnearby.com"
-               target="_blank"
-               rel="noopener noreferrer"
-               class="group relative flex items-center justify-between p-3 sm:p-3.5 rounded-2xl border border-sky-500/30 dark:border-sky-400/25 bg-gradient-to-r from-sky-500/10 via-blue-500/10 to-indigo-500/10 hover:from-sky-500/20 hover:via-blue-500/20 hover:to-indigo-500/20 transition-all duration-200 shadow-xs hover:shadow-md hover:border-sky-500/50">
-                <div class="flex items-center gap-3 min-w-0">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-md shadow-sky-500/25 shrink-0 group-hover:scale-105 transition-transform">
-                        <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M14.314 0L2.3 12 6 15.7 21.684 0h-7.37zm.07 11.205L7.973 17.616 14.385 24h7.315l-9.8-9.8 2.484-2.995z"/>
-                        </svg>
-                    </div>
-                    <div class="min-w-0 text-left">
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <span class="text-xs sm:text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                {{ __('Try Flutter Web Tenant Demo') }}
-                            </span>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-sky-500 text-white shadow-xs">
-                                {{ __('New') }}
-                            </span>
-                        </div>
-                        <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                            {{ __('Explore our high-speed Flutter Web POS & store app at') }} <span class="text-sky-600 dark:text-sky-400 font-semibold underline underline-offset-2">https://web.zoomnearby.com</span>
-                        </p>
-                    </div>
-                </div>
-                <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-sky-500 to-blue-600 group-hover:from-sky-600 group-hover:to-blue-700 shadow-sm shadow-sky-500/25 transition shrink-0 ml-2">
-                    <span class="hidden sm:inline">{{ __('Launch Demo') }}</span>
-                    <svg class="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                </div>
-            </a>
+            <!-- Small single button: Try Flutter Web Version Tenant Demo -->
+            <div class="text-center">
+                <a href="https://web.zoomnearby.com"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-500/50 transition shadow-2xs">
+                    <span>🚀</span>
+                    <span>{{ __('Try Flutter Web Version Tenant Demo') }} &rarr;</span>
+                </a>
+            </div>
 
             <!-- Form -->
             <form wire:submit.prevent="login" class="space-y-4">

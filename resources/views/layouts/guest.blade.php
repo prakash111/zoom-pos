@@ -93,16 +93,6 @@
         <!-- Right Quick Actions -->
         <div class="auth-header-actions flex items-center gap-2 sm:gap-2.5 shrink-0">
 
-            @if(request()->routeIs('tenant.login'))
-                <a href="https://web.zoomnearby.com" target="_blank" rel="noopener noreferrer"
-                   class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-xs font-bold text-sky-700 dark:text-sky-300 transition shrink-0"
-                   title="{{ __('Try Flutter Web Tenant Demo') }}">
-                    <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
-                    <span>{{ __('Flutter Web Demo') }}</span>
-                    <svg class="w-3 h-3 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                </a>
-            @endif
-
             {{-- Mobile navigation toggle --}}
             @if (!empty($guestNavLinks))
                 <button type="button" x-on:click="navOpen = !navOpen" :aria-expanded="navOpen.toString()"
