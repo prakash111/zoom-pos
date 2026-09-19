@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+export 'package:zoom_pos_mobile/widgets/app_drawer.dart'
+    show DrawerItemParser, buildDrawerMenuItem;
+
 class RawMenuItem {
   const RawMenuItem({
     required this.id,
@@ -83,12 +86,10 @@ List<NavGroupItem> buildDrawerHierarchy(List<RawMenuItem> flatList) {
       'customers',
       'cash_register',
     }.contains(item.id);
-    final bool hasParent = !isFlatCoreAction &&
-        item.parentId != null &&
-        item.parentId!.isNotEmpty;
-    final bool isSubMenu = !isFlatCoreAction &&
-        (item.level > 0 || item.indent > 0) &&
-        hasParent;
+    final bool hasParent =
+        !isFlatCoreAction && item.parentId != null && item.parentId!.isNotEmpty;
+    final bool isSubMenu =
+        !isFlatCoreAction && (item.level > 0 || item.indent > 0) && hasParent;
     final bool isMainMenu =
         !isSubMenu && (item.level == 0 || item.indent == 0 || !hasParent);
 
@@ -181,7 +182,8 @@ Widget buildDrawerItemTile(
     leading: Icon(
       effectiveIcon,
       size: 22,
-      color: effectiveColor, // Inherits selected palette (purple, green, dark slate, etc.)
+      color:
+          effectiveColor, // Inherits selected palette (purple, green, dark slate, etc.)
     ),
     title: Text(
       title,
@@ -209,8 +211,8 @@ Widget buildSubMenuItemTile(
   Color? selectedColor,
   EdgeInsetsGeometry? contentPadding,
 }) {
-  final IconData effectiveIcon = iconData ??
-      (icon is IconData ? icon : Icons.subdirectory_arrow_right);
+  final IconData effectiveIcon =
+      iconData ?? (icon is IconData ? icon : Icons.subdirectory_arrow_right);
   final Color effectiveColor = isSelected
       ? (selectedColor ?? activeColor)
       : activeColor.withValues(alpha: 0.85);

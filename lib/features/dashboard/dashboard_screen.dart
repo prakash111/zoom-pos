@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/widgets/app_network_image.dart';
+import '../../widgets/tenant_logo_avatar.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/config/bootstrap_cache.dart';
@@ -42,6 +42,15 @@ import '../settings/server_settings_screen.dart';
 import '../settings/settings_repository.dart';
 
 const int _maximumNavigationDepth = 2;
+
+const Set<String> _forcedRootKeys = <String>{
+  'settings',
+  'pos',
+  'pharmacy_pos',
+  'salon_pos',
+  'restaurant_pos',
+  'consignments',
+};
 
 class _FeatureTile {
   _FeatureTile(this.key, this.titleOf, this.icon,
@@ -258,7 +267,12 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
     }
   }
 
-  if (!sectionMetaByKey.containsKey('cashier_sales')) {
+  final activeMode = BootstrapCache.instance.activeMode.toLowerCase().trim();
+  final isSpecialized = activeMode != 'retail' &&
+      activeMode != 'general' &&
+      activeMode.isNotEmpty;
+
+  if (!isSpecialized && !sectionMetaByKey.containsKey('cashier_sales')) {
     sectionMetaByKey['cashier_sales'] = _NavSection(
       'cashier_sales',
       (l10n) => BootstrapCache.instance.resolveNavigationLabel(
@@ -270,6 +284,12 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
     );
   }
 
+  // Specialized vertical tenants maintain POS and commerce inside their vertical block;
+  // do not append or retain a redundant generic cashier_sales section.
+  if (isSpecialized) {
+    tilesBySection.remove('cashier_sales');
+  }
+
   final result = <_NavSection>[];
   for (final entry in tilesBySection.entries) {
     final rows = entry.value;
@@ -278,11 +298,13 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
 
     for (final row in rows) {
       final item = itemOverrides[row.tile.key];
-      // Store Settings must NEVER be trapped under Subscription & Billing or any parent.
-      final rawParent = row.tile.key == 'settings'
+      final isForcedRoot = _forcedRootKeys.contains(row.tile.key);
+      final rawParent = isForcedRoot
           ? null
           : (item != null
-              ? (item.level == 0 || item.parentId == null || item.parentId!.isEmpty
+              ? (item.level == 0 ||
+                      item.parentId == null ||
+                      item.parentId!.isEmpty
                   ? null
                   : (item.parentId ?? item.parent))
               : sectionMetaByKey[entry.key]?.parentByKey[row.tile.key]);
@@ -301,7 +323,7 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
           valid = false;
           break;
         }
-        cursor = cursor == 'settings'
+        cursor = _forcedRootKeys.contains(cursor)
             ? null
             : (itemOverrides[cursor] != null
                 ? (itemOverrides[cursor]!.level == 0 ||
@@ -761,8 +783,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               image: hasCover
                   ? DecorationImage(
                       image: kIsWeb
-                          ? NetworkImage(coverUrl, webHtmlElementStrategy: WebHtmlElementStrategy.prefer)
-                          : CachedNetworkImageProvider(coverUrl) as ImageProvider,
+                          ? NetworkImage(coverUrl,
+                              webHtmlElementStrategy:
+                                  WebHtmlElementStrategy.prefer)
+                          : CachedNetworkImageProvider(coverUrl)
+                              as ImageProvider,
                       fit: BoxFit.cover,
                     )
                   : null,
@@ -781,33 +806,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (logoUrl != null && logoUrl.isNotEmpty) ...[
-                  Container(
-                    width: 50,
-                    height: 50,
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.18),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(4),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: AppNetworkImage(
-                        imageUrl: logoUrl,
-                        fit: BoxFit.contain,
-                        fallbackIcon: Icons.storefront,
-                      ),
-                    ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: TenantLogoAvatar(
+                    imageUrl: logoUrl,
+                    tenantName: company?.tradeName ??
+                        company?.name ??
+                        'Sales & Inventory',
+                    size: 50,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ],
+                ),
                 Text(
                   company?.tradeName ?? company?.name ?? 'Sales & Inventory',
                   style: const TextStyle(
@@ -883,36 +892,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         for (final section in navSections) {
           if (section.tiles.isEmpty) continue;
-          final firstItem = section.tiles.first;
 
           final rootItems = <_FeatureTile>[];
           final childrenByParent = <String?, List<_FeatureTile>>{};
-          _FeatureTile? activeParent;
 
           for (final tile in section.tiles) {
             final override = itemOverrides[tile.key];
+            final bool isForcedRoot = _forcedRootKeys.contains(tile.key);
             // Check if the item is explicitly a Main Menu (level 0)
-            final bool isMainMenu = override != null
-                ? (override.level == 0 ||
-                    override.parentId == null ||
-                    override.parentId!.isEmpty)
-                : (tile.key == 'settings' ||
-                    tile.key == firstItem.key ||
-                    (section.key != 'cashier_sales' &&
-                        section.parentByKey[tile.key] == null));
+            final bool isMainMenu = isForcedRoot ||
+                (override != null
+                    ? (override.level == 0 ||
+                        override.parentId == null ||
+                        override.parentId!.isEmpty)
+                    : (section.parentByKey[tile.key] == null));
 
             if (isMainMenu) {
-              activeParent = tile;
               rootItems.add(tile);
             } else {
               final targetParentKey = (override != null &&
                       override.parentId != null &&
                       override.parentId!.isNotEmpty)
                   ? override.parentId!
-                  : (section.parentByKey[tile.key] ??
-                      activeParent?.key ??
-                      firstItem.key);
-              (childrenByParent[targetParentKey] ??= []).add(tile);
+                  : section.parentByKey[tile.key];
+              if (targetParentKey != null && targetParentKey.isNotEmpty) {
+                (childrenByParent[targetParentKey] ??= []).add(tile);
+              } else {
+                rootItems.add(tile);
+              }
             }
           }
 
@@ -1831,9 +1838,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: Text(
-          company?.tradeName ?? company?.name ?? 'Sales & Inventory',
-          overflow: TextOverflow.ellipsis,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TenantLogoAvatar(
+              imageUrl: company?.logoUrl ?? bootstrap.logoUrl,
+              tenantName: company?.tradeName ?? company?.name,
+              size: 28,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                company?.tradeName ?? company?.name ?? 'Sales & Inventory',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         elevation: 0,
         bottom: appBarBottom,

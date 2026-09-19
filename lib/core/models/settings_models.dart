@@ -247,8 +247,8 @@ class NavSectionOrder {
 
   factory NavSectionOrder.fromJson(Map<String, dynamic> json) {
     return NavSectionOrder(
-        key: json['key'] as String? ?? '',
-        order: (json['order'] as num?)?.toInt() ?? 0,
+        key: json['key']?.toString() ?? '',
+        order: _safeNavInt(json['order']) ?? 0,
         customTitle: json['custom_title']?.toString().trim().isNotEmpty == true
             ? json['custom_title'].toString().trim()
             : null);
@@ -282,19 +282,17 @@ class NavItemConfig {
 
   factory NavItemConfig.fromJson(Map<String, dynamic> json) {
     return NavItemConfig(
-      key: json['key'] as String? ?? '',
-      section: json['section'] as String?,
-      parent: (json['parent_id'] ?? json['parent']) as String?,
-      level: ((json['level'] as num?)?.toInt() ?? 0).clamp(0, 2),
-      order: (json['order'] as num?)?.toInt(),
-      visible: json['visible'] as bool? ?? true,
-      children: json['children'] is List
-          ? (json['children'] as List)
-              .whereType<Map>()
-              .map((item) =>
-                  NavItemConfig.fromJson(Map<String, dynamic>.from(item)))
-              .toList()
-          : const [],
+      key: json['key']?.toString() ?? '',
+      section: _safeNullableNavString(json['section']),
+      parent: _safeNullableNavString(json['parent_id'] ?? json['parent']),
+      level: (_safeNavInt(json['level']) ?? 0).clamp(0, 2),
+      order: _safeNavInt(json['order']),
+      visible: _safeNavBool(json['visible'], fallback: true),
+      children: _safeNavList(json['children'])
+          .map(_safeNavMap)
+          .where((item) => item.isNotEmpty)
+          .map(NavItemConfig.fromJson)
+          .toList(),
     );
   }
 
@@ -349,13 +347,11 @@ class NavConfig {
   const NavConfig({this.sections = const [], this.items = const []});
 
   factory NavConfig.fromJson(Map<String, dynamic> json) {
-    final flatItems = json['items'] is List
-        ? (json['items'] as List)
-            .whereType<Map>()
-            .map((item) =>
-                NavItemConfig.fromJson(Map<String, dynamic>.from(item)))
-            .toList()
-        : <NavItemConfig>[];
+    final flatItems = _safeNavList(json['items'])
+        .map(_safeNavMap)
+        .where((item) => item.isNotEmpty)
+        .map(NavItemConfig.fromJson)
+        .toList();
 
     final rawItems =
         flatItems.isNotEmpty ? flatItems : _flattenTree(json['tree']);
@@ -376,15 +372,16 @@ class NavConfig {
       return item;
     }).toList();
 
-    final rawSections = json['sections'] is List
-        ? json['sections'] as List
-        : (json['tree'] is List ? json['tree'] as List : const []);
+    final configuredSections = _safeNavList(json['sections']);
+    final rawSections = configuredSections.isNotEmpty
+        ? configuredSections
+        : _safeNavList(json['tree']);
 
     return NavConfig(
       sections: rawSections
-          .whereType<Map>()
-          .map((section) =>
-              NavSectionOrder.fromJson(Map<String, dynamic>.from(section)))
+          .map(_safeNavMap)
+          .where((section) => section.isNotEmpty)
+          .map(NavSectionOrder.fromJson)
           .toList(),
       items: sanitizedItems,
     );
@@ -397,9 +394,9 @@ class NavConfig {
     final flattened = <NavItemConfig>[];
 
     void visit(dynamic rawNodes, String section, String? parent, int level) {
-      if (rawNodes is! List) return;
-      for (final raw in rawNodes.whereType<Map>()) {
-        final json = Map<String, dynamic>.from(raw);
+      for (final raw in _safeNavList(rawNodes)) {
+        final json = _safeNavMap(raw);
+        if (json.isEmpty) continue;
         final node = NavItemConfig.fromJson({
           ...json,
           'section': section,
@@ -412,10 +409,9 @@ class NavConfig {
       }
     }
 
-    if (source is! List) return flattened;
-    for (final rawSection in source.whereType<Map>()) {
-      final section = Map<String, dynamic>.from(rawSection);
-      final key = section['key'] as String? ?? '';
+    for (final rawSection in _safeNavList(source)) {
+      final section = _safeNavMap(rawSection);
+      final key = section['key']?.toString() ?? '';
       if (key.isNotEmpty) visit(section['items'], key, null, 0);
     }
 
@@ -523,4 +519,40 @@ class NavConfig {
       if (tree.isNotEmpty) 'tree': tree,
     };
   }
+}
+
+Map<String, dynamic> _safeNavMap(dynamic value) {
+  if (value is Map) {
+    final result = <String, dynamic>{};
+    value.forEach((k, v) {
+      result[k.toString()] = v;
+    });
+    return result;
+  }
+  return <String, dynamic>{};
+}
+
+List<dynamic> _safeNavList(dynamic value) {
+  if (value is Map) return List<dynamic>.from(value.values);
+  if (value is Iterable) return List<dynamic>.from(value);
+  return const <dynamic>[];
+}
+
+String? _safeNullableNavString(dynamic value) {
+  if (value == null) return null;
+  final result = value.toString();
+  return result.isEmpty ? null : result;
+}
+
+int? _safeNavInt(dynamic value) {
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '');
+}
+
+bool _safeNavBool(dynamic value, {required bool fallback}) {
+  if (value is bool) return value;
+  final normalized = value?.toString().trim().toLowerCase();
+  if (normalized == 'true' || normalized == '1') return true;
+  if (normalized == 'false' || normalized == '0') return false;
+  return fallback;
 }

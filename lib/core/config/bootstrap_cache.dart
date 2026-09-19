@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../models/settings_models.dart';
+import '../navigation/navigation_provider.dart';
 import '../sdui/models/sdui_models.dart';
 import '../utils/color_utils.dart';
 import '../services/dynamic_string_service.dart';
@@ -108,7 +109,8 @@ class BootstrapCache extends ChangeNotifier {
   static const _uiSchemaCacheKey = 'zoom_pos.bootstrap.ui_schema';
   static const _themeCacheKey = 'zoom_pos.bootstrap.theme';
   static const _labelsCacheKey = 'zoom_pos.bootstrap.navigation_labels';
-  static const _formLabelsCacheKey = 'zoom_pos.bootstrap.form_field_customizations';
+  static const _formLabelsCacheKey =
+      'zoom_pos.bootstrap.form_field_customizations';
 
   TenantSchema? tenant;
   Map<String, ModuleSchema> modules = {};
@@ -247,9 +249,13 @@ class BootstrapCache extends ChangeNotifier {
       final navRaw = prefs.getString(_navCacheKey);
       if (navRaw != null) {
         try {
-          navConfig = NavConfig.fromJson(
-            Map<String, dynamic>.from(jsonDecode(navRaw) as Map),
-          );
+          final decoded = jsonDecode(navRaw);
+          if (decoded is Map) {
+            navConfig = NavConfig.fromJson(_safeMap(decoded));
+          } else if (decoded is List) {
+            navConfig = NavConfig.fromJson(
+                {'tree': _safeList(decoded), 'sections': _safeList(decoded)});
+          }
         } catch (error, stackTrace) {
           _logParseFailure('cached nav configuration', error, stackTrace);
         }
@@ -258,7 +264,10 @@ class BootstrapCache extends ChangeNotifier {
       final configRaw = prefs.getString(_configCacheKey);
       if (configRaw != null) {
         try {
-          config = Map<String, dynamic>.from(jsonDecode(configRaw) as Map);
+          final decoded = jsonDecode(configRaw);
+          if (decoded is Map) {
+            config = _safeMap(decoded);
+          }
         } catch (error, stackTrace) {
           _logParseFailure('cached app configuration', error, stackTrace);
         }
@@ -267,9 +276,10 @@ class BootstrapCache extends ChangeNotifier {
       final tenantRaw = prefs.getString(_tenantCacheKey);
       if (tenantRaw != null) {
         try {
-          tenant = TenantSchema.fromJson(
-            Map<String, dynamic>.from(jsonDecode(tenantRaw) as Map),
-          );
+          final decoded = jsonDecode(tenantRaw);
+          if (decoded is Map) {
+            tenant = TenantSchema.fromJson(_safeMap(decoded));
+          }
         } catch (error, stackTrace) {
           _logParseFailure('cached tenant', error, stackTrace);
         }
@@ -278,11 +288,12 @@ class BootstrapCache extends ChangeNotifier {
       final modulesRaw = prefs.getString(_modulesCacheKey);
       if (modulesRaw != null) {
         try {
-          final rawMap = Map<String, dynamic>.from(
-            jsonDecode(modulesRaw) as Map,
-          );
-          final parsedModules = _parseModules(rawMap, source: 'disk cache');
-          if (parsedModules.isNotEmpty) modules = parsedModules;
+          final decoded = jsonDecode(modulesRaw);
+          if (decoded is Map) {
+            final rawMap = _safeMap(decoded);
+            final parsedModules = _parseModules(rawMap, source: 'disk cache');
+            if (parsedModules.isNotEmpty) modules = parsedModules;
+          }
         } catch (error, stackTrace) {
           _logParseFailure('cached modules', error, stackTrace);
         }
@@ -291,8 +302,9 @@ class BootstrapCache extends ChangeNotifier {
       final menuRaw = prefs.getString(_menuCacheKey);
       if (menuRaw != null) {
         try {
+          final decoded = jsonDecode(menuRaw);
           final parsedMenu = _parseMenuStructure(
-            jsonDecode(menuRaw),
+            decoded,
             source: 'disk cache',
           );
           if (parsedMenu.isNotEmpty) {
@@ -310,9 +322,10 @@ class BootstrapCache extends ChangeNotifier {
       final uiSchemaRaw = prefs.getString(_uiSchemaCacheKey);
       if (uiSchemaRaw != null) {
         try {
-          uiSchema = SduiUiSchema.fromJson(
-            Map<String, dynamic>.from(jsonDecode(uiSchemaRaw) as Map),
-          );
+          final decoded = jsonDecode(uiSchemaRaw);
+          if (decoded is Map) {
+            uiSchema = SduiUiSchema.fromJson(_safeMap(decoded));
+          }
         } catch (error, stackTrace) {
           _logParseFailure('cached UI schema', error, stackTrace);
         }
@@ -321,10 +334,11 @@ class BootstrapCache extends ChangeNotifier {
       final themeRaw = prefs.getString(_themeCacheKey);
       if (themeRaw != null) {
         try {
-          theme = BootstrapTheme.fromJson(
-            Map<String, dynamic>.from(jsonDecode(themeRaw) as Map),
-          );
-          globalThemeProvider?.syncFromBootstrap(theme);
+          final decoded = jsonDecode(themeRaw);
+          if (decoded is Map) {
+            theme = BootstrapTheme.fromJson(_safeMap(decoded));
+            globalThemeProvider?.syncFromBootstrap(theme);
+          }
         } catch (error, stackTrace) {
           _logParseFailure('cached theme', error, stackTrace);
         }
@@ -335,7 +349,8 @@ class BootstrapCache extends ChangeNotifier {
         try {
           final decoded = jsonDecode(labelsRaw);
           if (decoded is Map) {
-            navigationLabels = decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
+            navigationLabels =
+                decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
           }
         } catch (error, stackTrace) {
           _logParseFailure('cached navigation labels', error, stackTrace);
@@ -347,10 +362,11 @@ class BootstrapCache extends ChangeNotifier {
         try {
           final decoded = jsonDecode(formLabelsRaw);
           if (decoded is Map) {
-            formFieldCustomizations = Map<String, dynamic>.from(decoded);
+            formFieldCustomizations = _safeMap(decoded);
           }
         } catch (error, stackTrace) {
-          _logParseFailure('cached form field customizations', error, stackTrace);
+          _logParseFailure(
+              'cached form field customizations', error, stackTrace);
         }
       }
     } catch (error, stackTrace) {
@@ -378,15 +394,14 @@ class BootstrapCache extends ChangeNotifier {
     try {
       final responseEnvelope = await client
           .get(ApiEndpoints.appBootstrap, query: {'locale': locale});
-      final response = responseEnvelope['data'] is Map
-          ? Map<String, dynamic>.from(responseEnvelope['data'] as Map)
-          : responseEnvelope;
+      final rawData = responseEnvelope['data'];
+      final Map<String, dynamic> response =
+          rawData is Map ? _safeMap(rawData) : _safeMap(responseEnvelope);
       final prefs = await SharedPreferences.getInstance();
 
       if (response['tenant'] is Map) {
         try {
-          tenant = TenantSchema.fromJson(
-              Map<String, dynamic>.from(response['tenant'] as Map));
+          tenant = TenantSchema.fromJson(_safeMap(response['tenant']));
           await prefs.setString(_tenantCacheKey, jsonEncode(tenant!.toJson()));
         } catch (error, stackTrace) {
           _logParseFailure('server tenant', error, stackTrace);
@@ -395,7 +410,7 @@ class BootstrapCache extends ChangeNotifier {
 
       if (response['modules'] is Map) {
         final parsedModules = _parseModules(
-          Map<String, dynamic>.from(response['modules'] as Map),
+          _safeMap(response['modules']),
           source: 'server bootstrap',
         );
         if (parsedModules.isNotEmpty) {
@@ -407,9 +422,10 @@ class BootstrapCache extends ChangeNotifier {
         }
       }
 
-      final menuPayload = response.containsKey('menu_structure')
-          ? response['menu_structure']
-          : response['navigation'] ?? response['sections'];
+      final menuPayload = response['menu_structure'] ??
+          response['navigation'] ??
+          response['nav_v2'] ??
+          response['sections'];
       debugPrint(
           'Bootstrap raw menu payload: ${menuPayload != null ? (menuPayload is List ? "${menuPayload.length} sections" : menuPayload.runtimeType) : "null"}');
       final parsedMenu = _parseMenuStructure(
@@ -430,8 +446,7 @@ class BootstrapCache extends ChangeNotifier {
 
       if (response['ui_schema'] is Map) {
         try {
-          uiSchema = SduiUiSchema.fromJson(
-              Map<String, dynamic>.from(response['ui_schema'] as Map));
+          uiSchema = SduiUiSchema.fromJson(_safeMap(response['ui_schema']));
           await prefs.setString(
               _uiSchemaCacheKey, jsonEncode(uiSchema.toJson()));
         } catch (error, stackTrace) {
@@ -449,26 +464,35 @@ class BootstrapCache extends ChangeNotifier {
         );
       }
 
-      final nav = response['nav'];
+      final nav = response['nav'] ?? response['nav_v2'];
       if (nav is Map) {
         try {
-          navConfig = NavConfig.fromJson(Map<String, dynamic>.from(nav));
+          navConfig = NavConfig.fromJson(_safeMap(nav));
           await prefs.setString(_navCacheKey, jsonEncode(navConfig.toJson()));
         } catch (error, stackTrace) {
-          _logParseFailure('server nav configuration', error, stackTrace);
+          _logParseFailure('nav_v2 schema', error, stackTrace);
+        }
+      } else if (nav is Iterable) {
+        try {
+          final list = List.from(nav);
+          navConfig = NavConfig.fromJson(
+              {'tree': _safeList(list), 'sections': _safeList(list)});
+          await prefs.setString(_navCacheKey, jsonEncode(navConfig.toJson()));
+        } catch (error, stackTrace) {
+          _logParseFailure('nav_v2 schema', error, stackTrace);
         }
       }
 
       final cfg = response['config'];
       if (cfg is Map) {
-        config = Map<String, dynamic>.from(cfg);
+        config = _safeMap(cfg);
         await prefs.setString(_configCacheKey, jsonEncode(config));
       }
 
       if (response['theme'] is Map) {
         try {
           await applyThemeJson(
-            Map<String, dynamic>.from(response['theme'] as Map),
+            _safeMap(response['theme']),
             preferences: prefs,
           );
         } catch (error, stackTrace) {
@@ -477,17 +501,23 @@ class BootstrapCache extends ChangeNotifier {
       }
 
       final navLabels = response['navigation_labels'] ??
-          (response['tenant'] is Map ? response['tenant']['navigation_labels'] : null);
+          (response['tenant'] is Map
+              ? response['tenant']['navigation_labels']
+              : null);
       if (navLabels is Map) {
-        navigationLabels = navLabels.map((k, v) => MapEntry(k.toString(), v.toString()));
+        navigationLabels =
+            navLabels.map((k, v) => MapEntry(k.toString(), v.toString()));
         await prefs.setString(_labelsCacheKey, jsonEncode(navigationLabels));
       }
 
       final formCustomizations = response['form_field_customizations'] ??
-          (response['tenant'] is Map ? response['tenant']['form_field_customizations'] : null);
+          (response['tenant'] is Map
+              ? response['tenant']['form_field_customizations']
+              : null);
       if (formCustomizations is Map) {
-        formFieldCustomizations = Map<String, dynamic>.from(formCustomizations);
-        await prefs.setString(_formLabelsCacheKey, jsonEncode(formFieldCustomizations));
+        formFieldCustomizations = _safeMap(formCustomizations);
+        await prefs.setString(
+            _formLabelsCacheKey, jsonEncode(formFieldCustomizations));
       }
     } catch (error, stackTrace) {
       if (menuStructure.isEmpty) {
@@ -595,7 +625,7 @@ class BootstrapCache extends ChangeNotifier {
       }
       try {
         parsed[entry.key] = ModuleSchema.fromJson(
-          Map<String, dynamic>.from(entry.value as Map),
+          _safeMap(entry.value),
         );
       } catch (error, stackTrace) {
         _logParseFailure('$source module ${entry.key}', error, stackTrace);
@@ -612,18 +642,21 @@ class BootstrapCache extends ChangeNotifier {
     if (rawSections is Map) {
       rawSections = rawSections['sections'] ??
           rawSections['navigation'] ??
-          rawSections['menu_structure'];
+          rawSections['nav_v2'] ??
+          rawSections['menu_structure'] ??
+          rawSections.values;
     }
 
-    if (rawSections is! List) {
+    if (rawSections is! Iterable) {
       debugPrint(
-          'Bootstrap $source: menu_structure must be a list, got ${rawSections.runtimeType}.');
+          'Bootstrap $source: menu_structure must be an iterable, got ${rawSections.runtimeType}.');
       return const [];
     }
 
+    final rawSectionsList = List.from(rawSections);
     final parsed = <SduiNavSectionSchema>[];
-    for (var index = 0; index < rawSections.length; index++) {
-      final rawSection = rawSections[index];
+    for (var index = 0; index < rawSectionsList.length; index++) {
+      final rawSection = rawSectionsList[index];
       if (rawSection is! Map) {
         debugPrint(
             'Bootstrap $source: ignoring non-object section at index $index.');
@@ -632,7 +665,7 @@ class BootstrapCache extends ChangeNotifier {
 
       try {
         final section = SduiNavSectionSchema.fromJson(
-          Map<String, dynamic>.from(rawSection),
+          _safeMap(rawSection),
         );
         if (section.key.isEmpty || section.items.isEmpty) {
           debugPrint(
@@ -641,10 +674,28 @@ class BootstrapCache extends ChangeNotifier {
         }
         parsed.add(section);
       } catch (error, stackTrace) {
-        _logParseFailure('$source section $index', error, stackTrace);
+        _logParseFailure('nav_v2 schema', error, stackTrace);
       }
     }
     return parsed;
+  }
+
+  static Map<String, dynamic> _safeMap(dynamic raw) {
+    final result = NavigationProvider.safeMap(raw);
+    result.updateAll((key, value) {
+      if (value is Map) return _safeMap(value);
+      if (value is Iterable) return _safeList(value);
+      return value;
+    });
+    return result;
+  }
+
+  static List<dynamic> _safeList(dynamic raw) {
+    return NavigationProvider.safeList(raw).map((item) {
+      if (item is Map) return _safeMap(item);
+      if (item is Iterable) return _safeList(item);
+      return item;
+    }).toList();
   }
 
   void _logParseFailure(String field, Object error, StackTrace stackTrace) {

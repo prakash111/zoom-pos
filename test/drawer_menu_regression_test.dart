@@ -422,12 +422,21 @@ void main() {
               order: 0,
               visible: true),
           NavItemConfig.fromJson({
-            'key': 'quotations',
+            'key': 'sales',
             'section': 'cashier_sales',
             'parent': 'pos',
             'parent_id': 'pos',
             'level': 1,
             'order': 1,
+            'visible': true,
+          }),
+          NavItemConfig.fromJson({
+            'key': 'quotations',
+            'section': 'cashier_sales',
+            'parent': 'pos',
+            'parent_id': 'pos',
+            'level': 1,
+            'order': 2,
             'visible': true,
           }),
           NavItemConfig.fromJson({
@@ -642,14 +651,19 @@ void main() {
       await tester.pumpAndSettle();
 
       // Store Profile is a standalone tile at depth 0, NOT an accordion containing the other items
-      expect(find.byKey(const ValueKey('drawer-item-settings_profile')), findsOneWidget);
-      expect(find.byKey(const ValueKey('drawer-expand-settings_profile')), findsNothing);
+      expect(find.byKey(const ValueKey('drawer-item-settings_profile')),
+          findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-expand-settings_profile')),
+          findsNothing);
 
       // Languages & Translations, Devices, Hardware Printer, Change Password are all visible at root level
-      expect(find.byKey(const ValueKey('drawer-item-languages')), findsOneWidget);
+      expect(
+          find.byKey(const ValueKey('drawer-item-languages')), findsOneWidget);
       expect(find.byKey(const ValueKey('drawer-item-devices')), findsOneWidget);
-      expect(find.byKey(const ValueKey('drawer-item-hardware_printer')), findsOneWidget);
-      expect(find.byKey(const ValueKey('drawer-item-change_password')), findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-hardware_printer')),
+          findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-change_password')),
+          findsOneWidget);
 
       // Sub-items of languages (staff, roles) are not visible until languages is expanded
       expect(find.byKey(const ValueKey('drawer-item-staff')), findsNothing);
@@ -664,8 +678,10 @@ void main() {
       expect(find.byKey(const ValueKey('drawer-item-roles')), findsOneWidget);
 
       // Verify indentation: staff has left padding 46 (16 + 1 * 30)
-      final staffTile = tester.widget<ListTile>(find.byKey(const ValueKey('drawer-item-staff')));
-      expect(staffTile.contentPadding, const EdgeInsets.only(left: 46, right: 12));
+      final staffTile = tester
+          .widget<ListTile>(find.byKey(const ValueKey('drawer-item-staff')));
+      expect(
+          staffTile.contentPadding, const EdgeInsets.only(left: 46, right: 12));
     });
   });
 }

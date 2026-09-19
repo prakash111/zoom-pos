@@ -10,14 +10,22 @@ import '../config/app_config.dart';
 String? resolveImageUrl(String? rawUrl, {String? baseUrl}) {
   if (rawUrl == null || rawUrl.trim().isEmpty) return null;
   final value = rawUrl.trim();
-  if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('data:image/')) {
+  if (value.startsWith('http://')) {
+    return 'https://${value.substring(7)}';
+  }
+  if (value.startsWith('https://') || value.startsWith('data:image/')) {
     return value;
   }
   if (value.startsWith('//')) {
     return 'https:$value';
   }
 
-  var host = (baseUrl == null || baseUrl.trim().isEmpty) ? AppConfig.defaultBaseUrl : baseUrl.trim();
+  var host = (baseUrl == null || baseUrl.trim().isEmpty)
+      ? AppConfig.defaultBaseUrl
+      : baseUrl.trim();
+  if (host.startsWith('http://')) {
+    host = 'https://${host.substring(7)}';
+  }
   host = host.replaceAll(RegExp(r'/+$'), '');
   host = host.replaceFirst(RegExp(r'/api/v1/pos$', caseSensitive: false), '');
   host = host.replaceFirst(RegExp(r'/api/v1$', caseSensitive: false), '');

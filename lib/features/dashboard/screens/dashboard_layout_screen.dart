@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +6,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/config/bootstrap_cache.dart';
 import '../../../core/models/analytics_model.dart';
 import '../../../core/sdui/sdui_component_registry.dart';
+import '../../../widgets/tenant_logo_avatar.dart';
 import '../../../core/widgets/dashboard_kit.dart';
 import '../../../core/widgets/dashboard_shell.dart';
 import '../../analytics/analytics_repository.dart';
@@ -73,18 +73,12 @@ class _DashboardLayoutScreenState extends State<DashboardLayoutScreen> {
     final company = auth?.company;
     final bootstrap = BootstrapCache.instance;
     final logoUrl = company?.logoUrl ?? bootstrap.logoUrl;
-    final brandMark = (logoUrl != null && logoUrl.isNotEmpty)
-        ? ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: CachedNetworkImage(
-              imageUrl: logoUrl,
-              width: 36,
-              height: 36,
-              fit: BoxFit.contain,
-              errorWidget: (_, __, ___) => const SizedBox.shrink(),
-            ),
-          )
-        : null;
+    final brandMark = TenantLogoAvatar(
+      imageUrl: logoUrl,
+      tenantName: company?.tradeName ?? company?.name,
+      size: 36,
+      borderRadius: BorderRadius.circular(8),
+    );
 
     return DashboardShell(
       destinations: [for (final r in _rail) r.$1],

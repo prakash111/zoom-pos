@@ -189,9 +189,10 @@ class SduiNavItemSchema {
         json['parent_id']?.toString() ?? json['parent']?.toString();
     final rawChildren = json['children'];
     final List<SduiNavItemSchema> parsedChildren = [];
-    if (rawChildren is List) {
-      for (var index = 0; index < rawChildren.length; index++) {
-        final child = rawChildren[index];
+    if (rawChildren is Iterable || rawChildren is Map) {
+      final childrenList = _safeSduiList(rawChildren);
+      for (var index = 0; index < childrenList.length; index++) {
+        final child = childrenList[index];
         if (child is! Map) {
           debugPrint(
               'Bootstrap navigation: ignoring non-object child at index $index for ${json['key'] ?? '(unknown)'}.');
@@ -199,7 +200,7 @@ class SduiNavItemSchema {
         }
         try {
           parsedChildren.add(SduiNavItemSchema.fromJson(
-            Map<String, dynamic>.from(child),
+            _safeSduiMap(child),
           ));
         } catch (error, stackTrace) {
           debugPrint(
@@ -209,7 +210,7 @@ class SduiNavItemSchema {
       }
     } else if (rawChildren != null) {
       debugPrint(
-          'Bootstrap navigation: expected children to be a list for ${json['key'] ?? '(unknown)'}, got ${rawChildren.runtimeType}.');
+          'Bootstrap navigation: expected children to be an iterable for ${json['key'] ?? '(unknown)'}, got ${rawChildren.runtimeType}.');
     }
 
     final rawKey = json['key']?.toString() ?? json['id']?.toString() ?? '';
@@ -236,12 +237,9 @@ class SduiNavItemSchema {
       'cash_register',
     }.contains(key);
     final normalizedParent = isFlatCoreAction ? null : rawParent;
-    final normalizedChildren = isFlatCoreAction
-        ? const <SduiNavItemSchema>[]
-        : parsedChildren;
-    final normalizedType = normalizedChildren.isNotEmpty
-        ? 'accordion'
-        : 'link';
+    final normalizedChildren =
+        isFlatCoreAction ? const <SduiNavItemSchema>[] : parsedChildren;
+    final normalizedType = normalizedChildren.isNotEmpty ? 'accordion' : 'link';
 
     return SduiNavItemSchema(
       key: key,
@@ -304,9 +302,10 @@ class SduiNavSectionSchema {
   factory SduiNavSectionSchema.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'] ?? json['children'];
     final parsedItems = <SduiNavItemSchema>[];
-    if (rawItems is List) {
-      for (var index = 0; index < rawItems.length; index++) {
-        final item = rawItems[index];
+    if (rawItems is Iterable || rawItems is Map) {
+      final itemsList = _safeSduiList(rawItems);
+      for (var index = 0; index < itemsList.length; index++) {
+        final item = itemsList[index];
         if (item is! Map) {
           debugPrint(
               'Bootstrap navigation: ignoring non-object item at index $index for section ${json['key'] ?? '(unknown)'}.');
@@ -314,7 +313,7 @@ class SduiNavSectionSchema {
         }
         try {
           parsedItems.add(SduiNavItemSchema.fromJson(
-            Map<String, dynamic>.from(item),
+            _safeSduiMap(item),
           ));
         } catch (error, stackTrace) {
           debugPrint(
@@ -324,7 +323,7 @@ class SduiNavSectionSchema {
       }
     } else if (rawItems != null) {
       debugPrint(
-          'Bootstrap navigation: expected items to be a list for section ${json['key'] ?? '(unknown)'}, got ${rawItems.runtimeType}.');
+          'Bootstrap navigation: expected items to be an iterable for section ${json['key'] ?? '(unknown)'}, got ${rawItems.runtimeType}.');
     }
 
     // Newer backends explicitly identify the actionable section parent and
@@ -334,15 +333,15 @@ class SduiNavSectionSchema {
     final rawFirstItem = json['first_item'];
     if (rawFirstItem is Map) {
       explicitItems.add(SduiNavItemSchema.fromJson(
-        Map<String, dynamic>.from(rawFirstItem),
+        _safeSduiMap(rawFirstItem),
       ));
     }
     final rawSubItems = json['sub_items'];
-    if (rawSubItems is List) {
-      for (final item in rawSubItems) {
+    if (rawSubItems is Iterable || rawSubItems is Map) {
+      for (final item in _safeSduiList(rawSubItems)) {
         if (item is Map) {
           explicitItems.add(SduiNavItemSchema.fromJson(
-            Map<String, dynamic>.from(item),
+            _safeSduiMap(item),
           ));
         }
       }
@@ -658,4 +657,21 @@ class SduiUiSchema {
         'tax_configuration': taxConfiguration.toJson(),
         'action_pills': actionPills.map((p) => p.toJson()).toList(),
       };
+}
+
+Map<String, dynamic> _safeSduiMap(dynamic value) {
+  if (value is Map) {
+    final result = <String, dynamic>{};
+    value.forEach((k, v) {
+      result[k.toString()] = v;
+    });
+    return result;
+  }
+  return <String, dynamic>{};
+}
+
+List<dynamic> _safeSduiList(dynamic value) {
+  if (value is Map) return List<dynamic>.from(value.values);
+  if (value is Iterable) return List<dynamic>.from(value);
+  return const <dynamic>[];
 }
