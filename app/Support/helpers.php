@@ -69,6 +69,26 @@ if (! function_exists('get_appearance_settings')) {
     }
 }
 
+if (! function_exists('get_contact_form_fields')) {
+    /**
+     * Retrieve configured dynamic form fields for the public contact page and landing form.
+     */
+    function get_contact_form_fields(): array
+    {
+        return \App\Services\ContactFormService::getFields();
+    }
+}
+
+if (! function_exists('get_contact_form_settings')) {
+    /**
+     * Retrieve global contact form settings (titles, buttons, emails).
+     */
+    function get_contact_form_settings(): array
+    {
+        return \App\Services\ContactFormService::getSettings();
+    }
+}
+
 if (! function_exists('default_landing_sections_palette')) {
     /** Default granular color pairs for public landing page sections. */
     function default_landing_sections_palette(): array

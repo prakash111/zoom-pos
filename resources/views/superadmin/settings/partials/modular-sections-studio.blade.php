@@ -786,6 +786,18 @@ Automated low-stock threshold alerts') }}" class="w-full px-3.5 py-2 rounded-xl 
                     <input type="text" wire:model="supportPhone" placeholder="+1 (555) 019-2834" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium">
                 </div>
             </div>
+
+            <div class="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <span class="text-xs font-black text-indigo-900 dark:text-indigo-200 block">{{ __('Custom Contact Form Fields & Visitor Inquiries') }}</span>
+                    <span class="text-[11px] text-indigo-700 dark:text-indigo-400">{{ __('Add arbitrary custom fields (numbers, dropdowns, checkboxes) and manage visitor submissions in real-time.') }}</span>
+                </div>
+                <a href="{{ route('superadmin.inquiries.index', ['tab' => 'builder']) }}"
+                   class="px-4 py-2 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white transition flex items-center gap-1.5 shrink-0 shadow-sm">
+                    <span>🛠️ {{ __('Open Custom Form Builder') }}</span>
+                    <span>→</span>
+                </a>
+            </div>
         </div>
 
         <!-- ============================================================== -->

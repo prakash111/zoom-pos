@@ -52,6 +52,7 @@ Route::prefix('superadmin')->name('superadmin.')->group(function () {
         Route::get('/settings/regional', Settings\Index::class)->name('settings.regional');
         Route::get('/branding', fn () => redirect()->route('superadmin.settings.index', ['tab' => 'whitelabel']))->name('branding.index');
         Route::get('/menus', MenuBuilderComponent::class)->name('menus.index');
+        Route::get('/inquiries', \App\Livewire\SuperAdmin\Inquiries\Index::class)->name('inquiries.index');
         Route::get('/pages', Pages\Index::class)->name('pages.index');
         Route::get('/pages/create', Pages\Create::class)->name('pages.create');
         Route::get('/pages/{page}', Pages\Edit::class)->name('pages.edit');

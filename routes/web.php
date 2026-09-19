@@ -99,6 +99,10 @@ if (config('app.demo_mode')) {
 Route::middleware(EnsureAppIsInstalled::class)->get('/page/{page:slug}', [PublicPageController::class, 'show'])->name('page.show');
 Route::middleware(EnsureAppIsInstalled::class)->get('/pages/{page:slug}', [PublicPageController::class, 'show'])->name('pages.show');
 
+Route::middleware(EnsureAppIsInstalled::class)
+    ->get('/contact', [PublicContactController::class, 'index'])
+    ->name('contact.index');
+
 Route::middleware([EnsureAppIsInstalled::class, 'throttle:6,1'])
     ->post('/contact', [PublicContactController::class, 'store'])
     ->name('contact.store');

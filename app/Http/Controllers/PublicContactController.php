@@ -2,56 +2,60 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\ContactInquiryMailable;
-use App\Models\ContactInquiry;
+use App\Models\Page;
 use App\Models\PlatformBranding;
+use App\Services\ContactFormService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\View\View;
 
 /**
- * Handles the marketing-site "Questions before you sign up?" form.
+ * Handles the marketing-site contact page and form submissions.
  *
- * The public pages don't load Livewire, so the contact form is a plain
- * <form method="POST"> that works with JavaScript disabled and is enhanced
- * with a fetch() submit for an inline success state. Throttled at the route.
+ * Supports arbitrary custom form fields configured by Superadmin,
+ * Honeypot anti-spam protection, responsive dynamic rendering,
+ * and AJAX / standard HTTP redirects.
  */
 class PublicContactController extends Controller
 {
+    public function index(Request $request): View
+    {
+        $branding = PlatformBranding::current();
+        $contactSettings = ContactFormService::getSettings();
+        $fields = ContactFormService::getFields();
+        $appearance = get_appearance_settings();
+        $footerPages = Page::where('is_active', true)
+            ->where('show_in_footer', true)
+            ->orderBy('title')
+            ->get();
+
+        return view('public.contact', [
+            'branding' => $branding,
+            'contactSettings' => $contactSettings,
+            'fields' => $fields,
+            'appearance' => $appearance,
+            'footerPages' => $footerPages,
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse|JsonResponse
     {
         // Honeypot: real users never fill a hidden field. Silently accept so a
-        // bot can't tell it was rejected.
+        // bot cannot tell it was rejected.
         if (filled($request->input('company_website'))) {
             return $this->done($request, 'Thanks — your message has been received.');
         }
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255'],
-            'store_type' => ['nullable', 'string', 'max:50'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'subject' => ['nullable', 'string', 'max:255'],
-            'message' => ['required', 'string', 'max:5000'],
-        ]);
+        $rules = ContactFormService::buildValidationRules();
+        $validated = $request->validate($rules);
 
-        $inquiry = ContactInquiry::create($validated);
+        $inquiry = ContactFormService::processSubmission($validated, $request->ip());
 
-        $recipient = PlatformBranding::current()->support_email ?: config('mail.from.address');
+        $settings = ContactFormService::getSettings();
+        $successMsg = $settings['success_message'] ?: "Message sent — we'll get back to you shortly.";
 
-        if ($recipient) {
-            try {
-                Mail::to($recipient)->send(new ContactInquiryMailable($inquiry));
-            } catch (\Throwable $e) {
-                // The inquiry is already stored — a mail transport hiccup must
-                // not fail the visitor's submission.
-                Log::warning('Failed to send contact inquiry notification email.', ['error' => $e->getMessage()]);
-            }
-        }
-
-        return $this->done($request, "Message sent — we'll get back to you shortly.");
+        return $this->done($request, $successMsg);
     }
 
     private function done(Request $request, string $message): RedirectResponse|JsonResponse

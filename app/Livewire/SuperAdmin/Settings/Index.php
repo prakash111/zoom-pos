@@ -725,10 +725,21 @@ class Index extends Component
             $this->landingTheme = $themeKey;
             set_setting('landing_page_theme', $themeKey);
             cache()->forget('app_landing_page_theme');
-            cache()->increment('landing_page_cache_version') ?: cache()->forever('landing_page_cache_version', 2);
+            cache()->forget('landing_page_theme_config');
+            cache()->forget('landing_sections_theme_palette');
+            if (cache()->has('landing_page_cache_version')) {
+                cache()->increment('landing_page_cache_version');
+            } else {
+                cache()->forever('landing_page_cache_version', 2);
+            }
             $this->dispatch('toast', ['message' => 'Landing page layout updated successfully!', 'type' => 'success']);
             $this->dispatch('notify', ['type' => 'success', 'message' => 'Landing page layout updated successfully!']);
         }
+    }
+
+    public function updatedLandingTheme(string $value): void
+    {
+        $this->setLandingTheme($value);
     }
 
     public function saveAppearance(array $appearance): void
@@ -736,7 +747,7 @@ class Index extends Component
         $allowedLayouts = ['slim', 'expanded', 'macos-dock', 'speed-dial'];
         $allowedPositions = ['left', 'right', 'top', 'bottom', 'floating'];
         $allowedModes = ['docked', 'floating'];
-        $allowedItems = ['dashboard', 'tenants', 'plans', 'codes', 'taxes', 'menus', 'pages', 'settings', 'smtp'];
+        $allowedItems = ['dashboard', 'tenants', 'plans', 'codes', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
 
         $layout = in_array($appearance['layout'] ?? null, $allowedLayouts, true) ? $appearance['layout'] : 'slim';
         $position = in_array($appearance['position'] ?? null, $allowedPositions, true) ? $appearance['position'] : 'left';
@@ -753,7 +764,7 @@ class Index extends Component
             'appearance_ui_accent_color' => $this->validatedColor($appearance['uiAccentColor'] ?? null, '#4f46e5'),
             'appearance_nav_text_color' => $this->validatedColor($appearance['navTextColor'] ?? null, '#ffffff'),
             'appearance_nav_text_active_color' => $this->validatedColor($appearance['navTextActiveColor'] ?? null, '#60a5fa'),
-            'appearance_nav_visible_items' => json_encode($visibleItems ?: ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'pages', 'settings', 'smtp']),
+            'appearance_nav_visible_items' => json_encode($visibleItems ?: ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp']),
             'landing_dark_bg' => $landingDarkBg,
         ];
 
@@ -1462,6 +1473,7 @@ class Index extends Component
             'superadminSidebarColor' => ['nullable', 'string', 'max:32'],
             'landingPrimaryColor' => ['nullable', 'string', 'max:32'],
             'landingAccentColor' => ['nullable', 'string', 'max:32'],
+            'landingTheme' => ['nullable', 'string', 'in:theme_fast,theme_modern,theme_enterprise,theme_minimal,theme_dark_studio'],
             'supportEmail' => ['nullable', 'email'],
             'supportPhone' => ['nullable', 'string', 'max:50'],
             'landingPageId' => ['nullable', 'exists:pages,id'],
@@ -1680,11 +1692,22 @@ class Index extends Component
             'landing_content' => $landingContent ?: null,
         ]);
 
+        $allowedThemes = ['theme_fast', 'theme_modern', 'theme_enterprise', 'theme_minimal', 'theme_dark_studio'];
+        if (in_array($this->landingTheme, $allowedThemes, true)) {
+            set_setting('landing_page_theme', $this->landingTheme);
+        }
+
         MenuItem::clearMenuCache();
         \Illuminate\Support\Facades\Cache::forget('public_settings');
         \Illuminate\Support\Facades\Cache::forget('platform_branding_settings');
         \Illuminate\Support\Facades\Cache::forget('app_landing_page_theme');
-        \Illuminate\Support\Facades\Cache::increment('landing_page_cache_version');
+        \Illuminate\Support\Facades\Cache::forget('landing_page_theme_config');
+        \Illuminate\Support\Facades\Cache::forget('landing_sections_theme_palette');
+        if (\Illuminate\Support\Facades\Cache::has('landing_page_cache_version')) {
+            \Illuminate\Support\Facades\Cache::increment('landing_page_cache_version');
+        } else {
+            \Illuminate\Support\Facades\Cache::forever('landing_page_cache_version', 2);
+        }
 
         AuditLog::record('branding.updated', null, auth('platform_web')->id());
 

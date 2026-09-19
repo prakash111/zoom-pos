@@ -317,8 +317,10 @@
             $isTaxes = request()->routeIs('superadmin.tax.*');
             $isMenus = request()->routeIs('superadmin.menus.*');
             $isPages = request()->routeIs('superadmin.pages.*');
+            $isInquiries = request()->routeIs('superadmin.inquiries.*');
             $isSmtp = request()->routeIs('superadmin.smtp.*');
             $isSettings = request()->routeIs('superadmin.settings.*') || request()->routeIs('superadmin.branding.*') || request()->routeIs('superadmin.backups.*') || request()->routeIs('superadmin.modules.*') || request()->routeIs('superadmin.system.*') || request()->routeIs('superadmin.audit.*') || request()->routeIs('superadmin.languages.*');
+            $unreadInquiriesCount = \App\Models\ContactInquiry::where('status', 'new')->count();
         @endphp
         
         <!-- ==========================================
@@ -596,6 +598,36 @@
                     <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ __('Pages') }}</span>
                 </a>
 
+                <!-- 6b. Web Inquiries -->
+                <a x-show="isItemVisible('inquiries')"
+                   wire:navigate.hover href="{{ route('superadmin.inquiries.index') }}"
+                   class="dockable-nav-item relative"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.inquiries.index') }}') ? 'true' : 'false'"
+                   aria-selected="{{ $isInquiries ? 'true' : 'false' }}"
+                   :class="{
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center': position === 'left' || position === 'right',
+                       'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.inquiries.index') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.inquiries.index') }}')
+                   }"
+                   @class([
+                       'transition-all group duration-200 cursor-pointer relative',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isInquiries,
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isInquiries,
+                   ])
+                   title="{{ __('Web Inquiries & Contact Form') }}">
+                    <div class="relative">
+                        <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        @if ($unreadInquiriesCount > 0)
+                            <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-indigo-900"></span>
+                        @endif
+                    </div>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ __('Inquiries') }}</span>
+                </a>
+
                 <!-- 7. Platform Settings -->
                 <a x-show="isItemVisible('settings')"
                    wire:navigate.hover href="{{ route('superadmin.settings.index') }}"
@@ -791,7 +823,7 @@
                 </div>
 
                 <!-- Category 4: Content & Navigation -->
-                <div x-show="isItemVisible('menus') || isItemVisible('pages')" :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
+                <div x-show="isItemVisible('menus') || isItemVisible('pages') || isItemVisible('inquiries')" :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
                         {{ __('Content & CMS') }}
                     </div>
@@ -810,6 +842,36 @@
                         <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
                             <div class="text-xs truncate">{{ __('Menu Builder') }}</div>
                             <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Header & footer navigation') }}</div>
+                        </div>
+                    </a>
+
+                    <a x-show="isItemVisible('inquiries')" wire:navigate.hover href="{{ route('superadmin.inquiries.index') }}"
+                       :class="{
+                           'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
+                           'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
+                           'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
+                       }"
+                       @class([
+                           'bg-white text-indigo-900 shadow-md' => $isInquiries,
+                           'text-white/80 hover:text-white hover:bg-white/15' => !$isInquiries,
+                       ])
+                       title="{{ __('Web Inquiries & Contact Form') }}">
+                        <span class="text-base shrink-0 relative">
+                            📬
+                            @if ($unreadInquiriesCount > 0)
+                                <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-indigo-900"></span>
+                            @endif
+                        </span>
+                        <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
+                            <div class="text-xs truncate flex items-center gap-1.5">
+                                <span>{{ __('Web Inquiries') }}</span>
+                                @if ($unreadInquiriesCount > 0)
+                                    <span class="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-500 text-white font-black">
+                                        {{ $unreadInquiriesCount }}
+                                    </span>
+                                @endif
+                            </div>
+                            <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Form leads & builder') }}</div>
                         </div>
                     </a>
 
@@ -1011,6 +1073,24 @@
                 </div>
             </a>
 
+            <!-- 6b. Web Inquiries -->
+            <a x-show="isItemVisible('inquiries')" wire:navigate.hover href="{{ route('superadmin.inquiries.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.inquiries.index') }}') ? 'true' : 'false'"
+               aria-selected="{{ $isInquiries ? 'true' : 'false' }}"
+               title="{{ __('Web Inquiries & Contact Form') }}">
+                <div @class([
+                    'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition relative',
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isInquiries,
+                    'bg-white/15 text-white hover:bg-white/30' => !$isInquiries,
+                ]) :class="isCurrentRoute('{{ route('superadmin.inquiries.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
+                    📬
+                    @if ($unreadInquiriesCount > 0)
+                        <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-indigo-900"></span>
+                    @endif
+                </div>
+            </a>
+
             <!-- 7. Platform Settings -->
             <a x-show="isItemVisible('settings')" wire:navigate.hover href="{{ route('superadmin.settings.index') }}"
                class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
@@ -1124,6 +1204,16 @@
                 <a x-show="isItemVisible('pages')" wire:navigate.hover href="{{ route('superadmin.pages.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
                     <span>{{ __('Pages') }}</span>
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">📄</span>
+                </a>
+
+                <a x-show="isItemVisible('inquiries')" wire:navigate.hover href="{{ route('superadmin.inquiries.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                    <span>{{ __('Inquiries') }}</span>
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center relative">
+                        📬
+                        @if ($unreadInquiriesCount > 0)
+                            <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-indigo-900"></span>
+                        @endif
+                    </span>
                 </a>
 
                 <a x-show="isItemVisible('settings')" wire:navigate.hover href="{{ route('superadmin.settings.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
@@ -1293,6 +1383,26 @@
                                 <div>
                                     <div class="font-bold">{{ __('Custom Pages') }}</div>
                                     <div class="text-[10px] text-slate-400 font-normal">{{ __('Public content pages, TinyMCE editor') }}</div>
+                                </div>
+                            </a>
+
+                            <a wire:navigate.hover href="{{ route('superadmin.inquiries.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                                <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition relative">
+                                    📬
+                                    @if ($unreadInquiriesCount > 0)
+                                        <span class="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full"></span>
+                                    @endif
+                                </span>
+                                <div class="flex-1">
+                                    <div class="font-bold flex items-center justify-between">
+                                        <span>{{ __('Web Inquiries & Form') }}</span>
+                                        @if ($unreadInquiriesCount > 0)
+                                            <span class="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-500 text-white font-black">
+                                                {{ $unreadInquiriesCount }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 font-normal">{{ __('Visitor inquiries & custom form builder') }}</div>
                                 </div>
                             </a>
 

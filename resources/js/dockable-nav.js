@@ -37,6 +37,7 @@ export const ADMIN_DOCK_ITEMS = [
     { key: 'plans', label: 'SaaS Plans & Pricing', icon: '👑', route: 'superadmin.plans.index' },
     { key: 'taxes', label: 'Global Tax Engine', icon: '⚖️', route: 'superadmin.tax.index' },
     { key: 'menus', label: 'Menu Builder', icon: '🧭', route: 'superadmin.menus.index' },
+    { key: 'inquiries', label: 'Web Inquiries', icon: '📬', route: 'superadmin.inquiries.index' },
     { key: 'pages', label: 'CMS Custom Pages', icon: '📄', route: 'superadmin.pages.index' },
     { key: 'settings', label: 'Platform Settings', icon: '⚙️', route: 'superadmin.settings.index' },
     { key: 'smtp', label: 'SMTP & Mail Config', icon: '✉️', route: 'superadmin.smtp.index' }
@@ -64,9 +65,9 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
         visibleAdminItems: (function() {
             try {
                 const raw = localStorage.getItem('nav_visible_items');
-                return raw ? JSON.parse(raw) : ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'pages', 'settings', 'smtp'];
+                return raw ? JSON.parse(raw) : ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
             } catch(e) {
-                return ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'pages', 'settings', 'smtp'];
+                return ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
             }
         })(),
         x: 24,

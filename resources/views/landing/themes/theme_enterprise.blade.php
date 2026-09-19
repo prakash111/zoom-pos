@@ -709,6 +709,28 @@
     </section>
     @endif
 
+    {{-- Contact Inquiries Section --}}
+    @if ($branding->isSectionEnabled('contact'))
+    <section id="contact" class="landing-sec-contact py-16 sm:py-24 w-full border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6">
+            <div class="text-center mb-12">
+                <span class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-black uppercase tracking-wider mb-3">
+                    {{ $branding->getSectionBadge('contact', __('Get In Touch')) }}
+                </span>
+                <h2 class="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                    {{ $branding->getSectionTitle('contact', __('Speak with an Omnichannel POS Specialist')) }}
+                </h2>
+                <p class="mt-3 text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
+                    {{ $branding->getSectionSubtitle('contact', __('Need a tailored setup for multi-location retail, restaurant chains, or online catalog migration? Our solutions engineering team replies within 24 hours.')) }}
+                </p>
+            </div>
+            <div class="max-w-2xl mx-auto bg-white dark:bg-slate-900/80 rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-xl">
+                <x-landing.contact-form />
+            </div>
+        </div>
+    </section>
+    @endif
+
     {{-- Tour Modal Triggered by 'Watch Tour' --}}
     <div x-show="showTourModal" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
