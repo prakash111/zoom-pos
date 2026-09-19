@@ -9,6 +9,7 @@ use App\Models\PlatformSystem;
 use App\Models\PushNotificationSetting;
 use App\Services\Localization\LocalizationService;
 use App\Services\Modular\ModuleRegistry;
+use App\Services\Navigation\NavigationSanitizerService;
 use App\Services\Navigation\TenantNavigationConfigService;
 use App\Services\Navigation\TenantNavRegistry;
 use App\Services\Sdui\SchemaResponse;
@@ -16,6 +17,8 @@ use App\Services\Tenancy\TenantSampleDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -58,7 +61,9 @@ class AppBootstrapController extends Controller
         $allModules = ModuleRegistry::modulesFor($company);
         $availableModes = ModuleRegistry::availableModes($company);
         $activeModule = ModuleRegistry::getModule($activeMode);
-        $menuStructure = TenantNavRegistry::getEffectiveNavForTenant($company);
+        $menuStructure = NavigationSanitizerService::sanitizeSections(
+            TenantNavRegistry::getEffectiveNavForTenant($company)
+        );
         $navigationConfigVersion = sha1((string) json_encode($menuStructure));
 
         $translationVersion = $localization->translationVersion($locale, $company->id);
@@ -139,7 +144,7 @@ class AppBootstrapController extends Controller
             ],
             'translations' => $localization->getMergedTranslations($locale, $company->id),
             'translations_version' => $translationVersion,
-            'nav' => $company->normalizedNavConfig(),
+            'nav' => NavigationSanitizerService::normalizeNavPayload($company->normalizedNavConfig()),
             'push' => PushNotificationSetting::current()->publicConfig($company->id),
             'config' => [
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
@@ -202,11 +207,11 @@ class AppBootstrapController extends Controller
         ])->saveOrFail();
 
         $companyIdStr = (string) $company->id;
-        if (\Illuminate\Support\Facades\Schema::hasTable('tenant_settings')) {
-            \Illuminate\Support\Facades\DB::table('tenant_settings')->updateOrInsert(
+        if (Schema::hasTable('tenant_settings')) {
+            DB::table('tenant_settings')->updateOrInsert(
                 ['tenant_id' => $companyIdStr, 'key' => 'navigation_menu_custom'],
                 [
-                    'value'      => json_encode($navConfig['tree']),
+                    'value' => json_encode($navConfig['tree']),
                     'updated_at' => now(),
                     'created_at' => now(),
                 ]

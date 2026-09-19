@@ -42,15 +42,12 @@ class TenantNavigationConfigService
      */
     public const FORCED_ROOT = [
         'settings',
-        // Core commerce actions are always independent siblings. Older
-        // editors could persist these under POS or Consignments; normalize
-        // them at the API boundary so every client receives one shape.
+        // Point of Sale and Consignments are always independent root commerce links.
         'pos',
-        'sales',
-        'quotations',
+        'pharmacy_pos',
+        'salon_pos',
+        'restaurant_pos',
         'consignments',
-        'customers',
-        'cash_register',
     ];
 
     /**
@@ -181,6 +178,10 @@ class TenantNavigationConfigService
             $customTitle = trim((string) ($row['custom_title'] ?? ''));
             if ($customTitle === '') {
                 $customTitle = trim((string) ($treeSection['custom_title'] ?? ''));
+            }
+            if ($customTitle === '' && ! empty($treeSection['items'])) {
+                $first = $treeSection['items'][0];
+                $customTitle = trim((string) ($first['title'] ?? $first['label'] ?? ''));
             }
 
             $sections[$key] = ['key' => $key, 'order' => max(0, (int) ($row['order'] ?? $index))];
@@ -429,6 +430,12 @@ class TenantNavigationConfigService
             ];
             if (! empty($section['custom_title'])) {
                 $treeSection['custom_title'] = $section['custom_title'];
+            } elseif (! empty($treeSection['items'])) {
+                $first = $treeSection['items'][0];
+                $firstTitle = trim((string) ($first['title'] ?? $first['label'] ?? ''));
+                if ($firstTitle !== '') {
+                    $treeSection['custom_title'] = $firstTitle;
+                }
             }
 
             return $treeSection;
