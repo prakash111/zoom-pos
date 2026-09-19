@@ -699,6 +699,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final candidates = [
       company?.businessType,
       bootstrap.tenant?.businessType,
+      bootstrap.config['business_type']?.toString(),
+      bootstrap.config['store_type']?.toString(),
       bootstrap.activeModule.title,
       bootstrap.activeMode,
       company?.posMode,
@@ -729,8 +731,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final l10n = AppLocalizations.of(context);
 
         final tp = context.watch<ThemeProvider>();
-        final coverUrl = company?.drawerCoverUrl ?? bootstrap.drawerCoverUrl;
-        final logoUrl = company?.logoUrl ?? bootstrap.logoUrl;
+        final coverUrl = company?.drawerCoverUrl ??
+            bootstrap.drawerCoverUrl ??
+            bootstrap.config['drawer_cover_url']?.toString();
+        final logoUrl = company?.logoUrl ??
+            bootstrap.logoUrl ??
+            bootstrap.tenant?.logoUrl ??
+            bootstrap.config['logo_url']?.toString();
+        final storeTitle = company?.tradeName ??
+            company?.name ??
+            bootstrap.tenant?.businessName ??
+            bootstrap.config['store_name']?.toString() ??
+            bootstrap.config['trade_name']?.toString() ??
+            bootstrap.config['business_name']?.toString() ??
+            bootstrap.config['name']?.toString() ??
+            'ZoomNearby Enterprise';
         final hasCover = coverUrl != null && coverUrl.isNotEmpty;
         final primaryColor = tp.activeLinkColor ??
             bootstrap.theme.primaryColorValue ??
@@ -809,16 +824,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: TenantLogoAvatar(
-                    imageUrl: logoUrl,
-                    tenantName: company?.tradeName ??
-                        company?.name ??
-                        'Sales & Inventory',
+                    logoUrl: logoUrl,
+                    tenantName: storeTitle,
                     size: 50,
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 Text(
-                  company?.tradeName ?? company?.name ?? 'Sales & Inventory',
+                  storeTitle,
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,

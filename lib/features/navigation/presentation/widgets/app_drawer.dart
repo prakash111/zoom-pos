@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 export 'package:zoom_pos_mobile/widgets/app_drawer.dart'
-    show DrawerItemParser, buildDrawerMenuItem;
+    show DrawerItemParser, buildDrawerMenuItem, buildDrawerHeader, AppDrawer;
 
 class RawMenuItem {
   const RawMenuItem({

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Navigation item model hardened against Flutter Web minified JS cast exceptions.
 class NavItem {
@@ -133,16 +135,178 @@ class NavSection {
       };
 }
 
+/// Tenant metadata model hardened against minified JS dynamic type casts.
+class Tenant {
+  const Tenant({
+    required this.id,
+    required this.name,
+    this.tradeName,
+    this.businessType = 'RETAIL',
+    this.logoUrl,
+    this.drawerCoverUrl,
+    this.faviconUrl,
+    this.activeMode,
+  });
+
+  final String id;
+  final String name;
+  final String? tradeName;
+  final String businessType;
+  final String? logoUrl;
+  final String? drawerCoverUrl;
+  final String? faviconUrl;
+  final String? activeMode;
+
+  String get displayName =>
+      (tradeName != null && tradeName!.trim().isNotEmpty)
+          ? tradeName!.trim()
+          : (name.trim().isNotEmpty ? name.trim() : 'ZoomNearby Enterprise');
+
+  String get displayType {
+    final t = businessType.trim();
+    return (t.isNotEmpty && t.toLowerCase() != 'general')
+        ? t.toUpperCase()
+        : 'RETAIL';
+  }
+
+  factory Tenant.fromJson(Map<String, dynamic> json) {
+    final safe = NavigationProvider.safeMap(json);
+    final rawHeader = NavigationProvider.safeMap(
+        safe['drawer_header'] ?? safe['header']);
+
+    final rawName = safe['name']?.toString() ??
+        safe['business_name']?.toString() ??
+        safe['store_name']?.toString() ??
+        safe['display_name']?.toString() ??
+        safe['tenant_name']?.toString() ??
+        safe['title']?.toString() ??
+        rawHeader['name']?.toString() ??
+        rawHeader['store_name']?.toString() ??
+        rawHeader['business_name']?.toString() ??
+        rawHeader['title']?.toString() ??
+        '';
+
+    final rawTradeName = safe['trade_name']?.toString() ??
+        safe['trading_name']?.toString() ??
+        rawHeader['trade_name']?.toString() ??
+        rawHeader['trading_name']?.toString() ??
+        (rawName.isNotEmpty ? rawName : null);
+
+    final rawType = safe['business_type']?.toString() ??
+        safe['store_type']?.toString() ??
+        safe['active_mode']?.toString() ??
+        safe['pos_mode']?.toString() ??
+        rawHeader['store_type']?.toString() ??
+        rawHeader['business_type']?.toString() ??
+        rawHeader['badge']?.toString() ??
+        'RETAIL';
+
+    final rawLogo = safe['logo_url']?.toString() ??
+        safe['logo']?.toString() ??
+        rawHeader['logo_url']?.toString() ??
+        rawHeader['logo']?.toString();
+
+    final rawCover = safe['drawer_cover_url']?.toString() ??
+        rawHeader['drawer_cover_url']?.toString();
+
+    final rawFavicon = safe['favicon_url']?.toString() ??
+        rawHeader['favicon_url']?.toString();
+
+    return Tenant(
+      id: safe['id']?.toString() ?? '',
+      name: rawName,
+      tradeName: rawTradeName,
+      businessType: rawType.isNotEmpty ? rawType : 'RETAIL',
+      logoUrl: rawLogo,
+      drawerCoverUrl: rawCover,
+      faviconUrl: rawFavicon,
+      activeMode: safe['active_mode']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        if (tradeName != null) 'trade_name': tradeName,
+        'business_type': businessType,
+        if (logoUrl != null) 'logo_url': logoUrl,
+        if (drawerCoverUrl != null) 'drawer_cover_url': drawerCoverUrl,
+        if (faviconUrl != null) 'favicon_url': faviconUrl,
+        if (activeMode != null) 'active_mode': activeMode,
+      };
+}
+
 /// Provider managing navigation state, hardened against minified JS type errors
 /// (`TypeError: Instance of 'Minified:E<dynamic>': type 'Minified:E<dynamic>' is not a subtype of type 'Map<String, dynamic>'`).
 class NavigationProvider extends ChangeNotifier {
   List<NavSection> _sections = [];
   bool _isLoading = false;
   String? _error;
+  Tenant? _currentTenant;
 
   List<NavSection> get sections => _sections;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  Tenant? get currentTenant => _currentTenant;
+
+  static const String _cachedTenantProfileKey = 'cached_tenant_profile';
+  static const String _bootstrapTenantCacheKey = 'zoom_pos.bootstrap.tenant';
+  static const String _sessionCacheKey = 'zoom_pos.session_cache.v1';
+
+  /// Immediately loads cached tenant profile from SharedPreferences before network sync completes.
+  Future<Tenant?> loadCachedTenant() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedJson = prefs.getString(_cachedTenantProfileKey) ??
+          prefs.getString(_bootstrapTenantCacheKey);
+      if (cachedJson != null && cachedJson.trim().isNotEmpty) {
+        final decoded = jsonDecode(cachedJson);
+        if (decoded is Map) {
+          final tenant = Tenant.fromJson(safeMap(decoded));
+          if (tenant.name.isNotEmpty ||
+              tenant.tradeName?.isNotEmpty == true ||
+              tenant.id.isNotEmpty) {
+            _currentTenant = tenant;
+            notifyListeners();
+            return tenant;
+          }
+        }
+      }
+
+      // Fallback: check session cache
+      final sessionRaw = prefs.getString(_sessionCacheKey);
+      if (sessionRaw != null && sessionRaw.trim().isNotEmpty) {
+        final decoded = jsonDecode(sessionRaw);
+        if (decoded is Map && decoded['company'] is Map) {
+          final companyMap = safeMap(decoded['company']);
+          final tenant = Tenant.fromJson(companyMap);
+          if (tenant.name.isNotEmpty ||
+              tenant.tradeName?.isNotEmpty == true ||
+              tenant.id.isNotEmpty) {
+            _currentTenant = tenant;
+            notifyListeners();
+            return tenant;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('NavigationProvider.loadCachedTenant error: $e');
+    }
+    return _currentTenant;
+  }
+
+  /// Explicitly updates tenant and persists to local cache.
+  Future<void> updateTenant(Tenant tenant) async {
+    _currentTenant = tenant;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          _cachedTenantProfileKey, jsonEncode(tenant.toJson()));
+    } catch (e) {
+      debugPrint('NavigationProvider.updateTenant error: $e');
+    }
+    notifyListeners();
+  }
 
   /// Defensive map cloning. Guaranteed to never throw cast exceptions on minified web maps.
   static Map<String, dynamic> safeMap(dynamic value) {
@@ -180,6 +344,84 @@ class NavigationProvider extends ChangeNotifier {
     return fallback;
   }
 
+  /// Synchronizes bootstrap data from server or parsed payload.
+  /// Crucial rule: Errors or failures NEVER wipe [_currentTenant] to null.
+  Future<void> syncBootstrap([
+    dynamic payloadOrToken,
+    dynamic optionalClient,
+  ]) async {
+    // 1. Ensure local cache is read immediately if current tenant is null
+    if (_currentTenant == null) {
+      await loadCachedTenant();
+    }
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      dynamic payload;
+      if (payloadOrToken is Map) {
+        payload = payloadOrToken;
+      } else if (payloadOrToken is String && payloadOrToken.trim().isNotEmpty) {
+        if (optionalClient != null) {
+          try {
+            final res = await (optionalClient as dynamic).get('/app/bootstrap');
+            payload = res;
+          } catch (_) {
+            rethrow;
+          }
+        }
+      }
+
+      if (payload != null) {
+        final safePayload = safeMap(
+          payload is Map &&
+                  payload.containsKey('data') &&
+                  payload['data'] is Map
+              ? payload['data']
+              : payload,
+        );
+
+        final dynamic rawTenant = safePayload['tenant'] ??
+            safePayload['company'] ??
+            safePayload['drawer_header'] ??
+            safePayload['header'];
+
+        if (rawTenant is Map) {
+          final parsedTenant = Tenant.fromJson(safeMap(rawTenant));
+          if (parsedTenant.name.isNotEmpty ||
+              parsedTenant.tradeName?.isNotEmpty == true ||
+              parsedTenant.id.isNotEmpty) {
+            _currentTenant = parsedTenant;
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString(
+                _cachedTenantProfileKey,
+                jsonEncode(parsedTenant.toJson()),
+              );
+            } catch (_) {}
+          }
+        }
+
+        parseNavigation(safePayload);
+      }
+      _isLoading = false;
+      notifyListeners();
+    } catch (error, stackTrace) {
+      _error = error.toString();
+      _isLoading = false;
+      debugPrint('syncBootstrap failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      // NEVER wipe _currentTenant on bootstrap sync failure!
+      if (_currentTenant == null) {
+        await loadCachedTenant();
+      }
+      notifyListeners();
+    }
+  }
+
   /// Parses navigation sections from raw JSON collections using [List.from]
   /// and [safeMap] to harden against minified JS dynamic type casts.
   void parseNavigation(dynamic payload) {
@@ -189,6 +431,21 @@ class NavigationProvider extends ChangeNotifier {
 
     try {
       final safePayload = safeMap(payload);
+
+      // Extract tenant if embedded in payload
+      final dynamic rawTenant = safePayload['tenant'] ??
+          safePayload['company'] ??
+          safePayload['drawer_header'] ??
+          safePayload['header'];
+      if (rawTenant is Map) {
+        final parsedTenant = Tenant.fromJson(safeMap(rawTenant));
+        if (parsedTenant.name.isNotEmpty ||
+            parsedTenant.tradeName?.isNotEmpty == true ||
+            parsedTenant.id.isNotEmpty) {
+          _currentTenant = parsedTenant;
+        }
+      }
+
       final rawSections = safePayload.containsKey('sections')
           ? safePayload['sections']
           : (safePayload.containsKey('menu_structure')

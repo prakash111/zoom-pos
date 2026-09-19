@@ -160,7 +160,10 @@ class BootstrapCache extends ChangeNotifier {
       ? tenant!.availableModes
       : modules.keys.toList(growable: false);
 
-  String? get logoUrl => config['logo_url']?.toString();
+  String? get logoUrl =>
+      config['logo_url']?.toString() ??
+      config['logo']?.toString() ??
+      tenant?.logoUrl;
   String? get faviconUrl => config['favicon_url']?.toString();
   String? get drawerCoverUrl => config['drawer_cover_url']?.toString();
 
@@ -273,7 +276,8 @@ class BootstrapCache extends ChangeNotifier {
         }
       }
 
-      final tenantRaw = prefs.getString(_tenantCacheKey);
+      final tenantRaw = prefs.getString(_tenantCacheKey) ??
+          prefs.getString('cached_tenant_profile');
       if (tenantRaw != null) {
         try {
           final decoded = jsonDecode(tenantRaw);
@@ -399,10 +403,13 @@ class BootstrapCache extends ChangeNotifier {
           rawData is Map ? _safeMap(rawData) : _safeMap(responseEnvelope);
       final prefs = await SharedPreferences.getInstance();
 
-      if (response['tenant'] is Map) {
+      final dynamic rawTenantData = response['tenant'] ?? response['company'];
+      if (rawTenantData is Map) {
         try {
-          tenant = TenantSchema.fromJson(_safeMap(response['tenant']));
-          await prefs.setString(_tenantCacheKey, jsonEncode(tenant!.toJson()));
+          tenant = TenantSchema.fromJson(_safeMap(rawTenantData));
+          final encodedTenant = jsonEncode(tenant!.toJson());
+          await prefs.setString(_tenantCacheKey, encodedTenant);
+          await prefs.setString('cached_tenant_profile', encodedTenant);
         } catch (error, stackTrace) {
           _logParseFailure('server tenant', error, stackTrace);
         }

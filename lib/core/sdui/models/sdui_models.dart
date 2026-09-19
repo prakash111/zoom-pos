@@ -9,6 +9,7 @@ class TenantSchema {
     this.availableModes = const [],
     this.businessType,
     this.planFeatures = const [],
+    this.logoUrl,
   });
 
   final String id;
@@ -17,6 +18,7 @@ class TenantSchema {
   final List<String> availableModes;
   final String? businessType;
   final List<String> planFeatures;
+  final String? logoUrl;
 
   factory TenantSchema.fromJson(Map<String, dynamic> json) {
     final rawFeatures = json['plan_features'] ?? json['features'];
@@ -40,6 +42,16 @@ class TenantSchema {
                 : 'RETAIL'))
         .toString();
 
+    final rawLogo = (json['logo_url'] ??
+            json['logo'] ??
+            (json['drawer_header'] is Map
+                ? (json['drawer_header'] as Map)['logo_url']
+                : null) ??
+            (json['header'] is Map
+                ? (json['header'] as Map)['logo_url']
+                : null))
+        ?.toString();
+
     return TenantSchema(
       id: json['id']?.toString() ?? '',
       businessName:
@@ -53,6 +65,7 @@ class TenantSchema {
           const [],
       businessType: resolvedType,
       planFeatures: resolvedFeatures,
+      logoUrl: rawLogo,
     );
   }
 
@@ -63,6 +76,7 @@ class TenantSchema {
         'available_modes': availableModes,
         if (businessType != null) 'business_type': businessType,
         'plan_features': planFeatures,
+        if (logoUrl != null) 'logo_url': logoUrl,
       };
 }
 

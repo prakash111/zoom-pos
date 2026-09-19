@@ -22,7 +22,8 @@ import '../core/utils/image_url.dart';
 class TenantLogoAvatar extends StatelessWidget {
   const TenantLogoAvatar({
     super.key,
-    required this.imageUrl,
+    this.imageUrl,
+    this.logoUrl,
     this.tenantName,
     this.size = 48.0,
     this.borderRadius,
@@ -33,6 +34,7 @@ class TenantLogoAvatar extends StatelessWidget {
   });
 
   final String? imageUrl;
+  final String? logoUrl;
   final String? tenantName;
   final double size;
   final BorderRadius? borderRadius;
@@ -95,7 +97,7 @@ class TenantLogoAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secureUrl = normalizeHttps(imageUrl);
+    final secureUrl = normalizeHttps(logoUrl ?? imageUrl);
     final effectiveRadius = borderRadius ?? BorderRadius.circular(size * 0.22);
 
     if (secureUrl == null || secureUrl.isEmpty) {

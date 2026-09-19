@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zoom_pos_mobile/core/models/settings_models.dart';
 import 'package:zoom_pos_mobile/core/navigation/navigation_provider.dart';
 import 'package:zoom_pos_mobile/core/sdui/models/sdui_models.dart';
@@ -343,6 +345,182 @@ void main() {
       expect(uiSchema.tax.subComponents, hasLength(1));
       expect(uiSchema.actionPills, hasLength(1));
       expect(uiSchema.statusFor('orders', 'pending')?.label, 'Pending');
+    });
+  });
+
+  group('Tenant Model, Local Cache and Drawer Header Resilience Tests', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('Tenant.fromJson parses diverse schemas and drawer_header payloads', () {
+      final json = {
+        'id': 'tenant_123',
+        'store_name': 'ZoomWeb Retail',
+        'trade_name': 'ZoomWeb SuperStore',
+        'business_type': 'PHARMACY',
+        'logo_url': 'https://example.com/logo.png',
+        'drawer_header': {
+          'store_type': 'PHARMACY',
+          'badge': 'PHARMACY',
+        }
+      };
+
+      final tenant = Tenant.fromJson(json);
+      expect(tenant.id, 'tenant_123');
+      expect(tenant.displayName, 'ZoomWeb SuperStore');
+      expect(tenant.displayType, 'PHARMACY');
+      expect(tenant.logoUrl, 'https://example.com/logo.png');
+    });
+
+    testWidgets('TenantLogoAvatar supports logoUrl named parameter with fallback', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: TenantLogoAvatar(
+              logoUrl: null,
+              tenantName: 'Retail Hub',
+              size: 44,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('R'), findsOneWidget);
+    });
+
+    test('NavigationProvider loads cached tenant profile from SharedPreferences', () async {
+      SharedPreferences.setMockInitialValues({
+        'cached_tenant_profile': jsonEncode({
+          'id': 'cached_t1',
+          'name': 'Cached Store',
+          'trade_name': 'ZoomWeb Cached',
+          'business_type': 'RETAIL',
+          'logo_url': 'https://example.com/cached_logo.png',
+        }),
+      });
+
+      final provider = NavigationProvider();
+      expect(provider.currentTenant, isNull);
+
+      final loaded = await provider.loadCachedTenant();
+      expect(loaded, isNotNull);
+      expect(provider.currentTenant?.displayName, 'ZoomWeb Cached');
+      expect(provider.currentTenant?.displayType, 'RETAIL');
+      expect(provider.currentTenant?.logoUrl, 'https://example.com/cached_logo.png');
+    });
+
+    test('NavigationProvider.syncBootstrap never wipes currentTenant on failure', () async {
+      final provider = NavigationProvider();
+      final tenant = Tenant.fromJson({
+        'id': 'active_1',
+        'name': 'ZoomWeb Active',
+        'trade_name': 'ZoomWeb Active',
+        'business_type': 'RETAIL',
+      });
+
+      await provider.updateTenant(tenant);
+      expect(provider.currentTenant?.displayName, 'ZoomWeb Active');
+
+      // Trigger a failure in syncBootstrap by passing an invalid payload/throwing error
+      await provider.syncBootstrap('invalid_token', Object());
+
+      // Current tenant must still be preserved!
+      expect(provider.currentTenant, isNotNull);
+      expect(provider.currentTenant?.displayName, 'ZoomWeb Active');
+      expect(provider.error, isNotNull);
+    });
+
+    testWidgets('buildDrawerHeader renders store logo, brand name, and badge when tenant is provided', (tester) async {
+      final tenant = Tenant.fromJson({
+        'id': 't_test',
+        'name': 'ZoomWeb Store',
+        'trade_name': 'ZoomWeb Store',
+        'business_type': 'RETAIL',
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => buildDrawerHeader(
+                context,
+                tenant: tenant,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Verify header renders without collapsing
+      expect(find.byKey(const ValueKey('app-drawer-header')), findsOneWidget);
+      expect(find.text('ZoomWeb Store'), findsOneWidget);
+      expect(find.text('RETAIL'), findsOneWidget);
+      expect(find.byType(TenantLogoAvatar), findsOneWidget);
+    });
+
+    testWidgets('buildDrawerHeader never collapses into SizedBox.shrink when tenant is null', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => buildDrawerHeader(
+                context,
+                tenant: null,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Verify fallback name and badge render
+      expect(find.byKey(const ValueKey('app-drawer-header')), findsOneWidget);
+      expect(find.text('ZoomNearby Enterprise'), findsOneWidget);
+      expect(find.text('RETAIL'), findsOneWidget);
+      expect(find.byType(TenantLogoAvatar), findsOneWidget);
+    });
+
+    testWidgets('AppDrawer renders successfully with header and navigation items', (tester) async {
+      final tenant = Tenant.fromJson({
+        'id': 't_app_drawer',
+        'name': 'ZoomWeb POS',
+        'business_type': 'RETAIL',
+      });
+
+      final sections = [
+        const NavSection(
+          key: 'main',
+          title: 'Main Navigation',
+          items: [
+            NavItem(key: 'pos', title: 'Point of Sale'),
+            NavItem(key: 'sales', title: 'Sales'),
+          ],
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            drawer: AppDrawer(
+              tenant: tenant,
+              sections: sections,
+            ),
+            body: const Center(child: Text('Content')),
+          ),
+        ),
+      );
+
+      // Open drawer
+      final scaffoldState = tester.state<ScaffoldState>(find.byType(Scaffold));
+      scaffoldState.openDrawer();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppDrawer), findsOneWidget);
+      expect(find.text('ZoomWeb POS'), findsOneWidget);
+      expect(find.text('RETAIL'), findsOneWidget);
+      expect(find.text('MAIN NAVIGATION'), findsOneWidget);
+      expect(find.text('Point of Sale'), findsOneWidget);
+      expect(find.text('Sales'), findsOneWidget);
     });
   });
 }

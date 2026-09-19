@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../core/navigation/navigation_provider.dart';
+import 'tenant_logo_avatar.dart';
+
 /// DrawerItemParser provides parser and builder utilities for navigation drawer items.
 ///
 /// Strict rules enforced:
@@ -191,4 +194,211 @@ Widget buildDrawerMenuItem(
     onChildTap: onChildTap,
     isSelected: isSelected,
   );
+}
+
+/// Builds a resilient drawer header that never collapses to SizedBox.shrink().
+///
+/// Guaranteed behavior:
+/// - Renders store logo (via [TenantLogoAvatar]), brand name, and store type badge pill.
+/// - Falls back to 'ZoomNearby Enterprise' and 'RETAIL' if [tenant] is null or loading.
+/// - Never collapses into SizedBox.shrink() or empty space.
+/// - No web-specific suppression (renders consistently across web, desktop, and mobile).
+Widget buildDrawerHeader(
+  BuildContext context, {
+  Tenant? tenant,
+  String? fallbackName,
+  String? fallbackType,
+  String? logoUrl,
+  String? coverUrl,
+  Color? primaryColor,
+  VoidCallback? onTap,
+}) {
+  final displayName = (tenant?.displayName.isNotEmpty == true)
+      ? tenant!.displayName
+      : (fallbackName != null && fallbackName.trim().isNotEmpty
+          ? fallbackName.trim()
+          : 'ZoomNearby Enterprise');
+
+  final displayType = (tenant?.displayType.isNotEmpty == true)
+      ? tenant!.displayType
+      : (fallbackType != null && fallbackType.trim().isNotEmpty
+          ? fallbackType.trim().toUpperCase()
+          : 'RETAIL');
+
+  final effectiveLogo = tenant?.logoUrl ?? logoUrl;
+  final effectiveCover = tenant?.drawerCoverUrl ?? coverUrl;
+  final hasCover = effectiveCover != null && effectiveCover.trim().isNotEmpty;
+
+  return InkWell(
+    onTap: onTap,
+    child: Container(
+      key: const ValueKey('app-drawer-header'),
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        16,
+        MediaQuery.of(context).padding.top + 16,
+        16,
+        16,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A), // Slate-900 brand surface
+        image: hasCover
+            ? DecorationImage(
+                image: NetworkImage(
+                  effectiveCover,
+                  webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                ),
+                fit: BoxFit.cover,
+              )
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              TenantLogoAvatar(
+                logoUrl: effectiveLogo,
+                tenantName: displayName,
+                size: 44,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B), // Slate-800
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: const Color(0xFF334155),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        displayType,
+                        style: const TextStyle(
+                          color: Color(0xFF38BDF8), // Light Sky Blue
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Standalone resilient application drawer widget.
+class AppDrawer extends StatelessWidget {
+  const AppDrawer({
+    super.key,
+    this.tenant,
+    this.fallbackName,
+    this.fallbackType,
+    this.logoUrl,
+    this.coverUrl,
+    this.sections,
+    this.onItemTap,
+    this.activeColor = const Color(0xFF1D4ED8),
+    this.selectedKey,
+    this.headerOnTap,
+    this.footer,
+  });
+
+  final Tenant? tenant;
+  final String? fallbackName;
+  final String? fallbackType;
+  final String? logoUrl;
+  final String? coverUrl;
+  final List<NavSection>? sections;
+  final void Function(NavItem item)? onItemTap;
+  final Color activeColor;
+  final String? selectedKey;
+  final VoidCallback? headerOnTap;
+  final Widget? footer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      backgroundColor: const Color(0xFF0F172A),
+      child: SafeArea(
+        top: false,
+        bottom: true,
+        child: Column(
+          children: [
+            buildDrawerHeader(
+              context,
+              tenant: tenant,
+              fallbackName: fallbackName,
+              fallbackType: fallbackType,
+              logoUrl: logoUrl,
+              coverUrl: coverUrl,
+              onTap: headerOnTap,
+            ),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  if (sections != null)
+                    for (final section in sections!) ...[
+                      if (section.title.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                          child: Text(
+                            section.title.toUpperCase(),
+                            style: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      for (final item in section.items)
+                        DrawerItemParser.buildDrawerMenuItem(
+                          context,
+                          item.toJson(),
+                          activeColor: activeColor,
+                          isSelected: item.key == selectedKey,
+                          onTap: () => onItemTap?.call(item),
+                        ),
+                    ],
+                ],
+              ),
+            ),
+            if (footer != null) footer!,
+          ],
+        ),
+      ),
+    );
+  }
 }
