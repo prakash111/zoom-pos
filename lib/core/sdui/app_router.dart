@@ -1,13 +1,39 @@
 import 'package:flutter/material.dart';
 
+import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/register_screen.dart';
+import '../../features/landing/screens/landing_screen.dart';
 import 'screens/dynamic_schema_page.dart';
 
-/// The only business-page route resolver in the Flutter shell.
+/// The business-page and public route resolver in the Flutter shell.
 class AppRouter {
   AppRouter._();
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     final requested = settings.name?.trim() ?? '';
+    final normalized = requested.toLowerCase().replaceFirst(RegExp(r'^/+'), '');
+
+    if (normalized == 'landing' || normalized == 'home') {
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => const LandingScreen(),
+      );
+    }
+
+    if (normalized == 'login') {
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => const LoginScreen(),
+      );
+    }
+
+    if (normalized == 'register') {
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => const RegisterScreen(),
+      );
+    }
+
     final endpoint = requested.startsWith('/api/')
         ? requested
         : '/api/tenant/views/${requested.replaceFirst(RegExp(r'^/+'), '')}';

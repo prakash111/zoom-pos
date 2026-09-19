@@ -5,11 +5,41 @@ import 'package:flutter/material.dart';
 /// reference design. Drawn entirely with a [CustomPainter] so it needs no
 /// image asset and scales crisply to any window size.
 class AuthIllustration extends StatelessWidget {
-  const AuthIllustration({super.key});
+  const AuthIllustration({super.key, this.bannerImageUrl});
+
+  final String? bannerImageUrl;
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+
+    if (bannerImageUrl != null && bannerImageUrl!.trim().isNotEmpty) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF0B0F19)
+              : const Color(0xFFF8FAFC),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.network(
+                bannerImageUrl!,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => _defaultScene(context, primary),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return _defaultScene(context, primary);
+  }
+
+  Widget _defaultScene(BuildContext context, Color primary) {
     return DecoratedBox(
       decoration: const BoxDecoration(color: Colors.white),
       child: Padding(

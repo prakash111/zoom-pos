@@ -4,8 +4,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../widgets/tenant_logo_avatar.dart';
+import '../../core/config/platform_branding_provider.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/config/bootstrap_cache.dart';
@@ -660,6 +662,148 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _launchHelpSupport(BuildContext context, String phone) async {
+    final branding = context.read<PlatformBrandingProvider>();
+    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final email = branding.supportEmail.isNotEmpty
+        ? branding.supportEmail
+        : 'support@zoomnearby.com';
+
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.support_agent,
+                        color: Color(0xFF10B981), size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Help & Customer Support',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'We are here to assist you anytime',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              if (digits.isNotEmpty) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF25D366).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.chat, color: Color(0xFF25D366)),
+                  ),
+                  title: const Text('Chat on WhatsApp',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(phone),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () async {
+                    Navigator.pop(sheetCtx);
+                    final waUrl = Uri.parse(
+                        'https://wa.me/$digits?text=${Uri.encodeComponent('Hello, I need assistance with ZoomPOS.')}');
+                    if (await canLaunchUrl(waUrl)) {
+                      await launchUrl(waUrl,
+                          mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.phone, color: Color(0xFF3B82F6)),
+                  ),
+                  title: const Text('Call Support Hotline',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(cleanPhone),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () async {
+                    Navigator.pop(sheetCtx);
+                    final telUrl = Uri.parse('tel:$cleanPhone');
+                    if (await canLaunchUrl(telUrl)) {
+                      await launchUrl(telUrl);
+                    }
+                  },
+                ),
+              ],
+              if (email.isNotEmpty) ...[
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.email_outlined,
+                        color: Color(0xFF6366F1)),
+                  ),
+                  title: const Text('Email Support Desk',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(email),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () async {
+                    Navigator.pop(sheetCtx);
+                    final mailUrl = Uri.parse(
+                        'mailto:$email?subject=${Uri.encodeComponent('ZoomPOS Support Inquiry')}');
+                    if (await canLaunchUrl(mailUrl)) {
+                      await launchUrl(mailUrl);
+                    }
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Shared tap handler for every dock rendering (drawer, rail, top bar,
   /// bottom bar) — none of them are a persistent multi-tab shell, they're a
   /// quick-launcher over the app's stack-based navigation, so selecting a
@@ -788,79 +932,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 : const Color(0xFF94A3B8)); // slate-400
         final selectedItemColor = primaryColor;
 
-        final children = <Widget>[
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(
-                16, MediaQuery.of(context).padding.top + 12, 16, 14),
-            decoration: BoxDecoration(
-              color: primaryColor,
-              image: hasCover
-                  ? DecorationImage(
-                      image: kIsWeb
-                          ? NetworkImage(coverUrl,
-                              webHtmlElementStrategy:
-                                  WebHtmlElementStrategy.prefer)
-                          : CachedNetworkImageProvider(coverUrl)
-                              as ImageProvider,
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-              gradient: hasCover
-                  ? LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.15),
-                        Colors.black.withValues(alpha: 0.55)
-                      ],
-                    )
-                  : null,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: TenantLogoAvatar(
-                    logoUrl: logoUrl,
-                    tenantName: storeTitle,
-                    size: 50,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+        final headerWidget = Container(
+          width: double.infinity,
+          padding: EdgeInsets.fromLTRB(
+              16, MediaQuery.of(context).padding.top + 12, 16, 14),
+          decoration: BoxDecoration(
+            color: primaryColor,
+            image: hasCover
+                ? DecorationImage(
+                    image: kIsWeb
+                        ? NetworkImage(coverUrl,
+                            webHtmlElementStrategy:
+                                WebHtmlElementStrategy.prefer)
+                        : CachedNetworkImageProvider(coverUrl)
+                            as ImageProvider,
+                    fit: BoxFit.cover,
+                  )
+                : null,
+            gradient: hasCover
+                ? LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.15),
+                      Colors.black.withValues(alpha: 0.55)
+                    ],
+                  )
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: TenantLogoAvatar(
+                  logoUrl: logoUrl,
+                  tenantName: storeTitle,
+                  size: 50,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                Text(
-                  storeTitle,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        _resolveTenantBadge(company, bootstrap),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.95),
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
+              ),
+              Text(
+                storeTitle,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _resolveTenantBadge(company, bootstrap),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
+        );
+
+        final children = <Widget>[
           ListTile(
             leading: const Icon(Icons.home_outlined),
             title: Text(l10n.navHome),
@@ -1147,6 +1292,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           dividerColor: onDrawer.withValues(alpha: 0.22),
         );
 
+        final brandingProvider = context.read<PlatformBrandingProvider>();
+        final supportPhone = (bootstrap.config['support_whatsapp'] ??
+                bootstrap.config['support_phone'] ??
+                brandingProvider.supportPhone)
+            .toString()
+            .trim();
+        final effectiveSupportPhone =
+            supportPhone.isNotEmpty ? supportPhone : '+918535075196';
+
         return Drawer(
           backgroundColor:
               drawerGradient != null ? Colors.transparent : drawerBgColor,
@@ -1162,6 +1316,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 bottom: true,
                 child: Column(
                   children: [
+                    headerWidget,
                     Expanded(
                       child: ListView(
                         padding: EdgeInsets.zero,
@@ -1234,23 +1389,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 8),
                             ],
                             ListTile(
                               contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.logout,
-                                  color: Color(0xFFEF4444)),
+                              leading: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.support_agent,
+                                    color: Color(0xFF10B981), size: 18),
+                              ),
                               title: const Text(
-                                'Log Out',
+                                'Help & Support',
                                 style: TextStyle(
-                                  color: Color(0xFFEF4444),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
                                 ),
                               ),
+                              subtitle: Text(
+                                effectiveSupportPhone,
+                                style: TextStyle(
+                                  color: unselectedIconColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              trailing: const Icon(Icons.chevron_right, size: 16),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10)),
-                              onTap: () => _confirmLogout(context),
+                              onTap: () => _launchHelpSupport(context, effectiveSupportPhone),
                             ),
                           ],
                         ),
@@ -1303,9 +1473,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 trailing: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: IconButton(
-                    tooltip: 'Log Out',
-                    icon: const Icon(Icons.logout, color: Color(0xFFEF4444)),
-                    onPressed: () => _confirmLogout(context),
+                    tooltip: 'Help & Support',
+                    icon: const Icon(Icons.support_agent, color: Color(0xFF10B981)),
+                    onPressed: () {
+                      final bootstrap = BootstrapCache.instance;
+                      final branding = context.read<PlatformBrandingProvider>();
+                      final phone = (bootstrap.config['support_whatsapp'] ??
+                              bootstrap.config['support_phone'] ??
+                              branding.supportPhone)
+                          .toString()
+                          .trim();
+                      _launchHelpSupport(context, phone.isNotEmpty ? phone : '+918535075196');
+                    },
                   ),
                 ),
                 destinations: [
@@ -1568,22 +1747,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 6),
               ],
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.logout,
-                    color: Color(0xFFEF4444), size: 20),
-                title: const Text(
-                  'Log Out',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-                onTap: () => _confirmLogout(context),
+              Builder(
+                builder: (ctx) {
+                  final branding = ctx.read<PlatformBrandingProvider>();
+                  final phone = (bootstrap.config['support_whatsapp'] ??
+                          bootstrap.config['support_phone'] ??
+                          branding.supportPhone)
+                      .toString()
+                      .trim();
+                  final effectivePhone =
+                      phone.isNotEmpty ? phone : '+918535075196';
+
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.support_agent,
+                          color: Color(0xFF10B981), size: 16),
+                    ),
+                    title: const Text(
+                      'Help & Support',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    subtitle: Text(
+                      effectivePhone,
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right, size: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    onTap: () => _launchHelpSupport(ctx, effectivePhone),
+                  );
+                },
               ),
             ],
           ),
@@ -1875,13 +2081,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SyncStatusBadge(),
           const _ThemeModeButton(),
           IconButton(
-            tooltip: 'App preferences',
-            icon: const Icon(Icons.tune),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AppPreferencesScreen()),
-            ),
-          ),
-          IconButton(
             tooltip: l10n.refresh,
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -1892,16 +2091,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               context.read<AuthProvider>().reloadSession();
               context.read<LocaleProvider>().refreshFromServer();
             },
-          ),
-          IconButton(
-            tooltip: l10n.serverAddress,
-            icon: const Icon(Icons.dns_outlined),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ServerSettingsScreen(
-                    preferences: context.read<AppPreferences>()),
-              ),
-            ),
           ),
           Stack(
             alignment: Alignment.center,

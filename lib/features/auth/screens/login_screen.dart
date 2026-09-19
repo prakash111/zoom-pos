@@ -7,6 +7,7 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/storage/app_preferences.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../landing/screens/landing_screen.dart';
 import '../../settings/server_settings_screen.dart';
 import '../auth_provider.dart';
 import '../widgets/auth_scaffold.dart';
@@ -324,6 +325,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       MaterialPageRoute(builder: (_) => const RegisterScreen()),
                     ),
             child: Text(l10n.createOne),
+          ),
+          const SizedBox(width: 8),
+          const Text('•', style: TextStyle(color: AuthColors.muted)),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: AuthColors.muted,
+              textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            icon: const Icon(Icons.home_outlined, size: 16),
+            label: const Text('Back to Home'),
+            onPressed: () => Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const LandingScreen()),
+            ),
           ),
         ],
       ),

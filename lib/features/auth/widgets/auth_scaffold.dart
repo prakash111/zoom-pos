@@ -391,7 +391,14 @@ class AuthScaffold extends StatelessWidget {
                         child: Row(
                           children: [
                             Expanded(flex: 5, child: _formColumn(context)),
-                            const Expanded(flex: 5, child: AuthIllustration()),
+                            Expanded(
+                              flex: 5,
+                              child: AuthIllustration(
+                                bannerImageUrl: branding.showAuthBanner
+                                    ? branding.authBannerImageUrl
+                                    : null,
+                              ),
+                            ),
                           ],
                         ),
                       ),

@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../dashboard/dashboard_screen.dart';
 import '../../../core/config/platform_branding_provider.dart';
 import '../../../core/services/dynamic_string_service.dart';
+import '../../landing/screens/landing_screen.dart';
 import '../auth_provider.dart';
 import 'login_screen.dart';
 
@@ -47,7 +49,7 @@ class _AuthGateState extends State<AuthGate> {
     final status = context.watch<AuthProvider>().status;
 
     if (_timedOut && status == AuthStatus.unknown) {
-      return const LoginScreen();
+      return kIsWeb ? const LandingScreen() : const LoginScreen();
     }
 
     switch (status) {
@@ -98,7 +100,7 @@ class _AuthGateState extends State<AuthGate> {
         return const DashboardScreen();
       case AuthStatus.authenticating:
       case AuthStatus.unauthenticated:
-        return const LoginScreen();
+        return kIsWeb ? const LandingScreen() : const LoginScreen();
     }
   }
 }

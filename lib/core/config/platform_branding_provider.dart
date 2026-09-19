@@ -32,11 +32,17 @@ class PlatformBrandingProvider extends ChangeNotifier {
   static const _accentKey = 'zoom_pos.platform_accent_color';
   static const _splashBgKey = 'zoom_pos.platform_splash_bg';
   static const _authBgKey = 'zoom_pos.platform_auth_bg';
+  static const _supportPhoneKey = 'zoom_pos.platform_support_phone';
+  static const _supportEmailKey = 'zoom_pos.platform_support_email';
+  static const _bannerKey = 'zoom_pos.platform_auth_banner_url';
+  static const _showBannerKey = 'zoom_pos.platform_show_auth_banner';
 
   /// Fallbacks shown until (and unless) the server responds — these mirror the
   /// Superadmin contract defaults.
   static const String defaultName = 'Sales & Inventory';
   static const String defaultTagline = 'Online inventory management system';
+  static const String defaultSupportPhone = '+918535075196';
+  static const String defaultSupportEmail = 'support@zoomnearby.com';
 
   /// Auth marketing copy is purely Superadmin-authored — there is no app-side
   /// default. Empty means "render nothing".
@@ -59,6 +65,10 @@ class PlatformBrandingProvider extends ChangeNotifier {
   String tagline = defaultTagline;
   String headline = defaultHeadline;
   String description = defaultDescription;
+  String supportPhone = defaultSupportPhone;
+  String supportEmail = defaultSupportEmail;
+  String? authBannerImageUrl;
+  bool showAuthBanner = false;
   bool headerInline = defaultHeaderInline;
   bool showTagline = defaultShowTagline;
 
@@ -112,6 +122,12 @@ class PlatformBrandingProvider extends ChangeNotifier {
       accentColor = _parseHex(str(_accentKey)) ?? accentColor;
       splashBgColor = _parseHex(str(_splashBgKey)) ?? splashBgColor;
       authBgColor = _parseHex(str(_authBgKey)) ?? authBgColor;
+      supportPhone = str(_supportPhoneKey) ?? supportPhone;
+      supportEmail = str(_supportEmailKey) ?? supportEmail;
+      authBannerImageUrl = str(_bannerKey) ?? authBannerImageUrl;
+      if (prefs.containsKey(_showBannerKey)) {
+        showAuthBanner = prefs.getBool(_showBannerKey) ?? showAuthBanner;
+      }
       if (prefs.containsKey(_inlineKey)) {
         headerInline = prefs.getBool(_inlineKey) ?? defaultHeaderInline;
       }
@@ -164,6 +180,15 @@ class PlatformBrandingProvider extends ChangeNotifier {
           ? _asBool(response['show_tagline'], showTagline)
           : showTagline;
 
+      final phone = pick('support_phone', const ['support_whatsapp', 'phone']);
+      final email = pick('support_email', const ['email']);
+      final banner = pick('auth_banner_image_url', const ['banner_url', 'auth_banner_url']);
+      final showBanner = response.containsKey('show_auth_banner')
+          ? _asBool(response['show_auth_banner'], showAuthBanner)
+          : (platform.containsKey('show_auth_banner')
+              ? _asBool(platform['show_auth_banner'], showAuthBanner)
+              : showAuthBanner);
+
       // Primary colour under any of its aliases (theme.primary /
       // theme.primary_color / brand_color / primary_color).
       final primary = _parseHex(theme['primary'] ??
@@ -195,6 +220,10 @@ class PlatformBrandingProvider extends ChangeNotifier {
       }
       if (head != null) set(head, headline, () => headline = head);
       if (desc != null) set(desc, description, () => description = desc);
+      if (phone != null) set(phone, supportPhone, () => supportPhone = phone);
+      if (email != null) set(email, supportEmail, () => supportEmail = email);
+      set(banner, authBannerImageUrl, () => authBannerImageUrl = banner);
+      set(showBanner, showAuthBanner, () => showAuthBanner = showBanner);
       set(inline, headerInline, () => headerInline = inline);
       set(showTag, showTagline, () => showTagline = showTag);
       set(primary, primaryColor, () => primaryColor = primary);
@@ -217,11 +246,15 @@ class PlatformBrandingProvider extends ChangeNotifier {
         await prefs.setString(_accentKey, _hex(accentColor));
         await prefs.setString(_splashBgKey, _hex(splashBgColor));
         await prefs.setString(_authBgKey, _hex(authBgColor));
+        await prefs.setString(_supportPhoneKey, supportPhone);
+        await prefs.setString(_supportEmailKey, supportEmail);
+        await prefs.setBool(_showBannerKey, showAuthBanner);
         Future<void> put(String k, String? v) => (v != null && v.isNotEmpty)
             ? prefs.setString(k, v)
             : prefs.remove(k);
         await put(_logoKey, brandLogoUrl);
         await put(_faviconKey, faviconUrl);
+        await put(_bannerKey, authBannerImageUrl);
       }
     } catch (_) {
       // Offline / server unreachable — the cached values stand.
