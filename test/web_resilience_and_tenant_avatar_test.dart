@@ -305,5 +305,44 @@ void main() {
       expect(find.byType(ExpansionTile), findsOneWidget);
       expect(find.text('Sales & Invoices'), findsOneWidget);
     });
+
+    test('SduiUiSchema parses minified dynamic map without TypeError', () {
+      // Simulate raw dynamic JS maps where types are not Map<String, dynamic>
+      final dynamic rawUiSchema = {
+        'payment_methods': [
+          {
+            'id': 'cash',
+            'code': 'cash',
+            'name': 'Cash',
+            'metadata': {'quick_cash': true},
+          }
+        ],
+        'status_labels': {
+          'orders': {
+            'pending': {'label': 'Pending', 'color': '#f59e0b'},
+          }
+        },
+        'tax': {
+          'tax_id': 'vat_standard',
+          'tax_label': 'VAT',
+          'display_mode': 'exclusive',
+          'is_india': false,
+          'sub_components': [
+            {'key': 'cgst', 'label': 'CGST', 'split': 0.5}
+          ],
+        },
+        'action_pills': [
+          {'key': 'refund', 'label': 'Refund', 'icon': 'receipt'},
+        ],
+      };
+
+      final uiSchema = SduiUiSchema.fromJson(rawUiSchema);
+      expect(uiSchema.paymentMethods, hasLength(1));
+      expect(uiSchema.paymentMethods.first.code, 'cash');
+      expect(uiSchema.tax.taxLabel, 'VAT');
+      expect(uiSchema.tax.subComponents, hasLength(1));
+      expect(uiSchema.actionPills, hasLength(1));
+      expect(uiSchema.statusFor('orders', 'pending')?.label, 'Pending');
+    });
   });
 }

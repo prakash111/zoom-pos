@@ -136,9 +136,11 @@ class ModuleSchema {
       description: json['description']?.toString() ?? '',
       layoutType: json['layout_type']?.toString() ?? 'standard_grid',
       icon: json['icon']?.toString(),
-      features: (json['features'] as Map<String, dynamic>?) ?? const {},
+      features: _safeSduiMap(json['features']),
       cartConfiguration: ModuleCartConfig.fromJson(
-        json['cart_configuration'] as Map<String, dynamic>?,
+        json['cart_configuration'] is Map
+            ? _safeSduiMap(json['cart_configuration'])
+            : null,
       ),
     );
   }
@@ -440,7 +442,7 @@ class SduiPaymentMethodSchema {
       color: json['color']?.toString() ?? '#15803d',
       isCredit: json['is_credit'] == true,
       requiresCustomer: json['requires_customer'] == true,
-      metadata: (json['metadata'] as Map<String, dynamic>?) ?? const {},
+      metadata: _safeSduiMap(json['metadata']),
     );
   }
 
@@ -534,17 +536,20 @@ class SduiTaxConfigSchema {
   final bool isIndia;
   final List<SduiTaxSubComponent> subComponents;
 
-  factory SduiTaxConfigSchema.fromJson(Map<String, dynamic>? json) {
-    if (json == null) return const SduiTaxConfigSchema();
-    final rawSubs = json['sub_components'] as List<dynamic>? ?? const [];
+  factory SduiTaxConfigSchema.fromJson(Map<String, dynamic>? rawJson) {
+    if (rawJson == null) return const SduiTaxConfigSchema();
+    final json = _safeSduiMap(rawJson);
+    final rawSubs = json['sub_components'] is Iterable
+        ? List.from(json['sub_components'] as Iterable)
+        : const [];
     return SduiTaxConfigSchema(
       taxId: json['tax_id']?.toString() ?? '',
       taxLabel: json['tax_label']?.toString() ?? 'Tax',
       displayMode: json['display_mode']?.toString() ?? 'country_default',
       isIndia: json['is_india'] == true,
       subComponents: rawSubs
-          .whereType<Map<String, dynamic>>()
-          .map(SduiTaxSubComponent.fromJson)
+          .whereType<Map>()
+          .map((s) => SduiTaxSubComponent.fromJson(_safeSduiMap(s)))
           .toList(),
     );
   }
@@ -609,42 +614,50 @@ class SduiUiSchema {
     return statusLabels[domain]?[statusKey];
   }
 
-  factory SduiUiSchema.fromJson(Map<String, dynamic>? json) {
-    if (json == null) return const SduiUiSchema();
+  factory SduiUiSchema.fromJson(Map<String, dynamic>? rawJson) {
+    if (rawJson == null) return const SduiUiSchema();
+    final json = _safeSduiMap(rawJson);
 
-    final rawMethods = json['payment_methods'] as List<dynamic>? ?? const [];
+    final rawMethods = json['payment_methods'] is Iterable
+        ? List.from(json['payment_methods'] as Iterable)
+        : const [];
     final methods = rawMethods
-        .whereType<Map<String, dynamic>>()
-        .map(SduiPaymentMethodSchema.fromJson)
+        .whereType<Map>()
+        .map((m) => SduiPaymentMethodSchema.fromJson(_safeSduiMap(m)))
         .toList();
 
-    final rawStatusMap =
-        json['status_labels'] as Map<String, dynamic>? ?? const {};
+    final rawStatusMap = _safeSduiMap(json['status_labels']);
     final statusLabels = <String, Map<String, SduiStatusSchema>>{};
     rawStatusMap.forEach((domain, statuses) {
-      if (statuses is Map<String, dynamic>) {
+      if (statuses is Map) {
         final domainMap = <String, SduiStatusSchema>{};
         statuses.forEach((key, val) {
-          if (val is Map<String, dynamic>) {
-            domainMap[key] = SduiStatusSchema.fromJson(val);
+          if (val is Map) {
+            domainMap[key.toString()] =
+                SduiStatusSchema.fromJson(_safeSduiMap(val));
           }
         });
         statusLabels[domain] = domainMap;
       }
     });
 
-    final rawPills = json['action_pills'] as List<dynamic>? ?? const [];
+    final rawPills = json['action_pills'] is Iterable
+        ? List.from(json['action_pills'] as Iterable)
+        : const [];
     final actionPills = rawPills
-        .whereType<Map<String, dynamic>>()
-        .map(SduiActionPillSchema.fromJson)
+        .whereType<Map>()
+        .map((p) => SduiActionPillSchema.fromJson(_safeSduiMap(p)))
         .toList();
+
+    final rawTax = json['tax'] ?? json['tax_configuration'];
+    final SduiTaxConfigSchema taxConfig = rawTax is Map
+        ? SduiTaxConfigSchema.fromJson(_safeSduiMap(rawTax))
+        : const SduiTaxConfigSchema();
 
     return SduiUiSchema(
       paymentMethods: methods,
       statusLabels: statusLabels,
-      taxConfiguration: SduiTaxConfigSchema.fromJson(
-        (json['tax'] ?? json['tax_configuration']) as Map<String, dynamic>?,
-      ),
+      taxConfiguration: taxConfig,
       actionPills: actionPills,
     );
   }
