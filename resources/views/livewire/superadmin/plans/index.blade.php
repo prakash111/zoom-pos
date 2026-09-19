@@ -69,13 +69,18 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Max Users Limit</label>
-                    <input type="number" wire:model="limitUsers" placeholder="5 (0 for unlimited)" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Max Staff Users (-1 = Unlimited)</label>
+                    <input type="number" wire:model="staffLimit" placeholder="5" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Max Devices Limit</label>
-                    <input type="number" wire:model="limitDevices" placeholder="3" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Max POS Devices (-1 = Unlimited)</label>
+                    <input type="number" wire:model="deviceLimit" placeholder="3" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Invoice Limit (-1 = Unlimited)</label>
+                    <input type="number" wire:model="invoiceLimit" placeholder="-1" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
                 </div>
 
                 <div>
@@ -83,17 +88,40 @@
                     <input type="number" wire:model="limitStorageMb" placeholder="2048" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
                 </div>
 
-                <div class="flex items-center gap-2 pt-4">
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Bundled Extensions & Add-ons</label>
+                    <div class="flex flex-wrap gap-4 pt-1">
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" wire:model="extensions" value="leadmanagement" class="rounded-md text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Lead Management CRM</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" wire:model="extensions" value="whatsapp_api" class="rounded-md text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">WhatsApp Cloud API</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" wire:model="extensions" value="custom_domain" class="rounded-md text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Custom Domain</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="sm:col-span-3">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Marketing Features & Badges (One per line)</label>
+                    <textarea wire:model="customFeaturesText" rows="3" placeholder="Real-time Inventory Sync&#10;Thermal Receipt & Barcode Printing&#10;Advanced Sales Analytics" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500"></textarea>
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
                     <input type="checkbox" wire:model="featureMultiLocation" id="fml" class="rounded-lg text-indigo-600 focus:ring-indigo-500">
                     <label for="fml" class="text-xs font-bold text-slate-700 dark:text-slate-300">Multi-location Branches</label>
                 </div>
 
-                <div class="flex items-center gap-2 pt-4">
+                <div class="flex items-center gap-2 pt-2">
                     <input type="checkbox" wire:model="featureAutomaticBackup" id="fab" class="rounded-lg text-indigo-600 focus:ring-indigo-500">
                     <label for="fab" class="text-xs font-bold text-slate-700 dark:text-slate-300">Automatic Cloud Backups</label>
                 </div>
 
-                <div class="flex items-center gap-2 pt-4">
+                <div class="flex items-center gap-2 pt-2">
                     <input type="checkbox" wire:model="active" id="active" class="rounded-lg text-indigo-600 focus:ring-indigo-500">
                     <label for="active" class="text-xs font-bold text-slate-700 dark:text-slate-300">Active (Publicly Selectable)</label>
                 </div>
@@ -128,10 +156,24 @@
                         <span class="text-xs font-bold text-slate-400">/ {{ $plan->billing_cycle }}</span>
                     </div>
 
+                    @if (!empty($plan->extensions))
+                        <div class="mt-3 flex flex-wrap gap-1.5">
+                            @foreach ($plan->extensions as $ext)
+                                <span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50 uppercase tracking-wider">
+                                    {{ str_replace('_', ' ', $ext) }}
+                                </span>
+                            @endforeach
+                        </div>
+                    @endif
+
                     <ul class="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-400 font-medium">
                         <li class="flex items-center gap-2">
                             <span class="text-emerald-500 font-bold">✓</span>
-                            <span>{{ $plan->limits['usuarios'] ?? '∞' }} Staff Users &middot; {{ $plan->limits['dispositivos'] ?? '∞' }} POS Devices</span>
+                            <span>{{ ($plan->invoice_limit ?? -1) === -1 ? 'Unlimited' : number_format($plan->invoice_limit) }} Invoices / mo</span>
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-emerald-500 font-bold">✓</span>
+                            <span>{{ ($plan->staff_limit ?? -1) === -1 ? 'Unlimited' : ($plan->staff_limit ?? $plan->limits['usuarios'] ?? '∞') }} Staff Users &middot; {{ ($plan->device_limit ?? -1) === -1 ? 'Unlimited' : ($plan->device_limit ?? $plan->limits['dispositivos'] ?? '∞') }} POS Devices</span>
                         </li>
                         <li class="flex items-center gap-2">
                             <span class="text-emerald-500 font-bold">✓</span>

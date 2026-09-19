@@ -312,6 +312,9 @@ Route::get('/t/{token}', [TableOrderController::class, 'show'])->name('restauran
 Route::get('/c/{id}', [CatalogViewController::class, 'show'])
     ->where('id', '[a-f0-9]{32}')
     ->name('catalog.show');
+Route::post('/c/{id}/order', [CatalogViewController::class, 'placeOrder'])
+    ->where('id', '[a-f0-9]{32}')
+    ->name('catalog.order');
 
 // Public shareable document links (for customers clicking from WhatsApp or Email).
 Route::get('/i/{sale_number}', [InvoiceController::class, 'publicShow'])->name('sales.public');

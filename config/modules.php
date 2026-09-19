@@ -39,7 +39,7 @@ return [
     ],
 
     // Additive packages managed by Super Admin, never signup operating modes.
-    'extensions' => ['leadmanagement'],
+    'extensions' => ['leadmanagement', 'whatsapp_api', 'custom_domain'],
 
     'catalog' => [
         [

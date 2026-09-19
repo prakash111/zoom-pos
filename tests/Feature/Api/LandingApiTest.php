@@ -136,4 +136,62 @@ class LandingApiTest extends TestCase
         $this->assertEquals('Browse our online summer catalog and place orders via WhatsApp.', $fresh->description);
         $this->assertTrue($fresh->meta['enable_whatsapp_order']);
     }
+
+    public function test_landing_api_returns_dynamic_plans_and_landing_enabled(): void
+    {
+        PlatformBranding::current()->update([
+            'landing_page_enabled' => true,
+        ]);
+
+        \App\Models\Plan::create([
+            'name' => 'growth_plan',
+            'display_name' => 'Growth Business Plan',
+            'price' => 39.00,
+            'currency' => 'USD',
+            'billing_cycle' => 'monthly',
+            'invoice_limit' => 2000,
+            'device_limit' => 5,
+            'staff_limit' => 10,
+            'extensions' => ['leadmanagement', 'whatsapp_api', 'custom_domain'],
+            'features' => ['Advanced POS', 'Digital Invoices'],
+            'active' => true,
+        ]);
+
+        $response = $this->getJson('/api/v1/public/landing-config');
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('landing_page_enabled', true);
+
+        $plans = $response->json('plans');
+        $this->assertNotEmpty($plans);
+        $growth = collect($plans)->firstWhere('name', 'Growth Business Plan');
+        $this->assertNotNull($growth);
+        $this->assertEquals(2000, $growth['invoice_limit']);
+        $this->assertEquals(5, $growth['device_limit']);
+        $this->assertEquals(10, $growth['staff_limit']);
+        $this->assertContains('leadmanagement', $growth['extensions']);
+        $this->assertContains('whatsapp_api', $growth['extensions']);
+    }
+
+    public function test_contact_inquiry_submission_validates_and_persists(): void
+    {
+        $response = $this->postJson('/api/v1/public/contact-us', [
+            'name' => 'Alice Walker',
+            'email' => 'alice@retailmart.com',
+            'phone' => '+1555123456',
+            'store_type' => 'Retail & Supermarket',
+            'subject' => 'Hardware Compatibility',
+            'message' => 'Does this software support Sunmi Android POS terminals with built-in printers?',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('contact_inquiries', [
+            'name' => 'Alice Walker',
+            'email' => 'alice@retailmart.com',
+            'subject' => 'Hardware Compatibility',
+        ]);
+    }
 }
+

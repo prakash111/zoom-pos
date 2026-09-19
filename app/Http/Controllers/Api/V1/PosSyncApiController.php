@@ -459,6 +459,7 @@ class PosSyncApiController extends Controller
             'support_email' => $settings['platform']['support_email'],
             'auth_banner_image_url' => $settings['platform']['auth_banner_image_url'],
             'show_auth_banner' => $settings['platform']['show_auth_banner'],
+            'landing_page_enabled' => (bool) ($settings['platform']['landing_page_enabled'] ?? true),
             'platform_tagline' => null,
             'header_inline' => true,
             'show_tagline' => false,
@@ -2434,6 +2435,7 @@ class PosSyncApiController extends Controller
                     'id' => (string) ($p->external_id ?: $p->id),
                     'server_id' => $p->id,
                     'name' => $p->name,
+                    'description' => (string) ($p->description ?? ''),
                     'barcode' => $p->barcode ?: $p->code ?: '',
                     'sku' => $p->sku ?: '',
                     'sale_price' => (float) ($p->sale_price ?? 0),
@@ -2525,6 +2527,7 @@ class PosSyncApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:200'],
+            'description' => ['nullable', 'string', 'max:5000'],
             'sale_price' => ['required', 'numeric', 'min:0'],
             'cost_price' => ['nullable', 'numeric', 'min:0'],
             'current_stock' => ['nullable', 'numeric'],
@@ -2564,6 +2567,7 @@ class PosSyncApiController extends Controller
             'company_id' => $company->id,
             'external_id' => $extId,
             'name' => $request->input('name'),
+            'description' => $request->input('description') ?: null,
             'sale_price' => (float) $request->input('sale_price', 0),
             'cost_price' => (float) $request->input('cost_price', 0),
             'current_stock' => (float) $request->input('current_stock', 0),
@@ -3628,6 +3632,8 @@ class PosSyncApiController extends Controller
             $features = is_array($p->features) ? $p->features : (is_string($p->features) ? (json_decode($p->features, true) ?: []) : []);
             $limits = is_array($p->limits) ? $p->limits : (is_string($p->limits) ? (json_decode($p->limits, true) ?: []) : []);
 
+            $extensions = is_array($p->extensions) ? $p->extensions : [];
+
             return [
                 'name' => $p->name,
                 'display_name' => $p->display_name ?: ucfirst($p->name),
@@ -3635,6 +3641,10 @@ class PosSyncApiController extends Controller
                 'currency' => $p->currency ?: 'USD',
                 'billing_cycle' => $p->billing_cycle,
                 'duration_days' => (int) ($p->duration_days ?? 30),
+                'invoice_limit' => (int) ($p->invoice_limit ?? ($limits['invoices'] ?? -1)),
+                'device_limit' => (int) ($p->device_limit ?? ($limits['dispositivos'] ?? -1)),
+                'staff_limit' => (int) ($p->staff_limit ?? ($limits['usuarios'] ?? -1)),
+                'extensions' => array_values($extensions),
                 'features' => array_values($features),
                 'limits' => $limits,
             ];

@@ -76,6 +76,14 @@ use Modules\leadmanagement\Http\Controllers\LeadModuleController;
 // hosted-checkout purchase. HMAC-verified in the controller (no auth middleware).
 Route::post('/license/activate', [LicenseActivationController::class, 'activate']);
 Route::get('/public/landing', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
+Route::get('/public/landing-config', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
+Route::get('/v1/public/landing-config', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
+Route::get('/subscription/plans', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'plans']);
+Route::get('/v1/subscription/plans', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'plans']);
+Route::post('/public/contact-us', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
+Route::post('/v1/public/contact-us', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
+Route::post('/public/contact', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
+Route::post('/v1/public/contact', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
 
 Route::prefix('v1/tax')->middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
     Route::post('/calculate', [TaxApiController::class, 'calculate']);
@@ -843,6 +851,10 @@ Route::prefix('v1/pos')->group(function () {
     Route::get('/app/public-settings', [PosSyncApiController::class, 'publicSettings']);
     Route::get('/public/settings', [PosSyncApiController::class, 'publicSettings']);
     Route::get('/public/landing', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
+    Route::get('/public/landing-config', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
+    Route::get('/public/plans', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'plans']);
+    Route::post('/public/contact-us', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
+    Route::post('/public/contact', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
     Route::get('/auth/landing', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
     Route::get('/auth/auth-config', [PosSyncApiController::class, 'authConfig']);
     Route::get('/auth-config', [PosSyncApiController::class, 'authConfig']);

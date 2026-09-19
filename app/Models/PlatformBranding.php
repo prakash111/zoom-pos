@@ -181,6 +181,7 @@ class PlatformBranding extends Model
                 'support_email' => $this->support_email ?: 'support@zoomnearby.com',
                 'auth_banner_image_url' => \App\Models\DynamicSetting::get('auth_banner_image_url') ?: null,
                 'show_auth_banner' => (bool) \App\Models\DynamicSetting::get('show_auth_banner', false),
+                'landing_page_enabled' => (bool) $this->landing_page_enabled,
             ],
             'theme' => [
                 'primary_color' => $primary,

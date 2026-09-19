@@ -37,6 +37,16 @@ class Index extends Component
 
     public int $limitBranches = 1;
 
+    public int $invoiceLimit = -1;
+
+    public int $deviceLimit = 3;
+
+    public int $staffLimit = 5;
+
+    public array $extensions = [];
+
+    public string $customFeaturesText = '';
+
     public bool $featureMultiLocation = false;
 
     public bool $featureAutomaticBackup = false;
@@ -50,10 +60,15 @@ class Index extends Component
             'durationDays' => ['nullable', 'integer', 'min:1'],
             'price' => ['required', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'size:3'],
-            'limitUsers' => ['required', 'integer', 'min:0'],
-            'limitDevices' => ['required', 'integer', 'min:0'],
+            'limitUsers' => ['required', 'integer', 'min:-1'],
+            'limitDevices' => ['required', 'integer', 'min:-1'],
             'limitStorageMb' => ['required', 'integer', 'min:0'],
             'limitBranches' => ['required', 'integer', 'min:0'],
+            'invoiceLimit' => ['required', 'integer', 'min:-1'],
+            'deviceLimit' => ['required', 'integer', 'min:-1'],
+            'staffLimit' => ['required', 'integer', 'min:-1'],
+            'extensions' => ['nullable', 'array'],
+            'customFeaturesText' => ['nullable', 'string', 'max:1000'],
         ];
     }
 
@@ -62,6 +77,7 @@ class Index extends Component
         $this->reset([
             'editingName', 'name', 'displayName', 'billingCycle', 'durationDays', 'price', 'currency',
             'active', 'limitUsers', 'limitDevices', 'limitStorageMb', 'limitBranches',
+            'invoiceLimit', 'deviceLimit', 'staffLimit', 'extensions', 'customFeaturesText',
             'featureMultiLocation', 'featureAutomaticBackup',
         ]);
         $this->billingCycle = 'monthly';
@@ -72,6 +88,11 @@ class Index extends Component
         $this->limitDevices = 3;
         $this->limitStorageMb = 1024;
         $this->limitBranches = 1;
+        $this->invoiceLimit = -1;
+        $this->deviceLimit = 3;
+        $this->staffLimit = 5;
+        $this->extensions = [];
+        $this->customFeaturesText = '';
         $this->showForm = true;
     }
 
@@ -86,18 +107,51 @@ class Index extends Component
         $this->price = (float) $plan->price;
         $this->currency = $plan->currency;
         $this->active = $plan->active;
-        $this->limitUsers = $plan->limits['usuarios'] ?? 0;
-        $this->limitDevices = $plan->limits['dispositivos'] ?? 0;
-        $this->limitStorageMb = $plan->limits['armazenamento_mb'] ?? 0;
+        $this->staffLimit = $plan->staff_limit ?? ($plan->limits['usuarios'] ?? 5);
+        $this->deviceLimit = $plan->device_limit ?? ($plan->limits['dispositivos'] ?? 3);
+        $this->invoiceLimit = $plan->invoice_limit ?? ($plan->limits['invoices'] ?? -1);
+        $this->limitUsers = $this->staffLimit;
+        $this->limitDevices = $this->deviceLimit;
+        $this->limitStorageMb = $plan->limits['armazenamento_mb'] ?? 1024;
         $this->limitBranches = $plan->limits['filiais'] ?? 1;
+        $this->extensions = is_array($plan->extensions) ? $plan->extensions : [];
         $this->featureMultiLocation = (bool) ($plan->features['multi_location'] ?? false);
         $this->featureAutomaticBackup = (bool) ($plan->features['automatic_backup'] ?? false);
+
+        $custom = [];
+        if (is_array($plan->features)) {
+            foreach ($plan->features as $k => $v) {
+                if ($k === 'multi_location' || $k === 'automatic_backup') {
+                    continue;
+                }
+                if (is_string($v) && is_numeric($k)) {
+                    $custom[] = $v;
+                } elseif ($v === true || $v === 1 || $v === '1') {
+                    $custom[] = is_string($k) ? str_replace('_', ' ', ucfirst($k)) : $v;
+                } elseif (is_string($v)) {
+                    $custom[] = "$k: $v";
+                }
+            }
+        }
+        $this->customFeaturesText = implode("\n", $custom);
         $this->showForm = true;
     }
 
     public function save(): void
     {
         $data = $this->validate();
+
+        $features = [
+            'multi_location' => $this->featureMultiLocation,
+            'automatic_backup' => $this->featureAutomaticBackup,
+        ];
+
+        if (! empty(trim($this->customFeaturesText))) {
+            $lines = array_filter(array_map('trim', explode("\n", str_replace(',', "\n", $this->customFeaturesText))));
+            foreach ($lines as $line) {
+                $features[$line] = true;
+            }
+        }
 
         $plan = Plan::updateOrCreate(
             ['name' => $this->editingName ?? $data['name']],
@@ -109,16 +163,18 @@ class Index extends Component
                 'price' => $data['price'],
                 'currency' => strtoupper($data['currency']),
                 'active' => $this->active,
+                'invoice_limit' => $this->invoiceLimit,
+                'device_limit' => $this->deviceLimit,
+                'staff_limit' => $this->staffLimit,
+                'extensions' => array_values(array_unique(array_filter($this->extensions))),
                 'limits' => [
-                    'usuarios' => $this->limitUsers,
-                    'dispositivos' => $this->limitDevices,
+                    'usuarios' => $this->staffLimit,
+                    'dispositivos' => $this->deviceLimit,
+                    'invoices' => $this->invoiceLimit,
                     'armazenamento_mb' => $this->limitStorageMb,
                     'filiais' => $this->limitBranches,
                 ],
-                'features' => [
-                    'multi_location' => $this->featureMultiLocation,
-                    'automatic_backup' => $this->featureAutomaticBackup,
-                ],
+                'features' => $features,
             ]
         );
 

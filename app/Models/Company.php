@@ -503,6 +503,11 @@ class Company extends Model
             ? $this->licensed_modules
             : [$this->pos_mode ?: 'retail'];
 
+        $planExtensions = is_array($this->plan?->extensions) ? $this->plan->extensions : [];
+        if (! empty($planExtensions)) {
+            $raw = array_merge($raw, $planExtensions);
+        }
+
         $keys = [];
         foreach ($raw as $item) {
             if (! is_string($item)) {
@@ -530,13 +535,14 @@ class Company extends Model
 
         $keys = array_values(array_unique($keys));
 
-        // Extensions require an explicit Super Admin assignment and an active,
+        // Extensions require an explicit Super Admin assignment (or plan grant) and an active,
         // licensed installation. The primary POS mode never grants an extension.
         $extensions = ModuleRegistry::extensionKeys();
         $active = array_intersect($keys, $extensions) === [] ? [] : array_keys(ModuleRegistry::allModules());
-        $explicitModules = is_array($this->licensed_modules) && $this->licensed_modules !== [];
+        $explicitModules = (is_array($this->licensed_modules) && $this->licensed_modules !== []) || ! empty($planExtensions);
         $keys = array_values(array_filter($keys, fn ($key) => ! in_array($key, $extensions, true)
-            || ($explicitModules && in_array($key, $active, true))));
+            || ($explicitModules && in_array($key, $active, true))
+            || in_array($key, $planExtensions, true)));
 
         return $keys === [] ? ['retail'] : $keys;
     }

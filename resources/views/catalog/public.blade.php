@@ -4,7 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $catalog->title }} — {{ $company?->name ?? 'Digital Catalog' }}</title>
-    @vite(['resources/css/app.css'])
+    @if (file_exists(public_path('build/manifest.json')))
+        @vite(['resources/css/app.css'])
+    @endif
+    <link rel="stylesheet" href="{{ secure_asset('css/app.css') }}" onerror="this.onerror=null;this.href='{{ asset('css/app.css') }}'">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -360,8 +364,28 @@
                     }
                 },
 
-                orderViaWhatsApp() {
+                async orderViaWhatsApp() {
                     if (this.cart.length === 0) return;
+
+                    // Synchronize order to POS as pending
+                    try {
+                        await fetch('/c/{{ $catalog->id }}/order', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                customer_name: this.customerName,
+                                customer_phone: this.customerPhone,
+                                customer_notes: this.customerNotes,
+                                items: this.cart
+                            })
+                        });
+                    } catch (e) {
+                        console.warn('POS order recording notice:', e);
+                    }
 
                     let itemsSummary = '';
                     this.cart.forEach(item => {
