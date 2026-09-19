@@ -84,20 +84,25 @@ class LivewireLoginTest extends TestCase
 
         // 1. Tenant Login Component & View in Demo Mode
         Livewire::test(TenantLogin::class)
-            ->assertSet('identifier', 'admin@zoommarket.test')
-            ->assertSet('password', 'password123')
+            ->assertSet('identifier', 'demo@zoomnearby.com')
+            ->assertSet('password', 'demo1234')
             ->call('fillDemo', 'cashier')
             ->assertSet('identifier', 'cashier@zoommarket.test')
             ->assertSet('password', 'password123')
             ->call('fillDemo', 'manager')
-            ->assertSet('identifier', 'admin@zoommarket.test')
-            ->assertSet('password', 'password123');
+            ->assertSet('identifier', 'demo@zoomnearby.com')
+            ->assertSet('password', 'demo1234');
 
         $tenantResponse = $this->get(route('tenant.login'));
         $tenantResponse->assertOk();
         $tenantResponse->assertSee('Demo Mode Active');
-        $tenantResponse->assertSee('Store Manager');
-        $tenantResponse->assertSee('Cashier Staff');
+        $tenantResponse->assertSee('https://web.zoomnearby.com');
+        $tenantResponse->assertSee('Try Flutter Web Version Tenant Demo');
+        // Consolidated demo module switcher — the 5 store-type chips.
+        $tenantResponse->assertSee('Cafe &amp; Restaurant', false);
+        $tenantResponse->assertSee('Pharmacy');
+        $tenantResponse->assertSee(url('/demo-login/retail'));
+        $tenantResponse->assertSee(url('/demo-login/salon'));
 
         // 2. Super Admin Login Component & View in Demo Mode
         Livewire::test(PlatformLogin::class)
@@ -122,6 +127,7 @@ class LivewireLoginTest extends TestCase
         $tenantResponse->assertOk();
         $tenantResponse->assertDontSee('Demo Mode Active');
         $tenantResponse->assertDontSee('Quick Demo Credentials');
+        $tenantResponse->assertSee('https://web.zoomnearby.com');
 
         Livewire::test(PlatformLogin::class)
             ->assertSet('email', '')

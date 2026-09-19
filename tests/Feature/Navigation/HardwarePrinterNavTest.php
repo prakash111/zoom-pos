@@ -124,8 +124,18 @@ class HardwarePrinterNavTest extends TestCase
             ->getJson('/api/tenant/views/printer-setup')
             ->assertOk()
             ->assertJsonPath('schema.title', 'Printer & Hardware Setup')
+            ->assertJsonPath('schema.background_color', '#0B1120')
+            ->assertJsonPath('schema.components.0.type', 'segmented_tabs')
+            ->assertJsonPath('schema.components.0.active_value', 'bluetooth')
+            ->assertJsonPath('schema.components.0.active_background_color', '#10B981')
+            ->assertJsonPath('schema.components.0.active_text_color', '#0B1120')
+            ->assertJsonPath('schema.components.0.inactive_background_color', '#1E293B')
+            ->assertJsonPath('schema.components.0.inactive_text_color', '#94A3B8')
+            ->assertJsonPath('schema.components.1.type', 'empty_state')
+            ->assertJsonPath('schema.components.1.text_color', '#E2E8F0')
             ->json('schema');
-        $this->assertEmpty((new SchemaValidator())->validate($schema));
+        $this->assertStringContainsString('No paired Bluetooth printers found', $schema['components'][1]['message']);
+        $this->assertEmpty((new SchemaValidator)->validate($schema));
 
         // The Receipt Settings screen exposes the same native pairing route.
         $receipts = $this->withHeaders($headers)
@@ -145,6 +155,6 @@ class HardwarePrinterNavTest extends TestCase
         $screen = SchemaResponse::screen('T', [
             SchemaResponse::buttonOutlined('Printer & Hardware Setup', $action, 'print'),
         ]);
-        $this->assertEmpty((new SchemaValidator())->validate($screen));
+        $this->assertEmpty((new SchemaValidator)->validate($screen));
     }
 }

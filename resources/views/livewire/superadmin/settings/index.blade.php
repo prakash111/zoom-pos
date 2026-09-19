@@ -1,11 +1,11 @@
-<div class="space-y-6 max-w-7xl mx-auto">
+<div class="space-y-6 max-w-7xl mx-auto pb-36 sm:pb-28">
     
     <!-- Top Header Banner & Quick Actions -->
-    <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-8 shadow-xl border border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6 relative overflow-hidden">
         <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div class="space-y-2 relative z-10">
             <div class="flex items-center gap-2.5">
-                <div class="w-10 h-10 rounded-2xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl shadow-xs font-black">
+                <div class="w-10 h-10 rounded-2xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl shadow-xs font-black shrink-0">
                     ⚙️
                 </div>
                 <div>
@@ -19,20 +19,20 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-3 relative z-10 shrink-0">
+        <div class="grid grid-cols-2 sm:flex items-center gap-2 sm:gap-3 relative z-10 w-full sm:w-auto shrink-0">
             <button type="button"
                     wire:click="clearSystemCache"
                     wire:loading.attr="disabled"
-                    class="px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs">
+                    class="h-10 px-3 sm:px-4 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs">
                 <span wire:loading.remove wire:target="clearSystemCache">🧹</span>
                 <span wire:loading wire:target="clearSystemCache" class="animate-spin">⏳</span>
-                <span>{{ __('Clear Cache') }}</span>
+                <span class="truncate">{{ __('Clear Cache') }}</span>
             </button>
             
             <a wire:navigate.hover href="{{ route('superadmin.dashboard') }}"
-               class="px-4 py-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs border border-indigo-200/60 dark:border-indigo-800/50">
+               class="h-10 px-3 sm:px-4 py-2 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs border border-indigo-200/60 dark:border-indigo-800/50">
                 <span>📊</span>
-                <span>{{ __('Dashboard') }}</span>
+                <span class="truncate">{{ __('Dashboard') }}</span>
             </a>
         </div>
     </div>
@@ -69,55 +69,57 @@
     }" class="space-y-6">
 
         <!-- Horizontal Sub-Tabs Bar -->
-        <div class="flex items-center gap-2 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-x-auto no-scrollbar tab-scroll-container">
-            <button type="button" 
-                    @click="switchTab('general')"
-                    :class="activeTab === 'general' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
-                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
-                <span>⚙️</span> {{ __('General & Platform') }}
-            </button>
+        <div class="overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div class="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm min-w-max">
+                <button type="button" 
+                        @click="switchTab('general')"
+                        :class="activeTab === 'general' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold'"
+                        class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
+                    <span>⚙️</span> {{ __('General & Platform') }}
+                </button>
 
-            <button type="button" 
-                    @click="switchTab('smtp')"
-                    :class="activeTab === 'smtp' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
-                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
-                <span>✉️</span> {{ __('SMTP & Email') }}
-            </button>
+                <button type="button" 
+                        @click="switchTab('smtp')"
+                        :class="activeTab === 'smtp' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold'"
+                        class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
+                    <span>✉️</span> {{ __('SMTP & Email') }}
+                </button>
 
-            <button type="button"
-                    @click="switchTab('push')"
-                    :class="activeTab === 'push' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
-                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
-                <span>🔔</span> {{ __('Push Notifications') }}
-            </button>
+                <button type="button"
+                        @click="switchTab('push')"
+                        :class="activeTab === 'push' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold'"
+                        class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
+                    <span>🔔</span> {{ __('Push Notifications') }}
+                </button>
 
-            <button type="button" 
-                    @click="switchTab('whitelabel')"
-                    :class="(activeTab === 'whitelabel' || activeTab === 'branding') ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
-                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
-                <span>🖌️</span> {{ __('White-label & Branding') }}
-            </button>
+                <button type="button" 
+                        @click="switchTab('whitelabel')"
+                        :class="(activeTab === 'whitelabel' || activeTab === 'branding') ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold'"
+                        class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
+                    <span>🖌️</span> {{ __('White-label & Branding') }}
+                </button>
 
-            <button type="button" 
-                    @click="switchTab('pages')"
-                    :class="activeTab === 'pages' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
-                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
-                <span>📄</span> {{ __('Custom Pages & CMS') }}
-            </button>
+                <button type="button" 
+                        @click="switchTab('pages')"
+                        :class="activeTab === 'pages' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold'"
+                        class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
+                    <span>📄</span> {{ __('Custom Pages & CMS') }}
+                </button>
 
-            <button type="button"
-                    @click="switchTab('social')"
-                    :class="activeTab === 'social' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
-                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
-                <span>🔐</span> {{ __('Social Login') }}
-            </button>
+                <button type="button"
+                        @click="switchTab('social')"
+                        :class="activeTab === 'social' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold'"
+                        class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
+                    <span>🔐</span> {{ __('Social Login') }}
+                </button>
 
-            <button type="button" 
-                    @click="switchTab('appearance')"
-                    :class="activeTab === 'appearance' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
-                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
-                <span>🎨</span> {{ __('Navigation & Appearance') }}
-            </button>
+                <button type="button"
+                        @click="switchTab('appearance')"
+                        :class="activeTab === 'appearance' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold'"
+                        class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs transition whitespace-nowrap shrink-0 cursor-pointer">
+                    <span>🎨</span> {{ __('Navigation & Appearance') }}
+                </button>
+            </div>
         </div>
 
         <!-- Tab Panes -->

@@ -17,7 +17,9 @@ use App\Models\Sale;
 use App\Models\User;
 use App\Services\Auth\PermissionChecker;
 use App\Services\Documents\DocumentNumberService;
+use App\Services\Dispatch\DocumentDispatchService;
 use App\Services\Invoice\InvoiceDeliveryService;
+use App\Services\OmnichannelRegistryService;
 use App\Services\Pos\Adapters\RepairCartAdapter;
 use App\Services\Pos\UniversalPosBuilder;
 use App\Services\Repair\RepairNotificationService;
@@ -38,6 +40,7 @@ class RepairApiController extends Controller
         protected PermissionChecker $permissionChecker,
         protected RepairNotificationService $notificationService,
         protected InvoiceDeliveryService $invoiceDeliveryService,
+        protected DocumentDispatchService $documentDispatchService,
     ) {}
 
     /**
@@ -509,6 +512,7 @@ class RepairApiController extends Controller
         $customerId = $request->input('customer_id');
         $customerName = trim((string) $request->input('customer_name'));
         $customerPhone = trim((string) $request->input('customer_phone'));
+        $customerEmail = trim((string) ($request->input('customer_email') ?: $request->input('email') ?: ''));
 
         if ($customerId) {
             $existingCustomer = Customer::where('company_id', $company->id)
@@ -521,6 +525,11 @@ class RepairApiController extends Controller
                 }
                 if ($customerPhone === '') {
                     $customerPhone = (string) ($existingCustomer->phone ?? '');
+                }
+                if ($customerEmail === '') {
+                    $customerEmail = (string) ($existingCustomer->email ?? '');
+                } elseif (empty($existingCustomer->email)) {
+                    $existingCustomer->update(['email' => $customerEmail]);
                 }
             }
         } elseif ($customerName !== '') {
@@ -535,12 +544,18 @@ class RepairApiController extends Controller
 
             if ($existingCustomer) {
                 $customerId = $existingCustomer->id;
+                if ($customerEmail === '') {
+                    $customerEmail = (string) ($existingCustomer->email ?? '');
+                } elseif (empty($existingCustomer->email)) {
+                    $existingCustomer->update(['email' => $customerEmail]);
+                }
             } else {
                 $createdCust = Customer::create([
                     'company_id' => $company->id,
                     'tenant_id' => $company->id,
                     'name' => $customerName,
                     'phone' => $customerPhone ?: null,
+                    'email' => $customerEmail ?: null,
                     'is_demo' => false,
                 ]);
                 $customerId = $createdCust->id;
@@ -556,7 +571,7 @@ class RepairApiController extends Controller
         $ticketNumber = app(DocumentNumberService::class)->next($company, 'repair');
 
         return DB::transaction(function () use (
-            $company, $user, $request, $ticketNumber, $customerId, $customerName, $customerPhone,
+            $company, $user, $request, $ticketNumber, $customerId, $customerName, $customerPhone, $customerEmail,
             $categoryId, $technicianId, $serial, $passcode, $problem, $advanceDeposit, $advanceMethod
         ) {
             $checklist = $request->input('inspection_checklist');
@@ -749,7 +764,7 @@ class RepairApiController extends Controller
 
             $deviceLabel = trim(trim((string) $ticket->brand).' '.trim((string) $ticket->model)) ?: 'Device';
             $trackingUrl = $dispatchResults['tracking_url'] ?? url('/track/'.$ticket->ticket_number);
-            $shareText = "Hello {$ticket->customer_name}, your repair ticket #{$ticket->ticket_number} for {$deviceLabel} has been booked. Track status: {$trackingUrl}";
+            $shareText = $dispatchResults['sms_text'];
 
             // `action: show_ticket_share_sheet` tells the client to pop a native
             // bottom sheet (WhatsApp / Print Token / System Share / Done)
@@ -770,6 +785,7 @@ class RepairApiController extends Controller
                     'ticket_id' => $ticket->id,
                     'customer_name' => $ticket->customer_name,
                     'customer_phone' => $ticket->customer_phone,
+                    'customer_email' => $customerEmail ?: ($ticket->customer?->email ?? ''),
                     'device' => $deviceLabel,
                     'status' => $ticket->status,
                     'defect' => $ticket->issue_description ?: $ticket->reported_defect,
@@ -829,16 +845,17 @@ class RepairApiController extends Controller
             return response()->json(['success' => false, 'error' => 'Repair ticket not found.'], 404);
         }
 
-        $customerName = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Walk-in Customer');
-        $phone = $ticket->customer?->phone ?: ($ticket->customer_phone ?: '');
+        $customer = $ticket->customer;
+        $customerName = $customer?->name ?: ($ticket->customer_name ?: 'Walk-in Customer');
+        $phone = $customer?->phone ?: ($ticket->customer_phone ?: '');
+        $email = $customer?->email ?: ($ticket->customer_email ?: '');
         $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'Device';
 
         // Build the customer-facing links inline (no notifyTicketCreated — that
         // dispatches webhooks and audit rows; sharing an existing ticket must
         // stay a read-only, idempotent action).
         $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
-        $shareText = "Hello {$customerName}, your repair ticket #{$ticket->ticket_number} for {$device} is with "
-            .($company->name ?: 'our service center').". Track status: {$trackingUrl}";
+        $shareText = $this->notificationService->buildCustomerMessage($ticket);
         $whatsappUrl = RepairNotificationService::whatsAppUrl($shareText, $phone);
         $printUrl = url("/api/tenant/repair/tickets/{$ticket->id}/intake-sheet");
 
@@ -851,6 +868,7 @@ class RepairApiController extends Controller
                 'ticket_id' => $ticket->id,
                 'customer_name' => $customerName,
                 'customer_phone' => $phone,
+                'customer_email' => $email,
                 'device' => $device,
                 'status' => $ticket->status,
                 'defect' => $ticket->issue_description ?: $ticket->reported_defect,
@@ -860,6 +878,151 @@ class RepairApiController extends Controller
                 'tracking_url' => $trackingUrl,
             ],
         ]);
+    }
+
+    /**
+     * Unified document dispatch sheet for an existing repair ticket.
+     * The response follows the omnichannel SDUI contract without requiring
+     * an unnecessary document preview iframe. Customer contact fields are
+     * pre-bound so operators never need to enter phone/email manually.
+     * GET /api/tenant/repair/tickets/{id}/share-sheet
+     */
+    public function ticketsShareDispatchSheet(Request $request, string $id): JsonResponse
+    {
+        $this->authorizeAction($request, 'view');
+        $company = $this->resolveCompany($request);
+        $ticket = RepairTicket::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->with(['items.product', 'customer', 'category', 'technician'])
+            ->find($id);
+
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Repair ticket not found.'], 404);
+        }
+
+        $customer = $ticket->customer;
+        $customerName = $customer?->name ?: ($ticket->customer_name ?: 'Walk-in Customer');
+        $phone = $customer?->phone ?: ($ticket->customer_phone ?: '');
+        $email = $customer?->email ?: ($ticket->customer_email ?: '');
+        $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'Device';
+        $reference = (string) $ticket->ticket_number;
+        $statusLabel = ucfirst(str_replace('_', ' ', $ticket->status ?? 'received'));
+        $trackingUrl = route('repair.portal.track', $reference);
+        $shareText = $this->notificationService->buildCustomerMessage($ticket);
+        $endpointPrefix = $request->is('api/*') ? '/api/v1/tenant' : '/tenant';
+
+        $dynamicChannels = \App\Services\OmnichannelRegistryService::resolveChannels($company->id, [
+            'type' => 'repair',
+            'id' => $ticket->id,
+            'phone' => $phone,
+            'email' => $email,
+            'reference' => $reference,
+            'message' => $shareText,
+        ]);
+
+        $channelComponents = \App\Services\DispatchChannelService::groupedComponents($dynamicChannels, ['type' => 'repair', 'id' => $ticket->id, 'phone' => $phone, 'email' => $email]);
+
+        // System share / tracking link
+        $shareComponent = [
+            'type' => 'list_tile',
+            'title' => 'Share Tracking Link',
+            'subtitle' => "Track: {$trackingUrl}",
+            'leading' => ['type' => 'icon', 'icon' => 'send', 'color' => '#38BDF8'],
+            'action' => [
+                'type' => 'SHARE',
+                'text' => $shareText,
+            ],
+        ];
+
+        $components = array_merge(
+            [
+                [
+                    'type' => 'section_header',
+                    'title' => 'Dispatch Channels',
+                    'subtitle' => "Notify {$customerName} using a configured gateway or your device app",
+                ],
+            ],
+            $channelComponents,
+            [
+                [
+                    'type' => 'section_header',
+                    'title' => 'Printer & Share',
+                    'subtitle' => 'Print token slip or share tracking portal link',
+                ],
+                $shareComponent,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'type' => 'bottom_sheet',
+            'title' => "Repair Ticket #{$reference}",
+            'header' => ['title' => "#{$reference}", 'subtitle' => "{$device} • {$customerName} • {$statusLabel}"],
+            'components' => $components,
+            'schema' => [
+                'type' => 'bottom_sheet',
+                'title' => "Repair Ticket #{$reference}",
+                'header' => ['title' => "#{$reference}", 'subtitle' => "{$device} • {$customerName} • {$statusLabel}"],
+                'components' => $components,
+            ],
+        ], 200, ['Cache-Control' => 'no-store, private']);
+    }
+
+    /** Dispatch a repair ticket directly to its linked customer contact. */
+    public function ticketsDispatch(Request $request, string $id): JsonResponse
+    {
+        $this->authorizeAction($request, 'view');
+        $company = $this->resolveCompany($request);
+        $ticket = RepairTicket::withoutGlobalScope('company')->where('company_id', $company->id)
+            ->with(['customer'])->find($id);
+        if (! $ticket) {
+            return response()->json(['success' => false, 'error' => 'Repair ticket not found.'], 404);
+        }
+
+        $channel = strtolower((string) $request->input('channel'));
+        $customerName = $ticket->customer?->name ?: ($ticket->customer_name ?: 'Customer');
+        $phone = $ticket->customer?->phone ?: ($ticket->customer_phone ?: '');
+        $email = $ticket->customer?->email ?: ($ticket->customer_email ?: '');
+        $device = trim(($ticket->brand ?? '').' '.($ticket->model ?? '')) ?: 'Device';
+        $trackingUrl = route('repair.portal.track', $ticket->ticket_number);
+        $message = $this->notificationService->buildCustomerMessage($ticket);
+
+        if ($channel === 'whatsapp') {
+            // Always use the contact bound to this ticket. A caller cannot
+            // redirect a repair notification to an arbitrary recipient.
+            $recipient = preg_replace('/[^0-9+]/', '', (string) $phone);
+            if ($recipient === '') return response()->json(['success' => false, 'error' => 'Customer phone is not linked.'], 422);
+            // Repair sharing is a text notification only. Do not attach the
+            // intake PDF, and do not claim delivery when the dispatcher merely
+            // generated a manual wa.me link because no provider is configured.
+            $result = $this->documentDispatchService->dispatchWhatsApp($company, $recipient, $message, null);
+        } elseif ($channel === 'email') {
+            // Email delivery follows the linked customer record (with the
+            // ticket snapshot as the model fallback), just like WhatsApp.
+            $recipient = trim((string) $email);
+            if (! filter_var($recipient, FILTER_VALIDATE_EMAIL)) return response()->json(['success' => false, 'error' => 'Customer email is not linked.'], 422);
+            $html = '<p>'.e($message).'</p><p>Ticket: <strong>'.e($ticket->ticket_number).'</strong></p>';
+            $result = $this->documentDispatchService->dispatchEmail($company, $recipient, "Repair Ticket #{$ticket->ticket_number}", $html);
+        } elseif ($channel === 'sms') {
+            if (! preg_match('/[0-9]/', $phone)) return response()->json(['success' => false, 'error' => 'Customer phone is not linked.'], 422);
+            $result = $this->documentDispatchService->dispatchSms($company, $phone, $message);
+        } else {
+            return response()->json(['success' => false, 'error' => 'Unsupported dispatch channel.'], 422);
+        }
+
+        $error = $result['error'] ?? $result['message'] ?? 'Dispatch failed.';
+
+        return response()->json([
+            'success' => (bool) ($result['success'] ?? false),
+            'message' => $result['message'] ?? (($result['success'] ?? false) ? 'Repair ticket sent to the linked customer.' : $error),
+            'status' => $result['status'] ?? 'failed',
+            'channel' => $channel,
+            'url' => $result['url'] ?? null,
+            'action' => $result['action'] ?? null,
+            'whatsapp_url' => $result['whatsapp_url'] ?? null,
+            'email_url' => $result['email_url'] ?? null,
+            'sms_url' => $result['sms_url'] ?? null,
+        ], ($result['success'] ?? false) ? 200 : 422);
     }
 
     /**

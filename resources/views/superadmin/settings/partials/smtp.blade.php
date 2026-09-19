@@ -106,7 +106,7 @@
         <div class="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
             <button type="submit"
                     wire:loading.attr="disabled"
-                    class="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-lg shadow-indigo-600/30 flex items-center gap-2 cursor-pointer active:scale-95">
+                    class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95">
                 <span wire:loading.remove wire:target="saveSmtp">💾 {{ __('Save SMTP Configuration') }}</span>
                 <span wire:loading wire:target="saveSmtp">⏳ {{ __('Saving...') }}</span>
             </button>

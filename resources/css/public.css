@@ -1,0 +1,407 @@
+/* ==========================================================================
+   Public marketing site stylesheet.
+
+   Scoped Tailwind build for the landing themes, CMS pages and the shared
+   public layout ONLY. The authenticated app ships the full `app.css`
+   (~277 KB); a visitor on `/` should never pay for the POS / dashboard
+   utilities they will never see. Keeping the @source globs tight here is
+   what makes this bundle small (~30 KB) — do not widen them to `views/**`.
+   ========================================================================== */
+
+/* `source(none)` disables Tailwind v4's automatic whole-project content
+   detection — without it this bundle scans every Blade file in the app and
+   ends up the same size as app.css. Only the files listed below are scanned:
+   the fast theme + the shared public chrome. The four legacy themes
+   (theme_modern / _enterprise / _minimal / _dark_studio) keep using the full
+   app.css — layouts/public.blade.php picks the bundle per active theme. */
+@import 'tailwindcss' source(none);
+@plugin '@tailwindcss/forms';
+
+@source '../views/layouts/public.blade.php';
+@source '../views/landing/themes/theme_fast.blade.php';
+@source '../views/landing/partials/**/*.blade.php';
+@source '../views/components/landing/icon.blade.php';
+@source '../views/components/landing/contact-form.blade.php';
+@source '../views/components/landing/download-buttons.blade.php';
+@source '../views/public/**/*.blade.php';
+
+/* Class-based dark mode (toggled via localStorage + <html class="dark">). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+    /* Marketing brand palette — bold ink + lime accent, pastel icon tints.
+       Mirrors the marketing tokens in resources/css/app.css. */
+    --color-brand-ink: #14161f;
+    --color-brand-lime: #d7f24e;
+    --color-brand-lime-dark: #bfda36;
+    --color-brand-emerald: #10b981;
+    --color-brand-teal: #14b8a6;
+    --color-brand-lavender: #e2dcfb;
+    --color-brand-lavender-ink: #6d5bd0;
+    --color-brand-butter: #fdf0c4;
+    --color-brand-butter-ink: #b6890a;
+    --color-brand-mint: #d9f2e6;
+    --color-brand-mint-ink: #10916b;
+}
+
+/* This site must render correctly with no network beyond the page itself —
+   no Google Fonts, no icon CDN. Use the OS-native font stack: zero bytes
+   shipped, zero round trips, instant first paint. */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        ui-sans-serif, system-ui, Helvetica, Arial, sans-serif;
+}
+
+html {
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    overflow-x: clip;
+}
+
+img, svg, video, canvas {
+    max-width: 100%;
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+:where(button, a, input, select, textarea, [role='button']):focus-visible {
+    outline: 2px solid color-mix(in srgb, #2563eb 82%, white);
+    outline-offset: 2px;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* CMS page body (TinyMCE-authored content injected via {!! clean_html() !!}). */
+.page-content :where(h1, h2, h3, h4) { font-weight: 800; letter-spacing: -0.02em; margin: 1.5em 0 0.5em; }
+.page-content h1 { font-size: 2rem; }
+.page-content h2 { font-size: 1.625rem; }
+.page-content h3 { font-size: 1.25rem; }
+.page-content p { margin: 1em 0; line-height: 1.75; }
+.page-content ul, .page-content ol { margin: 1em 0; padding-inline-start: 1.5em; }
+.page-content li { margin: 0.35em 0; }
+.page-content a { color: var(--color-brand-emerald); text-decoration: underline; }
+.page-content img { border-radius: 1rem; max-width: 100%; height: auto; }
+.page-content table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+.page-content td, .page-content th { border: 1px solid rgb(226 232 240); padding: 0.5em 0.75em; }
+html.dark .page-content td, html.dark .page-content th { border-color: rgb(51 65 85); }
+
+/* Paint & scroll performance: sections past the first viewport are not
+   rendered until the user scrolls near them, with reserved height so the
+   scrollbar doesn't jump. */
+.public-site main > :nth-child(n + 3) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 720px;
+}
+
+@keyframes float-slow {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+}
+.animate-float-slow {
+    animation: float-slow 6s ease-in-out infinite;
+}
+
+/* SPA navigation progress bar (NProgress, driven by public-navigation.js). */
+#nprogress { pointer-events: none; }
+#nprogress .bar {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 3px;
+    z-index: 100000;
+    background: linear-gradient(90deg, #10b981, #d7f24e);
+}
+#nprogress .peg {
+    display: block;
+    position: absolute;
+    right: 0;
+    width: 100px;
+    height: 100%;
+    box-shadow: 0 0 10px #10b981, 0 0 5px #d7f24e;
+    opacity: 1;
+    transform: rotate(3deg) translate(0, -4px);
+}
+
+/* Low-power / reduced-motion / small screens: drop the expensive full-screen
+   backdrop blurs and ambient orbs, and neutralise animation. */
+@media (max-width: 767px), (prefers-reduced-motion: reduce) {
+    .public-site *,
+    .public-site *::before,
+    .public-site *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    .public-site .landing-ambient {
+        display: none;
+    }
+    .public-site [class*='backdrop-blur'] {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html:focus-within { scroll-behavior: auto !important; }
+}
+
+/* The attached landing design: white chrome, navy type and blue waves. */
+.reference-site {
+    --reference-blue: #0065ff;
+    --reference-ink: #091944;
+    --reference-muted: #58709e;
+    --reference-rule: #e1ebfc;
+    --reference-card: #fff;
+    color: var(--reference-ink);
+    background: #fff;
+}
+.reference-site ::selection { color: #fff; background: #0065ff; }
+.reference-container { width: min(calc(100% - 48px), 1300px); margin-inline: auto; }
+.reference-header { position: sticky; top: 0; z-index: 50; background: #fffffff5; border-bottom: 1px solid #edf3fc; }
+.reference-header-inner { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.reference-logo { min-width: 0; flex-shrink: 0; }
+.reference-brand { display: inline-flex; align-items: center; gap: 10px; }
+.reference-brand > svg { flex-shrink: 0; }
+.reference-brand strong { display: block; font-size: 29px; font-weight: 850; letter-spacing: -1.1px; line-height: 1.15; }
+.reference-brand small { display: block; font-size: 12px; color: var(--reference-muted); }
+.reference-brand img { width: auto; max-width: 290px; max-height: 52px; object-fit: contain; }
+.reference-nav { display: flex; align-items: center; gap: 32px; }
+.reference-nav-link { position: relative; padding-block: 26px; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.reference-nav-link:hover, .reference-nav-link.is-active { color: var(--reference-blue); }
+.reference-nav-link.is-active::after { content: ''; position: absolute; inset-inline: 0; bottom: 16px; height: 2px; background: var(--reference-blue); }
+.reference-header-actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.reference-button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 11px 22px; border-radius: 14px; border: 1px solid transparent; font-size: 13px; font-weight: 650; line-height: 1.35; cursor: pointer; transition: background-color .15s, box-shadow .15s, transform .15s; text-align: center; text-decoration: none; }
+.reference-button > svg { flex-shrink: 0; }
+.reference-button:hover { transform: translateY(-1px); }
+.reference-button--primary { background: #0065ff; color: #fff; box-shadow: 0 5px 12px #0065ff16; }
+.reference-button--primary:hover { background: #0058e0; box-shadow: 0 6px 14px #0065ff26; }
+.reference-button--outline { border-color: #0065ff; color: #0065ff; background: #ffffff70; }
+.reference-button--outline:hover { background: #edf5ff; }
+.reference-button--login { color: var(--reference-ink); border-color: #a7b9d9; padding-inline: 18px; }
+.reference-button--white { background: #fff; color: #4b28f7; }
+.reference-language { position: relative; }
+.reference-language > button { display: flex; align-items: center; gap: 8px; min-height: 40px; font-size: 12px; cursor: pointer; padding: 8px; }
+.reference-language-menu { position: absolute; top: 100%; inset-inline-end: 0; min-width: 180px; max-height: 320px; overflow-y: auto; padding: 8px; background: var(--reference-card); border: 1px solid var(--reference-rule); border-radius: 14px; box-shadow: 0 12px 30px #17367715; }
+.reference-language-menu a { display: block; padding: 10px 12px; font-size: 13px; border-radius: 8px; }
+.reference-language-menu a:hover { background: #e9f2ff; color: #0065ff; }
+.reference-menu-toggle { display: none; width: 40px; height: 40px; align-items: center; justify-content: center; border: 1px solid var(--reference-rule); border-radius: 12px; cursor: pointer; }
+.reference-mobile-nav { display: none; }
+.reference-landing { overflow: clip; color: var(--reference-ink); }
+.reference-landing > section { scroll-margin-top: 90px; }
+.reference-landing .reference-hero {
+    background-color: var(--landing-hero-bg, #fff) !important;
+    background-image: radial-gradient(ellipse at 80% 30%, #e5f0ffb0, transparent 64%), linear-gradient(130deg, #eef7ff80, #fff 50%, #f0f6ff90) !important;
+    position: relative;
+    overflow: clip;
+}
+.reference-hero-grid { display: grid; grid-template-columns: 48% 52%; align-items: center; min-height: 500px; padding-block: 38px 10px; }
+.reference-hero-copy { position: relative; z-index: 2; min-width: 0; }
+.reference-badge { display: inline-flex; align-items: center; gap: 9px; padding: 6px 13px; border-radius: 30px; background: #eaf3ff; color: #0065ff; font-size: 11px; font-weight: 600; line-height: 1.4; }
+.reference-text-blue { color: #0065ff; }
+.reference-hero-badge { margin-bottom: 14px; font-size: 12px; color: #073bbf; background: #e6efff; }
+.reference-hero h1 { font-size: clamp(34px, 3vw, 48px); font-weight: 820; line-height: 1.13; letter-spacing: -1.7px; max-width: 680px; }
+.reference-hero .reference-gradient-text { background: linear-gradient(100deg, #067eee, #0064ff 62%, #5825ff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.reference-hero-description { margin-top: 12px; font-size: 17px; line-height: 1.45; max-width: 530px; }
+.reference-hero-actions { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 20px; }
+.reference-hero-actions .reference-button { min-height: 48px; }
+.reference-hero-modules { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; margin-top: 30px; max-width: 580px; }
+.reference-icon { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 13px; background: linear-gradient(135deg, #258aff, #0065ff); color: #fff; box-shadow: inset 0 1px 1px #ffffff30; }
+.reference-icon--green { background: linear-gradient(135deg, #15d97c, #00b466); }
+.reference-icon--purple { background: linear-gradient(135deg, #a35bff, #6233ff); }
+.reference-icon--pink { background: linear-gradient(135deg, #fc40c8, #ed16a0); }
+.reference-icon--orange { background: linear-gradient(135deg, #ffb435, #ff890b); }
+.reference-icon--cyan { background: linear-gradient(135deg, #30caff, #008fff); }
+.reference-icon--teal { background: linear-gradient(135deg, #13d5df, #00aac5); }
+.reference-feature-card .reference-icon--cyan { background: linear-gradient(135deg, #09d5e1, #00b4cf); }
+.reference-hero-module .reference-icon { border-radius: 50%; width: 42px; height: 42px; }
+.reference-hero-module h2 { margin-top: 10px; font-size: 11px; font-weight: 650; line-height: 1.35; }
+.reference-hero-module p { margin-top: 5px; font-size: 10px; line-height: 1.55; max-width: 115px; }
+.reference-hero-art { position: relative; min-width: 0; height: 440px; display: flex; align-items: center; justify-content: center; }
+.reference-hero-art > img { position: relative; z-index: 1; width: 116%; max-width: none; height: auto; margin-inline-start: 2%; }
+.reference-hero-wave { position: absolute; inset: 2% -35% -2% -4%; background: linear-gradient(135deg, #e7f7ff 8%, #96d3ff 42%, #cad2ff 69%, #b49bff 100%); border-radius: 68% 12% 46% 25% / 57% 34% 60% 40%; transform: rotate(-12deg); opacity: .7; }
+.reference-hero-wave::after { content: ''; position: absolute; inset: 58% -10% -20% 15%; border-radius: 50%; background: linear-gradient(100deg, #8cc5ff80, #8d86ff60); }
+.reference-device-note { position: absolute; z-index: 2; inset-inline-end: -48px; top: 18px; color: #0065ff; font-family: 'Comic Sans MS', 'Segoe Print', cursive; font-style: italic; font-size: 17px; line-height: 1.25; text-align: center; transform: rotate(-12deg); }
+.reference-device-note svg { display: block; margin-inline: auto; margin-top: 6px; }
+.reference-extra-highlights { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; color: var(--reference-muted); font-size: 11px; }
+.reference-stats { padding-block: 16px 18px; }
+.reference-stats-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) 1.25fr; align-items: center; padding: 18px 28px; border-radius: 18px; background: linear-gradient(110deg, #f1f7ff, #f4f8ff); gap: 22px; }
+.reference-stat { display: flex; align-items: center; justify-content: center; gap: 20px; min-width: 0; color: #0631b5; border-inline-end: 1px solid #bdd5ff; }
+.reference-stat > svg { flex-shrink: 0; }
+.reference-stat strong { display: block; font-size: 20px; font-weight: 750; line-height: 1.3; }
+.reference-stat small { display: block; font-size: 11px; line-height: 1.4; margin-top: 4px; }
+.reference-stat-trust { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #0065ff; }
+.reference-stat-trust > span { font-family: 'Comic Sans MS', 'Segoe Print', cursive; font-size: 16px; font-style: italic; text-align: center; transform: rotate(-6deg); }
+.reference-stat-trust > svg { flex-shrink: 0; }
+.reference-stats-heading { text-align: center; margin-bottom: 20px; }
+.reference-stats-heading h2 { font-size: 24px; font-weight: 750; }
+.reference-features { padding-block: 16px 12px; position: relative; }
+.reference-features::after { content: ''; position: absolute; z-index: 0; inset: auto -5% -80px -5%; height: 110px; background: #edf6ff; border-radius: 70% 50% 0 0; opacity: .6; pointer-events: none; }
+.reference-features > .reference-container { position: relative; z-index: 1; }
+.reference-features-grid { display: grid; grid-template-columns: minmax(0, .28fr) minmax(0, .72fr); align-items: center; gap: 26px; }
+.reference-features-intro { padding-inline-end: 20px; }
+.reference-features-intro h2 { font-size: 28px; font-weight: 780; line-height: 1.18; letter-spacing: -.8px; margin-top: 12px; }
+.reference-features-intro > p { margin-top: 12px; font-size: 13px; line-height: 1.45; }
+.reference-features-intro > .reference-button { margin-top: 18px; font-size: 12px; min-height: 40px; padding: 9px 16px; }
+.reference-feature-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 20px; }
+.reference-feature-card { display: flex; align-items: flex-start; gap: 20px; min-width: 0; min-height: 94px; padding: 16px 20px; border-radius: 14px; border: 1px solid var(--reference-rule); background: var(--reference-card); box-shadow: 0 5px 20px #3580d805; }
+.reference-feature-card h3 { font-size: 12px; font-weight: 650; line-height: 1.45; }
+.reference-feature-card p { margin-top: 6px; font-size: 11px; line-height: 1.7; }
+.reference-all-features { padding-top: 36px; scroll-margin-top: 100px; }
+.reference-full-feature { border-color: var(--reference-rule); }
+.reference-dashboard-preview { margin-top: 24px; padding: 24px; }
+.reference-demo { width: min(90vw, 900px); max-height: 90svh; overflow-y: auto; margin: auto; border: 1px solid var(--reference-rule); border-radius: 22px; padding: 28px; color: var(--reference-ink); background: var(--reference-card); box-shadow: 0 24px 90px #071a4440; }
+.reference-demo::backdrop { background: #071a4480; }
+.reference-demo-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.reference-demo-heading h2 { font-size: 24px; font-weight: 750; }
+.reference-demo-heading button { font-size: 30px; cursor: pointer; width: 40px; height: 40px; flex-shrink: 0; }
+.reference-demo > p { margin-top: 12px; font-size: 14px; }
+.reference-demo > img { width: 100%; height: auto; margin-block: 16px; }
+.reference-landing .reference-cta { background-image: linear-gradient(105deg, #147de2, #2a66f4 35%, #6c32f6) !important; color: #fff !important; position: relative; }
+.reference-cta-inner { min-height: 74px; display: flex; align-items: center; justify-content: center; gap: 22px; padding-block: 14px; }
+.reference-cta-inner > svg { flex-shrink: 0; }
+.reference-cta-inner h2 { font-size: 14px; font-weight: 650; line-height: 1.4; }
+.reference-cta-inner p { color: #fff !important; font-size: 11px; line-height: 1.5; margin-top: 4px; }
+.reference-cta-inner .reference-button { margin-inline-start: 160px; font-size: 12px; min-height: 40px; padding: 9px 18px; }
+.reference-cta::after { content: ''; position: absolute; right: 3%; top: 16px; width: 44px; height: 44px; background-image: radial-gradient(circle, #ffffff45 2px, transparent 2px); background-size: 16px 16px; pointer-events: none; }
+
+/* Extend the same card and typography treatment through every enabled section. */
+.reference-landing > section:not(:is(.reference-hero, .reference-stats, .reference-features, .reference-cta)) { border-color: var(--reference-rule); }
+.reference-landing > section:not(:is(.reference-hero, .reference-stats, .reference-features, .reference-cta)) > div { max-width: 1300px; padding-block: 64px; }
+.reference-landing > section:not(:is(.reference-hero, .reference-stats, .reference-features, .reference-cta)) :is(h2) { font-size: 32px; line-height: 1.2; font-weight: 750; letter-spacing: -.7px; }
+.reference-landing :is(.rounded-2xl, .rounded-xl, .rounded-lg) { border-color: var(--reference-rule); }
+.reference-landing :is(.bg-brand-lime, .bg-emerald-400) { background: #0065ff; color: #fff; }
+.reference-landing :is(.text-emerald-600, .text-emerald-700, .text-lime-800) { color: #0065ff; }
+.reference-landing :is(.bg-lime-100, .bg-emerald-50) { background: #eaf3ff; border-color: #dceaff; color: #0065ff; }
+.reference-landing .landing-sec-pricing { padding-block: 0; }
+.reference-landing .landing-sec-pricing .border-brand-lime { border-color: #0065ff; box-shadow: 0 8px 30px #0065ff10; }
+.reference-landing .landing-sec-pricing a { border-radius: 12px; background: #0065ff; color: #fff; }
+.reference-landing .landing-sec-contact .contact-form-card { border-radius: 20px; }
+.reference-landing .contact-form-input:focus { --tw-ring-color: #4388ff40; border-color: #0065ff !important; }
+.reference-landing .landing-sec-testimonials figure { box-shadow: 0 6px 24px #2674c908; }
+.reference-site > footer { background: #f6f9ff; border-color: var(--reference-rule); }
+.reference-site > footer > div { max-width: 1360px; padding-block: 44px 24px; }
+.reference-site > footer a:hover { color: #0065ff; }
+.reference-site > footer .text-brand-lime { color: #0065ff; }
+.reference-site > footer .mt-12 { margin-top: 32px; }
+.reference-theme-toggle { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; padding: 8px 12px; border: 1px solid var(--reference-rule); border-radius: 10px; color: #0065ff; cursor: pointer; }
+.reference-site > footer .gap-5 { flex-wrap: wrap; justify-content: center; }
+
+.dark .reference-site { --reference-ink: #e8efff; --reference-muted: #a2b5d7; --reference-rule: #26395c; --reference-card: #14243d; }
+.dark .reference-header { background: #0c1930f5; border-color: #26395c; }
+.dark .reference-landing { background: #0c1930; }
+.dark .reference-landing .reference-hero { background-image: radial-gradient(ellipse at 80% 30%, #1e397a80, transparent 64%), linear-gradient(130deg, #132849, #0c1930 70%) !important; }
+.dark .reference-badge { background: #183964; color: #91bfff; }
+.dark .reference-stats-strip { background: #14243d; }
+.dark .reference-stat { color: #b5ccff; border-color: #3a5483; }
+.dark .reference-stat-trust { color: #91bfff; }
+.dark .reference-hero-wave { opacity: .2; }
+.dark .reference-button--outline { color: #91bfff; border-color: #568bde; background: #132a4880; }
+.dark .reference-button--outline:hover { background: #1b365d; }
+.dark .reference-features::after { background: #14243d; }
+.dark .reference-site > footer { background: #0c1930; }
+
+@media (min-width: 1800px) {
+    .reference-container { width: min(calc(100% - 120px), 1500px); }
+    .reference-hero-grid { min-height: 570px; }
+    .reference-hero h1 { font-size: 56px; }
+    .reference-hero-art { height: 500px; }
+}
+@media (max-width: 1250px) {
+    .reference-nav { gap: 20px; }
+    .reference-brand strong { font-size: 24px; }
+    .reference-brand img { max-width: 230px; }
+    .reference-hero-module h2 { white-space: normal; }
+    .reference-feature-card { padding: 16px; gap: 12px; }
+    .reference-device-note { inset-inline-end: -10px; font-size: 14px; }
+    .reference-cta-inner .reference-button { margin-inline-start: auto; }
+}
+@media (max-width: 1023px) {
+    .reference-header-inner { min-height: 72px; gap: 16px; }
+    .reference-nav { display: none; }
+    .reference-menu-toggle { display: inline-flex; }
+    .reference-mobile-nav { position: absolute; inset-inline: 24px; top: calc(100% + 8px); background: var(--reference-card); border: 1px solid var(--reference-rule); border-radius: 16px; box-shadow: 0 12px 36px #1b39741a; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+    .reference-mobile-nav > a { padding: 11px 14px; font-size: 14px; }
+    .reference-hero-grid { grid-template-columns: 52% 48%; padding-top: 32px; }
+    .reference-hero h1 { font-size: 36px; }
+    .reference-hero-description { font-size: 15px; }
+    .reference-hero-modules { gap: 12px; }
+    .reference-device-note { display: none; }
+    .reference-stats-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 20px; gap: 14px; }
+    .reference-stat { gap: 12px; }
+    .reference-stat:last-of-type { border: 0; }
+    .reference-stat strong { font-size: 18px; }
+    .reference-stat-trust { grid-column: 1 / -1; justify-content: center; padding-top: 14px; border-top: 1px solid #bdd5ff; }
+    .reference-stat-trust > span { font-family: inherit; font-style: normal; font-size: 12px; transform: none; }
+    .reference-stat-trust br { display: none; }
+    .reference-stat-trust > svg { width: 24px; height: 24px; }
+    .reference-features-grid { grid-template-columns: 1fr; gap: 24px; }
+    .reference-features-intro { max-width: 590px; padding: 0; }
+    .reference-feature-cards { padding-inline-end: 0; }
+    .reference-cta-inner { gap: 16px; }
+    .reference-cta-inner > div { flex: 1; }
+}
+@media (max-width: 767px) {
+    .reference-container { width: calc(100% - 40px); }
+    .reference-header-inner { gap: 12px; }
+    .reference-header-actions { gap: 8px; }
+    .reference-brand strong { font-size: 20px; letter-spacing: -.6px; }
+    .reference-brand > svg { width: 44px; height: 42px; }
+    .reference-brand small { font-size: 10px; }
+    .reference-brand img { max-width: 190px; max-height: 44px; }
+    .reference-register { display: none; }
+    .reference-button--login { padding: 9px 14px; min-height: 40px; }
+    .reference-hero-grid { grid-template-columns: 1fr; padding-block: 30px 20px; min-height: auto; }
+    .reference-hero h1 { font-size: clamp(34px, 6.8vw, 46px); max-width: 600px; }
+    .reference-hero-description { max-width: 570px; }
+    .reference-hero-modules { gap: 16px; margin-top: 26px; }
+    .reference-hero-module h2 { font-size: 11px; }
+    .reference-hero-module p { font-size: 10px; }
+    .reference-hero-art { height: auto; margin-top: 32px; padding-block: 8px; }
+    .reference-hero-art > img { width: 105%; margin: 0; }
+    .reference-hero-wave { inset: 0 -20% 0 0; }
+    .reference-stat { gap: 10px; justify-content: flex-start; }
+    .reference-stat strong { font-size: 18px; }
+    .reference-stat small { font-size: 10px; }
+    .reference-stat > svg { width: 28px; height: 28px; }
+    .reference-stats-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 16px; }
+    .reference-stat:nth-child(2n) { border-inline-end: 0; }
+    .reference-feature-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .reference-feature-card { padding: 16px; }
+    .reference-cta-inner { flex-wrap: wrap; justify-content: flex-start; padding-block: 24px; }
+    .reference-cta-inner .reference-button { margin-inline-start: 54px; }
+    .reference-cta-inner > div { min-width: calc(100% - 60px); }
+    .reference-landing > section:not(:is(.reference-hero, .reference-stats, .reference-features, .reference-cta)) > div { padding-block: 44px; }
+}
+@media (max-width: 479px) {
+    .reference-header-inner { min-height: 68px; }
+    .reference-header-actions { gap: 6px; }
+    .reference-language { display: none; }
+    .reference-brand { gap: 5px; }
+    .reference-brand strong { font-size: 18px; }
+    .reference-brand > svg { width: 36px; height: 36px; }
+    .reference-brand img { max-width: 150px; max-height: 40px; }
+    .reference-button--login { font-size: 12px; padding-inline: 12px; }
+    .reference-hero h1 { font-size: 35px; letter-spacing: -1.1px; }
+    .reference-hero-badge { font-size: 10px; gap: 6px; }
+    .reference-hero-actions { gap: 10px; }
+    .reference-hero-actions .reference-button { padding-inline: 15px; font-size: 12px; }
+    .reference-hero-modules { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 16px; }
+    .reference-hero-module p { max-width: 105px; }
+    .reference-stats-strip { padding: 18px; }
+    .reference-feature-cards { grid-template-columns: 1fr; gap: 12px; }
+    .reference-feature-card { min-height: 92px; }
+    .reference-features-intro h2 { font-size: 28px; }
+    .reference-cta-inner .reference-button { margin-inline-start: 0; }
+}

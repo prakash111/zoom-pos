@@ -11,7 +11,7 @@ trait ActsAsTenantUser
     /** @return array{0: Company, 1: User} */
     protected function actingAsTenantAdmin(?Company $company = null): array
     {
-        $company ??= Company::create(['name' => 'Acme Inc', 'status' => 'active']);
+        $company ??= Company::create(['name' => 'Acme Inc', 'status' => 'active', 'pos_mode' => 'general']);
 
         $user = User::create([
             'company_id' => $company->id,
@@ -21,6 +21,7 @@ trait ActsAsTenantUser
             'password' => Hash::make('secret1234'),
             'role' => 'administrator',
             'status' => 'approved',
+            'email_verified_at' => now(),
         ]);
 
         $this->actingAs($user, 'web');
@@ -32,7 +33,7 @@ trait ActsAsTenantUser
     /** @return array{0: Company, 1: User} */
     protected function actingAsTenantStaff(?Company $company = null): array
     {
-        $company ??= Company::create(['name' => 'Acme Inc', 'status' => 'active']);
+        $company ??= Company::create(['name' => 'Acme Inc', 'status' => 'active', 'pos_mode' => 'general']);
 
         $user = User::create([
             'company_id' => $company->id,
@@ -42,6 +43,7 @@ trait ActsAsTenantUser
             'password' => Hash::make('secret1234'),
             'role' => 'operador',
             'status' => 'approved',
+            'email_verified_at' => now(),
         ]);
 
         $this->actingAs($user, 'web');

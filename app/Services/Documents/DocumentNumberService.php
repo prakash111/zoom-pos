@@ -20,8 +20,9 @@ class DocumentNumberService
             'repair', 'repair_ticket' => $this->nextRepair($company, $date),
             'pharmacy', 'prescription', 'rx' => $this->nextPrescription($company, $date),
             'salon', 'appointment' => $this->nextSalon($company, $date),
-            'quotation', 'quote' => $this->nextSaleNumber($company, $company->quotation_prefix ?: 'QUO-', 'quotation'),
-            default => $this->nextSaleNumber($company, $company->invoice_prefix ?: 'INV-', null),
+            'quotation', 'quote' => $this->nextSaleNumber($company, $this->compactPrefix($company->quotation_prefix, 'QUO-'), 'quotation'),
+            'order', 'sale', 'receipt' => $this->nextSaleNumber($company, $this->compactPrefix($company->invoice_prefix, 'ORD-'), null),
+            default => $this->nextSaleNumber($company, $this->compactPrefix($company->invoice_prefix, 'INV-'), null),
         };
     }
 
@@ -65,7 +66,18 @@ class DocumentNumberService
             $query->where('operation_type', $operationType);
         }
 
-        return $this->prefix($prefix, 'INV-').sprintf('%04d', $query->count() + 1);
+        return $this->prefix($prefix, 'INV-').sprintf('%03d', $query->count() + 1);
+    }
+
+    /** Keep legacy demo/module prefixes from leaking into document numbers. */
+    private function compactPrefix(?string $configured, string $fallback): string
+    {
+        $prefix = trim((string) $configured);
+        if ($prefix === '' || strlen($prefix) > 8) {
+            return $fallback;
+        }
+
+        return $prefix;
     }
 
     private function prefix(?string $configured, string $fallback): string

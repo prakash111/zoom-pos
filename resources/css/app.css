@@ -91,15 +91,119 @@ body {
    property VALUES stay inline in the layout (they embed a per-request PHP
    value, the tenant's own branded accent color); the rules that consume
    those variables are static and belong here. */
-.dockable-nav-item:not([aria-selected='true']) span,
-.top-nav-item:not(.active) span {
-    color: var(--nav-item-color);
+/* Inactive dock & top-bar nav items - text and icon inheritance */
+.dockable-nav-item:not([aria-selected='true']):not(.active),
+.top-nav-item:not(.active),
+.dock-nav-item:not(.active),
+.dock-link:not(.active) {
+    color: var(--nav-item-color, var(--nav-inactive-color, #ffffff)) !important;
+}
+.dockable-nav-item:not([aria-selected='true']):not(.active) span,
+.top-nav-item:not(.active) span,
+.dock-nav-item:not(.active) span,
+.dock-link:not(.active) span {
+    color: var(--nav-item-color, var(--nav-inactive-color, #ffffff)) !important;
+}
+.dockable-nav-item:not([aria-selected='true']):not(.active) svg,
+.top-nav-item:not(.active) svg,
+.dock-nav-item:not(.active) svg,
+.dock-link:not(.active) svg,
+.dockable-nav-item:not([aria-selected='true']):not(.active) i,
+.top-nav-item:not(.active) i,
+.dock-nav-item:not(.active) i,
+.dock-link:not(.active) i {
+    color: var(--nav-item-color, var(--nav-inactive-color, #ffffff)) !important;
+}
+.dockable-nav-item:not([aria-selected='true']):not(.active) svg[stroke],
+.dockable-nav-item:not([aria-selected='true']):not(.active) svg [stroke],
+.dockable-nav-item:not([aria-selected='true']):not(.active) svg path[stroke],
+.top-nav-item:not(.active) svg[stroke],
+.top-nav-item:not(.active) svg [stroke],
+.top-nav-item:not(.active) svg path[stroke],
+.dock-nav-item:not(.active) svg[stroke],
+.dock-nav-item:not(.active) svg [stroke],
+.dock-nav-item:not(.active) svg path[stroke],
+.dock-link:not(.active) svg[stroke],
+.dock-link:not(.active) svg [stroke],
+.dock-link:not(.active) svg path[stroke] {
+    stroke: var(--nav-item-color, var(--nav-inactive-color, #ffffff)) !important;
+}
+.dockable-nav-item:not([aria-selected='true']):not(.active) svg[fill]:not([fill='none']),
+.dockable-nav-item:not([aria-selected='true']):not(.active) svg [fill]:not([fill='none']),
+.dockable-nav-item:not([aria-selected='true']):not(.active) svg path[fill]:not([fill='none']),
+.top-nav-item:not(.active) svg[fill]:not([fill='none']),
+.top-nav-item:not(.active) svg [fill]:not([fill='none']),
+.top-nav-item:not(.active) svg path[fill]:not([fill='none']),
+.dock-nav-item:not(.active) svg[fill]:not([fill='none']),
+.dock-nav-item:not(.active) svg [fill]:not([fill='none']),
+.dock-nav-item:not(.active) svg path[fill]:not([fill='none']),
+.dock-link:not(.active) svg[fill]:not([fill='none']),
+.dock-link:not(.active) svg [fill]:not([fill='none']),
+.dock-link:not(.active) svg path[fill]:not([fill='none']) {
+    fill: var(--nav-item-color, var(--nav-inactive-color, #ffffff)) !important;
+}
+
+/* Active dock & top-bar nav items - text and icon inheritance */
+.dockable-nav-item[aria-selected='true'],
+.dockable-nav-item.active,
+.top-nav-item.active,
+.dock-nav-item.active,
+.dock-link.active {
+    color: var(--nav-item-active-color, var(--nav-active-color, #60a5fa)) !important;
 }
 .dockable-nav-item[aria-selected='true'] span,
 .dockable-nav-item.active span,
-.top-nav-item.active span {
-    color: var(--nav-item-active-color) !important;
+.top-nav-item.active span,
+.dock-nav-item.active span,
+.dock-link.active span {
+    color: var(--nav-item-active-color, var(--nav-active-color, #60a5fa)) !important;
     font-weight: 700;
+}
+.dockable-nav-item[aria-selected='true'] svg,
+.dockable-nav-item.active svg,
+.top-nav-item.active svg,
+.dock-nav-item.active svg,
+.dock-link.active svg,
+.dockable-nav-item[aria-selected='true'] i,
+.dockable-nav-item.active i,
+.top-nav-item.active i,
+.dock-nav-item.active i,
+.dock-link.active i {
+    color: var(--nav-item-active-color, var(--nav-active-color, #60a5fa)) !important;
+}
+.dockable-nav-item[aria-selected='true'] svg[stroke],
+.dockable-nav-item[aria-selected='true'] svg [stroke],
+.dockable-nav-item[aria-selected='true'] svg path[stroke],
+.dockable-nav-item.active svg[stroke],
+.dockable-nav-item.active svg [stroke],
+.dockable-nav-item.active svg path[stroke],
+.top-nav-item.active svg[stroke],
+.top-nav-item.active svg [stroke],
+.top-nav-item.active svg path[stroke],
+.dock-nav-item.active svg[stroke],
+.dock-nav-item.active svg [stroke],
+.dock-nav-item.active svg path[stroke],
+.dock-link.active svg[stroke],
+.dock-link.active svg [stroke],
+.dock-link.active svg path[stroke] {
+    stroke: var(--nav-item-active-color, var(--nav-active-color, #60a5fa)) !important;
+}
+.dockable-nav-item[aria-selected='true'] svg[fill]:not([fill='none']),
+.dockable-nav-item[aria-selected='true'] svg [fill]:not([fill='none']),
+.dockable-nav-item[aria-selected='true'] svg path[fill]:not([fill='none']),
+.dockable-nav-item.active svg[fill]:not([fill='none']),
+.dockable-nav-item.active svg [fill]:not([fill='none']),
+.dockable-nav-item.active svg path[fill]:not([fill='none']),
+.top-nav-item.active svg[fill]:not([fill='none']),
+.top-nav-item.active svg [fill]:not([fill='none']),
+.top-nav-item.active svg path[fill]:not([fill='none']),
+.dock-nav-item.active svg[fill]:not([fill='none']),
+.dock-nav-item.active svg [fill]:not([fill='none']),
+.dock-nav-item.active svg path[fill]:not([fill='none']),
+.dock-link.active svg[fill]:not([fill='none']),
+.dock-link.active svg [fill]:not([fill='none']),
+.dock-link.active svg path[fill]:not([fill='none']) {
+    fill: var(--nav-item-active-color, var(--nav-active-color, #60a5fa)) !important;
 }
 
 .bg-theme-primary { background-color: var(--color-primary) !important; }
@@ -138,10 +242,12 @@ body {
 }
 
 .vertical-rail-label {
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-    text-orientation: mixed;
-    letter-spacing: 0.05em;
+    writing-mode: horizontal-tb;
+    transform: none;
+    text-orientation: initial;
+    letter-spacing: normal;
+    text-align: center;
+    max-width: 100%;
 }
 
 /* Anti-flicker initial dock layout rules: applied from a data attribute set
@@ -221,6 +327,28 @@ html[data-dock-mode='floating'] .main-content-pane {
     --color-brand-butter-ink: #b6890a;
     --color-brand-mint: #d9f2e6;
     --color-brand-mint-ink: #10916b;
+
+    /* Enterprise Platform Token Palette (Dark & Light SaaS Standards) */
+    --color-slate-deep: #0b1120;
+    --color-midnight-navy: #131d2d;
+    --color-soft-slate: #1e293b;
+    --color-pure-white: #f8fafc;
+    --color-muted-slate: #94a3b8;
+    --color-border-dark: #1e293b;
+
+    /* Accents & Statuses */
+    --color-accent-emerald: #10b981;
+    --color-accent-sky: #38bdf8;
+    --color-accent-indigo: #6366f1;
+    --color-accent-amber: #f59e0b;
+    --color-accent-rose: #ef4444;
+
+    /* Light Theme Badges & Print Tokens */
+    --color-badge-paid-bg: #ecfdf5;
+    --color-badge-paid-text: #065f46;
+    --color-badge-unpaid-bg: #fef2f2;
+    --color-badge-unpaid-text: #991b1b;
+    --color-thermal-ink: #0f172a;
 }
 
 @keyframes float-slow {

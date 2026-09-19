@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Http\Middleware\EnsureTenantExtension;
 use App\Models\SduiModule;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -43,17 +44,42 @@ class ModuleServiceProvider extends ServiceProvider
 
             if (is_file($path)) {
                 require $path;
+                return;
+            }
+            if (is_file(base_path('module-packages/'.$relative))) {
+                require base_path('module-packages/'.$relative);
+                return;
+            }
+
+            // Fallback for case differences in module directory (e.g. LeadManagement vs leadmanagement)
+            $parts = explode('/', $relative, 2);
+            if (count($parts) === 2) {
+                $lowerRelative = strtolower($parts[0]).'/'.$parts[1];
+                if (is_file(base_path('modules/'.$lowerRelative))) {
+                    require base_path('modules/'.$lowerRelative);
+                    return;
+                }
+                if (is_file(base_path('module-packages/'.$lowerRelative))) {
+                    require base_path('module-packages/'.$lowerRelative);
+                    return;
+                }
             }
         });
     }
 
     public function boot(): void
     {
-        if (! Schema::hasTable('sdui_modules')) {
-            return;
-        }
-
         try {
+            // Schema::hasTable() itself opens a DB connection — on a fresh
+            // install (no database configured/migrated yet, e.g. before the
+            // /install wizard has run, or the DB is briefly unreachable) this
+            // throws rather than returning false, which would otherwise crash
+            // every single request app-wide (including /install itself) since
+            // this provider boots on every bootstrap, HTTP or console.
+            if (! Schema::hasTable('sdui_modules')) {
+                return;
+            }
+
             $activeModules = SduiModule::query()
                 ->where('source_type', 'package')
                 ->where('is_active', true)
@@ -67,7 +93,7 @@ class ModuleServiceProvider extends ServiceProvider
 
         foreach ($activeModules as $module) {
             try {
-                $this->bootModule((string) $module->package_path);
+                $this->bootModule((string) $module->package_path, $module);
             } catch (Throwable $e) {
                 Log::warning("ModuleServiceProvider: failed booting module '{$module->slug}'.", [
                     'error' => $e->getMessage(),
@@ -80,11 +106,27 @@ class ModuleServiceProvider extends ServiceProvider
      * Wire one on-disk module directory into the app. Public + path-based so
      * it can be re-run after a runtime activate without rebooting the kernel.
      */
-    public function bootModule(string $packagePath): void
+    public function bootModule(string $packagePath, ?SduiModule $module = null): void
     {
+        // Calls made after an activation historically passed only the path.
+        // Recover the row when possible so extension routes from older ZIPs
+        // receive the same tenant entitlement guard as current packages.
+        if ($module === null) {
+            try {
+                if (Schema::hasTable('sdui_modules')) {
+                    $module = SduiModule::query()->where('package_path', $packagePath)->first();
+                }
+            } catch (Throwable) {
+                // Route loading remains usable during a fresh/unavailable DB.
+            }
+        }
+
         $base = base_path('modules/'.$packagePath);
         if ($packagePath === '' || ! is_dir($base)) {
-            return;
+            $base = base_path('module-packages/'.$packagePath);
+            if ($packagePath === '' || ! is_dir($base)) {
+                return;
+            }
         }
 
         $key = basename($packagePath);
@@ -95,11 +137,34 @@ class ModuleServiceProvider extends ServiceProvider
             $this->app->register($providerClass);
         }
 
-        // 2. Routes — the flat file, then split api/web files.
+        // 2. Routes — the flat file, then split api/web files. Keep a handle
+        // on routes added by this package so the entitlement middleware can
+        // also protect legacy packages whose own controllers predate it.
+        $routesBefore = [];
+        if ($module?->isExtension()) {
+            foreach ($this->app['router']->getRoutes()->getRoutes() as $route) {
+                $routesBefore[spl_object_id($route)] = true;
+            }
+        }
+
         foreach (['routes.php', 'routes/api.php', 'routes/web.php'] as $rel) {
             $file = $base.'/'.$rel;
             if (is_file($file)) {
                 $this->loadRoutesFrom($file);
+            }
+        }
+
+        if ($module?->isExtension()) {
+            $guard = EnsureTenantExtension::class.':'.$module->slug;
+            foreach ($this->app['router']->getRoutes()->getRoutes() as $route) {
+                if (isset($routesBefore[spl_object_id($route)])) {
+                    continue;
+                }
+
+                $middleware = $route->gatherMiddleware();
+                if (! in_array($guard, $middleware, true)) {
+                    $route->middleware($guard);
+                }
             }
         }
 

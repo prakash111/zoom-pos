@@ -8,6 +8,7 @@
     "layout_type": "standard_grid",
     "inherits_ui": "universal_pos",
     "min_system_version": "1.0.0",
+    "requires_license": true,
     "features": {
         "has_barcode_scanner": true,
         "has_expiry_tracking": true,

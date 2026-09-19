@@ -60,6 +60,7 @@
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php scripts/patch-nativephp.php",
             "@php artisan package:discover --ansi"
         ],
         "post-update-cmd": [

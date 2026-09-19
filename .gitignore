@@ -16,6 +16,7 @@ docker-compose.override.yml
 /.zed
 /database/database.sqlite
 /storage/installed
+/storage/--installed
 /laravel.zip
 /lara.zip
 *.zip
@@ -29,3 +30,13 @@ docker-compose.override.yml
 /read
 /modules/*
 !/modules/.gitkeep
+
+/license-review
+
+/scratch
+/Documentation
+/Licensing
+/localization_patch.diff
+/nativephp_debug.json
+/public/*.apk
+/public/cart.png

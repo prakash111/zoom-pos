@@ -37,15 +37,19 @@ export const ADMIN_DOCK_ITEMS = [
     { key: 'plans', label: 'SaaS Plans & Pricing', icon: '👑', route: 'superadmin.plans.index' },
     { key: 'taxes', label: 'Global Tax Engine', icon: '⚖️', route: 'superadmin.tax.index' },
     { key: 'menus', label: 'Menu Builder', icon: '🧭', route: 'superadmin.menus.index' },
+    { key: 'inquiries', label: 'Web Inquiries', icon: '📬', route: 'superadmin.inquiries.index' },
     { key: 'pages', label: 'CMS Custom Pages', icon: '📄', route: 'superadmin.pages.index' },
     { key: 'settings', label: 'Platform Settings', icon: '⚙️', route: 'superadmin.settings.index' },
     { key: 'smtp', label: 'SMTP & Mail Config', icon: '✉️', route: 'superadmin.smtp.index' }
 ];
 
-export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 'left', operatingMode = 'general') {
+export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 'left', operatingMode = 'general', persistUrl = '') {
     return {
         storageKey: storageKey,
         operatingMode: operatingMode, // 'general' | 'restaurant' | 'food_restaurant' | 'admin'
+        persistUrl: persistUrl,       // Laravel endpoint that stores the dock position per user (tenant only)
+        _lastPersistedPosition: null,
+        _persistTimer: null,
         position: defaultPosition, // 'left' | 'right' | 'top' | 'bottom' | 'floating'
         mode: 'docked',            // 'docked' | 'floating'
         layout: 'slim',            // 'slim' | 'expanded' | 'macos-dock' | 'speed-dial'
@@ -61,9 +65,9 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
         visibleAdminItems: (function() {
             try {
                 const raw = localStorage.getItem('nav_visible_items');
-                return raw ? JSON.parse(raw) : ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'pages', 'settings', 'smtp'];
+                return raw ? JSON.parse(raw) : ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
             } catch(e) {
-                return ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'pages', 'settings', 'smtp'];
+                return ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
             }
         })(),
         x: 24,
@@ -296,6 +300,42 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
                     this.setNavTextActiveColor(e.detail.color);
                 }
             });
+            window.addEventListener('dock-nav-update', (e) => {
+                if (!e.detail) return;
+                if (e.detail.layout) this.layout = e.detail.layout;
+                if (e.detail.position) {
+                    this.position = e.detail.position;
+                    if (e.detail.mode) this.mode = e.detail.mode;
+                }
+                if (e.detail.mode) this.mode = e.detail.mode;
+                if (typeof e.detail.sticky !== 'undefined') this.sticky = !!e.detail.sticky;
+                if (typeof e.detail.customBg !== 'undefined') this.customBg = e.detail.customBg;
+                if (e.detail.uiAccentColor) {
+                    this.uiAccentColor = e.detail.uiAccentColor;
+                }
+                if (e.detail.navTextColor) {
+                    this.navTextColor = e.detail.navTextColor;
+                    document.documentElement.style.setProperty('--nav-item-color', this.navTextColor);
+                    document.documentElement.style.setProperty('--nav-inactive-color', this.navTextColor);
+                }
+                if (e.detail.navTextActiveColor) {
+                    this.navTextActiveColor = e.detail.navTextActiveColor;
+                    document.documentElement.style.setProperty('--nav-item-active-color', this.navTextActiveColor);
+                    document.documentElement.style.setProperty('--nav-active-color', this.navTextActiveColor);
+                }
+                if (e.detail.visibleAdminItems || e.detail.visibleItems) {
+                    const items = e.detail.visibleAdminItems || e.detail.visibleItems;
+                    this.visibleAdminItems = [...items];
+                    this.visibleItems = [...items];
+                    try {
+                        localStorage.setItem('nav_visible_items', JSON.stringify(items));
+                        localStorage.setItem('dock_visible_items', JSON.stringify(items));
+                    } catch(err) {}
+                }
+                this.applyDomAttributes();
+                this.applyDynamicCssVars();
+                this.saveState();
+            });
             window.addEventListener('operating-mode-updated', (e) => {
                 if (e.detail && e.detail.mode) {
                     this.operatingMode = e.detail.mode;
@@ -340,9 +380,11 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
 
             if (this.navTextColor) {
                 root.style.setProperty('--nav-item-color', this.navTextColor);
+                root.style.setProperty('--nav-inactive-color', this.navTextColor);
             }
             if (this.navTextActiveColor) {
                 root.style.setProperty('--nav-item-active-color', this.navTextActiveColor);
+                root.style.setProperty('--nav-active-color', this.navTextActiveColor);
             }
         },
 
@@ -423,6 +465,43 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
                     y: this.y
                 }
             }));
+
+            this.persistServerPosition();
+        },
+
+        /**
+         * Asynchronously store the dock position on the server (per-user) so a
+         * page reload on any device restores the exact position. Debounced,
+         * de-duped, and a no-op when no endpoint was wired (e.g. the superadmin
+         * panel, which is localStorage-only). Never blocks or throws.
+         */
+        persistServerPosition() {
+            if (!this.persistUrl) return;
+
+            const pos = this.position;
+            if (['left', 'right', 'top', 'bottom', 'floating'].indexOf(pos) === -1) return;
+            if (pos === this._lastPersistedPosition) return;
+
+            clearTimeout(this._persistTimer);
+            this._persistTimer = setTimeout(() => {
+                const tokenEl = document.querySelector('meta[name="csrf-token"]');
+                const token = tokenEl ? tokenEl.getAttribute('content') : '';
+
+                fetch(this.persistUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({ dock_position: pos }),
+                    credentials: 'same-origin',
+                    keepalive: true,
+                }).then((res) => {
+                    if (res && res.ok) this._lastPersistedPosition = pos;
+                }).catch(() => { /* offline / transient — localStorage still holds it */ });
+            }, 400);
         },
 
         setPosition(newPos) {
@@ -494,44 +573,86 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
 
         isCurrentRoute(href) {
             try {
-                return new URL(href, window.location.origin).pathname === this.currentPath;
+                const targetPath = new URL(href, window.location.origin).pathname;
+                if (targetPath === this.currentPath) return true;
+                if (targetPath !== '/' && targetPath !== '/superadmin' && targetPath !== '/superadmin/' && targetPath !== '/tenant' && targetPath !== '/tenant/') {
+                    const normalizedTarget = targetPath.endsWith('/') ? targetPath.slice(0, -1) : targetPath;
+                    const normalizedCurrent = this.currentPath.endsWith('/') ? this.currentPath.slice(0, -1) : this.currentPath;
+                    if (normalizedCurrent.startsWith(normalizedTarget + '/')) {
+                        return true;
+                    }
+                }
+                return false;
             } catch (e) {
                 return false;
             }
         },
 
         isItemVisible(itemKey) {
+            const isAdmin = this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin';
+            if (isAdmin) {
+                const list = (this.visibleAdminItems && this.visibleAdminItems.length > 0) ? this.visibleAdminItems : this.visibleItems;
+                return Array.isArray(list) && list.includes(itemKey);
+            }
             const isRest = this.operatingMode === 'restaurant' || this.operatingMode === 'food_restaurant';
             const itemDef = ALL_DOCK_ITEMS.find(i => i.key === itemKey);
             if (itemDef) {
                 if (!isRest && itemDef.mode === 'restaurant') return false;
                 if (isRest && itemDef.mode === 'retail') return false;
             }
-            return this.visibleItems.includes(itemKey);
+            return Array.isArray(this.visibleItems) && this.visibleItems.includes(itemKey);
         },
 
         toggleItem(itemKey) {
-            if (this.visibleItems.includes(itemKey)) {
-                this.visibleItems = this.visibleItems.filter(k => k !== itemKey);
+            const isAdmin = this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin';
+            if (isAdmin) {
+                if (!Array.isArray(this.visibleAdminItems)) this.visibleAdminItems = [];
+                if (this.visibleAdminItems.includes(itemKey)) {
+                    this.visibleAdminItems = this.visibleAdminItems.filter(k => k !== itemKey);
+                } else {
+                    this.visibleAdminItems.push(itemKey);
+                }
+                this.visibleItems = [...this.visibleAdminItems];
+                this.persistAdminDock();
             } else {
-                this.visibleItems.push(itemKey);
+                if (this.visibleItems.includes(itemKey)) {
+                    this.visibleItems = this.visibleItems.filter(k => k !== itemKey);
+                } else {
+                    this.visibleItems.push(itemKey);
+                }
+                this.saveState();
             }
-            this.saveState();
         },
 
         selectAllItems() {
-            this.visibleItems = this.availableDockItems.map(i => i.key);
-            this.saveState();
+            const isAdmin = this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin';
+            if (isAdmin) {
+                this.selectAllAdminItems();
+            } else {
+                this.visibleItems = this.availableDockItems.map(i => i.key);
+                this.saveState();
+            }
         },
 
         selectDefaultItems() {
-            this.visibleItems = [...this.getDefaultKeys()];
-            this.saveState();
+            const isAdmin = this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin';
+            if (isAdmin) {
+                this.resetAdminDefaultItems();
+            } else {
+                this.visibleItems = [...this.getDefaultKeys()];
+                this.saveState();
+            }
         },
 
         uncheckAllItems() {
-            this.visibleItems = [this.getDefaultKeys()[0] || 'home'];
-            this.saveState();
+            const isAdmin = this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin';
+            if (isAdmin) {
+                this.visibleAdminItems = ['dashboard'];
+                this.persistAdminDock();
+            } else {
+                this.visibleItems = [this.getDefaultKeys()[0] || 'home'];
+                this.saveState();
+            }
         },
 
         resetItems() {

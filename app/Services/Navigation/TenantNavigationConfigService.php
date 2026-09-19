@@ -15,6 +15,42 @@ class TenantNavigationConfigService
     public const MAX_LEVEL = 2;
 
     /**
+     * Platform items whose parent is fixed by the registry and must never be
+     * re-homed by a stored override or a drag-happy tree editor. Every "Store
+     * Settings" tab is always a direct child of the `settings` accordion —
+     * see TenantNavRegistry::settingsTabItems(). Keyed child => required parent.
+     *
+     * @var array<string, string>
+     */
+    public const FORCED_PARENTS = [
+        'settings_mode' => 'settings',
+        'settings_profile' => 'settings',
+        'settings_branding' => 'settings',
+        'settings_receipts' => 'settings',
+        'settings_financial' => 'settings',
+        'settings_taxes' => 'settings',
+        'settings_api' => 'settings',
+        'settings_navigation' => 'settings',
+    ];
+
+    /**
+     * Items that must stay at the top of their section (Main Menu). `settings`
+     * is an accordion container: if it is nested under another row, its own
+     * tabs land at level 3 and get clamped. Keep it a first-class parent.
+     *
+     * @var list<string>
+     */
+    public const FORCED_ROOT = [
+        'settings',
+        // Point of Sale and Consignments are always independent root commerce links.
+        'pos',
+        'pharmacy_pos',
+        'salon_pos',
+        'restaurant_pos',
+        'consignments',
+    ];
+
+    /**
      * @return array<string, array<int, string>>
      */
     public static function validationRules(): array
@@ -23,6 +59,7 @@ class TenantNavigationConfigService
             'sections' => ['nullable', 'array'],
             'sections.*.key' => ['required', 'string', 'max:60'],
             'sections.*.order' => ['nullable', 'integer', 'min:0'],
+            'sections.*.custom_title' => ['nullable', 'string', 'max:120'],
             'items' => ['nullable', 'array'],
             'items.*.key' => ['required', 'string', 'max:60'],
             'items.*.section' => ['nullable', 'string', 'max:60'],
@@ -34,11 +71,14 @@ class TenantNavigationConfigService
             'tree' => ['nullable', 'array'],
             'tree.*.key' => ['required', 'string', 'max:60'],
             'tree.*.order' => ['nullable', 'integer', 'min:0'],
+            'tree.*.custom_title' => ['nullable', 'string', 'max:120'],
             'tree.*.items' => ['required', 'array'],
         ];
 
         foreach (['tree.*.items.*', 'tree.*.items.*.children.*', 'tree.*.items.*.children.*.children.*'] as $path) {
             $rules[$path.'.key'] = ['required', 'string', 'max:60'];
+            $rules[$path.'.title'] = ['nullable', 'string', 'max:120'];
+            $rules[$path.'.label'] = ['nullable', 'string', 'max:120'];
             $rules[$path.'.parent_id'] = ['nullable', 'string', 'max:60'];
             $rules[$path.'.level'] = ['nullable', 'integer', 'between:0,2'];
             $rules[$path.'.order'] = ['nullable', 'integer', 'min:0'];
@@ -104,13 +144,24 @@ class TenantNavigationConfigService
     /**
      * @param  array<string, mixed>  $payload
      * @param  list<array<string, mixed>>  $tree
-     * @return list<array{key: string, order: int}>
+     * @return list<array{key: string, order: int, custom_title?: string}>
      */
     private function normalizeSections(array $payload, array $tree): array
     {
         $source = is_array($payload['sections'] ?? null) ? $payload['sections'] : [];
         if ($source === [] && $tree !== []) {
             $source = $tree;
+        }
+
+        $treeByKey = [];
+        foreach ($tree as $treeSection) {
+            if (! is_array($treeSection)) {
+                continue;
+            }
+            $treeKey = trim((string) ($treeSection['key'] ?? ''));
+            if ($treeKey !== '') {
+                $treeByKey[$treeKey] = $treeSection;
+            }
         }
 
         $sections = [];
@@ -122,7 +173,21 @@ class TenantNavigationConfigService
             if ($key === '' || isset($sections[$key])) {
                 continue;
             }
+
+            $treeSection = $treeByKey[$key] ?? null;
+            $customTitle = trim((string) ($row['custom_title'] ?? ''));
+            if ($customTitle === '') {
+                $customTitle = trim((string) ($treeSection['custom_title'] ?? ''));
+            }
+            if ($customTitle === '' && ! empty($treeSection['items'])) {
+                $first = $treeSection['items'][0];
+                $customTitle = trim((string) ($first['title'] ?? $first['label'] ?? ''));
+            }
+
             $sections[$key] = ['key' => $key, 'order' => max(0, (int) ($row['order'] ?? $index))];
+            if ($customTitle !== '') {
+                $sections[$key]['custom_title'] = $customTitle;
+            }
         }
 
         uasort($sections, fn ($a, $b) => $a['order'] <=> $b['order']);
@@ -153,7 +218,7 @@ class TenantNavigationConfigService
      * @param  list<mixed>  $nodes
      * @param  array<string, array{key: string, section: ?string, parent: ?string, parent_id: ?string, level: int, order: ?int, visible: bool}>  $items
      */
-    private function flattenNodes(array $nodes, string $section, ?string $parent, int $level, array &$items): void
+    private function flattenNodes(array $nodes, string $section, ?string $parent, int $level, array &$items, ?string $clampAnchor = null): void
     {
         foreach (array_values($nodes) as $index => $node) {
             if (! is_array($node)) {
@@ -164,10 +229,17 @@ class TenantNavigationConfigService
                 continue;
             }
 
-            $safeLevel = min(self::MAX_LEVEL, max(0, $level));
-            $safeParent = $level > self::MAX_LEVEL ? null : $parent;
-            if ($level > self::MAX_LEVEL) {
-                $safeLevel = 0;
+            if ($level <= self::MAX_LEVEL) {
+                $safeLevel = max(0, $level);
+                $safeParent = $parent;
+            } else {
+                // A chain deeper than Main -> Sub -> Sub-Sub (a drag-happy
+                // editor can nest items arbitrarily deep). Pin the overflow to
+                // the nearest ancestor that still fits, as a Sub-Sub-Menu —
+                // never eject it to the top level, which is what silently
+                // moved "API & Integrations" out of Store Settings.
+                $safeLevel = self::MAX_LEVEL;
+                $safeParent = $clampAnchor;
             }
 
             $items[$key] = [
@@ -180,8 +252,11 @@ class TenantNavigationConfigService
                 'visible' => (bool) ($node['visible'] ?? true),
             ];
 
+            // The deepest still-valid ancestor a clamped descendant may attach to.
+            $childAnchor = $safeLevel <= self::MAX_LEVEL - 1 ? $key : $clampAnchor;
+
             $children = is_array($node['children'] ?? null) ? $node['children'] : [];
-            $this->flattenNodes($children, $section, $key, $safeLevel + 1, $items);
+            $this->flattenNodes($children, $section, $key, $safeLevel + 1, $items, $childAnchor);
         }
     }
 
@@ -223,6 +298,31 @@ class TenantNavigationConfigService
      */
     private function repairHierarchy(array $items): array
     {
+        // Snap registry-pinned items back into place before any other repair.
+        // This heals a stored tree the mobile editor mangled (e.g. "Store
+        // Settings" dropped under "Subscription & Billing", "Taxes &
+        // Compliance" under "Financial & Currency", or "API & Integrations"
+        // ejected to the top level): "settings" is a first-class parent and
+        // every Store Settings tab is its direct child.
+        foreach (self::FORCED_ROOT as $rootKey) {
+            if (isset($items[$rootKey])) {
+                $items[$rootKey]['parent'] = null;
+                $items[$rootKey]['parent_id'] = null;
+                $items[$rootKey]['level'] = 0;
+            }
+        }
+
+        foreach (self::FORCED_PARENTS as $childKey => $parentKey) {
+            if (! isset($items[$childKey], $items[$parentKey])) {
+                continue;
+            }
+            if ($items[$childKey]['section'] !== $items[$parentKey]['section']) {
+                continue;
+            }
+            $items[$childKey]['parent'] = $parentKey;
+            $items[$childKey]['parent_id'] = $parentKey;
+        }
+
         // Break missing/cross-section/self links, cycles, and parent chains
         // deeper than Main Menu -> Sub-Menu -> Sub-Sub-Menu. The pass is
         // deterministic: only the item currently being inspected is
@@ -269,7 +369,7 @@ class TenantNavigationConfigService
     }
 
     /**
-     * @param  list<array{key: string, order: int}>  $sections
+     * @param  list<array{key: string, order: int, custom_title?: string}>  $sections
      * @param  array<string, array{section: ?string}>  $items
      * @return list<array{key: string, order: int}>
      */
@@ -289,9 +389,9 @@ class TenantNavigationConfigService
     }
 
     /**
-     * @param  list<array{key: string, order: int}>  $sections
+     * @param  list<array{key: string, order: int, custom_title?: string}>  $sections
      * @param  array<string, array{key: string, section: ?string, parent: ?string, parent_id: ?string, level: int, order: ?int, visible: bool}>  $items
-     * @return list<array{key: string, order: int, items: list<array<string, mixed>>}>
+     * @return list<array{key: string, order: int, custom_title?: string, items: list<array<string, mixed>>}>
      */
     private function buildTree(array $sections, array $items): array
     {
@@ -322,13 +422,23 @@ class TenantNavigationConfigService
             }, $rows));
         };
 
-        return array_values(array_map(
-            fn ($section) => [
+        return array_values(array_map(function ($section) use ($buildNodes): array {
+            $treeSection = [
                 'key' => $section['key'],
                 'order' => $section['order'],
                 'items' => $buildNodes($section['key'], null),
-            ],
-            $sections
-        ));
+            ];
+            if (! empty($section['custom_title'])) {
+                $treeSection['custom_title'] = $section['custom_title'];
+            } elseif (! empty($treeSection['items'])) {
+                $first = $treeSection['items'][0];
+                $firstTitle = trim((string) ($first['title'] ?? $first['label'] ?? ''));
+                if ($firstTitle !== '') {
+                    $treeSection['custom_title'] = $firstTitle;
+                }
+            }
+
+            return $treeSection;
+        }, $sections));
     }
 }

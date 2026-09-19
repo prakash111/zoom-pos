@@ -4,7 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $catalog->title }} — {{ $company?->name ?? 'Digital Catalog' }}</title>
-    @vite(['resources/css/app.css'])
+    @if (file_exists(public_path('build/manifest.json')))
+        @vite(['resources/css/app.css'])
+    @endif
+    <link rel="stylesheet" href="{{ secure_asset('css/app.css') }}" onerror="this.onerror=null;this.href='{{ asset('css/app.css') }}'">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -14,7 +18,7 @@
 <body class="bg-slate-50 text-slate-900 min-h-screen antialiased flex flex-col justify-between"
       x-data="catalogCart({
           storeName: {{ json_encode($company?->name ?? 'Store') }},
-          storePhone: {{ json_encode($company?->phone ?? '') }},
+          storePhone: {{ json_encode(data_get($catalog->meta, 'whatsapp_number') ?: ($company?->phone ?? '')) }},
           currency: {{ json_encode($company?->currency ?? 'USD') }},
           catalogTitle: {{ json_encode($catalog->title) }}
       })">
@@ -81,7 +85,7 @@
                     {{ $catalog->title }}
                 </h2>
                 <p class="text-xs sm:text-sm text-blue-100 font-medium">
-                    Select your items below, add them to your cart, and place your order directly via WhatsApp in 1-click.
+                    {{ $catalog->description ?: 'Select your items below, add them to your cart, and place your order directly via WhatsApp in 1-click.' }}
                 </p>
             </div>
         </div>
@@ -117,6 +121,11 @@
                         </div>
                         @if ($product->code)
                             <div class="text-[10px] font-mono text-slate-400">{{ $product->code }}</div>
+                        @endif
+                        @if ($product->description)
+                            <p class="text-[11px] text-slate-500 line-clamp-2 text-left leading-relaxed mt-1" title="{{ $product->description }}">
+                                {{ $product->description }}
+                            </p>
                         @endif
                         <div class="text-base sm:text-lg font-black text-blue-600 pt-1">
                             ${{ number_format($product->sale_price, 2) }}
@@ -355,8 +364,28 @@
                     }
                 },
 
-                orderViaWhatsApp() {
+                async orderViaWhatsApp() {
                     if (this.cart.length === 0) return;
+
+                    // Synchronize order to POS as pending
+                    try {
+                        await fetch('/c/{{ $catalog->id }}/order', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                customer_name: this.customerName,
+                                customer_phone: this.customerPhone,
+                                customer_notes: this.customerNotes,
+                                items: this.cart
+                            })
+                        });
+                    } catch (e) {
+                        console.warn('POS order recording notice:', e);
+                    }
 
                     let itemsSummary = '';
                     this.cart.forEach(item => {

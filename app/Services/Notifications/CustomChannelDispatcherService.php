@@ -45,7 +45,7 @@ class CustomChannelDispatcherService
         // 1. Substitute dynamic tags in URL and Template
         $renderedUrl = $this->renderTemplate($channel->url, $variables);
         $template = (string) ($channel->payload_template ?? '');
-        $renderedBody = $this->renderTemplate($template, $variables);
+        $renderedBody = $this->renderBodyTemplate($template, $variables);
 
         $method = strtoupper($channel->method ?: 'POST');
         $format = strtolower($channel->payload_format ?: ($method === 'GET' ? 'query_params' : 'json'));
@@ -150,6 +150,32 @@ class CustomChannelDispatcherService
         }
 
         return str_replace($search, $replace, $template);
+    }
+
+    private function renderBodyTemplate(string $template, array $variables): string
+    {
+        $decoded = json_decode($template, true);
+        if (! is_array($decoded)) {
+            return $this->renderTemplate($template, $variables);
+        }
+
+        // Render values before encoding so message newlines and quotes remain valid JSON.
+        $render = function (mixed $value) use (&$render, $variables): mixed {
+            if (is_array($value)) {
+                return array_map($render, $value);
+            }
+            if (is_string($value)) {
+                if (preg_match('/^\{([^{}]+)\}$/', $value, $match) && is_array($variables[$match[1]] ?? null)) {
+                    return $variables[$match[1]];
+                }
+
+                return $this->renderTemplate($value, $variables);
+            }
+
+            return $value;
+        };
+
+        return json_encode($render($decoded), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 
     protected function dispatchQueryParams($client, string $method, string $url, string $renderedBody)

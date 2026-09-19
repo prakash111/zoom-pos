@@ -1,79 +1,106 @@
-@props([])
+@props(['branding' => null])
 
 @php
-    $showcaseFeatures = [
-        'inventory' => [
-            'icon' => '📦',
-            'label' => __('Smart Inventory & Stock'),
-            'title' => __('Real-time stock tracking, multi-warehouse sync & restock alerts'),
-            'points' => [
-                __('Instant barcode & SKU generator with one-click label printing'),
-                __('Multi-warehouse & branch transfers with receiving audit trails'),
-                __('Automated low-stock threshold triggers & re-order notifications'),
-                __('Batch & lot tracking with expiry dates, weight & unit conversions'),
-                __('Real-time valuation, cost-averaging & margin analytics per category'),
+    $branding = $branding ?? \App\Models\PlatformBranding::current();
+    $rawFeatures = $branding ? $branding->landingFeatures() : [];
+    $mockupKeys = ['inventory', 'pos', 'restaurant', 'finance'];
+
+    $showcaseFeatures = [];
+    foreach ($rawFeatures as $i => $item) {
+        $key = 'feat_' . $i;
+        $mockup = $item['mockup'] ?? $mockupKeys[$i % count($mockupKeys)];
+        $body = $item['body'] ?? '';
+        $points = array_filter(array_map('trim', explode("\n", $body)));
+        if (empty($points)) {
+            $points = [$body];
+        }
+        $showcaseFeatures[$key] = [
+            'icon' => $item['icon'] ?: '✨',
+            'label' => $item['title'],
+            'title' => $item['title'],
+            'points' => $points,
+            'mockup' => $mockup,
+        ];
+    }
+
+    if (empty($showcaseFeatures)) {
+        $showcaseFeatures = [
+            'inventory' => [
+                'icon' => '📦',
+                'label' => __('Smart Inventory & Stock'),
+                'title' => __('Real-time stock tracking, multi-warehouse sync & restock alerts'),
+                'points' => [
+                    __('Instant barcode & SKU generator with one-click label printing'),
+                    __('Multi-warehouse & branch transfers with receiving audit trails'),
+                    __('Automated low-stock threshold triggers & re-order notifications'),
+                    __('Batch & lot tracking with expiry dates, weight & unit conversions'),
+                    __('Real-time valuation, cost-averaging & margin analytics per category'),
+                ],
+                'mockup' => 'inventory',
             ],
-            'mockup' => 'inventory',
-        ],
-        'retail' => [
-            'icon' => '🛒',
-            'label' => __('Retail & Store POS'),
-            'title' => __('A fast, flexible checkout built for peak rush hours'),
-            'points' => [
-                __('Barcode scanning with sub-second add-to-cart feedback'),
-                __('Multi-payment tender split — cash, card, and digital transfers'),
-                __('Seamless customer accounts with credit limits & payment histories'),
-                __('Full cash register management with opening/closing shift balances & X/Z reports'),
-                __('Zero-latency offline mode — ring up sales during network outages without interruption'),
+            'retail' => [
+                'icon' => '🛒',
+                'label' => __('Retail & Store POS'),
+                'title' => __('A fast, flexible checkout built for peak rush hours'),
+                'points' => [
+                    __('Barcode scanning with sub-second add-to-cart feedback'),
+                    __('Multi-payment tender split — cash, card, and digital transfers'),
+                    __('Seamless customer accounts with credit limits & payment histories'),
+                    __('Full cash register management with opening/closing shift balances & X/Z reports'),
+                    __('Zero-latency offline mode — ring up sales during network outages without interruption'),
+                ],
+                'mockup' => 'pos',
             ],
-            'mockup' => 'pos',
-        ],
-        'restaurant' => [
-            'icon' => '🍽️',
-            'label' => __('Restaurant & Food POS'),
-            'title' => __('Dine-in floor, takeaway, and the kitchen — perfectly synchronized'),
-            'points' => [
-                __('Interactive dining floor plans with live occupied & billing status'),
-                __('Kitchen Order Tickets (KOT) dispatched to live Kitchen Display Screens (KDS)'),
-                __('Contactless Table QR menu ordering — guests scan, browse, and order from phones'),
-                __('Per-seat item tracking, custom food modifiers, and course pacing'),
-                __('Instant table merge, bill splitting, and takeaway queue management'),
+            'restaurant' => [
+                'icon' => '🍽️',
+                'label' => __('Restaurant & Food POS'),
+                'title' => __('Dine-in floor, takeaway, and the kitchen — perfectly synchronized'),
+                'points' => [
+                    __('Interactive dining floor plans with live occupied & billing status'),
+                    __('Kitchen Order Tickets (KOT) dispatched to live Kitchen Display Screens (KDS)'),
+                    __('Contactless Table QR menu ordering — guests scan, browse, and order from phones'),
+                    __('Per-seat item tracking, custom food modifiers, and course pacing'),
+                    __('Instant table merge, bill splitting, and takeaway queue management'),
+                ],
+                'mockup' => 'restaurant',
             ],
-            'mockup' => 'restaurant',
-        ],
-        'finance' => [
-            'icon' => '🧾',
-            'label' => __('Finance & Invoicing'),
-            'title' => __('Automated tax invoicing and real-time ledger accounting'),
-            'points' => [
-                __('Multi-currency pricing with configurable precision & exchange rates'),
-                __('Compliant automated tax invoices (VAT/GST/HSN) generated instantly'),
-                __('One-click instant dispatch to customers via WhatsApp or Email'),
-                __('Thermal receipt printing (80mm / 58mm) alongside full A4 PDF invoices'),
-                __('Accounts Payable (AP) and Accounts Receivable (AR) ledgers built-in'),
+            'finance' => [
+                'icon' => '🧾',
+                'label' => __('Finance & Invoicing'),
+                'title' => __('Automated tax invoicing and real-time ledger accounting'),
+                'points' => [
+                    __('Multi-currency pricing with configurable precision & exchange rates'),
+                    __('Compliant automated tax invoices (VAT/GST/HSN) generated instantly'),
+                    __('One-click instant dispatch to customers via WhatsApp or Email'),
+                    __('Thermal receipt printing (80mm / 58mm) alongside full A4 PDF invoices'),
+                    __('Accounts Payable (AP) and Accounts Receivable (AR) ledgers built-in'),
+                ],
+                'mockup' => 'finance',
             ],
-            'mockup' => 'finance',
-        ],
-    ];
+        ];
+    }
+
+    $firstTab = array_key_first($showcaseFeatures) ?: 'feat_0';
 @endphp
 
-<div id="features" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 scroll-mt-20">
+<section id="features" class="landing-sec-features py-20 sm:py-28 scroll-mt-20 transition-colors duration-300">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-12 sm:mb-16">
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-3">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider mb-3">
             <span class="w-1.5 h-1.5 rounded-full bg-brand-lime"></span>
-            {{ __('Unified Operations Suite') }}
+            {{ $branding->getSectionBadge('features', __('Unified Operations Suite')) }}
         </span>
-        <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white">{{ __('Everything your business needs, in one unified engine') }}</h2>
-        <p class="mt-3 text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">{{ __("From real-time warehouse stock tracking to front-counter barcode POS and back-of-house kitchen display, it's all synchronized.") }}</p>
+        <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white">{{ $branding->getSectionTitle('features', __('Everything Your Business Needs to Maximize Internet & In-Store Sales')) }}</h2>
+        <p class="mt-3 text-sm sm:text-base text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">{{ $branding->getSectionSubtitle('features', __('From online catalogs and WhatsApp orders to barcode checkout, multi-store stock, and automated tax invoicing — one synchronized cloud platform.')) }}</p>
     </div>
 
-    <div x-data="{ tab: 'inventory' }" class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 lg:gap-8 items-start">
+    <div x-data="{ tab: '{{ $firstTab }}' }" class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 lg:gap-8 items-start">
         <!-- Tab List -->
         <div class="flex lg:flex-col gap-2 overflow-x-auto no-scrollbar pb-2 lg:pb-0">
             @foreach ($showcaseFeatures as $key => $f)
                 <button type="button"
                         x-on:click="tab = '{{ $key }}'"
-                        :class="tab === '{{ $key }}' ? 'bg-gradient-to-r from-emerald-500/20 to-lime-500/20 border-emerald-500/40 text-white shadow-lg shadow-emerald-500/10' : 'bg-slate-900/60 text-slate-400 border-white/5 hover:bg-slate-800 hover:text-slate-200'"
+                        :class="tab === '{{ $key }}' ? 'bg-gradient-to-r from-emerald-500/20 to-lime-500/20 border-emerald-500/40 text-emerald-950 dark:text-white shadow-lg shadow-emerald-500/10' : 'bg-slate-100 dark:bg-slate-900/60 text-slate-700 dark:text-slate-400 border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-950 dark:hover:text-slate-200'"
                         class="shrink-0 flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs sm:text-sm font-bold border transition text-left whitespace-nowrap lg:whitespace-normal">
                     <span class="text-lg">{{ $f['icon'] }}</span>
                     <span>{{ $f['label'] }}</span>
@@ -82,7 +109,7 @@
         </div>
 
         <!-- Tab Panels -->
-        <div class="rounded-3xl bg-slate-900/80 backdrop-blur-xl border border-white/10 p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+        <div class="rounded-3xl bg-white dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-6 sm:p-10 shadow-2xl relative overflow-hidden">
             <div class="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-brand-lime/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>
 
             @foreach ($showcaseFeatures as $key => $f)
@@ -90,19 +117,22 @@
                     <div>
                         <div class="flex items-center gap-3 mb-6">
                             <span class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-2xl shrink-0">{{ $f['icon'] }}</span>
-                            <h3 class="text-xl sm:text-2xl font-black tracking-tight text-white">{!! $f['title'] !!}</h3>
+                            <h3 class="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">{!! $f['title'] !!}</h3>
                         </div>
                         <ul class="space-y-3.5">
                             @foreach ($f['points'] as $point)
-                                <li class="flex items-start gap-3 text-sm text-slate-300 leading-relaxed">
-                                    <div class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">✓</div>
+                                @php
+                                    $isBenefit = str_starts_with(trim((string) $point), 'Benefit:');
+                                @endphp
+                                <li class="flex items-start gap-3 text-sm leading-relaxed {{ $isBenefit ? 'text-emerald-700 dark:text-brand-lime font-bold p-3 rounded-xl bg-brand-lime/10 border border-brand-lime/20 mt-2' : 'text-slate-600 dark:text-slate-300' }}">
+                                    <div class="w-5 h-5 rounded-full {{ $isBenefit ? 'bg-brand-lime/20 text-brand-lime' : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' }} flex items-center justify-center text-xs font-black shrink-0 mt-0.5">✓</div>
                                     <span>{!! $point !!}</span>
                                 </li>
                             @endforeach
                         </ul>
 
                         <div class="mt-8">
-                            <a href="{{ route('tenant.register') }}" class="inline-flex items-center gap-2 text-xs font-black text-brand-lime hover:underline">
+                            <a href="{{ route('tenant.register') }}" class="inline-flex items-center gap-2 text-xs font-black text-emerald-600 dark:text-brand-lime hover:underline">
                                 <span>{{ __('Get started with') }} {{ $f['label'] }}</span>
                                 <span>→</span>
                             </a>
@@ -110,12 +140,12 @@
                     </div>
 
                     <!-- Per-tab High-Fidelity Mockup Frame -->
-                    <div class="rounded-2xl bg-slate-950 border border-white/15 p-1 shadow-2xl overflow-hidden">
-                        <div class="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900/90 border-b border-white/10">
+                    <div class="rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-white/15 p-1 shadow-2xl overflow-hidden">
+                        <div class="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-200/80 dark:bg-slate-900/90 border-b border-slate-300/60 dark:border-white/10">
                             <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
                             <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
                             <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
-                            <span class="ml-2 text-[10px] font-mono text-slate-400">{{ $f['label'] }}</span>
+                            <span class="ml-2 text-[10px] font-mono text-slate-600 dark:text-slate-400">{{ $f['label'] }}</span>
                         </div>
 
                         @if ($f['mockup'] === 'inventory')
@@ -199,4 +229,4 @@
             @endforeach
         </div>
     </div>
-</div>
+</section>

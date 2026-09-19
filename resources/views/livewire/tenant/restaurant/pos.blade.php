@@ -895,6 +895,13 @@
 
                 <!-- Action Buttons -->
                 <div class="space-y-2.5">
+                    @if ($lastDispatchedKotId)
+                        <button type="button" x-data
+                                @click="$wire.set('showKotSuccessModal', false); $dispatch('open-sdui-sheet', { endpoint: '{{ url('/tenant/documents/kot/'.$lastDispatchedKotId.'/preview-modal') }}' })"
+                                class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition">
+                            {{ __('Send Kitchen Ticket') }}
+                        </button>
+                    @endif
                     @if ($lastDispatchedKotPrintUrl)
                         <a href="{{ $lastDispatchedKotPrintUrl }}"
                            target="_blank"

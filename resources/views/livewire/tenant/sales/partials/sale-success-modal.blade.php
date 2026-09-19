@@ -58,7 +58,7 @@
                 </button>
             @else
                 <button type="button"
-                   @click="$dispatch('open-print-preview', { url: '{{ route('tenant.sales.pdf', ['sale' => $cSale, 'embed' => 1]) }}' })"
+                   @click="$dispatch('open-sdui-sheet', { endpoint: @js(route('tenant.documents.preview-modal', ['type' => 'invoice', 'id' => $cSale->id])) })"
                    class="w-full py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white font-extrabold text-xs shadow-md active:scale-[0.97] transition duration-150 ease-out flex items-center justify-center gap-2 cursor-pointer">
                     <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z" /></svg>
                     <span>{{ __("Preview & Print Invoice") }}</span>

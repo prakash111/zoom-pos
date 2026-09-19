@@ -14,7 +14,7 @@ class Product extends Model
     use TracksSyncState;
 
     protected $fillable = [
-        'company_id', 'external_id', 'code', 'sku', 'barcode', 'name', 'image_url', 'category_id', 'category_name', 'category_type',
+        'company_id', 'external_id', 'code', 'sku', 'barcode', 'name', 'description', 'image_url', 'category_id', 'category_name', 'category_type',
         'brand_id', 'brand_name', 'unit', 'type', 'cost_price', 'sale_price', 'price', 'variants', 'modifiers', 'spice_levels', 'profit_margin',
         'current_stock', 'minimum_stock', 'active', 'is_demo', 'batch_number', 'mfg_date', 'expiry_date',
         'requires_prescription', 'narcotic_schedule', 'generic_name', 'composition', 'duration_minutes', 'follow_up_days', 'hsn_code', 'sac_code', 'tax_rate',

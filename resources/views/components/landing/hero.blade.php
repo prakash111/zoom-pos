@@ -2,8 +2,8 @@
 
 @php
     $heroBadge = $branding->getHeroBadge();
-    $heroTitle = $branding->getHeroTitle();
-    $heroSubtitle = $branding->getHeroSubtitle();
+    $heroTitle = $branding->getSectionTitle('hero', $branding->getHeroTitle());
+    $heroSubtitle = $branding->getSectionSubtitle('hero', $branding->getHeroSubtitle());
     $ctaPrimaryText = $branding->getHeroCtaPrimaryText();
     $ctaPrimaryUrl = $branding->getHeroCtaPrimaryUrl();
     $ctaSecondaryText = $branding->getHeroCtaSecondaryText();
@@ -11,7 +11,7 @@
     $customBannerUrl = $branding->landing_hero_banner_image_url;
 @endphp
 
-<div id="showcase" class="relative py-6 sm:py-10 lg:py-14 px-3 sm:px-6 lg:px-8 overflow-hidden">
+<div id="showcase" class="landing-sec-hero relative py-6 sm:py-10 lg:py-14 px-3 sm:px-6 lg:px-8 overflow-hidden">
     <!-- Ambient Aurora Glow Canvas Background -->
     <div class="absolute inset-0 bg-gradient-to-br from-[#0c5966] via-[#10707e] to-[#6da734] dark:from-[#06242a] dark:via-[#09353c] dark:to-[#2b4414] -z-20"></div>
 
@@ -25,41 +25,6 @@
         <!-- Top-Right Neon Lime Atmospheric Glow -->
         <div class="absolute -top-32 -right-32 w-[600px] h-[600px] bg-gradient-to-bl from-[#bef264]/40 via-[#86efac]/25 to-transparent rounded-full blur-3xl pointer-events-none -z-0"></div>
         <div class="absolute -top-10 -left-10 w-[400px] h-[400px] bg-gradient-to-br from-teal-300/20 via-cyan-200/10 to-transparent rounded-full blur-2xl pointer-events-none -z-0"></div>
-
-        <!-- Integrated Top Nav Bar -->
-        <div class="relative z-10 px-6 sm:px-10 lg:px-12 pt-6 sm:pt-8 pb-4 hidden md:flex items-center justify-between border-b border-slate-100/80 dark:border-slate-800/60">
-            <!-- Brand Logo -->
-            <a href="{{ url('/') }}" class="inline-flex items-center gap-2.5 group">
-                @if ($branding->logo_url)
-                    <img src="{{ $branding->logo_url }}" alt="{{ $branding->platform_name }}" class="h-8 w-auto object-contain" decoding="async" fetchpriority="high">
-                @else
-                    <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-lime to-emerald-400 p-1.5 flex items-center justify-center shadow-sm shadow-emerald-400/30 group-hover:scale-105 transition-transform">
-                        <svg class="w-5 h-5 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round">
-                            <path d="M7 17L17 7M11 17L17 11M7 13L13 7" />
-                        </svg>
-                    </div>
-                @endif
-                <span class="text-lg font-black tracking-tight text-slate-900 dark:text-white">{{ $branding->platform_name }}</span>
-            </a>
-
-            <!-- Center Nav Links -->
-            <nav class="hidden md:flex items-center gap-6 lg:gap-8 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                <a href="#showcase" class="hover:text-slate-950 dark:hover:text-white transition">{{ __('Platform') }}</a>
-                <a href="#features" class="hover:text-slate-950 dark:hover:text-white transition">{{ __('Products') }}</a>
-                <a href="#solutions" class="hover:text-slate-950 dark:hover:text-white transition">{{ __('Solutions') }}</a>
-                <a href="#pricing" class="hover:text-slate-950 dark:hover:text-white transition">{{ __('Pricing') }}</a>
-                <a href="#about" class="hover:text-slate-950 dark:hover:text-white transition">{{ __('Company') }}</a>
-            </nav>
-
-            <!-- Right Actions -->
-            <div class="flex items-center gap-4 text-xs font-bold">
-                <a href="#contact" class="hidden sm:inline-block text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white transition">{{ __('Documentation') }}</a>
-                <a href="{{ route('tenant.login') }}" class="text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white transition">{{ __('Sign in') }}</a>
-                <a href="{{ $ctaPrimaryUrl }}" class="px-5 py-2.5 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 hover:bg-slate-800 dark:hover:bg-slate-100 transition shadow-md shadow-slate-900/10 active:scale-95">
-                    {{ $ctaPrimaryText }}
-                </a>
-            </div>
-        </div>
 
         <!-- Main Hero Grid Content -->
         <div class="relative z-10 px-6 sm:px-10 lg:px-12 pt-8 sm:pt-16 pb-12 sm:pb-16 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
@@ -97,12 +62,26 @@
                     </a>
                 </div>
 
+                <x-landing.download-buttons :branding="$branding" class="mt-5" />
+
                 <!-- Quick highlights bullets -->
+                @php
+                    $heroHighlights = $branding->landingList('hero.highlights', [
+                        __('Barcode & Touch POS'),
+                        __('Live Stock Alerts'),
+                        __('Restaurant Floor KOT'),
+                        __('Offline First Sync'),
+                    ]);
+                @endphp
                 <div class="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-bold text-slate-500 dark:text-slate-400">
-                    <span class="flex items-center gap-1.5"><span class="text-brand-lime font-black">✓</span> {{ __('Barcode & Touch POS') }}</span>
-                    <span class="flex items-center gap-1.5"><span class="text-brand-lime font-black">✓</span> {{ __('Live Stock Alerts') }}</span>
-                    <span class="flex items-center gap-1.5"><span class="text-brand-lime font-black">✓</span> {{ __('Restaurant Floor KOT') }}</span>
-                    <span class="flex items-center gap-1.5"><span class="text-brand-lime font-black">✓</span> {{ __('Offline First Sync') }}</span>
+                    @foreach ($heroHighlights as $hl)
+                        @php
+                            $hlText = is_array($hl) ? ($hl['label'] ?? ($hl[0] ?? '')) : (string) $hl;
+                        @endphp
+                        @if (!empty($hlText))
+                            <span class="flex items-center gap-1.5"><span class="text-brand-lime font-black">✓</span> {{ __($hlText) }}</span>
+                        @endif
+                    @endforeach
                 </div>
             </div>
 
@@ -130,8 +109,8 @@
                                         </svg>
                                     </div>
                                     <div>
-                                        <span class="text-xs font-black text-slate-800 dark:text-slate-200">{{ __('Smart POS & Inventory') }}</span>
-                                        <span class="hidden sm:inline text-[10px] text-emerald-600 dark:text-emerald-400 font-bold ml-1.5">● {{ __('Live') }}</span>
+                                        <span class="text-xs font-black text-slate-800 dark:text-slate-200">{{ $branding->landingText('hero.dashboard_title', __('Smart POS & Inventory')) }}</span>
+                                        <span class="hidden sm:inline text-[10px] text-emerald-600 dark:text-emerald-400 font-bold ml-1.5">● {{ $branding->landingText('hero.dashboard_status', __('Live')) }}</span>
                                     </div>
                                 </div>
 
@@ -155,76 +134,53 @@
                             </div>
 
                             <!-- Live Product & Inventory Data Rows -->
+                            @php
+                                $heroProducts = $branding->landingList('hero.products', [
+                                    ['name' => 'Artisan Coffee Roast 1kg', 'price' => '$14.50', 'status' => __('In Stock'), 'tone' => 'emerald', 'icon' => '☕', 'sku' => 'COF-4829', 'stock' => '142 in stock'],
+                                    ['name' => 'Gourmet Truffle Oil 500ml', 'price' => '$18.20', 'status' => __('In Stock'), 'tone' => 'emerald', 'icon' => '🫒', 'sku' => 'OIL-9104', 'stock' => '88 in stock'],
+                                    ['name' => 'Organic Almond Flour 1kg', 'price' => '$8.90', 'status' => __('Low Stock'), 'tone' => 'amber', 'icon' => '🌾', 'sku' => 'FLR-3318', 'stock' => '3 remaining'],
+                                    ['name' => 'Handcrafted Penne Pasta', 'price' => '$6.50', 'status' => __('In Stock'), 'tone' => 'emerald', 'icon' => '🍝', 'sku' => 'PAS-7741', 'stock' => '240 in stock'],
+                                ]);
+                            @endphp
                             <div class="mt-4 space-y-2.5">
-                                
-                                <!-- Product Row 1 -->
-                                <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 text-xs">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-black text-xs flex items-center justify-center">
-                                            ☕
-                                        </div>
-                                        <div>
-                                            <div class="font-bold text-slate-800 dark:text-slate-200">Artisan Coffee Roast 1kg</div>
-                                            <div class="text-[10px] text-slate-400 font-mono">SKU: COF-4829 &middot; 142 {{ __('in stock') }}</div>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-3">
-                                        <span class="font-bold text-slate-800 dark:text-slate-200">$14.50</span>
-                                        <span class="px-2.5 py-0.5 rounded-full bg-[#dcfce7] text-[#15803d] dark:bg-[#14532d]/60 dark:text-[#86efac] font-bold text-[10px]">{{ __('In Stock') }}</span>
-                                    </div>
-                                </div>
+                                @foreach ($heroProducts as $idx => $prod)
+                                    @php
+                                        $rawName = is_array($prod) ? ($prod['name'] ?? ($prod[0] ?? '')) : (string) $prod;
+                                        $price = is_array($prod) ? ($prod['price'] ?? ($prod[1] ?? '')) : '';
+                                        $status = is_array($prod) ? ($prod['status'] ?? ($prod[2] ?? __('In Stock'))) : __('In Stock');
+                                        $tone = is_array($prod) ? ($prod['tone'] ?? ($prod[3] ?? 'emerald')) : 'emerald';
+                                        $icon = is_array($prod) ? ($prod['icon'] ?? null) : null;
+                                        $sku = is_array($prod) ? ($prod['sku'] ?? 'SKU-00' . ($idx + 1)) : 'SKU-00' . ($idx + 1);
+                                        $stock = is_array($prod) ? ($prod['stock'] ?? 'Active') : 'Active';
 
-                                <!-- Product Row 2 -->
-                                <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 text-xs">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-300 font-black text-xs flex items-center justify-center">
-                                            🫒
+                                        if (!$icon && preg_match('/^(\X)\s*(.*)$/u', $rawName, $m) && !preg_match('/^[a-zA-Z0-9]/', $m[1])) {
+                                            $icon = $m[1];
+                                            $displayName = $m[2];
+                                        } else {
+                                            $icon = $icon ?: '📦';
+                                            $displayName = $rawName;
+                                        }
+                                    @endphp
+                                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 text-xs">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-lg {{ $tone === 'amber' ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' : ($tone === 'indigo' ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300') }} font-black text-xs flex items-center justify-center">
+                                                {{ $icon }}
+                                            </div>
+                                            <div>
+                                                <div class="font-bold text-slate-800 dark:text-slate-200">{{ $displayName }}</div>
+                                                <div class="text-[10px] text-slate-400 font-mono">{{ $sku }} &middot; {{ $stock }}</div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <div class="font-bold text-slate-800 dark:text-slate-200">Gourmet Truffle Oil 500ml</div>
-                                            <div class="text-[10px] text-slate-400 font-mono">SKU: OIL-9104 &middot; 88 {{ __('in stock') }}</div>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-3">
-                                        <span class="font-bold text-slate-800 dark:text-slate-200">$18.20</span>
-                                        <span class="px-2.5 py-0.5 rounded-full bg-[#dcfce7] text-[#15803d] dark:bg-[#14532d]/60 dark:text-[#86efac] font-bold text-[10px]">{{ __('In Stock') }}</span>
-                                    </div>
-                                </div>
-
-                                <!-- Product Row 3 (Low Stock Alert) -->
-                                <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 text-xs">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-black text-xs flex items-center justify-center">
-                                            🌾
-                                        </div>
-                                        <div>
-                                            <div class="font-bold text-slate-800 dark:text-slate-200">Organic Almond Flour 1kg</div>
-                                            <div class="text-[10px] text-slate-400 font-mono">SKU: FLR-3318 &middot; 3 {{ __('remaining') }}</div>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-3">
-                                        <span class="font-bold text-slate-800 dark:text-slate-200">$8.90</span>
-                                        <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 font-bold text-[10px]">{{ __('Low Stock') }}</span>
-                                    </div>
-                                </div>
-
-                                <!-- Product Row 4 -->
-                                <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 text-xs">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-black text-xs flex items-center justify-center">
-                                            🍝
-                                        </div>
-                                        <div>
-                                            <div class="font-bold text-slate-800 dark:text-slate-200">Handcrafted Penne Pasta</div>
-                                            <div class="text-[10px] text-slate-400 font-mono">SKU: PAS-7741 &middot; 240 {{ __('in stock') }}</div>
+                                        <div class="flex items-center gap-3">
+                                            @if ($price)
+                                                <span class="font-bold text-slate-800 dark:text-slate-200">{{ $price }}</span>
+                                            @endif
+                                            <span class="px-2.5 py-0.5 rounded-full {{ $tone === 'amber' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300' : 'bg-[#dcfce7] text-[#15803d] dark:bg-[#14532d]/60 dark:text-[#86efac]' }} font-bold text-[10px]">
+                                                {{ $status }}
+                                            </span>
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-3">
-                                        <span class="font-bold text-slate-800 dark:text-slate-200">$6.50</span>
-                                        <span class="px-2.5 py-0.5 rounded-full bg-[#dcfce7] text-[#15803d] dark:bg-[#14532d]/60 dark:text-[#86efac] font-bold text-[10px]">{{ __('In Stock') }}</span>
-                                    </div>
-                                </div>
-
+                                @endforeach
                             </div>
                         </div>
 
@@ -235,38 +191,38 @@
                             <div class="flex items-start justify-between pb-2 border-b border-slate-200/80 dark:border-slate-800">
                                 <div>
                                     <div class="flex items-center gap-1.5">
-                                        <span class="text-xs font-black text-slate-900 dark:text-white">🧾 {{ __('Table #04 · Floor Main') }}</span>
+                                        <span class="text-xs font-black text-slate-900 dark:text-white">🧾 {{ $branding->landingText('hero.receipt_title', __('Online Order #2048 · Web Store')) }}</span>
                                     </div>
-                                    <div class="text-[10px] text-slate-400">{{ __('Order #1084 · Server Alex M.') }}</div>
+                                    <div class="text-[10px] text-slate-400">{{ $branding->landingText('hero.receipt_sub', __('Express Delivery · Riya M.')) }}</div>
                                 </div>
                                 <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-black">
-                                    {{ __('KOT Sent') }}
+                                    {{ $branding->landingText('hero.receipt_badge', __('Order Synced')) }}
                                 </span>
                             </div>
 
                             <!-- Items List -->
                             <div class="py-2.5 space-y-1 text-xs text-slate-600 dark:text-slate-300 font-medium">
                                 <div class="flex justify-between">
-                                    <span>2x Artisan Coffee Roast</span>
-                                    <span class="font-bold text-slate-900 dark:text-white">$29.00</span>
+                                    <span>1x {{ __('Single-Origin Ethiopian 1kg') }}</span>
+                                    <span class="font-bold text-slate-900 dark:text-white">$28.50</span>
                                 </div>
                                 <div class="flex justify-between">
-                                    <span>1x Gourmet Truffle Oil</span>
-                                    <span class="font-bold text-slate-900 dark:text-white">$18.20</span>
+                                    <span>1x {{ __('Wireless Noise-Canceling Pro') }}</span>
+                                    <span class="font-bold text-slate-900 dark:text-white">$149.00</span>
                                 </div>
                             </div>
 
                             <!-- Split Tender & Total -->
                             <div class="pt-2 border-t border-dashed border-slate-200 dark:border-slate-800 flex items-end justify-between">
                                 <div>
-                                    <div class="text-[9px] uppercase font-bold text-slate-400">{{ __('Split Tender Paid') }}</div>
+                                    <div class="text-[9px] uppercase font-bold text-slate-400">{{ $branding->landingText('hero.payment_label', __('Split Online / Card / Cash')) }}</div>
                                     <div class="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                        💵 $25.00 Cash + 💳 $22.20 Card
+                                        {{ $branding->landingText('hero.payment_detail', '💳 Card $149.00 + 📱 UPI $28.50') }}
                                     </div>
                                 </div>
                                 <div class="text-right">
-                                    <div class="text-[9px] uppercase font-bold text-slate-400">{{ __('Total') }}</div>
-                                    <div class="text-base font-black text-slate-900 dark:text-white">$47.20</div>
+                                    <div class="text-[9px] uppercase font-bold text-slate-400">{{ $branding->landingText('hero.total_label', __("Today's Revenue")) }}</div>
+                                    <div class="text-base font-black text-slate-900 dark:text-white">{{ $branding->landingText('hero.total_amount', '$1,840.50') }}</div>
                                 </div>
                             </div>
 

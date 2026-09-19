@@ -17,13 +17,15 @@ use Livewire\Component;
 class Index extends Component
 {
     public array $gateways = [
-        'stripe' => ['enabled' => false, 'mode' => 'test', 'public_key' => '', 'secret_key' => ''],
-        'paypal' => ['enabled' => false, 'mode' => 'test', 'public_key' => '', 'secret_key' => ''],
-        'razorpay' => ['enabled' => false, 'mode' => 'test', 'public_key' => '', 'secret_key' => ''],
-        'mercadopago' => ['enabled' => false, 'mode' => 'test', 'public_key' => '', 'secret_key' => ''],
+        'stripe' => ['enabled' => false, 'mode' => 'test', 'public_key' => '', 'secret_key' => '', 'webhook_secret' => ''],
+        'paypal' => ['enabled' => false, 'mode' => 'test', 'public_key' => '', 'secret_key' => '', 'webhook_secret' => ''],
+        'razorpay' => ['enabled' => false, 'mode' => 'test', 'public_key' => '', 'secret_key' => '', 'webhook_secret' => ''],
+        'mercadopago' => ['enabled' => false, 'mode' => 'test', 'public_key' => '', 'secret_key' => '', 'webhook_secret' => ''],
     ];
 
     protected array $hasStoredSecret = ['stripe' => false, 'paypal' => false, 'razorpay' => false, 'mercadopago' => false];
+
+    protected array $hasStoredWebhookSecret = ['stripe' => false, 'paypal' => false, 'razorpay' => false, 'mercadopago' => false];
 
     public function mount(): void
     {
@@ -38,14 +40,21 @@ class Index extends Component
                 'mode' => $setting->mode,
                 'public_key' => (string) $setting->public_key,
                 'secret_key' => '',
+                'webhook_secret' => '',
             ];
             $this->hasStoredSecret[$setting->gateway] = filled($setting->secret_key);
+            $this->hasStoredWebhookSecret[$setting->gateway] = filled($setting->webhook_secret);
         }
     }
 
     public function hasStoredSecret(string $gateway): bool
     {
         return $this->hasStoredSecret[$gateway] ?? false;
+    }
+
+    public function hasStoredWebhookSecret(string $gateway): bool
+    {
+        return $this->hasStoredWebhookSecret[$gateway] ?? false;
     }
 
     public function save(): void
@@ -57,6 +66,9 @@ class Index extends Component
             $setting->public_key = $config['public_key'] ?: null;
             if (filled($config['secret_key'])) {
                 $setting->secret_key = $config['secret_key'];
+            }
+            if (filled($config['webhook_secret'] ?? null)) {
+                $setting->webhook_secret = $config['webhook_secret'];
             }
             $setting->save();
         }

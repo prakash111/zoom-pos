@@ -24,5 +24,5 @@
         </div>
     @endforeach
 
-    <div class="flex justify-end"><button type="button" wire:click="saveSocialLogin" class="px-6 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-extrabold shadow-lg">{{ __('Save Social Login Settings') }}</button></div>
+    <div class="flex justify-end"><button type="button" wire:click="saveSocialLogin" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-extrabold shadow-lg flex items-center justify-center">{{ __('Save Social Login Settings') }}</button></div>
 </div>

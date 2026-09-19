@@ -3,14 +3,21 @@
 namespace App\Services\Modular;
 
 use App\Models\AuditLog;
+use App\Models\Company;
 use App\Models\PlatformSystem;
 use App\Models\SduiModule;
+use App\Services\License\LicenseService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
@@ -45,54 +52,8 @@ class ModulePackageService
         try {
             $this->extractSafely($zip->getRealPath(), $tmpDir);
             $manifestDir = $this->locateManifestDir($tmpDir);
-            $manifest = $this->readManifest($manifestDir);
 
-            $existing = SduiModule::where('slug', $manifest['key'])->first();
-            $this->validateManifest($manifest, $existing);
-
-            $modulesRoot = base_path('modules');
-            File::ensureDirectoryExists($modulesRoot);
-            $destination = $modulesRoot.'/'.$manifest['key'];
-
-            if (File::isDirectory($destination)) {
-                File::deleteDirectory($destination);
-            }
-
-            if (! @rename($manifestDir, $destination)) {
-                throw new RuntimeException('Could not move extracted module into place.');
-            }
-
-            $inheritsUi = $manifest['inherits_ui'] ?? null;
-            $features = $manifest['features'] ?? [];
-            if ($inheritsUi !== null) {
-                $features['inherits_ui'] = $inheritsUi;
-            }
-
-            $module = SduiModule::updateOrCreate(
-                ['slug' => $manifest['key']],
-                [
-                    'name' => $manifest['name'],
-                    'description' => $manifest['description'] ?? null,
-                    'icon' => $manifest['icon'] ?? 'widgets',
-                    'layout_type' => $manifest['layout_type'] ?? ($inheritsUi === 'universal_pos' ? 'universal_pos' : 'standard_grid'),
-                    'features' => $features,
-                    'navigation' => $manifest['navigation'] ?? [],
-                    'version' => $manifest['version'],
-                    'author' => $manifest['author'] ?? null,
-                    'min_system_version' => $manifest['min_system_version'] ?? null,
-                    'source_type' => 'package',
-                    'package_path' => $manifest['key'],
-                    'installed_at' => now(),
-                    'is_active' => false,
-                ]
-            );
-
-            AuditLog::record('module.installed', null, $adminUserId !== null ? (string) $adminUserId : null, [
-                'key' => $manifest['key'],
-                'version' => $manifest['version'],
-            ]);
-
-            return $module;
+            return $this->registerFromDir($manifestDir, $adminUserId, move: true);
         } finally {
             if (File::isDirectory($tmpDir)) {
                 File::deleteDirectory($tmpDir);
@@ -100,9 +61,157 @@ class ModulePackageService
         }
     }
 
+    /**
+     * Download a module's package from the license server (the module source
+     * lives only there), install it, record the license, and activate.
+     *
+     * @return array{status: bool, message: string, module: ?SduiModule, activated: bool}
+     */
+    public function installFromLicenseServer(string $slug, string $key, int|string|null $adminUserId): array
+    {
+        $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '', $slug));
+        $key = trim($key);
+
+        $dl = app(LicenseService::class)->downloadModule($key, $slug, LicenseService::currentDomain());
+        if (! $dl['status'] || empty($dl['path'])) {
+            return ['status' => false, 'message' => $dl['message'], 'module' => null, 'activated' => false];
+        }
+
+        $tmpDir = storage_path('app/tmp_module_'.Str::random(12));
+        File::makeDirectory($tmpDir, 0700, true);
+
+        try {
+            $this->extractSafely($dl['path'], $tmpDir);
+            $manifestDir = $this->locateManifestDir($tmpDir);
+            $module = $this->registerFromDir($manifestDir, $adminUserId, move: true);
+        } catch (Throwable $e) {
+            return ['status' => false, 'message' => 'Downloaded package could not be installed: '.$e->getMessage(), 'module' => null, 'activated' => false];
+        } finally {
+            @unlink($dl['path']);
+            if (File::isDirectory($tmpDir)) {
+                File::deleteDirectory($tmpDir);
+            }
+        }
+
+        if ($module->license_status !== 'active') {
+            $recorded = $this->verifyAndRecordLicense($module, $key, $adminUserId);
+            if (! $recorded['status']) {
+                return ['status' => true, 'message' => 'Installed, but the license did not verify: '.$recorded['message'], 'module' => $module, 'activated' => false];
+            }
+            $module->refresh();
+        }
+
+        if ($module->isExtension() && $adminUserId === null) {
+            return ['status' => true, 'message' => "\"{$module->name}\" installed and licensed. Super Admin must activate it in the panel.", 'module' => $module, 'activated' => false];
+        }
+
+        try {
+            $this->activate($module, $adminUserId);
+
+            return ['status' => true, 'message' => "\"{$module->name}\" installed and activated.", 'module' => $module, 'activated' => true];
+        } catch (Throwable $e) {
+            return ['status' => true, 'message' => "\"{$module->name}\" installed and licensed. Activation failed: ".$e->getMessage(), 'module' => $module, 'activated' => false];
+        }
+    }
+
+    /**
+     * Register a module from a directory that already contains module.json:
+     * validate the manifest, place the files under modules/<key>/, upsert the
+     * sdui_modules row, and apply any license the License Manager pushed early.
+     */
+    private function registerFromDir(string $sourceDir, int|string|null $adminUserId, bool $move): SduiModule
+    {
+        $manifest = $this->readManifest($sourceDir);
+
+        $existing = SduiModule::where('slug', $manifest['key'])->first();
+        $this->validateManifest($manifest, $existing);
+
+        $modulesRoot = base_path('modules');
+        File::ensureDirectoryExists($modulesRoot);
+        $destination = $modulesRoot.'/'.$manifest['key'];
+
+        if (File::isDirectory($destination)) {
+            File::deleteDirectory($destination);
+        }
+
+        if ($move) {
+            if (! @rename($sourceDir, $destination)) {
+                throw new RuntimeException('Could not move extracted module into place.');
+            }
+        } elseif (! File::copyDirectory($sourceDir, $destination)) {
+            throw new RuntimeException('Could not copy the bundled module into place.');
+        }
+
+        $inheritsUi = $manifest['inherits_ui'] ?? null;
+        $features = $manifest['features'] ?? [];
+        if ($inheritsUi !== null) {
+            $features['inherits_ui'] = $inheritsUi;
+        }
+
+        // Storefront metadata for the "Buy module" link. Stored inside features
+        // so no extra column is needed; a SuperAdmin can override per-slug via
+        // the platform_system `module_catalog` key.
+        $catalog = array_filter([
+            'price' => isset($manifest['price']) ? (float) $manifest['price'] : null,
+            'currency' => isset($manifest['currency']) ? strtoupper((string) $manifest['currency']) : null,
+            'buy_url' => isset($manifest['buy_url']) ? (string) $manifest['buy_url'] : null,
+            'buy_enabled' => array_key_exists('buy_enabled', $manifest) ? (bool) $manifest['buy_enabled'] : null,
+        ], fn ($v) => $v !== null);
+        if ($catalog !== []) {
+            $features['catalog'] = $catalog;
+        }
+
+        $module = SduiModule::updateOrCreate(
+            ['slug' => $manifest['key']],
+            [
+                'name' => $manifest['name'],
+                'type' => $manifest['type'],
+                'description' => $manifest['description'] ?? null,
+                'icon' => $manifest['icon'] ?? 'widgets',
+                'layout_type' => $manifest['layout_type'] ?? ($inheritsUi === 'universal_pos' ? 'universal_pos' : 'standard_grid'),
+                'features' => $features,
+                'navigation' => $manifest['navigation'] ?? [],
+                'version' => $manifest['version'],
+                'author' => $manifest['author'] ?? null,
+                'min_system_version' => $manifest['min_system_version'] ?? null,
+                'source_type' => 'package',
+                'package_path' => $manifest['key'],
+                'installed_at' => now(),
+                'is_active' => false,
+                'registration_allowed' => $manifest['type'] === SduiModule::TYPE_EXTENSION
+                    ? false : ($existing?->registration_allowed ?? false),
+                'requires_license' => $manifest['requires_license'] ?? true,
+            ]
+        );
+
+        AuditLog::record('module.installed', null, $adminUserId !== null ? (string) $adminUserId : null, [
+            'key' => $manifest['key'],
+            'version' => $manifest['version'],
+        ]);
+
+        // A license the License Manager pushed before the files were in place.
+        $this->applyPendingLicense($module, $adminUserId);
+
+        return $module;
+    }
+
     public function activate(SduiModule $module, int|string|null $adminUserId): void
     {
         $this->assertPackageModule($module);
+
+        if ($module->isExtension()) {
+            $this->assertSuperAdmin();
+            if ($adminUserId === null || (string) $adminUserId !== (string) auth('platform_web')->id()) {
+                throw new AuthorizationException('Extension activation must be requested by Super Admin from the panel.');
+            }
+        }
+
+        // Licensing gate. Kept here (not only in the Livewire layer) so nothing
+        // — a console command, a queued job, a future caller — can activate an
+        // unlicensed package module. Upholds the `is_active` ⇒ licensed invariant.
+        if ($module->requires_license && $module->license_status !== 'active') {
+            throw new RuntimeException("Module '{$module->slug}' needs a valid license key before it can be activated.");
+        }
 
         $migrationsPath = 'modules/'.$module->package_path.'/Database/Migrations';
         if (File::isDirectory(base_path($migrationsPath))) {
@@ -127,11 +236,43 @@ class ModulePackageService
         $this->flushPlatformCaches();
     }
 
+    /** Existing tenant module assignments are the extension entitlement source. */
+    public function authorizeExtensionAssignment(Company $company, array $modules, string $field = 'modules'): void
+    {
+        $extensions = ModuleRegistry::extensionKeys();
+        $before = array_intersect(array_map([ModuleRegistry::class, 'canonicalKey'], array_filter((array) $company->licensed_modules, 'is_string')), $extensions);
+        $after = array_intersect($modules, $extensions);
+        $added = array_diff($after, $before);
+
+        if ($added !== [] || array_diff($before, $after) !== []) {
+            $this->assertSuperAdmin();
+        }
+        foreach ($added as $key) {
+            if (! ModuleRegistry::isActive($key)) {
+                throw ValidationException::withMessages([
+                    $field => 'Activate the extension in Super Admin → Modules before enabling it for a tenant.',
+                ]);
+            }
+        }
+    }
+
+    private function assertSuperAdmin(): void
+    {
+        $admin = auth('platform_web')->user();
+        if (! $admin?->isSuperAdmin() || $admin->status !== 'active') {
+            throw new AuthorizationException('Only Super Admin can activate or assign extensions from the Super Admin panel.');
+        }
+    }
+
     public function deactivate(SduiModule $module, int|string|null $adminUserId): void
     {
         $this->assertPackageModule($module);
 
         $module->update(['is_active' => false]);
+
+        // A deactivated module must not linger as a selectable store type or a
+        // governance toggle — same cleanup uninstall() does.
+        $this->purgeFromRegistrationModes($module->slug);
 
         AuditLog::record('module.deactivated', null, $adminUserId !== null ? (string) $adminUserId : null, [
             'key' => $module->slug,
@@ -140,6 +281,115 @@ class ModulePackageService
         // Drop the module's routes/nav/settings from every cached layer
         // immediately, not just from fresh (uncached) requests.
         $this->flushPlatformCaches();
+    }
+
+    /**
+     * Verify a submitted license key for a package module and, on success,
+     * persist the licence record onto the row. Does NOT activate — the caller
+     * chains activate() so the existing migration / cache-flush path runs.
+     *
+     * @return array{status: bool, message: string, driver: string, expires_at: ?string}
+     */
+    public function verifyAndRecordLicense(SduiModule $module, string $key, int|string|null $adminUserId): array
+    {
+        $this->assertPackageModule($module);
+
+        $key = trim($key);
+        $actor = $adminUserId !== null ? (string) $adminUserId : null;
+
+        $result = app(LicenseService::class)->verify($key, $module->slug, LicenseService::currentDomain());
+
+        if (! $result['status']) {
+            AuditLog::record('module.license_rejected', null, $actor, [
+                'key' => $module->slug,
+                'driver' => $result['driver'],
+                'reason' => $result['message'],
+            ]);
+
+            return [
+                'status' => false,
+                'message' => $result['message'] ?: 'License verification failed.',
+                'driver' => $result['driver'],
+                'expires_at' => null,
+            ];
+        }
+
+        $module->forceFill([
+            'license_status' => 'active',
+            'license_key_hash' => Hash::make($key),
+            'license_key_prefix' => substr($key, 0, 10),
+            'license_key_encrypted' => $key,
+            'license_driver' => $result['driver'],
+            'license_buyer' => $result['buyer'] ?? null,
+            'license_verified_at' => now(),
+            'license_expires_at' => $result['expires_at'] ? Carbon::parse($result['expires_at']) : null,
+        ])->save();
+
+        AuditLog::record('module.license_verified', null, $actor, [
+            'key' => $module->slug,
+            'driver' => $result['driver'],
+            'expires_at' => optional($module->license_expires_at)->toIso8601String(),
+        ]);
+
+        return [
+            'status' => true,
+            'message' => $result['message'] ?: 'License verified.',
+            'driver' => $result['driver'],
+            'expires_at' => optional($module->license_expires_at)->toIso8601String(),
+        ];
+    }
+
+    /**
+     * If the License Manager pushed a key for this slug before its ZIP was
+     * uploaded, verify + record it now and clear the pending marker.
+     */
+    private function applyPendingLicense(SduiModule $module, int|string|null $adminUserId): void
+    {
+        if (! $module->requires_license || $module->license_status === 'active') {
+            return;
+        }
+
+        $stored = PlatformSystem::get('license_pending_'.$module->slug);
+        if (! $stored) {
+            return;
+        }
+
+        try {
+            $key = decrypt($stored);
+        } catch (Throwable $e) {
+            return;
+        }
+
+        $result = $this->verifyAndRecordLicense($module, $key, $adminUserId);
+        if ($result['status']) {
+            try {
+                PlatformSystem::query()->where('key', 'license_pending_'.$module->slug)->delete();
+            } catch (Throwable $e) {
+                // non-fatal
+            }
+        }
+    }
+
+    /**
+     * Mark a module's license as no longer valid (revoked / expired) and wipe
+     * the stored key material. Used by the daily re-check; the caller is
+     * responsible for deactivating the module if it is still active.
+     */
+    public function clearLicense(SduiModule $module, string $newStatus, ?string $reason = null): void
+    {
+        $newStatus = in_array($newStatus, ['revoked', 'expired', 'unlicensed'], true) ? $newStatus : 'unlicensed';
+
+        $module->forceFill([
+            'license_status' => $newStatus,
+            'license_key_hash' => null,
+            'license_key_prefix' => null,
+            'license_key_encrypted' => null,
+        ])->save();
+
+        AuditLog::record('module.license_'.$newStatus, null, null, [
+            'key' => $module->slug,
+            'reason' => $reason,
+        ]);
     }
 
     public function uninstall(SduiModule $module, bool $dropData, int|string|null $adminUserId): void
@@ -215,7 +465,7 @@ class ModulePackageService
      * failed install, or a manual copy. The uninstall flow prevents these
      * going forward; this lets a SuperAdmin sweep any that already exist.
      *
-     * @return array<string, string>  slug => absolute path
+     * @return array<string, string> slug => absolute path
      */
     public function orphanedModuleDirs(): array
     {
@@ -286,7 +536,7 @@ class ModulePackageService
         try {
             Artisan::call('optimize:clear');
         } catch (Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('ModulePackageService: optimize:clear failed after a module lifecycle change.', [
+            Log::warning('ModulePackageService: optimize:clear failed after a module lifecycle change.', [
                 'error' => $e->getMessage(),
             ]);
         }
@@ -526,6 +776,19 @@ class ModulePackageService
         }
 
         $manifest['key'] = $key;
+
+        $type = $manifest['type'] ?? SduiModule::TYPE_CORE;
+        if (! in_array($type, [SduiModule::TYPE_CORE, SduiModule::TYPE_EXTENSION], true)) {
+            throw new InvalidArgumentException('module.json "type" must be "core" or "extension".');
+        }
+        $manifest['type'] = in_array($key, config('modules.extensions', []), true)
+            ? SduiModule::TYPE_EXTENSION : $type;
+
+        // Every ZIP-installed module needs a license key to activate unless it
+        // explicitly opts out. Built-in verticals never reach this path.
+        $manifest['requires_license'] = array_key_exists('requires_license', $manifest)
+            ? (bool) $manifest['requires_license']
+            : true;
 
         $navigation = $manifest['navigation'] ?? [];
         if (! is_array($navigation)) {

@@ -83,11 +83,10 @@ class RepairChecklistCustomizationTest extends TestCase
         if (($node['type'] ?? null) === $type) {
             $out[] = $node;
         }
-        foreach (['components', 'children'] as $bucket) {
-            foreach ($node[$bucket] ?? [] as $child) {
-                if (is_array($child)) {
-                    $out = array_merge($out, $this->allOfType($child, $type));
-                }
+        $sub = $node['components'] ?? $node['children'] ?? [];
+        foreach ($sub as $child) {
+            if (is_array($child)) {
+                $out = array_merge($out, $this->allOfType($child, $type));
             }
         }
 
@@ -275,7 +274,7 @@ class RepairChecklistCustomizationTest extends TestCase
             ->assertJsonPath('share.status', 'diagnosing');
         $share = $res->json('share');
         $this->assertStringContainsString('/portal/repair/REP-SH-1', $share['tracking_url']);
-        $this->assertStringStartsWith('https://wa.me/919000011111', $share['whatsapp_url']);
+        $this->assertStringStartsWith('whatsapp://send?phone=919000011111&text=', $share['whatsapp_url']);
         $this->assertStringContainsString('REP-SH-1', $share['share_text']);
         $this->assertStringContainsString("/repair/tickets/{$ticket->id}/intake-sheet", $share['print_url']);
     }

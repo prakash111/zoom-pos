@@ -43,14 +43,14 @@
    class="dockable-nav-item"
    :aria-selected="isCurrentRoute('{{ $route }}') ? 'true' : 'false'"
    :class="{
-       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
-       'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
-       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
-       'transition-all group duration-200 cursor-pointer': true,
-       '{{ $activeClasses }}': isCurrentRoute('{{ $route }}'),
-       '{{ $inactiveClasses }}': !isCurrentRoute('{{ $route }}')
-   }"
-   title="{{ $title ?? $label }}">
+        'w-full max-w-[58px] sm:max-w-[66px] py-2 sm:py-2.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center': position === 'left' || position === 'right',
+        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
+        'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
+        'transition-all group duration-200 cursor-pointer': true,
+        '{{ $activeClasses }}': isCurrentRoute('{{ $route }}'),
+        '{{ $inactiveClasses }}': !isCurrentRoute('{{ $route }}')
+    }"
+    title="{{ $title ?? $label }}">
     {{ $slot }}
-    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label {{ $labelSize }}' : 'text-xs whitespace-nowrap font-bold'">{{ $label }}</span>
+    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ $label }}</span>
 </a>

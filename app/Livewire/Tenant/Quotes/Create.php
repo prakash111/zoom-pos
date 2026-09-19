@@ -3,7 +3,9 @@
 namespace App\Livewire\Tenant\Quotes;
 
 use App\Models\AuditLog;
+use App\Models\Company;
 use App\Models\Customer;
+use App\Models\Lead;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Sale;
@@ -11,11 +13,14 @@ use App\Models\TaxRule;
 use App\Models\User;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Modules\leadmanagement\Models\LeadActivity;
 
 #[Layout('layouts.tenant', ['title' => 'New Quotation'])]
 class Create extends Component
 {
     public ?int $customerId = null;
+
+    public ?int $leadId = null;
 
     public ?string $userId = null;
 
@@ -82,9 +87,13 @@ class Create extends Component
             ->orderBy('name')
             ->get();
 
-        $prefix = $company?->quotation_prefix ?: 'QUO-';
+        $prefix = trim((string) ($company?->quotation_prefix ?: 'QUO-'));
+        if ($prefix === '' || strlen($prefix) > 8) {
+            $prefix = 'QUO-';
+        }
+        $prefix = str_ends_with($prefix, '-') ? $prefix : $prefix.'-';
         $count = Sale::where('operation_type', 'quotation')->count() + 1;
-        $this->quoteNumber = $prefix.sprintf('%04d', $count);
+        $this->quoteNumber = $prefix.sprintf('%03d', $count);
 
         $this->availableTaxRules = TaxRule::query()
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
@@ -122,7 +131,37 @@ class Create extends Component
         $this->agreedPaymentMethod = $this->availablePaymentMethods->first()?->code ?? 'cash';
         $this->paymentMethod = $this->agreedPaymentMethod;
 
-        $this->addItem();
+        if ($leadIdQuery = request()->query('lead_id')) {
+            abort_unless($company?->hasModule('leadmanagement'), 403, 'Lead Management is not activated for this store.');
+            $lead = Lead::find($leadIdQuery);
+            if ($lead) {
+                $this->leadId = $lead->id;
+                if ($lead->customer_id) {
+                    $this->customerId = $lead->customer_id;
+                }
+                if ($lead->assigned_to) {
+                    $this->userId = (string) $lead->assigned_to;
+                }
+                if ($lead->requirement_summary || $lead->notes) {
+                    $this->notes = $lead->notes ?: $lead->requirement_summary;
+                    $this->quoteNotes = $this->notes;
+                }
+                $amount = (float) ($lead->expected_value ?: $lead->estimated_value ?: 0);
+                $this->items = [
+                    [
+                        'product_id' => null,
+                        'name' => $lead->title ?: ($lead->name.' - Scope of Work'),
+                        'description' => $lead->requirement_summary ?: ($lead->notes ?: ''),
+                        'quantity' => 1,
+                        'price' => $amount,
+                    ],
+                ];
+            } else {
+                $this->addItem();
+            }
+        } else {
+            $this->addItem();
+        }
     }
 
     public function addItem(): void
@@ -317,10 +356,15 @@ class Create extends Component
         $paymentMethodToSave = $this->agreedPaymentMethod ?: ($this->paymentMethod ?: 'cash');
         $notesToSave = filled($this->quoteNotes) ? $this->quoteNotes : ($this->notes ?: null);
 
+        if ($this->leadId) {
+            abort_unless(Company::find($companyId)?->hasModule('leadmanagement'), 403, 'Lead Management is not activated for this store.');
+        }
+
         $quote = Sale::create([
             'company_id' => $companyId,
             'sale_number' => $this->quoteNumber,
             'customer_id' => $customer?->id,
+            'lead_id' => $this->leadId,
             'customer_name' => $customer?->name ?? 'Client Proposal',
             'user_id' => $this->userId ?: auth('web')->id(),
             'total' => $this->total,
@@ -339,7 +383,23 @@ class Create extends Component
             'items' => $this->items,
         ]);
 
-        AuditLog::record('quotation.created', $quote->company_id, auth('web')->id(), ['quote_id' => $quote->id, 'quote_number' => $quote->sale_number]);
+        if ($this->leadId) {
+            $lead = Lead::find($this->leadId);
+            if ($lead) {
+                $lead->update(['stage' => 'proposal_sent']);
+                LeadActivity::create([
+                    'company_id' => $companyId,
+                    'lead_id' => $lead->id,
+                    'type' => 'note',
+                    'title' => 'Quotation Created',
+                    'description' => "Quotation #{$quote->sale_number} sent to prospect.",
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
+            }
+        }
+
+        AuditLog::record('quotation.created', $quote->company_id, auth('web')->id(), ['quote_id' => $quote->id, 'quote_number' => $quote->sale_number, 'lead_id' => $this->leadId]);
 
         session()->flash('status', "Quotation {$quote->sale_number} created successfully.");
 

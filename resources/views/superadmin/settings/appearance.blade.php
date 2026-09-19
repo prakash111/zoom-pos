@@ -10,6 +10,91 @@
          uiAccentColor: localStorage.getItem('ui_accent_color') || @js(appearance_defaults()['uiAccentColor']),
          navTextColor: localStorage.getItem('nav_text_color') || @js(appearance_defaults()['navTextColor']),
          navTextActiveColor: localStorage.getItem('nav_text_active_color') || @js(appearance_defaults()['navTextActiveColor']),
+         landingDarkBg: localStorage.getItem('landing_dark_bg') || @js(appearance_defaults()['landingDarkBg'] ?? '#0b0f19'),
+         palette: (function() {
+             try {
+                 var def = @js(default_landing_sections_palette());
+                 var pal = @js(appearance_defaults()['landingSectionsPalette'] ?? []);
+                 return Object.assign({}, def, pal);
+             } catch(e) {
+                 return @js(default_landing_sections_palette());
+             }
+         })(),
+         activeSection: 'hero',
+         paletteMode: 'dark',
+         sectionNames: {
+             hero: '{{ __('Hero Showcase') }}',
+             features: '{{ __('Retail Features') }}',
+             mission: '{{ __('Our Mission') }}',
+             pricing: '{{ __('Pricing & Plans') }}',
+             faq: '{{ __('FAQ') }}',
+             cta: '{{ __('Scale CTA') }}',
+             contact: '{{ __('Contact Form') }}'
+         },
+         matchingPatterns: @js(get_landing_matching_patterns()),
+         applyMatchingPattern(key) {
+             var p = this.matchingPatterns[key];
+             if (!p) return;
+             this.palette = JSON.parse(JSON.stringify(p.palette));
+             this.setLandingBg(p.dark_bg);
+         },
+         applyAndSaveMatchingPattern(key) {
+             var p = this.matchingPatterns[key];
+             if (!p) return;
+             this.palette = JSON.parse(JSON.stringify(p.palette));
+             this.setLandingBg(p.dark_bg);
+             if (this.$wire && this.$wire.applyMatchingPalettePattern) {
+                 this.$wire.applyMatchingPalettePattern(key);
+             }
+         },
+         palettePresets: [
+             { key: 'obsidian', label: 'Obsidian Dark', color: '#0b0f19', dark_bg: '#0b0f19', dark_card_bg: '#131e29', dark_text: '#f8fafc', dark_muted: '#94a3b8', light_bg: '#ffffff', light_card_bg: '#ffffff', light_text: '#0f172a', light_muted: '#64748b' },
+             { key: 'midnight', label: 'Midnight Navy', color: '#0f172a', dark_bg: '#0f172a', dark_card_bg: '#1e293b', dark_text: '#f8fafc', dark_muted: '#94a3b8', light_bg: '#f8fafc', light_card_bg: '#ffffff', light_text: '#0f172a', light_muted: '#64748b' },
+             { key: 'emerald', label: 'Deep Emerald', color: '#064e3b', dark_bg: '#064e3b', dark_card_bg: '#022c22', dark_text: '#ecfdf5', dark_muted: '#6ee7b7', light_bg: '#f0fdf4', light_card_bg: '#ffffff', light_text: '#064e3b', light_muted: '#047857' },
+             { key: 'indigo', label: 'Royal Indigo', color: '#1e1b4b', dark_bg: '#1e1b4b', dark_card_bg: '#312e81', dark_text: '#e0e7ff', dark_muted: '#a5b4fc', light_bg: '#eef2ff', light_card_bg: '#ffffff', light_text: '#1e1b4b', light_muted: '#4338ca' },
+             { key: 'clean_white', label: 'Clean White', color: '#ffffff', dark_bg: '#020617', dark_card_bg: '#0f172a', dark_text: '#f8fafc', dark_muted: '#94a3b8', light_bg: '#ffffff', light_card_bg: '#f8fafc', light_text: '#0f172a', light_muted: '#64748b' },
+             { key: 'warm_slate', label: 'Warm Slate', color: '#f1f5f9', dark_bg: '#1e293b', dark_card_bg: '#0f172a', dark_text: '#f1f5f9', dark_muted: '#94a3b8', light_bg: '#f1f5f9', light_card_bg: '#ffffff', light_text: '#0f172a', light_muted: '#475569' }
+         ],
+         applyPalettePreset(preset) {
+             if (!preset || !this.palette[this.activeSection]) return;
+             if (this.paletteMode === 'dark') {
+                 this.palette[this.activeSection].dark_bg = preset.dark_bg;
+                 this.palette[this.activeSection].dark_text = preset.dark_text;
+                 this.palette[this.activeSection].dark_muted = preset.dark_muted;
+                 if (this.activeSection === 'contact' && preset.dark_card_bg) {
+                     this.palette[this.activeSection].dark_card_bg = preset.dark_card_bg;
+                 }
+                 if (['mission', 'pricing', 'cta'].includes(this.activeSection)) {
+                     this.setLandingBg(preset.dark_bg);
+                 }
+             } else {
+                 this.palette[this.activeSection].light_bg = preset.light_bg;
+                 this.palette[this.activeSection].light_text = preset.light_text;
+                 this.palette[this.activeSection].light_muted = preset.light_muted;
+                 if (this.activeSection === 'contact' && preset.light_card_bg) {
+                     this.palette[this.activeSection].light_card_bg = preset.light_card_bg;
+                 }
+             }
+         },
+         updateColorToken(sec, token, val) {
+             var hex = val.trim();
+             if (!hex.startsWith('#') && hex.length > 0) hex = '#' + hex;
+             if (this.palette[sec]) {
+                 this.palette[sec][token] = hex;
+             }
+             if (sec === 'mission' && token === 'dark_bg') {
+                 this.setLandingBg(hex);
+             }
+         },
+         resetSectionPalette(sec) {
+             var def = @js(default_landing_sections_palette());
+             if (def[sec]) {
+                 this.palette[sec] = Object.assign({}, def[sec]);
+                 if (sec === 'mission') {
+                     this.setLandingBg(def[sec].dark_bg);
+                 }
+             }
+         },
         visibleItems: (function() {
             try {
                 var raw = localStorage.getItem('nav_visible_items');
@@ -100,12 +185,14 @@
              this.navTextColor = v;
              localStorage.setItem('nav_text_color', v);
              document.documentElement.style.setProperty('--nav-item-color', v);
+             document.documentElement.style.setProperty('--nav-inactive-color', v);
              window.dispatchEvent(new CustomEvent('dock-nav-update', { detail: { navTextColor: v } }));
          },
          setNavTextActiveColor(v) {
              this.navTextActiveColor = v;
              localStorage.setItem('nav_text_active_color', v);
              document.documentElement.style.setProperty('--nav-item-active-color', v);
+             document.documentElement.style.setProperty('--nav-active-color', v);
              window.dispatchEvent(new CustomEvent('dock-nav-update', { detail: { navTextActiveColor: v } }));
          },
          toggleItem(key) {
@@ -114,26 +201,41 @@
              } else {
                  this.visibleItems.push(key);
              }
+             this.visibleAdminItems = [...this.visibleItems];
              localStorage.setItem('nav_visible_items', JSON.stringify(this.visibleItems));
-             window.dispatchEvent(new CustomEvent('dock-nav-update', { detail: { visibleItems: this.visibleItems } }));
+             window.dispatchEvent(new CustomEvent('dock-nav-update', { detail: { visibleItems: this.visibleItems, visibleAdminItems: this.visibleAdminItems } }));
          },
          isItemVisible(key) {
              return this.visibleItems.includes(key);
          },
          selectAllItems() {
              this.visibleItems = this.availableDockItems.map(i => i.key);
+             this.visibleAdminItems = [...this.visibleItems];
              localStorage.setItem('nav_visible_items', JSON.stringify(this.visibleItems));
-             window.dispatchEvent(new CustomEvent('dock-nav-update', { detail: { visibleItems: this.visibleItems } }));
+             window.dispatchEvent(new CustomEvent('dock-nav-update', { detail: { visibleItems: this.visibleItems, visibleAdminItems: this.visibleAdminItems } }));
          },
          selectDefaultItems() {
-             this.visibleItems = ['dashboard', 'tenants', 'plans', 'codes', 'settings', 'smtp'];
+             this.visibleItems = ['dashboard', 'tenants', 'plans', 'taxes', 'settings', 'smtp'];
+             this.visibleAdminItems = [...this.visibleItems];
              localStorage.setItem('nav_visible_items', JSON.stringify(this.visibleItems));
-             window.dispatchEvent(new CustomEvent('dock-nav-update', { detail: { visibleItems: this.visibleItems } }));
+             window.dispatchEvent(new CustomEvent('dock-nav-update', { detail: { visibleItems: this.visibleItems, visibleAdminItems: this.visibleAdminItems } }));
          },
          uncheckAllItems() {
              this.visibleItems = [];
+             this.visibleAdminItems = [];
              localStorage.setItem('nav_visible_items', JSON.stringify(this.visibleItems));
-             window.dispatchEvent(new CustomEvent('dock-nav-update', { detail: { visibleItems: this.visibleItems } }));
+             window.dispatchEvent(new CustomEvent('dock-nav-update', { detail: { visibleItems: this.visibleItems, visibleAdminItems: this.visibleAdminItems } }));
+         },
+         setLandingBg(v) {
+             this.landingDarkBg = v;
+             localStorage.setItem('landing_dark_bg', v);
+             if (this.palette && this.palette.mission) this.palette.mission.dark_bg = v;
+             if (this.palette && this.palette.pricing) this.palette.pricing.dark_bg = v;
+             if (this.palette && this.palette.cta) this.palette.cta.dark_bg = v;
+             var hexInput = document.getElementById('landing_dark_bg_hex');
+             if (hexInput) hexInput.value = v.replace('#', '');
+             var picker = document.getElementById('landing_dark_bg_picker');
+             if (picker) picker.value = v;
          },
          resetAll() {
              this.setLayout('slim');
@@ -142,6 +244,8 @@
              this.setUiAccentColor('#4f46e5');
              this.setNavTextColor('#ffffff');
              this.setNavTextActiveColor('#60a5fa');
+             this.setLandingBg('#0b0f19');
+             this.palette = Object.assign({}, @js(default_landing_sections_palette()));
              this.selectDefaultItems();
          },
         toggleCustomizerModal() {
@@ -151,136 +255,43 @@
     <div class="border-b border-slate-100 dark:border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🎨</span> {{ __('Navigation, Theme & Layout Customization') }}
+                <span>🎨</span> {{ __('Navigation & Layout Customization') }}
             </h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {{ __('Configure public landing page themes, menu structures, typography text colors, UI accent highlights, dock backgrounds, and item pinning in real time.') }}
+                {{ __('Configure menu structures, typography text colors, UI accent highlights, dock backgrounds, and item pinning in real time.') }}
             </p>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
             <button type="button"
-                    @click="$wire.saveAppearance({ layout, position, mode, customBg, uiAccentColor, navTextColor, navTextActiveColor, visibleItems })"
+                    @click="$wire.saveAppearance({ layout, position, mode, customBg, uiAccentColor, navTextColor, navTextActiveColor, visibleItems, landingDarkBg, palette })"
                     wire:loading.attr="disabled"
                     wire:target="saveAppearance"
-                    class="px-4 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-60">
+                    class="h-10 px-4 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60">
                 <span wire:loading.remove wire:target="saveAppearance">💾</span>
                 <span wire:loading wire:target="saveAppearance">⏳</span>
                 <span>{{ __('Save Global Defaults') }}</span>
             </button>
             <button type="button"
                     @click="resetAll()"
-                    class="px-3.5 py-2 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 hover:bg-rose-100 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+                    class="h-10 px-3.5 py-2 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 hover:bg-rose-100 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
                 <span>🔄</span>
                 <span>{{ __('Reset Layout Defaults') }}</span>
             </button>
 
             <button type="button"
                     @click="toggleCustomizerModal()"
-                    class="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/30 flex items-center gap-1.5 cursor-pointer">
+                    class="h-10 px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/30 flex items-center justify-center gap-1.5 cursor-pointer">
                 <span>🪟</span>
                 <span>{{ __('Open Popup Customizer') }}</span>
             </button>
         </div>
     </div>
 
-    <!-- 1. PUBLIC LANDING PAGE THEME & LAYOUT -->
-    <div class="space-y-3 pb-6 border-b border-slate-150 dark:border-slate-800">
-        <div class="flex items-center justify-between">
-            <div>
-                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    1. Public Landing Page Theme & Layout
-                </h4>
-                <p class="text-[11px] text-slate-400">
-                    Select the global landing page design and conversion structure shown on the root domain (<code>/</code>).
-                </p>
-            </div>
-            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                Live Switcher
-            </span>
-        </div>
-
-        <!-- Theme Grid Selector Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1">
-            
-            <!-- Theme 1: Modern SaaS / Cloud POS (Default) -->
-            <div wire:click="setLandingTheme('theme_modern')"
-                 class="cursor-pointer relative p-3.5 rounded-2xl border-2 transition-all duration-150 flex flex-col justify-between
-                 {{ $landingTheme === 'theme_modern' 
-                     ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm ring-2 ring-blue-500/20' 
-                     : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700' }}">
-                <div class="flex items-start justify-between">
-                    <div class="p-2 rounded-xl bg-blue-100/60 dark:bg-blue-900/40 text-blue-600 text-lg">🚀</div>
-                    @if($landingTheme === 'theme_modern')
-                        <span class="text-blue-600 dark:text-blue-400 font-bold text-sm">✓</span>
-                    @endif
-                </div>
-                <div class="mt-3">
-                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Modern Cloud POS</div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Vibrant SaaS gradients & interactive product features</div>
-                </div>
-            </div>
-
-            <!-- Theme 2: Enterprise Retail & Hardware Showcase (From /read Specs) -->
-            <div wire:click="setLandingTheme('theme_enterprise')"
-                 class="cursor-pointer relative p-3.5 rounded-2xl border-2 transition-all duration-150 flex flex-col justify-between
-                 {{ $landingTheme === 'theme_enterprise' 
-                     ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm ring-2 ring-blue-500/20' 
-                     : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700' }}">
-                <div class="flex items-start justify-between">
-                    <div class="p-2 rounded-xl bg-emerald-100/60 dark:bg-emerald-900/40 text-emerald-600 text-lg">🏪</div>
-                    @if($landingTheme === 'theme_enterprise')
-                        <span class="text-blue-600 dark:text-blue-400 font-bold text-sm">✓</span>
-                    @endif
-                </div>
-                <div class="mt-3">
-                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Enterprise Showcase</div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">High-contrast retail structure based on video guide</div>
-                </div>
-            </div>
-
-            <!-- Theme 3: Minimal Funnel & Direct Register -->
-            <div wire:click="setLandingTheme('theme_minimal')"
-                 class="cursor-pointer relative p-3.5 rounded-2xl border-2 transition-all duration-150 flex flex-col justify-between
-                 {{ $landingTheme === 'theme_minimal' 
-                     ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm ring-2 ring-blue-500/20' 
-                     : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700' }}">
-                <div class="flex items-start justify-between">
-                    <div class="p-2 rounded-xl bg-amber-100/60 dark:bg-amber-900/40 text-amber-600 text-lg">⚡</div>
-                    @if($landingTheme === 'theme_minimal')
-                        <span class="text-blue-600 dark:text-blue-400 font-bold text-sm">✓</span>
-                    @endif
-                </div>
-                <div class="mt-3">
-                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Minimal Conversion</div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Focused single-page funnel for quick tenant signups</div>
-                </div>
-            </div>
-
-            <!-- Theme 4: Dark Studio / Tech POS -->
-            <div wire:click="setLandingTheme('theme_dark_studio')"
-                 class="cursor-pointer relative p-3.5 rounded-2xl border-2 transition-all duration-150 flex flex-col justify-between
-                 {{ $landingTheme === 'theme_dark_studio' 
-                 ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm ring-2 ring-blue-500/20' 
-                 : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700' }}">
-                <div class="flex items-start justify-between">
-                    <div class="p-2 rounded-xl bg-purple-100/60 dark:bg-purple-900/40 text-purple-600 text-lg">✨</div>
-                    @if($landingTheme === 'theme_dark_studio')
-                        <span class="text-blue-600 dark:text-blue-400 font-bold text-sm">✓</span>
-                    @endif
-                </div>
-                <div class="mt-3">
-                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Dark Studio POS</div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Sleek, dark-mode native interface showcase</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 2. Menu Layout Structure -->
+    <!-- 1. Menu Layout Structure -->
     <div class="space-y-3">
         <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
-            2. {{ __('Menu Layout Structure') }}
+            1. {{ __('Menu Layout Structure') }}
         </label>
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <button type="button"
@@ -341,11 +352,11 @@
         </div>
     </div>
 
-    <!-- 3. Menu Item Typography & Text Colors -->
+    <!-- 2. Menu Item Typography & Text Colors -->
     <div class="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
         <div>
             <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
-                3. {{ __('Navigation Menu Item Text Colors & Typography') }}
+                2. {{ __('Navigation Menu Item Text Colors & Typography') }}
             </label>
             <p class="text-[11px] text-slate-400 mt-0.5">
                 {{ __('Customize font colors for default inactive links and active highlight states across all dock and top-bar navigation bars.') }}
@@ -405,12 +416,12 @@
         </div>
     </div>
 
-    <!-- 4. Primary UI Accent Color -->
+    <!-- 3. Primary UI Accent Color -->
     <div class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
         <div class="flex items-center justify-between">
             <div>
                 <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
-                    4. {{ __('Dashboard Hero & UI Accent Color') }}
+                    3. {{ __('Dashboard Hero & UI Accent Color') }}
                 </label>
                 <p class="text-[11px] text-slate-400 mt-0.5">{{ __('Primary color of dashboard cards, action buttons, and active highlight pills') }}</p>
             </div>
@@ -445,12 +456,12 @@
         </div>
     </div>
 
-    <!-- 5. Dock Navigation Custom Background -->
+    <!-- 4. Dock Navigation Custom Background -->
     <div class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
         <div class="flex items-center justify-between">
             <div>
                 <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
-                    5. {{ __('Dock Navigation Background') }}
+                    4. {{ __('Dock Navigation Background') }}
                 </label>
                 <p class="text-[11px] text-slate-400 mt-0.5">{{ __('Set an independent background color or gradient for the navigation bar') }}</p>
             </div>
@@ -490,6 +501,341 @@
                 <span class="w-5 h-5 rounded-lg bg-black shrink-0"></span>
                 <span class="font-bold text-[11px] truncate">{{ __('OLED Black') }}</span>
             </button>
+        </div>
+    </div>
+
+    <!-- 5. LANDING PAGE SECTION THEMES & CONTRAST -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 sm:p-7 border border-slate-200 dark:border-slate-700 shadow-sm space-y-6 mt-6">
+        <!-- Section Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-700/60">
+            <div>
+                <h4 class="text-sm sm:text-base font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                    <span>🎨</span> {{ __('Landing Page Section Themes & Contrast') }}
+                </h4>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    {{ __('Configure per-section background colors, primary headline text, and secondary muted copy for both Light and Dark modes.') }}
+                </p>
+            </div>
+            
+            <!-- Dual Theme Mode Switcher -->
+            <div class="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700 self-start sm:self-auto">
+                <button type="button" 
+                        @click="paletteMode = 'light'" 
+                        :class="paletteMode === 'light' ? 'bg-white dark:bg-slate-800 text-amber-600 shadow-sm font-black' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white font-bold'"
+                        class="px-3.5 py-1.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5">
+                    <span>☀️</span>
+                    <span>{{ __('Light Theme Values') }}</span>
+                </button>
+                <button type="button" 
+                        @click="paletteMode = 'dark'" 
+                        :class="paletteMode === 'dark' ? 'bg-white dark:bg-slate-800 text-indigo-500 shadow-sm font-black' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white font-bold'"
+                        class="px-3.5 py-1.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5">
+                    <span>🌙</span>
+                    <span>{{ __('Dark Theme Values') }}</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- One-Time Matching Color Combination Pattern Selector -->
+        <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 dark:from-slate-950 dark:via-indigo-950 dark:to-slate-950 p-4 rounded-2xl border border-indigo-500/20 text-white shadow-md">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                <div>
+                    <span class="text-xs font-black uppercase tracking-wider text-indigo-300 flex items-center gap-2">
+                        <span>🎨</span> {{ __('One-Time Matching Color Combination Patterns (All Sections)') }}
+                    </span>
+                    <p class="text-[11px] text-slate-300 mt-0.5">
+                        {{ __('Instantly apply a harmonized, alternating color combination across all landing sections for both Light & Dark modes.') }}
+                    </p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                <template x-for="(mp, mKey) in matchingPatterns" :key="mKey">
+                    <button type="button"
+                            @click="applyAndSaveMatchingPattern(mKey)"
+                            class="p-2.5 rounded-xl border border-white/10 hover:border-indigo-400 bg-white/5 hover:bg-white/10 transition-all text-left group cursor-pointer relative flex flex-col justify-between">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="w-3.5 h-3.5 rounded-full border border-white/30 shadow-xs shrink-0" :style="{ backgroundColor: mp.color }"></span>
+                            <span class="text-[9px] font-mono text-indigo-300 group-hover:text-white uppercase font-bold">{{ __('Apply') }} →</span>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white truncate" x-text="mp.name"></div>
+                            <div class="text-[9px] text-slate-400 truncate mt-0.5" x-text="mp.description"></div>
+                        </div>
+                    </button>
+                </template>
+            </div>
+        </div>
+
+        <!-- Section Navigation Tabs -->
+        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+            <template x-for="(name, sec) in sectionNames" :key="sec">
+                <button type="button"
+                        @click="activeSection = sec"
+                        :class="activeSection === sec ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-500/20' : 'bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-semibold'"
+                        class="px-3.5 py-2 rounded-xl text-xs transition whitespace-nowrap cursor-pointer flex items-center gap-2 shrink-0 border border-transparent">
+                    <span x-text="sec === 'hero' ? '🚀' : (sec === 'features' ? '⚡' : (sec === 'mission' ? '🎯' : (sec === 'pricing' ? '💳' : (sec === 'faq' ? '❓' : (sec === 'contact' ? '✉️' : '✨')))))"></span>
+                    <span x-text="name"></span>
+                </button>
+            </template>
+        </div>
+
+        <!-- Customization Grid: Controls (Left) vs Live Preview (Right) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <!-- Left: Presets & Color Token Inputs -->
+            <div class="lg:col-span-7 space-y-5">
+                <!-- Preset Swatches Bar -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                            {{ __('Quick Palette Presets') }} (<span x-text="paletteMode === 'dark' ? 'Dark' : 'Light'"></span>)
+                        </label>
+                        <button type="button" 
+                                @click="resetSectionPalette(activeSection)" 
+                                class="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-bold cursor-pointer">
+                            {{ __('Reset to Default') }}
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                        <template x-for="p in palettePresets" :key="p.key">
+                            <button type="button" 
+                                    @click="applyPalettePreset(p)"
+                                    class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:scale-105 transition-all text-left group cursor-pointer relative"
+                                    :style="{ backgroundColor: paletteMode === 'dark' ? p.dark_bg : p.light_bg }">
+                                <div class="flex items-center justify-between mb-1">
+                                    <div class="w-2.5 h-2.5 rounded-full border border-white/40 shadow-xs" :style="{ backgroundColor: p.color }"></div>
+                                    <span class="text-[9px] font-bold opacity-75" :style="{ color: paletteMode === 'dark' ? p.dark_text : p.light_text }">✓</span>
+                                </div>
+                                <div class="text-[10px] font-bold truncate" :style="{ color: paletteMode === 'dark' ? p.dark_text : p.light_text }" x-text="p.label"></div>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Color Token Inputs (Background, Card Background for Contact, Primary Text, Muted Text) -->
+                <div class="space-y-3 bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                            <span x-text="sectionNames[activeSection]"></span> · <span class="capitalize" x-text="paletteMode"></span> Tokens
+                        </span>
+                        <span class="text-[10px] font-mono text-slate-400">HEX / RGB</span>
+                    </div>
+
+                    <!-- Token 1: Background Color -->
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="w-1/3">
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                                {{ __('Background Color') }}
+                            </label>
+                            <span class="text-[10px] text-slate-400">{{ __('Section backdrop') }}</span>
+                        </div>
+                        <div class="flex-1 flex items-center gap-2">
+                            <div class="relative flex-1">
+                                <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 font-mono text-xs">#</span>
+                                <input type="text"
+                                       :value="(palette[activeSection][paletteMode === 'dark' ? 'dark_bg' : 'light_bg'] || '').replace('#', '')"
+                                       @input="updateColorToken(activeSection, paletteMode === 'dark' ? 'dark_bg' : 'light_bg', $event.target.value)"
+                                       class="w-full pl-6 pr-2 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono uppercase bg-white dark:bg-slate-800 text-slate-800 dark:text-white"
+                                       placeholder="FFFFFF">
+                            </div>
+                            <input type="color"
+                                   :value="palette[activeSection][paletteMode === 'dark' ? 'dark_bg' : 'light_bg'] || '#000000'"
+                                   @input="updateColorToken(activeSection, paletteMode === 'dark' ? 'dark_bg' : 'light_bg', $event.target.value)"
+                                   class="w-8 h-8 p-0.5 rounded-lg border border-slate-300 dark:border-slate-600 cursor-pointer bg-transparent shrink-0">
+                        </div>
+                    </div>
+
+                    <!-- Token 1b: Card Background Color (Contact Form Section) -->
+                    <div x-show="activeSection === 'contact'" class="flex items-center justify-between gap-3 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                        <div class="w-1/3">
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                                {{ __('Card Background') }}
+                            </label>
+                            <span class="text-[10px] text-slate-400">{{ __('Contact form surface') }}</span>
+                        </div>
+                        <div class="flex-1 flex items-center gap-2">
+                            <div class="relative flex-1">
+                                <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 font-mono text-xs">#</span>
+                                <input type="text"
+                                       :value="(palette[activeSection] && palette[activeSection][paletteMode === 'dark' ? 'dark_card_bg' : 'light_card_bg'] || '').replace('#', '')"
+                                       @input="updateColorToken(activeSection, paletteMode === 'dark' ? 'dark_card_bg' : 'light_card_bg', $event.target.value)"
+                                       class="w-full pl-6 pr-2 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono uppercase bg-white dark:bg-slate-800 text-slate-800 dark:text-white"
+                                       placeholder="131E29">
+                            </div>
+                            <input type="color"
+                                   :value="(palette[activeSection] && palette[activeSection][paletteMode === 'dark' ? 'dark_card_bg' : 'light_card_bg']) || '#ffffff'"
+                                   @input="updateColorToken(activeSection, paletteMode === 'dark' ? 'dark_card_bg' : 'light_card_bg', $event.target.value)"
+                                   class="w-8 h-8 p-0.5 rounded-lg border border-slate-300 dark:border-slate-600 cursor-pointer bg-transparent shrink-0">
+                        </div>
+                    </div>
+
+                    <!-- Token 2: Primary Text Color -->
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="w-1/3">
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                                {{ __('Primary Text') }}
+                            </label>
+                            <span class="text-[10px] text-slate-400">{{ __('Headings & titles') }}</span>
+                        </div>
+                        <div class="flex-1 flex items-center gap-2">
+                            <div class="relative flex-1">
+                                <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 font-mono text-xs">#</span>
+                                <input type="text"
+                                       :value="(palette[activeSection][paletteMode === 'dark' ? 'dark_text' : 'light_text'] || '').replace('#', '')"
+                                       @input="updateColorToken(activeSection, paletteMode === 'dark' ? 'dark_text' : 'light_text', $event.target.value)"
+                                       class="w-full pl-6 pr-2 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono uppercase bg-white dark:bg-slate-800 text-slate-800 dark:text-white"
+                                       placeholder="0F172A">
+                            </div>
+                            <input type="color"
+                                   :value="palette[activeSection][paletteMode === 'dark' ? 'dark_text' : 'light_text'] || '#000000'"
+                                   @input="updateColorToken(activeSection, paletteMode === 'dark' ? 'dark_text' : 'light_text', $event.target.value)"
+                                   class="w-8 h-8 p-0.5 rounded-lg border border-slate-300 dark:border-slate-600 cursor-pointer bg-transparent shrink-0">
+                        </div>
+                    </div>
+
+                    <!-- Token 3: Muted / Secondary Text Color -->
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="w-1/3">
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                                {{ __('Muted Copy Text') }}
+                            </label>
+                            <span class="text-[10px] text-slate-400">{{ __('Paragraphs & details') }}</span>
+                        </div>
+                        <div class="flex-1 flex items-center gap-2">
+                            <div class="relative flex-1">
+                                <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 font-mono text-xs">#</span>
+                                <input type="text"
+                                       :value="(palette[activeSection][paletteMode === 'dark' ? 'dark_muted' : 'light_muted'] || '').replace('#', '')"
+                                       @input="updateColorToken(activeSection, paletteMode === 'dark' ? 'dark_muted' : 'light_muted', $event.target.value)"
+                                       class="w-full pl-6 pr-2 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono uppercase bg-white dark:bg-slate-800 text-slate-800 dark:text-white"
+                                       placeholder="64748B">
+                            </div>
+                            <input type="color"
+                                   :value="palette[activeSection][paletteMode === 'dark' ? 'dark_muted' : 'light_muted'] || '#000000'"
+                                   @input="updateColorToken(activeSection, paletteMode === 'dark' ? 'dark_muted' : 'light_muted', $event.target.value)"
+                                   class="w-8 h-8 p-0.5 rounded-lg border border-slate-300 dark:border-slate-600 cursor-pointer bg-transparent shrink-0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Action Buttons -->
+                <div class="flex items-center justify-between pt-1">
+                    <span class="text-[11px] text-slate-500">
+                        {{ __('Tip: Switch between Light & Dark modes to configure both themes before saving.') }}
+                    </span>
+                    <button type="button"
+                            @click="$wire.saveAppearance({ layout, position, mode, customBg, uiAccentColor, navTextColor, navTextActiveColor, visibleItems, landingDarkBg, palette })"
+                            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer">
+                        <span>💾</span>
+                        <span>{{ __('Save Section Themes') }}</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right: Live Interactive Contrast & Section Preview -->
+            <div class="lg:col-span-5">
+                <label class="block text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-2">
+                    {{ __('Live Preview') }} (<span x-text="paletteMode === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode'"></span>)
+                </label>
+                
+                <div class="rounded-2xl p-6 transition-all duration-300 shadow-xl border overflow-hidden relative"
+                     :style="{
+                         backgroundColor: paletteMode === 'dark' ? palette[activeSection].dark_bg : palette[activeSection].light_bg,
+                         borderColor: paletteMode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)'
+                     }">
+                    
+                    <!-- Decorative subtle glow in dark mode -->
+                    <div class="absolute -top-10 -right-10 w-36 h-36 rounded-full blur-2xl pointer-events-none opacity-20"
+                         :style="{ backgroundColor: paletteMode === 'dark' ? palette[activeSection].dark_text : '#3b82f6' }"></div>
+
+                    <!-- Badge -->
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider mb-4 border"
+                         :style="{
+                             backgroundColor: paletteMode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
+                             borderColor: paletteMode === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+                             color: paletteMode === 'dark' ? palette[activeSection].dark_text : palette[activeSection].light_text
+                         }">
+                        <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: uiAccentColor || '#4f46e5' }"></span>
+                        <span x-text="sectionNames[activeSection]"></span>
+                    </div>
+
+                    <!-- Main Heading -->
+                    <h3 class="text-xl sm:text-2xl font-black tracking-tight leading-snug transition-colors"
+                        :style="{ color: paletteMode === 'dark' ? palette[activeSection].dark_text : palette[activeSection].light_text }">
+                        <template x-if="activeSection === 'hero'">
+                            <span>High-Performance Omnichannel Cloud POS</span>
+                        </template>
+                        <template x-if="activeSection === 'features'">
+                            <span>Everything Your Business Needs to Scale</span>
+                        </template>
+                        <template x-if="activeSection === 'mission'">
+                            <span>Engineered for Reliability & Modern Growth</span>
+                        </template>
+                        <template x-if="activeSection === 'pricing'">
+                            <span>Simple, Transparent Pricing For Every Tier</span>
+                        </template>
+                        <template x-if="activeSection === 'faq'">
+                            <span>Frequently Asked Questions & Answers</span>
+                        </template>
+                        <template x-if="activeSection === 'cta'">
+                            <span>Ready to Scale Your Online & In-Store Sales?</span>
+                        </template>
+                        <template x-if="activeSection === 'contact'">
+                            <span>Speak with an Omnichannel POS Specialist</span>
+                        </template>
+                    </h3>
+
+                    <!-- Muted Paragraph Copy -->
+                    <p class="mt-3 text-xs leading-relaxed transition-colors"
+                       :style="{ color: paletteMode === 'dark' ? palette[activeSection].dark_muted : palette[activeSection].light_muted }">
+                        Unify your online storefront, barcode checkout, multi-warehouse stock, and WhatsApp tax invoicing into one zero-latency cloud engine.
+                    </p>
+
+                    <!-- Contact Form Card Live Surface Preview -->
+                    <template x-if="activeSection === 'contact'">
+                        <div class="mt-4 p-3.5 rounded-xl border transition-all space-y-2"
+                             :style="{
+                                 backgroundColor: paletteMode === 'dark' ? (palette.contact && palette.contact.dark_card_bg ? palette.contact.dark_card_bg : '#131e29') : (palette.contact && palette.contact.light_card_bg ? palette.contact.light_card_bg : '#ffffff'),
+                                 borderColor: paletteMode === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)'
+                             }">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold uppercase tracking-wider"
+                                      :style="{ color: paletteMode === 'dark' ? palette.contact.dark_text : palette.contact.light_text }">
+                                    {{ __('Card Surface Preview') }}
+                                </span>
+                                <span class="text-[9px] font-mono opacity-70"
+                                      :style="{ color: paletteMode === 'dark' ? palette.contact.dark_muted : palette.contact.light_muted }">
+                                    <span x-text="paletteMode === 'dark' ? (palette.contact && palette.contact.dark_card_bg) : (palette.contact && palette.contact.light_card_bg)"></span>
+                                </span>
+                            </div>
+                            <div class="p-2 rounded-lg border text-[11px] font-medium"
+                                 :style="{
+                                     backgroundColor: paletteMode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc',
+                                     borderColor: paletteMode === 'dark' ? 'rgba(255, 255, 255, 0.15)' : '#cbd5e1',
+                                     color: paletteMode === 'dark' ? '#f8fafc' : '#0f172a'
+                                 }">
+                                {{ __('Business Email: contact@store.com') }}
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Mock Interaction Element -->
+                    <div class="mt-5 pt-4 border-t flex items-center justify-between gap-3"
+                         :style="{ borderColor: paletteMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }">
+                        <span class="text-[10px] font-bold"
+                              :style="{ color: paletteMode === 'dark' ? palette[activeSection].dark_muted : palette[activeSection].light_muted }">
+                            Token: <span class="font-mono" x-text="paletteMode === 'dark' ? palette[activeSection].dark_bg : palette[activeSection].light_bg"></span>
+                        </span>
+                        <button type="button"
+                                class="px-3.5 py-1.5 rounded-lg text-xs font-black shadow-sm transition"
+                                :style="{
+                                    backgroundColor: uiAccentColor || '#4f46e5',
+                                    color: '#ffffff'
+                                }">
+                            Explore →
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -550,3 +896,55 @@
     </div>
 
 </div>
+
+<script>
+function setLandingBg(hex) {
+    if (window.Alpine) {
+        var el = document.querySelector('[x-data]');
+        if (el && el._x_dataStack && el._x_dataStack[0] && el._x_dataStack[0].setLandingBg) {
+            el._x_dataStack[0].setLandingBg(hex);
+        }
+    }
+    var hexInput = document.getElementById('landing_dark_bg_hex');
+    if (hexInput) {
+        hexInput.value = hex.replace('#', '');
+        hexInput.dispatchEvent(new Event('input'));
+    }
+    var picker = document.getElementById('landing_dark_bg_picker');
+    if (picker) {
+        picker.value = hex;
+        picker.dispatchEvent(new Event('change'));
+    }
+}
+function syncLandingHexInput(val) {
+    var hexInput = document.getElementById('landing_dark_bg_hex');
+    if (hexInput) {
+        hexInput.value = val.replace('#', '');
+        hexInput.dispatchEvent(new Event('input'));
+    }
+    if (window.Alpine) {
+        var el = document.querySelector('[x-data]');
+        if (el && el._x_dataStack && el._x_dataStack[0]) {
+            el._x_dataStack[0].landingDarkBg = val;
+            localStorage.setItem('landing_dark_bg', val);
+        }
+    }
+}
+function syncLandingColorPreview(val) {
+    var hex = val.startsWith('#') ? val : '#' + val;
+    if (val.length === 6 || val.length === 7) {
+        var picker = document.getElementById('landing_dark_bg_picker');
+        if (picker) {
+            picker.value = hex;
+            picker.dispatchEvent(new Event('change'));
+        }
+        if (window.Alpine) {
+            var el = document.querySelector('[x-data]');
+            if (el && el._x_dataStack && el._x_dataStack[0]) {
+                el._x_dataStack[0].landingDarkBg = hex;
+                localStorage.setItem('landing_dark_bg', hex);
+            }
+        }
+    }
+}
+</script>

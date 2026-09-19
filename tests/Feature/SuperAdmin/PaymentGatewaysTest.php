@@ -54,12 +54,51 @@ class PaymentGatewaysTest extends TestCase
         $this->assertSame('pk_updated', $setting->public_key);
     }
 
+    public function test_each_gateway_card_shows_its_copyable_webhook_and_callback_urls(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        Livewire::test(Index::class)
+            ->assertSee(route('webhooks.stripe'))
+            ->assertSee(route('webhooks.razorpay'))
+            ->assertSee(route('webhooks.paypal'))
+            ->assertSee(route('webhooks.mercadopago'))
+            ->assertSee(route('subscription.payment.callback', ['gateway' => 'razorpay']))
+            ->assertSee('checkout.session.completed')  // Stripe events line
+            ->assertSee('order.paid')                  // Razorpay events line
+            ->assertSee('Webhook & Callback URLs')
+            ->assertSee('Copy');
+    }
+
+    public function test_webhook_signing_secret_is_saved_encrypted_and_kept_on_blank(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        Livewire::test(Index::class)
+            ->set('gateways.stripe.webhook_secret', 'whsec_topsecret')
+            ->call('save');
+
+        $setting = PaymentGatewaySetting::where('gateway', 'stripe')->firstOrFail();
+        $this->assertSame('whsec_topsecret', $setting->webhook_secret);
+        $this->assertStringNotContainsString('whsec_topsecret', (string) $setting->getRawOriginal('webhook_secret'));
+
+        // A blank webhook_secret on the next save must not wipe it.
+        Livewire::test(Index::class)
+            ->set('gateways.stripe.public_key', 'pk_x')
+            ->call('save');
+        $this->assertSame('whsec_topsecret', $setting->fresh()->webhook_secret);
+    }
+
     public function test_payment_gateway_screen_does_not_show_social_login_configuration(): void
     {
         $this->actingAsSuperAdmin();
 
         Livewire::test(Index::class)
             ->assertDontSee('Social Login')
-            ->assertDontSee('Callback URL');
+            // The payment page now legitimately shows payment webhook/callback
+            // URLs; it must still never surface the OAuth social-login config
+            // (whose callback URLs live under /auth/{provider}/callback).
+            ->assertDontSee('/auth/')
+            ->assertDontSee('Google Client');
     }
 }

@@ -34,6 +34,7 @@ class EnvatoLicenseVerificationService
             ];
         }
 
+        // Vendor configuration only (services.envato.api_token / ENVATO_API_TOKEN).
         $apiToken = config('services.envato.api_token') ?: env('ENVATO_API_TOKEN');
 
         if (! empty($apiToken)) {

@@ -39,6 +39,15 @@ class SchemaValidator
 
                 continue;
             }
+
+            // Some app-bar controls are interactive client widgets rather
+            // than dispatched actions. The theme selector, for example,
+            // updates ThemeProvider directly from its dropdown selection.
+            if (! isset($actionButton['action'])
+                && strtolower((string) ($actionButton['type'] ?? '')) === 'theme_selector_dropdown') {
+                continue;
+            }
+
             $this->validateAction($actionButton['action'] ?? null, "app_bar.actions.{$index}.action", $errors);
         }
 
@@ -55,6 +64,9 @@ class SchemaValidator
         }
 
         $type = strtolower(trim((string) ($component['type'] ?? '')));
+        if ($type === '' && isset($component['title']) && (isset($component['route']) || isset($component['endpoint']))) {
+            $type = 'list_tile';
+        }
         if (! in_array($type, SchemaResponse::COMPONENT_TYPES, true)) {
             $errors[] = "{$path}.type: unsupported component [{$type}]";
 
@@ -85,7 +97,8 @@ class SchemaValidator
             $this->validateAction($component['action'] ?? null, "{$path}.action", $errors);
         }
 
-        if ($type === 'line_item_tile' && isset($component['action'])) {
+        if (in_array($type, ['line_item_tile', 'list_tile', 'notification_item', 'segmented_tabs'], true)
+            && isset($component['action'])) {
             $this->validateAction($component['action'], "{$path}.action", $errors);
         }
 
@@ -156,26 +169,26 @@ class SchemaValidator
             return;
         }
 
-        if (in_array($type, ['navigate', 'form_submit', 'api_post', 'filter_view'], true)
-            && trim((string) ($action['endpoint'] ?? $action['target_endpoint'] ?? '')) === '') {
+        if (in_array($type, ['navigate', 'navigate_to', 'form_submit', 'submit_form', 'api_post', 'filter_view', 'reload_component', 'refresh_sheet'], true)
+            && trim((string) ($action['endpoint'] ?? $action['target_endpoint'] ?? $action['route'] ?? '')) === '') {
             $errors[] = "{$path}.endpoint: is required for [{$type}]";
         }
 
-        if (in_array($type, ['navigate', 'form_submit', 'api_post', 'filter_view'], true)) {
-            $endpoint = trim((string) ($action['endpoint'] ?? $action['target_endpoint'] ?? ''));
+        if (in_array($type, ['navigate', 'navigate_to', 'form_submit', 'submit_form', 'api_post', 'filter_view', 'reload_component', 'refresh_sheet'], true)) {
+            $endpoint = trim((string) ($action['endpoint'] ?? $action['target_endpoint'] ?? $action['route'] ?? ''));
             // A `navigate` action may also target a native client screen by its
             // component-registry key (e.g. 'pos', 'restaurant_pos') — a bare
             // lowercase slug resolved entirely on-device and never fetched.
             // `form_submit` / `api_post` always hit the network, so they stay
             // restricted to same-origin /api/ paths.
-            $isNativeRouteKey = $type === 'navigate'
+            $isNativeRouteKey = in_array($type, ['navigate', 'navigate_to'], true)
                 && preg_match('/^[a-z][a-z0-9_-]*$/', $endpoint) === 1;
             if ($endpoint !== '' && ! str_starts_with($endpoint, '/api/') && ! $isNativeRouteKey) {
                 $errors[] = "{$path}.endpoint: must be a same-origin /api/ path or a native route key";
             }
         }
 
-        if ($type === 'form_submit') {
+        if (in_array($type, ['form_submit', 'submit_form'], true)) {
             $method = strtoupper((string) ($action['method'] ?? 'POST'));
             if (! in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
                 $errors[] = "{$path}.method: unsupported form method [{$method}]";
@@ -188,13 +201,25 @@ class SchemaValidator
             }
         }
 
-        if ($type === 'open_remote_sheet'
-            && ! str_starts_with(trim((string) ($action['sheet_endpoint'] ?? '')), '/api/')) {
+        if (in_array($type, ['open_remote_sheet', 'open_bottom_sheet', 'open_quotation_modal'], true)
+            && ! str_starts_with(trim((string) ($action['sheet_endpoint'] ?? $action['endpoint'] ?? '')), '/api/')) {
             $errors[] = "{$path}.sheet_endpoint: must be a same-origin /api/ path";
         }
 
         if ($type === 'open_url' && trim((string) ($action['url'] ?? '')) === '') {
             $errors[] = "{$path}.url: is required for [open_url]";
+        }
+
+        if ($type === 'open_receipt_preview') {
+            $endpoint = trim((string) ($action['endpoint'] ?? ''));
+            $pdfEndpoint = trim((string) ($action['pdf_endpoint'] ?? ''));
+            if (! str_starts_with($endpoint, '/api/') || ! str_contains($pdfEndpoint, '/pdf-stream')) {
+                $errors[] = "{$path}: [open_receipt_preview] requires same-origin preview and PDF stream endpoints";
+            }
+        }
+
+        if ($type === 'trigger_thermal_print' && empty($action['document_id'])) {
+            $errors[] = "{$path}.document_id: is required for [trigger_thermal_print]";
         }
 
         if ($type === 'show_post_sale_sheet') {

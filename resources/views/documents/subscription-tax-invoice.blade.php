@@ -56,7 +56,7 @@
                     {{ $invoice->seller_details['address'] ?? '100 Innovation Blvd, Suite 400, San Francisco, CA' }}
                 </div>
                 <div class="text-xs text-slate-400">
-                    Email: {{ $invoice->seller_details['support_email'] ?? 'support@saas.zoomnearby.com' }} | Phone: {{ $invoice->seller_details['support_phone'] ?? '+1 (800) 555-0199' }}
+                    Email: {{ $invoice->seller_details['support_email'] ?? 'support@example.com' }} | Phone: {{ $invoice->seller_details['support_phone'] ?? '+1 (800) 555-0199' }}
                 </div>
             </div>
 

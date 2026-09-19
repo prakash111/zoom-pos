@@ -3,7 +3,10 @@
 namespace App\Livewire\SuperAdmin\Modules;
 
 use App\Models\SduiModule;
+use App\Services\License\LicenseService;
+use App\Services\Modular\ModuleCatalog;
 use App\Services\Modular\ModulePackageService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -16,6 +19,12 @@ class Index extends Component
     use WithFileUploads;
 
     public $zipFile = null;
+
+    /** @var array<int, string>  moduleId => license key typed in the activate row */
+    public array $licenseKeys = [];
+
+    /** @var array<string, string>  slug => license key typed in the "Available modules" card */
+    public array $catalogKeys = [];
 
     public function install(ModulePackageService $service): void
     {
@@ -33,9 +42,57 @@ class Index extends Component
         $this->reset('zipFile');
     }
 
+    /**
+     * Fetch a module from the vendor's License Manager using a license key,
+     * install it, and activate — one step from the "Available modules" card.
+     */
+    public function getModule(ModulePackageService $service, string $slug): void
+    {
+        $this->validate(
+            ["catalogKeys.$slug" => ['required', 'string', 'min:8', 'max:191']],
+            [],
+            ["catalogKeys.$slug" => 'license key'],
+        );
+
+        $result = $service->installFromLicenseServer($slug, (string) $this->catalogKeys[$slug], auth('platform_web')->id());
+
+        if (! $result['status']) {
+            $this->addError("catalogKeys.$slug", $result['message']);
+
+            return;
+        }
+
+        unset($this->catalogKeys[$slug]);
+        session()->flash($result['activated'] ? 'status' : 'error', $result['message']);
+    }
+
     public function activate(ModulePackageService $service, int $moduleId): void
     {
         $module = SduiModule::findOrFail($moduleId);
+
+        // Licensed package modules need a valid key before the first activation.
+        if ($module->requires_license && $module->license_status !== 'active') {
+            $this->validate(
+                ["licenseKeys.$moduleId" => ['required', 'string', 'min:8', 'max:191']],
+                [],
+                ["licenseKeys.$moduleId" => 'license key'],
+            );
+
+            $result = $service->verifyAndRecordLicense(
+                $module,
+                (string) $this->licenseKeys[$moduleId],
+                auth('platform_web')->id(),
+            );
+
+            if (! $result['status']) {
+                $this->addError("licenseKeys.$moduleId", $result['message']);
+
+                return;
+            }
+
+            $module->refresh();
+            unset($this->licenseKeys[$moduleId]);
+        }
 
         try {
             $service->activate($module, auth('platform_web')->id());
@@ -43,6 +100,54 @@ class Index extends Component
         } catch (Throwable $e) {
             session()->flash('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Re-verify an already-licensed module's stored key on demand. On a
+     * definitive failure the module is deactivated immediately.
+     */
+    public function revalidateLicense(ModulePackageService $service, int $moduleId): void
+    {
+        $module = SduiModule::findOrFail($moduleId);
+
+        if (! $module->requires_license) {
+            session()->flash('status', "Module \"{$module->name}\" does not require a license.");
+
+            return;
+        }
+
+        $key = (string) $module->license_key_encrypted;
+        if ($key === '') {
+            $service->clearLicense($module, 'unlicensed', 'No stored key to re-verify.');
+            if ($module->is_active) {
+                $service->deactivate($module, auth('platform_web')->id());
+            }
+            session()->flash('error', "Module \"{$module->name}\" has no stored license key — deactivated.");
+
+            return;
+        }
+
+        $result = app(LicenseService::class)->verify($key, $module->slug, LicenseService::currentDomain());
+
+        if ($result['status']) {
+            $module->forceFill([
+                'license_status' => 'active',
+                'license_driver' => $result['driver'],
+                'license_verified_at' => now(),
+                'license_expires_at' => $result['expires_at']
+                    ? Carbon::parse($result['expires_at'])
+                    : null,
+            ])->save();
+            session()->flash('status', "License for \"{$module->name}\" re-verified.");
+
+            return;
+        }
+
+        $service->clearLicense($module, 'revoked', $result['message']);
+        if ($module->is_active) {
+            $service->deactivate($module, auth('platform_web')->id());
+        }
+        session()->flash('error', "License for \"{$module->name}\" is no longer valid — deactivated. ({$result['message']})");
     }
 
     public function deactivate(ModulePackageService $service, int $moduleId): void
@@ -87,9 +192,22 @@ class Index extends Component
 
     public function render()
     {
+        $modules = $this->packageModules();
+        $installedSlugs = $modules->pluck('slug')->all();
+
+        // Every sellable vertical not already installed here — shown as a card
+        // with Buy / Download & Activate.
+        $purchasable = collect(ModuleCatalog::available())
+            ->reject(fn ($p) => in_array($p['slug'], $installedSlugs, true))
+            ->values();
+
         return view('livewire.superadmin.modules.index', [
-            'modules' => $this->packageModules(),
+            'modules' => $modules,
             'orphans' => app(ModulePackageService::class)->orphanedModuleDirs(),
+            'purchasable' => $purchasable,
+            'catalog' => $modules->mapWithKeys(fn ($m) => [
+                $m->id => ModuleCatalog::for($m->slug),
+            ])->all(),
         ]);
     }
 

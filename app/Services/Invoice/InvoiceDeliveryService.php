@@ -10,12 +10,14 @@ use App\Models\Company;
 use App\Models\Configuration;
 use App\Models\PlatformBranding;
 use App\Models\Sale;
+use App\Models\TenantNotificationGateway;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class InvoiceDeliveryService
@@ -65,9 +67,28 @@ class InvoiceDeliveryService
         if ($companyId) {
             $tenantConfigs = Configuration::withoutGlobalScopes()
                 ->where('company_id', $companyId)
-                ->where('key', 'like', 'smtp_%')
+                ->where(fn ($query) => $query->where('key', 'like', 'smtp_%')->orWhere('key', 'enable_smtp'))
                 ->pluck('value', 'key')
                 ->all();
+        }
+
+        $company ??= $companyId ? Company::withoutGlobalScopes()->find($companyId) : null;
+        $tenantConfigs = array_merge((array) ($company?->api_settings ?? []), $tenantConfigs);
+        $disabled = false;
+        foreach (['smtp_enabled', 'enable_smtp'] as $flag) {
+            if (array_key_exists($flag, $tenantConfigs) && ! filter_var($tenantConfigs[$flag], FILTER_VALIDATE_BOOL)) {
+                $disabled = true;
+            }
+        }
+
+        $gateway = $companyId && Schema::hasTable('tenant_notification_gateways')
+            ? TenantNotificationGateway::withoutGlobalScopes()->where('company_id', $companyId)->where('channel', 'email')->first()
+            : null;
+        if ($gateway) {
+            $disabled = ! $gateway->isConfigured();
+            foreach ((array) $gateway->credentials as $key => $value) {
+                $tenantConfigs['smtp_'.$key] = $value;
+            }
         }
 
         $host = $tenantConfigs['smtp_host'] ?? null;
@@ -79,7 +100,7 @@ class InvoiceDeliveryService
         $fromName = $tenantConfigs['smtp_from_name'] ?? ($company?->name ?? 'Store');
 
         // Fallback to platform settings if tenant has no host configured
-        if (empty($host)) {
+        if (! $disabled && empty($host)) {
             $branding = PlatformBranding::current();
             $host = $branding?->smtp_host;
             $port = $branding?->smtp_port ?? 587;
@@ -91,7 +112,7 @@ class InvoiceDeliveryService
         }
 
         // Fallback to default config
-        if (empty($host)) {
+        if (! $disabled && empty($host)) {
             $host = config('mail.mailers.smtp.host');
             $port = config('mail.mailers.smtp.port') ?: 587;
             $username = config('mail.mailers.smtp.username');
@@ -99,6 +120,13 @@ class InvoiceDeliveryService
             $encryption = config('mail.mailers.smtp.encryption') ?: 'tls';
             $fromAddress = $fromAddress ?: config('mail.from.address');
             $fromName = $fromName ?: config('mail.from.name');
+            if (in_array($host, ['localhost', '127.0.0.1', '::1'], true) && empty($username) && empty($password)) {
+                $host = null;
+            }
+        }
+
+        if ($disabled) {
+            $host = null;
         }
 
         return [
@@ -107,7 +135,7 @@ class InvoiceDeliveryService
             'username' => $username,
             'password' => $password,
             'encryption' => $encryption,
-            'from_address' => $fromAddress ?: 'no-reply@saas.zoomnearby.com',
+            'from_address' => $fromAddress ?: 'no-reply@example.com',
             'from_name' => $fromName ?: 'Store',
         ];
     }
@@ -195,11 +223,11 @@ class InvoiceDeliveryService
                 'company' => $company,
                 'logoBase64' => $logoBase64,
             ])->setPaper('a4', 'portrait')
-              ->setOptions([
-                  'isHtml5ParserEnabled' => true,
-                  'isRemoteEnabled' => true,
-                  'defaultFont' => 'sans-serif',
-              ]);
+                ->setOptions([
+                    'isHtml5ParserEnabled' => true,
+                    'isRemoteEnabled' => true,
+                    'defaultFont' => 'sans-serif',
+                ]);
 
             return $pdf->output();
         } finally {
@@ -241,11 +269,11 @@ class InvoiceDeliveryService
                     'logoBase64' => $logoBase64,
                     ...$this->devanagariFontData(),
                 ])->setPaper('a4', 'portrait')
-                  ->setOptions([
-                      'isHtml5ParserEnabled' => true,
-                      'isRemoteEnabled' => true,
-                      'defaultFont' => 'sans-serif',
-                  ]);
+                    ->setOptions([
+                        'isHtml5ParserEnabled' => true,
+                        'isRemoteEnabled' => true,
+                        'defaultFont' => 'sans-serif',
+                    ]);
 
                 return $pdf->output();
             }
@@ -682,7 +710,7 @@ class InvoiceDeliveryService
         $customerName = $sale->customer_name ?: 'Valued Customer';
         $currency = $company?->currency ?? 'USD';
         $sym = $company?->currency_symbol ?: ($currency === 'INR' ? '₹' : '$');
-        $isIndia = in_array(strtoupper(trim((string)($company?->country ?? ''))), ['IN', 'IND', 'INDIA'], true) || $currency === 'INR' || $sym === '₹';
+        $isIndia = in_array(strtoupper(trim((string) ($company?->country ?? ''))), ['IN', 'IND', 'INDIA'], true) || $currency === 'INR' || $sym === '₹';
         $taxLabel = $isIndia ? 'GSTIN' : 'Tax ID';
 
         $itemsText = '';
@@ -695,15 +723,15 @@ class InvoiceDeliveryService
 
         $subtotal = number_format((float) ($sale->total - ($sale->tax_amount ?? 0) + $sale->discount), 2);
         $discountText = $sale->discount > 0 ? "\n*Discount:* -{$sym}".number_format((float) $sale->discount, 2) : '';
-        $taxText = (float)($sale->tax_amount ?? 0) > 0 ? "\n*".($isIndia ? 'GST' : 'Tax').":* +{$sym}".number_format((float) $sale->tax_amount, 2) : '';
+        $taxText = (float) ($sale->tax_amount ?? 0) > 0 ? "\n*".($isIndia ? 'GST' : 'Tax').":* +{$sym}".number_format((float) $sale->tax_amount, 2) : '';
         $total = number_format((float) $sale->total, 2);
         $date = $sale->created_at ? $sale->created_at->format('d M Y, h:i A') : now()->format('d M Y, h:i A');
         $publicLink = route('sales.public', $sale->sale_number);
-        $taxIdLine = !empty($company?->tax_id) ? "*{$taxLabel}:* {$company->tax_id}\n" : '';
+        $taxIdLine = ! empty($company?->tax_id) ? "*{$taxLabel}:* {$company->tax_id}\n" : '';
 
-        return "🧾 *" . ($isIndia ? 'TAX INVOICE / GST RECEIPT' : 'TAX INVOICE RECEIPT') . "*\n"
+        return '🧾 *'.($isIndia ? 'TAX INVOICE / GST RECEIPT' : 'TAX INVOICE RECEIPT')."*\n"
             ."*Store:* {$companyName}\n"
-            . $taxIdLine
+            .$taxIdLine
             ."*Invoice:* #{$sale->sale_number}\n"
             ."*Date:* {$date}\n"
             ."*Customer:* {$customerName}\n\n"

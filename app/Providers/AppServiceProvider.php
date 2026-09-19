@@ -3,17 +3,24 @@
 namespace App\Providers;
 
 use App\Events\TenantRegistered;
+use App\Http\Middleware\PreventDemoModifications;
 use App\Listeners\TenantRegisteredListener;
+use App\Models\MenuItem;
+use App\Models\Page;
+use App\Models\PlatformBranding;
+use App\Models\SaaSPlan;
 use App\Models\Sale;
 use App\Models\User;
 use App\Observers\SaleObserver;
 use App\Services\Auth\PermissionChecker;
 use App\Support\Desktop;
 use App\View\Composers\TenantNavigationComposer;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        if (blank(config('app.key'))) {
+        if (Desktop::isRunning() && blank(config('app.key'))) {
             config(['app.key' => Desktop::resolveOrCreatePersistentAppKey()]);
         }
     }
@@ -32,8 +39,32 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (! $this->app->runningUnitTests()) {
+            \App\Support\Installation::isInstalled();
+        }
+
         Sale::observe(SaleObserver::class);
         Event::listen(TenantRegistered::class, TenantRegisteredListener::class);
+
+        // Re-run the demo read-only guard on Livewire follow-up requests
+        // (`/livewire/update`) so a Super Admin settings save via a Livewire
+        // action is blocked in DEMO_MODE, not just the initial page load.
+        if (config('app.demo_mode')) {
+            Livewire::addPersistentMiddleware([
+                PreventDemoModifications::class,
+            ]);
+        }
+
+        // Bump the marketing landing page's whole-response cache whenever any
+        // content it renders changes (branding, plans, footer pages, menus).
+        $bustLandingCache = static function (): void {
+            Cache::increment('landing_page_cache_version')
+                ?: Cache::forever('landing_page_cache_version', 2);
+        };
+        foreach ([PlatformBranding::class, SaaSPlan::class, Page::class, MenuItem::class] as $model) {
+            $model::saved($bustLandingCache);
+            $model::deleted($bustLandingCache);
+        }
 
         $storageDirs = [
             storage_path('framework/views'),

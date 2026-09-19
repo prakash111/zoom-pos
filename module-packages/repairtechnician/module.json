@@ -5,9 +5,10 @@
     "version": "1.0.0",
     "author": "ZoomNearby",
     "icon": "handyman",
-    "layout_type": "standard_grid",
+    "layout_type": "repair_kanban",
     "inherits_ui": "universal_pos",
     "min_system_version": "1.0.0",
+    "requires_license": true,
     "features": {
         "has_barcode_scanner": true,
         "has_due_reminders": true,

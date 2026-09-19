@@ -9,7 +9,6 @@ use App\Models\OrderPayment;
 use App\Models\Plan;
 use App\Models\Product;
 use App\Models\Sale;
-use App\Models\SduiModule;
 use App\Models\User;
 use App\Services\Modular\ModulePackageService;
 use App\Services\Navigation\TenantNavRegistry;
@@ -28,7 +27,9 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
     use RefreshDatabase;
 
     protected Company $company;
+
     protected User $admin;
+
     protected string $token;
 
     protected function setUp(): void
@@ -141,6 +142,13 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
             // Floating bottom cart bar
             $this->assertArrayHasKey('cart_bar', $schema);
             $this->assertNotEmpty($schema['cart_bar']['checkout_sheet_endpoint']);
+
+            if ($schema['banner'] !== null) {
+                $this->assertSame('#2A1E17', $schema['banner']['background_color']);
+                $this->assertSame('#D97706', $schema['banner']['border_color']);
+                $this->assertSame('#FCD34D', $schema['banner']['text_color']);
+                $this->assertSame('#10B981', $schema['banner']['action_text_color']);
+            }
 
             // SDUI Schema Validator must pass cleanly
             $errors = app(SchemaValidator::class)->validate($schema);
@@ -270,7 +278,7 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
 
         // The prepended workbench summary card is a valid component tree with a
         // single primary button that fires the same native action.
-        $card = SchemaResponse::postSaleActionSheet(\App\Models\Sale::findOrFail($data['sale_id']));
+        $card = SchemaResponse::postSaleActionSheet(Sale::findOrFail($data['sale_id']));
         $screen = SchemaResponse::screen('Post-Sale', [$card]);
         $this->assertEmpty(app(SchemaValidator::class)->validate($screen));
         $cardStr = json_encode($card, JSON_UNESCAPED_SLASHES);
@@ -488,6 +496,7 @@ class UniversalPosAndGlobalEngineContractTest extends TestCase
             'version' => '1.0.0',
             'author' => 'Perfex Partner',
             'inherits_ui' => 'universal_pos',
+            'requires_license' => false,
             'navigation' => [
                 [
                     'id' => 'hardware_management',

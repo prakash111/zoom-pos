@@ -262,26 +262,18 @@
                                             </button>
                                             <div x-show="open" x-on:click.outside="open = false" x-cloak
                                                  class="absolute right-0 z-20 mt-1 w-40 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 py-1 text-left">
-                                                <button type="button" wire:click="sendReminder({{ $inv->id }}, 'whatsapp')" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer">{{ __('WhatsApp') }}</button>
-                                                <button type="button" wire:click="sendReminder({{ $inv->id }}, 'email')" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer">{{ __('Email') }}</button>
-                                                @forelse ($reminderChannels as $rc)
-                                                    <button type="button" wire:click="sendReminder({{ $inv->id }}, 'custom', {{ $rc->id }})" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer flex items-center gap-1.5">
-                                                        @if ($rc->isIconUrl())
-                                                            <img src="{{ $rc->iconDisplay() }}" alt="" class="w-3.5 h-3.5 rounded object-cover">
-                                                        @else
-                                                            <span class="leading-none">{{ $rc->iconDisplay() }}</span>
-                                                        @endif
-                                                        <span>{{ $rc->name }}</span>
-                                                    </button>
-                                                @empty
-                                                    <button type="button" wire:click="sendReminder({{ $inv->id }}, 'custom')" x-on:click="open = false" class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer">{{ __('Custom Channel') }}</button>
-                                                @endforelse
+                                                <button type="button"
+                                                        x-on:click="open = false; $dispatch('open-sdui-sheet', { endpoint: @js('/api/v1/tenant/receivables/'.$inv->id.'/reminder-sheet') })"
+                                                        class="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold cursor-pointer flex items-center gap-1.5">
+                                                    <span class="material-symbols-outlined text-sm">send</span>
+                                                    <span>{{ __('Send Reminder') }}</span>
+                                                </button>
                                             </div>
                                         </div>
                                     @endif
 
                                     <button type="button" x-data
-                                            x-on:click="$dispatch('open-print-preview', { url: @js(route('tenant.sales.pdf', ['sale' => $inv, 'embed' => 1])), title: @js(__('Invoice Preview')) })"
+                                            x-on:click="$dispatch('open-sdui-sheet', { endpoint: @js('/api/v1/tenant/receivables/'.$inv->id.'/reminder-sheet') })"
                                             class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 font-bold text-[10px] transition" title="{{ __("Print receipt/invoice") }}">
                                         🖨️
                                     </button>
@@ -485,5 +477,5 @@
         </div>
     @endif
 
-    <div x-data x-on:open-external-url.window="window.open($event.detail.url, '_blank')"></div>
+
 </div>

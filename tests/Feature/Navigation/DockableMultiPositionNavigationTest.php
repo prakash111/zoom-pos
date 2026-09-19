@@ -54,6 +54,12 @@ class DockableMultiPositionNavigationTest extends TestCase
         $response->assertSee('data-nav-layout', false);
         $response->assertSee('data-nav-theme', false);
 
+        // Mobile: a Left/Right dock must stay a side rail beside the content,
+        // not get stacked on top of it by the shared <lg column override.
+        $response->assertSee('@media (max-width: 1023px)', false);
+        $response->assertSee('flex-direction: row !important;', false);
+        $response->assertSee('flex-direction: row-reverse !important;', false);
+
         // Check 4 Menu Layout Structures
         $response->assertSee('Slim Icon Rail');
         $response->assertSee('Expanded Full Sidebar');
@@ -235,5 +241,68 @@ class DockableMultiPositionNavigationTest extends TestCase
         $this->actingAs($user, 'web')->get(route('tenant.quotations.index'))->assertOk();
         $this->actingAs($user, 'web')->get(route('tenant.quotes.create'))->assertOk();
         $this->actingAs($user, 'web')->get(route('tenant.quotations.create'))->assertOk();
+    }
+
+    // -- Server-side dock-position persistence -----------------------------
+
+    public function test_dock_position_endpoint_persists_the_choice_for_the_signed_in_user(): void
+    {
+        [, $user] = $this->actingAsTenantAdmin();
+
+        $this->postJson(route('tenant.preferences.dock-position'), ['dock_position' => 'right'])
+            ->assertOk()
+            ->assertExactJson(['status' => 'success', 'dock_position' => 'right']);
+
+        $this->assertSame('right', $user->fresh()->dock_position);
+        $this->assertSame('right', session('dock_position'));
+    }
+
+    public function test_dock_position_endpoint_accepts_every_supported_position(): void
+    {
+        [, $user] = $this->actingAsTenantAdmin();
+
+        foreach (['left', 'right', 'top', 'bottom', 'floating'] as $position) {
+            $this->postJson(route('tenant.preferences.dock-position'), ['dock_position' => $position])
+                ->assertOk();
+            $this->assertSame($position, $user->fresh()->dock_position);
+        }
+    }
+
+    public function test_dock_position_endpoint_rejects_an_unknown_position(): void
+    {
+        $this->actingAsTenantAdmin();
+
+        $this->postJson(route('tenant.preferences.dock-position'), ['dock_position' => 'diagonal'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('dock_position');
+
+        $this->postJson(route('tenant.preferences.dock-position'), [])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('dock_position');
+    }
+
+    public function test_dock_position_endpoint_requires_authentication(): void
+    {
+        $this->postJson(route('tenant.preferences.dock-position'), ['dock_position' => 'right'])
+            ->assertStatus(401);
+    }
+
+    public function test_tenant_layout_seeds_the_dock_from_the_saved_server_position(): void
+    {
+        [, $user] = $this->actingAsTenantAdmin();
+        $user->forceFill(['dock_position' => 'right'])->save();
+        $user->unsetRelation('company');
+
+        $response = $this->actingAs($user, 'web')->get(route('tenant.dashboard'));
+        $response->assertOk();
+
+        // Alpine boots from the server value and the persist endpoint is wired in.
+        $response->assertSee(
+            "dockableNav('tenant_dock_nav_state', 'right', 'general', '".route('tenant.preferences.dock-position')."')",
+            false,
+        );
+        // Anti-flicker <head> pre-apply script falls back to the same value.
+        $response->assertSee('saved.position : "right"', false);
+        $response->assertSee('<meta name="csrf-token"', false);
     }
 }

@@ -2,6 +2,9 @@
 
 namespace Tests\Feature\Tenant;
 
+use App\Models\Configuration;
+use App\Livewire\Tenant\Sales\Show as SalesShow;
+
 use App\Livewire\Tenant\Quotes\Create as QuotesCreate;
 use App\Livewire\Tenant\Quotes\Edit as QuotesEdit;
 use App\Livewire\Tenant\Quotes\Index as QuotesIndex;
@@ -241,6 +244,7 @@ class QuotesAndDocumentsTest extends TestCase
     {
         [$company, $user] = $this->actingAsTenantAdmin();
         Mail::fake();
+        Configuration::withoutGlobalScopes()->create(['company_id' => $company->id, 'key' => 'smtp_host', 'value' => 'smtp.example.test']);
 
         $quote = Sale::create([
             'company_id' => $company->id,
@@ -305,6 +309,7 @@ class QuotesAndDocumentsTest extends TestCase
     {
         [$company, $user] = $this->actingAsTenantAdmin();
         Mail::fake();
+        Configuration::withoutGlobalScopes()->create(['company_id' => $company->id, 'key' => 'smtp_host', 'value' => 'smtp.example.test']);
 
         $sale = Sale::create([
             'company_id' => $company->id,
@@ -339,6 +344,57 @@ class QuotesAndDocumentsTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_invoice_and_quotation_mailables_emit_exactly_one_pdf_mime_part(): void
+    {
+        [$company] = $this->actingAsTenantAdmin();
+        $mailer = app('mail.manager')->mailer('array');
+        $transport = $mailer->getSymfonyTransport();
+        $transport->flush();
+
+        $invoice = Sale::create([
+            'company_id' => $company->id,
+            'operation_type' => 'sale',
+            'sale_number' => 'INV-MIME-001',
+            'status' => 'completed',
+            'items' => [['name' => 'Invoice item', 'quantity' => 1, 'unit_price' => 100]],
+            'total' => 100,
+        ]);
+        $quotation = Sale::create([
+            'company_id' => $company->id,
+            'operation_type' => 'quotation',
+            'sale_number' => 'QUO-MIME-001',
+            'status' => 'draft',
+            'items' => [['name' => 'Quotation item', 'quantity' => 1, 'unit_price' => 100]],
+            'total' => 100,
+        ]);
+
+        $pdfGenerator = \Mockery::mock(InvoiceDeliveryService::class);
+        $pdfGenerator->shouldReceive('generateInvoicePdf')->once()->with($invoice)->andReturn('%PDF-invoice');
+        $pdfGenerator->shouldReceive('generateQuotationPdf')->once()->with($quotation)->andReturn('%PDF-quotation');
+        $this->app->instance(InvoiceDeliveryService::class, $pdfGenerator);
+
+        $mailables = [
+            [new InvoiceMailable($invoice, $company), 'Invoice-INV-MIME-001.pdf'],
+            [new QuotationMailable($quotation, $company), 'Quotation-QUO-MIME-001.pdf'],
+        ];
+
+        foreach ($mailables as [$mailable, $expectedFileName]) {
+            $transport->flush();
+            $this->assertCount(1, $mailable->attachments());
+            $this->assertCount(1, $mailable->attachments());
+            $mailer->to('recipient@example.test')->send($mailable);
+
+            $this->assertCount(1, $transport->messages());
+            $message = $transport->messages()->sole()->getOriginalMessage();
+            $attachments = $message->getAttachments();
+
+            $this->assertCount(1, $attachments);
+            $this->assertSame($expectedFileName, $attachments[0]->getFilename());
+            $this->assertSame('application', $attachments[0]->getMediaType());
+            $this->assertSame('pdf', $attachments[0]->getMediaSubtype());
+        }
     }
 
     public function test_whatsapp_url_generator_and_placeholders_for_quotes_and_invoices(): void
@@ -443,6 +499,7 @@ class QuotesAndDocumentsTest extends TestCase
     {
         [$company, $user] = $this->actingAsTenantAdmin();
         Mail::fake();
+        Configuration::withoutGlobalScopes()->create(['company_id' => $company->id, 'key' => 'smtp_host', 'value' => 'smtp.example.test']);
 
         $quote = Sale::create([
             'company_id' => $company->id,
@@ -653,4 +710,28 @@ class QuotesAndDocumentsTest extends TestCase
             ->call('save')
             ->assertRedirect(route('tenant.quotes.show', $quote));
     }
+    public function test_device_sending_in_sales_and_quotes_does_not_send_or_queue_email(): void
+    {
+        [$company, $user] = $this->actingAsTenantAdmin();
+        config(['mail.mailers.smtp.host' => null]);
+        Mail::fake();
+        foreach ([SalesShow::class => 'sale', QuotesShow::class => 'quote'] as $component => $key) {
+            $sale = Sale::create([
+                'company_id' => $company->id, 'sale_number' => $key === 'sale' ? 'INV-WEB-DEVICE' : 'QUO-WEB-DEVICE',
+                'operation_type' => $key === 'sale' ? 'sale' : 'quotation', 'status' => 'draft', 'customer_name' => 'Prakash', 'total' => 60,
+            ]);
+            $test = Livewire::test($component, [$key => $sale])->call('openSendModal', 'email')
+                ->set('recipientEmail', 'prakash@example.test')->set('customMessage', 'Hello {customer_name}, document #{document_number}.');
+            $test->assertSee('Open Email &amp; Send', false)->call('sendEmail')->assertDispatched('open-external-url', function ($event, $parameters) use ($sale) {
+                $url = rawurldecode($parameters['url']);
+                return str_starts_with($url, 'mailto:prakash@example.test') && str_contains($url, 'Hello Prakash, document #'.$sale->sale_number);
+            });
+            $test->call('openSendModal', 'sms')->set('recipientPhone', '+919876511111')
+                ->assertSee('Open SMS &amp; Send', false)->call('sendSms')->assertDispatched('open-external-url');
+            $this->assertSame('draft', $sale->fresh()->status);
+        }
+        Mail::assertNothingSent();
+        $this->assertDatabaseCount('message_queue', 0);
+    }
+
 }

@@ -93,7 +93,7 @@
                 </label>
                 <input type="email"
                        wire:model="smtpFromAddress"
-                       placeholder="{{ __("no-reply@saas.zoomnearby.com, billing@yourdomain.com") }}"
+                       placeholder="{{ __("no-reply@yourdomain.com, billing@yourdomain.com") }}"
                        class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-indigo-500 focus:border-indigo-500 font-medium">
                 <p class="text-[11px] text-slate-400 mt-1">{{ __('This email address will appear in the "From:" header of all outgoing system emails.') }}</p>
                 @error('smtpFromAddress') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror

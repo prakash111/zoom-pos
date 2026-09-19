@@ -39,10 +39,13 @@ class RoleApiController extends Controller
             ->map(fn (Role $role) => $this->present($role, $company->id))
             ->values();
 
+        $modules = $this->permissionCatalog($company);
+
         return response()->json([
             'success' => true,
             'roles' => $roles,
-            'modules' => $this->permissionCatalog(),
+            'modules' => $modules,
+            'permission_groups' => $modules,
         ]);
     }
 
@@ -188,16 +191,37 @@ class RoleApiController extends Controller
         ];
     }
 
-    /** @return list<array<string, mixed>> */
-    private function permissionCatalog(): array
+    /**
+     * GET /api/tenant/roles/schema
+     */
+    public function getPermissionsSchema(Request $request): JsonResponse
     {
+        return app(\App\Http\Controllers\Api\RolePermissionController::class)->getPermissionsSchema($request);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function permissionCatalog(?\App\Models\Company $company = null): array
+    {
+        $filtered = $company
+            ? \App\Http\Controllers\Api\RolePermissionController::getFilteredModulesForTenant($company)
+            : PermissionChecker::MODULES;
+
         $modules = [];
-        foreach (PermissionChecker::MODULES as $slug => $label) {
+        foreach ($filtered as $slug => $label) {
             $actions = [];
             foreach (PermissionChecker::getActionsForModule($slug) as $actionSlug => $actionLabel) {
-                $actions[] = ['slug' => $actionSlug, 'label' => $actionLabel];
+                $actions[] = [
+                    'slug' => $actionSlug,
+                    'label' => $actionLabel,
+                    'field_key' => "perm__{$slug}__{$actionSlug}",
+                ];
             }
-            $modules[] = ['slug' => $slug, 'label' => $label, 'actions' => $actions];
+            $modules[] = [
+                'module' => $slug,
+                'slug' => $slug,
+                'label' => $label,
+                'actions' => $actions,
+            ];
         }
 
         return $modules;

@@ -10,7 +10,9 @@ use App\Services\Delivery\MessageQueueService;
 use App\Services\FinancialAnalyticsService;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Printing\DesktopPrintService;
-use App\Services\WhatsApp\WhatsAppCloudApiClient;
+use App\Services\DispatchChannelService;
+use App\Services\Notifications\DeviceMessageService;
+use App\Services\Notifications\TenantNotificationDispatcherService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -28,7 +30,7 @@ class Show extends Component
 
     public string $customMessage = '';
 
-    public string $activeChannel = 'email'; // email | whatsapp
+    public string $activeChannel = 'email'; // email | whatsapp | sms
 
     public bool $showSendModal = false;
 
@@ -42,18 +44,58 @@ class Show extends Component
 
     public function getWhatsAppUrlProperty(): string
     {
-        return app(InvoiceDeliveryService::class)->generateInvoiceWhatsAppUrl(
-            $this->sale,
-            $this->recipientPhone,
-            $this->customMessage
-        );
+        return DeviceMessageService::appUrl('whatsapp', $this->recipientPhone, $this->deviceMessage);
     }
 
     public function getWhatsAppApiConfiguredProperty(): bool
     {
         $company = $this->sale->company ?? Company::find($this->sale->company_id);
 
-        return $company && app(WhatsAppCloudApiClient::class)->isConfigured($company);
+        return $company && DispatchChannelService::isWhatsAppConfigured($company->id);
+    }
+
+    public function getEmailApiConfiguredProperty(): bool
+    {
+        return DispatchChannelService::isEmailConfigured($this->sale->company_id);
+    }
+
+    public function getSmsApiConfiguredProperty(): bool
+    {
+        return DispatchChannelService::isSmsConfigured($this->sale->company_id);
+    }
+
+    public function getDeviceMessageProperty(): string
+    {
+        $delivery = app(InvoiceDeliveryService::class);
+        $message = $delivery->buildInvoiceWhatsAppMessage($this->sale, $this->customMessage);
+        $link = route('sales.public', $this->sale->sale_number);
+        if (! str_contains($message, $link)) {
+            $message .= "\nView online: {$link}";
+        }
+
+        return $message;
+    }
+
+    public function getEmailUrlProperty(): string
+    {
+        return DeviceMessageService::url('email', $this->recipientEmail, $this->deviceMessage, 'Invoice #'.$this->sale->sale_number);
+    }
+
+    public function getSmsUrlProperty(): string
+    {
+        return DeviceMessageService::url('sms', $this->recipientPhone, $this->deviceMessage);
+    }
+
+    public function sendSms(): void
+    {
+        $this->validate(['recipientPhone' => ['required', 'string', 'min:6'], 'customMessage' => ['nullable', 'string', 'max:2500']]);
+        $company = $this->sale->company ?? Company::findOrFail($this->sale->company_id);
+        $result = app(TenantNotificationDispatcherService::class)->dispatchSms($company, $this->recipientPhone, $this->deviceMessage);
+        if (($result['status'] ?? '') === 'manual_link') {
+            $this->dispatch('open-external-url', url: $result['url']);
+        }
+        session()->flash(($result['success'] ?? false) ? 'status' : 'error', $result['message'] ?? $result['error'] ?? 'SMS dispatch failed.');
+        $this->showSendModal = false;
     }
 
     public function getDesktopPrintReadyProperty(): bool
@@ -116,7 +158,10 @@ class Show extends Component
             $this->showSendModal = false;
             $attachmentText = $this->attachPdf ? 'with PDF attached' : '(text-only)';
 
-            if ($result['status'] === 'sent') {
+            if ($result['status'] === 'manual_link') {
+                $this->dispatch('open-external-url', url: $result['url']);
+                session()->flash('status', 'Message prepared. Complete sending in your device app.');
+            } elseif ($result['status'] === 'sent') {
                 session()->flash('status', "Invoice #{$this->sale->sale_number} sent successfully to {$this->recipientEmail} {$attachmentText}!");
             } else {
                 session()->flash('status', "No connection right now — invoice #{$this->sale->sale_number} is queued and will send to {$this->recipientEmail} automatically once you're back online.");
@@ -142,7 +187,10 @@ class Show extends Component
 
             $this->showSendModal = false;
 
-            if ($result['status'] === 'sent') {
+            if ($result['status'] === 'manual_link') {
+                $this->dispatch('open-external-url', url: $result['url']);
+                session()->flash('status', 'Message prepared. Complete sending in your device app.');
+            } elseif ($result['status'] === 'sent') {
                 session()->flash('status', "Invoice #{$this->sale->sale_number} sent via WhatsApp to {$this->recipientPhone}!");
             } else {
                 session()->flash('status', "No connection right now — the WhatsApp message for invoice #{$this->sale->sale_number} is queued and will send automatically once you're back online.");

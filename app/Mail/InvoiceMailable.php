@@ -59,10 +59,10 @@ class InvoiceMailable extends Mailable
             return [];
         }
 
-        $pdfData = $this->pdfBinary;
-        if (empty($pdfData)) {
-            $pdfData = app(InvoiceDeliveryService::class)->generateInvoicePdf($this->sale);
+        if (empty($this->pdfBinary)) {
+            $this->pdfBinary = app(InvoiceDeliveryService::class)->generateInvoicePdf($this->sale);
         }
+        $pdfData = $this->pdfBinary;
 
         $fileName = "Invoice-{$this->sale->sale_number}.pdf";
 

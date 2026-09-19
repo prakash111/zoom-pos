@@ -14,31 +14,6 @@
         </div>
     @endif
 
-    <!-- Upload Card -->
-    <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-4">
-        <div>
-            <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🧩 {{ __("Install a Module Package") }}</span>
-            </h3>
-            <p class="text-xs text-slate-400">{{ __("Upload a .zip containing module.json to register a new business module. It installs inactive — review it, then Activate.") }}</p>
-        </div>
-
-        <form wire:submit="install" class="flex flex-wrap gap-4 items-end pt-2">
-            <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Module Archive (.zip, max 10MB)") }}</label>
-                <input type="file" wire:model="zipFile" accept=".zip" class="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-100 dark:file:bg-slate-800 file:text-slate-700 dark:file:text-slate-300">
-                @error('zipFile')
-                    <p class="text-xs text-rose-600 font-bold mt-1">{{ $message }}</p>
-                @enderror
-            </div>
-
-            <button type="submit" wire:loading.attr="disabled" wire:target="zipFile,install" class="px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/25 active:scale-95 transition flex items-center gap-1.5 cursor-pointer">
-                <span wire:loading.remove wire:target="install">⬆ {{ __("Install Module") }}</span>
-                <span wire:loading wire:target="install">{{ __("Installing…") }}</span>
-            </button>
-        </form>
-    </div>
-
     @if (! empty($orphans))
         <div class="bg-amber-50 dark:bg-amber-950/30 rounded-3xl p-6 border border-amber-200 dark:border-amber-800 space-y-3">
             <h4 class="font-extrabold text-sm text-amber-800 dark:text-amber-300 flex items-center gap-2">
@@ -61,11 +36,60 @@
         </div>
     @endif
 
+    <!-- Available modules (catalog from the License Manager) -->
+    @if (isset($purchasable) && $purchasable->isNotEmpty())
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 space-y-4">
+            <div>
+                <h4 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">{{ __("Available modules") }}</h4>
+                <p class="text-xs text-slate-400">{{ __("Buy a module (a key is issued and this site fetches + installs it), or paste a key you already have to download and activate it now.") }}</p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                @foreach ($purchasable as $p)
+                    <div class="rounded-2xl border border-slate-100 dark:border-slate-800 p-4 flex flex-col gap-1.5">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="font-bold text-slate-900 dark:text-white text-sm">{{ $p['name'] }}</span>
+                            <span class="font-mono text-[11px] text-slate-400">{{ $p['slug'] }}</span>
+                        </div>
+                        @if (($p['type'] ?? 'core') === 'extension')
+                            <span class="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">{{ __('Optional Extension') }} · {{ __('Super Admin activation only') }}</span>
+                        @endif
+                        @if (! empty($p['description']))
+                            <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{{ $p['description'] }}</p>
+                        @endif
+                        <div class="text-sm font-black text-slate-900 dark:text-white mt-1">
+                            @if (($p['price'] ?? 0) > 0){{ $p['currency'] }} {{ number_format($p['price'], 2) }}@else<span class="text-slate-400 font-bold">{{ __('Price on the store') }}</span>@endif
+                        </div>
+
+                        @if (! empty($p['store_link']))
+                            <a href="{{ $p['store_link'] }}" target="_blank" rel="noopener noreferrer"
+                               class="mt-2 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white text-center">{{ __("Buy module") }} ↗</a>
+                        @endif
+
+                        <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                            <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400">{{ __("Already have a key?") }}</p>
+                            <input type="text" wire:model.defer="catalogKeys.{{ $p['slug'] }}"
+                                   placeholder="{{ __('License key') }}"
+                                   class="w-full text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2">
+                            @error('catalogKeys.'.$p['slug'])
+                                <p class="text-[11px] text-rose-600 font-bold">{{ $message }}</p>
+                            @enderror
+                            <button type="button" wire:click="getModule('{{ $p['slug'] }}')" wire:loading.attr="disabled"
+                                    class="w-full px-3 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white">
+                                <span wire:loading.remove wire:target="getModule">{{ __("Download & Activate") }}</span>
+                                <span wire:loading wire:target="getModule">{{ __("Working…") }}</span>
+                            </button>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <!-- Installed Modules Table -->
     <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-[0_4px_25px_rgb(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
             <h4 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">{{ __("Installed Modules") }}</h4>
-            <p class="text-xs text-slate-400">{{ __("Package-based modules installed via ZIP upload") }}</p>
+            <p class="text-xs text-slate-400">{{ __("Modules fetched from the License Manager") }}</p>
         </div>
 
         <div class="overflow-x-auto">
@@ -84,34 +108,94 @@
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
                     @forelse ($modules as $module)
                         <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
-                            <td class="px-6 py-4 font-bold text-slate-900 dark:text-white">{{ $module->name }}</td>
+                            <td class="px-6 py-4 font-bold text-slate-900 dark:text-white">
+                                {{ $module->name }}
+                                @if ($module->isExtension())
+                                    <span class="block mt-1 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">{{ __('Extension') }} · {{ __('Super Admin activation only') }}</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 font-mono font-bold text-indigo-600 dark:text-indigo-400">{{ $module->slug }}</td>
                             <td class="px-6 py-4 text-slate-700 dark:text-slate-300">{{ $module->version ?? '—' }}</td>
                             <td class="px-6 py-4 text-slate-700 dark:text-slate-300">{{ $module->author ?? '—' }}</td>
                             <td class="px-6 py-4">
-                                @if ($module->is_active)
-                                    <span class="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-extrabold">{{ __("Active") }}</span>
-                                @else
-                                    <span class="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[11px] font-extrabold">{{ __("Inactive") }}</span>
-                                @endif
+                                <div class="flex flex-col gap-1 items-start">
+                                    @if ($module->is_active)
+                                        <span class="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-extrabold">{{ __("Active") }}</span>
+                                    @else
+                                        <span class="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[11px] font-extrabold">{{ __("Inactive") }}</span>
+                                    @endif
+
+                                    @if ($module->requires_license)
+                                        @php
+                                            $ls = $module->license_status;
+                                            $lsClass = match ($ls) {
+                                                'active' => 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300',
+                                                'expired' => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300',
+                                                'revoked' => 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300',
+                                                default => 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
+                                            };
+                                        @endphp
+                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-extrabold {{ $lsClass }}">
+                                            {{ __("License") }}: {{ ucfirst($ls) }}
+                                        </span>
+                                        @if ($ls === 'active')
+                                            <span class="text-[10px] font-mono text-slate-400">
+                                                {{ $module->license_driver ?? '—' }} ·
+                                                {{ $module->license_expires_at ? $module->license_expires_at->format('Y-m-d') : __('no expiry') }}
+                                            </span>
+                                        @endif
+                                    @endif
+                                </div>
                             </td>
                             <td class="px-6 py-4 text-slate-400 text-xs font-mono">
                                 {{ $module->installed_at?->format('Y-m-d H:i:s') ?? '—' }}
                             </td>
-                            <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap">
+                            <td class="px-6 py-4 text-right whitespace-nowrap align-top">
+                                @php $needsKey = $module->requires_license && $module->license_status !== 'active'; @endphp
+
                                 @if ($module->is_active)
-                                    <button wire:click="deactivate({{ $module->id }})" wire:confirm="{{ __("Deactivate this module? Its navigation and routes will stop working, but its data is kept.") }}" type="button" class="text-amber-600 hover:underline font-bold">{{ __("Deactivate") }}</button>
+                                    <div class="space-x-3">
+                                        <button wire:click="deactivate({{ $module->id }})" wire:confirm="{{ __("Deactivate this module? Its navigation and routes stop working (and it is removed from selectable store types), but its data is kept.") }}" type="button" class="text-amber-600 hover:underline font-bold">{{ __("Deactivate") }}</button>
+                                        @if ($module->requires_license)
+                                            <button wire:click="revalidateLicense({{ $module->id }})" type="button" class="text-slate-500 hover:underline font-bold">{{ __("Re-check license") }}</button>
+                                        @endif
+                                    </div>
+                                @elseif ($needsKey)
+                                    <div class="flex flex-col items-end gap-1.5 max-w-xs ml-auto">
+                                        <input type="text" wire:model.defer="licenseKeys.{{ $module->id }}"
+                                               placeholder="{{ __('Enter license key') }}"
+                                               class="w-56 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-slate-800 dark:text-slate-100">
+                                        @error('licenseKeys.'.$module->id)
+                                            <p class="text-[11px] text-rose-600 font-bold text-right">{{ $message }}</p>
+                                        @enderror
+                                        <div class="flex items-center gap-3">
+                                            @if (! empty($catalog[$module->id]['store_link']))
+                                                <a href="{{ $catalog[$module->id]['store_link'] }}" target="_blank" rel="noopener noreferrer" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold text-xs">
+                                                    {{ __("Buy") }}@if (($catalog[$module->id]['price'] ?? 0) > 0) {{ $catalog[$module->id]['currency'] }} {{ number_format($catalog[$module->id]['price'], 2) }}@endif ↗
+                                                </a>
+                                            @endif
+                                            <button wire:click="activate({{ $module->id }})" type="button" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white">{{ __("Verify & Activate") }}</button>
+                                        </div>
+                                    </div>
                                 @else
-                                    <button wire:click="activate({{ $module->id }})" wire:confirm="{{ __("Activate this module and run its migrations?") }}" type="button" class="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">{{ __("Activate") }}</button>
+                                    <div class="space-x-3">
+                                        <button wire:click="activate({{ $module->id }})" wire:confirm="{{ __("Activate this module and run its migrations?") }}" type="button" class="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">{{ __("Activate") }}</button>
+                                        @if ($module->requires_license)
+                                            <button wire:click="revalidateLicense({{ $module->id }})" type="button" class="text-slate-500 hover:underline font-bold">{{ __("Re-check license") }}</button>
+                                        @endif
+                                    </div>
                                 @endif
-                                <button wire:click="uninstall({{ $module->id }}, false)" wire:confirm="{{ __("Uninstall this module? Its files will be removed but its data tables are kept.") }}" type="button" class="text-rose-600 hover:underline font-bold">{{ __("Uninstall") }}</button>
-                                <button wire:click="uninstall({{ $module->id }}, true)" wire:confirm="{{ __("Uninstall this module AND drop its data tables? This cannot be undone.") }}" type="button" class="text-rose-800 hover:underline font-bold">{{ __("Uninstall + Drop Data") }}</button>
+
+                                <div class="space-x-3 mt-2">
+                                    <button wire:click="uninstall({{ $module->id }}, false)" wire:confirm="{{ __("Uninstall this module? Its files will be removed but its data tables are kept.") }}" type="button" class="text-rose-600 hover:underline font-bold">{{ __("Uninstall") }}</button>
+                                    <button wire:click="uninstall({{ $module->id }}, true)" wire:confirm="{{ __("Uninstall this module AND drop its data tables? This cannot be undone.") }}" type="button" class="text-rose-800 hover:underline font-bold">{{ __("Uninstall + Drop Data") }}</button>
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
                             <td colspan="7" class="px-6 py-12 text-center text-slate-400">
-                                {{ __("No package-based modules installed yet. Upload a .zip above to get started.") }}
+                                {{ __("No modules installed yet — buy or activate one from Available modules above.") }}
                             </td>
                         </tr>
                     @endforelse

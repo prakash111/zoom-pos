@@ -116,7 +116,7 @@
             </div>
             <div>
                 <select wire:model="posMode" class="w-full sm:w-80 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-semibold focus:ring-indigo-500">
-                    @foreach (\App\Services\Modular\ModuleRegistry::allModules() as $mKey => $mVal)
+                    @foreach (\App\Services\Modular\ModuleRegistry::operatingModules() as $mKey => $mVal)
                         <option value="{{ $mKey }}">{{ __($mVal['title']) }} ({{ $mKey }})</option>
                     @endforeach
                 </select>
@@ -124,17 +124,28 @@
             </div>
 
             <div class="pt-3">
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __("Tenant Licensed & Visible Modules") }}</label>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __("Tenant Licensed & Visible Modules") }}</label>
+                    <div class="flex items-center gap-2">
+                        <button type="button" wire:click="selectAllModules" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 cursor-pointer">
+                            {{ __("Select All") }}
+                        </button>
+                        <span class="text-slate-300 dark:text-slate-600">|</span>
+                        <button type="button" wire:click="deselectAllModules" class="text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 cursor-pointer">
+                            {{ __("Deselect All") }}
+                        </button>
+                    </div>
+                </div>
                 <p class="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
                     {{ __("Select which specific modules are licensed and visible in this tenant's workspace navigation.") }}
                 </p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    @foreach (\App\Services\Modular\ModuleRegistry::allModules() as $mKey => $mVal)
+                    @foreach (\App\Services\Modular\ModuleRegistry::operatingModules() as $mKey => $mVal)
                         @php $isLic = in_array($mKey, $licensedModules, true); @endphp
                         <label class="flex items-center justify-between p-3 rounded-xl border cursor-pointer {{ $isLic ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30' : 'border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-100' }}">
                             <div class="flex items-center gap-2">
                                 <span class="text-base">
-                                    @if ($mKey === 'restaurant') 🍽️ @elseif ($mKey === 'pharmacy') 💊 @elseif ($mKey === 'service_booking') ✂️ @else 🏪 @endif
+                                    @if ($mKey === 'restaurant') 🍽️ @elseif ($mKey === 'pharmacy') 💊 @elseif ($mKey === 'service_booking') ✂️ @elseif ($mKey === 'repair_technician') 🛠️ @elseif ($mKey === 'leadmanagement') 📊 @else 🏪 @endif
                                 </span>
                                 <div>
                                     <span class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ __($mVal['title']) }}</span>
@@ -146,6 +157,27 @@
                     @endforeach
                 </div>
                 @error('licensedModules') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
+            </div>
+
+            <div class="pt-3 space-y-2">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Optional Extensions') }}</label>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ __('Only Super Admin can enable extensions for this tenant. Install and activate extensions in Modules first.') }}</p>
+                @forelse ($extensions as $extension)
+                    @php
+                        $extensionKey = \App\Services\Modular\ModuleRegistry::canonicalKey($extension->slug);
+                        $isEnabled = in_array($extensionKey, $licensedModules, true);
+                        $isAvailable = \App\Services\Modular\ModuleRegistry::isActive($extensionKey);
+                    @endphp
+                    <label class="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <div>
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ __($extension->name) }}</span>
+                            <span class="block text-[10px] text-slate-500 dark:text-slate-400">{{ __('Extension') }} · {{ $isAvailable ? __('Active') : __('Activate in Modules to make available') }}</span>
+                        </div>
+                        <input type="checkbox" wire:model="licensedModules" value="{{ $extensionKey }}" @disabled(!$canManageExtensions || (!$isAvailable && !$isEnabled)) class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 disabled:opacity-40">
+                    </label>
+                @empty
+                    <a href="{{ route('superadmin.modules.index') }}" class="text-xs font-semibold text-indigo-600">{{ __('Manage extensions in Modules') }} →</a>
+                @endforelse
             </div>
         </div>
 

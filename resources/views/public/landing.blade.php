@@ -5,19 +5,50 @@
 
 @section('content')
 
-    <x-landing.hero :branding="$branding" />
-
-    @if ($branding->isSectionEnabled('trust_bar'))
-        <x-landing.trust-bar />
-    @endif
-
-    @if ($branding->isSectionEnabled('features'))
-        <x-landing.features />
-    @endif
-
-    @if ($branding->isSectionEnabled('solutions'))
-        <x-landing.pillars />
-    @endif
+    @foreach ($branding->landingSectionOrder() as $section)
+        @if ($branding->isSectionEnabled($section))
+            @switch($section)
+                @case('hero')
+                    <x-landing.hero :branding="$branding" />
+                    @break
+                @case('trust_bar')
+                    <x-landing.trust-bar :branding="$branding" />
+                    @break
+                @case('features')
+                    <x-landing.features :branding="$branding" />
+                    @break
+                @case('solutions')
+                    <x-landing.pillars :branding="$branding" />
+                    @break
+                @case('downloads')
+                    <x-landing.downloads :branding="$branding" />
+                    @break
+                @case('stats')
+                    <x-landing.stats :branding="$branding" />
+                    @break
+                @case('about')
+                    <x-landing.about :branding="$branding" />
+                    @break
+                @case('testimonials')
+                    <x-landing.testimonials :branding="$branding" />
+                    @break
+                @case('pricing')
+                    @if ($plans->isNotEmpty())
+                        <x-landing.pricing :plans="$plans" :branding="$branding" />
+                    @endif
+                    @break
+                @case('faq')
+                    <x-landing.faq :branding="$branding" />
+                    @break
+                @case('contact')
+                    <x-landing.contact :branding="$branding" />
+                    @break
+                @case('cta')
+                    <x-landing.cta :branding="$branding" />
+                    @break
+            @endswitch
+        @endif
+    @endforeach
 
     {{-- Custom Page Content (authored via TinyMCE if selected) --}}
     @if (!empty($page->content))
@@ -26,30 +57,6 @@
                 {!! clean_html($page->content) !!}
             </div>
         </div>
-    @endif
-
-    @if ($branding->isSectionEnabled('stats'))
-        <x-landing.stats />
-    @endif
-
-    @if ($branding->isSectionEnabled('about'))
-        <x-landing.about :branding="$branding" />
-    @endif
-
-    @if ($branding->isSectionEnabled('testimonials'))
-        <x-landing.testimonials :branding="$branding" />
-    @endif
-
-    @if ($branding->isSectionEnabled('pricing') && $plans->isNotEmpty())
-        <x-landing.pricing :plans="$plans" />
-    @endif
-
-    @if ($branding->isSectionEnabled('contact'))
-        <x-landing.contact />
-    @endif
-
-    @if ($branding->isSectionEnabled('cta'))
-        <x-landing.cta />
     @endif
 
 @endsection

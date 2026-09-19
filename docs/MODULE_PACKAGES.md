@@ -4,18 +4,105 @@
 on this platform's Perfex-style plugin engine
 (`App\Services\Modular\ModulePackageService`, Super Admin → Modules).
 
-Three are shipped here, extracted as self-contained verticals:
+These installable packages are maintained here:
 
 | Key | Name | Tables | API prefix |
 |---|---|---|---|
 | `pharmacy` | Pharmacy | `pharmacy_mod_drug_batches`, `pharmacy_mod_prescriptions`, `pharmacy_mod_prescription_items` | `/api/tenant/pharmacy-module` |
 | `repairtechnician` | Repair Technician | `repair_mod_device_categories`, `repair_mod_tickets`, `repair_mod_ticket_items` | `/api/tenant/repair-module` |
 | `salon` | Salon & Bookings | `salon_mod_services`, `salon_mod_stylists`, `salon_mod_appointments` | `/api/tenant/salon-module` |
+| `leadmanagement` | Lead Management (optional extension) | `lead_mod_leads`, `lead_mod_activities`, `lead_mod_sources` | `/api/tenant/lead-module` |
 
-They are **additive** — the core built-in `pharmacy` / `repair_technician` /
-`service_booking` operating modes are untouched. The package tables are
-`*_mod_*`-prefixed so a package installs cleanly whether or not the host
-also has the built-in vertical.
+The script ships with two **native** verticals — `retail` and `restaurant`
+(`ModuleRegistry::NATIVE`). Everything else — pharmacy, salon, repair — is a
+package: its schema lives in `ModuleRegistry::extendedSchemas()` and only
+surfaces once the package's `sdui_modules` row is active. `config/modules.php`
+`registration.premium` maps each operating-mode id to its package slug
+(`service_booking` ⇄ `salon`, `repair_technician` ⇄ `repairtechnician`).
+The package tables are `*_mod_*`-prefixed and independent of any core table.
+
+An installed package is represented **once** in `ModuleRegistry::allModules()`,
+keyed by its canonical operating-mode id (so the `salon` package appears as
+`service_booking`, not both). `ModuleRegistry::canonicalKey()` collapses a
+slug to that id; `find()` / `isActive()` / `isInstalled()` accept either form.
+
+## Optional extensions
+
+`module.json` accepts `"type": "core"` (the default for existing packages) or
+`"type": "extension"`, stored in `sdui_modules.type`. Lead Management is an
+extension, including previously installed copies. `source_type` remains
+`package`, so ZIP installation, licensing, migrations and uninstall use the
+existing package lifecycle.
+
+Extensions are excluded from registration governance, tenant signup, primary
+operating-mode selectors, and `available_modes`. Only an active Super Admin
+session in the Super Admin panel may activate or assign an extension; signed
+license callbacks can install and license it but leave activation to Super Admin.
+
+After activating it in **Super Admin → Modules**, enable it under **Tenants →
+Tenant Detail → Optional Extensions** and save. An explicit entry in the
+tenant's existing `licensed_modules` array grants access while the package is
+active, licensed, unexpired and available to the package loader. Tenants without
+an assignment, including legacy tenants with no whitelist, receive no extension
+navigation, features or web/API access. Tenant-editable settings and role grants
+cannot activate it. Core module selection remains separate.
+
+Deactivation preserves data and tenant assignments; it blocks access until
+Super Admin reactivates the package. Core tenant edits preserve existing inactive
+extension assignments. Removing a tenant assignment or uninstalling also blocks
+access. Lead-linked quotation creation requires the extension; ordinary
+quotations continue working when the extension is disabled.
+
+## Licensing
+
+Every ZIP-installed module needs a **valid license key to Activate**. Built-in
+verticals never do (they have no `sdui_modules` row).
+
+- `module.json` → `"requires_license"` (bool, **default `true`** for packages).
+  Set it `false` only for internal / test modules.
+- Activation flow: SuperAdmin → Modules shows a key field on an unlicensed
+  module. The key (supplied by the vendor) is verified through
+  `App\Services\License\LicenseService` against the vendor-configured driver
+  (driver hardcoded to `custom`; server hardcoded to https://license.zoomnearby.com
+  in config/services.php). There is no in-app licensing screen. With no license
+  server configured the `custom` driver only *format-checks* the key.
+- On success the row stores `license_status = active` plus an encrypted copy of
+  the key, its hash/prefix, the driver, buyer and expiry.
+- `license:check-status` runs **daily** (also `php artisan license:check-status
+  --sync`): it re-verifies every `requires_license` package and the core
+  installer license. A revoked / expired module is **deactivated
+  automatically**; the core license only logs a warning
+  (`platform_system.core_license_status`) and never disables the platform. A
+  transient "server unreachable" is tolerated for 3 consecutive days before the
+  module is pulled.
+- Lifecycle: `unlicensed → active → (expired | revoked)`. A re-check or a fresh
+  key returns it to `active`.
+- `SduiModule::scopeLicenseManaged()` / `isLicensed()` and the invariant
+  **`is_active` ⇒ licensed** mean no read path needs its own license check.
+
+### Module distribution — source lives on the License Manager only
+
+The ZIPs built here are **not shipped** in a sold build (`.gitattributes`
+`export-ignore`s `module-packages/`). The vendor uploads each one on the
+License Manager admin → Products → *Module package (.zip)*. It is stored
+web‑inaccessible and only sent through `POST /api/v1/module/download` after a
+license key verifies for that product + domain.
+
+### Getting a module (SuperAdmin)
+
+SuperAdmin → Modules → **Available modules** (populated from the License
+Manager's `GET /api/v1/catalog`). Per module:
+
+- **Buy module ↗** → the vendor's hosted `buy.php`. On payment the key is
+  issued, pushed to this site, and the module is downloaded + installed
+  automatically.
+- **Already have a key?** → paste it → **Download & Activate**:
+  `ModulePackageService::installFromLicenseServer()` calls
+  `POST /api/v1/module/download`, extracts the returned ZIP into
+  `modules/<slug>/`, records the license, and activates.
+
+A SuperAdmin can override price / currency per slug via the `platform_system`
+key `module_catalog` (`{ "<slug>": { "price": …, "currency": … } }`).
 
 ## Package layout
 
@@ -76,10 +163,14 @@ request instead of after the next deploy.
 | Action | `sdui_modules` row | `modules/<key>/` files | Own tables | Registry / drawer / governance card |
 |---|---|---|---|---|
 | **Install** | created, `is_active = false` | written | — | hidden (inactive) |
-| **Activate** | `is_active = true` | kept | `migrate --path` | shown |
-| **Deactivate** | `is_active = false` | kept | kept | **hidden** |
+| **Activate** | `is_active = true` (requires `license_status = active` when `requires_license`) | kept | `migrate --path` | shown |
+| **Deactivate** | `is_active = false`, dropped from `allowed_registration_modes` | kept | kept | **hidden** |
 | **Uninstall** | deleted | `File::deleteDirectory()` | kept | hidden |
 | **Uninstall + "drop data"** | deleted | deleted | `migrate:rollback --path` | hidden |
+
+**Deactivate** (manual button *or* the daily license job) now also drops the
+slug from `allowed_registration_modes`, so a pulled module stops being an
+offered store type — not just Uninstall.
 
 Uninstall also:
 

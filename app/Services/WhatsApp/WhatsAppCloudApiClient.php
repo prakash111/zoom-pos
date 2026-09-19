@@ -4,7 +4,9 @@ namespace App\Services\WhatsApp;
 
 use App\Models\Company;
 use App\Models\Configuration;
+use App\Models\TenantNotificationGateway;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Thin wrapper around the Meta WhatsApp Cloud API. Credentials are per-tenant
@@ -19,6 +21,20 @@ class WhatsAppCloudApiClient
 
     public function isConfigured(Company $company): bool
     {
+        if (Schema::hasTable('tenant_notification_gateways')) {
+            $gateway = TenantNotificationGateway::withoutGlobalScopes()
+                ->where('company_id', $company->id)->where('channel', 'whatsapp')->first();
+            if ($gateway) {
+                return $gateway->provider === TenantNotificationGateway::PROVIDER_META_CLOUD && $gateway->isConfigured();
+            }
+        }
+
+        $settings = (array) ($company->api_settings ?? []);
+        $enabled = $settings['whatsapp_api_enabled'] ?? $this->config($company, 'whatsapp_api_enabled');
+        if ($enabled !== null && ! filter_var($enabled, FILTER_VALIDATE_BOOL)) {
+            return false;
+        }
+
         return filled($this->phoneNumberId($company)) && filled($this->accessToken($company));
     }
 
@@ -138,6 +154,16 @@ class WhatsAppCloudApiClient
 
     protected function config(Company $company, string $key): ?string
     {
+        if (Schema::hasTable('tenant_notification_gateways')) {
+            $gateway = TenantNotificationGateway::withoutGlobalScopes()
+                ->where('company_id', $company->id)->where('channel', 'whatsapp')->first();
+            if ($gateway) {
+                return $gateway->provider === TenantNotificationGateway::PROVIDER_META_CLOUD && $gateway->isConfigured()
+                    ? $gateway->getCredential($key === 'whatsapp_phone_number_id' ? 'phone_number_id' : 'access_token')
+                    : null;
+            }
+        }
+
         return Configuration::withoutGlobalScopes()
             ->where('company_id', $company->id)
             ->where('key', $key)

@@ -2,11 +2,8 @@
 
 namespace App\Livewire\Public;
 
-use App\Mail\ContactInquiryMailable;
 use App\Models\ContactInquiry;
-use App\Models\PlatformBranding;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use App\Services\ContactFormService;
 use Livewire\Component;
 
 class ContactForm extends Component
@@ -23,6 +20,8 @@ class ContactForm extends Component
 
     public string $message = '';
 
+    public array $customData = [];
+
     public bool $submitted = false;
 
     protected function rules(): array
@@ -34,36 +33,44 @@ class ContactForm extends Component
             'phone' => ['nullable', 'string', 'max:50'],
             'subject' => ['nullable', 'string', 'max:255'],
             'message' => ['required', 'string', 'max:5000'],
+            'customData' => ['array'],
         ];
     }
 
     public function submit(): void
     {
         $validated = $this->validate();
-        $validated['store_type'] = $validated['storeType'];
+        $storeType = $validated['storeType'];
         unset($validated['storeType']);
 
-        $inquiry = ContactInquiry::create($validated);
+        $submissionData = [
+            'name' => $this->name,
+            'email' => $this->email,
+            'phone' => $this->phone,
+            'store_type' => $storeType,
+            'subject' => $this->subject,
+            'message' => $this->message,
+        ];
 
-        $recipient = PlatformBranding::current()->support_email ?: config('mail.from.address');
-
-        if ($recipient) {
-            try {
-                Mail::to($recipient)->send(new ContactInquiryMailable($inquiry));
-            } catch (\Throwable $e) {
-                // The inquiry is already safely stored — a mail transport
-                // hiccup shouldn't block the visitor's submission from succeeding.
-                Log::warning('Failed to send contact inquiry notification email.', ['error' => $e->getMessage()]);
-            }
+        foreach ($this->customData as $key => $val) {
+            $submissionData[$key] = $val;
         }
 
-        $this->reset(['name', 'email', 'storeType', 'phone', 'subject', 'message']);
+        ContactFormService::processSubmission($submissionData, request()->ip());
+
+        $this->reset(['name', 'email', 'storeType', 'phone', 'subject', 'message', 'customData']);
         $this->submitted = true;
-        $this->dispatch('toast', message: 'Message sent — we\'ll get back to you shortly.');
+        
+        $settings = ContactFormService::getSettings();
+        $msg = $settings['success_message'] ?: 'Message sent — we\'ll get back to you shortly.';
+        $this->dispatch('toast', message: $msg);
     }
 
     public function render()
     {
-        return view('livewire.public.contact-form');
+        return view('livewire.public.contact-form', [
+            'fields' => ContactFormService::getFields(),
+            'settings' => ContactFormService::getSettings(),
+        ]);
     }
 }

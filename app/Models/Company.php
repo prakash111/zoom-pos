@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
+use App\Casts\SafeEncryptedString;
 use App\Models\Concerns\HasLegacyStringId;
+use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\TenantNavigationConfigService;
 use App\Services\Navigation\TenantNavRegistry;
 use App\Support\IdGenerator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class Company extends Model
 {
@@ -30,7 +34,7 @@ class Company extends Model
     protected $fillable = [
         'unique_account_id', 'name', 'slug', 'custom_domain', 'trade_name', 'legal_name', 'tax_id', 'tax_id_label',
         'email', 'phone', 'website', 'address', 'city', 'state', 'postal_code', 'country', 'currency',
-        'language', 'default_locale', 'timezone', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'accent_color', 'drawer_bg', 'drawer_gradient_enabled', 'drawer_gradient_start', 'drawer_gradient_end', 'drawer_gradient_direction', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'licensed_modules', 'nav_config', 'receipt_format', 'status', 'is_seeding_complete', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
+        'language', 'default_locale', 'timezone', 'logo', 'favicon', 'drawer_cover', 'primary_color', 'accent_color', 'drawer_bg', 'drawer_gradient_enabled', 'drawer_gradient_start', 'drawer_gradient_end', 'drawer_gradient_direction', 'theme_color', 'pos_layout', 'pos_mode', 'restaurant_mode_locked', 'licensed_modules', 'nav_config', 'receipt_format', 'status', 'is_seeding_complete', 'is_profile_completed', 'is_demo', 'plan_name', 'activation_key', 'registered_at', 'expires_at',
         'max_users', 'max_devices', 'pricing_mode', 'tax_api_mode', 'tax_api_key', 'tax_api_endpoint',
         'navigation_menu_customization', 'navigation_labels', 'form_field_customizations',
         'invoice_prefix', 'quotation_prefix', 'repair_prefix', 'prescription_prefix', 'salon_prefix', 'tax_settings', 'invoice_terms', 'quote_terms', 'bank_details',
@@ -42,15 +46,23 @@ class Company extends Model
         'barcode_scale_prefix', 'barcode_scale_type',
     ];
 
+    protected $appends = [
+        'display_name',
+        'business_name',
+        'trading_name',
+    ];
+
     protected function casts(): array
     {
         return [
             'registered_at' => 'datetime',
             'expires_at' => 'datetime',
             'is_seeding_complete' => 'boolean',
+            'is_profile_completed' => 'boolean',
+            'is_demo' => 'boolean',
             'drawer_gradient_enabled' => 'boolean',
             'tax_settings' => 'array',
-            'tax_api_key' => 'encrypted',
+            'tax_api_key' => SafeEncryptedString::class,
             'currency_decimals' => 'integer',
             'other_currencies' => 'array',
             'restaurant_mode_locked' => 'boolean',
@@ -119,11 +131,21 @@ class Company extends Model
             return null;
         }
 
-        if (str_starts_with($this->logo, 'http://') || str_starts_with($this->logo, 'https://') || str_starts_with($this->logo, 'data:')) {
+        if (str_starts_with($this->logo, 'data:')) {
             return $this->logo;
         }
 
-        $cleanPath = preg_replace('#^/?storage/#', '', $this->logo);
+        if (preg_match('#(?:https?://[^/]+)?/?storage/(.+)#i', $this->logo, $matches)) {
+            $cleanPath = $matches[1];
+
+            return Storage::disk('public')->url($cleanPath);
+        }
+
+        if (str_starts_with($this->logo, 'http://') || str_starts_with($this->logo, 'https://')) {
+            return $this->logo;
+        }
+
+        $cleanPath = ltrim(preg_replace('#^/?storage/#', '', $this->logo), '/');
 
         if (Storage::disk('public')->exists($cleanPath)) {
             return Storage::disk('public')->url($cleanPath);
@@ -133,7 +155,7 @@ class Company extends Model
             return asset(ltrim($this->logo, '/'));
         }
 
-        return asset('storage/'.ltrim($cleanPath, '/'));
+        return Storage::disk('public')->url($cleanPath);
     }
 
     public function getFaviconUrl(): ?string
@@ -142,11 +164,21 @@ class Company extends Model
             return null;
         }
 
-        if (str_starts_with($this->favicon, 'http://') || str_starts_with($this->favicon, 'https://') || str_starts_with($this->favicon, 'data:')) {
+        if (str_starts_with($this->favicon, 'data:')) {
             return $this->favicon;
         }
 
-        $cleanPath = preg_replace('#^/?storage/#', '', $this->favicon);
+        if (preg_match('#(?:https?://[^/]+)?/?storage/(.+)#i', $this->favicon, $matches)) {
+            $cleanPath = $matches[1];
+
+            return Storage::disk('public')->url($cleanPath);
+        }
+
+        if (str_starts_with($this->favicon, 'http://') || str_starts_with($this->favicon, 'https://')) {
+            return $this->favicon;
+        }
+
+        $cleanPath = ltrim(preg_replace('#^/?storage/#', '', $this->favicon), '/');
 
         if (Storage::disk('public')->exists($cleanPath)) {
             return Storage::disk('public')->url($cleanPath);
@@ -156,7 +188,7 @@ class Company extends Model
             return asset(ltrim($this->favicon, '/'));
         }
 
-        return asset('storage/'.ltrim($cleanPath, '/'));
+        return Storage::disk('public')->url($cleanPath);
     }
 
     public function getDrawerCoverUrl(): ?string
@@ -165,11 +197,21 @@ class Company extends Model
             return null;
         }
 
-        if (str_starts_with($this->drawer_cover, 'http://') || str_starts_with($this->drawer_cover, 'https://') || str_starts_with($this->drawer_cover, 'data:')) {
+        if (str_starts_with($this->drawer_cover, 'data:')) {
             return $this->drawer_cover;
         }
 
-        $cleanPath = preg_replace('#^/?storage/#', '', $this->drawer_cover);
+        if (preg_match('#(?:https?://[^/]+)?/?storage/(.+)#i', $this->drawer_cover, $matches)) {
+            $cleanPath = $matches[1];
+
+            return Storage::disk('public')->url($cleanPath);
+        }
+
+        if (str_starts_with($this->drawer_cover, 'http://') || str_starts_with($this->drawer_cover, 'https://')) {
+            return $this->drawer_cover;
+        }
+
+        $cleanPath = ltrim(preg_replace('#^/?storage/#', '', $this->drawer_cover), '/');
 
         if (Storage::disk('public')->exists($cleanPath)) {
             return Storage::disk('public')->url($cleanPath);
@@ -179,7 +221,7 @@ class Company extends Model
             return asset(ltrim($this->drawer_cover, '/'));
         }
 
-        return asset('storage/'.ltrim($cleanPath, '/'));
+        return Storage::disk('public')->url($cleanPath);
     }
 
     public function getReceiptFormat(): string
@@ -202,6 +244,10 @@ class Company extends Model
             if (empty($company->pos_mode)) {
                 $company->pos_mode = 'general';
             }
+        });
+
+        static::saved(function (Company $company) {
+            $company->flushTenantCaches();
         });
     }
 
@@ -457,18 +503,26 @@ class Company extends Model
             ? $this->licensed_modules
             : [$this->pos_mode ?: 'retail'];
 
+        $planExtensions = is_array($this->plan?->extensions) ? $this->plan->extensions : [];
+        if (! empty($planExtensions)) {
+            $raw = array_merge($raw, $planExtensions);
+        }
+
         $keys = [];
         foreach ($raw as $item) {
             if (! is_string($item)) {
                 continue;
             }
-            $key = match (strtolower(trim($item))) {
+            $clean = strtolower(trim($item));
+            $canonical = ModuleRegistry::canonicalKey($clean);
+            $key = match ($canonical) {
                 'general', 'general_retail', 'retail' => 'retail',
                 'food_restaurant', 'restaurant' => 'restaurant',
-                'repair', 'repairs', 'technician', 'repair_technician', 'automotive', 'electronics_service' => 'repair_technician',
+                'repair', 'repairs', 'technician', 'repair_technician', 'repairtechnician', 'automotive', 'electronics_service' => 'repair_technician',
                 'salon', 'spa', 'wellness', 'beauty', 'salon_wellness', 'service_booking', 'service', 'services' => 'service_booking',
                 'pharmacy', 'pharmacy_pos', 'chemist' => 'pharmacy',
-                default => strtolower(trim($item)),
+                'lead', 'leads', 'leadmanagement', 'lead_management' => 'leadmanagement',
+                default => $canonical,
             };
             if ($key !== '') {
                 $keys[] = $key;
@@ -481,12 +535,34 @@ class Company extends Model
 
         $keys = array_values(array_unique($keys));
 
+        // Extensions require an explicit Super Admin assignment (or plan grant) and an active,
+        // licensed installation. The primary POS mode never grants an extension.
+        $extensions = ModuleRegistry::extensionKeys();
+        $active = array_intersect($keys, $extensions) === [] ? [] : array_keys(ModuleRegistry::allModules());
+        $explicitModules = (is_array($this->licensed_modules) && $this->licensed_modules !== []) || ! empty($planExtensions);
+        $keys = array_values(array_filter($keys, fn ($key) => ! in_array($key, $extensions, true)
+            || ($explicitModules && in_array($key, $active, true))
+            || in_array($key, $planExtensions, true)));
+
         return $keys === [] ? ['retail'] : $keys;
     }
 
     public function hasModule(string $moduleKey): bool
     {
-        return in_array($moduleKey, $this->licensedModuleKeys(), true);
+        $clean = strtolower(trim($moduleKey));
+        $canonical = ModuleRegistry::canonicalKey($clean);
+        $norm = match ($canonical) {
+            'general', 'general_retail', 'retail' => 'retail',
+            'food_restaurant', 'restaurant' => 'restaurant',
+            'repair', 'repairs', 'technician', 'repair_technician', 'repairtechnician', 'automotive', 'electronics_service' => 'repair_technician',
+            'salon', 'spa', 'wellness', 'beauty', 'salon_wellness', 'service_booking', 'service', 'services' => 'service_booking',
+            'pharmacy', 'pharmacy_pos', 'chemist' => 'pharmacy',
+            'lead', 'leads', 'leadmanagement', 'lead_management' => 'leadmanagement',
+            default => $canonical,
+        };
+        $licensed = $this->licensedModuleKeys();
+
+        return in_array($norm, $licensed, true) || in_array($canonical, $licensed, true) || in_array($clean, $licensed, true);
     }
 
     /**
@@ -532,7 +608,7 @@ class Company extends Model
             }
             $key = trim((string) ($item['key'] ?? ''));
             if ($key === '') {
-                $key = \Illuminate\Support\Str::slug($label, '_') ?: 'check_'.($i + 1);
+                $key = Str::slug($label, '_') ?: 'check_'.($i + 1);
             }
             $default = strtolower(trim((string) ($item['default'] ?? 'pass')));
             $default = match ($default) {
@@ -562,22 +638,50 @@ class Company extends Model
         return $this->accent_color ?: '#D97706';
     }
 
+    /**
+     * The drawer/sidebar background sent in the bootstrap theme payload.
+     * If drawer_background is empty or #FFFFFF (or white), default to null
+     * so dark mode applies cleanly with zero white-leak.
+     */
     public function getDrawerBg(): string
     {
-        return $this->drawer_bg ?: '#FFF7ED';
+        $raw = trim((string) $this->drawer_bg);
+        $isUnconfiguredOrWhite = $raw === ''
+            || in_array(strtolower($raw), ['#ffffff', '#fff', 'ffffff', 'fff', 'white'], true);
+
+        return $isUnconfiguredOrWhite ? '#FFF7ED' : $raw;
     }
 
     public function getThemeTokens(): array
     {
-        return [
+        $drawerBg = $this->getDrawerBg();
+
+        $tokens = [
             'primary_color' => $this->getPrimaryColor(),
             'accent_color' => $this->getAccentColor(),
-            'drawer_bg' => $this->getDrawerBg(),
+            'drawer_bg' => $drawerBg,
+            'drawer_background' => $drawerBg,
+            'surface' => '#1E293B',
+            'background' => '#0F172A',
+            'text_primary' => '#F8FAFC',
+            'text_secondary' => '#94A3B8',
             'drawer_gradient_enabled' => (bool) ($this->drawer_gradient_enabled ?? false),
-            'drawer_gradient_start' => $this->drawer_gradient_start ?? $this->getDrawerBg(),
-            'drawer_gradient_end' => $this->drawer_gradient_end ?? '#0f172a',
+            'drawer_gradient_start' => $this->drawer_gradient_start ?? ($drawerBg ?? '#1E293B'),
+            'drawer_gradient_end' => $this->drawer_gradient_end ?? '#0F172A',
             'drawer_gradient_direction' => $this->drawer_gradient_direction ?? 'top_to_bottom',
         ];
+
+        $preferences = TenantSetting::get($this->id, 'app_preferences', []);
+        $drawerTextColor = is_array($preferences) ? ($preferences['drawer_text_icon_color'] ?? $preferences['drawer_text_and_icons'] ?? $preferences['drawer_icon_color'] ?? $preferences['drawer_text_color'] ?? null) : null;
+
+        if ($drawerTextColor !== null && $drawerTextColor !== '') {
+            $tokens['drawer_text_icon_color'] = $drawerTextColor;
+            $tokens['drawer_text_and_icons'] = $drawerTextColor;
+            $tokens['drawer_icon_color'] = $drawerTextColor;
+            $tokens['drawer_text_color'] = $drawerTextColor;
+        }
+
+        return $tokens;
     }
 
     public function getPosLayout(): string
@@ -671,5 +775,123 @@ class Company extends Model
     public function getDefaultLocale(): string
     {
         return $this->default_locale ?: ($this->language ?: 'en');
+    }
+
+    /**
+     * Unified Store Display Name Resolver.
+     * Priority: Business Name (`business_name`) -> Trading Name (`trading_name`) -> Fallback ('Store').
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        if (! empty($this->business_name)) {
+            return $this->business_name;
+        }
+
+        if (! empty($this->trading_name)) {
+            return $this->trading_name;
+        }
+
+        return $this->name ?? 'Store';
+    }
+
+    public function getBusinessNameAttribute(): string
+    {
+        return trim((string) ($this->attributes['name'] ?? ''));
+    }
+
+    public function getTradingNameAttribute(): string
+    {
+        return trim((string) ($this->attributes['trade_name'] ?? ''));
+    }
+
+    public function getStoreTypeAttribute(): string
+    {
+        return strtoupper((string) ($this->attributes['pos_mode'] ?? 'RESTAURANT'));
+    }
+
+    public function getGstinAttribute(): ?string
+    {
+        return $this->tax_id ?: ($this->attributes['gstin'] ?? 'N/A');
+    }
+
+    /**
+     * Determine if a given name matches a known demo/sample data placeholder.
+     */
+    public static function isDemoPlaceholderName(?string $name): bool
+    {
+        if ($name === null) {
+            return false;
+        }
+
+        $clean = strtolower(trim($name));
+        $placeholders = [
+            'the copper kettle café',
+            'the copper kettle cafe',
+            'metro retail mart',
+            'carefirst pharmacy',
+            'fixpoint device repairs',
+            'lumière salon & spa',
+            'lumiere salon & spa',
+        ];
+
+        return in_array($clean, $placeholders, true);
+    }
+
+    /**
+     * Resolve effective trade name, strictly prioritizing the primary updated display_name.
+     */
+    public function getEffectiveTradeName(): string
+    {
+        return $this->display_name;
+    }
+
+    /**
+     * Build the structured drawer and navigation header payload.
+     *
+     * @return array<string, mixed>
+     */
+    public function getDrawerHeaderPayload(): array
+    {
+        $storeType = strtoupper($this->pos_mode ?: 'RESTAURANT');
+        $badge = str_replace('_', ' & ', strtoupper($this->pos_mode ?: 'CAFE & RESTAURANT'));
+
+        return [
+            'store_name' => $this->display_name,
+            'business_name' => $this->display_name,
+            'tenant_name' => $this->display_name,
+            'title' => $this->display_name,
+            'name' => $this->display_name,
+            'display_name' => $this->display_name,
+            'trading_name' => $this->display_name,
+            'trade_name' => $this->display_name,
+            'dba_name' => trim((string) ($this->attributes['trade_name'] ?? '')),
+            'store_type' => $storeType,
+            'badge' => $badge,
+            'logo_url' => $this->getLogoUrl(),
+            'favicon_url' => $this->getFaviconUrl(),
+            'drawer_cover_url' => $this->getDrawerCoverUrl(),
+        ];
+    }
+
+    /**
+     * Force-clear all cached tenant bootstrap, navigation, profile, and settings payloads.
+     */
+    public function flushTenantCaches(): void
+    {
+        $tenantId = (string) $this->id;
+        Cache::forget("tenant_{$tenantId}_bootstrap");
+        Cache::forget("tenant_{$tenantId}_navigation");
+        Cache::forget("tenant_{$tenantId}_profile");
+        Cache::forget("tenant_{$tenantId}_settings");
+        Cache::forget("tenant_nav_{$tenantId}");
+        Cache::forget("company_{$tenantId}");
+        Cache::forget("tenant_executive_kpis_{$tenantId}");
+        Cache::forget("tenant_{$tenantId}_drawer");
+        Cache::forget("tenant_{$tenantId}_drawer_menu");
+        Cache::forget("navigation_menu_{$tenantId}");
+        Cache::forget("store_profile_{$tenantId}");
+        Cache::forget("tenant_store_profile_{$tenantId}");
+        Cache::forget("drawer_menu_{$tenantId}");
+        Cache::forget("tenant_{$tenantId}_menu");
     }
 }

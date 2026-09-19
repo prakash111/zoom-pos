@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Casts\SafeEncryptedString;
+use App\Services\Localization\LocalizationService;
+use App\Services\Modular\ModuleRegistry;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
@@ -9,8 +12,13 @@ use InvalidArgumentException;
 
 class SduiModule extends Model
 {
+    public const TYPE_CORE = 'core';
+
+    public const TYPE_EXTENSION = 'extension';
+
     protected $fillable = [
         'name',
+        'type',
         'slug',
         'description',
         'icon',
@@ -28,6 +36,15 @@ class SduiModule extends Model
         'source_type',
         'package_path',
         'installed_at',
+        'requires_license',
+        'license_status',
+        'license_key_hash',
+        'license_key_prefix',
+        'license_key_encrypted',
+        'license_driver',
+        'license_buyer',
+        'license_verified_at',
+        'license_expires_at',
     ];
 
     protected function casts(): array
@@ -41,6 +58,10 @@ class SduiModule extends Model
             'registration_allowed' => 'boolean',
             'sort_order' => 'integer',
             'installed_at' => 'datetime',
+            'requires_license' => 'boolean',
+            'license_key_encrypted' => SafeEncryptedString::class,
+            'license_verified_at' => 'datetime',
+            'license_expires_at' => 'datetime',
         ];
     }
 
@@ -49,10 +70,49 @@ class SduiModule extends Model
         return $this->hasMany(SduiScreen::class);
     }
 
+    public function isExtension(): bool
+    {
+        return $this->type === self::TYPE_EXTENSION
+            || in_array(ModuleRegistry::canonicalKey($this->slug), config('modules.extensions', []), true);
+    }
+
+    /**
+     * A module is usable when it needs no license, or when it holds one that is
+     * currently marked active. The daily `license:check-status` job keeps the
+     * `is_active` ⇒ licensed invariant true.
+     */
+    public function isLicensed(): bool
+    {
+        return ! $this->requires_license || $this->license_status === 'active';
+    }
+
+    public function licenseIsExpired(): bool
+    {
+        return $this->license_expires_at !== null && $this->license_expires_at->isPast();
+    }
+
+    /**
+     * Package modules whose license must be re-verified on a schedule.
+     */
+    public function scopeLicenseManaged($query)
+    {
+        return $query->where('source_type', 'package')->where('requires_license', true);
+    }
+
     protected static function booted(): void
     {
         static::saving(function (SduiModule $module): void {
             $module->slug = Str::slug($module->slug ?: $module->name);
+
+            if (in_array(ModuleRegistry::canonicalKey($module->slug), config('modules.extensions', []), true)) {
+                $module->type = self::TYPE_EXTENSION;
+            }
+            if (! in_array($module->type ?? self::TYPE_CORE, [self::TYPE_CORE, self::TYPE_EXTENSION], true)) {
+                throw new InvalidArgumentException('Invalid module type.');
+            }
+            if ($module->isExtension()) {
+                $module->registration_allowed = false;
+            }
 
             $navigation = $module->navigation ?? [];
             if (is_array($navigation)) {
@@ -89,7 +149,7 @@ class SduiModule extends Model
                 $strings[$module->description] ??= $module->description;
             }
 
-            app(\App\Services\Localization\LocalizationService::class)
+            app(LocalizationService::class)
                 ->registerModuleTranslations($module->slug, $strings);
         });
     }
@@ -100,6 +160,7 @@ class SduiModule extends Model
         foreach ($items as $index => $item) {
             if (! is_array($item)) {
                 $normalized[] = $item;
+
                 continue;
             }
 

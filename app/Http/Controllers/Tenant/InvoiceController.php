@@ -216,6 +216,11 @@ class InvoiceController extends Controller
                 $attachPdf
             );
 
+            if ($result['status'] === 'manual_link') {
+                if ($request->wantsJson()) return response()->json($result);
+                return redirect()->back()->with('device_message_url', $result['url'])->with('status', $result['message']);
+            }
+
             $message = $result['status'] === 'sent'
                 ? "Invoice #{$sale->sale_number} sent successfully to {$validated['recipient_email']}."
                 : "No connection right now — invoice #{$sale->sale_number} is queued and will send to {$validated['recipient_email']} automatically once you're back online.";

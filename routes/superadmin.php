@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\PeriodicLicenseCheck;
+use App\Http\Middleware\PreventDemoModifications;
 use App\Livewire\Auth\PlatformLogin;
 use App\Livewire\SuperAdmin\ActivationCodes;
 use App\Livewire\SuperAdmin\AuditLogs;
@@ -31,21 +33,26 @@ Route::prefix('superadmin')->name('superadmin.')->group(function () {
         return redirect()->route('superadmin.login');
     })->middleware('auth:platform_web')->name('logout');
 
-    Route::middleware('auth:platform_web')->group(function () {
+    Route::middleware(['auth:platform_web', PeriodicLicenseCheck::class, PreventDemoModifications::class])->group(function () {
         Route::get('/', Dashboard::class)->name('dashboard');
 
         Route::get('/tenants', Tenants\Index::class)->name('tenants.index');
         Route::get('/tenants/create', Tenants\Create::class)->name('tenants.create');
         Route::get('/tenants/{company}', Tenants\Show::class)->name('tenants.show');
+        Route::match(['post', 'put'], '/tenants/{tenantId}/modules', [\App\Http\Controllers\SuperAdmin\TenantController::class, 'updateModules'])->name('tenants.modules');
 
         Route::get('/plans', Plans\Index::class)->name('plans.index');
         Route::get('/activation-codes', ActivationCodes\Index::class)->name('activation-codes.index');
         Route::get('/payment-gateways', PaymentGateways\Index::class)->name('payment-gateways.index');
         Route::get('/settings', Settings\Index::class)->name('settings.index');
+        Route::post('/settings/theme-customizer', [\App\Http\Controllers\SuperAdmin\ThemeCustomizerController::class, 'saveGlobalDefaults'])->name('theme.customizer.save');
+        Route::post('/settings/theme-customizer/sections', [\App\Http\Controllers\SuperAdmin\ThemeCustomizerController::class, 'saveSectionThemes'])->name('theme.customizer.sections');
+        Route::post('/settings/theme-customizer/matching-pattern', [\App\Http\Controllers\SuperAdmin\ThemeCustomizerController::class, 'applyMatchingPattern'])->name('theme.customizer.matching-pattern');
         Route::get('/settings/notifications', Settings\Index::class)->name('settings.notifications');
         Route::get('/settings/regional', Settings\Index::class)->name('settings.regional');
-        Route::get('/branding', Branding\Index::class)->name('branding.index');
+        Route::get('/branding', fn () => redirect()->route('superadmin.settings.index', ['tab' => 'whitelabel']))->name('branding.index');
         Route::get('/menus', MenuBuilderComponent::class)->name('menus.index');
+        Route::get('/inquiries', \App\Livewire\SuperAdmin\Inquiries\Index::class)->name('inquiries.index');
         Route::get('/pages', Pages\Index::class)->name('pages.index');
         Route::get('/pages/create', Pages\Create::class)->name('pages.create');
         Route::get('/pages/{page}', Pages\Edit::class)->name('pages.edit');

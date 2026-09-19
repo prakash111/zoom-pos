@@ -40,6 +40,14 @@
                         <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">{{ $inquiry->subject }}</td>
                     </tr>
                 @endif
+                @if (!empty($inquiry->custom_fields))
+                    @foreach ($inquiry->custom_fields as $cf)
+                        <tr>
+                            <td style="padding: 6px 0; color: #64748b;">{{ $cf['label'] ?? 'Custom Field' }}:</td>
+                            <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">{{ is_array($cf['value'] ?? '') ? implode(', ', $cf['value']) : ($cf['value'] ?? '-') }}</td>
+                        </tr>
+                    @endforeach
+                @endif
             </table>
         </div>
 

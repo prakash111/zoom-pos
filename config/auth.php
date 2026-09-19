@@ -63,6 +63,11 @@ return [
             'driver' => 'platform_api',
             'provider' => 'platform_admins',
         ],
+
+        'sanctum' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ],
     ],
 
     /*
