@@ -72,6 +72,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // rate limit (throttle:6,1) and a honeypot field.
         $middleware->validateCsrfTokens(except: [
             'contact',
+            'store/order',
+            'c/*/order',
             'api/v1/webhooks/*',
             'api/webhooks/*',
             'v1/webhooks/*',

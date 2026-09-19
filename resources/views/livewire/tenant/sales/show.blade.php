@@ -31,8 +31,45 @@
                     'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' => $sale->status === 'pending',
                     'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' => $sale->status === 'cancelled',
                 ])>{{ ucfirst($sale->status) }}</span>
+
+                @if ($sale->status === 'pending')
+                    <button type="button"
+                            wire:click="markCompleted"
+                            wire:confirm="{{ __('Confirm accepting order, marking completed, and deducting stock?') }}"
+                            class="px-3.5 py-1.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 active:scale-95 transition flex items-center gap-1.5 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                        <span>{{ __('Accept & Complete') }}</span>
+                    </button>
+                    <button type="button"
+                            wire:click="cancel"
+                            wire:confirm="{{ __('Cancel this order?') }}"
+                            class="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 transition cursor-pointer">
+                        <span>{{ __('Cancel') }}</span>
+                    </button>
+                @endif
             </div>
         </div>
+
+        @if ($sale->service_type === 'storefront' || $sale->delivery_address)
+            <div class="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/40 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-black text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                        <span>🛍️</span> {{ __("Web Storefront Online Order") }}
+                    </span>
+                    <span class="text-[11px] font-bold text-purple-700 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/60 px-2 py-0.5 rounded-md uppercase">
+                        {{ $sale->payment_method ? strtoupper($sale->payment_method) : 'UNPAID' }}
+                    </span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-700 dark:text-slate-300 pt-1">
+                    @if ($sale->customer_phone)
+                        <div><span class="text-slate-400 font-medium">{{ __("Phone:") }}</span> <span class="font-bold">{{ $sale->customer_phone }}</span></div>
+                    @endif
+                    @if ($sale->delivery_address)
+                        <div class="sm:col-span-2"><span class="text-slate-400 font-medium">{{ __("Delivery Address:") }}</span> <span class="font-bold">{{ $sale->delivery_address }}</span></div>
+                    @endif
+                </div>
+            </div>
+        @endif
 
         <!-- 1-Click WhatsApp, Email & Print Actions Bar -->
         <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">

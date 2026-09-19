@@ -84,6 +84,10 @@ Route::post('/public/contact-us', [\App\Http\Controllers\Api\V1\LandingApiContro
 Route::post('/v1/public/contact-us', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
 Route::post('/public/contact', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
 Route::post('/v1/public/contact', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
+Route::get('/storefront/catalog', [\App\Http\Controllers\Tenant\StorefrontController::class, 'apiCatalog']);
+Route::get('/v1/storefront/catalog', [\App\Http\Controllers\Tenant\StorefrontController::class, 'apiCatalog']);
+Route::post('/storefront/order', [\App\Http\Controllers\Tenant\StorefrontController::class, 'placeOrder']);
+Route::post('/v1/storefront/order', [\App\Http\Controllers\Tenant\StorefrontController::class, 'placeOrder']);
 
 Route::prefix('v1/tax')->middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
     Route::post('/calculate', [TaxApiController::class, 'calculate']);

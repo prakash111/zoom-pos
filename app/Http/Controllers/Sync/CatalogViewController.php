@@ -34,10 +34,24 @@ class CatalogViewController extends Controller
             ->where('active', true)
             ->get();
 
-        return view('catalog.public', [
+        $categories = \App\Models\Category::withoutGlobalScopes()
+            ->where('company_id', $catalog->company_id)
+            ->withCount(['products' => function ($q) use ($catalog) {
+                $q->withoutGlobalScopes()->where('company_id', $catalog->company_id)->whereIn('id', $catalog->product_ids)->where('active', true);
+            }])
+            ->get();
+
+        $languages = \App\Models\Language::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        return view('tenants.store.index', [
             'catalog' => $catalog,
             'products' => $products,
+            'categories' => $categories,
             'company' => $company,
+            'languages' => $languages,
         ]);
     }
 
@@ -56,6 +70,9 @@ class CatalogViewController extends Controller
             'customer_name' => ['nullable', 'string', 'max:100'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
             'customer_notes' => ['nullable', 'string', 'max:500'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'payment_method' => ['nullable', 'string', 'max:50'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['nullable'],
             'items.*.name' => ['required', 'string'],
@@ -81,15 +98,36 @@ class CatalogViewController extends Controller
         $saleCount = Sale::withoutGlobalScopes()->where('company_id', $company->id)->count();
         $saleNumber = 'WEB-'.strtoupper(substr($catalog->id, 0, 4)).'-'.sprintf('%04d', $saleCount + 1);
 
+        $addressParts = array_filter([$validated['address'] ?? null, $validated['city'] ?? null]);
+        $fullAddress = implode(', ', $addressParts);
+
+        $customerId = null;
+        if (! empty($validated['customer_phone'])) {
+            $customer = \App\Models\Customer::withoutGlobalScopes()->firstOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'phone' => $validated['customer_phone'],
+                ],
+                [
+                    'name' => $validated['customer_name'] ?: 'Online Storefront Guest',
+                    'address' => $validated['address'] ?? null,
+                    'city' => $validated['city'] ?? null,
+                    'source' => 'storefront',
+                ]
+            );
+            $customerId = $customer->id;
+        }
+
         $sale = Sale::withoutGlobalScopes()->create([
             'company_id' => $company->id,
             'sale_number' => $saleNumber,
+            'customer_id' => $customerId,
             'customer_name' => $validated['customer_name'] ?: 'Online Storefront Guest',
-            'customer_phone' => $validated['customer_phone'] ?? null,
+            'delivery_address' => $fullAddress ?: null,
             'notes' => $validated['customer_notes'] ?? ('Order placed from online storefront: '.$catalog->title),
             'total' => $subtotal,
             'discount' => 0,
-            'payment_method' => 'unpaid',
+            'payment_method' => $validated['payment_method'] ?? 'cod',
             'status' => 'pending',
             'operation_type' => 'sale',
             'service_type' => 'storefront',

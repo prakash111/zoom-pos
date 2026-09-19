@@ -200,6 +200,35 @@ class Show extends Component
         }
     }
 
+    public function markCompleted(): void
+    {
+        if ($this->sale->status === 'completed') {
+            return;
+        }
+
+        DB::transaction(function () {
+            foreach ($this->sale->items ?? [] as $item) {
+                if (! empty($item['product_id'])) {
+                    Product::find($item['product_id'])?->decrement('current_stock', (float) ($item['quantity'] ?? 1));
+                }
+            }
+            $this->sale->update([
+                'status' => 'completed',
+                'paid_amount' => $this->sale->total,
+                'due_amount' => 0,
+            ]);
+        });
+
+        AuditLog::record('sale.completed', $this->sale->company_id, auth('web')->id(), [
+            'sale_id' => $this->sale->id,
+            'source' => $this->sale->service_type ?? 'pos',
+        ]);
+
+        app(FinancialAnalyticsService::class)->clearCache($this->sale->company_id);
+
+        session()->flash('status', 'Order accepted, marked as completed, and stock deducted.');
+    }
+
     public function cancel(): void
     {
         if ($this->sale->status === 'cancelled') {

@@ -220,6 +220,11 @@ class Sale extends Model
         return (float) ($this->due_amount ?? $this->total ?? 0);
     }
 
+    public function getCustomerPhoneAttribute(): ?string
+    {
+        return $this->customer?->phone;
+    }
+
     public function getQuotationNumberAttribute(): ?string
     {
         return $this->sale_number ?: (string) $this->id;

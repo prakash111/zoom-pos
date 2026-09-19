@@ -37,6 +37,20 @@ class LandingPageController extends Controller
             return redirect('/tenant');
         }
 
+        // If visiting a tenant workspace domain/subdomain or tenant context is bound, serve Tenant E-Commerce Storefront
+        $storefrontController = app(\App\Http\Controllers\Tenant\StorefrontController::class);
+        $host = strtolower($request->getHost());
+        $baseHost = parse_url(config('app.url'), PHP_URL_HOST);
+        $isTenantHost = ($baseHost && str_ends_with($host, '.'.$baseHost) && $host !== $baseHost)
+            || ($baseHost && $host !== $baseHost && $host !== 'localhost' && $host !== '127.0.0.1');
+
+        if (app()->bound('tenant.company_id') || $isTenantHost) {
+            $company = $storefrontController->resolveCompany($request);
+            if ($company) {
+                return $storefrontController->index($request);
+            }
+        }
+
         $branding = PlatformBranding::current();
         if (! $branding->landing_page_enabled) {
             return redirect('/tenant/login');

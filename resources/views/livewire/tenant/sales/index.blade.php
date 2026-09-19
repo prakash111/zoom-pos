@@ -36,11 +36,23 @@
                     @forelse ($sales as $sale)
                         <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
                             <td class="px-5 py-4 font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
-                                <a wire:navigate.hover href="{{ route('tenant.sales.show', $sale) }}" class="hover:underline">
-                                    {{ $sale->sale_number }}
-                                </a>
+                                <div class="flex items-center gap-1.5">
+                                    <a wire:navigate.hover href="{{ route('tenant.sales.show', $sale) }}" class="hover:underline">
+                                        {{ $sale->sale_number }}
+                                    </a>
+                                    @if ($sale->service_type === 'storefront')
+                                        <span class="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 uppercase tracking-wider">
+                                            {{ __('Storefront') }}
+                                        </span>
+                                    @endif
+                                </div>
                             </td>
-                            <td class="px-5 py-4 text-slate-800 dark:text-slate-200">{{ $sale->customer_name ?? __('Walk-in') }}</td>
+                            <td class="px-5 py-4 text-slate-800 dark:text-slate-200">
+                                <div class="font-bold text-xs sm:text-sm">{{ $sale->customer_name ?? __('Walk-in') }}</div>
+                                @if ($sale->customer_phone)
+                                    <div class="text-[11px] text-slate-400">📞 {{ $sale->customer_phone }}</div>
+                                @endif
+                            </td>
                             <td class="px-5 py-4 font-bold text-slate-900 dark:text-white">${{ number_format($sale->total, 2) }}</td>
                             <td class="px-5 py-4">
                                 <span @class([
